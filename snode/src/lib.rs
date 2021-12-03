@@ -66,13 +66,13 @@ pub type ClientNonce = u64;
 #[derive(Clone)]
 pub struct SynthNode {
     node: Pea2PeaNode,
-    state: ClientState,
+    pub state: ClientState,
 }
 
 /// Represents a connected snarkOS client peer.
 pub struct ClientPeer {
     connected_addr: SocketAddr,
-    listening_addr: SocketAddr,
+    pub listening_addr: SocketAddr,
     nonce: ClientNonce,
 }
 
@@ -104,80 +104,17 @@ impl Pea2Pea for SynthNode {
 }
 
 impl SynthNode {
-    /// Creates a default test node with the most basic network protocols enabled.
-    pub async fn default() -> Self {
-        let config = Config {
-            listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
-            max_connections: MAXIMUM_NUMBER_OF_PEERS as u16,
-            ..Default::default()
-        };
-
-        let pea2pea_node = Pea2PeaNode::new(Some(config)).await.unwrap();
-        let client_state = Default::default();
-        let node = Self::new(pea2pea_node, client_state);
-        node.enable_disconnect();
-        node.enable_handshake();
-        node.enable_reading();
-        node.enable_writing();
-        node
-    }
-
     /// Creates a test node using the given `Pea2Pea` node.
     pub fn new(node: Pea2PeaNode, state: ClientState) -> Self {
         Self { node, state }
     }
 
-    fn node_type(&self) -> NodeType {
+    pub fn node_type(&self) -> NodeType {
         NodeType::Client
     }
 
-    fn state(&self) -> State {
+    pub fn state(&self) -> State {
         self.state.status.get()
-    }
-
-    /// Spawns a task dedicated to broadcasting Ping messages.
-    pub fn send_pings(&self) {
-        let node = self.clone();
-        task::spawn(async move {
-            let genesis = Testnet2::genesis_block();
-            let ping_msg = ClientMessage::Ping(
-                MESSAGE_VERSION,
-                MAXIMUM_FORK_DEPTH,
-                node.node_type(),
-                node.state(),
-                genesis.hash(),
-                Data::Object(genesis.header().clone()),
-            );
-
-            loop {
-                if node.node().num_connected() != 0 {
-                    info!(parent: node.node().span(), "sending out Pings");
-                    node.send_broadcast(ping_msg.clone());
-                }
-                tokio::time::sleep(Duration::from_secs(PING_INTERVAL_SECS)).await;
-            }
-        });
-    }
-
-    /// Spawns a task dedicated to peer maintenance.
-    pub fn update_peers(&self) {
-        let node = self.clone();
-        task::spawn(async move {
-            loop {
-                let num_connections = node.node().num_connected() + node.node().num_connecting();
-                if num_connections < DESIRED_CONNECTIONS && node.node().num_connected() != 0 {
-                    info!(parent: node.node().span(), "I'd like to have {} more peers; asking peers for their peers", DESIRED_CONNECTIONS - num_connections);
-                    node.send_broadcast(ClientMessage::PeerRequest);
-                }
-                tokio::time::sleep(Duration::from_secs(PEER_INTERVAL_SECS)).await;
-            }
-        });
-    }
-
-    /// Starts the usual periodic activities of a test node.
-    pub fn run_periodic_tasks(&self) {
-        self.send_pings();
-        self.update_peers();
     }
 }
 
@@ -289,55 +226,55 @@ impl Handshake for SynthNode {
     }
 }
 
-/// Inbound message processing logic for the test nodes.
-#[async_trait::async_trait]
-impl Reading for SynthNode {
-    type Message = ClientMessage;
-
-    fn read_message<R: io::Read>(&self, source: SocketAddr, reader: &mut R) -> io::Result<Option<Self::Message>> {
-        // FIXME: use the maximum message size allowed by the protocol or (better) use streaming deserialization.
-        let mut buf = [0u8; 8 * 1024];
-
-        reader.read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE])?;
-        let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
-
-        if reader.read_exact(&mut buf[..len]).is_err() {
-            return Ok(None);
-        }
-
-        match ClientMessage::deserialize(&buf[..len]) {
-            Ok(msg) => {
-                info!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
-                Ok(Some(msg))
-            }
-            Err(e) => {
-                error!("a message from {} failed to deserialize: {}", source, e);
-                Err(io::ErrorKind::InvalidData.into())
-            }
-        }
-    }
-
-    async fn process_message(&self, source: SocketAddr, message: Self::Message) -> io::Result<()> {
-        match message {
-            ClientMessage::BlockRequest(_start_block_height, _end_block_height) => {}
-            ClientMessage::BlockResponse(_block) => {}
-            ClientMessage::Disconnect => {}
-            ClientMessage::PeerRequest => self.process_peer_request(source).await?,
-            ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
-            ClientMessage::Ping(version, _fork_depth, _peer_type, _peer_state, _block_hash, block_header) => {
-                // Deserialise the block header.
-                let block_header = block_header.deserialize().await.unwrap();
-                self.process_ping(source, version, block_header.height()).await?
-            }
-            ClientMessage::Pong(_is_fork, _block_locators) => {}
-            ClientMessage::UnconfirmedBlock(_block_height, _block_hash, _block) => {}
-            ClientMessage::UnconfirmedTransaction(_transaction) => {}
-            _ => return Err(io::ErrorKind::InvalidData.into()), // Peer is not following the protocol.
-        }
-
-        Ok(())
-    }
-}
+// /// Inbound message processing logic for the test nodes.
+// #[async_trait::async_trait]
+// impl Reading for SynthNode {
+//     type Message = ClientMessage;
+//
+//     fn read_message<R: io::Read>(&self, source: SocketAddr, reader: &mut R) -> io::Result<Option<Self::Message>> {
+//         // FIXME: use the maximum message size allowed by the protocol or (better) use streaming deserialization.
+//         let mut buf = [0u8; 8 * 1024];
+//
+//         reader.read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE])?;
+//         let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
+//
+//         if reader.read_exact(&mut buf[..len]).is_err() {
+//             return Ok(None);
+//         }
+//
+//         match ClientMessage::deserialize(&buf[..len]) {
+//             Ok(msg) => {
+//                 info!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
+//                 Ok(Some(msg))
+//             }
+//             Err(e) => {
+//                 error!("a message from {} failed to deserialize: {}", source, e);
+//                 Err(io::ErrorKind::InvalidData.into())
+//             }
+//         }
+//     }
+//
+//     async fn process_message(&self, source: SocketAddr, message: Self::Message) -> io::Result<()> {
+//         match message {
+//             ClientMessage::BlockRequest(_start_block_height, _end_block_height) => {}
+//             ClientMessage::BlockResponse(_block) => {}
+//             ClientMessage::Disconnect => {}
+//             ClientMessage::PeerRequest => self.process_peer_request(source).await?,
+//             ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
+//             ClientMessage::Ping(version, _fork_depth, _peer_type, _peer_state, _block_hash, block_header) => {
+//                 // Deserialise the block header.
+//                 let block_header = block_header.deserialize().await.unwrap();
+//                 self.process_ping(source, version, block_header.height()).await?
+//             }
+//             ClientMessage::Pong(_is_fork, _block_locators) => {}
+//             ClientMessage::UnconfirmedBlock(_block_height, _block_hash, _block) => {}
+//             ClientMessage::UnconfirmedTransaction(_transaction) => {}
+//             _ => return Err(io::ErrorKind::InvalidData.into()), // Peer is not following the protocol.
+//         }
+//
+//         Ok(())
+//     }
+// }
 
 /// Outbound message processing logic for the test nodes.
 impl Writing for SynthNode {
