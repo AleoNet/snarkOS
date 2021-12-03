@@ -2154,16 +2154,11 @@ dependencies = [
 name = "snarkos-snode"
 version = "2.0.0"
 dependencies = [
- "anyhow",
  "async-trait",
- "bincode",
  "pea2pea",
- "peak_alloc",
  "rand",
  "snarkos",
- "snarkos-storage",
  "snarkvm 0.7.5 (git+https://github.com/AleoHQ/snarkVM.git?rev=471e03b)",
- "structopt",
  "tokio",
  "tracing",
  "tracing-subscriber",
