@@ -2178,6 +2178,7 @@ dependencies = [
  "peak_alloc",
  "rand",
  "snarkos",
+ "snarkos-snode",
  "snarkos-storage",
  "snarkvm",
  "structopt",
