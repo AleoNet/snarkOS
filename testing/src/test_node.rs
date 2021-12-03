@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos::{Client, Data, Environment, Message};
+use snarkos_snode::{ClientState, SynthNode};
 use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
 
@@ -28,13 +29,11 @@ use std::{
     convert::TryInto,
     io,
     net::{IpAddr, Ipv4Addr, SocketAddr},
+    ops::Deref,
     time::Duration,
 };
 use tokio::task;
 use tracing::*;
-
-use snarkos_snode::{ClientState, SynthNode};
-use std::ops::Deref;
 
 // Consts & aliases.
 const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
