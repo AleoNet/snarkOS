@@ -23,6 +23,9 @@ features = ["test"]
 [dependencies.snarkos-storage]
 path = "../storage"
 
+[dependencies.snarkos-snode]
+path = "../snode"
+
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
 rev = "48c59e9"
