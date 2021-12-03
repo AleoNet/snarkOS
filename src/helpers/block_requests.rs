@@ -80,11 +80,9 @@ pub async fn handle_block_requests<N: Network, E: Environment>(
                 // Case 2(c)(a) - If the common ancestor is within the fork range of this ledger, proceed to switch to the fork.
                 if latest_block_height.saturating_sub(maximum_common_ancestor) <= E::MAXIMUM_FORK_DEPTH {
                     info!("Discovered a canonical chain from {} with common ancestor {} and cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
-                    // If the latest block is the same as the maximum common ancestor, do not revert.
-                    if latest_block_height != maximum_common_ancestor {
-                        return None;
-                    }
-                    (maximum_common_ancestor, true)
+                    // Revert if the latest block is not the maximum common ancestor.
+                    let requires_revert = latest_block_height != maximum_common_ancestor;
+                    (maximum_common_ancestor, requires_revert)
                 }
                 // Case 2(c)(b) - If the common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
                 else {
@@ -118,4 +116,298 @@ pub async fn handle_block_requests<N: Network, E: Environment>(
     }
 
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Client;
+    use snarkvm::dpc::testnet2::Testnet2;
+
+    use rand::{thread_rng, Rng};
+
+    const ITERATIONS: usize = 50;
+
+    #[tokio::test]
+    async fn test_block_requests_case_1() {
+        // Case 1 - You are ahead of your peer: Do nothing
+
+        let rng = &mut thread_rng();
+
+        for _ in 0..ITERATIONS {
+            // Declare internal state.
+            let current_block_height: u32 = rng.gen_range(1000..5000000);
+            let current_cumulative_weight: u128 = current_block_height as u128;
+
+            // Declare peer state.
+            let peer_ip = Some(format!("127.0.0.1:{}", rng.gen::<u16>()).parse().unwrap());
+            let peer_is_fork = None;
+            let peer_maximum_block_height: u32 = rng.gen_range(1..current_block_height);
+            let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
+            let peer_first_deviating_locator = None;
+
+            // Declare locator state.
+            let maximum_common_ancestor = peer_maximum_block_height;
+
+            // Determine if block requests or forking is required.
+            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+                current_block_height,
+                current_cumulative_weight,
+                peer_ip,
+                peer_is_fork,
+                peer_maximum_block_height,
+                peer_maximum_cumulative_weight,
+                maximum_common_ancestor,
+                peer_first_deviating_locator,
+            )
+            .await;
+
+            // Validate the output.
+            assert_eq!(result, None);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_block_requests_case_2a() {
+        // Case 2(a) -  You are behind your peer and `is_fork` is `None`:
+        // Peer is being malicious or thinks you are ahead. Both are issues,
+        // pick a different peer to sync with.
+
+        let rng = &mut thread_rng();
+
+        for _ in 0..ITERATIONS {
+            // Declare internal state.
+            let current_block_height: u32 = rng.gen_range(1..1000);
+            let current_cumulative_weight: u128 = current_block_height as u128;
+
+            // Declare peer state.
+            let peer_ip = Some(format!("127.0.0.1:{}", rng.gen::<u16>()).parse().unwrap());
+            let peer_is_fork = None;
+            let peer_maximum_block_height: u32 = rng.gen_range(current_block_height..current_block_height * 2);
+            let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
+
+            // Declare locator state.
+            let maximum_common_ancestor = current_block_height;
+            let peer_first_deviating_locator = Some(maximum_common_ancestor + 1);
+
+            // Determine if block requests or forking is required.
+            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+                current_block_height,
+                current_cumulative_weight,
+                peer_ip,
+                peer_is_fork,
+                peer_maximum_block_height,
+                peer_maximum_cumulative_weight,
+                maximum_common_ancestor,
+                peer_first_deviating_locator.as_ref(),
+            )
+            .await;
+
+            // Validate the output.
+            assert_eq!(result, None);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_block_requests_case_2b() {
+        // Case 2(b) -  You are behind your peer and `is_fork` is `Some(false)`:
+        // Request blocks from your latest state.
+
+        let rng = &mut thread_rng();
+
+        for _ in 0..ITERATIONS {
+            // Declare internal state.
+            let current_block_height: u32 = rng.gen_range(1..1000);
+            let current_cumulative_weight: u128 = current_block_height as u128;
+
+            // Declare peer state.
+            let peer_ip = Some(format!("127.0.0.1:{}", rng.gen::<u16>()).parse().unwrap());
+            let peer_is_fork = Some(false);
+            let peer_maximum_block_height: u32 = rng.gen_range(current_block_height..current_block_height * 2);
+            let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
+
+            // Declare locator state.
+            let maximum_common_ancestor = current_block_height;
+            let peer_first_deviating_locator = Some(maximum_common_ancestor + 1);
+
+            // Determine if block requests or forking is required.
+            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+                current_block_height,
+                current_cumulative_weight,
+                peer_ip,
+                peer_is_fork,
+                peer_maximum_block_height,
+                peer_maximum_cumulative_weight,
+                maximum_common_ancestor,
+                peer_first_deviating_locator.as_ref(),
+            )
+            .await;
+
+            // Validate the output.
+            assert!(result.is_some());
+            let (starting_block_height, end_block_height, requires_fork) = result.unwrap();
+
+            let expected_number_of_block_requests =
+                std::cmp::min(end_block_height - current_block_height, Client::<Testnet2>::MAXIMUM_BLOCK_REQUEST);
+            let expected_end_block_height = current_block_height + expected_number_of_block_requests;
+
+            assert_eq!(starting_block_height, maximum_common_ancestor + 1);
+            assert_eq!(end_block_height, expected_end_block_height);
+            assert_eq!(requires_fork, false);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_block_requests_case_2ca() {
+        // Case 2(c)(a) -  You are behind your peer, `is_fork` is `Some(true)`, and Common ancestor is within `MAXIMUM_FORK_DEPTH`:
+        // Request blocks from your latest state.
+
+        let rng = &mut thread_rng();
+
+        for _ in 0..ITERATIONS {
+            // Declare internal state.
+            let current_block_height: u32 =
+                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..Client::<Testnet2>::MAXIMUM_FORK_DEPTH * 2);
+            let current_cumulative_weight: u128 = current_block_height as u128;
+
+            // Declare peer state.
+            let peer_ip = Some(format!("127.0.0.1:{}", rng.gen::<u16>()).parse().unwrap());
+            let peer_is_fork = Some(true);
+
+            // Generate a common ancestor within the maximum fork depth.
+            let peer_maximum_block_height: u32 = rng.gen_range(current_block_height + 1..current_block_height * 2);
+            let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
+
+            // Declare locator state.
+            let maximum_common_ancestor =
+                rng.gen_range((current_block_height - Client::<Testnet2>::MAXIMUM_FORK_DEPTH)..current_block_height);
+            let peer_first_deviating_locator = Some(rng.gen_range(maximum_common_ancestor + 1..current_block_height));
+
+            // Determine if block requests or forking is required.
+            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+                current_block_height,
+                current_cumulative_weight,
+                peer_ip,
+                peer_is_fork,
+                peer_maximum_block_height,
+                peer_maximum_cumulative_weight,
+                maximum_common_ancestor,
+                peer_first_deviating_locator.as_ref(),
+            )
+            .await;
+
+            // Validate the output.
+            assert!(result.is_some());
+            let (starting_block_height, end_block_height, requires_fork) = result.unwrap();
+
+            let expected_number_of_block_requests =
+                std::cmp::min(end_block_height - starting_block_height, Client::<Testnet2>::MAXIMUM_BLOCK_REQUEST);
+            let expected_end_block_height = starting_block_height + expected_number_of_block_requests;
+
+            assert_eq!(starting_block_height, maximum_common_ancestor + 1);
+            assert_eq!(end_block_height, expected_end_block_height);
+            assert_eq!(requires_fork, true);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_block_requests_case_2cba() {
+        // Case 2(c)(b)(a) -  You are behind your peer, `is_fork` is `Some(true)`,
+        //    Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and you can calculate
+        // that you are outside of the `MAXIMUM_FORK_DEPTH`:
+        // Disconnect from peer.
+
+        let rng = &mut thread_rng();
+
+        for _ in 0..ITERATIONS {
+            // Declare internal state.
+            let current_block_height: u32 =
+                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..Client::<Testnet2>::MAXIMUM_FORK_DEPTH * 2);
+            let current_cumulative_weight: u128 = current_block_height as u128;
+
+            // Declare peer state.
+            let peer_ip = Some(format!("127.0.0.1:{}", rng.gen::<u16>()).parse().unwrap());
+            let peer_is_fork = Some(true);
+
+            // Generate a common ancestor within the maximum fork depth.
+            let peer_maximum_block_height: u32 = rng.gen_range(current_block_height + 1..current_block_height * 2);
+            let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
+
+            // Declare locator state.
+            let maximum_common_ancestor = rng.gen_range(0..(current_block_height - Client::<Testnet2>::MAXIMUM_FORK_DEPTH) / 2);
+            let peer_first_deviating_locator =
+                Some(rng.gen_range(maximum_common_ancestor + 1..current_block_height - Client::<Testnet2>::MAXIMUM_FORK_DEPTH));
+
+            // Determine if block requests or forking is required.
+            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+                current_block_height,
+                current_cumulative_weight,
+                peer_ip,
+                peer_is_fork,
+                peer_maximum_block_height,
+                peer_maximum_cumulative_weight,
+                maximum_common_ancestor,
+                peer_first_deviating_locator.as_ref(),
+            )
+            .await;
+
+            // Validate the output.
+            assert_eq!(result, None);
+        }
+    }
+
+    #[tokio::test]
+    async fn test_block_requests_case_2cbb() {
+        // Case 2(c)(b)(a) -  You are behind your peer, `is_fork` is `Some(true)`,
+        //    Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and You don't know if
+        // you are within the `MAXIMUM_FORK_DEPTH`:
+        // Disconnect from peer.
+
+        let rng = &mut thread_rng();
+
+        for _ in 0..ITERATIONS {
+            // Declare internal state.
+            let current_block_height: u32 =
+                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..Client::<Testnet2>::MAXIMUM_FORK_DEPTH * 2);
+            let current_cumulative_weight: u128 = current_block_height as u128;
+
+            // Declare peer state.
+            let peer_ip = Some(format!("127.0.0.1:{}", rng.gen::<u16>()).parse().unwrap());
+            let peer_is_fork = Some(true);
+
+            // Generate a common ancestor within the maximum fork depth.
+            let peer_maximum_block_height: u32 = rng.gen_range(current_block_height + 1..current_block_height * 2);
+            let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
+
+            // Declare locator state.
+            let maximum_common_ancestor = rng.gen_range(0..current_block_height - Client::<Testnet2>::MAXIMUM_FORK_DEPTH);
+            let peer_first_deviating_locator =
+                Some(rng.gen_range(current_block_height - Client::<Testnet2>::MAXIMUM_FORK_DEPTH..current_block_height));
+
+            // Determine if block requests or forking is required.
+            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+                current_block_height,
+                current_cumulative_weight,
+                peer_ip,
+                peer_is_fork,
+                peer_maximum_block_height,
+                peer_maximum_cumulative_weight,
+                maximum_common_ancestor,
+                peer_first_deviating_locator.as_ref(),
+            )
+            .await;
+
+            // Validate the output.
+            assert!(result.is_some());
+            let (starting_block_height, end_block_height, requires_fork) = result.unwrap();
+
+            let expected_number_of_block_requests =
+                std::cmp::min(end_block_height - starting_block_height, Client::<Testnet2>::MAXIMUM_BLOCK_REQUEST);
+            let expected_end_block_height = starting_block_height + expected_number_of_block_requests;
+
+            assert_eq!(starting_block_height, maximum_common_ancestor + 1);
+            assert_eq!(end_block_height, expected_end_block_height);
+            assert_eq!(requires_fork, true);
+        }
+    }
 }
