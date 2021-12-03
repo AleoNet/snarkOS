@@ -39,14 +39,12 @@ use tokio::{
 use tracing::*;
 
 // Consts & aliases.
-const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
-const CHALLENGE_HEIGHT: u32 = 0;
-const MESSAGE_VERSION: u32 = <Client<Testnet2>>::MESSAGE_VERSION;
-const MAXIMUM_FORK_DEPTH: u32 = <Client<Testnet2>>::MAXIMUM_FORK_DEPTH;
+pub const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
+pub const CHALLENGE_HEIGHT: u32 = 0;
+pub const MESSAGE_VERSION: u32 = <Client<Testnet2>>::MESSAGE_VERSION;
+pub const MAXIMUM_FORK_DEPTH: u32 = <Client<Testnet2>>::MAXIMUM_FORK_DEPTH;
 
-pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<Testnet2>>::MAXIMUM_NUMBER_OF_PEERS;
-
-type ClientMessage = Message<Testnet2, Client<Testnet2>>;
+pub type ClientMessage = Message<Testnet2, Client<Testnet2>>;
 pub type ClientNonce = u64;
 
 /// The test node; it consists of a `Node` that handles networking and `State`

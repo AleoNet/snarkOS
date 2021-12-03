@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos::{Client, Data, Environment, Message};
-use snarkos_snode::{ClientState, SynthNode};
+use snarkos::{Client, Data, Environment};
+use snarkos_snode::{ClientMessage, ClientState, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
 use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
 
@@ -36,17 +36,11 @@ use tokio::task;
 use tracing::*;
 
 // Consts & aliases.
-const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
 const PING_INTERVAL_SECS: u64 = 5;
 const PEER_INTERVAL_SECS: u64 = 3;
 const DESIRED_CONNECTIONS: usize = <Client<Testnet2>>::MINIMUM_NUMBER_OF_PEERS * 3;
-const MESSAGE_VERSION: u32 = <Client<Testnet2>>::MESSAGE_VERSION;
-const MAXIMUM_FORK_DEPTH: u32 = Testnet2::ALEO_MAXIMUM_FORK_DEPTH;
 
 pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<Testnet2>>::MAXIMUM_NUMBER_OF_PEERS;
-
-type ClientMessage = Message<Testnet2, Client<Testnet2>>;
-pub type ClientNonce = u64;
 
 #[derive(Clone)]
 pub struct TestNode(SynthNode);
