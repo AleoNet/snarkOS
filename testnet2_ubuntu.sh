@@ -21,6 +21,7 @@ apt-get install -y \
     make \
     pkg-config \
     tmux \
+    ufw \
     xz-utils
 
 # Install Rust
