@@ -38,9 +38,6 @@ use std::{
     thread::JoinHandle,
 };
 
-/// The number of seconds in two hours.
-const TWO_HOURS_UNIX: i64 = 7200;
-
 /// The maximum number of linear block locators.
 pub const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 64;
 /// The maximum number of quadratic block locators.
@@ -50,6 +47,9 @@ pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating
 
 /// TODO (howardwu): Reconcile this with the equivalent in `Environment`.
 const MAXIMUM_FORK_DEPTH: u32 = 4096;
+
+/// The maximum future block time - 2 minutes.
+const MAXIMUM_FUTURE_BLOCK_TIME: i64 = 120;
 
 ///
 /// A helper struct containing transaction metadata.
@@ -587,7 +587,10 @@ impl<N: Network> LedgerState<N> {
         // Compute the block difficulty target.
         let previous_timestamp = self.latest_block_timestamp();
         let previous_difficulty_target = self.latest_block_difficulty_target();
-        let block_timestamp = chrono::Utc::now().timestamp();
+
+        // Ensure that the new timestamp is ahead of the previous timestamp.
+        let block_timestamp = std::cmp::max(chrono::Utc::now().timestamp(), previous_timestamp.saturating_add(1));
+
         let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
         let cumulative_weight = self
             .latest_cumulative_weight()
@@ -689,7 +692,7 @@ impl<N: Network> LedgerState<N> {
 
         // Ensure the next block timestamp is within the declared time limit.
         let now = chrono::Utc::now().timestamp();
-        if block.timestamp() > (now + TWO_HOURS_UNIX) {
+        if block.timestamp() > (now + MAXIMUM_FUTURE_BLOCK_TIME) {
             return Err(anyhow!("The given block timestamp exceeds the time limit"));
         }
 
