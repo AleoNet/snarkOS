@@ -45,17 +45,17 @@ impl<N: Network> MiningPoolState<N> {
     }
 
     /// Returns all the shares in storage.
-    pub fn to_shares(&self) -> Vec<(u32, HashMap<Address<N>, u128>)> {
+    pub fn to_shares(&self) -> Vec<(u32, HashMap<Address<N>, u64>)> {
         self.shares.to_shares()
     }
 
     /// Returns the number of shares for a given block_height.
-    pub fn get_shares(&self, block_height: u32) -> Result<HashMap<Address<N>, u128>> {
+    pub fn get_shares(&self, block_height: u32) -> Result<HashMap<Address<N>, u64>> {
         self.shares.get_shares(block_height)
     }
 
     /// Adds the given `num_shares` for an address in storage.
-    pub fn add_shares(&self, block_height: u32, address: &Address<N>, num_shares: u128) -> Result<()> {
+    pub fn add_shares(&self, block_height: u32, address: &Address<N>, num_shares: u64) -> Result<()> {
         self.shares.add_shares(block_height, address, num_shares)
     }
 
@@ -70,7 +70,7 @@ impl<N: Network> MiningPoolState<N> {
 struct SharesState<N: Network> {
     // TODO (raychu86): Introduce concept of `rounds`.
     /// The miner shares for each block height.
-    shares: DataMap<u32, HashMap<Address<N>, u128>>,
+    shares: DataMap<u32, HashMap<Address<N>, u64>>,
 }
 
 impl<N: Network> SharesState<N> {
@@ -82,12 +82,12 @@ impl<N: Network> SharesState<N> {
     }
 
     /// Returns all shares in storage.
-    fn to_shares(&self) -> Vec<(u32, HashMap<Address<N>, u128>)> {
+    fn to_shares(&self) -> Vec<(u32, HashMap<Address<N>, u64>)> {
         self.shares.iter().collect()
     }
 
     /// Returns the shares for a given block height.
-    fn get_shares(&self, block_height: u32) -> Result<HashMap<Address<N>, u128>> {
+    fn get_shares(&self, block_height: u32) -> Result<HashMap<Address<N>, u64>> {
         match self.shares.get(&block_height)? {
             Some(shares) => Ok(shares),
             None => return Err(anyhow!("Block height {} does not have any shares in storage", block_height)),
@@ -95,7 +95,7 @@ impl<N: Network> SharesState<N> {
     }
 
     /// Adds the given number of shares to the block height and address in storage.
-    fn add_shares(&self, block_height: u32, address: &Address<N>, num_shares: u128) -> Result<()> {
+    fn add_shares(&self, block_height: u32, address: &Address<N>, num_shares: u64) -> Result<()> {
         if let Some(current_shares) = self.shares.get(&block_height)? {
             let mut new_shares = current_shares.clone();
 
