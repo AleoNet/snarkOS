@@ -21,7 +21,7 @@ use crate::{
     LedgerRequest,
     LedgerRouter,
     NodeType,
-    PeersRequest,
+    PeersRouter,
     ProverRouter,
 };
 use snarkos_storage::{storage::Storage, MiningPoolState};
@@ -67,7 +67,7 @@ pub struct MiningPool<N: Network, E: Environment> {
     mining_pool_router: MiningPoolRouter<N>,
     /// The status of the node.
     status: Status,
-    /// The pool of unconfirmed transactions.
+    /// The pool of uncer: PeersRouter<N, E>,onfirmed transactions.
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
     /// The peers router of the node.
     peers_router: PeersRouter<N, E>,
@@ -110,23 +110,23 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
             prover_router,
         });
 
-        // Initialize the handler for the mining pool.
-        {
-            let mining_pool = mining_pool.clone();
-            let (router, handler) = oneshot::channel();
-            tasks.append(task::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                // Asynchronously wait for a mining pool request.
-                while let Some(request) = mining_pool_handler.recv().await {
-                    mining_pool.update(request).await;
-                }
-            }));
-            // Wait until the mining pool handler is ready.
-            let _ = handler.await;
-        }
-
         if E::NODE_TYPE == NodeType::MiningPool {
+            // Initialize the handler for the mining pool.
+            {
+                let mining_pool = mining_pool.clone();
+                let (router, handler) = oneshot::channel();
+                tasks.append(task::spawn(async move {
+                    // Notify the outer function that the task is ready.
+                    let _ = router.send(());
+                    // Asynchronously wait for a mining pool request.
+                    while let Some(request) = mining_pool_handler.recv().await {
+                        mining_pool.update(request).await;
+                    }
+                }));
+                // Wait until the mining pool handler is ready.
+                let _ = handler.await;
+            }
+
             // TODO (raychu86): Implement the mining pool.
             //  1. Send the subscribed miners the block template to mine.
             //  2. Track the shares sent by the miners.
