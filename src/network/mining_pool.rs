@@ -20,10 +20,9 @@ use crate::{
     LedgerReader,
     LedgerRequest,
     LedgerRouter,
-    Message,
     NodeType,
     PeersRequest,
-    PeersRouter,
+    ProverRouter,
 };
 use snarkos_storage::{storage::Storage, MiningPoolState};
 use snarkvm::dpc::prelude::*;
@@ -60,6 +59,8 @@ pub enum MiningPoolRequest<N: Network> {
 pub struct MiningPool<N: Network, E: Environment> {
     /// The address of the mining pool.
     mining_pool_address: Option<Address<N>>,
+    /// The local address of this node.
+    local_ip: SocketAddr,
     /// The state storage of the mining pool.
     state: Arc<MiningPoolState<N>>,
     /// The mining pool router of the node.
@@ -74,6 +75,8 @@ pub struct MiningPool<N: Network, E: Environment> {
     ledger_reader: LedgerReader<N>,
     /// The ledger router of the node.
     ledger_router: LedgerRouter<N>,
+    /// The prover router of the node.
+    prover_router: ProverRouter<N>,
 }
 
 impl<N: Network, E: Environment> MiningPool<N, E> {
@@ -82,12 +85,13 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
         tasks: &mut Tasks<JoinHandle<()>>,
         path: P,
         mining_pool_address: Option<Address<N>>,
-        _local_ip: SocketAddr,
+        local_ip: SocketAddr,
         status: Status,
         memory_pool: Arc<RwLock<MemoryPool<N>>>,
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
+        prover_router: ProverRouter<N>,
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `MiningPool` struct.
         let (mining_pool_router, mut mining_pool_handler) = mpsc::channel(1024);
@@ -95,6 +99,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
         // Initialize the mining pool.
         let mining_pool = Arc::new(Self {
             mining_pool_address,
+            local_ip,
             state: Arc::new(MiningPoolState::open_writer::<S, P>(path)?),
             mining_pool_router,
             status: status.clone(),
@@ -102,6 +107,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
             peers_router,
             ledger_reader,
             ledger_router,
+            prover_router,
         });
 
         // Initialize the handler for the mining pool.
@@ -127,7 +133,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
             //  3. Broadcast valid blocks.
             //  4. Pay out and/or assign scores for the miners based on proportional shares or Pay-per-Share.
 
-            if let Some(recipient) = mining_pool_address {
+            if let Some(_recipient) = mining_pool_address {
                 // Initialize the mining pool process.
                 let mining_pool = mining_pool.clone();
                 let tasks_clone = tasks.clone();
@@ -212,7 +218,17 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     warn!("[ProposedBlock] {}", error);
                 }
 
-                // TODO (raychu86): If the block is valid, broadcast it.
+                // If the block is valid, broadcast it.
+                if block.is_valid() {
+                    debug!("Mining pool has found unconfirmed block {} ({})", block.height(), block.hash());
+                    // TODO (raychu86): Store the coinbase record.
+
+                    // Broadcast the next block.
+                    let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
+                    if let Err(error) = self.ledger_router.send(request).await {
+                        warn!("Failed to broadcast mined block - {}", error);
+                    }
+                }
             }
             MiningPoolRequest::BlockHeightClear(block_height) => {
                 // Remove the shares for the given block height.
