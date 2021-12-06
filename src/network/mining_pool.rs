@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{Status, Tasks},
+    helpers::{State, Status, Tasks},
     Environment,
     LedgerReader,
     LedgerRequest,
@@ -29,7 +29,6 @@ use snarkos_storage::{storage::Storage, MiningPoolState};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
-use rand::thread_rng;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 use tokio::{
     sync::{mpsc, oneshot, RwLock},
@@ -48,8 +47,8 @@ type MiningPoolHandler<N> = mpsc::Receiver<MiningPoolRequest<N>>;
 ///
 #[derive(Debug)]
 pub enum MiningPoolRequest<N: Network> {
-    /// ProposedBlock := (peer_ip, )
-    ProposedBlock(SocketAddr, Block<N>),
+    /// ProposedBlock := (peer_ip, proposed_block, miner_address)
+    ProposedBlock(SocketAddr, Block<N>, Address<N>),
     /// BlockHeightClear := (block_height)
     BlockHeightClear(u32),
 }
@@ -59,12 +58,16 @@ pub enum MiningPoolRequest<N: Network> {
 ///
 #[derive(Debug)]
 pub struct MiningPool<N: Network, E: Environment> {
-    /// The state storage of the prover.
+    /// The address of the mining pool.
+    mining_pool_address: Option<Address<N>>,
+    /// The state storage of the mining pool.
     state: Arc<MiningPoolState<N>>,
-    /// The prover router of the node.
+    /// The mining pool router of the node.
     mining_pool_router: MiningPoolRouter<N>,
     /// The status of the node.
     status: Status,
+    /// The pool of unconfirmed transactions.
+    memory_pool: Arc<RwLock<MemoryPool<N>>>,
     /// The peers router of the node.
     peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
@@ -74,149 +77,100 @@ pub struct MiningPool<N: Network, E: Environment> {
 }
 
 impl<N: Network, E: Environment> MiningPool<N, E> {
-    /// Initializes a new instance of the prover.
+    /// Initializes a new instance of the mining pool.
     pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
         tasks: &mut Tasks<JoinHandle<()>>,
         path: P,
-        miner_address: Option<Address<N>>,
-        local_ip: SocketAddr,
-        status: &Status,
+        mining_pool_address: Option<Address<N>>,
+        _local_ip: SocketAddr,
+        status: Status,
+        memory_pool: Arc<RwLock<MemoryPool<N>>>,
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
     ) -> Result<Arc<Self>> {
-        // // Initialize an mpsc channel for sending requests to the `Prover` struct.
-        // let (prover_router, mut prover_handler) = mpsc::channel(1024);
-        // // Initialize the prover pool.
-        // let pool = ThreadPoolBuilder::new()
-        //     .stack_size(8 * 1024 * 1024)
-        //     .num_threads((num_cpus::get() / 8 * 7).max(1))
-        //     .build()?;
-        //
-        // // Initialize the prover.
-        // let prover = Arc::new(Self {
-        //     state: Arc::new(ProverState::open_writer::<S, P>(path)?),
-        //     miner: Arc::new(pool),
-        //     prover_router,
-        //     memory_pool: Arc::new(RwLock::new(MemoryPool::new())),
-        //     status: status.clone(),
-        //     terminator: terminator.clone(),
-        //     peers_router,
-        //     ledger_reader,
-        //     ledger_router,
-        // });
-        //
-        // // Initialize the handler for the prover.
-        // {
-        //     let prover = prover.clone();
-        //     let (router, handler) = oneshot::channel();
-        //     tasks.append(task::spawn(async move {
-        //         // Notify the outer function that the task is ready.
-        //         let _ = router.send(());
-        //         // Asynchronously wait for a prover request.
-        //         while let Some(request) = prover_handler.recv().await {
-        //             // Hold the prover write lock briefly, to update the state of the prover.
-        //             prover.update(request).await;
-        //         }
-        //     }));
-        //     // Wait until the prover handler is ready.
-        //     let _ = handler.await;
-        // }
-        //
-        // // Initialize a new instance of the miner.
-        // if E::NODE_TYPE == NodeType::Miner {
-        //     if let Some(recipient) = miner {
-        //         // Initialize the prover process.
-        //         let prover = prover.clone();
-        //         let tasks_clone = tasks.clone();
-        //         let (router, handler) = oneshot::channel();
-        //         tasks.append(task::spawn(async move {
-        //             // Notify the outer function that the task is ready.
-        //             let _ = router.send(());
-        //             loop {
-        //                 // If `terminator` is `false` and the status is not `Peering` or `Mining` already, mine the next block.
-        //                 if !prover.terminator.load(Ordering::SeqCst) && !prover.status.is_peering() && !prover.status.is_mining() {
-        //                     // Set the status to `Mining`.
-        //                     prover.status.update(State::Mining);
-        //
-        //                     // Prepare the unconfirmed transactions, terminator, and status.
-        //                     let state = prover.state.clone();
-        //                     let miner = prover.miner.clone();
-        //                     let canon = prover.ledger_reader.clone(); // This is *safe* as the ledger only reads.
-        //                     let unconfirmed_transactions = prover.memory_pool.read().await.transactions();
-        //                     let terminator = prover.terminator.clone();
-        //                     let status = prover.status.clone();
-        //                     let ledger_router = prover.ledger_router.clone();
-        //                     let prover_router = prover.prover_router.clone();
-        //
-        //                     tasks_clone.append(task::spawn(async move {
-        //                         // Mine the next block.
-        //                         let result = task::spawn_blocking(move || {
-        //                             miner.install(move || {
-        //                                 canon.mine_next_block(
-        //                                     recipient,
-        //                                     E::COINBASE_IS_PUBLIC,
-        //                                     &unconfirmed_transactions,
-        //                                     &terminator,
-        //                                     &mut thread_rng(),
-        //                                 )
-        //                             })
-        //                         })
-        //                         .await
-        //                         .map_err(|e| e.into());
-        //
-        //                         // Set the status to `Ready`.
-        //                         status.update(State::Ready);
-        //
-        //                         match result {
-        //                             Ok(Ok((block, coinbase_record))) => {
-        //                                 debug!("Miner has found unconfirmed block {} ({})", block.height(), block.hash());
-        //                                 // Store the coinbase record.
-        //                                 if let Err(error) = state.add_coinbase_record(block.height(), coinbase_record) {
-        //                                     warn!("[Miner] Failed to store coinbase record - {}", error);
-        //                                 }
-        //
-        //                                 // Broadcast the next block.
-        //                                 let request = LedgerRequest::UnconfirmedBlock(local_ip, block, prover_router.clone());
-        //                                 if let Err(error) = ledger_router.send(request).await {
-        //                                     warn!("Failed to broadcast mined block - {}", error);
-        //                                 }
-        //                             }
-        //                             Ok(Err(error)) | Err(error) => trace!("{}", error),
-        //                         }
-        //                     }));
-        //                 }
-        //                 // Sleep for 2 seconds.
-        //                 tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-        //             }
-        //         }));
-        //         // Wait until the miner task is ready.
-        //         let _ = handler.await;
-        //     } else {
-        //         error!("Missing miner address. Please specify an Aleo address in order to mine");
-        //     }
-        // }
-        // // Initialize a new instance of the mining pool.
-        // else if E::NODE_TYPE == NodeType::MiningPool {
-        //     // TODO (raychu86): Implement the mining pool.
-        //     //  1. Send the subscribed miners the block template to mine.
-        //     //  2. Track the shares sent by the miners.
-        //     //  3. Broadcast valid blocks.
-        //     //  4. Pay out and/or assign scores for the miners based on proportional shares or Pay-per-Share.
-        // }
-        //
-        // Ok(prover)
+        // Initialize an mpsc channel for sending requests to the `MiningPool` struct.
+        let (mining_pool_router, mut mining_pool_handler) = mpsc::channel(1024);
 
-        unimplemented!()
+        // Initialize the mining pool.
+        let mining_pool = Arc::new(Self {
+            mining_pool_address,
+            state: Arc::new(MiningPoolState::open_writer::<S, P>(path)?),
+            mining_pool_router,
+            status: status.clone(),
+            memory_pool,
+            peers_router,
+            ledger_reader,
+            ledger_router,
+        });
+
+        // Initialize the handler for the mining pool.
+        {
+            let mining_pool = mining_pool.clone();
+            let (router, handler) = oneshot::channel();
+            tasks.append(task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                // Asynchronously wait for a mining pool request.
+                while let Some(request) = mining_pool_handler.recv().await {
+                    mining_pool.update(request).await;
+                }
+            }));
+            // Wait until the mining pool handler is ready.
+            let _ = handler.await;
+        }
+
+        if E::NODE_TYPE == NodeType::MiningPool {
+            // TODO (raychu86): Implement the mining pool.
+            //  1. Send the subscribed miners the block template to mine.
+            //  2. Track the shares sent by the miners.
+            //  3. Broadcast valid blocks.
+            //  4. Pay out and/or assign scores for the miners based on proportional shares or Pay-per-Share.
+
+            if let Some(recipient) = mining_pool_address {
+                // Initialize the mining pool process.
+                let mining_pool = mining_pool.clone();
+                let tasks_clone = tasks.clone();
+                let (router, handler) = oneshot::channel();
+                tasks.append(task::spawn(async move {
+                    // Notify the outer function that the task is ready.
+                    let _ = router.send(());
+                    loop {
+                        // If the status is not `Peering` or `Mining` already, mine the next block.
+                        if !mining_pool.status.is_peering() && !mining_pool.status.is_mining() {
+                            // Set the status to `Mining`.
+                            mining_pool.status.update(State::Mining);
+
+                            // Send block templates to the miners.
+                            tasks_clone.append(task::spawn(async move {
+                                // TODO (raychu86): Send a block template to the subscribed peers
+                                //  whenever the canon chain advances.
+                            }));
+
+                            // Set the status to `Ready`.
+                            status.update(State::Ready);
+                        }
+                        // Sleep for 2 seconds.
+                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                    }
+                }));
+                // Wait until the miner task is ready.
+                let _ = handler.await;
+            } else {
+                error!("Missing miner address. Please specify an Aleo address in order to run a mining pool");
+            }
+        }
+
+        Ok(mining_pool)
     }
 
-    /// Returns an instance of the prover router.
+    /// Returns an instance of the mining pool router.
     pub fn router(&self) -> MiningPoolRouter<N> {
         self.mining_pool_router.clone()
     }
 
     /// Returns all the shares in storage.
-    pub fn to_shares(&self) -> Vec<(u32, HashMap<Address<N>, u128>)> {
+    pub fn to_shares(&self) -> Vec<(u32, HashMap<Address<N>, u64>)> {
         self.state.to_shares()
     }
 
@@ -226,11 +180,45 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
     ///
     pub(super) async fn update(&self, request: MiningPoolRequest<N>) {
         match request {
-            MiningPoolRequest::ProposedBlock(peer_ip, block) => {
-                // TODO (raychu86): Do stuff.
+            MiningPoolRequest::ProposedBlock(peer_ip, block, miner_address) => {
+                // Check that the block is relevant.
+                if self.ledger_reader.latest_block_height().saturating_add(1) != block.height() {
+                    warn!("[ProposedBlock] Peer {} sent a stale candidate block.", peer_ip);
+                    return;
+                }
+
+                // TODO (raychu86): Check that the block is valid except for the block difficulty.
+
+                // Check that the block's coinbase transaction owner is the mining pool address.
+                match block.to_coinbase_transaction() {
+                    Ok(tx) => {
+                        let coinbase_records: Vec<Record<N>> = tx.to_records().collect();
+                        let valid_owner = coinbase_records
+                            .iter()
+                            .map(|r| Some(r.owner()) == self.mining_pool_address)
+                            .fold(false, |a, b| a || b);
+
+                        if !valid_owner {
+                            warn!("[ProposedBlock] Peer {} sent a candidate block with an invalid owner.", peer_ip);
+                            return;
+                        }
+                    }
+                    Err(err) => warn!("[ProposedBlock] {}", err),
+                };
+
+                // Update the score for the miner.
+                let shares = u64::MAX / block.difficulty_target();
+                if let Err(error) = self.state.add_shares(block.height(), &miner_address, shares) {
+                    warn!("[ProposedBlock] {}", error);
+                }
+
+                // TODO (raychu86): If the block is valid, broadcast it.
             }
             MiningPoolRequest::BlockHeightClear(block_height) => {
-                // TODO (raychu86): Do stuff.
+                // Remove the shares for the given block height.
+                if let Err(error) = self.state.remove_shares(block_height) {
+                    warn!("[BlockHeightClear] {}", error);
+                }
             }
         }
     }
