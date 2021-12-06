@@ -85,8 +85,6 @@ pub struct Prover<N: Network, E: Environment> {
     ledger_reader: LedgerReader<N>,
     /// The ledger router of the node.
     ledger_router: LedgerRouter<N>,
-    // TODO (raychu86): Add scores/share tracking for miners.
-    // mining_pool_state:,
 }
 
 impl<N: Network, E: Environment> Prover<N, E> {
@@ -212,14 +210,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
             } else {
                 error!("Missing miner address. Please specify an Aleo address in order to mine");
             }
-        }
-        // Initialize a new instance of the mining pool.
-        else if E::NODE_TYPE == NodeType::MiningPool {
-            // TODO (raychu86): Implement the mining pool.
-            //  1. Send the subscribed miners the block template to mine.
-            //  2. Track the shares sent by the miners.
-            //  3. Broadcast valid blocks.
-            //  4. Pay out and/or assign scores for the miners based on proportional shares or Pay-per-Share.
         }
 
         Ok(prover)
