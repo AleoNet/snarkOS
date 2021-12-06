@@ -30,7 +30,7 @@ use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
 use rand::thread_rng;
-use std::{net::SocketAddr, path::Path, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 use tokio::{
     sync::{mpsc, oneshot, RwLock},
     task,
@@ -215,8 +215,8 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
         self.mining_pool_router.clone()
     }
 
-    /// Returns all coinbase records in storage.
-    pub fn to_shares(&self) -> Vec<(Address<N>, u128)> {
+    /// Returns all the shares in storage.
+    pub fn to_shares(&self) -> Vec<(u32, HashMap<Address<N>, u128>)> {
         self.state.to_shares()
     }
 
