@@ -18,7 +18,7 @@ use crate::storage::{DataMap, Map, Storage};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
-use std::path::Path;
+use std::{collections::HashMap, path::Path};
 
 #[derive(Debug)]
 pub struct MiningPoolState<N: Network> {
@@ -44,19 +44,14 @@ impl<N: Network> MiningPoolState<N> {
         Ok(mining_pool)
     }
 
-    /// Returns `true` if the given address exists in storage.
-    pub fn contains_address(&self, address: &Address<N>) -> Result<bool> {
-        self.shares.contains_address(address)
-    }
-
     /// Returns all the shares in storage.
-    pub fn to_shares(&self) -> Vec<(Address<N>, u128)> {
+    pub fn to_shares(&self) -> Vec<(u32, HashMap<Address<N>, u128>)> {
         self.shares.to_shares()
     }
 
-    /// Returns the number of shares for a given address.
-    pub fn get_shares(&self, address: &Address<N>) -> Result<u128> {
-        self.shares.get_shares(address)
+    /// Returns the number of shares for a given block_height.
+    pub fn get_shares(&self, block_height: u32) -> Result<HashMap<Address<N>, u128>> {
+        self.shares.get_shares(block_height)
     }
 
     /// Adds the given `num_shares` for an address in storage.
@@ -64,9 +59,9 @@ impl<N: Network> MiningPoolState<N> {
         self.shares.add_shares(block_height, address, num_shares)
     }
 
-    /// Removes the given `num_shares` for an address in storage.
-    pub fn remove_shares(&self, address: &Address<N>, num_shares: u128) -> Result<()> {
-        self.shares.remove_shares(address, num_shares)
+    /// Removes the shares for a given block height in storage.
+    pub fn remove_shares(&self, block_height: u32) -> Result<()> {
+        self.shares.remove_shares(block_height)
     }
 }
 
@@ -74,8 +69,8 @@ impl<N: Network> MiningPoolState<N> {
 #[allow(clippy::type_complexity)]
 struct SharesState<N: Network> {
     // TODO (raychu86): Introduce concept of `rounds`.
-    /// The miner shares.
-    shares: DataMap<Address<N>, u128>,
+    /// The miner shares for each block height.
+    shares: DataMap<u32, HashMap<Address<N>, u128>>,
 }
 
 impl<N: Network> SharesState<N> {
@@ -86,48 +81,42 @@ impl<N: Network> SharesState<N> {
         })
     }
 
-    /// Returns `true` if the given address exists in storage.
-    fn contains_address(&self, address: &Address<N>) -> Result<bool> {
-        self.shares.contains_key(address)
-    }
-
     /// Returns all shares in storage.
-    fn to_shares(&self) -> Vec<(Address<N>, u128)> {
+    fn to_shares(&self) -> Vec<(u32, HashMap<Address<N>, u128>)> {
         self.shares.iter().collect()
     }
 
-    /// Returns the record for a given address.
-    fn get_shares(&self, address: &Address<N>) -> Result<u128> {
-        match self.shares.get(address)? {
-            Some(num_shares) => Ok(num_shares),
-            None => return Err(anyhow!("Address {} does not have any shares in storage", address)),
+    /// Returns the shares for a given block height.
+    fn get_shares(&self, block_height: u32) -> Result<HashMap<Address<N>, u128>> {
+        match self.shares.get(&block_height)? {
+            Some(shares) => Ok(shares),
+            None => return Err(anyhow!("Block height {} does not have any shares in storage", block_height)),
         }
     }
 
-    /// Adds the given number of shares to the address in storage.
-    fn add_shares(&self, _block_height: u32, address: &Address<N>, num_shares: u128) -> Result<()> {
-        // TODO (raychu86): Use block height to determine the round number.
-        if let Some(current_num_shares) = self.shares.get(&address)? {
-            let new_num_shares = current_num_shares.saturating_add(num_shares);
+    /// Adds the given number of shares to the block height and address in storage.
+    fn add_shares(&self, block_height: u32, address: &Address<N>, num_shares: u128) -> Result<()> {
+        if let Some(current_shares) = self.shares.get(&block_height)? {
+            let mut new_shares = current_shares.clone();
+
+            // Add the num shares for the address.
+            let address_entry = new_shares.entry(*address).or_insert(0);
+            *address_entry = address_entry.saturating_add(num_shares);
+
             // Insert the shares for the address.
-            self.shares.insert(&address, &new_num_shares)?;
+            self.shares.insert(&block_height, &new_shares)?;
             Ok(())
         } else {
             // Insert the shares for the address.
-            self.shares.insert(&address, &num_shares)?;
+            let mut new_shares = HashMap::new();
+            new_shares.insert(*address, num_shares);
+            self.shares.insert(&block_height, &new_shares)?;
             Ok(())
         }
     }
 
-    /// Removes the given number of shares for an address in storage.
-    fn remove_shares(&self, address: &Address<N>, num_shares: u128) -> Result<()> {
-        if let Some(current_num_shares) = self.shares.get(&address)? {
-            match current_num_shares.saturating_sub(num_shares) {
-                0 => self.shares.remove(&address)?,
-                new_num_shares => self.shares.insert(&address, &new_num_shares)?,
-            }
-        }
-
-        Ok(())
+    /// Removes all of the shares for a given block height.
+    fn remove_shares(&self, block_height: u32) -> Result<()> {
+        self.shares.remove(&block_height)
     }
 }
