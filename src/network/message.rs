@@ -98,7 +98,7 @@ pub enum Message<N: Network, E: Environment> {
     /// UnconfirmedBlock := (block_height, block_hash, block)
     UnconfirmedBlock(u32, N::BlockHash, Data<Block<N>>),
     /// UnconfirmedTransaction := (transaction)
-    UnconfirmedTransaction(Transaction<N>),
+    UnconfirmedTransaction(Data<Transaction<N>>),
     /// Unused
     #[allow(unused)]
     Unused(PhantomData<E>),
@@ -177,7 +177,7 @@ impl<N: Network, E: Environment> Message<N, E> {
                 block.serialize_blocking()?,
             ]
             .concat()),
-            Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize(transaction)?),
+            Self::UnconfirmedTransaction(transaction) => Ok(transaction.serialize_blocking()?),
             Self::Unused(_) => Ok(vec![]),
         }
     }
@@ -238,7 +238,7 @@ impl<N: Network, E: Environment> Message<N, E> {
                 bincode::deserialize(&data[4..36])?,
                 Data::Buffer(data[36..].to_vec()),
             ),
-            10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
+            10 => Self::UnconfirmedTransaction(Data::Buffer(data.to_vec())),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };
 
