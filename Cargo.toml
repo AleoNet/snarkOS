@@ -133,6 +133,9 @@ version = "0.1"
 version = "0.3"
 features = ["env-filter", "parking_lot"]
 
+[dependencies.twox-hash]
+version = "1"
+
 [dev-dependencies.rand_chacha]
 version = "0.3"
 

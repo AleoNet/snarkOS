@@ -29,10 +29,13 @@ use crate::{
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
+use circular_queue::CircularQueue;
 use futures::SinkExt;
+use once_cell::sync::Lazy;
 use rand::{prelude::IteratorRandom, rngs::OsRng, thread_rng, Rng};
 use std::{
     collections::{HashMap, HashSet},
+    hash::{BuildHasher, Hash, Hasher},
     net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant, SystemTime},
@@ -46,6 +49,7 @@ use tokio::{
 };
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
+use twox_hash::RandomXxHashBuilder64;
 
 /// Shorthand for the parent half of the `Peer` outbound message channel.
 pub(crate) type OutboundRouter<N, E> = mpsc::Sender<Message<N, E>>;
@@ -60,6 +64,9 @@ type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
 
 /// Shorthand for the parent half of the connection result channel.
 type ConnectionResult = oneshot::Sender<Result<()>>;
+
+/// A cache containing fast hashes of recent blocks.
+static BLOCK_CACHE: Lazy<RwLock<CircularQueue<u64>>> = Lazy::new(|| RwLock::new(CircularQueue::with_capacity(512)));
 
 ///
 /// An enum of requests that the `Peers` struct processes.
@@ -1179,6 +1186,19 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                             warn!("[PeerRestricted] {}", error);
                                         }
                                         break;
+                                    }
+
+                                    // Procure a fast, short hash of the block hash, and check if it's present in the cache.
+                                    let fast_hash = {
+                                        let mut hasher = RandomXxHashBuilder64::default().build_hasher();
+                                        block_hash.hash(&mut hasher);
+                                        hasher.finish()
+                                    };
+                                    if BLOCK_CACHE.read().await.iter().any(|&e| e == fast_hash) {
+                                        trace!("Skipping 'UnconfirmedBlock {}' from {}", block_height, peer_ip);
+                                        continue;
+                                    } else {
+                                        BLOCK_CACHE.write().await.push(fast_hash);
                                     }
 
                                     // Retrieve the last seen timestamp of the received block.
