@@ -25,7 +25,7 @@ use crate::{
     ProverRouter,
 };
 use snarkos_storage::{storage::Storage, MiningPoolState};
-use snarkvm::dpc::prelude::*;
+use snarkvm::{algorithms::crh::sha256d_to_u64, dpc::prelude::*, utilities::ToBytes};
 
 use anyhow::Result;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
@@ -212,8 +212,25 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     Err(err) => warn!("[ProposedBlock] {}", err),
                 };
 
+                // Determine the score to add for the miner.
+                let proof_bytes = match block.header().proof() {
+                    Some(proof) => match proof.to_bytes_le() {
+                        Ok(bytes) => bytes,
+                        Err(err) => {
+                            warn!("[ProposedBlock] {}", err);
+                            return;
+                        }
+                    },
+                    None => {
+                        warn!("[ProposedBlock] Peer {} sent a candidate block with a missing proof.", peer_ip);
+                        return;
+                    }
+                };
+
+                let hash_difficulty = sha256d_to_u64(&proof_bytes);
+                let shares = u64::MAX / hash_difficulty;
+
                 // Update the score for the miner.
-                let shares = u64::MAX / block.difficulty_target();
                 if let Err(error) = self.state.add_shares(block.height(), &miner_address, shares) {
                     warn!("[ProposedBlock] {}", error);
                 }
