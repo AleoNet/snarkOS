@@ -221,7 +221,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.ledger_router.clone()
     }
 
-    pub(super) async fn shut_down(&self) -> (Arc<Mutex<()>>, Arc<Mutex<()>>) {
+    pub(super) async fn shut_down(&self) -> (Arc<Mutex<()>>, Arc<Mutex<()>>, Arc<parking_lot::RwLock<()>>) {
         debug!("Ledger is shutting down...");
 
         // Set the terminator bit to `true` to ensure it stops mining.
@@ -242,9 +242,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Return the lock for the canon chain and block requests.
         let canon_lock = self.canon_lock.clone();
         let block_requests_lock = self.block_requests_lock.clone();
+        let storage_map_lock = self.canon.shut_down();
         trace!("[ShuttingDown] Block requests lock has been cloned");
 
-        (canon_lock, block_requests_lock)
+        (canon_lock, block_requests_lock, storage_map_lock)
     }
 
     ///
