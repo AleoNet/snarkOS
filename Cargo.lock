@@ -1925,6 +1925,7 @@ name = "snarkvm"
 version = "0.7.5"
 source = "git+https://github.com/AleoHQ/snarkVM.git?rev=471e03b#471e03bb088b5f2d4d6cbeb63403e0cfe70d897b"
 dependencies = [
+ "snarkvm-algorithms",
  "snarkvm-dpc",
  "snarkvm-utilities",
 ]
