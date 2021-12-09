@@ -290,3 +290,37 @@ pub fn nodes_from_connections(connections: &HashSet<Connection>) -> HashSet<Sock
 
     nodes
 }
+
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    #[test]
+    fn connections_partial_eq() {
+        let a = "12.34.56.78:9000".parse().unwrap();
+        let b = "98.76.54.32:1000".parse().unwrap();
+
+        assert_eq!(Connection::new(a, b), Connection::new(b, a));
+        assert_eq!(Connection::new(a, b), Connection::new(a, b));
+    }
+
+    #[test]
+    fn connections_hash() {
+        use std::collections::hash_map::DefaultHasher;
+
+        let a = "11.11.11.11:1000".parse().unwrap();
+        let b = "22.22.22.22:2000".parse().unwrap();
+
+        let mut h1 = DefaultHasher::new();
+        let mut h2 = DefaultHasher::new();
+
+        let k1 = Connection::new(a, b);
+        let k2 = Connection::new(b, a);
+
+        k1.hash(&mut h1);
+        k2.hash(&mut h2);
+
+        // verify k1 == k2 => hash(k1) == hash(k2)
+        assert_eq!(h1.finish(), h2.finish());
+    }
+}
