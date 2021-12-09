@@ -1,8 +1,6 @@
 use parking_lot::RwLock;
 use std::{
-    cmp::Ordering,
     collections::{HashMap, HashSet},
-    hash::{Hash, Hasher},
     net::SocketAddr,
 };
 use time::OffsetDateTime;
@@ -101,4 +99,59 @@ impl KnownNetwork {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    use time::Duration;
+
+    #[test]
+    fn connections_update() {
+        let addr_a = "11.11.11.11:1000".parse().unwrap();
+        let addr_b = "22.22.22.22:2000".parse().unwrap();
+        let addr_c = "33.33.33.33:3000".parse().unwrap();
+        let addr_d = "44.44.44.44:4000".parse().unwrap();
+        let addr_e = "55.55.55.55:5000".parse().unwrap();
+
+        let old_but_valid_timestamp = OffsetDateTime::now_utc() - Duration::hours(STALE_CONNECTION_CUTOFF_TIME_HRS - 1);
+        let stale_timestamp = OffsetDateTime::now_utc() - Duration::hours(STALE_CONNECTION_CUTOFF_TIME_HRS + 1);
+
+        // Seed the known network with the older connections.
+        let old_but_valid_connection = Connection {
+            source: addr_a,
+            target: addr_d,
+            last_seen: old_but_valid_timestamp,
+        };
+
+        let stale_connection = Connection {
+            source: addr_a,
+            target: addr_e,
+            last_seen: stale_timestamp,
+        };
+
+        let mut seeded_connections = HashSet::new();
+        seeded_connections.insert(old_but_valid_connection);
+        seeded_connections.insert(stale_connection);
+
+        let known_network = KnownNetwork {
+            nodes: Default::default(),
+            connections: RwLock::new(seeded_connections),
+        };
+
+        // Insert two connections.
+        known_network.update_connections(addr_a, vec![addr_b, addr_c]);
+        assert!(known_network.connections.read().contains(&Connection::new(addr_a, addr_b)));
+        assert!(known_network.connections.read().contains(&Connection::new(addr_a, addr_c)));
+        assert!(known_network.connections.read().contains(&Connection::new(addr_a, addr_d)));
+        // Assert the stale connection was purged.
+        assert!(!known_network.connections.read().contains(&Connection::new(addr_a, addr_e)));
+
+        // Insert (a, b) connection reversed, make sure it doesn't change the list.
+        known_network.update_connections(addr_b, vec![addr_a]);
+        assert_eq!(known_network.connections.read().len(), 3);
+
+        // Insert (a, d) again and make sure the timestamp was updated.
+        known_network.update_connections(addr_a, vec![addr_d]);
+        assert_ne!(
+            old_but_valid_timestamp,
+            known_network.get_connection(addr_a, addr_d).unwrap().last_seen
+        );
+    }
 }

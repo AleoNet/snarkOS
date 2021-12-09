@@ -1,7 +1,6 @@
-use parking_lot::RwLock;
 use std::{
     cmp::Ordering,
-    collections::{HashMap, HashSet},
+    collections::HashSet,
     hash::{Hash, Hasher},
     net::SocketAddr,
 };
