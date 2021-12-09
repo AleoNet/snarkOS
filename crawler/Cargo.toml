@@ -34,6 +34,9 @@ rev = "471e03b"
 [dependencies.async-trait]
 version = "0.1"
 
+[dependencies.parking_lot]
+version = "0.11.2"
+
 [dependencies.pea2pea]
 version = "0.29"
 
