@@ -97,10 +97,6 @@ impl Crawler {
         task::spawn(async move {
             loop {
                 info!(parent: node.node().span(), "Crawling the netowrk for more peers; asking peers for their peers");
-
-                // 1. Disconnect from N peers.
-                // 2. Connect to N peers?
-
                 node.send_broadcast(ClientMessage::PeerRequest);
                 tokio::time::sleep(Duration::from_secs(PEER_INTERVAL_SECS)).await;
             }
@@ -184,11 +180,11 @@ impl Crawler {
     async fn process_peer_response(&self, source: SocketAddr, peer_ips: Vec<SocketAddr>) -> io::Result<()> {
         let num_connections = self.node().num_connected() + self.node().num_connecting();
         let node = self.clone();
+
         task::spawn(async move {
             for peer_ip in peer_ips.into_iter().filter(|addr| node.node().listening_addr().unwrap() != *addr) {
                 if !node.node().is_connected(peer_ip) && !node.state.peers.lock().await.iter().any(|peer| peer.listening_addr == peer_ip) {
-                    info!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, peer_ip);
-                    let _ = node.node().connect(peer_ip).await;
+                    // Validate the addresses and store the connection map.
                 }
             }
         });
@@ -217,4 +213,80 @@ impl Crawler {
 
         self.send_direct_message(source, msg)
     }
+}
+
+// == CONNECTIONS, todo: restructure crate.
+
+use std::{
+    cmp::Ordering,
+    collections::HashSet,
+    hash::{Hash, Hasher},
+};
+use time::OffsetDateTime;
+
+// Purges connections that haven't been seen within this time (in hours).
+const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
+
+/// A connection between two peers.
+///
+/// Implements `partialEq` and `Hash` manually so that the `source`-`target` order has no impact on equality
+/// (since connections are directionless). The timestamp is also not included in the comparison.
+#[derive(Debug, Eq, Copy, Clone)]
+pub struct Connection {
+    /// One side of the connection.
+    pub source: SocketAddr,
+    /// The other side of the connection.
+    pub target: SocketAddr,
+    /// The last time this peer was seen by the crawler (used determine which connections are
+    /// likely stale).
+    last_seen: OffsetDateTime,
+}
+
+impl PartialEq for Connection {
+    fn eq(&self, other: &Self) -> bool {
+        let (a, b) = (self.source, self.target);
+        let (c, d) = (other.source, other.target);
+
+        a == d && b == c || a == c && b == d
+    }
+}
+
+impl Hash for Connection {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        let (a, b) = (self.source, self.target);
+
+        // This ensures the hash is the same for (a, b) as it is for (b, a).
+        match a.cmp(&b) {
+            Ordering::Greater => {
+                b.hash(state);
+                a.hash(state);
+            }
+            _ => {
+                a.hash(state);
+                b.hash(state);
+            }
+        }
+    }
+}
+
+impl Connection {
+    pub fn new(source: SocketAddr, target: SocketAddr) -> Self {
+        Connection {
+            source,
+            target,
+            last_seen: OffsetDateTime::now_utc(),
+        }
+    }
+}
+
+/// Constructs a set of nodes contained from the connection set.
+pub fn nodes_from_connections(connections: &HashSet<Connection>) -> HashSet<SocketAddr> {
+    let mut nodes: HashSet<SocketAddr> = HashSet::new();
+    for connection in connections.iter() {
+        // Using a hashset guarantees uniqueness.
+        nodes.insert(connection.source);
+        nodes.insert(connection.target);
+    }
+
+    nodes
 }
