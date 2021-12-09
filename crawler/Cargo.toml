@@ -40,6 +40,10 @@ version = "0.29"
 [dependencies.rand]
 version = "0.8"
 
+[dependencies.time]
+version = "0.3.5"
+features = ["local-offset"]
+
 [dependencies.tokio]
 version = "1"
 features = ["macros", "rt-multi-thread", "time"]
@@ -50,3 +54,4 @@ version = "0.1"
 [dependencies.tracing-subscriber]
 version = "0.3"
 features = ["env-filter", "parking_lot"]
+
