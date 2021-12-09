@@ -1082,6 +1082,14 @@ impl<N: Network> LedgerState<N> {
             _ => Err(anyhow!("Ledger storage state is inconsistent")),
         }
     }
+
+    /// Gracefully shuts down the ledger state.
+    // FIXME: currently only obtains the lock that is used to ensure that map operations
+    // can't be interrupted by a shutdown; the real solution is to use batch writes in
+    // rocksdb.
+    pub fn shut_down(&self) -> Arc<RwLock<()>> {
+        self.blocks.map_lock.clone()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1090,6 +1098,7 @@ struct BlockState<N: Network> {
     block_headers: DataMap<N::BlockHash, BlockHeader<N>>,
     block_transactions: DataMap<N::BlockHash, Vec<N::TransactionID>>,
     transactions: TransactionState<N>,
+    map_lock: Arc<RwLock<()>>,
 }
 
 impl<N: Network> BlockState<N> {
@@ -1100,6 +1109,7 @@ impl<N: Network> BlockState<N> {
             block_headers: storage.open_map("block_headers")?,
             block_transactions: storage.open_map("block_transactions")?,
             transactions: TransactionState::open(storage)?,
+            map_lock: Default::default(),
         })
     }
 
@@ -1282,6 +1292,9 @@ impl<N: Network> BlockState<N> {
             let transactions = block.transactions();
             let transaction_ids = transactions.transaction_ids().collect::<Vec<_>>();
 
+            // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+            let _map_lock = self.map_lock.read();
+
             // Insert the block height.
             self.block_heights.insert(&block_height, &block_hash)?;
             // Insert the block header.
@@ -1293,6 +1306,8 @@ impl<N: Network> BlockState<N> {
                 let metadata = Metadata::<N>::new(block_height, block_hash, block.timestamp(), index as u16);
                 self.transactions.add_transaction(transaction, metadata)?;
             }
+
+            // The map lock goes out of scope on its own.
 
             Ok(())
         }
@@ -1326,6 +1341,9 @@ impl<N: Network> BlockState<N> {
             // Retrieve the block height.
             let block_height = block_header.height();
 
+            // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+            let _map_lock = self.map_lock.read();
+
             // Remove the block height.
             self.block_heights.remove(&block_height)?;
             // Remove the block header.
@@ -1336,6 +1354,8 @@ impl<N: Network> BlockState<N> {
             for transaction_ids in transaction_ids.iter() {
                 self.transactions.remove_transaction(transaction_ids)?;
             }
+
+            // The map lock goes out of scope on its own.
 
             Ok(())
         }
