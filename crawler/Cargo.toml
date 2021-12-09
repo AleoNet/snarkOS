@@ -1,0 +1,52 @@
+[package]
+name = "snarkos-crawler"
+version = "2.0.0"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+    "aleo",
+    "cryptography",
+    "blockchain",
+    "decentralized",
+    "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "GPL-3.0"
+edition = "2018"
+
+[dependencies.snarkos]
+path = ".."
+features = ["test"]
+
+[dependencies.snarkos-storage]
+path = "../storage"
+
+[dependencies.snarkos-snode]
+path = "../snode"
+
+[dependencies.snarkvm]
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "471e03b"
+#path = "../../snarkVM"
+
+[dependencies.async-trait]
+version = "0.1"
+
+[dependencies.pea2pea]
+version = "0.29"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.tokio]
+version = "1"
+features = ["macros", "rt-multi-thread", "time"]
+
+[dependencies.tracing]
+version = "0.1"
+
+[dependencies.tracing-subscriber]
+version = "0.3"
+features = ["env-filter", "parking_lot"]

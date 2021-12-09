@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = ["storage", "snode", "testing"]
+members = ["storage", "snode", "testing", "crawler"]
 
 [features]
 default = []
