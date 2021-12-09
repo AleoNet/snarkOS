@@ -11,7 +11,7 @@ use crate::connection::{nodes_from_connections, Connection};
 const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
 
 /// Keeps track of crawled peers and their connections.
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct KnownNetwork {
     // The nodes and their block height if known.
     nodes: RwLock<HashMap<SocketAddr, u32>>,

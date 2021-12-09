@@ -1,2 +1,2 @@
 mod connection;
-mod known_network;
+pub mod known_network;

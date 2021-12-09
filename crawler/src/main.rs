@@ -14,10 +14,13 @@ use std::{
     io,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     ops::Deref,
+    sync::Arc,
     time::Duration,
 };
 use tokio::task;
 use tracing::*;
+
+use snarkos_crawler::known_network::KnownNetwork;
 
 fn main() {}
 
@@ -27,11 +30,14 @@ const PEER_INTERVAL_SECS: u64 = 3;
 pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<Testnet2>>::MAXIMUM_NUMBER_OF_PEERS;
 
 #[derive(Clone)]
-struct Crawler(SynthNode);
+struct Crawler {
+    synth_node: SynthNode,
+    known_network: Arc<KnownNetwork>,
+}
 
 impl Pea2Pea for Crawler {
     fn node(&self) -> &Pea2PeaNode {
-        &self.0.node()
+        &self.synth_node.node()
     }
 }
 
@@ -39,7 +45,7 @@ impl Deref for Crawler {
     type Target = SynthNode;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        &self.synth_node
     }
 }
 
@@ -54,17 +60,25 @@ impl Crawler {
 
         let pea2pea_node = Pea2PeaNode::new(Some(config)).await.unwrap();
         let client_state = Default::default();
-        let node = Self(SynthNode::new(pea2pea_node, client_state));
+        let node = Self {
+            synth_node: SynthNode::new(pea2pea_node, client_state),
+            known_network: Arc::new(KnownNetwork::default()),
+        };
+
         node.enable_disconnect();
         node.enable_handshake();
         node.enable_reading();
         node.enable_writing();
+
         node
     }
 
     /// Creates a test node using the given `Pea2Pea` node.
     pub fn new(node: Pea2PeaNode, state: ClientState) -> Self {
-        Self(SynthNode::new(node, state))
+        Self {
+            synth_node: SynthNode::new(node, state),
+            known_network: Arc::new(KnownNetwork::default()),
+        }
     }
 
     /// Spawns a task dedicated to broadcasting Ping messages.
