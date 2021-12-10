@@ -146,7 +146,7 @@ impl<N: Network> LedgerState<N> {
         // Iterate and append each block hash from genesis to tip to validate ledger state.
         const INCREMENT: u32 = 500;
         let mut start_block_height = 0u32;
-        while start_block_height < latest_block_height {
+        while start_block_height <= latest_block_height {
             // Compute the end block height (inclusive) for this iteration.
             let end_block_height = std::cmp::min(start_block_height.saturating_add(INCREMENT), latest_block_height);
 
@@ -161,8 +161,11 @@ impl<N: Network> LedgerState<N> {
 
             // Split the block hashes into (last_block_hash, [start_block_hash, ..., penultimate_block_hash]).
             if let Some((end_block_hash, block_hashes_excluding_last)) = block_hashes.split_last() {
-                // Add the block hashes (up to penultimate) to the ledger tree.
-                ledger.ledger_tree.write().add_all(block_hashes_excluding_last)?;
+                // It's possible that the batch only contains one block.
+                if !block_hashes_excluding_last.is_empty() {
+                    // Add the block hashes (up to penultimate) to the ledger tree.
+                    ledger.ledger_tree.write().add_all(block_hashes_excluding_last)?;
+                }
 
                 // Check 1 - Ensure the root of the ledger tree matches the one saved in the ledger roots map.
                 let ledger_root = ledger.get_previous_ledger_root(end_block_height)?;
@@ -187,12 +190,12 @@ impl<N: Network> LedgerState<N> {
                 ledger.ledger_tree.write().add(end_block_hash)?;
             }
 
-            // Update the starting block height for the next iteration.
-            start_block_height = std::cmp::min(end_block_height.saturating_add(1), latest_block_height);
-
             // Log the progress of the validation procedure.
-            let progress = (start_block_height as f64 / latest_block_height as f64 * 100f64) as u8;
-            debug!("Validating the ledger up to block {} ({}%)", start_block_height, progress);
+            let progress = (end_block_height as f64 / latest_block_height as f64 * 100f64) as u8;
+            debug!("Validating the ledger up to block {} ({}%)", end_block_height, progress);
+
+            // Update the starting block height for the next iteration.
+            start_block_height = end_block_height.saturating_add(1);
         }
 
         // If this is new storage, the while loop above did not execute,
