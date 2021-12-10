@@ -542,10 +542,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         } else if unconfirmed_block_height == self.canon.latest_block_height() + 1
             && unconfirmed_previous_block_hash == self.canon.latest_block_hash()
         {
-            // Acquire the lock for the canon chain.
-            let _canon_lock = self.canon_lock.lock().await;
             // Acquire the lock for block requests.
             let _block_requests_lock = self.block_requests_lock.lock().await;
+            // Acquire the lock for the canon chain.
+            let _canon_lock = self.canon_lock.lock().await;
 
             // Ensure the block height is not part of a block request on a fork.
             let mut is_block_on_fork = false;
