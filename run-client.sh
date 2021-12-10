@@ -22,7 +22,7 @@ while :
 do
   echo "Checking for updates..."
   git stash
-  STATUS=$(git pull origin testnet2)
+  STATUS=$(git pull)
 
   echo "Running the node..."
   
