@@ -332,12 +332,15 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 }
             }
             PeersRequest::Heartbeat(ledger_reader, ledger_router, prover_router) => {
+                // Obtain the number of connected peers.
+                let number_of_connected_peers = self.number_of_connected_peers().await;
+
                 // Ensure the number of connected peers is below the maximum threshold.
-                if self.number_of_connected_peers().await > E::MAXIMUM_NUMBER_OF_PEERS {
+                if number_of_connected_peers > E::MAXIMUM_NUMBER_OF_PEERS {
                     debug!("Exceeded maximum number of connected peers");
 
                     // Determine the peers to disconnect from.
-                    let num_excess_peers = self.number_of_connected_peers().await.saturating_sub(E::MAXIMUM_NUMBER_OF_PEERS);
+                    let num_excess_peers = number_of_connected_peers.saturating_sub(E::MAXIMUM_NUMBER_OF_PEERS);
                     let peer_ips_to_disconnect = self
                         .connected_peers
                         .read()
@@ -365,7 +368,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 let connected_sync_nodes = self.connected_sync_nodes().await;
                 let number_of_connected_sync_nodes = connected_sync_nodes.len();
                 let num_excess_sync_nodes = number_of_connected_sync_nodes.saturating_sub(1);
-                if num_excess_sync_nodes > 0 {
+                if number_of_connected_peers >= E::MINIMUM_NUMBER_OF_PEERS && num_excess_sync_nodes > 0 {
                     // Proceed to send disconnect requests to these peers.
                     for peer_ip in connected_sync_nodes
                         .iter()
@@ -380,7 +383,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 }
 
                 // Skip if the number of connected peers is above the minimum threshold.
-                match self.number_of_connected_peers().await < E::MINIMUM_NUMBER_OF_PEERS {
+                match number_of_connected_peers < E::MINIMUM_NUMBER_OF_PEERS {
                     true => {
                         trace!("Sending request for more peer connections");
                         // Request more peers if the number of connected peers is below the threshold.
@@ -1172,7 +1175,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 Message::UnconfirmedBlock(block_height, block_hash, block) => {
                                     // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
                                     let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
-                                    if frequency >= 5 {
+                                    if frequency >= 10 {
                                         warn!("Dropping {} for spamming unconfirmed blocks (frequency = {})", peer_ip, frequency);
                                         // Send a `PeerRestricted` message.
                                         if let Err(error) = peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
