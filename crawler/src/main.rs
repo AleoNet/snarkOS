@@ -67,7 +67,7 @@ impl Crawler {
     /// Creates a default crawler node with the most basic network protocols enabled.
     pub async fn default() -> Self {
         let config = Config {
-            listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            listener_ip: Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
             desired_listening_port: Some(4132),
             max_connections: MAXIMUM_NUMBER_OF_PEERS as u16,
             ..Default::default()
