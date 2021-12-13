@@ -63,6 +63,11 @@ impl Storage for RocksDB {
         // Customize database options.
         let mut options = rocksdb::Options::default();
 
+        // FIXME: shorten the prefixes and make them the same length
+        let prefix_extractor = rocksdb::SliceTransform::create_fixed_prefix(16);
+        options.set_prefix_extractor(prefix_extractor);
+        options.set_memtable_prefix_bloom_ratio(0.05);
+
         let primary = path.as_ref().to_path_buf();
         let rocksdb = match is_read_only {
             true => {

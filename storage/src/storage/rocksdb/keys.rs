@@ -18,16 +18,16 @@ use super::*;
 
 /// An iterator over the keys of a prefix.
 pub struct Keys<'a, K> {
-    db_iter: rocksdb::DBRawIterator<'a>,
-    prefix: Vec<u8>,
+    db_iter: rocksdb::DBIterator<'a>,
+    prefix_len: usize,
     _phantom: PhantomData<K>,
 }
 
 impl<'a, K: DeserializeOwned> Keys<'a, K> {
-    pub(crate) fn new(db_iter: rocksdb::DBRawIterator<'a>, prefix: Vec<u8>) -> Self {
+    pub(crate) fn new(db_iter: rocksdb::DBIterator<'a>, prefix_len: usize) -> Self {
         Self {
             db_iter,
-            prefix,
+            prefix_len,
             _phantom: PhantomData,
         }
     }
@@ -37,27 +37,9 @@ impl<'a, K: DeserializeOwned> Iterator for Keys<'a, K> {
     type Item = K;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.db_iter.valid() {
-            let key = match self
-                .db_iter
-                .key()
-                .and_then(|k| {
-                    if k[0..self.prefix.len()] == self.prefix[..] {
-                        Some(k)
-                    } else {
-                        None
-                    }
-                })
-                .map(|k| bincode::deserialize(&k[self.prefix.len()..]).ok())
-            {
-                Some(key) => key,
-                None => None,
-            };
+        let (key, _) = self.db_iter.next()?;
+        let key = bincode::deserialize(&key[self.prefix_len..]).ok()?;
 
-            self.db_iter.next();
-            key
-        } else {
-            None
-        }
+        Some(key)
     }
 }
