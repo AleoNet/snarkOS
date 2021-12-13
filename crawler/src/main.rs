@@ -22,12 +22,26 @@ use tracing::*;
 
 use snarkos_crawler::known_network::KnownNetwork;
 
-fn main() {}
+#[tokio::main]
+async fn main() {
+    // Configure and start crawler.
+    let crawler = Crawler::default().await;
 
-const PING_INTERVAL_SECS: u64 = 5;
-const PEER_INTERVAL_SECS: u64 = 3;
+    crawler.node().connect("165.232.145.194:4132".parse().unwrap()).await.unwrap();
+    crawler.run_periodic_tasks();
 
-pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<Testnet2>>::MAXIMUM_NUMBER_OF_PEERS;
+    tokio::spawn(async move {
+        tokio::time::sleep(Duration::from_secs(5)).await;
+        dbg!(crawler.known_network.nodes().len());
+        dbg!(crawler.known_network.connections().len());
+    });
+}
+
+const PING_INTERVAL_SECS: u64 = 10;
+const PEER_INTERVAL_SECS: u64 = 10;
+
+// pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<Testnet2>>::MAXIMUM_NUMBER_OF_PEERS;
+pub const MAXIMUM_NUMBER_OF_PEERS: usize = 10000;
 
 #[derive(Clone)]
 struct Crawler {
@@ -50,7 +64,7 @@ impl Deref for Crawler {
 }
 
 impl Crawler {
-    /// Creates a default test node with the most basic network protocols enabled.
+    /// Creates a default crawler node with the most basic network protocols enabled.
     pub async fn default() -> Self {
         let config = Config {
             listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
@@ -73,7 +87,7 @@ impl Crawler {
         node
     }
 
-    /// Creates a test node using the given `Pea2Pea` node.
+    /// Creates a crawler node using the given `Pea2Pea` node.
     pub fn new(node: Pea2PeaNode, state: ClientState) -> Self {
         Self {
             synth_node: SynthNode::new(node, state),
@@ -117,7 +131,7 @@ impl Crawler {
         });
     }
 
-    /// Starts the usual periodic activities of a test node.
+    /// Starts the usual periodic activities of a crawler node.
     pub fn run_periodic_tasks(&self) {
         self.send_pings();
         self.update_peers();
@@ -191,14 +205,19 @@ impl Crawler {
         self.send_direct_message(source, msg)
     }
 
-    async fn process_peer_response(&self, source: SocketAddr, peer_ips: Vec<SocketAddr>) -> io::Result<()> {
+    async fn process_peer_response(&self, source: SocketAddr, mut peer_ips: Vec<SocketAddr>) -> io::Result<()> {
         let num_connections = self.node().num_connected() + self.node().num_connecting();
         let node = self.clone();
 
         task::spawn(async move {
-            for peer_ip in peer_ips.into_iter().filter(|addr| node.node().listening_addr().unwrap() != *addr) {
+            // Insert the address into the known network.
+            peer_ips.retain(|addr| node.node().listening_addr().unwrap() != *addr);
+            node.known_network.update_connections(source, peer_ips.clone());
+
+            for peer_ip in peer_ips {
                 if !node.node().is_connected(peer_ip) && !node.state.peers.lock().await.iter().any(|peer| peer.listening_addr == peer_ip) {
-                    // Validate the addresses and store the connection map.
+                    info!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, peer_ip);
+                    let _ = node.node().connect(peer_ip).await;
                 }
             }
         });
@@ -228,5 +247,3 @@ impl Crawler {
         self.send_direct_message(source, msg)
     }
 }
-
-// == CONNECTIONS, todo: restructure crate.

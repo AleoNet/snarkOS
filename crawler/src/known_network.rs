@@ -21,7 +21,7 @@ pub struct KnownNetwork {
 
 impl KnownNetwork {
     // More convenient for testing.
-    fn update_connections(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
+    pub fn update_connections(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
         // Rules:
         //  - if a connecton exists already, do nothing.
         //  - if a connection is new, add it.
