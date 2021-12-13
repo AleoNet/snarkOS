@@ -23,6 +23,9 @@ members = ["storage", "testing"]
 default = []
 test = []
 
+[patch.crates-io]
+termion = { git = "https://gitlab.redox-os.org/Jezza/termion.git", branch = "windows-support" }
+
 [dependencies]
 snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "471e03b" }
 #snarkvm = { path = "../snarkVM" }
