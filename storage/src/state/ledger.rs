@@ -28,7 +28,7 @@ use rand::{CryptoRng, Rng};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     path::Path,
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
@@ -143,18 +143,16 @@ impl<N: Network> LedgerState<N> {
             ledger.blocks.add_block(genesis)?;
         }
 
+        // Check that all canonical block headers exist in storage.
+        let count = ledger.get_block_header_count()?;
+        assert_eq!(count, latest_block_height.saturating_add(1));
+
         // Iterate and append each block hash from genesis to tip to validate ledger state.
         const INCREMENT: u32 = 500;
         let mut start_block_height = 0u32;
         while start_block_height <= latest_block_height {
             // Compute the end block height (inclusive) for this iteration.
             let end_block_height = std::cmp::min(start_block_height.saturating_add(INCREMENT), latest_block_height);
-
-            // Perform a spot check that the block headers for this iteration exists in storage.
-            if start_block_height % 2 == 0 {
-                let block_headers = ledger.get_block_headers(start_block_height, end_block_height)?;
-                assert_eq!(end_block_height - start_block_height + 1, block_headers.len() as u32);
-            }
 
             // Retrieve the block hashes.
             let block_hashes = ledger.get_block_hashes(start_block_height, end_block_height)?;
@@ -419,6 +417,11 @@ impl<N: Network> LedgerState<N> {
     /// Returns the block headers from the given `start_block_height` to `end_block_height` (inclusive).
     pub fn get_block_headers(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<BlockHeader<N>>> {
         self.blocks.get_block_headers(start_block_height, end_block_height)
+    }
+
+    /// Returns the number of all block headers belonging to canonical blocks.
+    pub fn get_block_header_count(&self) -> Result<u32> {
+        self.blocks.get_block_header_count()
     }
 
     /// Returns the transactions from the block of the given block height.
@@ -1225,6 +1228,15 @@ impl<N: Network> BlockState<N> {
             .into_par_iter()
             .map(|height| self.get_block_header(height))
             .collect()
+    }
+
+    /// Returns the number of all block headers belonging to canonical blocks.
+    pub fn get_block_header_count(&self) -> Result<u32> {
+        let block_hashes = self.block_heights.values().collect::<HashSet<_>>();
+
+        let count = self.block_headers.keys().filter(|hash| block_hashes.contains(hash)).count();
+
+        Ok(count as u32)
     }
 
     /// Returns the transactions from the block of the given block height.
