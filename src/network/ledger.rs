@@ -561,6 +561,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         }
                     }
                 }
+                if is_block_on_fork {
+                    break;
+                }
             }
 
             // If the unconfirmed block is not on a fork, attempt to add it as the next block.
