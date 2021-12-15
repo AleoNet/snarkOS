@@ -95,6 +95,8 @@ pub struct LedgerState<N: Network> {
     blocks: BlockState<N>,
     /// The indicator bit and tracker for a ledger in read-only mode.
     read_only: (bool, Arc<AtomicU32>, RwLock<Option<Arc<JoinHandle<()>>>>),
+    /// Used to ensure the database operations aren't interrupted by a shutdown.
+    map_lock: Arc<RwLock<()>>,
 }
 
 impl<N: Network> LedgerState<N> {
@@ -121,6 +123,7 @@ impl<N: Network> LedgerState<N> {
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
             read_only: (is_read_only, Arc::new(AtomicU32::new(0)), RwLock::new(None)),
+            map_lock: Default::default(),
         };
 
         // Determine the latest block height.
@@ -140,7 +143,13 @@ impl<N: Network> LedgerState<N> {
         if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
             let genesis = N::genesis_block();
             ledger.ledger_roots.insert(&genesis.previous_ledger_root(), &genesis.height())?;
+
+            // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+            let _map_lock = ledger.map_lock.read();
+
             ledger.blocks.add_block(genesis)?;
+
+            // The map lock goes out of scope on its own.
         }
 
         // Check that all canonical block headers exist in storage.
@@ -244,6 +253,7 @@ impl<N: Network> LedgerState<N> {
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
             read_only: (is_read_only, Arc::new(AtomicU32::new(0)), RwLock::new(None)),
+            map_lock: Default::default(),
         });
 
         // Determine the latest block height.
@@ -263,8 +273,14 @@ impl<N: Network> LedgerState<N> {
         // If this is new storage, initialize it with the genesis block.
         if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
             let genesis = N::genesis_block();
+
+            // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+            let _map_lock = ledger.map_lock.read();
+
             ledger.ledger_roots.insert(&genesis.previous_ledger_root(), &genesis.height())?;
             ledger.blocks.add_block(genesis)?;
+
+            // The map lock goes out of scope on its own.
         }
 
         // Update the latest ledger state.
@@ -784,6 +800,9 @@ impl<N: Network> LedgerState<N> {
             }
         }
 
+        // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+        let _map_lock = self.map_lock.read();
+
         self.blocks.add_block(block)?;
         self.ledger_tree.write().add(&block.hash())?;
         self.ledger_roots.insert(&block.previous_ledger_root(), &block.height())?;
@@ -791,6 +810,9 @@ impl<N: Network> LedgerState<N> {
         self.latest_block_headers.write().push(block.header().clone());
         *self.latest_block_locators.write() = self.get_block_locators(block.height())?;
         *self.latest_block.write() = block.clone();
+
+        // The map lock goes out of scope on its own.
+
         Ok(())
     }
 
@@ -818,6 +840,9 @@ impl<N: Network> LedgerState<N> {
             .iter()
             .map(|block| (block.height(), block.clone()))
             .collect();
+
+        // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+        let _map_lock = self.map_lock.read();
 
         // Process the block removals.
         let mut current_block_height = latest_block_height;
@@ -848,6 +873,8 @@ impl<N: Network> LedgerState<N> {
         self.regenerate_latest_ledger_state()?;
         // Regenerate the ledger tree.
         self.regenerate_ledger_tree()?;
+
+        // The map lock goes out of scope on its own.
 
         // Return the removed blocks, in increasing order (i.e. 1, 2, 3...).
         Ok(blocks.values().skip(1).cloned().collect())
@@ -1094,7 +1121,7 @@ impl<N: Network> LedgerState<N> {
     // can't be interrupted by a shutdown; the real solution is to use batch writes in
     // rocksdb.
     pub fn shut_down(&self) -> Arc<RwLock<()>> {
-        self.blocks.map_lock.clone()
+        self.map_lock.clone()
     }
 }
 
@@ -1104,7 +1131,6 @@ struct BlockState<N: Network> {
     block_headers: DataMap<N::BlockHash, BlockHeader<N>>,
     block_transactions: DataMap<N::BlockHash, Vec<N::TransactionID>>,
     transactions: TransactionState<N>,
-    map_lock: Arc<RwLock<()>>,
 }
 
 impl<N: Network> BlockState<N> {
@@ -1115,7 +1141,6 @@ impl<N: Network> BlockState<N> {
             block_headers: storage.open_map("block_headers")?,
             block_transactions: storage.open_map("block_transactions")?,
             transactions: TransactionState::open(storage)?,
-            map_lock: Default::default(),
         })
     }
 
@@ -1307,9 +1332,6 @@ impl<N: Network> BlockState<N> {
             let transactions = block.transactions();
             let transaction_ids = transactions.transaction_ids().collect::<Vec<_>>();
 
-            // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
-            let _map_lock = self.map_lock.read();
-
             // Insert the block height.
             self.block_heights.insert(&block_height, &block_hash)?;
             // Insert the block header.
@@ -1321,8 +1343,6 @@ impl<N: Network> BlockState<N> {
                 let metadata = Metadata::<N>::new(block_height, block_hash, block.timestamp(), index as u16);
                 self.transactions.add_transaction(transaction, metadata)?;
             }
-
-            // The map lock goes out of scope on its own.
 
             Ok(())
         }
@@ -1356,9 +1376,6 @@ impl<N: Network> BlockState<N> {
             // Retrieve the block height.
             let block_height = block_header.height();
 
-            // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
-            let _map_lock = self.map_lock.read();
-
             // Remove the block height.
             self.block_heights.remove(&block_height)?;
             // Remove the block header.
@@ -1369,8 +1386,6 @@ impl<N: Network> BlockState<N> {
             for transaction_ids in transaction_ids.iter() {
                 self.transactions.remove_transaction(transaction_ids)?;
             }
-
-            // The map lock goes out of scope on its own.
 
             Ok(())
         }
