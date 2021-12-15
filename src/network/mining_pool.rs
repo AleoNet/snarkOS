@@ -53,6 +53,20 @@ pub enum MiningPoolRequest<N: Network> {
 }
 
 ///
+/// The block template, sent out to all workers on the mining pool.
+///
+#[derive(Debug)]
+pub struct BlockTemplate<N: Network> {
+    pub previous_block_hash: N::BlockHash,
+    pub block_height: u32,
+    pub block_timestamp: i64,
+    pub difficulty_target: u64,
+    pub cumulative_weight: u128,
+    pub ledger_root: N::LedgerRoot,
+    pub transactions: Transactions<N>,
+}
+
+///
 /// A mining pool for a specific network on the node server.
 ///
 #[derive(Debug)]
