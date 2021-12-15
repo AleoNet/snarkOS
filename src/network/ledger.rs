@@ -231,7 +231,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         trace!("[ShuttingDown] Terminator bit has been enabled");
 
         // Clear the unconfirmed blocks.
-        *self.unconfirmed_blocks.write().await = Default::default();
+        self.unconfirmed_blocks.write().await.clear();
         trace!("[ShuttingDown] Pending queue has been cleared");
 
         // Disconnect all connected peers.
@@ -443,7 +443,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             let _block_request_lock = self.block_requests_lock.lock().await;
 
             trace!("Ledger state has become stale, clearing queue and reverting by one block");
-            *self.unconfirmed_blocks.write().await = Default::default();
+            self.unconfirmed_blocks.write().await.clear();
 
             // Reset the memory pool of its transactions.
             if let Err(error) = prover_router.send(ProverRequest::MemoryPoolClear(None)).await {
@@ -646,7 +646,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Set the terminator bit to `true` to ensure the miner resets state.
                 self.terminator.store(true, Ordering::SeqCst);
                 // Reset the unconfirmed blocks.
-                *self.unconfirmed_blocks.write().await = Default::default();
+                self.unconfirmed_blocks.write().await.clear();
 
                 false
             }
