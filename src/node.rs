@@ -60,6 +60,9 @@ pub struct Node {
     /// Specify the password for the RPC server.
     #[structopt(default_value = "pass", long = "password")]
     pub rpc_password: String,
+    /// Specify the node's storage path
+    #[structopt(long)]
+    pub dir: Option<String>,
     /// Specify the verbosity of the node [options: 0, 1, 2, 3]
     #[structopt(default_value = "2", long = "verbosity")]
     pub verbosity: u8,
@@ -109,7 +112,7 @@ impl Node {
                 // so that there is no need to adhere to a specific number assignment logic.
                 PathBuf::from(format!("/tmp/snarkos-test-ledger-{}", _local_ip.port()))
             } else {
-                aleo_std::aleo_ledger_dir(self.network, self.dev)
+                aleo_std::aleo_ledger_dir(self.network, self.dev,self.dir.as_ref())
             }
         }
     }
@@ -122,7 +125,7 @@ impl Node {
                 // so that there is no need to adhere to a specific number assignment logic.
                 PathBuf::from(format!("/tmp/snarkos-test-prover-{}", _local_ip.port()))
             } else {
-                aleo_std::aleo_prover_dir(self.network, self.dev)
+                aleo_std::aleo_prover_dir(self.network, self.dev, self.dir.as_ref())
             }
         }
     }
@@ -264,18 +267,21 @@ pub struct Clean {
     /// Enables development mode, specify the unique ID of the local node to clean.
     #[structopt(long)]
     pub dev: Option<u16>,
+    /// Specify the node's storage path
+    #[structopt(long)]
+    pub dir: Option<String>,
 }
 
 impl Clean {
     pub fn parse(self) -> Result<String> {
         // Remove the specified ledger from storage.
-        Self::remove_ledger(self.network, self.dev)
+        Self::remove_ledger(self.network, self.dev, self.dir.as_ref())
     }
 
     /// Removes the specified ledger from storage.
-    fn remove_ledger(network: u16, dev: Option<u16>) -> Result<String> {
+    fn remove_ledger(network: u16, dev: Option<u16>, dir: Option<&String>) -> Result<String> {
         // Construct the path to the ledger in storage.
-        let path = aleo_std::aleo_ledger_dir(network, dev);
+        let path = aleo_std::aleo_ledger_dir(network, dev, dir);
         // Check if the path to the ledger exists in storage.
         if path.exists() {
             // Remove the ledger files from storage.
