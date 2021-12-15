@@ -549,20 +549,17 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // Ensure the block height is not part of a block request on a fork.
             let mut is_block_on_fork = false;
-            for requests in self.block_requests.read().await.values() {
+            'outer: for requests in self.block_requests.read().await.values() {
                 for request in requests.keys() {
                     // If the unconfirmed block conflicts with a requested block on a fork, skip.
                     if request.block_height == unconfirmed_block_height {
                         if let Some(requested_block_hash) = request.block_hash {
                             if unconfirmed_block.hash() != requested_block_hash {
                                 is_block_on_fork = true;
-                                break;
+                                break 'outer;
                             }
                         }
                     }
-                }
-                if is_block_on_fork {
-                    break;
                 }
             }
 
