@@ -210,7 +210,7 @@ impl<N: Network, E: Environment> Message<N, E> {
     /// Serializes the given message into bytes.
     #[inline]
     pub fn serialize(&self) -> Result<Vec<u8>> {
-        Ok([self.id().to_le_bytes().to_vec(), self.data()?].concat())
+        Ok([&self.id().to_le_bytes()[..], &self.data()?].concat())
     }
 
     /// Deserializes the given buffer into a message.
