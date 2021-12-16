@@ -1,4 +1,4 @@
-use snarkos::{Client, Data, Environment};
+use snarkos::{Client, ClientTrial, Data, Environment};
 use snarkos_snode::{ClientMessage, ClientState, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
 use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
@@ -47,7 +47,7 @@ async fn main() {
 const PING_INTERVAL_SECS: u64 = 10;
 const PEER_INTERVAL_SECS: u64 = 10;
 
-const SYNC_NODES: [&'static str; 13] = <Client<Testnet2>>::SYNC_NODES;
+const SYNC_NODES: [&'static str; 13] = <ClientTrial<Testnet2>>::SYNC_NODES;
 
 // pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<Testnet2>>::MAXIMUM_NUMBER_OF_PEERS;
 pub const MAXIMUM_NUMBER_OF_PEERS: usize = 10000;
