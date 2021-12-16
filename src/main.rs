@@ -36,14 +36,14 @@ fn main() -> Result<()> {
     // Initialize the runtime configuration.
     let runtime = runtime::Builder::new_multi_thread()
         .enable_all()
-        .thread_stack_size(8 * 1024 * 1024)
+        .thread_stack_size(64 * 1024 * 1024)
         .worker_threads((num_cpus::get() / 8 * 2).max(1))
         .max_blocking_threads(num_cpus::get())
         .build()?;
 
     // Initialize the parallelization parameters.
     rayon::ThreadPoolBuilder::new()
-        .stack_size(8 * 1024 * 1024)
+        .stack_size(64 * 1024 * 1024)
         .num_threads((num_cpus::get() / 8 * 5).max(1))
         .build_global()
         .unwrap();
