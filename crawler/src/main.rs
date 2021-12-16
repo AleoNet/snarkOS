@@ -31,9 +31,11 @@ async fn main() {
     crawler.run_periodic_tasks();
 
     tokio::spawn(async move {
-        tokio::time::sleep(Duration::from_secs(5)).await;
-        dbg!(crawler.known_network.nodes().len());
-        dbg!(crawler.known_network.connections().len());
+        loop {
+            tokio::time::sleep(Duration::from_secs(5)).await;
+            dbg!(crawler.known_network.nodes().len());
+            dbg!(crawler.known_network.connections().len());
+        }
     });
 
     std::future::pending::<()>().await;
