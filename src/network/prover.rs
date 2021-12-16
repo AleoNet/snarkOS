@@ -85,8 +85,6 @@ pub struct Prover<N: Network, E: Environment> {
     ledger_reader: LedgerReader<N>,
     /// The ledger router of the node.
     ledger_router: LedgerRouter<N>,
-    /// The address of the pool this node is connected to, if any.
-    pool_address: Option<SocketAddr>,
 }
 
 impl<N: Network, E: Environment> Prover<N, E> {
@@ -101,7 +99,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
-        pool_address: Option<SocketAddr>,
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `Prover` struct.
         let (prover_router, mut prover_handler) = mpsc::channel(1024);
@@ -122,7 +119,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
             peers_router,
             ledger_reader,
             ledger_router,
-            pool_address,
         });
 
         // Initialize the handler for the prover.

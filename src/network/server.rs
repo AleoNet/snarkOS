@@ -101,7 +101,6 @@ impl<N: Network, E: Environment> Server<N, E> {
             peers.router(),
             ledger.reader(),
             ledger.router(),
-            None, //TODO: enter socket addr for pool if applicable
         )
         .await?;
 
