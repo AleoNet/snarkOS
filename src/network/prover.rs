@@ -85,6 +85,8 @@ pub struct Prover<N: Network, E: Environment> {
     ledger_reader: LedgerReader<N>,
     /// The ledger router of the node.
     ledger_router: LedgerRouter<N>,
+    /// The address of the pool this node is connected to, if any.
+    pool_address: Option<SocketAddr>,
 }
 
 impl<N: Network, E: Environment> Prover<N, E> {
