@@ -49,7 +49,7 @@ pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating
 const MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 /// The maximum future block time - 2 minutes.
-const MAXIMUM_FUTURE_BLOCK_TIME: i64 = 120;
+const MAXIMUM_FUTURE_BLOCK_TIME: i64 = 2;
 
 ///
 /// A helper struct containing transaction metadata.
