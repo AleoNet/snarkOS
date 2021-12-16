@@ -103,8 +103,8 @@ pub enum Message<N: Network, E: Environment> {
     GetWork,
     /// BlockTemplate := (block_template)
     BlockTemplate(Data<BlockTemplate<N>>),
-    /// SendShare := (block)
-    SendShare(Data<Block<N>>),
+    /// SendShare := (address, block)
+    SendShare(Address<N>, Data<Block<N>>),
     /// Unused
     #[allow(unused)]
     Unused(PhantomData<E>),
@@ -192,7 +192,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize(transaction)?),
             Self::GetWork => Ok(vec![]),
             Self::BlockTemplate(block_template) => Ok(block_template.serialize_blocking()?),
-            Self::SendShare(block) => Ok(block.serialize_blocking()?),
+            Self::SendShare(address, block) => Ok([bincode::serialize(address)?, block.serialize_blocking()?].concat()),
             Self::Unused(_) => Ok(vec![]),
         }
     }
@@ -259,7 +259,7 @@ impl<N: Network, E: Environment> Message<N, E> {
                 false => return Err(anyhow!("Invalid 'GetWork' message: {:?} {:?}", buffer, data)),
             },
             12 => Self::BlockTemplate(Data::Buffer(data.to_vec())),
-            13 => Self::SendShare(Data::Buffer(data.to_vec())),
+            13 => Self::SendShare(bincode::deserialize(&data[0..32])?, Data::Buffer(data[32..].to_vec())),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };
 
