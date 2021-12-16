@@ -27,7 +27,7 @@ async fn main() {
     // Configure and start crawler.
     let crawler = Crawler::default().await;
 
-    crawler.node().connect("31.135.8.13:4132".parse().unwrap()).await.unwrap();
+    crawler.node().connect("144.126.219.193:4132".parse().unwrap()).await.unwrap();
     crawler.run_periodic_tasks();
 
     tokio::spawn(async move {
