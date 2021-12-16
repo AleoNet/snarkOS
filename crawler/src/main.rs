@@ -28,7 +28,8 @@ async fn main() {
     let crawler = Crawler::default().await;
 
     for addr in SYNC_NODES {
-        crawler.node().connect(addr.parse().unwrap()).await.unwrap();
+        // Ignore connection failures for now.
+        let _ = crawler.node().connect(addr.parse().unwrap()).await;
     }
 
     crawler.run_periodic_tasks();
