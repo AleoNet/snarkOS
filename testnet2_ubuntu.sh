@@ -30,7 +30,7 @@ source $HOME/.cargo/env
 
 # Install snarkOS
 # cargo clean
-cargo install --path .
+cargo build --release
 
 echo "=================================================="
 echo " Attention - Please ensure ports 4132 and 3032"
