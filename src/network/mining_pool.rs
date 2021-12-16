@@ -218,7 +218,10 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                             return;
                         }
                     }
-                    Err(err) => warn!("[ProposedBlock] {}", err),
+                    Err(err) => {
+                        warn!("[ProposedBlock] {}", err);
+                        return;
+                    }
                 };
 
                 // Determine the score to add for the miner.
