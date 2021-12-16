@@ -24,10 +24,11 @@ use crate::{
     PeersRouter,
     ProverRouter,
 };
-use snarkos_storage::{state::BlockTemplate, storage::Storage, MiningPoolState};
+use snarkos_storage::{storage::Storage, BlockTemplate, MiningPoolState};
 use snarkvm::{algorithms::crh::sha256d_to_u64, dpc::prelude::*, utilities::ToBytes};
 
 use anyhow::Result;
+use rand::thread_rng;
 use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
 use tokio::{
     sync::{mpsc, oneshot, RwLock},
@@ -77,6 +78,8 @@ pub struct MiningPool<N: Network, E: Environment> {
     ledger_router: LedgerRouter<N>,
     /// The prover router of the node.
     prover_router: ProverRouter<N>,
+    /// The current block template that is being mined on by the pool.
+    current_template: RwLock<Option<BlockTemplate<N>>>,
 }
 
 impl<N: Network, E: Environment> MiningPool<N, E> {
@@ -108,6 +111,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
             ledger_reader,
             ledger_router,
             prover_router,
+            current_template: RwLock::new(None),
         });
 
         if E::NODE_TYPE == NodeType::MiningPool {
@@ -133,7 +137,18 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
             //  3. Broadcast valid blocks.
             //  4. Pay out and/or assign scores for the miners based on proportional shares or Pay-per-Share.
 
-            if let Some(_recipient) = mining_pool_address {
+            if let Some(recipient) = mining_pool_address {
+                // Set initial block template.
+                let unconfirmed_transactions = mining_pool.memory_pool.read().await.transactions();
+                let mut current_template = mining_pool.current_template.write().await;
+                *current_template = Some(
+                    mining_pool
+                        .ledger_reader
+                        .prepare_block_template(recipient, E::COINBASE_IS_PUBLIC, &unconfirmed_transactions, &mut thread_rng())?
+                        .0,
+                );
+                drop(current_template);
+
                 // Initialize the mining pool process.
                 let mining_pool = mining_pool.clone();
                 let tasks_clone = tasks.clone();
