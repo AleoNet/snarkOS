@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{State, Status, Tasks},
+    helpers::{Status, Tasks},
     Environment,
     LedgerReader,
     LedgerRequest,
@@ -133,44 +133,9 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                 let _ = handler.await;
             }
 
-            // TODO (raychu86): Implement the mining pool.
-            //  1. Send the subscribed miners the block template to mine.
-            //  2. Track the shares sent by the miners.
-            //  3. Broadcast valid blocks.
-            //  4. Pay out and/or assign scores for the miners based on proportional shares or Pay-per-Share.
-
             if let Some(recipient) = mining_pool_address {
                 // Set initial block template.
                 mining_pool.set_block_template(recipient).await?;
-
-                // Initialize the mining pool process.
-                let mining_pool = mining_pool.clone();
-                let tasks_clone = tasks.clone();
-                let (router, handler) = oneshot::channel();
-                tasks.append(task::spawn(async move {
-                    // Notify the outer function that the task is ready.
-                    let _ = router.send(());
-                    loop {
-                        // If the status is not `Peering` or `Mining` already, mine the next block.
-                        if !mining_pool.status.is_peering() && !mining_pool.status.is_mining() {
-                            // Set the status to `Mining`.
-                            mining_pool.status.update(State::Mining);
-
-                            // Send block templates to the miners.
-                            tasks_clone.append(task::spawn(async move {
-                                // TODO (raychu86): Send a block template to the subscribed peers
-                                //  whenever the canon chain advances.
-                            }));
-
-                            // Set the status to `Ready`.
-                            status.update(State::Ready);
-                        }
-                        // Sleep for 2 seconds.
-                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
-                    }
-                }));
-                // Wait until the miner task is ready.
-                let _ = handler.await;
             } else {
                 error!("Missing miner address. Please specify an Aleo address in order to run a mining pool");
             }
