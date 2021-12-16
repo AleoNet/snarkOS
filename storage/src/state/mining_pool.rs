@@ -68,7 +68,6 @@ impl<N: Network> MiningPoolState<N> {
 #[derive(Clone, Debug)]
 #[allow(clippy::type_complexity)]
 struct SharesState<N: Network> {
-    // TODO (raychu86): Introduce concept of `rounds`.
     /// The miner shares for each block height.
     shares: DataMap<u32, HashMap<Address<N>, u64>>,
 }

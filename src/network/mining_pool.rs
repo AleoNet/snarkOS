@@ -16,11 +16,14 @@
 
 use crate::{
     helpers::{Status, Tasks},
+    Data,
     Environment,
     LedgerReader,
     LedgerRequest,
     LedgerRouter,
+    Message,
     NodeType,
+    PeersRequest,
     PeersRouter,
     ProverRouter,
 };
@@ -49,8 +52,8 @@ type MiningPoolHandler<N> = mpsc::Receiver<MiningPoolRequest<N>>;
 pub enum MiningPoolRequest<N: Network> {
     /// ProposedBlock := (peer_ip, proposed_block, miner_address)
     ProposedBlock(SocketAddr, Block<N>, Address<N>),
-    /// GetCurrentBlockTemplate := (peer_ip)
-    GetCurrentBlockTemplate(SocketAddr),
+    /// GetCurrentBlockTemplate := (peer_ip, miner_address)
+    GetCurrentBlockTemplate(SocketAddr, Address<N>),
     /// BlockHeightClear := (block_height)
     BlockHeightClear(u32),
 }
@@ -82,6 +85,9 @@ pub struct MiningPool<N: Network, E: Environment> {
     prover_router: ProverRouter<N>,
     /// The current block template that is being mined on by the pool.
     current_template: RwLock<Option<BlockTemplate<N>>>,
+    /// Peripheral information on each known miner.
+    /// MinerInfo := (last_submitted, share_difficulty, shares_submitted_since_reset)
+    miner_info: RwLock<HashMap<Address<N>, (i64, u64, u32)>>,
 }
 
 impl<N: Network, E: Environment> MiningPool<N, E> {
@@ -114,6 +120,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
             ledger_router,
             prover_router,
             current_template: RwLock::new(None),
+            miner_info: RwLock::new(HashMap::new()),
         });
 
         if E::NODE_TYPE == NodeType::MiningPool {
@@ -161,67 +168,96 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
     pub(super) async fn update(&self, request: MiningPoolRequest<N>) {
         match request {
             MiningPoolRequest::ProposedBlock(peer_ip, block, miner_address) => {
-                // Check that the block is relevant.
-                if self.ledger_reader.latest_block_height().saturating_add(1) != block.height() {
-                    warn!("[ProposedBlock] Peer {} sent a stale candidate block.", peer_ip);
-                    return;
-                }
-
-                // TODO (raychu86): Check that the block is valid except for the block difficulty.
-
-                // Check that the block's coinbase transaction owner is the mining pool address.
-                match block.to_coinbase_transaction() {
-                    Ok(tx) => {
-                        let coinbase_records: Vec<Record<N>> = tx.to_records().collect();
-                        let valid_owner = coinbase_records
-                            .iter()
-                            .map(|r| Some(r.owner()) == self.mining_pool_address)
-                            .fold(false, |a, b| a || b);
-
-                        if !valid_owner {
-                            warn!("[ProposedBlock] Peer {} sent a candidate block with an invalid owner.", peer_ip);
-                            return;
-                        }
-                    }
-                    Err(err) => {
-                        warn!("[ProposedBlock] {}", err);
+                if let Some(current_template) = *self.current_template.read().await {
+                    // Check that the block is relevant.
+                    if self.ledger_reader.latest_block_height().saturating_add(1) != block.height() {
+                        warn!("[ProposedBlock] Peer {} sent a stale candidate block.", peer_ip);
                         return;
                     }
-                };
 
-                // Determine the score to add for the miner.
-                let proof_bytes = match block.header().proof() {
-                    Some(proof) => match proof.to_bytes_le() {
-                        Ok(bytes) => bytes,
+                    // TODO (raychu86): Check that the block is valid except for the block difficulty.
+
+                    // Check that the block's coinbase transaction owner is the mining pool address.
+                    match block.to_coinbase_transaction() {
+                        Ok(tx) => {
+                            let coinbase_records: Vec<Record<N>> = tx.to_records().collect();
+                            let valid_owner = coinbase_records
+                                .iter()
+                                .map(|r| Some(r.owner()) == self.mining_pool_address)
+                                .fold(false, |a, b| a || b);
+
+                            if !valid_owner {
+                                warn!("[ProposedBlock] Peer {} sent a candidate block with an invalid owner.", peer_ip);
+                                return;
+                            }
+                        }
                         Err(err) => {
                             warn!("[ProposedBlock] {}", err);
                             return;
                         }
-                    },
-                    None => {
-                        warn!("[ProposedBlock] Peer {} sent a candidate block with a missing proof.", peer_ip);
+                    };
+
+                    // Determine the score to add for the miner.
+                    let proof_bytes = match block.header().proof() {
+                        Some(proof) => match proof.to_bytes_le() {
+                            Ok(bytes) => bytes,
+                            Err(err) => {
+                                warn!("[ProposedBlock] {}", err);
+                                return;
+                            }
+                        },
+                        None => {
+                            warn!("[ProposedBlock] Peer {} sent a candidate block with a missing proof.", peer_ip);
+                            return;
+                        }
+                    };
+
+                    let hash_difficulty = sha256d_to_u64(&proof_bytes);
+                    let info = self.miner_info.write().await;
+                    let share_difficulty = match info.get(&miner_address) {
+                        Some((_, share_difficulty, _)) => *share_difficulty,
+                        None => {
+                            let share_difficulty = current_template.difficulty_target.saturating_mul(50);
+                            let miner_info = self
+                                .miner_info
+                                .write()
+                                .await
+                                .insert(miner_address, (chrono::Utc::now().timestamp(), share_difficulty, 0));
+
+                            share_difficulty
+                        }
+                    };
+
+                    if hash_difficulty > share_difficulty {
+                        warn!("[ProposedBlock] faulty share submitted by {}", miner_address);
                         return;
                     }
-                };
 
-                let hash_difficulty = sha256d_to_u64(&proof_bytes);
-                let shares = u64::MAX / hash_difficulty;
-
-                // Update the score for the miner.
-                if let Err(error) = self.state.add_shares(block.height(), &miner_address, shares) {
-                    warn!("[ProposedBlock] {}", error);
-                }
-
-                // If the block is valid, broadcast it.
-                if block.is_valid() {
-                    debug!("Mining pool has found unconfirmed block {} ({})", block.height(), block.hash());
-                    // TODO (raychu86): Store the coinbase record.
-
-                    // Broadcast the next block.
-                    let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
-                    if let Err(error) = self.ledger_router.send(request).await {
-                        warn!("Failed to broadcast mined block - {}", error);
+                    // Update the score for the miner.
+                    // TODO: add round stuff
+                    if let Err(error) = self.state.add_shares(block.height(), &miner_address, 1) {
+                        warn!("[ProposedBlock] {}", error);
                     }
+
+                    // Since a worker will swap out the difficulty target for their share target,
+                    // let's put it back to the original value before checking the POSW for true
+                    // validity.
+                    let difficulty_target = current_template.difficulty_target;
+                    block.set_difficulty_target(difficulty_target);
+
+                    // If the block is valid, broadcast it.
+                    if block.is_valid() {
+                        debug!("Mining pool has found unconfirmed block {} ({})", block.height(), block.hash());
+                        // TODO (raychu86): Store the coinbase record.
+
+                        // Broadcast the next block.
+                        let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
+                        if let Err(error) = self.ledger_router.send(request).await {
+                            warn!("Failed to broadcast mined block - {}", error);
+                        }
+                    }
+                } else {
+                    warn!("[ProposedBlock] No current template exists");
                 }
             }
             MiningPoolRequest::BlockHeightClear(block_height) => {
@@ -230,17 +266,50 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     warn!("[BlockHeightClear] {}", error);
                 }
             }
+            MiningPoolRequest::GetCurrentBlockTemplate(peer_ip, address) => {
+                if let Some(current_template) = *self.current_template.read().await {
+                    // Ensure this miner exists in the info list first, so we can get their share
+                    // difficulty.
+                    if let None = self.miner_info.read().await.get(&address) {
+                        // If not, let's add them.
+                        let share_difficulty = current_template.difficulty_target.saturating_mul(50);
+                        let miner_info = self
+                            .miner_info
+                            .write()
+                            .await
+                            .insert(address, (chrono::Utc::now().timestamp(), share_difficulty, 0));
+                    }
+
+                    let share_difficulty = self
+                        .miner_info
+                        .read()
+                        .await
+                        .get(&address)
+                        .expect("miner should exist in miner_info")
+                        .1;
+                    if let Err(error) = self
+                        .peers_router
+                        .send(PeersRequest::MessageSend(
+                            peer_ip,
+                            Message::BlockTemplate(share_difficulty, Data::Object(current_template)),
+                        ))
+                        .await
+                    {
+                        warn!("[ProposedBlock] {}", error);
+                    }
+                } else {
+                    warn!("[ProposedBlock] No current block template exists");
+                }
+            }
         }
     }
 
     async fn set_block_template(&self, recipient: Address<N>) -> Result<()> {
         let unconfirmed_transactions = self.memory_pool.read().await.transactions();
         let mut current_template = self.current_template.write().await;
-        let (mut block_template, _) =
+        let (block_template, _) =
             self.ledger_reader
                 .prepare_block_template(recipient, E::COINBASE_IS_PUBLIC, &unconfirmed_transactions, &mut thread_rng())?;
-
-        // TODO: Ensure the difficulty target is low enough for miners to produce valid shares.
 
         *current_template = Some(block_template);
         Ok(())
