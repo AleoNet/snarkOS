@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{helpers::State, Environment, NodeType};
-use snarkos_storage::BlockLocators;
+use snarkos_storage::{BlockLocators, BlockTemplate};
 use snarkvm::prelude::*;
 
 use ::bytes::{Buf, BytesMut};
@@ -99,6 +99,12 @@ pub enum Message<N: Network, E: Environment> {
     UnconfirmedBlock(u32, N::BlockHash, Data<Block<N>>),
     /// UnconfirmedTransaction := (transaction)
     UnconfirmedTransaction(Transaction<N>),
+    /// GetWork := ()
+    GetWork,
+    /// BlockTemplate := (block_template)
+    BlockTemplate(Data<BlockTemplate<N>>),
+    /// SendShare := (block)
+    SendShare(Data<Block<N>>),
     /// Unused
     #[allow(unused)]
     Unused(PhantomData<E>),
@@ -120,6 +126,9 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Pong(..) => "Pong",
             Self::UnconfirmedBlock(..) => "UnconfirmedBlock",
             Self::UnconfirmedTransaction(..) => "UnconfirmedTransaction",
+            Self::GetWork => "GetWork",
+            Self::BlockTemplate(..) => "BlockTemplate",
+            Self::SendShare(..) => "SendShare",
             Self::Unused(..) => "Unused",
         }
     }
@@ -139,7 +148,10 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Pong(..) => 8,
             Self::UnconfirmedBlock(..) => 9,
             Self::UnconfirmedTransaction(..) => 10,
-            Self::Unused(..) => 11,
+            Self::GetWork => 11,
+            Self::BlockTemplate(..) => 12,
+            Self::SendShare(..) => 13,
+            Self::Unused(..) => 14,
         }
     }
 
@@ -178,6 +190,9 @@ impl<N: Network, E: Environment> Message<N, E> {
             ]
             .concat()),
             Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize(transaction)?),
+            Self::GetWork => Ok(vec![]),
+            Self::BlockTemplate(block_template) => Ok(block_template.serialize_blocking()?),
+            Self::SendShare(block) => Ok(block.serialize_blocking()?),
             Self::Unused(_) => Ok(vec![]),
         }
     }
@@ -239,6 +254,12 @@ impl<N: Network, E: Environment> Message<N, E> {
                 Data::Buffer(data[36..].to_vec()),
             ),
             10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
+            11 => match data.is_empty() {
+                true => Self::GetWork,
+                false => return Err(anyhow!("Invalid 'GetWork' message: {:?} {:?}", buffer, data)),
+            },
+            12 => Self::BlockTemplate(Data::Buffer(data.to_vec())),
+            13 => Self::SendShare(Data::Buffer(data.to_vec())),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };
 
