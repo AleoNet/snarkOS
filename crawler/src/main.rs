@@ -153,6 +153,10 @@ impl Reading for Crawler {
         reader.read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE])?;
         let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
 
+        if len > buf.len() {
+            return Ok(None);
+        }
+
         if reader.read_exact(&mut buf[..len]).is_err() {
             return Ok(None);
         }
