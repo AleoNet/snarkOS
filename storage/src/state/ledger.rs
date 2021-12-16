@@ -468,15 +468,12 @@ impl<N: Network> LedgerState<N> {
         // Determine the number of latest block headers to include as block locators (linear).
         let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS, block_locator_height);
 
-        // Acquire the read lock for the latest block hashes and block headers.
-        let latest_block_hashes = self.latest_block_hashes.read();
-        let latest_block_headers = self.latest_block_headers.read();
-
         // Construct the list of block locator headers.
-        let block_hashes = latest_block_hashes.iter().cloned();
-        let block_headers = latest_block_headers.iter().cloned();
+        let block_hashes = self.latest_block_hashes.read().asc_iter().cloned().collect::<Vec<_>>();
+        let block_headers = self.latest_block_headers.read().asc_iter().cloned().collect::<Vec<_>>();
         let block_locator_headers = block_hashes
-            .zip_eq(block_headers)
+            .into_iter()
+            .zip_eq(block_headers.into_iter())
             .take(num_block_headers as usize)
             .map(|(hash, header)| (header.height(), (hash, Some(header))));
 
