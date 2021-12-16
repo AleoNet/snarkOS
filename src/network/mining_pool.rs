@@ -239,6 +239,12 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                         warn!("[ProposedBlock] {}", error);
                     }
 
+                    // Update miner info for this miner.
+                    let mut miner_info = info.get(&miner_address).expect("miner should have existing info");
+                    miner_info.0 = chrono::Utc::now().timestamp();
+                    miner_info.2 += 1;
+                    info.insert(miner_address, *miner_info);
+
                     // Since a worker will swap out the difficulty target for their share target,
                     // let's put it back to the original value before checking the POSW for true
                     // validity.
