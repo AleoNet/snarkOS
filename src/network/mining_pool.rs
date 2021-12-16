@@ -139,15 +139,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
 
             if let Some(recipient) = mining_pool_address {
                 // Set initial block template.
-                let unconfirmed_transactions = mining_pool.memory_pool.read().await.transactions();
-                let mut current_template = mining_pool.current_template.write().await;
-                *current_template = Some(
-                    mining_pool
-                        .ledger_reader
-                        .prepare_block_template(recipient, E::COINBASE_IS_PUBLIC, &unconfirmed_transactions, &mut thread_rng())?
-                        .0,
-                );
-                drop(current_template);
+                mining_pool.set_block_template(recipient).await?;
 
                 // Initialize the mining pool process.
                 let mining_pool = mining_pool.clone();
@@ -269,5 +261,18 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                 }
             }
         }
+    }
+
+    async fn set_block_template(&self, recipient: Address<N>) -> Result<()> {
+        let unconfirmed_transactions = self.memory_pool.read().await.transactions();
+        let mut current_template = self.current_template.write().await;
+        let (mut block_template, _) =
+            self.ledger_reader
+                .prepare_block_template(recipient, E::COINBASE_IS_PUBLIC, &unconfirmed_transactions, &mut thread_rng())?;
+
+        // TODO: Ensure the difficulty target is low enough for miners to produce valid shares.
+
+        *current_template = Some(block_template);
+        Ok(())
     }
 }
