@@ -52,6 +52,20 @@ const MAXIMUM_FORK_DEPTH: u32 = 4096;
 const MAXIMUM_FUTURE_BLOCK_TIME: i64 = 120;
 
 ///
+/// The block template, sent out to all workers on the mining pool.
+///
+#[derive(Debug)]
+pub struct BlockTemplate<N: Network> {
+    pub previous_block_hash: N::BlockHash,
+    pub block_height: u32,
+    pub block_timestamp: i64,
+    pub difficulty_target: u64,
+    pub cumulative_weight: u128,
+    pub ledger_root: N::LedgerRoot,
+    pub transactions: Transactions<N>,
+}
+
+///
 /// A helper struct containing transaction metadata.
 ///
 /// *Attention*: This data structure is intended for usage in storage only.
@@ -587,15 +601,13 @@ impl<N: Network> LedgerState<N> {
         Ok(true)
     }
 
-    /// Mines a new block using the latest state of the given ledger.
-    pub fn mine_next_block<R: Rng + CryptoRng>(
+    /// Prepares a block template to be mined.
+    pub fn prepare_block_template<R: Rng + CryptoRng>(
         &self,
         recipient: Address<N>,
         is_public: bool,
         transactions: &[Transaction<N>],
-        terminator: &AtomicBool,
-        rng: &mut R,
-    ) -> Result<(Block<N>, Record<N>)> {
+    ) -> BlockTemplate {
         // Prepare the new block.
         let previous_block_hash = self.latest_block_hash();
         let block_height = self.latest_block_height() + 1;
@@ -656,8 +668,7 @@ impl<N: Network> LedgerState<N> {
         // Construct the new block transactions.
         let transactions = Transactions::from(&transactions)?;
 
-        // Mine the next block.
-        match Block::mine(
+        BlockTemplate {
             previous_block_hash,
             block_height,
             block_timestamp,
@@ -665,6 +676,29 @@ impl<N: Network> LedgerState<N> {
             cumulative_weight,
             ledger_root,
             transactions,
+        }
+    }
+
+    /// Mines a new block using the latest state of the given ledger.
+    pub fn mine_next_block<R: Rng + CryptoRng>(
+        &self,
+        recipient: Address<N>,
+        is_public: bool,
+        transactions: &[Transaction<N>],
+        terminator: &AtomicBool,
+        rng: &mut R,
+    ) -> Result<(Block<N>, Record<N>)> {
+        let template = self.prepare_block_template(recipient, is_public, transactions);
+
+        // Mine the next block.
+        match Block::mine(
+            template.previous_block_hash,
+            template.block_height,
+            template.block_timestamp,
+            template.difficulty_target,
+            template.cumulative_weight,
+            template.ledger_root,
+            template.transactions,
             terminator,
             rng,
         ) {
