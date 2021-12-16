@@ -27,7 +27,10 @@ async fn main() {
     // Configure and start crawler.
     let crawler = Crawler::default().await;
 
-    crawler.node().connect("144.126.219.193:4132".parse().unwrap()).await.unwrap();
+    for addr in SYNC_NODES {
+        crawler.node().connect(addr.parse().unwrap()).await.unwrap();
+    }
+
     crawler.run_periodic_tasks();
 
     tokio::spawn(async move {
@@ -43,6 +46,8 @@ async fn main() {
 
 const PING_INTERVAL_SECS: u64 = 10;
 const PEER_INTERVAL_SECS: u64 = 10;
+
+const SYNC_NODES: [&'static str; 13] = <Client<Testnet2>>::SYNC_NODES;
 
 // pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<Testnet2>>::MAXIMUM_NUMBER_OF_PEERS;
 pub const MAXIMUM_NUMBER_OF_PEERS: usize = 10000;
