@@ -22,6 +22,7 @@ pub use helpers::BlockLocators;
 
 pub(crate) mod state;
 pub use state::{
+    BlockTemplate,
     LedgerState,
     Metadata,
     MiningPoolState,
