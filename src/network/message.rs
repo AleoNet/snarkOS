@@ -21,10 +21,10 @@ use crate::{
 use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::posw::PoSWProof, prelude::*};
 
-use ::bytes::{Buf, Bytes, BytesMut};
+use ::bytes::{Buf, BufMut, Bytes, BytesMut};
 use anyhow::{anyhow, Result};
 use serde::{de::DeserializeOwned, Serialize};
-use std::{marker::PhantomData, net::SocketAddr};
+use std::{io::Write, marker::PhantomData, net::SocketAddr};
 use tokio::task;
 use tokio_util::codec::{Decoder, Encoder};
 
@@ -57,10 +57,10 @@ impl<T: 'static + Serialize + DeserializeOwned + Send> Data<T> {
         }
     }
 
-    pub fn serialize_blocking(&self) -> bincode::Result<Vec<u8>> {
+    pub fn serialize_blocking_into<W: Write>(&self, writer: &mut W) -> Result<()> {
         match self {
-            Self::Object(x) => bincode::serialize(x),
-            Self::Buffer(bytes) => Ok(bytes.to_vec()),
+            Self::Object(x) => Ok(bincode::serialize_into(writer, x)?),
+            Self::Buffer(bytes) => Ok(writer.write_all(bytes)?),
         }
     }
 
@@ -160,20 +160,26 @@ impl<N: Network, E: Environment> Message<N, E> {
 
     /// Returns the message data as bytes.
     #[inline]
-    pub fn data(&self) -> Result<Vec<u8>> {
+    pub fn serialize_data_into<W: Write>(&self, writer: &mut W) -> Result<()> {
         match self {
-            Self::BlockRequest(start_block_height, end_block_height) => Ok(to_bytes_le![start_block_height, end_block_height]?),
-            Self::BlockResponse(block) => Ok(block.serialize_blocking()?),
-            Self::ChallengeRequest(version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight) => Ok(
-                bincode::serialize(&(version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight))?,
-            ),
-            Self::ChallengeResponse(block_header) => Ok(block_header.serialize_blocking()?),
-            Self::Disconnect => Ok(vec![]),
-            Self::PeerRequest => Ok(vec![]),
-            Self::PeerResponse(peer_ips) => Ok(bincode::serialize(peer_ips)?),
+            Self::BlockRequest(start_block_height, end_block_height) => {
+                let bytes = to_bytes_le![start_block_height, end_block_height]?;
+                Ok(writer.write_all(&bytes)?)
+            }
+            Self::BlockResponse(block) => block.serialize_blocking_into(writer),
+            Self::ChallengeRequest(version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight) => {
+                Ok(bincode::serialize_into(
+                    writer,
+                    &(version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight),
+                )?)
+            }
+            Self::ChallengeResponse(block_header) => Ok(block_header.serialize_blocking_into(writer)?),
+            Self::Disconnect => Ok(()),
+            Self::PeerRequest => Ok(()),
+            Self::PeerResponse(peer_ips) => Ok(bincode::serialize_into(writer, peer_ips)?),
             Self::Ping(version, fork_depth, node_type, status, block_hash, block_header) => {
-                let non_deferred = bincode::serialize(&(version, fork_depth, node_type, status, block_hash))?;
-                Ok([non_deferred, block_header.serialize_blocking()?].concat())
+                bincode::serialize_into(&mut *writer, &(version, fork_depth, node_type, status, block_hash))?;
+                block_header.serialize_blocking_into(writer)
             }
             Self::Pong(is_fork, block_locators) => {
                 let serialized_is_fork: u8 = match is_fork {
@@ -184,33 +190,35 @@ impl<N: Network, E: Environment> Message<N, E> {
                     },
                 };
 
-                Ok([vec![serialized_is_fork], block_locators.serialize_blocking()?].concat())
+                writer.write_all(&[serialized_is_fork])?;
+                block_locators.serialize_blocking_into(writer)
             }
-            Self::UnconfirmedBlock(block_height, block_hash, block) => Ok([
-                block_height.to_le_bytes().to_vec(),
-                block_hash.to_bytes_le()?,
-                block.serialize_blocking()?,
-            ]
-            .concat()),
-            Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize(transaction)?),
-            Self::PoolRegister(address) => Ok(bincode::serialize(address)?),
+            Self::UnconfirmedBlock(block_height, block_hash, block) => {
+                writer.write_all(&block_height.to_le_bytes())?;
+                writer.write_all(&block_hash.to_bytes_le()?)?;
+                block.serialize_blocking_into(writer)
+            }
+            Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize_into(writer, transaction)?),
+            Self::PoolRegister(address) => Ok(bincode::serialize_into(writer, address)?),
             Self::PoolRequest(share_difficulty, block_template) => {
-                Ok([bincode::serialize(share_difficulty)?, block_template.serialize_blocking()?].concat())
+                bincode::serialize_into(&mut *writer, share_difficulty)?;
+                block_template.serialize_blocking_into(writer)
             }
-            Self::PoolResponse(address, nonce, proof) => Ok([
-                bincode::serialize(address)?,
-                bincode::serialize(nonce)?,
-                proof.serialize_blocking()?,
-            ]
-            .concat()),
-            Self::Unused(_) => Ok(vec![]),
+            Self::PoolResponse(address, nonce, proof) => {
+                bincode::serialize_into(&mut *writer, address)?;
+                bincode::serialize_into(&mut *writer, nonce)?;
+                proof.serialize_blocking_into(writer)
+            }
+            Self::Unused(_) => Ok(()),
         }
     }
 
     /// Serializes the given message into bytes.
     #[inline]
-    pub fn serialize(&self) -> Result<Vec<u8>> {
-        Ok([&self.id().to_le_bytes()[..], &self.data()?].concat())
+    pub fn serialize_into<W: Write>(&self, writer: &mut W) -> Result<()> {
+        writer.write_all(&self.id().to_le_bytes()[..])?;
+
+        self.serialize_data_into(writer)
     }
 
     /// Deserializes the given buffer into a message.
@@ -265,11 +273,11 @@ impl<N: Network, E: Environment> Message<N, E> {
             ),
             10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
             11 => Self::PoolRegister(bincode::deserialize(data)?),
-            12 => Self::PoolRequest(bincode::deserialize(&data[0..8])?, Data::Buffer(data[8..].to_vec())),
+            12 => Self::PoolRequest(bincode::deserialize(&data[0..8])?, Data::Buffer(data[8..].to_vec().into())),
             13 => Self::PoolResponse(
                 bincode::deserialize(&data[0..32])?,
                 bincode::deserialize(&data[32..64])?,
-                Data::Buffer(data[64..].to_vec()),
+                Data::Buffer(data[64..].to_vec().into()),
             ),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };
@@ -282,28 +290,18 @@ impl<N: Network, E: Environment> Encoder<Message<N, E>> for Message<N, E> {
     type Error = anyhow::Error;
 
     fn encode(&mut self, message: Message<N, E>, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        // Serialize the message into a buffer.
-        let buffer = message.serialize()?;
+        // Prepare the room for the length of the payload.
+        dst.extend_from_slice(&0u32.to_le_bytes());
 
-        // Ensure the message does not exceed the maximum length limit.
-        if buffer.len() > E::MAXIMUM_MESSAGE_SIZE {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("Frame of length {} is too large.", buffer.len()),
-            )
-            .into());
-        }
+        // Serialize the payload directly into dst.
+        message.serialize_into(&mut dst.writer())?;
 
-        // Convert the length into a byte array.
-        // The cast to u32 cannot overflow due to the length check above.
-        let len_slice = u32::to_le_bytes(buffer.len() as u32);
+        // Calculate the length of the serialized payload.
+        let len_slice = (dst[4..].len() as u32).to_le_bytes();
 
-        // Reserve space in the buffer.
-        dst.reserve(4 + buffer.len());
+        // Overwrite the initial 4B reserved before with the length of the payload.
+        dst[..4].copy_from_slice(&len_slice);
 
-        // Write the length and string to the buffer.
-        dst.extend_from_slice(&len_slice);
-        dst.extend_from_slice(&buffer);
         Ok(())
     }
 }
