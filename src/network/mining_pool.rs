@@ -24,7 +24,7 @@ use crate::{
     PeersRouter,
     ProverRouter,
 };
-use snarkos_storage::{storage::Storage, MiningPoolState};
+use snarkos_storage::{state::BlockTemplate, storage::Storage, MiningPoolState};
 use snarkvm::{algorithms::crh::sha256d_to_u64, dpc::prelude::*, utilities::ToBytes};
 
 use anyhow::Result;
@@ -50,20 +50,6 @@ pub enum MiningPoolRequest<N: Network> {
     ProposedBlock(SocketAddr, Block<N>, Address<N>),
     /// BlockHeightClear := (block_height)
     BlockHeightClear(u32),
-}
-
-///
-/// The block template, sent out to all workers on the mining pool.
-///
-#[derive(Debug)]
-pub struct BlockTemplate<N: Network> {
-    pub previous_block_hash: N::BlockHash,
-    pub block_height: u32,
-    pub block_timestamp: i64,
-    pub difficulty_target: u64,
-    pub cumulative_weight: u128,
-    pub ledger_root: N::LedgerRoot,
-    pub transactions: Transactions<N>,
 }
 
 ///
