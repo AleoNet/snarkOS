@@ -99,10 +99,10 @@ pub enum Message<N: Network, E: Environment> {
     UnconfirmedBlock(u32, N::BlockHash, Data<Block<N>>),
     /// UnconfirmedTransaction := (transaction)
     UnconfirmedTransaction(Transaction<N>),
-    /// GetWork := ()
-    GetWork,
-    /// BlockTemplate := (block_template)
-    BlockTemplate(Data<BlockTemplate<N>>),
+    /// GetWork := (address)
+    GetWork(Address<N>),
+    /// BlockTemplate := (share_difficulty, block_template)
+    BlockTemplate(u64, Data<BlockTemplate<N>>),
     /// SendShare := (address, block)
     SendShare(Address<N>, Data<Block<N>>),
     /// Unused
@@ -126,7 +126,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Pong(..) => "Pong",
             Self::UnconfirmedBlock(..) => "UnconfirmedBlock",
             Self::UnconfirmedTransaction(..) => "UnconfirmedTransaction",
-            Self::GetWork => "GetWork",
+            Self::GetWork(..) => "GetWork",
             Self::BlockTemplate(..) => "BlockTemplate",
             Self::SendShare(..) => "SendShare",
             Self::Unused(..) => "Unused",
@@ -148,7 +148,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Pong(..) => 8,
             Self::UnconfirmedBlock(..) => 9,
             Self::UnconfirmedTransaction(..) => 10,
-            Self::GetWork => 11,
+            Self::GetWork(..) => 11,
             Self::BlockTemplate(..) => 12,
             Self::SendShare(..) => 13,
             Self::Unused(..) => 14,
@@ -190,8 +190,10 @@ impl<N: Network, E: Environment> Message<N, E> {
             ]
             .concat()),
             Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize(transaction)?),
-            Self::GetWork => Ok(vec![]),
-            Self::BlockTemplate(block_template) => Ok(block_template.serialize_blocking()?),
+            Self::GetWork(address) => Ok(bincode::serialize(address)?),
+            Self::BlockTemplate(share_difficulty, block_template) => {
+                Ok([bincode::serialize(share_difficulty)?, block_template.serialize_blocking()?].concat())
+            }
             Self::SendShare(address, block) => Ok([bincode::serialize(address)?, block.serialize_blocking()?].concat()),
             Self::Unused(_) => Ok(vec![]),
         }
@@ -254,11 +256,8 @@ impl<N: Network, E: Environment> Message<N, E> {
                 Data::Buffer(data[36..].to_vec()),
             ),
             10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
-            11 => match data.is_empty() {
-                true => Self::GetWork,
-                false => return Err(anyhow!("Invalid 'GetWork' message: {:?} {:?}", buffer, data)),
-            },
-            12 => Self::BlockTemplate(Data::Buffer(data.to_vec())),
+            11 => Self::GetWork(bincode::deserialize(data)?),
+            12 => Self::BlockTemplate(bincode::deserialize(&data[0..8])?, Data::Buffer(data[8..].to_vec())),
             13 => Self::SendShare(bincode::deserialize(&data[0..32])?, Data::Buffer(data[32..].to_vec())),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };

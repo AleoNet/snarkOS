@@ -1270,17 +1270,17 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         }
                                     }
                                 }
-                                Message::GetWork => {
+                                Message::GetWork(address) => {
                                     if E::NODE_TYPE != NodeType::MiningPool {
                                         trace!("Skipping 'GetWork' from {}", peer_ip);
                                     } else {
-                                        if let Err(error) = mining_pool_router.send(MiningPoolRequest::GetCurrentBlockTemplate(peer_ip)).await {
+                                        if let Err(error) = mining_pool_router.send(MiningPoolRequest::GetCurrentBlockTemplate(peer_ip, address)).await {
                                                 warn!("[GetWork] {}", error);
                                         }
                                     }
                                 }
-                                Message::BlockTemplate(block_template) => {
-                                    if let Err(error) = prover_router.send(ProverRequest::BlockTemplate(peer_ip, block_template)).await {
+                                Message::BlockTemplate(share_difficulty, block_template) => {
+                                    if let Err(error) = worker_router.send(WorkerRequest::BlockTemplate(peer_ip, share_difficulty, block_template)).await {
                                         warn!("[BlockTemplate] {}", error);
                                     }
                                 }
