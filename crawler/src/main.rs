@@ -27,7 +27,7 @@ async fn main() {
     // Configure and start crawler.
     let crawler = Crawler::default().await;
 
-    crawler.node().connect("165.232.145.194:4132".parse().unwrap()).await.unwrap();
+    crawler.node().connect("31.135.8.13:4132".parse().unwrap()).await.unwrap();
     crawler.run_periodic_tasks();
 
     tokio::spawn(async move {
@@ -35,6 +35,8 @@ async fn main() {
         dbg!(crawler.known_network.nodes().len());
         dbg!(crawler.known_network.connections().len());
     });
+
+    std::future::pending::<()>().await;
 }
 
 const PING_INTERVAL_SECS: u64 = 10;
