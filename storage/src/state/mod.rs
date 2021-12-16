@@ -15,7 +15,14 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 pub(crate) mod ledger;
-pub use ledger::{LedgerState, Metadata, MAXIMUM_BLOCK_LOCATORS, MAXIMUM_LINEAR_BLOCK_LOCATORS, MAXIMUM_QUADRATIC_BLOCK_LOCATORS};
+pub use ledger::{
+    BlockTemplate,
+    LedgerState,
+    Metadata,
+    MAXIMUM_BLOCK_LOCATORS,
+    MAXIMUM_LINEAR_BLOCK_LOCATORS,
+    MAXIMUM_QUADRATIC_BLOCK_LOCATORS,
+};
 
 pub(crate) mod mining_pool;
 pub use mining_pool::MiningPoolState;
