@@ -22,6 +22,8 @@ use crate::{
     LedgerRequest,
     LedgerRouter,
     Message,
+    MiningPoolRequest,
+    MiningPoolRouter,
     NodeType,
     ProverRequest,
     ProverRouter,
@@ -66,16 +68,31 @@ type ConnectionResult = oneshot::Sender<Result<()>>;
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, ledger_reader, ledger_router, prover_router, connection_result)
-    Connect(SocketAddr, LedgerReader<N>, LedgerRouter<N>, ProverRouter<N>, ConnectionResult),
-    /// Heartbeat := (ledger_reader, ledger_router, prover_router)
-    Heartbeat(LedgerReader<N>, LedgerRouter<N>, ProverRouter<N>),
+    /// Connect := (peer_ip, ledger_reader, ledger_router, prover_router, mining_pool_router, connection_result)
+    Connect(
+        SocketAddr,
+        LedgerReader<N>,
+        LedgerRouter<N>,
+        ProverRouter<N>,
+        MiningPoolRouter<N>,
+        ConnectionResult,
+    ),
+    /// Heartbeat := (ledger_reader, ledger_router, prover_router, mining_pool_router)
+    Heartbeat(LedgerReader<N>, LedgerRouter<N>, ProverRouter<N>, MiningPoolRouter<N>),
     /// MessagePropagate := (peer_ip, message)
     MessagePropagate(SocketAddr, Message<N, E>),
     /// MessageSend := (peer_ip, message)
     MessageSend(SocketAddr, Message<N, E>),
-    /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router, prover_router)
-    PeerConnecting(TcpStream, SocketAddr, LedgerReader<N>, LedgerRouter<N>, ProverRouter<N>),
+    /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router, prover_router,
+    /// mining_pool_router)
+    PeerConnecting(
+        TcpStream,
+        SocketAddr,
+        LedgerReader<N>,
+        LedgerRouter<N>,
+        ProverRouter<N>,
+        MiningPoolRouter<N>,
+    ),
     /// PeerConnected := (peer_ip, peer_nonce, outbound_router)
     PeerConnected(SocketAddr, u64, OutboundRouter<N, E>),
     /// PeerDisconnected := (peer_ip)
@@ -257,7 +274,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(super) async fn update(&self, request: PeersRequest<N, E>) {
         match request {
-            PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, prover_router, connection_result) => {
+            PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, prover_router, mining_pool_router, connection_result) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -307,6 +324,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                         ledger_reader,
                                         ledger_router,
                                         prover_router,
+                                        mining_pool_router,
                                         self.connected_nonces().await,
                                         Some(connection_result),
                                     )
@@ -325,10 +343,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
             }
-            PeersRequest::Heartbeat(ledger_reader, ledger_router, prover_router) => {
+            PeersRequest::Heartbeat(ledger_reader, ledger_router, prover_router, mining_pool_router) => {
                 // Obtain the number of connected peers.
                 let number_of_connected_peers = self.number_of_connected_peers().await;
-
                 // Ensure the number of connected peers is below the maximum threshold.
                 if number_of_connected_peers > E::MAXIMUM_NUMBER_OF_PEERS {
                     debug!("Exceeded maximum number of connected peers");
@@ -418,8 +435,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                         // Initialize the connection process.
                         let (router, handler) = oneshot::channel();
-                        let request =
-                            PeersRequest::Connect(peer_ip, ledger_reader.clone(), ledger_router.clone(), prover_router.clone(), router);
+                        let request = PeersRequest::Connect(
+                            peer_ip,
+                            ledger_reader.clone(),
+                            ledger_router.clone(),
+                            prover_router.clone(),
+                            mining_pool_router.clone(),
+                            router,
+                        );
                         if let Err(error) = self.peers_router.send(request).await {
                             warn!("Failed to transmit the request: '{}'", error);
                         }
@@ -436,7 +459,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::MessageSend(sender, message) => {
                 self.send(sender, message).await;
             }
-            PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader, ledger_router, prover_router) => {
+            PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader, ledger_router, prover_router, mining_pool_router) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -507,6 +530,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             ledger_reader,
                             ledger_router,
                             prover_router,
+                            mining_pool_router,
                             self.connected_nonces().await,
                             None,
                         )
@@ -878,6 +902,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
+        mining_pool_router: MiningPoolRouter<N>,
         connected_nonces: Vec<u64>,
         connection_result: Option<ConnectionResult>,
     ) {
@@ -1237,6 +1262,33 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         // Route the `UnconfirmedTransaction` to the prover.
                                         if let Err(error) = prover_router.send(ProverRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
                                             warn!("[UnconfirmedTransaction] {}", error);
+                                        }
+                                    }
+                                }
+                                Message::GetWork => {
+                                    if E::NODE_TYPE != NodeType::MiningPool {
+                                        trace!("Skipping 'GetWork' from {}", peer_ip);
+                                    } else {
+                                        if let Err(error) = mining_pool_router.send(MiningPoolRequest::GetCurrentBlockTemplate(peer_ip)).await {
+                                                warn!("[GetWork] {}", error);
+                                        }
+                                    }
+                                }
+                                Message::BlockTemplate(block_template) => {
+                                    if let Err(error) = prover_router.send(ProverRequest::BlockTemplate(peer_ip, block_template)).await {
+                                        warn!("[BlockTemplate] {}", error);
+                                    }
+                                }
+                                Message::SendShare(address, block) => {
+                                    if E::NODE_TYPE != NodeType::MiningPool {
+                                        trace!("Skipping 'SendShare' from {}", peer_ip);
+                                    } else {
+                                        if let Ok(block) = block.deserialize().await {
+                                        if let Err(error) = mining_pool_router.send(MiningPoolRequest::ProposedBlock(peer_ip, block, address)).await {
+                                            warn!("[SendShare] {}", error);
+                                        }
+                                        } else {
+                                            warn!("[SendShare] could not deserialize block");
                                         }
                                     }
                                 }

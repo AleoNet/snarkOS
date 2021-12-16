@@ -49,6 +49,8 @@ type MiningPoolHandler<N> = mpsc::Receiver<MiningPoolRequest<N>>;
 pub enum MiningPoolRequest<N: Network> {
     /// ProposedBlock := (peer_ip, proposed_block, miner_address)
     ProposedBlock(SocketAddr, Block<N>, Address<N>),
+    /// GetCurrentBlockTemplate := (peer_ip)
+    GetCurrentBlockTemplate(SocketAddr),
     /// BlockHeightClear := (block_height)
     BlockHeightClear(u32),
 }
