@@ -21,7 +21,7 @@ use crate::{
 use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::posw::PoSWProof, prelude::*};
 
-use ::bytes::{Buf, BytesMut};
+use ::bytes::{Buf, Bytes, BytesMut};
 use anyhow::{anyhow, Result};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{marker::PhantomData, net::SocketAddr};
@@ -33,7 +33,7 @@ use tokio_util::codec::{Decoder, Encoder};
 #[derive(Clone, Debug)]
 pub enum Data<T: 'static + Serialize + DeserializeOwned + Send> {
     Object(T),
-    Buffer(Vec<u8>),
+    Buffer(Bytes),
 }
 
 impl<T: 'static + Serialize + DeserializeOwned + Send> Data<T> {
@@ -64,10 +64,10 @@ impl<T: 'static + Serialize + DeserializeOwned + Send> Data<T> {
         }
     }
 
-    pub async fn serialize(self) -> bincode::Result<Vec<u8>> {
+    pub async fn serialize(self) -> bincode::Result<Bytes> {
         match self {
             Self::Object(x) => match task::spawn_blocking(move || bincode::serialize(&x)).await {
-                Ok(bytes) => bytes,
+                Ok(bytes) => bytes.map(|vec| vec.into()),
                 Err(error) => Err(Box::new(bincode::ErrorKind::Custom(format!(
                     "Dedicated serialization failed: {}",
                     error
@@ -227,12 +227,12 @@ impl<N: Network, E: Environment> Message<N, E> {
         // Deserialize the data field.
         let message = match id {
             0 => Self::BlockRequest(bincode::deserialize(&data[0..4])?, bincode::deserialize(&data[4..8])?),
-            1 => Self::BlockResponse(Data::Buffer(data.to_vec())),
+            1 => Self::BlockResponse(Data::Buffer(data.to_vec().into())),
             2 => {
                 let (version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight) = bincode::deserialize(data)?;
                 Self::ChallengeRequest(version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight)
             }
-            3 => Self::ChallengeResponse(Data::Buffer(data.to_vec())),
+            3 => Self::ChallengeResponse(Data::Buffer(data.to_vec().into())),
             4 => match data.is_empty() {
                 true => Self::Disconnect,
                 false => return Err(anyhow!("Invalid 'Disconnect' message: {:?} {:?}", buffer, data)),
@@ -244,7 +244,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             6 => Self::PeerResponse(bincode::deserialize(data)?),
             7 => {
                 let (version, fork_depth, node_type, status, block_hash) = bincode::deserialize(&data[0..48])?;
-                let block_header = Data::Buffer(data[48..].to_vec());
+                let block_header = Data::Buffer(data[48..].to_vec().into());
 
                 Self::Ping(version, fork_depth, node_type, status, block_hash, block_header)
             }
@@ -256,12 +256,12 @@ impl<N: Network, E: Environment> Message<N, E> {
                     _ => return Err(anyhow!("Invalid 'Pong' message: {:?} {:?}", buffer, data)),
                 };
 
-                Self::Pong(is_fork, Data::Buffer(data[1..].to_vec()))
+                Self::Pong(is_fork, Data::Buffer(data[1..].to_vec().into()))
             }
             9 => Self::UnconfirmedBlock(
                 bincode::deserialize(&data[0..4])?,
                 bincode::deserialize(&data[4..36])?,
-                Data::Buffer(data[36..].to_vec()),
+                Data::Buffer(data[36..].to_vec().into()),
             ),
             10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
             11 => Self::PoolRegister(bincode::deserialize(data)?),
