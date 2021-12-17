@@ -65,7 +65,7 @@ impl<N: Network> BlockLocators<N> {
     #[inline]
     pub fn get_cumulative_weight(&self, block_height: u32) -> Option<u128> {
         match self.block_locators.get(&block_height) {
-            Some((_, header)) => header.as_ref().and_then(|header| Some(header.cumulative_weight())),
+            Some((_, header)) => header.as_ref().map(|header| header.cumulative_weight()),
             _ => None,
         }
     }
