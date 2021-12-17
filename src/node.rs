@@ -151,7 +151,7 @@ impl Node {
 
     async fn start_server<N: Network, E: Environment>(&self) -> Result<()> {
         let miner = match (E::NODE_TYPE, &self.miner) {
-            (NodeType::Miner, Some(address)) => {
+            (NodeType::Miner, Some(address)) | (NodeType::Worker, Some(address)) | (NodeType::MiningPool, Some(address)) => {
                 let miner_address = Address::<N>::from_str(address)?;
                 println!("{}", crate::display::welcome_message());
                 println!("Your Aleo address is {}.\n", miner_address);

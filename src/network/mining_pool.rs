@@ -259,6 +259,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
 
                     // Update the score for the miner.
                     // TODO: add round stuff
+                    // TODO: ensure shares can not be resubmitted
                     if let Err(error) = self.state.add_shares(block.height(), &worker_address, 1) {
                         warn!("[ProposedBlock] {}", error);
                     }
