@@ -24,7 +24,7 @@ default = []
 test = []
 
 [dependencies]
-snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "471e03b" }
+snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "d3ae7e6" }
 #snarkvm = { path = "../snarkVM" }
 
 bytes = "1.0.0"
@@ -92,7 +92,7 @@ version = "0.8"
 version = "1"
 
 [dependencies.self_update]
-version = "0.27"
+version = "0.28"
 
 [dependencies.serde]
 version = "1"
