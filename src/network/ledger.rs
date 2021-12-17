@@ -883,14 +883,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         true
                     }
                     // Case 2(c)(b) - If the common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
-                    else
-                    {
-                        // Ensure that the first deviating locator exists.
-                        let first_deviating_locator = match first_deviating_locator {
-                            Some(locator) => locator,
-                            None => return,
-                        };
-
+                    else if let Some(locator) = first_deviating_locator {
                         // Case 2(c)(b)(a) - Check if the real common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
                         // If this peer is outside of the fork range of this ledger, proceed to disconnect from the peer.
                         if latest_block_height.saturating_sub(first_deviating_locator) >= E::MAXIMUM_FORK_DEPTH {
@@ -907,6 +900,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                                 false => return
                             }
                         }
+                    }
+                    // The first deviating locator didn't exist; abort.
+                    else {
+                        return;
                     }
                 };
 
