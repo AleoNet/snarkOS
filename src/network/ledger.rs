@@ -859,14 +859,17 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
 
             // Determine the latest common ancestor.
-            let (latest_common_ancestor, ledger_reverted) =
+            let latest_common_ancestor = if !is_fork && first_deviating_locator.is_some() {
+                latest_block_height
+            } else {
+                maximum_common_ancestor
+            };
+
+            // If the ledger is on a fork, it might need to revert.
+            let ledger_reverted =
                 // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
                 if !is_fork {
-                    // Continue to sync from the latest block height of this ledger, if the peer is honest.
-                    match first_deviating_locator.is_none() {
-                        true => (maximum_common_ancestor, false),
-                        false => (latest_block_height, false),
-                    }
+                    false
                 }
                 // Case 2(c) - This ledger is on a fork of the peer.
                 else {
@@ -877,7 +880,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         if latest_block_height != maximum_common_ancestor && !self.revert_to_block_height(maximum_common_ancestor).await {
                             return;
                         }
-                        (maximum_common_ancestor, true)
+                        true
                     }
                     // Case 2(c)(b) - If the common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
                     else
@@ -900,7 +903,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         else {
                             info!("Discovered a potentially better canonical chain from {} with common ancestor {} and cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
                             match self.revert_to_block_height(maximum_common_ancestor).await {
-                                true => (maximum_common_ancestor, true),
+                                true => true,
                                 false => return
                             }
                         }
