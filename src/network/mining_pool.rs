@@ -172,10 +172,8 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                         return;
                     }
 
-                    // TODO (raychu86): Check that the block is valid except for the block difficulty.
-
                     // Check that the block's coinbase transaction owner is the mining pool address.
-                    match block.to_coinbase_transaction() {
+                    let records = match block.to_coinbase_transaction() {
                         Ok(tx) => {
                             let coinbase_records: Vec<Record<N>> = tx.to_records().collect();
                             let valid_owner = coinbase_records
@@ -187,6 +185,8 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                                 warn!("[ProposedBlock] Peer {} sent a candidate block with an invalid owner.", peer_ip);
                                 return;
                             }
+
+                            coinbase_records
                         }
                         Err(err) => {
                             warn!("[ProposedBlock] {}", err);
@@ -250,7 +250,13 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     // If the block is valid, broadcast it.
                     if block.is_valid() {
                         debug!("Mining pool has found unconfirmed block {} ({})", block.height(), block.hash());
-                        // TODO (raychu86): Store the coinbase record.
+
+                        // Store coinbase record(s)
+                        records.iter().for_each(|r| {
+                            if let Err(error) = self.state.add_coinbase_record(block.height(), r.clone()) {
+                                warn!("Could not store coinbase record {}", error);
+                            }
+                        });
 
                         // Broadcast the next block.
                         let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
