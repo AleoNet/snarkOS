@@ -92,7 +92,7 @@ version = "0.8"
 version = "1"
 
 [dependencies.self_update]
-version = "0.27"
+version = "0.28"
 
 [dependencies.serde]
 version = "1"
