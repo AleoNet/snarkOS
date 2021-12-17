@@ -15,22 +15,28 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{Status, Tasks},
+    helpers::{State, Status, Tasks},
+    Data,
     Environment,
     LedgerReader,
-    LedgerRouter,
+    Message,
     NodeType,
+    PeersRequest,
     PeersRouter,
 };
 
 use snarkos_storage::{storage::Storage, BlockTemplate};
 use snarkvm::dpc::prelude::*;
 
-use anyhow::Result;
+use anyhow::{anyhow, Result};
+use rand::thread_rng;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::{
     net::SocketAddr,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
 };
 use tokio::{
     sync::{mpsc, oneshot},
@@ -72,8 +78,6 @@ pub struct Worker<N: Network, E: Environment> {
     peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
     ledger_reader: LedgerReader<N>,
-    /// The ledger router of the node.
-    ledger_router: LedgerRouter<N>,
     /// The address of the connected pool.
     pool_address: Option<SocketAddr>,
 }
@@ -83,12 +87,10 @@ impl<N: Network, E: Environment> Worker<N, E> {
     pub async fn open<S: Storage>(
         tasks: &mut Tasks<JoinHandle<()>>,
         miner: Option<Address<N>>,
-        local_ip: SocketAddr,
         status: &Status,
         terminator: &Arc<AtomicBool>,
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
-        ledger_router: LedgerRouter<N>,
         pool_address: Option<SocketAddr>,
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests for the `Worker` struct.
@@ -108,7 +110,6 @@ impl<N: Network, E: Environment> Worker<N, E> {
             terminator: terminator.clone(),
             peers_router,
             ledger_reader,
-            ledger_router,
             pool_address,
         });
 
@@ -144,7 +145,89 @@ impl<N: Network, E: Environment> Worker<N, E> {
     ///
     pub(super) async fn update(&self, request: WorkerRequest<N>) {
         match request {
-            WorkerRequest::BlockTemplate(_peer_ip, share_difficulty, block_template) => {}
+            WorkerRequest::BlockTemplate(peer_ip, share_difficulty, block_template) => {
+                if let Some(pool_address) = self.pool_address {
+                    // Refuse work from any mining pool other than our registered one.
+                    if pool_address != peer_ip {
+                        return;
+                    }
+
+                    if let Some(recipient) = self.worker_address {
+                        // Mine the next block continuously until halting. We need to keep going because
+                        // a valid block does not necessarily mean we hit the network difficulty target,
+                        // only our share target.
+                        loop {
+                            // Check if we need to halt.
+                            let current_height = self.ledger_reader.latest_block_height();
+                            if current_height != block_template.block_height - 1 {
+                                // If so, let's ask for a new block template first.
+                                if let Err(error) = self
+                                    .peers_router
+                                    .send(PeersRequest::MessageSend(peer_ip, Message::GetWork(recipient)))
+                                    .await
+                                {
+                                    warn!("Could not send GetWork {}", error);
+                                }
+                                break;
+                            }
+
+                            // If `terminator` is `false` and the status is not `Peering` or `Mining`
+                            // already, mine the next block.
+                            if !self.terminator.load(Ordering::SeqCst) && !self.status.is_peering() && !self.status.is_mining() {
+                                // Set the status to `Mining`.
+                                self.status.update(State::Mining);
+                                let worker = self.worker.clone();
+                                let block_template = block_template.clone();
+                                let terminator = self.terminator.clone();
+                                let peers_router = self.peers_router.clone();
+                                let status = self.status.clone();
+
+                                let result = task::spawn_blocking(move || {
+                                    worker.install(move || {
+                                        Block::mine(
+                                            block_template.previous_block_hash,
+                                            block_template.block_height,
+                                            block_template.block_timestamp,
+                                            share_difficulty,
+                                            block_template.cumulative_weight,
+                                            block_template.ledger_root,
+                                            block_template.transactions,
+                                            &terminator,
+                                            &mut thread_rng(),
+                                        )
+                                    })
+                                })
+                                .await;
+
+                                status.update(State::Ready);
+
+                                match result {
+                                    Ok(Ok(block)) => {
+                                        debug!(
+                                            "Miner has found block which meets share target {} ({})",
+                                            block.height(),
+                                            block.hash()
+                                        );
+
+                                        // Propose it to the mining pool
+                                        if let Err(error) = peers_router
+                                            .send(PeersRequest::MessageSend(
+                                                peer_ip,
+                                                Message::SendShare(recipient, Data::Object(block)),
+                                            ))
+                                            .await
+                                        {
+                                            warn!("Could not send share to mining pool {}", error);
+                                        }
+                                    }
+                                    Ok(Err(error)) => trace!("{}", error),
+                                    Err(error) => trace!("{}", anyhow!("Could not mine next block {}", error)),
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 }

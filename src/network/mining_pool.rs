@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{Status, Tasks},
+    helpers::Tasks,
     Data,
     Environment,
     LedgerReader,
@@ -71,8 +71,6 @@ pub struct MiningPool<N: Network, E: Environment> {
     state: Arc<MiningPoolState<N>>,
     /// The mining pool router of the node.
     mining_pool_router: MiningPoolRouter<N>,
-    /// The status of the node.
-    status: Status,
     /// The pool of uncer: PeersRouter<N, E>,onfirmed transactions.
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
     /// The peers router of the node.
@@ -97,7 +95,6 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
         path: P,
         mining_pool_address: Option<Address<N>>,
         local_ip: SocketAddr,
-        status: Status,
         memory_pool: Arc<RwLock<MemoryPool<N>>>,
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
@@ -113,7 +110,6 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
             local_ip,
             state: Arc::new(MiningPoolState::open_writer::<S, P>(path)?),
             mining_pool_router,
-            status: status.clone(),
             memory_pool,
             peers_router,
             ledger_reader,

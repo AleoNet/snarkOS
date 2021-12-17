@@ -115,12 +115,10 @@ impl<N: Network, E: Environment> Server<N, E> {
         let worker = Worker::open::<RocksDB>(
             &mut tasks,
             miner.clone(),
-            local_ip,
             &status,
             &terminator,
             peers.router(),
             ledger.reader(),
-            ledger.router(),
             pool_address,
         )
         .await?;
@@ -130,7 +128,6 @@ impl<N: Network, E: Environment> Server<N, E> {
             &prover_storage_path,
             miner.clone(),
             local_ip,
-            status.clone(),
             prover.memory_pool(),
             peers.router(),
             ledger.reader(),
