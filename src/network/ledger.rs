@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{block_requests::find_maximal_peer, CircularMap, State, Status, Tasks},
+    helpers::{block_requests::*, CircularMap, State, Status, Tasks},
     Data,
     Environment,
     LedgerReader,
@@ -838,38 +838,17 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         // Case 2 - Proceed to send block requests, as the peer is ahead of this ledger.
         if let Some((peer_ip, is_fork, maximum_block_locators)) = maximal_peer {
-            // Determine the common ancestor block height between this ledger and the peer.
-            let mut maximum_common_ancestor = 0;
-            // Determine the first locator (smallest height) that does not exist in this ledger.
-            let mut first_deviating_locator = None;
-
-            // Verify the integrity of the block hashes sent by the peer.
-            for (block_height, (block_hash, _)) in maximum_block_locators.iter() {
-                // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
-                if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
-                    if expected_block_height != *block_height {
-                        let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
-                        trace!("{}", error);
-                        self.add_failure(peer_ip, error).await;
-                        return;
-                    } else {
-                        // Update the common ancestor, as this block hash exists in this ledger.
-                        if expected_block_height > maximum_common_ancestor {
-                            maximum_common_ancestor = expected_block_height;
-                        }
-                    }
-                } else {
-                    // Update the first deviating locator.
-                    match first_deviating_locator {
-                        None => first_deviating_locator = Some(block_height),
-                        Some(saved_height) => {
-                            if block_height < saved_height {
-                                first_deviating_locator = Some(block_height);
-                            }
-                        }
-                    }
+            // Determine the common ancestor block height between this ledger and the peer
+            // and the first locator (smallest height) that does not exist in this ledger.
+            let (maximum_common_ancestor, first_deviating_locator) = match verify_block_hashes(&self.canon, &maximum_block_locators) {
+                Ok(ret) => ret,
+                Err((expected_block_height, block_hash)) => {
+                    let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
+                    trace!("{}", error);
+                    self.add_failure(peer_ip, error).await;
+                    return;
                 }
-            }
+            };
 
             // Ensure the latest common ancestor is not greater than the latest block request.
             if latest_block_height < maximum_common_ancestor {
@@ -912,7 +891,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
                         // Case 2(c)(b)(a) - Check if the real common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
                         // If this peer is outside of the fork range of this ledger, proceed to disconnect from the peer.
-                        if latest_block_height.saturating_sub(*first_deviating_locator) >= E::MAXIMUM_FORK_DEPTH {
+                        if latest_block_height.saturating_sub(first_deviating_locator) >= E::MAXIMUM_FORK_DEPTH {
                             debug!("Peer {} has exceeded the permitted fork range of the protocol, disconnecting", peer_ip);
                             self.disconnect(peer_ip, "exceeded fork range").await;
                             return;
