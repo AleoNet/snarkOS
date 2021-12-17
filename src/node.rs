@@ -158,6 +158,14 @@ impl Node {
                 println!("{}", crate::display::notification_message::<N>(Some(miner_address)));
                 Some(miner_address)
             }
+            (NodeType::MiningPool, Some(address)) => {
+                let miner_address = Address::<N>::from_str(address)?;
+                println!("{}", crate::display::welcome_message());
+                println!("Your Aleo address is {}.\n", miner_address);
+                println!("Starting a mining pool node on {}.", N::NETWORK_NAME);
+                println!("{}", crate::display::notification_message::<N>(Some(miner_address)));
+                Some(miner_address)
+            }
             _ => {
                 println!("{}", crate::display::welcome_message());
                 println!("Starting a {} node on {}.", E::NODE_TYPE, N::NETWORK_NAME);
