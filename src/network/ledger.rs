@@ -842,8 +842,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // and the first locator (smallest height) that does not exist in this ledger.
             let (maximum_common_ancestor, first_deviating_locator) = match verify_block_hashes(&self.canon, &maximum_block_locators) {
                 Ok(ret) => ret,
-                Err((expected_block_height, block_hash)) => {
-                    let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
+                Err(error) => {
                     trace!("{}", error);
                     self.add_failure(peer_ip, error).await;
                     return;

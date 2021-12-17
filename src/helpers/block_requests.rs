@@ -60,15 +60,18 @@ pub fn find_maximal_peer<N: Network>(
 pub fn verify_block_hashes<N: Network>(
     canon: &LedgerState<N>,
     maximum_block_locators: &BlockLocators<N>,
-) -> Result<(u32, Option<u32>), (u32, u32)> {
-    let mut first_deviating_locator = None;
+) -> Result<(u32, Option<u32>), String> {
+    // Determine the common ancestor block height between this ledger and the peer.
     let mut maximum_common_ancestor = 0;
+    // Determine the first locator (smallest height) that does not exist in this ledger.
+    let mut first_deviating_locator = None;
 
     for (block_height, (block_hash, _)) in maximum_block_locators.iter() {
         // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
         if let Ok(expected_block_height) = canon.get_block_height(block_hash) {
             if expected_block_height != *block_height {
-                return Err((expected_block_height, *block_height));
+                let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
+                return Err(error);
             } else {
                 // Update the common ancestor, as this block hash exists in this ledger.
                 if expected_block_height > maximum_common_ancestor {
