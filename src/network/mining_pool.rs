@@ -218,8 +218,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                         Some((_, share_difficulty, _)) => *share_difficulty,
                         None => {
                             let share_difficulty = current_template.difficulty_target.saturating_mul(50);
-                            let miner_info = self
-                                .miner_info
+                            self.miner_info
                                 .write()
                                 .await
                                 .insert(miner_address, (chrono::Utc::now().timestamp(), share_difficulty, 0));
@@ -279,8 +278,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     if let None = self.miner_info.read().await.get(&address) {
                         // If not, let's add them.
                         let share_difficulty = current_template.difficulty_target.saturating_mul(50);
-                        let miner_info = self
-                            .miner_info
+                        self.miner_info
                             .write()
                             .await
                             .insert(address, (chrono::Utc::now().timestamp(), share_difficulty, 0));
