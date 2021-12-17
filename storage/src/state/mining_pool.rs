@@ -63,6 +63,31 @@ impl<N: Network> MiningPoolState<N> {
     pub fn remove_shares(&self, block_height: u32) -> Result<()> {
         self.shares.remove_shares(block_height)
     }
+
+    /// Returns `true` if the given commitment exists in storage.
+    pub fn contains_coinbase_record(&self, commitment: &N::Commitment) -> Result<bool> {
+        self.shares.contains_record(commitment)
+    }
+
+    /// Returns all coinbase records in storage.
+    pub fn to_coinbase_records(&self) -> Vec<(u32, Record<N>)> {
+        self.shares.to_records()
+    }
+
+    /// Returns the coinbase record for a given commitment.
+    pub fn get_coinbase_record(&self, commitment: &N::Commitment) -> Result<(u32, Record<N>)> {
+        self.shares.get_record(commitment)
+    }
+
+    /// Adds the given coinbase record to storage.
+    pub fn add_coinbase_record(&self, block_height: u32, record: Record<N>) -> Result<()> {
+        self.shares.add_record(block_height, record)
+    }
+
+    /// Removes the given record from storage.
+    pub fn remove_coinbase_record(&self, commitment: &N::Commitment) -> Result<()> {
+        self.shares.remove_record(commitment)
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -70,6 +95,8 @@ impl<N: Network> MiningPoolState<N> {
 struct SharesState<N: Network> {
     /// The miner shares for each block height.
     shares: DataMap<u32, HashMap<Address<N>, u64>>,
+    /// The coinbase records earned by the pool.
+    records: DataMap<N::Commitment, (u32, Record<N>)>,
 }
 
 impl<N: Network> SharesState<N> {
@@ -77,6 +104,7 @@ impl<N: Network> SharesState<N> {
     fn open<S: Storage>(storage: S) -> Result<Self> {
         Ok(Self {
             shares: storage.open_map("shares")?,
+            records: storage.open_map("records")?,
         })
     }
 
@@ -117,5 +145,43 @@ impl<N: Network> SharesState<N> {
     /// Removes all of the shares for a given block height.
     fn remove_shares(&self, block_height: u32) -> Result<()> {
         self.shares.remove(&block_height)
+    }
+
+    /// Returns `true` if the given commitment exists in storage.
+    fn contains_record(&self, commitment: &N::Commitment) -> Result<bool> {
+        self.records.contains_key(commitment)
+    }
+
+    /// Returns all records in storage.
+    fn to_records(&self) -> Vec<(u32, Record<N>)> {
+        self.records.values().collect()
+    }
+
+    /// Returns the record for a given commitment.
+    fn get_record(&self, commitment: &N::Commitment) -> Result<(u32, Record<N>)> {
+        match self.records.get(commitment)? {
+            Some((block_height, record)) => Ok((block_height, record)),
+            None => return Err(anyhow!("Record with commitment {} does not exist in storage", commitment)),
+        }
+    }
+
+    /// Adds the given block height and record to storage.
+    fn add_record(&self, block_height: u32, record: Record<N>) -> Result<()> {
+        // Ensure the record does not exist.
+        let commitment = record.commitment();
+        if self.records.contains_key(&commitment)? {
+            Err(anyhow!("Record with commitment {} already exists in storage", commitment))
+        } else {
+            // Insert the record.
+            self.records.insert(&commitment, &(block_height, record))?;
+            Ok(())
+        }
+    }
+
+    /// Removes the given record from storage.
+    fn remove_record(&self, commitment: &N::Commitment) -> Result<()> {
+        // Remove the record entry.
+        self.records.remove(commitment)?;
+        Ok(())
     }
 }
