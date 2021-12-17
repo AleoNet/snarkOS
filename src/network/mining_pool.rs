@@ -32,7 +32,7 @@ use snarkvm::{algorithms::crh::sha256d_to_u64, dpc::prelude::*, utilities::ToByt
 
 use anyhow::Result;
 use rand::thread_rng;
-use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc, time::Duration};
 use tokio::{
     sync::{mpsc, oneshot, RwLock},
     task,
@@ -135,12 +135,46 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
             // Wait until the mining pool handler is ready.
             let _ = handler.await;
 
-            if let Some(recipient) = mining_pool_address {
-                // Set initial block template.
-                mining_pool.set_block_template(recipient).await?;
-            } else {
-                error!("Missing miner address. Please specify an Aleo address in order to run a mining pool");
-            }
+            // Set up an update loop for the block template.
+            let mining_pool_clone = mining_pool.clone();
+            let (router, handler) = oneshot::channel();
+            tasks.append(task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                // Asynchronously wait for a mining pool request.
+                let recipient = mining_pool_clone
+                    .mining_pool_address
+                    .expect("A mining pool should have an available Aleo address at all times");
+                loop {
+                    let mut current_template = mining_pool_clone.current_template.write().await;
+                    match &*current_template {
+                        Some(t) => {
+                            if mining_pool_clone.ledger_reader.latest_block_height() != t.block_height - 1 {
+                                *current_template = Some(
+                                    mining_pool_clone
+                                        .generate_block_template(recipient)
+                                        .await
+                                        .expect("Should be able to generate a block template"),
+                                );
+                            }
+                        }
+                        None => {
+                            *current_template = Some(
+                                mining_pool_clone
+                                    .generate_block_template(recipient)
+                                    .await
+                                    .expect("Should be able to generate a block template"),
+                            );
+                        }
+                    };
+                    drop(current_template); // Release lock, to avoid recursively locking.
+
+                    // Sleep for `5` seconds.
+                    tokio::time::sleep(Duration::from_secs(5)).await;
+                }
+            }));
+            // Wait until the mining pool handler is ready.
+            let _ = handler.await;
         }
 
         Ok(mining_pool)
@@ -260,17 +294,6 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                         if let Err(error) = self.ledger_router.send(request).await {
                             warn!("Failed to broadcast mined block - {}", error);
                         }
-
-                        // Refresh the block template.
-                        if let Err(error) = self
-                            .set_block_template(
-                                self.mining_pool_address
-                                    .expect("an active mining pool should have an address at all times"),
-                            )
-                            .await
-                        {
-                            warn!("Could not refresh block template {}", error);
-                        }
                     }
                 } else {
                     warn!("[ProposedBlock] No current template exists");
@@ -315,14 +338,11 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
         }
     }
 
-    async fn set_block_template(&self, recipient: Address<N>) -> Result<()> {
+    async fn generate_block_template(&self, recipient: Address<N>) -> Result<BlockTemplate<N>> {
         let unconfirmed_transactions = self.memory_pool.read().await.transactions();
         let (block_template, _) =
             self.ledger_reader
                 .prepare_block_template(recipient, E::COINBASE_IS_PUBLIC, &unconfirmed_transactions, &mut thread_rng())?;
-
-        let mut current_template = self.current_template.write().await;
-        *current_template = Some(block_template);
-        Ok(())
+        Ok(block_template)
     }
 }
