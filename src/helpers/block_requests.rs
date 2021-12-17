@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::network::ledger::PeersState;
-use snarkos_storage::BlockLocators;
+use snarkos_storage::{BlockLocators, LedgerState};
 use snarkvm::dpc::prelude::*;
 
 use std::{collections::HashSet, net::SocketAddr};
@@ -53,4 +53,43 @@ pub fn find_maximal_peer<N: Network>(
     }
 
     maximal_peer
+}
+
+/// Verify the integrity of the block hashes sent by the peer.
+/// Returns the maximum common ancestor and the first deviating locator (if any), or potentially an error containing a mismatch.
+pub fn verify_block_hashes<N: Network>(
+    canon: &LedgerState<N>,
+    maximum_block_locators: &BlockLocators<N>,
+) -> Result<(u32, Option<u32>), String> {
+    // Determine the common ancestor block height between this ledger and the peer.
+    let mut maximum_common_ancestor = 0;
+    // Determine the first locator (smallest height) that does not exist in this ledger.
+    let mut first_deviating_locator = None;
+
+    for (block_height, (block_hash, _)) in maximum_block_locators.iter() {
+        // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
+        if let Ok(expected_block_height) = canon.get_block_height(block_hash) {
+            if expected_block_height != *block_height {
+                let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
+                return Err(error);
+            } else {
+                // Update the common ancestor, as this block hash exists in this ledger.
+                if expected_block_height > maximum_common_ancestor {
+                    maximum_common_ancestor = expected_block_height;
+                }
+            }
+        } else {
+            // Update the first deviating locator.
+            match first_deviating_locator {
+                None => first_deviating_locator = Some(*block_height),
+                Some(saved_height) => {
+                    if *block_height < saved_height {
+                        first_deviating_locator = Some(*block_height);
+                    }
+                }
+            }
+        }
+    }
+
+    Ok((maximum_common_ancestor, first_deviating_locator))
 }
