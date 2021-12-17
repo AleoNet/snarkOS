@@ -50,9 +50,9 @@ type MiningPoolHandler<N> = mpsc::Receiver<MiningPoolRequest<N>>;
 ///
 #[derive(Debug)]
 pub enum MiningPoolRequest<N: Network> {
-    /// ProposedBlock := (peer_ip, proposed_block, miner_address)
+    /// ProposedBlock := (peer_ip, proposed_block, worker_address)
     ProposedBlock(SocketAddr, Block<N>, Address<N>),
-    /// GetCurrentBlockTemplate := (peer_ip, miner_address)
+    /// GetCurrentBlockTemplate := (peer_ip, worker_address)
     GetCurrentBlockTemplate(SocketAddr, Address<N>),
     /// BlockHeightClear := (block_height)
     BlockHeightClear(u32),
@@ -91,7 +91,7 @@ pub struct MiningPool<N: Network, E: Environment> {
 impl<N: Network, E: Environment> MiningPool<N, E> {
     /// Initializes a new instance of the mining pool.
     pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
-        tasks: &mut Tasks<JoinHandle<()>>,
+        tasks: &Tasks<JoinHandle<()>>,
         path: P,
         mining_pool_address: Option<Address<N>>,
         local_ip: SocketAddr,
@@ -121,21 +121,19 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
 
         if E::NODE_TYPE == NodeType::MiningPool {
             // Initialize the handler for the mining pool.
-            {
-                let mining_pool = mining_pool.clone();
-                let (router, handler) = oneshot::channel();
-                tasks.append(task::spawn(async move {
-                    // TODO: add loop which retargets share difficulty.
-                    // Notify the outer function that the task is ready.
-                    let _ = router.send(());
-                    // Asynchronously wait for a mining pool request.
-                    while let Some(request) = mining_pool_handler.recv().await {
-                        mining_pool.update(request).await;
-                    }
-                }));
-                // Wait until the mining pool handler is ready.
-                let _ = handler.await;
-            }
+            let mining_pool_clone = mining_pool.clone();
+            let (router, handler) = oneshot::channel();
+            tasks.append(task::spawn(async move {
+                // TODO (julesdesmit): add loop which retargets share difficulty.
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                // Asynchronously wait for a mining pool request.
+                while let Some(request) = mining_pool_handler.recv().await {
+                    mining_pool_clone.update(request).await;
+                }
+            }));
+            // Wait until the mining pool handler is ready.
+            let _ = handler.await;
 
             if let Some(recipient) = mining_pool_address {
                 // Set initial block template.
@@ -164,7 +162,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
     ///
     pub(super) async fn update(&self, request: MiningPoolRequest<N>) {
         match request {
-            MiningPoolRequest::ProposedBlock(peer_ip, mut block, miner_address) => {
+            MiningPoolRequest::ProposedBlock(peer_ip, mut block, worker_address) => {
                 if let Some(current_template) = &*self.current_template.read().await {
                     // Check that the block is relevant.
                     if self.ledger_reader.latest_block_height().saturating_add(1) != block.height() {
@@ -176,10 +174,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     let records = match block.to_coinbase_transaction() {
                         Ok(tx) => {
                             let coinbase_records: Vec<Record<N>> = tx.to_records().collect();
-                            let valid_owner = coinbase_records
-                                .iter()
-                                .map(|r| Some(r.owner()) == self.mining_pool_address)
-                                .fold(false, |a, b| a || b);
+                            let valid_owner = coinbase_records.iter().any(|r| Some(r.owner()) == self.mining_pool_address);
 
                             if !valid_owner {
                                 warn!("[ProposedBlock] Peer {} sent a candidate block with an invalid owner.", peer_ip);
@@ -210,36 +205,38 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     };
 
                     let hash_difficulty = sha256d_to_u64(&proof_bytes);
-                    let mut info = self.miner_info.write().await;
-                    let share_difficulty = match info.get(&miner_address) {
-                        Some((_, share_difficulty, _)) => *share_difficulty,
-                        None => {
-                            let share_difficulty = current_template.difficulty_target.saturating_mul(50);
-                            self.miner_info
-                                .write()
-                                .await
-                                .insert(miner_address, (chrono::Utc::now().timestamp(), share_difficulty, 0));
+                    let share_difficulty = {
+                        let mut info = self.miner_info.write().await;
+                        match info.get(&worker_address) {
+                            Some((_, share_difficulty, _)) => *share_difficulty,
+                            None => {
+                                let share_difficulty = current_template.difficulty_target.saturating_mul(50);
+                                info.insert(worker_address, (chrono::Utc::now().timestamp(), share_difficulty, 0));
 
-                            share_difficulty
+                                share_difficulty
+                            }
                         }
                     };
 
                     if hash_difficulty > share_difficulty {
-                        warn!("[ProposedBlock] faulty share submitted by {}", miner_address);
+                        warn!("[ProposedBlock] faulty share submitted by {}", worker_address);
                         return;
                     }
 
                     // Update the score for the miner.
                     // TODO: add round stuff
-                    if let Err(error) = self.state.add_shares(block.height(), &miner_address, 1) {
+                    if let Err(error) = self.state.add_shares(block.height(), &worker_address, 1) {
                         warn!("[ProposedBlock] {}", error);
                     }
 
-                    // Update miner info for this miner.
-                    let mut miner_info = *info.get(&miner_address).expect("miner should have existing info");
-                    miner_info.0 = chrono::Utc::now().timestamp();
-                    miner_info.2 += 1;
-                    info.insert(miner_address, miner_info);
+                    {
+                        // Update info for this worker.
+                        let mut info = self.miner_info.write().await;
+                        let mut worker_info = *info.get_mut(&worker_address).expect("miner should have existing info");
+                        worker_info.0 = chrono::Utc::now().timestamp();
+                        worker_info.2 += 1;
+                        info.insert(worker_address, worker_info);
+                    }
 
                     // Since a worker will swap out the difficulty target for their share target,
                     // let's put it back to the original value before checking the POSW for true
@@ -263,6 +260,17 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                         if let Err(error) = self.ledger_router.send(request).await {
                             warn!("Failed to broadcast mined block - {}", error);
                         }
+
+                        // Refresh the block template.
+                        if let Err(error) = self
+                            .set_block_template(
+                                self.mining_pool_address
+                                    .expect("an active mining pool should have an address at all times"),
+                            )
+                            .await
+                        {
+                            warn!("Could not refresh block template {}", error);
+                        }
                     }
                 } else {
                     warn!("[ProposedBlock] No current template exists");
@@ -278,22 +286,18 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                 if let Some(current_template) = &*self.current_template.read().await {
                     // Ensure this miner exists in the info list first, so we can get their share
                     // difficulty.
-                    if let None = self.miner_info.read().await.get(&address) {
-                        // If not, let's add them.
-                        let share_difficulty = current_template.difficulty_target.saturating_mul(50);
-                        self.miner_info
-                            .write()
-                            .await
-                            .insert(address, (chrono::Utc::now().timestamp(), share_difficulty, 0));
-                    }
-
                     let share_difficulty = self
                         .miner_info
-                        .read()
+                        .write()
                         .await
-                        .get(&address)
-                        .expect("miner should exist in miner_info")
+                        .entry(address)
+                        .or_insert((
+                            chrono::Utc::now().timestamp(),
+                            current_template.difficulty_target.saturating_mul(50),
+                            0,
+                        ))
                         .1;
+
                     if let Err(error) = self
                         .peers_router
                         .send(PeersRequest::MessageSend(
@@ -313,11 +317,11 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
 
     async fn set_block_template(&self, recipient: Address<N>) -> Result<()> {
         let unconfirmed_transactions = self.memory_pool.read().await.transactions();
-        let mut current_template = self.current_template.write().await;
         let (block_template, _) =
             self.ledger_reader
                 .prepare_block_template(recipient, E::COINBASE_IS_PUBLIC, &unconfirmed_transactions, &mut thread_rng())?;
 
+        let mut current_template = self.current_template.write().await;
         *current_template = Some(block_template);
         Ok(())
     }
