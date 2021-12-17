@@ -133,7 +133,8 @@ impl<N: Network, E: Environment> Worker<N, E> {
             if let Some(pool_address) = pool_address {
                 if let Some(recipient) = miner {
                     // Ask for our first block template to get the loop started.
-                    if let Err(error) = peers_router
+                    if let Err(error) = worker
+                        .peers_router
                         .send(PeersRequest::MessageSend(pool_address, Message::GetWork(recipient)))
                         .await
                     {
