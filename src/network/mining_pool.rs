@@ -167,8 +167,8 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
     ///
     pub(super) async fn update(&self, request: MiningPoolRequest<N>) {
         match request {
-            MiningPoolRequest::ProposedBlock(peer_ip, block, miner_address) => {
-                if let Some(current_template) = *self.current_template.read().await {
+            MiningPoolRequest::ProposedBlock(peer_ip, mut block, miner_address) => {
+                if let Some(current_template) = &*self.current_template.read().await {
                     // Check that the block is relevant.
                     if self.ledger_reader.latest_block_height().saturating_add(1) != block.height() {
                         warn!("[ProposedBlock] Peer {} sent a stale candidate block.", peer_ip);
@@ -213,7 +213,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     };
 
                     let hash_difficulty = sha256d_to_u64(&proof_bytes);
-                    let info = self.miner_info.write().await;
+                    let mut info = self.miner_info.write().await;
                     let share_difficulty = match info.get(&miner_address) {
                         Some((_, share_difficulty, _)) => *share_difficulty,
                         None => {
@@ -240,10 +240,10 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     }
 
                     // Update miner info for this miner.
-                    let mut miner_info = info.get(&miner_address).expect("miner should have existing info");
+                    let mut miner_info = *info.get(&miner_address).expect("miner should have existing info");
                     miner_info.0 = chrono::Utc::now().timestamp();
                     miner_info.2 += 1;
-                    info.insert(miner_address, *miner_info);
+                    info.insert(miner_address, miner_info);
 
                     // Since a worker will swap out the difficulty target for their share target,
                     // let's put it back to the original value before checking the POSW for true
@@ -273,7 +273,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                 }
             }
             MiningPoolRequest::GetCurrentBlockTemplate(peer_ip, address) => {
-                if let Some(current_template) = *self.current_template.read().await {
+                if let Some(current_template) = &*self.current_template.read().await {
                     // Ensure this miner exists in the info list first, so we can get their share
                     // difficulty.
                     if let None = self.miner_info.read().await.get(&address) {
@@ -297,7 +297,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                         .peers_router
                         .send(PeersRequest::MessageSend(
                             peer_ip,
-                            Message::BlockTemplate(share_difficulty, Data::Object(current_template)),
+                            Message::BlockTemplate(share_difficulty, Data::Object(current_template.clone())),
                         ))
                         .await
                     {

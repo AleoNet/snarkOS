@@ -21,6 +21,7 @@ use crate::{
     peers::{Peers, PeersRequest, PeersRouter},
     prover::{Prover, ProverRouter},
     rpc::initialize_rpc_server,
+    worker::{Worker, WorkerRouter},
     Environment,
     MiningPool,
     MiningPoolRouter,
@@ -61,6 +62,8 @@ pub struct Server<N: Network, E: Environment> {
     prover: Arc<Prover<N, E>>,
     /// The mining pool of the node.
     pool: Arc<MiningPool<N, E>>,
+    /// The worker of the node.
+    worker: Arc<Worker<N, E>>,
     /// The list of tasks spawned by the node.
     tasks: Tasks<task::JoinHandle<()>>,
 }
@@ -70,7 +73,12 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Starts the connection listener for peers.
     ///
     #[inline]
-    pub async fn initialize(node: &Node, miner: Option<Address<N>>, mut tasks: Tasks<task::JoinHandle<()>>) -> Result<Self> {
+    pub async fn initialize(
+        node: &Node,
+        miner: Option<Address<N>>,
+        pool_address: Option<SocketAddr>,
+        mut tasks: Tasks<task::JoinHandle<()>>,
+    ) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(node.node).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
@@ -103,6 +111,19 @@ impl<N: Network, E: Environment> Server<N, E> {
             ledger.router(),
         )
         .await?;
+        // Initialize a new instance for managing the worker.
+        let worker = Worker::open::<RocksDB>(
+            &mut tasks,
+            miner.clone(),
+            local_ip,
+            &status,
+            &terminator,
+            peers.router(),
+            ledger.reader(),
+            ledger.router(),
+            pool_address,
+        )
+        .await?;
 
         let pool = MiningPool::open::<RocksDB, _>(
             &mut tasks,
@@ -129,6 +150,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             ledger.router(),
             prover.router(),
             pool.router(),
+            worker.router(),
         )
         .await;
         // Initialize a new instance of the heartbeat.
@@ -139,6 +161,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             ledger.router(),
             prover.router(),
             pool.router(),
+            worker.router(),
         )
         .await;
         // Initialize a new instance of the RPC server.
@@ -162,6 +185,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             ledger,
             prover,
             pool,
+            worker,
             tasks,
         })
     }
@@ -198,6 +222,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                 self.ledger.router(),
                 self.prover.router(),
                 self.pool.router(),
+                self.worker.router(),
                 router,
             ))
             .await?;
@@ -245,6 +270,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
         pool_router: MiningPoolRouter<N>,
+        worker_router: WorkerRouter<N>,
     ) {
         // Initialize the listener process.
         let (router, handler) = oneshot::channel();
@@ -266,6 +292,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                                 ledger_router.clone(),
                                 prover_router.clone(),
                                 pool_router.clone(),
+                                worker_router.clone(),
                             );
                             if let Err(error) = peers_router.send(request).await {
                                 error!("Failed to send request to peers: {}", error)
@@ -296,6 +323,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
         pool_router: MiningPoolRouter<N>,
+        worker_router: WorkerRouter<N>,
     ) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
@@ -313,6 +341,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                     ledger_router.clone(),
                     prover_router.clone(),
                     pool_router.clone(),
+                    worker_router.clone(),
                 );
                 if let Err(error) = peers_router.send(request).await {
                     error!("Failed to send heartbeat to peers: {}", error)

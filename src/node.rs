@@ -23,7 +23,11 @@ use crate::{
     Environment,
     Miner,
     MinerTrial,
+    MiningPoolOperator,
+    MiningPoolOperatorTrial,
     NodeType,
+    PoolWorker,
+    PoolWorkerTrial,
     SyncNode,
 };
 use snarkos_storage::storage::rocksdb::RocksDB;
@@ -46,6 +50,12 @@ pub struct Node {
     /// Specify this as a mining node, with the given miner address.
     #[structopt(long = "miner")]
     pub miner: Option<String>,
+    /// Specify this as a worker node, with the given pool address.
+    #[structopt(long = "pooladdr")]
+    pub pool_address: Option<SocketAddr>,
+    /// Specify this as a mining pool.
+    #[structopt(long = "miningpool")]
+    pub mining_pool: bool,
     /// Specify the network of this node.
     #[structopt(default_value = "2", long = "network")]
     pub network: u16,
@@ -91,12 +101,23 @@ impl Node {
                 println!("{}", command.parse()?);
                 Ok(())
             }
-            None => match (self.network, self.miner.is_some(), self.trial, self.sync) {
-                (2, _, _, true) => self.start_server::<Testnet2, SyncNode<Testnet2>>().await,
-                (2, true, false, false) => self.start_server::<Testnet2, Miner<Testnet2>>().await,
-                (2, false, false, false) => self.start_server::<Testnet2, Client<Testnet2>>().await,
-                (2, true, true, false) => self.start_server::<Testnet2, MinerTrial<Testnet2>>().await,
-                (2, false, true, false) => self.start_server::<Testnet2, ClientTrial<Testnet2>>().await,
+            None => match (
+                self.network,
+                self.miner.is_some(),
+                self.trial,
+                self.sync,
+                self.pool_address.is_some(),
+                self.mining_pool,
+            ) {
+                (2, _, _, true, false, false) => self.start_server::<Testnet2, SyncNode<Testnet2>>().await,
+                (2, true, false, false, false, false) => self.start_server::<Testnet2, Miner<Testnet2>>().await,
+                (2, false, false, false, false, false) => self.start_server::<Testnet2, Client<Testnet2>>().await,
+                (2, true, false, false, true, false) => self.start_server::<Testnet2, PoolWorker<Testnet2>>().await,
+                (2, true, false, false, false, true) => self.start_server::<Testnet2, MiningPoolOperator<Testnet2>>().await,
+                (2, true, true, false, false, false) => self.start_server::<Testnet2, MinerTrial<Testnet2>>().await,
+                (2, false, true, false, false, false) => self.start_server::<Testnet2, ClientTrial<Testnet2>>().await,
+                (2, true, true, false, false, true) => self.start_server::<Testnet2, MiningPoolOperatorTrial<Testnet2>>().await,
+                (2, true, true, false, true, false) => self.start_server::<Testnet2, PoolWorkerTrial<Testnet2>>().await,
                 _ => panic!("Unsupported node configuration"),
             },
         }
@@ -150,7 +171,7 @@ impl Node {
         let tasks = Tasks::new();
 
         // Initialize the node's server.
-        let server = Server::<N, E>::initialize(self, miner, tasks.clone()).await?;
+        let server = Server::<N, E>::initialize(self, miner, self.pool_address, tasks.clone()).await?;
 
         // Initialize signal handling; it also maintains ownership of the Server
         // in order for it to not go out of scope.
