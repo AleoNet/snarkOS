@@ -311,14 +311,15 @@ impl<N: Network, E: Environment> Decoder for Message<N, E> {
             return Ok(None);
         }
 
-        // Use `advance` to modify the source such that it no longer contains this frame.
-        let buffer = source[4..4 + length].to_vec();
-        source.advance(4 + length);
-
         // Convert the buffer to a message, or fail if it is not valid.
-        match Message::deserialize(&buffer) {
+        let message = match Message::deserialize(&source[4..][..length]) {
             Ok(message) => Ok(Some(message)),
             Err(error) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, error)),
-        }
+        };
+
+        // Use `advance` to modify the source such that it no longer contains this frame.
+        source.advance(4 + length);
+
+        message
     }
 }

@@ -28,7 +28,7 @@ use rand::{CryptoRng, Rng};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     path::Path,
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
@@ -37,9 +37,6 @@ use std::{
     thread,
     thread::JoinHandle,
 };
-
-/// The number of seconds in two hours.
-const TWO_HOURS_UNIX: i64 = 7200;
 
 /// The maximum number of linear block locators.
 pub const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 64;
@@ -50,6 +47,9 @@ pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating
 
 /// TODO (howardwu): Reconcile this with the equivalent in `Environment`.
 const MAXIMUM_FORK_DEPTH: u32 = 4096;
+
+/// The maximum future block time - 2 minutes.
+const MAXIMUM_FUTURE_BLOCK_TIME: i64 = 120;
 
 ///
 /// A helper struct containing transaction metadata.
@@ -95,6 +95,8 @@ pub struct LedgerState<N: Network> {
     blocks: BlockState<N>,
     /// The indicator bit and tracker for a ledger in read-only mode.
     read_only: (bool, Arc<AtomicU32>, RwLock<Option<Arc<JoinHandle<()>>>>),
+    /// Used to ensure the database operations aren't interrupted by a shutdown.
+    map_lock: Arc<RwLock<()>>,
 }
 
 impl<N: Network> LedgerState<N> {
@@ -121,6 +123,7 @@ impl<N: Network> LedgerState<N> {
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
             read_only: (is_read_only, Arc::new(AtomicU32::new(0)), RwLock::new(None)),
+            map_lock: Default::default(),
         };
 
         // Determine the latest block height.
@@ -140,29 +143,36 @@ impl<N: Network> LedgerState<N> {
         if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
             let genesis = N::genesis_block();
             ledger.ledger_roots.insert(&genesis.previous_ledger_root(), &genesis.height())?;
+
+            // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+            let _map_lock = ledger.map_lock.read();
+
             ledger.blocks.add_block(genesis)?;
+
+            // The map lock goes out of scope on its own.
         }
+
+        // Check that all canonical block headers exist in storage.
+        let count = ledger.get_block_header_count()?;
+        assert_eq!(count, latest_block_height.saturating_add(1));
 
         // Iterate and append each block hash from genesis to tip to validate ledger state.
         const INCREMENT: u32 = 500;
         let mut start_block_height = 0u32;
-        while start_block_height < latest_block_height {
+        while start_block_height <= latest_block_height {
             // Compute the end block height (inclusive) for this iteration.
             let end_block_height = std::cmp::min(start_block_height.saturating_add(INCREMENT), latest_block_height);
-
-            // Perform a spot check that the block headers for this iteration exists in storage.
-            if start_block_height % 2 == 0 {
-                let block_headers = ledger.get_block_headers(start_block_height, end_block_height)?;
-                assert_eq!(end_block_height - start_block_height + 1, block_headers.len() as u32);
-            }
 
             // Retrieve the block hashes.
             let block_hashes = ledger.get_block_hashes(start_block_height, end_block_height)?;
 
             // Split the block hashes into (last_block_hash, [start_block_hash, ..., penultimate_block_hash]).
             if let Some((end_block_hash, block_hashes_excluding_last)) = block_hashes.split_last() {
-                // Add the block hashes (up to penultimate) to the ledger tree.
-                ledger.ledger_tree.write().add_all(block_hashes_excluding_last)?;
+                // It's possible that the batch only contains one block.
+                if !block_hashes_excluding_last.is_empty() {
+                    // Add the block hashes (up to penultimate) to the ledger tree.
+                    ledger.ledger_tree.write().add_all(block_hashes_excluding_last)?;
+                }
 
                 // Check 1 - Ensure the root of the ledger tree matches the one saved in the ledger roots map.
                 let ledger_root = ledger.get_previous_ledger_root(end_block_height)?;
@@ -187,12 +197,12 @@ impl<N: Network> LedgerState<N> {
                 ledger.ledger_tree.write().add(end_block_hash)?;
             }
 
-            // Update the starting block height for the next iteration.
-            start_block_height = std::cmp::min(end_block_height.saturating_add(1), latest_block_height);
-
             // Log the progress of the validation procedure.
-            let progress = (start_block_height as f64 / latest_block_height as f64 * 100f64) as u8;
-            debug!("Validating the ledger up to block {} ({}%)", start_block_height, progress);
+            let progress = (end_block_height as f64 / latest_block_height as f64 * 100f64) as u8;
+            debug!("Validating the ledger up to block {} ({}%)", end_block_height, progress);
+
+            // Update the starting block height for the next iteration.
+            start_block_height = end_block_height.saturating_add(1);
         }
 
         // If this is new storage, the while loop above did not execute,
@@ -243,6 +253,7 @@ impl<N: Network> LedgerState<N> {
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
             read_only: (is_read_only, Arc::new(AtomicU32::new(0)), RwLock::new(None)),
+            map_lock: Default::default(),
         });
 
         // Determine the latest block height.
@@ -262,8 +273,14 @@ impl<N: Network> LedgerState<N> {
         // If this is new storage, initialize it with the genesis block.
         if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
             let genesis = N::genesis_block();
+
+            // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+            let _map_lock = ledger.map_lock.read();
+
             ledger.ledger_roots.insert(&genesis.previous_ledger_root(), &genesis.height())?;
             ledger.blocks.add_block(genesis)?;
+
+            // The map lock goes out of scope on its own.
         }
 
         // Update the latest ledger state.
@@ -416,6 +433,11 @@ impl<N: Network> LedgerState<N> {
     /// Returns the block headers from the given `start_block_height` to `end_block_height` (inclusive).
     pub fn get_block_headers(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<BlockHeader<N>>> {
         self.blocks.get_block_headers(start_block_height, end_block_height)
+    }
+
+    /// Returns the number of all block headers belonging to canonical blocks.
+    pub fn get_block_header_count(&self) -> Result<u32> {
+        self.blocks.get_block_header_count()
     }
 
     /// Returns the transactions from the block of the given block height.
@@ -587,7 +609,10 @@ impl<N: Network> LedgerState<N> {
         // Compute the block difficulty target.
         let previous_timestamp = self.latest_block_timestamp();
         let previous_difficulty_target = self.latest_block_difficulty_target();
-        let block_timestamp = chrono::Utc::now().timestamp();
+
+        // Ensure that the new timestamp is ahead of the previous timestamp.
+        let block_timestamp = std::cmp::max(chrono::Utc::now().timestamp(), previous_timestamp.saturating_add(1));
+
         let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
         let cumulative_weight = self
             .latest_cumulative_weight()
@@ -689,7 +714,7 @@ impl<N: Network> LedgerState<N> {
 
         // Ensure the next block timestamp is within the declared time limit.
         let now = chrono::Utc::now().timestamp();
-        if block.timestamp() > (now + TWO_HOURS_UNIX) {
+        if block.timestamp() > (now + MAXIMUM_FUTURE_BLOCK_TIME) {
             return Err(anyhow!("The given block timestamp exceeds the time limit"));
         }
 
@@ -775,6 +800,9 @@ impl<N: Network> LedgerState<N> {
             }
         }
 
+        // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+        let _map_lock = self.map_lock.read();
+
         self.blocks.add_block(block)?;
         self.ledger_tree.write().add(&block.hash())?;
         self.ledger_roots.insert(&block.previous_ledger_root(), &block.height())?;
@@ -782,6 +810,9 @@ impl<N: Network> LedgerState<N> {
         self.latest_block_headers.write().push(block.header().clone());
         *self.latest_block_locators.write() = self.get_block_locators(block.height())?;
         *self.latest_block.write() = block.clone();
+
+        // The map lock goes out of scope on its own.
+
         Ok(())
     }
 
@@ -809,6 +840,9 @@ impl<N: Network> LedgerState<N> {
             .iter()
             .map(|block| (block.height(), block.clone()))
             .collect();
+
+        // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+        let _map_lock = self.map_lock.read();
 
         // Process the block removals.
         let mut current_block_height = latest_block_height;
@@ -839,6 +873,8 @@ impl<N: Network> LedgerState<N> {
         self.regenerate_latest_ledger_state()?;
         // Regenerate the ledger tree.
         self.regenerate_ledger_tree()?;
+
+        // The map lock goes out of scope on its own.
 
         // Return the removed blocks, in increasing order (i.e. 1, 2, 3...).
         Ok(blocks.values().skip(1).cloned().collect())
@@ -1079,6 +1115,14 @@ impl<N: Network> LedgerState<N> {
             _ => Err(anyhow!("Ledger storage state is inconsistent")),
         }
     }
+
+    /// Gracefully shuts down the ledger state.
+    // FIXME: currently only obtains the lock that is used to ensure that map operations
+    // can't be interrupted by a shutdown; the real solution is to use batch writes in
+    // rocksdb.
+    pub fn shut_down(&self) -> Arc<RwLock<()>> {
+        self.map_lock.clone()
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1209,6 +1253,15 @@ impl<N: Network> BlockState<N> {
             .into_par_iter()
             .map(|height| self.get_block_header(height))
             .collect()
+    }
+
+    /// Returns the number of all block headers belonging to canonical blocks.
+    pub fn get_block_header_count(&self) -> Result<u32> {
+        let block_hashes = self.block_heights.values().collect::<HashSet<_>>();
+
+        let count = self.block_headers.keys().filter(|hash| block_hashes.contains(hash)).count();
+
+        Ok(count as u32)
     }
 
     /// Returns the transactions from the block of the given block height.
