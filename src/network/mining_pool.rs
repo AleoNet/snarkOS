@@ -129,6 +129,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                 let mining_pool = mining_pool.clone();
                 let (router, handler) = oneshot::channel();
                 tasks.append(task::spawn(async move {
+                    // TODO: add loop which retargets share difficulty.
                     // Notify the outer function that the task is ready.
                     let _ = router.send(());
                     // Asynchronously wait for a mining pool request.
