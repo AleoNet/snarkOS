@@ -89,6 +89,8 @@ impl<N: Network, E: Environment> Server<N, E> {
         let ledger_storage_path = node.ledger_storage_path(local_ip);
         // Initialize the prover storage path.
         let prover_storage_path = node.prover_storage_path(local_ip);
+        // Initialize the mining pool storage path.
+        let pool_storage_path = prover_storage_path.join("-pool");
         // Initialize the status indicator.
         let status = Status::new();
         // Initialize the terminator bit.
@@ -125,7 +127,7 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         let pool = MiningPool::open::<RocksDB, _>(
             &mut tasks,
-            &prover_storage_path,
+            &pool_storage_path,
             miner.clone(),
             local_ip,
             prover.memory_pool(),
