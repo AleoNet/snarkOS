@@ -160,7 +160,7 @@ impl Node {
             }
             _ => {
                 println!("{}", crate::display::welcome_message());
-                println!("Starting a client node on {}.", N::NETWORK_NAME);
+                println!("Starting a {} node on {}.", E::NodeType, N::NETWORK_NAME);
                 println!("{}", crate::display::notification_message::<N>(None));
                 None
             }
