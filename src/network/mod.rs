@@ -31,3 +31,6 @@ pub use prover::*;
 
 pub mod server;
 pub use server::{LedgerReader, Server};
+
+pub mod worker;
+pub use worker::*;
