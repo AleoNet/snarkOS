@@ -53,7 +53,7 @@ pub struct Server<N: Network, E: Environment> {
     status: Status,
     /// The list of peers for the node.
     peers: Arc<Peers<N, E>>,
-    /// The prover of the node.
+    /// The ledger of the node.
     ledger: Arc<Ledger<N, E>>,
     /// The prover of the node.
     prover: Arc<Prover<N, E>>,
