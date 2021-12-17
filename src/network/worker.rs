@@ -19,6 +19,7 @@ use crate::{
     Environment,
     LedgerReader,
     LedgerRouter,
+    NodeType,
     PeersRouter,
 };
 
@@ -26,11 +27,16 @@ use snarkos_storage::{storage::Storage, BlockTemplate};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
+use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::{
     net::SocketAddr,
     sync::{atomic::AtomicBool, Arc},
 };
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task,
+    task::JoinHandle,
+};
 
 /// Shorthand for the parent half of the `Worker` message channel.
 pub(crate) type WorkerRouter<N> = mpsc::Sender<WorkerRequest<N>>;
@@ -52,10 +58,10 @@ pub enum WorkerRequest<N: Network> {
 ///
 #[derive(Debug)]
 pub struct Worker<N: Network, E: Environment> {
+    /// The thread pool for the worker.
+    worker: Arc<ThreadPool>,
     /// The address of the worker.
     worker_address: Option<Address<N>>,
-    /// The local address of the worker.
-    local_ip: SocketAddr,
     /// The worker router of the node.
     worker_router: WorkerRouter<N>,
     /// The status of the node.
@@ -85,6 +91,46 @@ impl<N: Network, E: Environment> Worker<N, E> {
         ledger_router: LedgerRouter<N>,
         pool_address: Option<SocketAddr>,
     ) -> Result<Arc<Self>> {
+        // Initialize an mpsc channel for sending requests for the `Worker` struct.
+        let (worker_router, mut worker_handler) = mpsc::channel(1024);
+        // Initialize the worker pool.
+        let pool = ThreadPoolBuilder::new()
+            .stack_size(8 * 1024 * 1024)
+            .num_threads((num_cpus::get() / 8 * 7).max(1))
+            .build()?;
+
+        // Initialize the worker.
+        let worker = Arc::new(Self {
+            worker: Arc::new(pool),
+            worker_address: miner,
+            worker_router,
+            status: status.clone(),
+            terminator: terminator.clone(),
+            peers_router,
+            ledger_reader,
+            ledger_router,
+            pool_address,
+        });
+
+        // Initialize the handler for the worker.
+        {
+            let worker = worker.clone();
+            let (router, handler) = oneshot::channel();
+            tasks.append(task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                // Asynchronously wait for a worker request.
+                while let Some(request) = worker_handler.recv().await {
+                    worker.update(request).await;
+                }
+            }));
+            // Wait until the worker handler is ready.
+            let _ = handler.await;
+        }
+
+        if E::NODE_TYPE == NodeType::Worker {}
+
+        Ok(worker)
     }
 
     /// Returns an instance of the worker router.
