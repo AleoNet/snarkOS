@@ -3,21 +3,21 @@ Returns a transition given the transition ID.
 
 ### Arguments
 
-|    Parameter    |  Type  | Required |                     Description                    |
+|    Parameter    |  Type  | Required |                    Description                     |
 |:---------------:|:------:|:--------:|:--------------------------------------------------:|
-| `transition_id` | string |    Yes   | The transition id of the requested transition info |
+| `transition_id` | string |   Yes    | The transition id of the requested transition info |
 
 ### Response
 
-|    Parameter      |  Type  | Description |
-|:-----------------:|:------:|:-----------:|
-| `ciphertexts`     | array  | The ciphertexts of the output records. |
-| `commitments`     | array  | The commitments of the output records. |
-| `events`          | array  | The events emitted from the transition. |
-| `proof`           | string | The zero-knowledge proof attesting to the validity of this transition. |
-| `serial_numbers`  | array  | The serial numbers of the input records. |
-| `transition_id`   | string | The ID of this transition. |
-| `value_balance`   | number | A value balance is the difference between the input and output record values. |
+|    Parameter     |  Type  |                                  Description                                  |
+|:----------------:|:------:|:-----------------------------------------------------------------------------:|
+|  `ciphertexts`   | array  |                    The ciphertexts of the output records.                     |
+|  `commitments`   | array  |                    The commitments of the output records.                     |
+|     `events`     | array  |                    The events emitted from the transition.                    |
+|     `proof`      | string |    The zero-knowledge proof attesting to the validity of this transition.     |
+| `serial_numbers` | array  |                   The serial numbers of the input records.                    |
+| `transition_id`  | string |                          The ID of this transition.                           |
+| `value_balance`  | number | A value balance is the difference between the input and output record values. |
 
 
 ### Example Request

@@ -3,22 +3,22 @@ Returns the ledger proof for the given commitment with the current ledger root.
 
 ### Arguments
 
-| Parameter           | Type   | Required | Description                                                        |
-|---------------------|--------|----------|--------------------------------------------------------------------|
-| `record_commitment` | string | Yes      | The record commitment to generate a ledger proof of inclusion for. |
+|       Parameter       |   Type   |  Required  |                             Description                              |
+|:---------------------:|:--------:|:----------:|:--------------------------------------------------------------------:|
+|  `record_commitment`  |  string  |    Yes     |  The record commitment to generate a ledger proof of inclusion for.  |
 
 ### Response
 
-|         Parameter        | Type   | Description |
-|--------------------------|--------|-------------|
-| `result`                 | string | The ledger proof as hex-encoded bytes. |
+| Parameter | Type   | Description                            |
+|-----------|--------|----------------------------------------|
+| `result`  | string | The ledger proof as hex-encoded bytes. |
 
 #### Ledger Proof (Deserialized)
-|             Parameter         | Type   | Description |
-|-------------------------------|--------|-------------|
-| `ledger_root`                 | string | The current ledger root. |
-| `ledger_root_inclusion_proof` | string | The proof of inclusion for the given given record commitment. |
-| `record_proof`                | string | The proof of inclusion for the record corresponding to the record commitment. |
+|            Parameter            |   Type   |                                  Description                                   |
+|:-------------------------------:|:--------:|:------------------------------------------------------------------------------:|
+|          `ledger_root`          |  string  |                            The current ledger root.                            |
+|  `ledger_root_inclusion_proof`  |  string  |         The proof of inclusion for the given given record commitment.          |
+|         `record_proof`          |  string  | The proof of inclusion for the record corresponding to the record commitment.  |
 
 ### Example Request
 ```ignore

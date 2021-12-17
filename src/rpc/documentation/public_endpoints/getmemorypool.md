@@ -7,19 +7,19 @@ None
 
 ### Response
 
-|     Parameter         |  Type  |                Description               |
+|       Parameter       |  Type  |               Description                |
 |:---------------------:|:------:|:----------------------------------------:|
-| `result`              |  array | The array of transactions                |
+|       `result`        | array  |        The array of transactions         |
 
 
 #### Transaction
 
-|      Parameter     |  Type  |                             Description                             |
+|     Parameter      |  Type  |                             Description                             |
 |:------------------:|:------:|:-------------------------------------------------------------------:|
-| `inner_circuit_id` | string | The ID of the inner circuit used to execute each transition.        |
-| `ledger_root`      | string | The ledger root used to prove inclusion of ledger-consumed records. |
-| `transaction_id`   | string | The ID of this transaction.                                         |
-| `transitions`      | array  | The state transitions.                                              |
+| `inner_circuit_id` | string |    The ID of the inner circuit used to execute each transition.     |
+|   `ledger_root`    | string | The ledger root used to prove inclusion of ledger-consumed records. |
+|  `transaction_id`  | string |                     The ID of this transaction.                     |
+|   `transitions`    | array  |                       The state transitions.                        |
 
 ### Example Request
 ```ignore

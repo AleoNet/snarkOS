@@ -3,15 +3,15 @@ Returns the record ciphertext for the given commitment.
 
 ### Arguments
 
-|   Parameter  |  Type  | Required |                     Description                    |
-|:------------:|:------:|:--------:|:--------------------------------------------------:|
-| `commitment` | string |    Yes   | The record commitment of the requested record ciphertext |
+|  Parameter   |  Type  | Required |                       Description                        |
+|:------------:|:------:|:--------:|:--------------------------------------------------------:|
+| `commitment` | string |   Yes    | The record commitment of the requested record ciphertext |
 
 ### Response
 
-|   Parameter  |  Type  |          Description         |
-|:------------:|:------:|:----------------------------:|
-| `result`     | string | The record ciphertext. |
+| Parameter |  Type  |      Description       |
+|:---------:|:------:|:----------------------:|
+| `result`  | string | The record ciphertext. |
 
 ### Example Request
 ```ignore

@@ -7,12 +7,12 @@ None
 
 ### Response
 
-|        Parameter            |  Type  | Description |
-|:---------------------------:|:------:|:-----------:|
-| `block_hash`                | string | The hash of the block. |
-| `header`                    | object | The block header containing the state of the ledger at the block. |
-| `previous_block_hash`       | string | The hash of the previous block. |
-| `transactions`              | object | The list of transactions included in the block. |
+|       Parameter       |  Type  |                            Description                            |
+|:---------------------:|:------:|:-----------------------------------------------------------------:|
+|     `block_hash`      | string |                      The hash of the block.                       |
+|       `header`        | object | The block header containing the state of the ledger at the block. |
+| `previous_block_hash` | string |                  The hash of the previous block.                  |
+|    `transactions`     | object |          The list of transactions included in the block.          |
 
 ### Example Request
 ```ignore

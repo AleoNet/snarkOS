@@ -7,7 +7,7 @@ None
 
 ### Response
 
-| Parameter |  Type  |              Description                |
+| Parameter |  Type  |               Description               |
 |:---------:|:------:|:---------------------------------------:|
 | `result`  | string | The ledger root of the canonical chain. |
 

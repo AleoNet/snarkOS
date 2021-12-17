@@ -7,16 +7,16 @@ None
 
 ### Response
 
-|        Parameter      |  Type  | Description |
-|:--------------------- |:------:|:----------- |
-| `previous_block_hash` | string | The hash of the previous block. |
-| `block_height`        | number | The height of the new block. |
-| `time`                | number | The block timestamp of the new block. |
-| `difficulty_target`   | number | The difficulty target of the new block. |
-| `cumulative_weight`   | number | The cumulative weight of the new block. |
-| `ledger_root`         | string | The latest state from the ledger. |
-| `transactions`        | array  | The list of transactions included in the new block. |
-| `coinbase_reward`     | number | The coinbase reward for mining the new block (does not include transaction fees). |
+|       Parameter        |  Type  |                                    Description                                    |
+|:----------------------:|:------:|:---------------------------------------------------------------------------------:|
+|     `block_height`     | number |                           The height of the new block.                            |
+|   `coinbase_reward`    | number | The coinbase reward for mining the new block (does not include transaction fees). |
+|  `cumulative_weight`   | number |                      The cumulative weight of the new block.                      |
+|  `difficulty_target`   | number |                      The difficulty target of the new block.                      |
+|     `ledger_root`      | string |                         The latest state from the ledger.                         |
+| `previous_block_hash`  | string |                          The hash of the previous block.                          |
+|         `time`         | number |                       The block timestamp of the new block.                       |
+|     `transactions`     | array  |                The list of transactions included in the new block.                |
 
 ### Example Request
 ```ignore

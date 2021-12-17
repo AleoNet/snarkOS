@@ -3,26 +3,26 @@ Returns up to `MAX_RESPONSE_BLOCKS` blocks from the given `start_block_height` t
 
 ### Arguments
 
-|       Parameter      |  Type  | Required |                         Description                         |
+|      Parameter       |  Type  | Required |                         Description                         |
 |:--------------------:|:------:|:--------:|:-----------------------------------------------------------:|
-| `start_block_height` | number |    Yes   | The block height of the first requested block in the array. |
-| `end_block_height`   | number |    Yes   | The block height of the last requested block in the array.  |
+| `start_block_height` | number |   Yes    | The block height of the first requested block in the array. |
+|  `end_block_height`  | number |   Yes    | The block height of the last requested block in the array.  |
 
 ### Response
 
-|     Parameter         |  Type  |                Description               |
+|       Parameter       |  Type  |               Description                |
 |:---------------------:|:------:|:----------------------------------------:|
-| `result`              |  array | The array of requested blocks            |
+|       `result`        | array  |      The array of requested blocks       |
 
 
 #### Block
 
-|        Parameter            |  Type  |                            Description                            |
+|          Parameter          |  Type  |                            Description                            |
 |:---------------------------:|:------:|:-----------------------------------------------------------------:|
-| `block_hash`                | string | The hash of the block.                                            |
-| `header`                    | object | The block header containing the state of the ledger at the block. |
-| `previous_block_hash`       | string | The hash of the previous block.                                   |
-| `transactions`              | object | The list of transactions included in the block.                   |
+|        `block_hash`         | string |                      The hash of the block.                       |
+|          `header`           | object | The block header containing the state of the ledger at the block. |
+|    `previous_block_hash`    | string |                  The hash of the previous block.                  |
+|       `transactions`        | object |          The list of transactions included in the block.          |
 
 
 ### Example Request

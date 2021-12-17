@@ -7,8 +7,8 @@ None
 
 ### Response
 
-| Parameter |  Type  |              Description                |
-|:---------:|:------:|:---------------------------------------:|
+| Parameter | Type  |                         Description                          |
+|:---------:|:-----:|:------------------------------------------------------------:|
 | `result`  | array | An array containing the IP addresses of all connected peers. |
 
 ### Example Request

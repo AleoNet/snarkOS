@@ -3,14 +3,14 @@ Returns up to `MAXIMUM_BLOCK_REQUEST` block hashes from the given `start_block_h
 
 ### Arguments
 
-|       Parameter      |  Type  | Required |                      Description                     |
+|      Parameter       |  Type  | Required |                     Description                      |
 |:--------------------:|:------:|:--------:|:----------------------------------------------------:|
-| `start_block_height` | number |    Yes   | The start block height of the requested block hashes |
-| `end_block_height`   | number |    Yes   | The end block height of the requested block hashes   |
+| `start_block_height` | number |   Yes    | The start block height of the requested block hashes |
+|  `end_block_height`  | number |   Yes    |  The end block height of the requested block hashes  |
 
 ### Response
 
-| Parameter |  Type  |                    Description                   |
+| Parameter |  Type  |                   Description                    |
 |:---------:|:------:|:------------------------------------------------:|
 | `result`  | array  | The list of block hashes of the requested blocks |
 

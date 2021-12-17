@@ -7,19 +7,19 @@ None
 
 ### Response
 
-|             Parameter            |  Type  | Description |
-|:-------------------------------- |:------:|:----------- |
-| `candidate_peers`                | array  | The list of candidate peer IPs addresses. |
-| `connected_peers`                | array  | The list of connected peer IP addresses. |
-| `latest_block_height`            | number | The latest block height. |
-| `latest_cumulative_weight`       | number | The latest cumulative weight of the canonical chain. |
-| `number_of_candidate_peers`      | number | The number of candidate peers. |
-| `number_of_connected_peers`      | number | The number of connected peers. |
-| `number_of_connected_sync_nodes` | number | The number of connected peers. |
-| `software`                       | string | The rust cargo package name and version. |
-| `status`                         | string | The state of the node. |
-| `type`                           | string | The type of the node. |
-| `version`                        | number | The version of the network protocol. |
+|             Parameter             |  Type  |                     Description                      |
+|:---------------------------------:|:------:|:----------------------------------------------------:|
+|         `candidate_peers`         | array  |      The list of candidate peer IPs addresses.       |
+|         `connected_peers`         | array  |       The list of connected peer IP addresses.       |
+|       `latest_block_height`       | number |               The latest block height.               |
+|    `latest_cumulative_weight`     | number | The latest cumulative weight of the canonical chain. |
+|    `number_of_candidate_peers`    | number |            The number of candidate peers.            |
+|    `number_of_connected_peers`    | number |            The number of connected peers.            |
+| `number_of_connected_sync_nodes`  | number |            The number of connected peers.            |
+|            `software`             | string |       The rust cargo package name and version.       |
+|             `status`              | string |                The state of the node.                |
+|              `type`               | string |                The type of the node.                 |
+|             `version`             | number |         The version of the network protocol.         |
 
 ### Example Request
 ```ignore

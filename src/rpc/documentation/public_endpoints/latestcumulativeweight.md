@@ -7,8 +7,8 @@ None
 
 ### Response
 
-| Parameter |  Type  |                  Description                 |
-|:---------:|:------:|:--------------------------------------------:|
+| Parameter |  Type  |                     Description                      |
+|:---------:|:------:|:----------------------------------------------------:|
 | `result`  | number | The latest cumulative weight of the canonical chain. |
 
 ### Example Request

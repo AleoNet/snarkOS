@@ -69,6 +69,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "latestbl
       }
     ]
   },
-  "id": 1
+  "id": "1"
 }
 ```

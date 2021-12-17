@@ -3,34 +3,34 @@ Returns a transaction with metadata given the transaction ID.
 
 ### Arguments
 
-|     Parameter    |  Type  | Required |                   Description                   |
+|    Parameter     |  Type  | Required |                   Description                   |
 |:----------------:|:------:|:--------:|:-----------------------------------------------:|
-| `transaction_id` | string |    Yes   | The transaction id of the requested transaction |
+| `transaction_id` | string |   Yes    | The transaction id of the requested transaction |
 
 ### Response
 
-|      Parameter      |  Type  | Description |
-|:-------------------:|:------:|:-----------:|
-| `metadata`          | object | The metadata of the requested transaction |
-| `transaction`       | object | The transaction object |
+|   Parameter   |  Type  |                Description                |
+|:-------------:|:------:|:-----------------------------------------:|
+|  `metadata`   | object | The metadata of the requested transaction |
+| `transaction` | object |          The transaction object           |
 
 #### Transaction Metadata
 
-|      Parameter      |  Type  | Description |
-|:-------------------:|:------:|:-----------:|
-| `block_hash`        | string | The block hash of the block the transaction is included in. |
-| `block_height`      | number | The block height of the block the transaction is included in. |
-| `block_timestamp`   | number | The block timestamp of the block the transaction is included in. |
-| `transaction_index` | number | The index of the transaction in the block. |
+|      Parameter      |  Type  |                           Description                            |
+|:-------------------:|:------:|:----------------------------------------------------------------:|
+|    `block_hash`     | string |   The block hash of the block the transaction is included in.    |
+|   `block_height`    | number |  The block height of the block the transaction is included in.   |
+|  `block_timestamp`  | number | The block timestamp of the block the transaction is included in. |
+| `transaction_index` | number |            The index of the transaction in the block.            |
 
 #### Transaction
 
-|      Parameter      |  Type  | Description |
-|:-------------------:|:------:|:-----------:|
-| `inner_circuit_id`  | string | The ID of the inner circuit used to execute each transition. |
-| `ledger_root`       | string | The ledger root used to prove inclusion of ledger-consumed records. |
-| `transaction_id`    | string | The ID of this transaction. |
-| `transitions`       | array  | The state transitions. |
+|     Parameter      |  Type  |                             Description                             |
+|:------------------:|:------:|:-------------------------------------------------------------------:|
+| `inner_circuit_id` | string |    The ID of the inner circuit used to execute each transition.     |
+|   `ledger_root`    | string | The ledger root used to prove inclusion of ledger-consumed records. |
+|  `transaction_id`  | string |                     The ID of this transaction.                     |
+|   `transitions`    | array  |                       The state transitions.                        |
 
 ### Example Request
 ```ignore

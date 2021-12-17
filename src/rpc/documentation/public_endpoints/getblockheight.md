@@ -3,13 +3,13 @@ Returns the block height for the given the block hash.
 
 ### Arguments
 
-|   Parameter  |  Type  | Required |                  Description                 |
+|  Parameter   |  Type  | Required |                 Description                  |
 |:------------:|:------:|:--------:|:--------------------------------------------:|
-| `block_hash` | string |    Yes   | The block hash of the requested block height |
+| `block_hash` | string |   Yes    | The block hash of the requested block height |
 
 ### Response
 
-| Parameter |  Type  |                       Description                     |
+| Parameter |  Type  |                      Description                      |
 |:---------:|:------:|:-----------------------------------------------------:|
 | `result`  | number | The block height of the block at the given block hash |
 

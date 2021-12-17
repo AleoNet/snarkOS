@@ -5,13 +5,13 @@ If the given transaction is valid, it is added to the memory pool and propagated
 
 ### Arguments
 
-|     Parameter     |  Type  | Required |              Description             |
+|     Parameter     |  Type  | Required |             Description              |
 |:-----------------:|:------:|:--------:|:------------------------------------:|
-| `transaction_hex` | string |    Yes   | The raw transaction hex to broadcast |
+| `transaction_hex` | string |   Yes    | The raw transaction hex to broadcast |
 
 ### Response
 
-| Parameter |  Type  |                 Description                |
+| Parameter |  Type  |                Description                 |
 |:---------:|:------:|:------------------------------------------:|
 | `result`  | string | The transaction id of the sent transaction |
 

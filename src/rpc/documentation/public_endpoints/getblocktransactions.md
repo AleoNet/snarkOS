@@ -3,24 +3,24 @@ Returns the transactions from the block of the given block height.
 
 ### Arguments
 
-|    Parameter   |  Type  | Required |                      Description                     |
+|   Parameter    |  Type  | Required |                     Description                      |
 |:--------------:|:------:|:--------:|:----------------------------------------------------:|
-| `block_height` | number |    Yes   | The block height of the requested block transactions |
+| `block_height` | number |   Yes    | The block height of the requested block transactions |
 
 ### Response
 
-| Parameter |  Type  |                Description               |
+| Parameter |  Type  |               Description                |
 |:---------:|:------:|:----------------------------------------:|
 | `result`  | object | The transactions of the requested block. |
 
 #### Transaction
 
-|      Parameter      |  Type  | Description |
-|:-------------------:|:------:|:-----------:|
-| `inner_circuit_id`  | string | The ID of the inner circuit used to execute each transition. |
-| `ledger_root`       | string | The ledger root used to prove inclusion of ledger-consumed records. |
-| `transaction_id`    | string | The ID of the transaction. |
-| `transitions`       | array  | The state transitions. |
+|     Parameter      |  Type  |                             Description                             |
+|:------------------:|:------:|:-------------------------------------------------------------------:|
+| `inner_circuit_id` | string |    The ID of the inner circuit used to execute each transition.     |
+|   `ledger_root`    | string | The ledger root used to prove inclusion of ledger-consumed records. |
+|  `transaction_id`  | string |                     The ID of the transaction.                      |
+|   `transitions`    | array  |                       The state transitions.                        |
 
 ### Example Request
 ```ignore
@@ -71,6 +71,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblock
       }
     ]
   },
-  "id": 1
+  "id": "1"
 }
 ```

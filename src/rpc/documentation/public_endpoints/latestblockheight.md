@@ -7,7 +7,7 @@ None
 
 ### Response
 
-| Parameter |  Type  |                  Description                 |
+| Parameter |  Type  |                 Description                  |
 |:---------:|:------:|:--------------------------------------------:|
 | `result`  | number | The number of blocks in the canonical chain. |
 

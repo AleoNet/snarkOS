@@ -3,18 +3,18 @@ Returns the block given the block height.
 
 ### Arguments
 
-|    Parameter   |  Type  | Required |                Description              |
+|   Parameter    |  Type  | Required |               Description               |
 |:--------------:|:------:|:--------:|:---------------------------------------:|
-| `block_height` | number |    Yes   | The block height of the requested block |
+| `block_height` | number |   Yes    | The block height of the requested block |
 
 ### Response
 
-|        Parameter            |  Type  | Description |
-|:---------------------------:|:------:|:-----------:|
-| `block_hash`                | string | The hash of the block. |
-| `header`                    | object | The block header containing the state of the ledger at the block. |
-| `previous_block_hash`       | string | The hash of the previous block. |
-| `transactions`              | object | The list of transactions included in the block. |
+|       Parameter       |  Type  |                            Description                            |
+|:---------------------:|:------:|:-----------------------------------------------------------------:|
+|     `block_hash`      | string |                      The hash of the block.                       |
+|       `header`        | object | The block header containing the state of the ledger at the block. |
+| `previous_block_hash` | string |                  The hash of the previous block.                  |
+|    `transactions`     | object |          The list of transactions included in the block.          |
 
 ### Example Request
 ```ignore
