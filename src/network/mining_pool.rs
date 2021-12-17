@@ -264,6 +264,14 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                         warn!("[ProposedBlock] {}", error);
                     }
 
+                    debug!(
+                        "Mining pool has received valid share {} ({}) - {} / {}",
+                        block.height(),
+                        block.hash(),
+                        worker_address,
+                        peer_ip
+                    );
+
                     {
                         // Update info for this worker.
                         let mut info = self.miner_info.write().await;
