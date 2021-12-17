@@ -775,26 +775,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
     }
 
-    ///
-    /// Proceeds to send block requests to a connected peer, if the ledger is out of date.
-    ///
-    /// Case 1 - You are ahead of your peer:
-    ///     - Do nothing
-    /// Case 2 - You are behind your peer:
-    ///     Case 2(a) - `is_fork` is `None`:
-    ///         - Peer is being malicious or thinks you are ahead. Both are issues,
-    ///           pick a different peer to sync with.
-    ///     Case 2(b) - `is_fork` is `Some(false)`:
-    ///         - Request blocks from your latest state
-    ///     Case 2(c) - `is_fork` is `Some(true)`:
-    ///             Case 2(c)(a) - Common ancestor is within `MAXIMUM_FORK_DEPTH`:
-    ///                  - Revert to common ancestor, and send block requests to sync.
-    ///             Case 2(c)(b) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`:
-    ///                  Case 2(c)(b)(a) - You can calculate that you are outside of the `MAXIMUM_FORK_DEPTH`:
-    ///                      - Disconnect from peer.
-    ///                  Case 2(c)(b)(b) - You don't know if you are within the `MAXIMUM_FORK_DEPTH`:
-    ///                      - Revert to most common ancestor and send block requests to sync.
-    ///
     async fn update_block_requests(&self) {
         // Ensure the ledger is not awaiting responses from outstanding block requests.
         if self.number_of_block_requests().await > 0 {
@@ -829,6 +809,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         );
 
         // Case 1 - Ensure the peer has a heavier canonical chain than this ledger.
+        // note: this check is duplicated in `handle_block_requests`, as it's super-fast and allows us
+        // to not acquire the `_block_requests_lock`.
         if latest_cumulative_weight >= maximum_cumulative_weight {
             return;
         }
@@ -849,54 +831,32 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             };
 
-            // Ensure the latest common ancestor is not greater than the latest block request.
-            if latest_block_height < maximum_common_ancestor {
-                warn!(
-                    "The common ancestor {} cannot be greater than the latest block {}",
-                    maximum_common_ancestor, latest_block_height
-                );
+            let update_result = handle_block_requests::<E, N>(
+                latest_block_height,
+                latest_cumulative_weight,
+                peer_ip,
+                is_fork,
+                maximum_block_height,
+                maximum_cumulative_weight,
+                maximum_common_ancestor,
+                first_deviating_locator,
+            );
+
+            if let BlockRequestUpdate::AbortAndDisconnect(ref reason) = update_result {
+                self.disconnect(peer_ip, reason).await;
                 return;
             }
 
-            // If the ledger is on a fork, it might need to revert.
-            let (latest_common_ancestor, ledger_needs_reverting) =
-                // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
-                if !is_fork {
-                    // Continue to sync from the latest block height of this ledger, if the peer is honest.
-                    match first_deviating_locator.is_none() {
-                        true => (maximum_common_ancestor, false),
-                        false => (latest_block_height, false),
-                    }
-                }
-                // Case 2(c) - This ledger is on a fork of the peer.
-                else {
-                    // Case 2(c)(a) - If the common ancestor is within the fork range of this ledger, proceed to switch to the fork.
-                    if latest_block_height.saturating_sub(maximum_common_ancestor) <= E::MAXIMUM_FORK_DEPTH {
-                        info!("Discovered a canonical chain from {} with common ancestor {} and cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
-                        // If the latest block is the same as the maximum common ancestor, do not revert.
-                        (maximum_common_ancestor, latest_block_height != maximum_common_ancestor)
-                    }
-                    // Case 2(c)(b) - If the common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
-                    else if let Some(first_deviating_locator) = first_deviating_locator {
-                        // Case 2(c)(b)(a) - Check if the real common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
-                        // If this peer is outside of the fork range of this ledger, proceed to disconnect from the peer.
-                        if latest_block_height.saturating_sub(first_deviating_locator) >= E::MAXIMUM_FORK_DEPTH {
-                            debug!("Peer {} has exceeded the permitted fork range of the protocol, disconnecting", peer_ip);
-                            self.disconnect(peer_ip, "exceeded fork range").await;
-                            return;
-                        }
-                        // Case 2(c)(b)(b) - You don't know if your real common ancestor is within `MAXIMUM_FORK_DEPTH`.
-                        // Revert to the common ancestor anyways.
-                        else {
-                            info!("Discovered a potentially better canonical chain from {} with common ancestor {} and cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
-                            (maximum_common_ancestor, true)
-                        }
-                    }
-                    // The first deviating locator didn't exist; abort.
-                    else {
-                        return;
-                    }
-                };
+            if let BlockRequestUpdate::Abort = update_result {
+                return;
+            }
+
+            let (start_block_height, end_block_height, ledger_needs_reverting) = if let BlockRequestUpdate::Success(success) = update_result
+            {
+                (success.start_block_height, success.end_block_height, success.ledger_needs_reverting)
+            } else {
+                unreachable!(); // safe, Abort and AbortAndDisconnect return early
+            };
 
             // Revert the ledger if needed.
             let ledger_reverted = if ledger_needs_reverting {
@@ -910,11 +870,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 false
             };
 
-            // TODO (howardwu): Ensure the start <= end.
-            // Determine the start and end block heights to request.
-            let number_of_block_requests = std::cmp::min(maximum_block_height - latest_common_ancestor, E::MAXIMUM_BLOCK_REQUEST);
-            let start_block_height = latest_common_ancestor + 1;
-            let end_block_height = start_block_height + number_of_block_requests - 1;
             debug!("Requesting blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
 
             // Send a `BlockRequest` message to the peer.
