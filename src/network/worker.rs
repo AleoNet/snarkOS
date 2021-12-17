@@ -129,7 +129,19 @@ impl<N: Network, E: Environment> Worker<N, E> {
             let _ = handler.await;
         }
 
-        if E::NODE_TYPE == NodeType::Worker {}
+        if E::NODE_TYPE == NodeType::Worker {
+            if let Some(pool_address) = pool_address {
+                if let Some(recipient) = miner {
+                    // Ask for our first block template to get the loop started.
+                    if let Err(error) = peers_router
+                        .send(PeersRequest::MessageSend(pool_address, Message::GetWork(recipient)))
+                        .await
+                    {
+                        warn!("Could not get block template {}", error);
+                    }
+                }
+            }
+        }
 
         Ok(worker)
     }
