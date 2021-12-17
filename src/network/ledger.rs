@@ -858,18 +858,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 return;
             }
 
-            // Determine the latest common ancestor.
-            let latest_common_ancestor = if !is_fork && first_deviating_locator.is_some() {
-                latest_block_height
-            } else {
-                maximum_common_ancestor
-            };
-
             // If the ledger is on a fork, it might need to revert.
-            let ledger_needs_reverting =
+            let (latest_common_ancestor, ledger_needs_reverting) =
                 // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
                 if !is_fork {
-                    false
+                    // Continue to sync from the latest block height of this ledger, if the peer is honest.
+                    match first_deviating_locator.is_none() {
+                        true => (maximum_common_ancestor, false),
+                        false => (latest_block_height, false),
+                    }
                 }
                 // Case 2(c) - This ledger is on a fork of the peer.
                 else {
@@ -877,11 +874,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     if latest_block_height.saturating_sub(maximum_common_ancestor) <= E::MAXIMUM_FORK_DEPTH {
                         info!("Discovered a canonical chain from {} with common ancestor {} and cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
                         // If the latest block is the same as the maximum common ancestor, do not revert.
-                        if latest_block_height != maximum_common_ancestor {
-                            true
-                        } else {
-                            false
-                        }
+                        (maximum_common_ancestor, latest_block_height != maximum_common_ancestor)
                     }
                     // Case 2(c)(b) - If the common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
                     else if let Some(first_deviating_locator) = first_deviating_locator {
@@ -896,7 +889,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         // Revert to the common ancestor anyways.
                         else {
                             info!("Discovered a potentially better canonical chain from {} with common ancestor {} and cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
-                            true
+                            (maximum_common_ancestor, true)
                         }
                     }
                     // The first deviating locator didn't exist; abort.
