@@ -221,7 +221,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.ledger_router.clone()
     }
 
-    pub(super) async fn shut_down(&self) -> (Arc<Mutex<()>>, Arc<Mutex<()>>) {
+    pub(super) async fn shut_down(&self) -> (Arc<Mutex<()>>, Arc<Mutex<()>>, Arc<parking_lot::RwLock<()>>) {
         debug!("Ledger is shutting down...");
 
         // Set the terminator bit to `true` to ensure it stops mining.
@@ -242,9 +242,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Return the lock for the canon chain and block requests.
         let canon_lock = self.canon_lock.clone();
         let block_requests_lock = self.block_requests_lock.clone();
+        let storage_map_lock = self.canon.shut_down();
         trace!("[ShuttingDown] Block requests lock has been cloned");
 
-        (canon_lock, block_requests_lock)
+        (canon_lock, block_requests_lock, storage_map_lock)
     }
 
     ///
@@ -541,21 +542,21 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         } else if unconfirmed_block_height == self.canon.latest_block_height() + 1
             && unconfirmed_previous_block_hash == self.canon.latest_block_hash()
         {
-            // Acquire the lock for the canon chain.
-            let _canon_lock = self.canon_lock.lock().await;
             // Acquire the lock for block requests.
             let _block_requests_lock = self.block_requests_lock.lock().await;
+            // Acquire the lock for the canon chain.
+            let _canon_lock = self.canon_lock.lock().await;
 
             // Ensure the block height is not part of a block request on a fork.
             let mut is_block_on_fork = false;
-            for requests in self.block_requests.read().await.values() {
+            'outer: for requests in self.block_requests.read().await.values() {
                 for request in requests.keys() {
                     // If the unconfirmed block conflicts with a requested block on a fork, skip.
                     if request.block_height == unconfirmed_block_height {
                         if let Some(requested_block_hash) = request.block_hash {
                             if unconfirmed_block.hash() != requested_block_hash {
                                 is_block_on_fork = true;
-                                break;
+                                break 'outer;
                             }
                         }
                     }
