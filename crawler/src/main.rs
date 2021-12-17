@@ -1,5 +1,13 @@
 use snarkos::{Client, ClientTrial, Data, Environment};
-use snarkos_snode::{ClientMessage, ClientState, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
+use snarkos_snode::{
+    enable_tracing,
+    ClientMessage,
+    ClientState,
+    SynthNode,
+    MAXIMUM_FORK_DEPTH,
+    MESSAGE_LENGTH_PREFIX_SIZE,
+    MESSAGE_VERSION,
+};
 use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
 
@@ -26,6 +34,9 @@ use snarkos_crawler::known_network::KnownNetwork;
 async fn main() {
     // Configure and start crawler.
     let crawler = Crawler::default().await;
+
+    // Enable tracing for the crawler.
+    enable_tracing();
 
     for addr in SYNC_NODES {
         // Ignore connection failures for now.

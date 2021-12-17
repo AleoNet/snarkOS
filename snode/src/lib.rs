@@ -235,3 +235,10 @@ impl Disconnect for SynthNode {
         assert_eq!(locked_peers.len(), initial_len - 1)
     }
 }
+
+/// Enables tracing for all synth node instances (usually scoped by test).
+pub fn enable_tracing() {
+    use tracing_subscriber::{fmt, EnvFilter};
+
+    fmt().with_test_writer().with_env_filter(EnvFilter::from_default_env()).init();
+}
