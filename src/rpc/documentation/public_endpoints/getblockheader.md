@@ -28,7 +28,7 @@ Returns the block header for the given the block height.
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockheader", "params": [0] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "getblockheader", "params": [0] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response

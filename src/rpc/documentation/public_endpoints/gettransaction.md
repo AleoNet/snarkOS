@@ -34,7 +34,7 @@ Returns a transaction with metadata given the transaction ID.
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "gettransaction", "params": ["at1mka6m3kfsgt5dpnfurk2ydjefqjzng4aawj7lkpc32pjkg86hyysrke9nf"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "gettransaction", "params": ["at1mka6m3kfsgt5dpnfurk2ydjefqjzng4aawj7lkpc32pjkg86hyysrke9nf"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response 

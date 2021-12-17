@@ -23,7 +23,7 @@ None
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getnodestate", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "getnodestate", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 

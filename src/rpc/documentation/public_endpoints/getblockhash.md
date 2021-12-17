@@ -15,7 +15,7 @@ Returns the block hash for the given block height, if it exists in the canonical
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockhash", "params": [0] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "getblockhash", "params": [0] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response
