@@ -33,8 +33,8 @@ pub enum NodeType {
     Beacon,
     /// A sync node is a discovery node, capable of syncing nodes for the network.
     Sync,
-    /// A mining pool node is a full node, capable of producing new blocks from pooled miners.
-    MiningPool,
+    /// A pool operator is a full node, capable of coordinating provers.
+    PoolOperator,
     /// A worker node is a full node, which directs its mining power towards a pool.
     Worker,
 }
@@ -126,7 +126,7 @@ pub struct PoolOperator<N: Network>(PhantomData<N>);
 #[rustfmt::skip]
 impl<N: Network> Environment for PoolOperator<N> {
     type Network = N;
-    const NODE_TYPE: NodeType = NodeType::MiningPool;
+    const NODE_TYPE: NodeType = NodeType::PoolOperator;
     const COINBASE_IS_PUBLIC: bool = true;
     const MINIMUM_NUMBER_OF_PEERS: usize = 11;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 1000;
@@ -195,7 +195,7 @@ pub struct PoolOperatorTrial<N: Network>(PhantomData<N>);
 #[rustfmt::skip]
 impl<N: Network> Environment for PoolOperatorTrial<N> {
     type Network = N;
-    const NODE_TYPE: NodeType = NodeType::MiningPool;
+    const NODE_TYPE: NodeType = NodeType::PoolOperator;
     const SYNC_NODES: [&'static str; 13] = [
         "144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132",
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",

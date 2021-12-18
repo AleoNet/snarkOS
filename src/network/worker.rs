@@ -160,7 +160,7 @@ impl<N: Network, E: Environment> Worker<N, E> {
         match request {
             WorkerRequest::BlockTemplate(peer_ip, share_difficulty, block_template) => {
                 if let Some(pool_address) = self.pool_address {
-                    // Refuse work from any mining pool other than our registered one.
+                    // Refuse work from any pool other than our registered one.
                     if pool_address != peer_ip {
                         return;
                     }
@@ -213,7 +213,7 @@ impl<N: Network, E: Environment> Worker<N, E> {
                                             block.hash()
                                         );
 
-                                        // Propose it to the mining pool
+                                        // Propose it to the pool.
                                         if let Err(error) = peers_router
                                             .send(PeersRequest::MessageSend(
                                                 peer_ip,
@@ -221,7 +221,7 @@ impl<N: Network, E: Environment> Worker<N, E> {
                                             ))
                                             .await
                                         {
-                                            warn!("Could not send share to mining pool {}", error);
+                                            warn!("Could not send share to pool {}", error);
                                         }
                                     }
                                     Ok(Err(error)) => trace!("{}", error),

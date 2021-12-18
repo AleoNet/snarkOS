@@ -53,7 +53,7 @@ pub struct Node {
     /// Specify this as a worker node, with the given pool address.
     #[structopt(long = "pooladdr")]
     pub pool_address: Option<SocketAddr>,
-    /// Specify this as a mining pool.
+    /// Specify this as a pool.
     #[structopt(long = "miningpool")]
     pub mining_pool: bool,
     /// Specify the network of this node.
@@ -151,7 +151,7 @@ impl Node {
 
     async fn start_server<N: Network, E: Environment>(&self) -> Result<()> {
         let miner = match (E::NODE_TYPE, &self.miner) {
-            (NodeType::Miner, Some(address)) | (NodeType::Worker, Some(address)) | (NodeType::MiningPool, Some(address)) => {
+            (NodeType::Miner, Some(address)) | (NodeType::Worker, Some(address)) | (NodeType::PoolOperator, Some(address)) => {
                 let miner_address = Address::<N>::from_str(address)?;
                 println!("{}", crate::display::welcome_message());
                 println!("Your Aleo address is {}.\n", miner_address);

@@ -21,13 +21,13 @@ use anyhow::{anyhow, Result};
 use std::{collections::HashMap, path::Path};
 
 #[derive(Debug)]
-pub struct MiningPoolState<N: Network> {
+pub struct PoolState<N: Network> {
     shares: SharesState<N>,
 }
 
-impl<N: Network> MiningPoolState<N> {
+impl<N: Network> PoolState<N> {
     ///
-    /// Opens a new writable instance of `MiningPoolState` from the given storage path.
+    /// Opens a new writable instance of `PoolState` from the given storage path.
     ///
     pub fn open_writer<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
         // Open storage.
@@ -35,13 +35,13 @@ impl<N: Network> MiningPoolState<N> {
         let is_read_only = false;
         let storage = S::open(path, context, is_read_only)?;
 
-        // Initialize the mining pool.
-        let mining_pool = Self {
+        // Initialize the pool.
+        let pool = Self {
             shares: SharesState::open(storage)?,
         };
 
-        info!("Mining pool successfully initialized");
-        Ok(mining_pool)
+        info!("Pool successfully initialized");
+        Ok(pool)
     }
 
     /// Returns all the shares in storage.
@@ -49,7 +49,7 @@ impl<N: Network> MiningPoolState<N> {
         self.shares.to_shares()
     }
 
-    /// Returns the number of shares for a given block_height.
+    /// Returns the number of shares for a given block height.
     pub fn get_shares(&self, block_height: u32) -> Result<HashMap<Address<N>, u64>> {
         self.shares.get_shares(block_height)
     }

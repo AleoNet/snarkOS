@@ -23,10 +23,10 @@ use crate::{
     rpc::initialize_rpc_server,
     worker::{Worker, WorkerRouter},
     Environment,
-    MiningPool,
-    MiningPoolRouter,
     Node,
     NodeType,
+    Pool,
+    PoolRouter,
 };
 use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
@@ -60,8 +60,8 @@ pub struct Server<N: Network, E: Environment> {
     ledger: Arc<Ledger<N, E>>,
     /// The prover of the node.
     prover: Arc<Prover<N, E>>,
-    /// The mining pool of the node.
-    pool: Arc<MiningPool<N, E>>,
+    /// The pool of the node.
+    pool: Arc<Pool<N, E>>,
     /// The worker of the node.
     worker: Arc<Worker<N, E>>,
     /// The list of tasks spawned by the node.
@@ -89,7 +89,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let ledger_storage_path = node.ledger_storage_path(local_ip);
         // Initialize the prover storage path.
         let prover_storage_path = node.prover_storage_path(local_ip);
-        // Initialize the mining pool storage path.
+        // Initialize the pool storage path.
         let pool_storage_path = prover_storage_path.join("-pool");
         // Initialize the status indicator.
         let status = Status::new();
@@ -125,7 +125,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         )
         .await?;
 
-        let pool = MiningPool::open::<RocksDB, _>(
+        let pool = Pool::open::<RocksDB, _>(
             &mut tasks,
             &pool_storage_path,
             miner.clone(),
@@ -268,7 +268,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
-        pool_router: MiningPoolRouter<N>,
+        pool_router: PoolRouter<N>,
         worker_router: WorkerRouter<N>,
     ) {
         // Initialize the listener process.
@@ -321,7 +321,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
-        pool_router: MiningPoolRouter<N>,
+        pool_router: PoolRouter<N>,
         worker_router: WorkerRouter<N>,
     ) {
         // Initialize the heartbeat process.

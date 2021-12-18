@@ -27,7 +27,7 @@ use crate::{
     PeersRouter,
     ProverRouter,
 };
-use snarkos_storage::{storage::Storage, MiningPoolState};
+use snarkos_storage::{storage::Storage, PoolState};
 use snarkvm::{algorithms::crh::sha256d_to_u64, dpc::prelude::*, utilities::ToBytes};
 
 use anyhow::Result;
@@ -39,17 +39,17 @@ use tokio::{
     task::JoinHandle,
 };
 
-/// Shorthand for the parent half of the `MiningPool` message channel.
-pub(crate) type MiningPoolRouter<N> = mpsc::Sender<MiningPoolRequest<N>>;
+/// Shorthand for the parent half of the `Pool` message channel.
+pub(crate) type PoolRouter<N> = mpsc::Sender<PoolRequest<N>>;
 #[allow(unused)]
-/// Shorthand for the child half of the `MiningPool` message channel.
-type MiningPoolHandler<N> = mpsc::Receiver<MiningPoolRequest<N>>;
+/// Shorthand for the child half of the `Pool` message channel.
+type PoolHandler<N> = mpsc::Receiver<PoolRequest<N>>;
 
 ///
-/// An enum of requests that the `MiningPool` struct processes.
+/// An enum of requests that the `Pool` struct processes.
 ///
 #[derive(Debug)]
-pub enum MiningPoolRequest<N: Network> {
+pub enum PoolRequest<N: Network> {
     /// ProposedBlock := (peer_ip, proposed_block, worker_address)
     ProposedBlock(SocketAddr, Block<N>, Address<N>),
     /// GetCurrentBlockTemplate := (peer_ip, worker_address)
@@ -59,19 +59,19 @@ pub enum MiningPoolRequest<N: Network> {
 }
 
 ///
-/// A mining pool for a specific network on the node server.
+/// A pool for a specific network on the node server.
 ///
 #[derive(Debug)]
-pub struct MiningPool<N: Network, E: Environment> {
-    /// The address of the mining pool.
-    mining_pool_address: Option<Address<N>>,
+pub struct Pool<N: Network, E: Environment> {
+    /// The address of the pool.
+    pool_address: Option<Address<N>>,
     /// The local address of this node.
     local_ip: SocketAddr,
-    /// The state storage of the mining pool.
-    state: Arc<MiningPoolState<N>>,
-    /// The mining pool router of the node.
-    mining_pool_router: MiningPoolRouter<N>,
-    /// The pool of uncer: PeersRouter<N, E>,onfirmed transactions.
+    /// The state storage of the pool.
+    state: Arc<PoolState<N>>,
+    /// The pool router of the node.
+    pool_router: PoolRouter<N>,
+    /// The pool of unconfirmed transactions.
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
     /// The peers router of the node.
     peers_router: PeersRouter<N, E>,
@@ -83,17 +83,17 @@ pub struct MiningPool<N: Network, E: Environment> {
     prover_router: ProverRouter<N>,
     /// The current block template that is being mined on by the pool.
     current_template: RwLock<Option<BlockTemplate<N>>>,
-    /// Peripheral information on each known miner.
-    /// MinerInfo := (last_submitted, share_difficulty, shares_submitted_since_reset)
-    miner_info: RwLock<HashMap<Address<N>, (i64, u64, u32)>>,
+    /// Peripheral information on each known worker.
+    /// WorkerInfo := (last_submitted, share_difficulty, shares_submitted_since_reset)
+    worker_info: RwLock<HashMap<Address<N>, (i64, u64, u32)>>,
 }
 
-impl<N: Network, E: Environment> MiningPool<N, E> {
-    /// Initializes a new instance of the mining pool.
+impl<N: Network, E: Environment> Pool<N, E> {
+    /// Initializes a new instance of the pool.
     pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
         tasks: &Tasks<JoinHandle<()>>,
         path: P,
-        mining_pool_address: Option<Address<N>>,
+        pool_address: Option<Address<N>>,
         local_ip: SocketAddr,
         memory_pool: Arc<RwLock<MemoryPool<N>>>,
         peers_router: PeersRouter<N, E>,
@@ -101,57 +101,57 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
         ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
     ) -> Result<Arc<Self>> {
-        // Initialize an mpsc channel for sending requests to the `MiningPool` struct.
-        let (mining_pool_router, mut mining_pool_handler) = mpsc::channel(1024);
+        // Initialize an mpsc channel for sending requests to the `Pool` struct.
+        let (pool_router, mut pool_handler) = mpsc::channel(1024);
 
-        // Initialize the mining pool.
-        let mining_pool = Arc::new(Self {
-            mining_pool_address,
+        // Initialize the pool.
+        let pool = Arc::new(Self {
+            pool_address,
             local_ip,
-            state: Arc::new(MiningPoolState::open_writer::<S, P>(path)?),
-            mining_pool_router,
+            state: Arc::new(PoolState::open_writer::<S, P>(path)?),
+            pool_router,
             memory_pool,
             peers_router,
             ledger_reader,
             ledger_router,
             prover_router,
             current_template: RwLock::new(None),
-            miner_info: RwLock::new(HashMap::new()),
+            worker_info: RwLock::new(HashMap::new()),
         });
 
-        if E::NODE_TYPE == NodeType::MiningPool {
-            // Initialize the handler for the mining pool.
-            let mining_pool_clone = mining_pool.clone();
+        if E::NODE_TYPE == NodeType::PoolOperator {
+            // Initialize the handler for the pool.
+            let pool_clone = pool.clone();
             let (router, handler) = oneshot::channel();
             tasks.append(task::spawn(async move {
                 // TODO (julesdesmit): add loop which retargets share difficulty.
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
-                // Asynchronously wait for a mining pool request.
-                while let Some(request) = mining_pool_handler.recv().await {
-                    mining_pool_clone.update(request).await;
+                // Asynchronously wait for a pool request.
+                while let Some(request) = pool_handler.recv().await {
+                    pool_clone.update(request).await;
                 }
             }));
-            // Wait until the mining pool handler is ready.
+            // Wait until the pool handler is ready.
             let _ = handler.await;
 
             // Set up an update loop for the block template.
-            let mining_pool_clone = mining_pool.clone();
+            let pool_clone = pool.clone();
             let (router, handler) = oneshot::channel();
             tasks.append(task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
-                // Asynchronously wait for a mining pool request.
-                let recipient = mining_pool_clone
-                    .mining_pool_address
-                    .expect("A mining pool should have an available Aleo address at all times");
+                // Asynchronously wait for a pool request.
+                let recipient = pool_clone
+                    .pool_address
+                    .expect("A pool should have an available Aleo address at all times");
                 loop {
-                    let mut current_template = mining_pool_clone.current_template.write().await;
+                    let mut current_template = pool_clone.current_template.write().await;
                     match &*current_template {
                         Some(t) => {
-                            if mining_pool_clone.ledger_reader.latest_block_height() != t.block_height() - 1 {
+                            if pool_clone.ledger_reader.latest_block_height() != t.block_height() - 1 {
                                 *current_template = Some(
-                                    mining_pool_clone
+                                    pool_clone
                                         .generate_block_template(recipient)
                                         .await
                                         .expect("Should be able to generate a block template"),
@@ -160,7 +160,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                         }
                         None => {
                             *current_template = Some(
-                                mining_pool_clone
+                                pool_clone
                                     .generate_block_template(recipient)
                                     .await
                                     .expect("Should be able to generate a block template"),
@@ -173,16 +173,16 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             }));
-            // Wait until the mining pool handler is ready.
+            // Wait until the pool handler is ready.
             let _ = handler.await;
         }
 
-        Ok(mining_pool)
+        Ok(pool)
     }
 
-    /// Returns an instance of the mining pool router.
-    pub fn router(&self) -> MiningPoolRouter<N> {
-        self.mining_pool_router.clone()
+    /// Returns an instance of the pool router.
+    pub fn router(&self) -> PoolRouter<N> {
+        self.pool_router.clone()
     }
 
     /// Returns all the shares in storage.
@@ -191,12 +191,12 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
     }
 
     ///
-    /// Performs the given `request` to the mining pool.
+    /// Performs the given `request` to the pool.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(&self, request: MiningPoolRequest<N>) {
+    pub(super) async fn update(&self, request: PoolRequest<N>) {
         match request {
-            MiningPoolRequest::ProposedBlock(peer_ip, mut block, worker_address) => {
+            PoolRequest::ProposedBlock(peer_ip, mut block, worker_address) => {
                 if let Some(current_template) = &*self.current_template.read().await {
                     // Check that the block is relevant.
                     if self.ledger_reader.latest_block_height().saturating_add(1) != block.height() {
@@ -204,11 +204,11 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                         return;
                     }
 
-                    // Check that the block's coinbase transaction owner is the mining pool address.
+                    // Check that the block's coinbase transaction owner is the pool address.
                     let records = match block.to_coinbase_transaction() {
                         Ok(tx) => {
                             let coinbase_records: Vec<Record<N>> = tx.to_records().collect();
-                            let valid_owner = coinbase_records.iter().any(|r| Some(r.owner()) == self.mining_pool_address);
+                            let valid_owner = coinbase_records.iter().any(|r| Some(r.owner()) == self.pool_address);
 
                             if !valid_owner {
                                 warn!("[ProposedBlock] Peer {} sent a candidate block with an invalid owner.", peer_ip);
@@ -240,7 +240,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
 
                     let hash_difficulty = sha256d_to_u64(&proof_bytes);
                     let share_difficulty = {
-                        let mut info = self.miner_info.write().await;
+                        let mut info = self.worker_info.write().await;
                         match info.get(&worker_address) {
                             Some((_, share_difficulty, _)) => *share_difficulty,
                             None => {
@@ -257,7 +257,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                         return;
                     }
 
-                    // Update the score for the miner.
+                    // Update the score for the worker.
                     // TODO: add round stuff
                     // TODO: ensure shares can not be resubmitted
                     if let Err(error) = self.state.add_shares(block.height(), &worker_address, 1) {
@@ -265,7 +265,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     }
 
                     debug!(
-                        "Mining pool has received valid share {} ({}) - {} / {}",
+                        "Pool has received valid share {} ({}) - {} / {}",
                         block.height(),
                         block.hash(),
                         worker_address,
@@ -274,8 +274,8 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
 
                     {
                         // Update info for this worker.
-                        let mut info = self.miner_info.write().await;
-                        let mut worker_info = *info.get_mut(&worker_address).expect("miner should have existing info");
+                        let mut info = self.worker_info.write().await;
+                        let mut worker_info = *info.get_mut(&worker_address).expect("worker should have existing info");
                         worker_info.0 = chrono::Utc::now().timestamp();
                         worker_info.2 += 1;
                         info.insert(worker_address, worker_info);
@@ -308,18 +308,18 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     warn!("[ProposedBlock] No current template exists");
                 }
             }
-            MiningPoolRequest::BlockHeightClear(block_height) => {
+            PoolRequest::BlockHeightClear(block_height) => {
                 // Remove the shares for the given block height.
                 if let Err(error) = self.state.remove_shares(block_height) {
                     warn!("[BlockHeightClear] {}", error);
                 }
             }
-            MiningPoolRequest::GetCurrentBlockTemplate(peer_ip, address) => {
+            PoolRequest::GetCurrentBlockTemplate(peer_ip, address) => {
                 if let Some(current_template) = &*self.current_template.read().await {
-                    // Ensure this miner exists in the info list first, so we can get their share
+                    // Ensure this worker exists in the info list first, so we can get their share
                     // difficulty.
                     let share_difficulty = self
-                        .miner_info
+                        .worker_info
                         .write()
                         .await
                         .entry(address)
