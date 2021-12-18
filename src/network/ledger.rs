@@ -794,7 +794,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         let mut maximum_cumulative_weight = latest_cumulative_weight;
 
         // Check if any of the peers are ahead and have a larger block height.
-        if let Some((peer_ip, is_fork, maximum_block_locators)) = find_maximal_peer::<N, E>(
+        if let Some((peer_ip, maximal_peer_is_on_fork, maximum_block_locators)) = find_maximal_peer::<N, E>(
             &*self.peers_state.read().await,
             &mut maximum_block_height,
             &mut maximum_cumulative_weight,
@@ -821,36 +821,37 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             };
 
             // Case 2 - Prepare to send block requests, as the peer is ahead of this ledger.
-            let (start_block_height, end_block_height, ledger_is_on_fork) = match handle_block_requests::<E, N>(
+            let (start_block_height, end_block_height, ledger_is_on_fork) = match handle_block_requests::<N, E>(
                 latest_block_height,
                 latest_cumulative_weight,
                 peer_ip,
-                is_fork,
+                Some(maximal_peer_is_on_fork),
                 maximum_block_height,
                 maximum_cumulative_weight,
                 maximum_common_ancestor,
                 first_deviating_locator,
             ) {
                 // Abort from the block request update.
-                BlockRequestHandler::Abort => return,
+                BlockRequestHandler::Abort(_) => return,
                 // Disconnect from the peer if it is misbehaving and proceed to abort.
-                BlockRequestHandler::AbortAndDisconnect(ref reason) => {
+                BlockRequestHandler::AbortAndDisconnect(_, ref reason) => {
                     self.disconnect(peer_ip, reason).await;
                     return;
                 }
                 // Proceed to send block requests to a connected peer, if the ledger is out of date.
-                BlockRequestHandler::Success(success) => {
-                    // Revert the ledger, if it is on a fork.
-                    if success.ledger_is_on_fork {
-                        // If the revert operation fails, abort.
-                        if !self.revert_to_block_height(maximum_common_ancestor).await {
-                            warn!("Ledger failed to revert to block {}", maximum_common_ancestor);
-                            return;
-                        }
-                    }
-                    (success.start_block_height, success.end_block_height, success.ledger_is_on_fork)
+                BlockRequestHandler::Proceed(_, proceed) => {
+                    (proceed.start_block_height, proceed.end_block_height, proceed.ledger_is_on_fork)
                 }
             };
+
+            // Revert the ledger, if it is on a fork.
+            if ledger_is_on_fork {
+                // If the revert operation fails, abort.
+                if !self.revert_to_block_height(maximum_common_ancestor).await {
+                    warn!("Ledger failed to revert to block {}", maximum_common_ancestor);
+                    return;
+                }
+            }
 
             // Send a `BlockRequest` message to the peer.
             debug!("Requesting blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
