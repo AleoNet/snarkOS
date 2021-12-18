@@ -27,7 +27,7 @@ use crate::{
     PeersRouter,
     ProverRouter,
 };
-use snarkos_storage::{storage::Storage, BlockTemplate, MiningPoolState};
+use snarkos_storage::{storage::Storage, MiningPoolState};
 use snarkvm::{algorithms::crh::sha256d_to_u64, dpc::prelude::*, utilities::ToBytes};
 
 use anyhow::Result;
@@ -149,7 +149,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     let mut current_template = mining_pool_clone.current_template.write().await;
                     match &*current_template {
                         Some(t) => {
-                            if mining_pool_clone.ledger_reader.latest_block_height() != t.block_height - 1 {
+                            if mining_pool_clone.ledger_reader.latest_block_height() != t.block_height() - 1 {
                                 *current_template = Some(
                                     mining_pool_clone
                                         .generate_block_template(recipient)
@@ -244,7 +244,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                         match info.get(&worker_address) {
                             Some((_, share_difficulty, _)) => *share_difficulty,
                             None => {
-                                let share_difficulty = current_template.difficulty_target.saturating_mul(50);
+                                let share_difficulty = current_template.difficulty_target().saturating_mul(50);
                                 info.insert(worker_address, (chrono::Utc::now().timestamp(), share_difficulty, 0));
 
                                 share_difficulty
@@ -284,7 +284,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                     // Since a worker will swap out the difficulty target for their share target,
                     // let's put it back to the original value before checking the POSW for true
                     // validity.
-                    let difficulty_target = current_template.difficulty_target;
+                    let difficulty_target = current_template.difficulty_target();
                     block.set_difficulty_target(difficulty_target);
 
                     // If the block is valid, broadcast it.
@@ -325,7 +325,7 @@ impl<N: Network, E: Environment> MiningPool<N, E> {
                         .entry(address)
                         .or_insert((
                             chrono::Utc::now().timestamp(),
-                            current_template.difficulty_target.saturating_mul(50),
+                            current_template.difficulty_target().saturating_mul(50),
                             0,
                         ))
                         .1;

@@ -18,16 +18,7 @@ use crate::{
     helpers::BlockLocators,
     storage::{DataMap, Map, MapId, Storage},
 };
-use snarkvm::{
-    dpc::prelude::*,
-    utilities::{
-        io::{Read, Result as IoResult, Write},
-        FromBytes,
-        FromBytesDeserializer,
-        ToBytes,
-        ToBytesSerializer,
-    },
-};
+use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
 use circular_queue::CircularQueue;
@@ -35,7 +26,7 @@ use itertools::Itertools;
 use parking_lot::RwLock;
 use rand::{CryptoRng, Rng};
 use rayon::prelude::*;
-use serde::{de, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashSet},
     path::Path,
@@ -59,107 +50,6 @@ const MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 /// The maximum future block time - 2 minutes.
 const MAXIMUM_FUTURE_BLOCK_TIME: i64 = 120;
-
-///
-/// The block template, sent out to all workers on the mining pool.
-///
-#[derive(Clone, Debug)]
-pub struct BlockTemplate<N: Network> {
-    pub previous_block_hash: N::BlockHash,
-    pub block_height: u32,
-    pub block_timestamp: i64,
-    pub difficulty_target: u64,
-    pub cumulative_weight: u128,
-    pub ledger_root: N::LedgerRoot,
-    pub transactions: Transactions<N>,
-}
-
-impl<N: Network> FromBytes for BlockTemplate<N> {
-    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
-        let previous_block_hash: N::BlockHash = FromBytes::read_le(&mut reader)?;
-        let block_height: u32 = FromBytes::read_le(&mut reader)?;
-        let block_timestamp: i64 = FromBytes::read_le(&mut reader)?;
-        let difficulty_target: u64 = FromBytes::read_le(&mut reader)?;
-        let cumulative_weight: u128 = FromBytes::read_le(&mut reader)?;
-        let ledger_root: N::LedgerRoot = FromBytes::read_le(&mut reader)?;
-        let transactions: Transactions<N> = FromBytes::read_le(&mut reader)?;
-
-        Ok(Self {
-            previous_block_hash,
-            block_height,
-            block_timestamp,
-            difficulty_target,
-            cumulative_weight,
-            ledger_root,
-            transactions,
-        })
-    }
-}
-
-impl<N: Network> ToBytes for BlockTemplate<N> {
-    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.previous_block_hash.write_le(&mut writer)?;
-        self.block_height.write_le(&mut writer)?;
-        self.block_timestamp.write_le(&mut writer)?;
-        self.difficulty_target.write_le(&mut writer)?;
-        self.cumulative_weight.write_le(&mut writer)?;
-        self.ledger_root.write_le(&mut writer)?;
-        self.transactions.write_le(&mut writer)?;
-
-        Ok(())
-    }
-}
-
-impl<N: Network> Serialize for BlockTemplate<N> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match serializer.is_human_readable() {
-            true => {
-                let mut block_template = serializer.serialize_struct("BlockTemplate", 1)?;
-                block_template.serialize_field("previous_block_hash", &self.previous_block_hash)?;
-                block_template.serialize_field("block_height", &self.block_height)?;
-                block_template.serialize_field("block_timestamp", &self.block_timestamp)?;
-                block_template.serialize_field("difficulty_target", &self.difficulty_target)?;
-                block_template.serialize_field("cumulative_weight", &self.cumulative_weight)?;
-                block_template.serialize_field("ledger_root", &self.ledger_root)?;
-                block_template.serialize_field("transactions", &self.transactions)?;
-                block_template.end()
-            }
-            false => ToBytesSerializer::serialize_with_size_encoding(self, serializer),
-        }
-    }
-}
-
-impl<'de, N: Network> Deserialize<'de> for BlockTemplate<N> {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        match deserializer.is_human_readable() {
-            true => {
-                let block_template = serde_json::Value::deserialize(deserializer)?;
-                let previous_block_hash: N::BlockHash =
-                    serde_json::from_value(block_template["previous_block_hash"].clone()).map_err(de::Error::custom)?;
-                let block_height: u32 = serde_json::from_value(block_template["block_height"].clone()).map_err(de::Error::custom)?;
-                let block_timestamp: i64 = serde_json::from_value(block_template["block_timestamp"].clone()).map_err(de::Error::custom)?;
-                let difficulty_target: u64 =
-                    serde_json::from_value(block_template["difficulty_target"].clone()).map_err(de::Error::custom)?;
-                let cumulative_weight: u128 =
-                    serde_json::from_value(block_template["cumulative_weight"].clone()).map_err(de::Error::custom)?;
-                let ledger_root: N::LedgerRoot =
-                    serde_json::from_value(block_template["ledger_root"].clone()).map_err(de::Error::custom)?;
-                let transactions: Transactions<N> =
-                    serde_json::from_value(block_template["transactions"].clone()).map_err(de::Error::custom)?;
-                Ok(Self {
-                    previous_block_hash,
-                    block_height,
-                    block_timestamp,
-                    difficulty_target,
-                    cumulative_weight,
-                    ledger_root,
-                    transactions,
-                })
-            }
-            false => FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "block template"),
-        }
-    }
-}
 
 ///
 /// A helper struct containing transaction metadata.
@@ -765,18 +655,18 @@ impl<N: Network> LedgerState<N> {
         // Construct the new block transactions.
         let transactions = Transactions::from(&transactions)?;
 
-        Ok((
-            BlockTemplate {
-                previous_block_hash,
-                block_height,
-                block_timestamp,
-                difficulty_target,
-                cumulative_weight,
-                ledger_root,
-                transactions,
-            },
-            coinbase_record,
-        ))
+        // Construct the block template.
+        let template = BlockTemplate::new(
+            previous_block_hash,
+            block_height,
+            block_timestamp,
+            difficulty_target,
+            cumulative_weight,
+            ledger_root,
+            transactions,
+        );
+
+        Ok((template, coinbase_record))
     }
 
     /// Mines a new block using the latest state of the given ledger.
@@ -791,17 +681,7 @@ impl<N: Network> LedgerState<N> {
         let (template, coinbase_record) = self.prepare_block_template(recipient, is_public, transactions, rng)?;
 
         // Mine the next block.
-        match Block::mine(
-            template.previous_block_hash,
-            template.block_height,
-            template.block_timestamp,
-            template.difficulty_target,
-            template.cumulative_weight,
-            template.ledger_root,
-            template.transactions,
-            terminator,
-            rng,
-        ) {
+        match Block::mine(template, terminator, rng) {
             Ok(block) => Ok((block, coinbase_record)),
             Err(error) => Err(anyhow!("Unable to mine the next block: {}", error)),
         }

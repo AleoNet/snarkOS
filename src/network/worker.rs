@@ -25,7 +25,7 @@ use crate::{
     PeersRouter,
 };
 
-use snarkos_storage::{storage::Storage, BlockTemplate};
+use snarkos_storage::storage::Storage;
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -172,7 +172,7 @@ impl<N: Network, E: Environment> Worker<N, E> {
                         loop {
                             // Check if we need to halt.
                             let current_height = self.ledger_reader.latest_block_height();
-                            if current_height != block_template.block_height - 1 {
+                            if current_height != block_template.block_height() - 1 {
                                 // If so, let's ask for a new block template first.
                                 if let Err(error) = self
                                     .peers_router
@@ -190,24 +190,15 @@ impl<N: Network, E: Environment> Worker<N, E> {
                                 // Set the status to `Mining`.
                                 self.status.update(State::Mining);
                                 let worker = self.worker.clone();
-                                let block_template = block_template.clone();
+                                let mut block_template = block_template.clone();
                                 let terminator = self.terminator.clone();
                                 let peers_router = self.peers_router.clone();
                                 let status = self.status.clone();
 
                                 let result = task::spawn_blocking(move || {
                                     worker.install(move || {
-                                        Block::mine(
-                                            block_template.previous_block_hash,
-                                            block_template.block_height,
-                                            block_template.block_timestamp,
-                                            share_difficulty,
-                                            block_template.cumulative_weight,
-                                            block_template.ledger_root,
-                                            block_template.transactions,
-                                            &terminator,
-                                            &mut thread_rng(),
-                                        )
+                                        block_template.set_difficulty_target(share_difficulty);
+                                        Block::mine(block_template, &terminator, &mut thread_rng())
                                     })
                                 })
                                 .await;
