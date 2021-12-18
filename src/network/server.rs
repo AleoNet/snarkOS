@@ -53,7 +53,7 @@ pub struct Server<N: Network, E: Environment> {
     status: Status,
     /// The list of peers for the node.
     peers: Arc<Peers<N, E>>,
-    /// The prover of the node.
+    /// The ledger of the node.
     ledger: Arc<Ledger<N, E>>,
     /// The prover of the node.
     prover: Arc<Prover<N, E>>,
@@ -90,7 +90,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let prover = Prover::open::<RocksDB, _>(
             &mut tasks,
             &prover_storage_path,
-            miner.clone(),
+            miner,
             local_ip,
             &status,
             &terminator,
@@ -125,7 +125,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         )
         .await;
         // Initialize a new instance of the notification.
-        Self::initialize_notification(&mut tasks, ledger.reader(), prover.clone(), miner.clone()).await;
+        Self::initialize_notification(&mut tasks, ledger.reader(), prover.clone(), miner).await;
 
         Ok(Self {
             local_ip,
@@ -187,12 +187,13 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Shut down the ledger.
         trace!("Proceeding to shut down the ledger...");
-        let (canon_lock, block_requests_lock) = self.ledger.shut_down().await;
+        let (canon_lock, block_requests_lock, storage_map_lock) = self.ledger.shut_down().await;
 
         // Acquire the locks for ledger.
         trace!("Proceeding to lock the ledger...");
-        let _canon_lock = canon_lock.lock().await;
         let _block_requests_lock = block_requests_lock.lock().await;
+        let _canon_lock = canon_lock.lock().await;
+        let _storage_map_lock = storage_map_lock.write();
         trace!("Ledger has shut down, proceeding to flush tasks...");
 
         // Flush the tasks.
@@ -326,7 +327,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             loop {
-                info!("{}", notification_message(miner.clone()));
+                info!("{}", notification_message(miner));
 
                 if E::NODE_TYPE == NodeType::Miner {
                     if let Some(miner) = miner {
