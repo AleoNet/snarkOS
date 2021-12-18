@@ -22,13 +22,20 @@ use std::{collections::HashSet, net::SocketAddr};
 
 /// Checks if any of the peers are ahead and have a larger block height, if they are on a fork, and their block locators.
 /// The maximum known block height and cumulative weight are tracked for the purposes of further operations.
-pub fn find_maximal_peer<N: Network>(
+pub fn find_maximal_peer<N: Network, E: Environment>(
     peers_state: &PeersState<N>,
-    sync_nodes: &HashSet<SocketAddr>,
-    peers_contains_sync_node: bool,
     maximum_block_height: &mut u32,
     maximum_cumulative_weight: &mut u128,
 ) -> Option<(SocketAddr, bool, BlockLocators<N>)> {
+    let sync_nodes: HashSet<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
+
+    // Determine if the peers state has any sync nodes.
+    // TODO: have nodes sync up to tip - 4096 with only sync nodes, then switch to syncing with the longest chain.
+    let peers_contains_sync_node = false;
+    // for ip in peers_state.keys() {
+    //     peers_contains_sync_node |= sync_nodes.contains(ip);
+    // }
+
     let mut maximal_peer = None;
 
     for (peer_ip, peer_state) in peers_state.iter() {
@@ -55,18 +62,15 @@ pub fn find_maximal_peer<N: Network>(
     maximal_peer
 }
 
-/// Verify the integrity of the block hashes sent by the peer.
-/// Returns the maximum common ancestor and the first deviating locator (if any), or potentially an error containing a mismatch.
-pub fn verify_block_hashes<N: Network>(
-    canon: &LedgerState<N>,
-    maximum_block_locators: &BlockLocators<N>,
-) -> Result<(u32, Option<u32>), String> {
+/// Returns the common ancestor and the first deviating locator (if it exists),
+/// given the block locators of a peer. If the peer has invalid block locators, returns an error.
+pub fn find_common_ancestor<N: Network>(canon: &LedgerState<N>, block_locators: &BlockLocators<N>) -> Result<(u32, Option<u32>), String> {
     // Determine the common ancestor block height between this ledger and the peer.
     let mut maximum_common_ancestor = 0;
     // Determine the first locator (smallest height) that does not exist in this ledger.
     let mut first_deviating_locator = None;
 
-    for (block_height, (block_hash, _)) in maximum_block_locators.iter() {
+    for (block_height, (block_hash, _)) in block_locators.iter() {
         // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
         if let Ok(expected_block_height) = canon.get_block_height(block_hash) {
             if expected_block_height != *block_height {
@@ -146,12 +150,13 @@ pub fn handle_block_requests<E: Environment, N: Network>(
     // Ensure the latest common ancestor is not greater than the latest block request.
     if latest_block_height < maximum_common_ancestor {
         warn!(
-            "The common ancestor {} cannot be greater than the latest block {}",
+            "A common ancestor {} cannot be greater than the latest block {}",
             maximum_common_ancestor, latest_block_height
         );
         return BlockRequestHandler::Abort;
     }
 
+    // Case 2 - Prepare to send block requests, as the peer is ahead of this ledger.
     // Determine the latest common ancestor, and whether the ledger is on a fork & needs to revert.
     let (latest_common_ancestor, ledger_is_on_fork) =
         // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.

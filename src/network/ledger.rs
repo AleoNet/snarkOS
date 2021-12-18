@@ -32,7 +32,7 @@ use snarkvm::dpc::prelude::*;
 use anyhow::Result;
 use chrono::Utc;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     hash::{Hash, Hasher},
     net::SocketAddr,
     path::Path,
@@ -790,28 +790,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         let mut maximum_block_height = latest_block_height;
         let mut maximum_cumulative_weight = latest_cumulative_weight;
 
-        // Determine if the peers state has any sync nodes.
-        let sync_nodes: HashSet<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-
-        // TODO: have nodes sync up to tip - 4096 with only sync nodes, then switch to syncing with the longest chain.
-        let peers_contains_sync_node = false;
-        // for ip in peers_state.keys() {
-        //     peers_contains_sync_node |= sync_nodes.contains(ip);
-        // }
-
         // Check if any of the peers are ahead and have a larger block height.
-        let maximal_peer = find_maximal_peer(
+        if let Some((peer_ip, is_fork, maximum_block_locators)) = find_maximal_peer::<N, E>(
             &*self.peers_state.read().await,
-            &sync_nodes,
-            peers_contains_sync_node,
             &mut maximum_block_height,
             &mut maximum_cumulative_weight,
-        );
-
-        if let Some((peer_ip, is_fork, maximum_block_locators)) = maximal_peer {
+        ) {
             // Case 1 - Ensure the peer has a heavier canonical chain than this ledger.
-            // Note: this check is duplicated in `handle_block_requests`, as it is fast and allows us
-            // to skip acquiring `_block_requests_lock`.
+            // Note: this check is duplicated in `handle_block_requests`, as it is fast
+            // and allows us to skip acquiring `_block_requests_lock`.
             if latest_cumulative_weight >= maximum_cumulative_weight {
                 return;
             }
@@ -821,7 +808,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // Determine the common ancestor block height between this ledger and the peer
             // and the first locator (smallest height) that does not exist in this ledger.
-            let (maximum_common_ancestor, first_deviating_locator) = match verify_block_hashes(&self.canon, &maximum_block_locators) {
+            let (maximum_common_ancestor, first_deviating_locator) = match find_common_ancestor(&self.canon, &maximum_block_locators) {
                 Ok(ret) => ret,
                 Err(error) => {
                     trace!("{}", error);
