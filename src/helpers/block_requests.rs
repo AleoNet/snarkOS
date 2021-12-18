@@ -252,6 +252,44 @@ mod tests {
     const ITERATIONS: usize = 50;
 
     #[tokio::test]
+    async fn test_block_requests_case_0() {
+        // Case 1 - You are ahead of your peer: Do nothing
+
+        let rng = &mut thread_rng();
+
+        for _ in 0..ITERATIONS {
+            // Declare internal state.
+            let latest_block_height: u32 = rng.gen_range(1000..5000000);
+            let latest_cumulative_weight: u128 = latest_block_height as u128;
+
+            // Declare peer state.
+            let peer_ip = format!("127.0.0.1:{}", rng.gen::<u16>()).parse().unwrap();
+            let peer_is_on_fork = None;
+            let peer_maximum_block_height: u32 = latest_block_height;
+            let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
+            let peer_first_deviating_locator = None;
+
+            // Declare locator state.
+            let maximum_common_ancestor = peer_maximum_block_height - 1;
+
+            // Determine if block requests or forking is required.
+            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+                latest_block_height,
+                latest_cumulative_weight,
+                peer_ip,
+                peer_is_on_fork,
+                peer_maximum_block_height,
+                peer_maximum_cumulative_weight,
+                maximum_common_ancestor,
+                peer_first_deviating_locator,
+            );
+
+            // Validate the output.
+            assert_eq!(result, BlockRequestHandler::Abort(Case::Zero));
+        }
+    }
+
+    #[tokio::test]
     async fn test_block_requests_case_1() {
         // Case 1 - You are ahead of your peer: Do nothing
 
@@ -343,7 +381,7 @@ mod tests {
             // Declare peer state.
             let peer_ip = format!("127.0.0.1:{}", rng.gen::<u16>()).parse().unwrap();
             let peer_is_on_fork = Some(false);
-            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height..latest_block_height * 2);
+            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height + 1..(latest_block_height + 1) * 2);
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
 
             // Declare locator state.
