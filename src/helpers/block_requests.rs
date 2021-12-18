@@ -18,6 +18,7 @@ use crate::network::ledger::PeersState;
 use snarkos_storage::{BlockLocators, LedgerState};
 use snarkvm::dpc::prelude::*;
 
+use rand::{rngs::OsRng, seq::SliceRandom};
 use std::{collections::HashSet, net::SocketAddr};
 
 /// Checks if any of the peers are ahead and have a larger block height, if they are on a fork, and their block locators.
@@ -29,30 +30,66 @@ pub fn find_maximal_peer<N: Network>(
     maximum_block_height: &mut u32,
     maximum_cumulative_weight: &mut u128,
 ) -> Option<(SocketAddr, bool, BlockLocators<N>)> {
-    let mut maximal_peer = None;
+    let mut candidates = Vec::with_capacity(8);
+    let mut maybe_maximum_block_height = *maximum_block_height;
+    let mut maybe_maximum_cumulative_weight = *maximum_cumulative_weight;
 
     for (peer_ip, peer_state) in peers_state.iter() {
         // Only update the maximal peer if there are no sync nodes or the peer is a sync node.
         if !peers_contains_sync_node || sync_nodes.contains(peer_ip) {
             // Update the maximal peer state if the peer is ahead and the peer knows if you are a fork or not.
             // This accounts for (Case 1 and Case 2(a))
-            if let Some((_, _, is_fork, block_height, block_locators)) = peer_state {
+            // Since the peers with is_fork == None will not influence the result,
+            // we simply let the pattern matching do the stuff here
+            if let Some((_, _, Some(is_fork), block_height, block_locators)) = peer_state {
+                let block_height = *block_height;
                 // Retrieve the cumulative weight, defaulting to the block height if it does not exist.
-                let cumulative_weight = match block_locators.get_cumulative_weight(*block_height) {
+                let cumulative_weight = match block_locators.get_cumulative_weight(block_height) {
                     Some(cumulative_weight) => cumulative_weight,
-                    None => *block_height as u128,
+                    None => block_height as u128,
                 };
-                // If the cumulative weight is more, set this peer as the maximal peer.
-                if cumulative_weight > *maximum_cumulative_weight && is_fork.is_some() {
-                    maximal_peer = Some((*peer_ip, is_fork.unwrap(), block_locators.clone()));
-                    *maximum_block_height = *block_height;
-                    *maximum_cumulative_weight = cumulative_weight;
+
+                // too light or too late
+                if cumulative_weight < maybe_maximum_cumulative_weight
+                    || (cumulative_weight == maybe_maximum_cumulative_weight && block_height > maybe_maximum_block_height)
+                {
+                    continue;
                 }
+
+                // find a better one, clear & replace
+                if cumulative_weight > maybe_maximum_cumulative_weight
+                    || (cumulative_weight == maybe_maximum_cumulative_weight && block_height < maybe_maximum_block_height)
+                {
+                    trace!(w = %cumulative_weight, h = block_height, "replace candidates");
+                    candidates.clear();
+                    candidates.push((peer_ip, is_fork, block_locators));
+                    maybe_maximum_cumulative_weight = cumulative_weight;
+                    maybe_maximum_block_height = block_height;
+                    continue;
+                }
+
+                // another candidate
+                candidates.push((peer_ip, is_fork, block_locators));
             }
         }
     }
 
-    maximal_peer
+    let candidates_count = candidates.len();
+    candidates.choose(&mut OsRng).map(|(&peer_ip, &is_fork, block_locators)| {
+        // we actually have one candidate here
+        // set the weight & height, and return what we want
+        *maximum_block_height = maybe_maximum_block_height;
+        *maximum_cumulative_weight = maybe_maximum_cumulative_weight;
+        trace!(
+            %peer_ip,
+            is_fork,
+            candidates_count,
+            weight_target = %maybe_maximum_cumulative_weight,
+            height_target = maybe_maximum_block_height,
+            "sync target chosen"
+        );
+        (peer_ip, is_fork, (*block_locators).clone())
+    })
 }
 
 /// Verify the integrity of the block hashes sent by the peer.
