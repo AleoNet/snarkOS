@@ -83,10 +83,8 @@ pub struct LedgerState<N: Network> {
     ledger_tree: RwLock<LedgerTree<N>>,
     /// The latest block of the ledger.
     latest_block: RwLock<Block<N>>,
-    /// The latest block hashes of the ledger.
-    latest_block_hashes: RwLock<CircularQueue<N::BlockHash>>,
-    /// The latest block headers of the ledger.
-    latest_block_headers: RwLock<CircularQueue<BlockHeader<N>>>,
+    /// The latest block hashes and headers in the ledger.
+    latest_block_hashes_and_headers: RwLock<CircularQueue<(N::BlockHash, BlockHeader<N>)>>,
     /// The block locators from the latest block of the ledger.
     latest_block_locators: RwLock<BlockLocators<N>>,
     /// The ledger root corresponding to each block height.
@@ -117,8 +115,7 @@ impl<N: Network> LedgerState<N> {
         let ledger = Self {
             ledger_tree: RwLock::new(LedgerTree::<N>::new()?),
             latest_block: RwLock::new(N::genesis_block().clone()),
-            latest_block_hashes: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
-            latest_block_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
+            latest_block_hashes_and_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
             latest_block_locators: Default::default(),
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
@@ -247,8 +244,7 @@ impl<N: Network> LedgerState<N> {
         let ledger = Arc::new(Self {
             ledger_tree: RwLock::new(LedgerTree::<N>::new()?),
             latest_block: RwLock::new(N::genesis_block().clone()),
-            latest_block_hashes: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
-            latest_block_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
+            latest_block_hashes_and_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
             latest_block_locators: Default::default(),
             ledger_roots: storage.open_map("ledger_roots")?,
             blocks: BlockState::open(storage)?,
@@ -468,17 +464,15 @@ impl<N: Network> LedgerState<N> {
         // Determine the number of latest block headers to include as block locators (linear).
         let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS, block_locator_height);
 
-        // Acquire the read lock for the latest block hashes and block headers.
-        let latest_block_hashes = self.latest_block_hashes.read();
-        let latest_block_headers = self.latest_block_headers.read();
-
         // Construct the list of block locator headers.
-        let block_hashes = latest_block_hashes.iter().cloned();
-        let block_headers = latest_block_headers.iter().cloned();
-        let block_locator_headers = block_hashes
-            .zip_eq(block_headers)
+        let block_locator_headers = self
+            .latest_block_hashes_and_headers
+            .read()
+            .asc_iter()
             .take(num_block_headers as usize)
-            .map(|(hash, header)| (header.height(), (hash, Some(header))));
+            .cloned()
+            .map(|(hash, header)| (header.height(), (hash, Some(header))))
+            .collect::<Vec<_>>();
 
         // Decrement the block locator height by the number of block headers.
         block_locator_height -= num_block_headers;
@@ -486,7 +480,7 @@ impl<N: Network> LedgerState<N> {
         // Return the block locators if the locator has run out of blocks.
         if block_locator_height == 0 {
             // Initialize the list of block locators.
-            let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> = block_locator_headers.collect();
+            let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> = block_locator_headers.into_iter().collect();
             // Add the genesis locator.
             block_locators.insert(0, (self.get_block_hash(0)?, None));
 
@@ -510,7 +504,7 @@ impl<N: Network> LedgerState<N> {
 
         // Initialize the list of block locators.
         let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> =
-            block_locator_headers.chain(block_locator_hashes).collect();
+            block_locator_headers.into_iter().chain(block_locator_hashes).collect();
         // Add the genesis locator.
         block_locators.insert(0, (self.get_block_hash(0)?, None));
 
@@ -806,8 +800,9 @@ impl<N: Network> LedgerState<N> {
         self.blocks.add_block(block)?;
         self.ledger_tree.write().add(&block.hash())?;
         self.ledger_roots.insert(&block.previous_ledger_root(), &block.height())?;
-        self.latest_block_hashes.write().push(block.hash());
-        self.latest_block_headers.write().push(block.header().clone());
+        self.latest_block_hashes_and_headers
+            .write()
+            .push((block.hash(), block.header().clone()));
         *self.latest_block_locators.write() = self.get_block_locators(block.height())?;
         *self.latest_block.write() = block.clone();
 
@@ -967,17 +962,14 @@ impl<N: Network> LedgerState<N> {
 
         {
             // Acquire the write lock for the latest block hashes and block headers.
-            let mut latest_block_hashes = self.latest_block_hashes.write();
-            let mut latest_block_headers = self.latest_block_headers.write();
+            let mut latest_block_hashes_and_headers = self.latest_block_hashes_and_headers.write();
 
             // Upon success, clear the latest ledger state.
-            latest_block_hashes.clear();
-            latest_block_headers.clear();
+            latest_block_hashes_and_headers.clear();
 
             // Add the latest block hashes and block headers.
             for (block_hash, block_header) in block_hashes.into_iter().zip_eq(block_headers) {
-                latest_block_hashes.push(block_hash);
-                latest_block_headers.push(block_header);
+                latest_block_hashes_and_headers.push((block_hash, block_header));
             }
         }
 
