@@ -775,6 +775,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
     }
 
+    ///
+    /// Proceeds to send block requests to a connected peer, if the ledger is out of date.
+    ///
     async fn update_block_requests(&self) {
         // Ensure the ledger is not awaiting responses from outstanding block requests.
         if self.number_of_block_requests().await > 0 {
