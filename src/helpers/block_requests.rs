@@ -101,13 +101,41 @@ pub fn find_common_ancestor<N: Network>(canon: &LedgerState<N>, block_locators: 
 /// A case annotation enum for the block request handler.
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum Case {
+    /// Case 0 - The common ancestor is greater than the latest block height:
+    ///     - Abort. This is an internal error that needs to be remedied promptly.
     Zero,
+    /// Case 1 - You are ahead of your peer:
+    ///     - Abort. There is no need to send block requests as you are ahead of the maximal peer.
     One,
+    /// Case 2 - You are behind your peer:
+    ///     Case 2(a) - `is_on_fork` is `None`:
+    ///         - Abort. Peer is malicious or thinks you are ahead. Both are issues, pick a different peer to sync with.
     TwoA,
+    /// Case 2 - You are behind your peer:
+    ///     Case 2(b) - `is_on_fork` is `Some(false)`:
+    ///         - Request blocks from your latest state
     TwoB,
+    /// Case 2 - You are behind your peer:
+    ///     Case 2(c) - `is_on_fork` is `Some(true)`:
+    ///             Case 2(c)(a) - Common ancestor is within `MAXIMUM_FORK_DEPTH`:
+    ///                  - Revert to common ancestor, and send block requests to sync.
     TwoCA,
+    /// Case 2 - You are behind your peer:
+    ///     Case 2(c) - `is_on_fork` is `Some(true)`:
+    ///             Case 2(c)(b) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator exists:
+    ///                  Case 2(c)(b)(a) - You can calculate that you are outside of the `MAXIMUM_FORK_DEPTH`:
+    ///                      - Disconnect from peer.
     TwoCBA,
+    /// Case 2 - You are behind your peer:
+    ///     Case 2(c) - `is_on_fork` is `Some(true)`:
+    ///             Case 2(c)(b) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator exists:
+    ///                  Case 2(c)(b)(b) - You don't know if you are within the `MAXIMUM_FORK_DEPTH`:
+    ///                      - Revert to most common ancestor and send block requests to sync.
     TwoCBB,
+    /// Case 2 - You are behind your peer:
+    ///     Case 2(c) - `is_on_fork` is `Some(true)`:
+    ///             Case 2(c)(c) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator is missing:
+    ///                  - Abort. Peer may be malicious as the first deviating locator must exist.
     TwoCC,
 }
 
@@ -129,26 +157,6 @@ pub(crate) enum BlockRequestHandler {
 
 ///
 /// Determines the appropriate block request update operation, based on the following cases:
-///
-/// Case 0 - The common ancestor is greater than the latest block height:
-///     - Abort. This is an internal error that needs to be remedied promptly.
-/// Case 1 - You are ahead of your peer:
-///     - Abort. There is no need to send block requests as you are ahead of the maximal peer.
-/// Case 2 - You are behind your peer:
-///     Case 2(a) - `is_on_fork` is `None`:
-///         - Abort. Peer is malicious or thinks you are ahead. Both are issues, pick a different peer to sync with.
-///     Case 2(b) - `is_on_fork` is `Some(false)`:
-///         - Request blocks from your latest state
-///     Case 2(c) - `is_on_fork` is `Some(true)`:
-///             Case 2(c)(a) - Common ancestor is within `MAXIMUM_FORK_DEPTH`:
-///                  - Revert to common ancestor, and send block requests to sync.
-///             Case 2(c)(b) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator exists:
-///                  Case 2(c)(b)(a) - You can calculate that you are outside of the `MAXIMUM_FORK_DEPTH`:
-///                      - Disconnect from peer.
-///                  Case 2(c)(b)(b) - You don't know if you are within the `MAXIMUM_FORK_DEPTH`:
-///                      - Revert to most common ancestor and send block requests to sync.
-///             Case 2(c)(c) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator is missing:
-///                  - Abort. Peer may be malicious as the first deviating locator must exist.
 ///
 pub(crate) fn handle_block_requests<N: Network, E: Environment>(
     latest_block_height: u32,
