@@ -1,24 +1,26 @@
-# Get Block
-Returns the block given the block height.
+# Get Block Template
+Returns the block template for the next mined block
 
 ### Arguments
 
-|   Parameter    |  Type  | Required |               Description               |
-|:--------------:|:------:|:--------:|:---------------------------------------:|
-| `block_height` | number |   Yes    | The block height of the requested block |
+None
 
 ### Response
 
-|       Parameter       |  Type  |                            Description                            |
-|:---------------------:|:------:|:-----------------------------------------------------------------:|
-|     `block_hash`      | string |                      The hash of the block.                       |
-|       `header`        | object | The block header containing the state of the ledger at the block. |
-| `previous_block_hash` | string |                  The hash of the previous block.                  |
-|    `transactions`     | object |          The list of transactions included in the block.          |
+|       Parameter        |  Type  |                                    Description                                    |
+|:----------------------:|:------:|:---------------------------------------------------------------------------------:|
+|     `block_height`     | number |                           The height of the new block.                            |
+|   `coinbase_reward`    | number | The coinbase reward for mining the new block (does not include transaction fees). |
+|  `cumulative_weight`   | number |                      The cumulative weight of the new block.                      |
+|  `difficulty_target`   | number |                      The difficulty target of the new block.                      |
+|     `ledger_root`      | string |                         The latest state from the ledger.                         |
+| `previous_block_hash`  | string |                          The hash of the previous block.                          |
+|         `time`         | number |                       The block timestamp of the new block.                       |
+|     `transactions`     | array  |                The list of transactions included in the new block.                |
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "getblock", "params": [0] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "getblocktemplate", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 
@@ -28,20 +30,12 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "getblock", "params":
 {
   "jsonrpc": "2.0",
   "result": {
-    "block_hash": "ab18946qsq2ppqylhk03ftpg7wjuknp4gwpqz0hhp8hl2ahn94sg5zqxd8qw8",
-    "header": {
-      "metadata": {
-        "cumulative_weight": 0,
-        "difficulty_target": 18446744073709551615,
-        "height": 0,
-        "timestamp": 0
-      },
-      "nonce": "hn1lrw8l2w7m74caxxngv57ps28ng49gdn77tgq26sm78qhxz9qwcyqc9djn4",
-      "previous_ledger_root": "al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
-      "proof": "hzkp1qvqqqqqqqqqqqpqqqqqqqqqqqqwpcgtfx3p968slxsgm0ej54pyp46df56ufnmwz3d2rjajg2fj62hq5en9nnx2cdnrww8d9nw9qdqf67m8ctxnk6xyk8tu5gthjjd48f085wvua32px9mw29g7ee2562wjt2fz2ncklpgefeefrfmv90xqgha5r42svfn9nktlpjvtezspwm2l4ejg7kqyydg5s5hgcq2c6taxxtlz4yww43dz0gvxdj4uex9sq83dp9hq3kgcfvgu47mquptj20cyzu0jdksqq2annt72wg4ysfskpsj0kayf9m6t73xs8qhwczrscqqcqqqqqqqqqqqj5d5uw7jep7kmnssfjv3utj97d2pghy0u3wjmlj750dv5y3wc9axdhvj3qs60u9wfl96d2r39qqq9ek8fy8dckr6an58arfrawnuemmqw464rud6r50t8x5cxfn9lhtj6jtma82rahw4zmv2emt8r5h5qfvnd34p93ejxrn6rph8r9ul8tfe65l8t4pvxnpltmcxjnn8wsgvr3d3qc7n39y8wlwz3f0kn3z8yqqgqqqqqqqqqqp2lrqkejgksx2vasrwssl4plmt05vk9he22x0k5uca6k0kehyda6cxu5vrj0q4qqe75elekpj086qpcjqrvgq5tk7cp6q9dj8g0unzvwwg8c5459ug3h3k6r077s8lrh3z63s262jfa5y528f0nnmc89wqgyqqqqqqqqqqqyfekfkkzzgr94sdfzkvyzgh3kag03evgmczdyteaaznnjgla87y3959mxv74c2pk3k5fs3hx4lcgwajgjn8h5x7aj2fc7mns9qegmzr9d8ljnrlwvzwhu0f7r9czwevwq3zeevkkt2033yexr55d3v93swzke3tvcdmlqyrsaey46wqxcvm4l7gzxvlca9a8p7wcls4a9mccsqvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqyqqqqqqqqqqqm8jv4psnamnzyqqwp9svtmekgysu5gcns7tk4rf2x9g6vay36afuhszk4kyd3t9m72g3kgf57y8gzq00zpcr7l9lyulduxxqe0658j2kyct252hhmvdt7u9t9029z7cazxr40dcx8glm3xg429v2tly3fm70mkmcu56r37czya0elz79cjcfuap9qzgpjd2y6ng6h7uyflzxvqqqqqf9tevv",
-      "transactions_root": "ht1gl4pv2jw4vyjtdrxn4806vttajn3k3fm2yrfe8akt36zqs72psxsv8rw4c"
-    },
     "previous_block_hash": "ab1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq5g436j",
+    "block_height": 0,
+    "time": 0,
+    "difficulty_target": 18446744073709551615,
+    "cumulative_weight": 0,
+    "ledger_root": "al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
     "transactions": {
       "transactions": [
         {
@@ -81,7 +75,8 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "getblock", "params":
           ]
         }
       ]
-    }
+    },
+    "coinbase_reward": 1000000000000000
   },
   "id": "1"
 }

@@ -7,24 +7,23 @@ None
 
 ### Response
 
-|     Parameter         |  Type  |                Description               |
+|       Parameter       |  Type  |               Description                |
 |:---------------------:|:------:|:----------------------------------------:|
-| `result`              |  array | The array of transactions                |
+|       `result`        | array  |        The array of transactions         |
 
 
 #### Transaction
 
-|      Parameter     |  Type  |                             Description                             |
+|     Parameter      |  Type  |                             Description                             |
 |:------------------:|:------:|:-------------------------------------------------------------------:|
-| `events`           | array  | The events emitted from the transaction                             |
-| `inner_circuit_id` | string | The ID of the inner circuit used to execute each transition.        |
-| `ledger_root`      | string | The ledger root used to prove inclusion of ledger-consumed records. |
-| `transaction_id`   | string | The ID of this transaction.                                         |
-| `transitions`      | array  | The state transitions.                                              |
+| `inner_circuit_id` | string |    The ID of the inner circuit used to execute each transition.     |
+|   `ledger_root`    | string | The ledger root used to prove inclusion of ledger-consumed records. |
+|  `transaction_id`  | string |                     The ID of this transaction.                     |
+|   `transitions`    | array  |                       The state transitions.                        |
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getmemorypool", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "getmemorypool", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response
@@ -34,9 +33,6 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getmemor
    "jsonrpc":"2.0",
    "result":[
      {
-       "events":[
-
-       ],
        "inner_circuit_id":"ic14z3rtzc25jgjxs6tzat3wtsrf5gees5zel8tggsslzrfyzhxw4xsgdfe4qk6997427zsfl9tqqesq5fzw5q",
        "ledger_root":"al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
        "transaction_id":"at1pazplqjlhvyvex64xrykr4egpt77z05n74u5vlnkyv05r3ctgyxs0cgj6w",

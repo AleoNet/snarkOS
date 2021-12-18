@@ -3,40 +3,50 @@ Returns the block header for the given the block height.
 
 ### Arguments
 
-|    Parameter   |  Type  | Required |                   Description                  |
+|   Parameter    |  Type  | Required |                  Description                   |
 |:--------------:|:------:|:--------:|:----------------------------------------------:|
-| `block_height` | number |    Yes   | The block height of the requested block header |
+| `block_height` | number |   Yes    | The block height of the requested block header |
 
 ### Response
 
-| Parameter               |  Type  |                   Description                |
-|:-----------------------:|:------:|:--------------------------------------------:|
-| `metadata`              | object | The block header metadata. |
-| `previous_ledger_root`  | string | The Merkle root representing the blocks in the ledger up to the previous block. |
-| `transactions_root`     | string | The Merkle root representing the transactions in the block. |
-| `proof`                 | string | Proof of Succinct Work |
+|       Parameter        |  Type  |                                   Description                                   |
+|:----------------------:|:------:|:-------------------------------------------------------------------------------:|
+|       `metadata`       | object |                           The block header metadata.                            |
+|        `nonce`         | string |                      The nonce for Proof of Succinct Work.                      |
+| `previous_ledger_root` | string | The Merkle root representing the blocks in the ledger up to the previous block. |
+|        `proof`         | string |                             Proof of Succinct Work                              |
+|  `transactions_root`   | string |           The Merkle root representing the transactions in the block.           |
 
+#### Block Header Metadata
+
+|      Parameter      |  Type  |                               Description                                |
+|:-------------------:|:------:|:------------------------------------------------------------------------:|
+| `cumulative_weight` | number |            The cumulative weight of the chain at this block.             |
+| `difficulty_target` | number |         Proof of work algorithm difficulty target for the block.         |
+|      `height`       | number |                         The height of the block.                         |
+|     `timestamp`     | number | The block timestamp is a Unix epoch time (UTC) (according to the miner). |
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockheader", "params": [6164] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "getblockheader", "params": [0] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response
 ```json
 {
-  "jsonrpc":"2.0",
-  "result":{
-    "metadata":{
-      "difficulty_target":18446744073709551615,
-      "height":6164,
-      "nonce":"7431854142636124133718475970690936399991195220046817601810838296960117666247",
-      "timestamp":1636486834
+  "jsonrpc": "2.0",
+  "result": {
+    "metadata": {
+      "cumulative_weight": 0,
+      "difficulty_target": 18446744073709551615,
+      "height": 0,
+      "timestamp": 0
     },
-    "previous_ledger_root":"al1zd9fn8fj4wkkea895qztz0hyhq2fds836yqlnguj2n5f2gj4xcqq2mj02a",
-    "proof":"hzkp1qvqqqqqqqqqqqpqqqqqqqqqqqr9qhz2qca83e0pl0agevaju2qymt5pwjx6kf4vkhdcs2rk0h7ynvv3sw2yhmswf8pppt7vqyflcfqgzjn4ppzpgesdwdzmn77ucn7930xdt40gp2vfp7z8t68304uqe4q6qr4xrsct9kghc9d77mqfv7xqrz2z8azhz2yuuewk6u0tfqafzj2x3uc7l5uy58ze30ustrjhpky0qk7pf72v6e4kyeel0veeagjvpjmjv6v9359zwc5c9gh2qqt5cs5vfquwysp83x6rsrha7t725p9eapssgaxqfllcq28yumj55655qqqcqqqqqqqqqqpuzgas23tfdk7vtdxdakj6nxeslzuj30jvjflwn0er2gt2pxd0jau9ua04fy0h8f4a7a0s3tlxdtqyu8rjty9s26j7eny5knc8cvsye8edeclmanjed53xan7jje020puru4jceg36gqf5u8whvjrvrpqqxh59ta4kluecprawpwk7vgg36eleq4kcfmjr57xjdnfegf5xvmjjx5qdccdayjx4yy0tjlafv6vvqqgqqqqqqqqqqqakf8kcu2r5yp5l2ce4dlyc8qrp4a5suyghfygcx2nghj9c50k3e5escs2dt43ndc5jky28z274pqpffk9ps6hljmyq80ew7eve5v2lkeucev8hh8r92uwpcy2ddf5kh5paer5kwdkcnk97acpaz2yfxfqqyqqqqqqqqqqqfemp9amjs8km44tdrqmm37w4nec5gvnxa9y55p58zsmpyr6yegpexktgdteykhc4akdkxym4w4u24lqd93haypjkansgu4s8ckgulqrllmscymc8kjya34fvgyyxf67q4tk4ktkgkvvskdsf55ha3yjzq63lea2y8wsyvpn9jk7vxdt38j0q4heh2z3wvw74hqfhnzhaa7csrqvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqyqqqqqqqqqqqeef347jgsmz2mxamwyr2h2k53hqh30hln04pycukxsvf3fj7lphn7mg6nwrsgj3qwujs5gtlm4wsqq06vmujq8vufkfd6lthfjdwc56ydvlhq9jkz5xcagddhmny8km3qmdfxmls8kssqs0euzhqq8gj3n08a2myxl9q5m6d7zv9yyx5wy3m8lqzvqslzwhut5fm45szfjxztqgqqqandu5p",
-    "transactions_root":"ht1glw36mv7q0sg46sag7da2w32k4amy7utglmrh6d3udy557t54qgs8va3uc"
+    "nonce": "hn1lrw8l2w7m74caxxngv57ps28ng49gdn77tgq26sm78qhxz9qwcyqc9djn4",
+    "previous_ledger_root": "al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
+    "proof": "hzkp1qvqqqqqqqqqqqpqqqqqqqqqqqqwpcgtfx3p968slxsgm0ej54pyp46df56ufnmwz3d2rjajg2fj62hq5en9nnx2cdnrww8d9nw9qdqf67m8ctxnk6xyk8tu5gthjjd48f085wvua32px9mw29g7ee2562wjt2fz2ncklpgefeefrfmv90xqgha5r42svfn9nktlpjvtezspwm2l4ejg7kqyydg5s5hgcq2c6taxxtlz4yww43dz0gvxdj4uex9sq83dp9hq3kgcfvgu47mquptj20cyzu0jdksqq2annt72wg4ysfskpsj0kayf9m6t73xs8qhwczrscqqcqqqqqqqqqqqj5d5uw7jep7kmnssfjv3utj97d2pghy0u3wjmlj750dv5y3wc9axdhvj3qs60u9wfl96d2r39qqq9ek8fy8dckr6an58arfrawnuemmqw464rud6r50t8x5cxfn9lhtj6jtma82rahw4zmv2emt8r5h5qfvnd34p93ejxrn6rph8r9ul8tfe65l8t4pvxnpltmcxjnn8wsgvr3d3qc7n39y8wlwz3f0kn3z8yqqgqqqqqqqqqqp2lrqkejgksx2vasrwssl4plmt05vk9he22x0k5uca6k0kehyda6cxu5vrj0q4qqe75elekpj086qpcjqrvgq5tk7cp6q9dj8g0unzvwwg8c5459ug3h3k6r077s8lrh3z63s262jfa5y528f0nnmc89wqgyqqqqqqqqqqqyfekfkkzzgr94sdfzkvyzgh3kag03evgmczdyteaaznnjgla87y3959mxv74c2pk3k5fs3hx4lcgwajgjn8h5x7aj2fc7mns9qegmzr9d8ljnrlwvzwhu0f7r9czwevwq3zeevkkt2033yexr55d3v93swzke3tvcdmlqyrsaey46wqxcvm4l7gzxvlca9a8p7wcls4a9mccsqvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqyqqqqqqqqqqqm8jv4psnamnzyqqwp9svtmekgysu5gcns7tk4rf2x9g6vay36afuhszk4kyd3t9m72g3kgf57y8gzq00zpcr7l9lyulduxxqe0658j2kyct252hhmvdt7u9t9029z7cazxr40dcx8glm3xg429v2tly3fm70mkmcu56r37czya0elz79cjcfuap9qzgpjd2y6ng6h7uyflzxvqqqqqf9tevv",
+    "transactions_root": "ht1gl4pv2jw4vyjtdrxn4806vttajn3k3fm2yrfe8akt36zqs72psxsv8rw4c"
   },
-  "id":"1"
+  "id": "1"
 }
 ```
