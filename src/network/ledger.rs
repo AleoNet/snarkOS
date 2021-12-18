@@ -808,18 +808,17 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             &mut maximum_cumulative_weight,
         );
 
-        // Case 1 - Ensure the peer has a heavier canonical chain than this ledger.
-        // note: this check is duplicated in `handle_block_requests`, as it's super-fast and allows us
-        // to not acquire the `_block_requests_lock`.
-        if latest_cumulative_weight >= maximum_cumulative_weight {
-            return;
-        }
-
-        // Acquire the lock for block requests.
-        let _block_requests_lock = self.block_requests_lock.lock().await;
-
-        // Case 2 - Proceed to send block requests, as the peer is ahead of this ledger.
         if let Some((peer_ip, is_fork, maximum_block_locators)) = maximal_peer {
+            // Case 1 - Ensure the peer has a heavier canonical chain than this ledger.
+            // Note: this check is duplicated in `handle_block_requests`, as it is fast and allows us
+            // to skip acquiring `_block_requests_lock`.
+            if latest_cumulative_weight >= maximum_cumulative_weight {
+                return;
+            }
+
+            // Acquire the lock for block requests.
+            let _block_requests_lock = self.block_requests_lock.lock().await;
+
             // Determine the common ancestor block height between this ledger and the peer
             // and the first locator (smallest height) that does not exist in this ledger.
             let (maximum_common_ancestor, first_deviating_locator) = match verify_block_hashes(&self.canon, &maximum_block_locators) {
@@ -831,7 +830,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 }
             };
 
-            let update_result = handle_block_requests::<E, N>(
+            // Case 2 - Prepare to send block requests, as the peer is ahead of this ledger.
+            let (start_block_height, end_block_height, ledger_is_on_fork) = match handle_block_requests::<E, N>(
                 latest_block_height,
                 latest_cumulative_weight,
                 peer_ip,
@@ -840,39 +840,30 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 maximum_cumulative_weight,
                 maximum_common_ancestor,
                 first_deviating_locator,
-            );
-
-            if let BlockRequestUpdate::AbortAndDisconnect(ref reason) = update_result {
-                self.disconnect(peer_ip, reason).await;
-                return;
-            }
-
-            if let BlockRequestUpdate::Abort = update_result {
-                return;
-            }
-
-            let (start_block_height, end_block_height, ledger_needs_reverting) = if let BlockRequestUpdate::Success(success) = update_result
-            {
-                (success.start_block_height, success.end_block_height, success.ledger_needs_reverting)
-            } else {
-                unreachable!(); // safe, Abort and AbortAndDisconnect return early
-            };
-
-            // Revert the ledger if needed.
-            let ledger_reverted = if ledger_needs_reverting {
-                // If the revert operation fails, abort.
-                if !self.revert_to_block_height(maximum_common_ancestor).await {
+            ) {
+                // Abort from the block request update.
+                BlockRequestHandler::Abort => return,
+                // Disconnect from the peer if it is misbehaving and proceed to abort.
+                BlockRequestHandler::AbortAndDisconnect(ref reason) => {
+                    self.disconnect(peer_ip, reason).await;
                     return;
-                } else {
-                    true
                 }
-            } else {
-                false
+                // Proceed to send block requests to a connected peer, if the ledger is out of date.
+                BlockRequestHandler::Success(success) => {
+                    // Revert the ledger, if it is on a fork.
+                    if success.ledger_is_on_fork {
+                        // If the revert operation fails, abort.
+                        if !self.revert_to_block_height(maximum_common_ancestor).await {
+                            warn!("Ledger failed to revert to block {}", maximum_common_ancestor);
+                            return;
+                        }
+                    }
+                    (success.start_block_height, success.end_block_height, success.ledger_is_on_fork)
+                }
             };
-
-            debug!("Requesting blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
 
             // Send a `BlockRequest` message to the peer.
+            debug!("Requesting blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
             let request = PeersRequest::MessageSend(peer_ip, Message::BlockRequest(start_block_height, end_block_height));
             if let Err(error) = self.peers_router.send(request).await {
                 warn!("[BlockRequest] {}", error);
@@ -897,8 +888,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Log each block request to ensure the peer responds with all requested blocks.
                 if let Some(locked_block_requests) = self.block_requests.write().await.get_mut(&peer_ip) {
                     for block_height in new_block_heights {
-                        // If the ledger was reverted, include the expected new block hash for the fork.
-                        match ledger_reverted {
+                        // If the ledger is on a fork and was reverted, include the expected new block hash for the fork.
+                        match ledger_is_on_fork {
                             true => {
                                 self.add_block_request(
                                     peer_ip,

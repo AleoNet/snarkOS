@@ -94,22 +94,22 @@ pub fn verify_block_hashes<N: Network>(
     Ok((maximum_common_ancestor, first_deviating_locator))
 }
 
-/// The successful outcome of a block request update operation.
-pub struct BlockRequestUpdateSuccess {
+/// The successful outcome of a block request handler.
+pub struct BlockRequestHandlerSuccess {
     pub start_block_height: u32,
     pub end_block_height: u32,
-    pub ledger_needs_reverting: bool,
+    pub ledger_is_on_fork: bool,
 }
 
-/// The result of a block request update operation.
-pub enum BlockRequestUpdate {
-    Success(BlockRequestUpdateSuccess),
+/// The result of calling the block request handler.
+pub enum BlockRequestHandler {
+    Success(BlockRequestHandlerSuccess),
     Abort,
     AbortAndDisconnect(String),
 }
 
 ///
-/// Proceeds to send block requests to a connected peer, if the ledger is out of date.
+/// Determines the appropriate block request update operation, based on the following cases:
 ///
 /// Case 1 - You are ahead of your peer:
 ///     - Do nothing
@@ -137,10 +137,10 @@ pub fn handle_block_requests<E: Environment, N: Network>(
     maximum_cumulative_weight: u128,
     maximum_common_ancestor: u32,
     first_deviating_locator: Option<u32>,
-) -> BlockRequestUpdate {
+) -> BlockRequestHandler {
     // Case 1 - Ensure the peer has a heavier canonical chain than this ledger.
     if latest_cumulative_weight >= maximum_cumulative_weight {
-        return BlockRequestUpdate::Abort;
+        return BlockRequestHandler::Abort;
     }
 
     // Ensure the latest common ancestor is not greater than the latest block request.
@@ -149,11 +149,11 @@ pub fn handle_block_requests<E: Environment, N: Network>(
             "The common ancestor {} cannot be greater than the latest block {}",
             maximum_common_ancestor, latest_block_height
         );
-        return BlockRequestUpdate::Abort;
+        return BlockRequestHandler::Abort;
     }
 
-    // If the ledger is on a fork, it might need to revert.
-    let (latest_common_ancestor, ledger_needs_reverting) =
+    // Determine the latest common ancestor, and whether the ledger is on a fork & needs to revert.
+    let (latest_common_ancestor, ledger_is_on_fork) =
         // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
         if !is_fork {
             // Continue to sync from the latest block height of this ledger, if the peer is honest.
@@ -175,11 +175,8 @@ pub fn handle_block_requests<E: Environment, N: Network>(
                 // Case 2(c)(b)(a) - Check if the real common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
                 // If this peer is outside of the fork range of this ledger, proceed to disconnect from the peer.
                 if latest_block_height.saturating_sub(first_deviating_locator) >= E::MAXIMUM_FORK_DEPTH {
-                    debug!(
-                        "Peer {} has exceeded the permitted fork range of the protocol, disconnecting",
-                        peer_ip
-                    );
-                    return BlockRequestUpdate::AbortAndDisconnect("exceeded fork range".into());
+                    debug!("Peer {} exceeded the permitted fork range, disconnecting", peer_ip);
+                    return BlockRequestHandler::AbortAndDisconnect("exceeded fork range".into());
                 }
                 // Case 2(c)(b)(b) - You don't know if your real common ancestor is within `MAXIMUM_FORK_DEPTH`.
                 // Revert to the common ancestor anyways.
@@ -188,9 +185,10 @@ pub fn handle_block_requests<E: Environment, N: Network>(
                     (maximum_common_ancestor, true)
                 }
             }
-            // The first deviating locator didn't exist; abort.
+            // The first deviating locator does not exist; abort.
             else {
-                return BlockRequestUpdate::Abort;
+                warn!("Peer {} is missing first deviating locator", peer_ip);
+                return BlockRequestHandler::Abort;
             }
         };
 
@@ -200,9 +198,9 @@ pub fn handle_block_requests<E: Environment, N: Network>(
     let start_block_height = latest_common_ancestor + 1;
     let end_block_height = start_block_height + number_of_block_requests - 1;
 
-    BlockRequestUpdate::Success(BlockRequestUpdateSuccess {
+    BlockRequestHandler::Success(BlockRequestHandlerSuccess {
         start_block_height,
         end_block_height,
-        ledger_needs_reverting,
+        ledger_is_on_fork,
     })
 }
