@@ -7,13 +7,13 @@ None
 
 ### Response
 
-| Parameter |  Type  |              Description                |
-|:---------:|:------:|:---------------------------------------:|
+| Parameter | Type  |                         Description                          |
+|:---------:|:-----:|:------------------------------------------------------------:|
 | `result`  | array | An array containing the IP addresses of all connected peers. |
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getconnectedpeers", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "getconnectedpeers", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response 

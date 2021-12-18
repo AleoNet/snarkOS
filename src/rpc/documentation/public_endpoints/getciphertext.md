@@ -1,29 +1,29 @@
 # Get Ciphertext
-Returns a ciphertext given the ciphertext ID.
+Returns the record ciphertext for the given commitment.
 
 ### Arguments
 
-|    Parameter    |  Type  | Required |                     Description                    |
-|:---------------:|:------:|:--------:|:--------------------------------------------------:|
-| `ciphertext_id` | string |    Yes   | The ciphertext id of the requested ciphertext info |
+|  Parameter   |  Type  | Required |                       Description                        |
+|:------------:|:------:|:--------:|:--------------------------------------------------------:|
+| `commitment` | string |   Yes    | The record commitment of the requested record ciphertext |
 
 ### Response
 
-|   Parameter  |  Type  |          Description         |
-|:------------:|:------:|:----------------------------:|
-| `result` | string | The bytes of the ciphertext. |
+| Parameter |  Type  |      Description       |
+|:---------:|:------:|:----------------------:|
+| `result`  | string | The record ciphertext. |
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getciphertext", "params": ["ar1k2rwg8tlg79zmgwzesyf4r3l2vyx27mtlrnjqanugx72l0jpfqxqt7sf3u"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "getciphertext", "params": ["cm1xck4eyf3a3qnz69yyrr3jf698mqzwpjgkqu0j359p0sdr5wyjyqsn0604p"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response
 
 ```json
 {
-    "jsonrpc": "2.0",
-    "result": "a379350c60e4c22bd8ff75808b90cf4fa8f0ef887386f60ce1af948e0069ed06f46382f7d8a2a7f1ba1435492b5f327bb7e91d16cc4939ee6c69bc56f6264409a3a91dea4599e7ec489816cfd7e966242deecb669b13a7175ca6d49b9e6cbe0a9accda04da9532850f35ef3ae6ab13a726435fb00154774e9daea6c07b627110c9edf3b477cb2850e2734a1b0fefd1a99406e8620a0f4b1549b68f9cbb112d06161487d93570f0be62e383fdc0bc80f4c53a729f44bfc2c2f1a193e0d5cfd1071d04219124da47a6b172cd55c819b6fa5450561a2aa32b489ceecadedb02280a179dc270acc9fcdfc2d3c91765c3a01011824b878e87f9206adcd683e7b5a008e26f7a24ecf8d0ee4031fc76b5cc8025324755d2becf2279ddd1ae1b7f4ffa0350b5686dbe317b77a46e5609408fc2e4497fb003e1efd306d4a5445c742f3b04",
-    "id": "1"
+  "jsonrpc": "2.0",
+  "result": "recd1v76mftwzagt9k9nsjjpdqgytv4ddk24e9q7f240daar7avcv3q9gd9rx6c230n99jhxfj24xpvkrr5vk04fl2kapa0a0a895hvevzq7tnwuat9lzwpy4c4rxys6uaj34098295t9fff7khqctvkcglumqlvg47rwzhqhw9u5zxfhug9dde67dyjc6uflp4x028mrmzkhfa6qn0l6jju8lfhmy5crcqqefjv8m4zwv34tvk03d65gdmv4fe35wtgy6rmy4heq89uwh0hqe40k2g7nyj2rk6xlgqnf724pt6ynkefxwypmvhhjzk806re4njej552jfq74ej0ykhrcxa93l9n6rkchlhuuzz2fpqtt2npqz8avnv442ng4djm8lve4dlqfelpjjn5yj425rs98pvn5k54gvn5vku3wek3ytxe8zpen7n2saf060j97u8yyygt4y9zqklnek3v",
+  "id": "1"
 }
 ```

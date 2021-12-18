@@ -7,73 +7,79 @@ None
 
 ### Response
 
-|        Parameter            |  Type  | Description |
-|:---------------------------:|:------:|:-----------:|
-| `block_hash`                | string | The hash of the block. |
-| `header`                    | object | The block header containing the state of the ledger at the block. |
-| `previous_block_hash`       | string | The hash of the previous block. |
-| `transactions`              | object | The list of transactions included in the block. |
+|       Parameter       |  Type  |                            Description                            |
+|:---------------------:|:------:|:-----------------------------------------------------------------:|
+|     `block_hash`      | string |                      The hash of the block.                       |
+|       `header`        | object | The block header containing the state of the ledger at the block. |
+| `previous_block_hash` | string |                  The hash of the previous block.                  |
+|    `transactions`     | object |          The list of transactions included in the block.          |
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "latestblock", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "latestblock", "params": [] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response
 
 ```json
 {
-   "jsonrpc":"2.0",
-   "result":{
-      "block_hash":"ab1mkgcrwag6avnp0a0ntxr9y4lt7y2fq9t0tqglkkuysk6jg2rhqrqa9788l",
-      "header":{
-         "metadata":{
-            "difficulty_target":18446744073709551615,
-            "height":6160,
-            "nonce":"5141009373721822405820512044696916600360683867327778483074084451822398628111",
-            "timestamp":1636486761
-         },
-         "previous_ledger_root":"al1u0rtgkhsd94mucjmxsy3ze76xap67aj4hx4jgfysehaes4vrvu8s227n0d",
-         "proof":"hzkp1qvqqqqqqqqqqqpqqqqqqqqqqqp2ek5pandazcszav4fnt4nsutfgxfwy5sc508xhgrkfjsa6aur3l0cls9supd0mcuzd9l6mlswfmqf5ln5c7ylf52yynx5wy8fw478az4z6emxeu3f5p8375zzgk7sra3gujf3g7d3hsz0knq7qk87trwq6955kjkyq2dvqt0lztlwmjg39x6fn84w6fva6czxhnu5v2nnttzewdl0z908kqmt53u8m7mtcul5pep7lsplhgne6pdrtgz8c4p8d9rllky48ezm8waqta5lmtmk26g9pvkmqy4ke7dpp0z97f239pwcqqqcqqqqqqqqqqp8qvzj40qqg4hd4e30593sxj8725xfury39f67gfw359ufcx0t3kcue42phlgpvhf6akqlzfh5y5q2qdead436q0n5cpnh5jrpc2urnqfqxe56neyxkc55wgh8zyx0l29qpmhm567gp8as92wzw3p2vgwq3cvcdfltq45mle2c5pgz8dfw0sg7up9yf9wq6zxxu5mf3kplxs5c77ww097jp7l6pe55r0kw2gmqpqgqqqqqqqqqqqdm0n57r5w2qnpgggujfyrfv4vsyhulqfpmc7ujnxrrzw2ct8lusus7zx2m9rcce9y3xmamqhw29srtfh7waqzp3yta54f29uezsh40tjuncpe2z8kjlyjr77la8clt78qkg8lxwfvjr02xg58jj20d7wqqyqqqqqqqqqqq2lpumrtvvs8srlldr00c3qdwqhhdcpm8ufhuruzd26e0utjxnsr78umtcmge7peglwsf6d3adpwvq4u8ylddupuc66g6n2gtresw6qr940ywqxl9vdallel8ghyzutjh9y7mzxk6cdgj2mhra86vphep3949hdux84xyytydfx8mup5lyhqs2pyv6rg64lr772wg5hlzr43gyqvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqyqqqqqqqqqqq59hacw5f6gcw39een200h0q7ahe5fpk5gm7f4h55ncmv5k0vzstzw8g0xgzc598wq2wswg5ea2mgqqgrw854s7zqncef060fxu5qvquf24gz73tqvww2mhrw2s3a5343puqf06zyj6kk5ltwvrxkrpamachqate665muvjvl5ayw3ncl7clyc4lj9y63xa3rvgawt72cd3hd2qqqqqd0jlq2",
-         "transactions_root":"ht1w3s2c6mnc3e6crtkv40gfmmjvykxgh88ac6tv6cy7jucmsxlxsgql99vqh"
+  "jsonrpc": "2.0",
+  "result": {
+    "block_hash": "ab18946qsq2ppqylhk03ftpg7wjuknp4gwpqz0hhp8hl2ahn94sg5zqxd8qw8",
+    "header": {
+      "metadata": {
+        "cumulative_weight": 0,
+        "difficulty_target": 18446744073709551615,
+        "height": 0,
+        "timestamp": 0
       },
-      "previous_block_hash":"ab1frc9xutuzphcu2gqsvf29d755wdyztuulxhxt9h7d6xwck74zcfq4lv6u8",
-      "transactions":{
-         "transactions":[
+      "nonce": "hn1lrw8l2w7m74caxxngv57ps28ng49gdn77tgq26sm78qhxz9qwcyqc9djn4",
+      "previous_ledger_root": "al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
+      "proof": "hzkp1qvqqqqqqqqqqqpqqqqqqqqqqqqwpcgtfx3p968slxsgm0ej54pyp46df56ufnmwz3d2rjajg2fj62hq5en9nnx2cdnrww8d9nw9qdqf67m8ctxnk6xyk8tu5gthjjd48f085wvua32px9mw29g7ee2562wjt2fz2ncklpgefeefrfmv90xqgha5r42svfn9nktlpjvtezspwm2l4ejg7kqyydg5s5hgcq2c6taxxtlz4yww43dz0gvxdj4uex9sq83dp9hq3kgcfvgu47mquptj20cyzu0jdksqq2annt72wg4ysfskpsj0kayf9m6t73xs8qhwczrscqqcqqqqqqqqqqqj5d5uw7jep7kmnssfjv3utj97d2pghy0u3wjmlj750dv5y3wc9axdhvj3qs60u9wfl96d2r39qqq9ek8fy8dckr6an58arfrawnuemmqw464rud6r50t8x5cxfn9lhtj6jtma82rahw4zmv2emt8r5h5qfvnd34p93ejxrn6rph8r9ul8tfe65l8t4pvxnpltmcxjnn8wsgvr3d3qc7n39y8wlwz3f0kn3z8yqqgqqqqqqqqqqp2lrqkejgksx2vasrwssl4plmt05vk9he22x0k5uca6k0kehyda6cxu5vrj0q4qqe75elekpj086qpcjqrvgq5tk7cp6q9dj8g0unzvwwg8c5459ug3h3k6r077s8lrh3z63s262jfa5y528f0nnmc89wqgyqqqqqqqqqqqyfekfkkzzgr94sdfzkvyzgh3kag03evgmczdyteaaznnjgla87y3959mxv74c2pk3k5fs3hx4lcgwajgjn8h5x7aj2fc7mns9qegmzr9d8ljnrlwvzwhu0f7r9czwevwq3zeevkkt2033yexr55d3v93swzke3tvcdmlqyrsaey46wqxcvm4l7gzxvlca9a8p7wcls4a9mccsqvqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqyqqqqqqqqqqqm8jv4psnamnzyqqwp9svtmekgysu5gcns7tk4rf2x9g6vay36afuhszk4kyd3t9m72g3kgf57y8gzq00zpcr7l9lyulduxxqe0658j2kyct252hhmvdt7u9t9029z7cazxr40dcx8glm3xg429v2tly3fm70mkmcu56r37czya0elz79cjcfuap9qzgpjd2y6ng6h7uyflzxvqqqqqf9tevv",
+      "transactions_root": "ht1gl4pv2jw4vyjtdrxn4806vttajn3k3fm2yrfe8akt36zqs72psxsv8rw4c"
+    },
+    "previous_block_hash": "ab1qqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqqq5g436j",
+    "transactions": {
+      "transactions": [
+        {
+          "inner_circuit_id": "ic13cstkmt5j4qqzfu5am8jx2rhxm0hqplyzcgzyueefz7n32xl4h53n4xmxvhjyzaq2c0f7l70a4xszau2ryc",
+          "ledger_root": "al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
+          "transaction_id": "at1ky80ktk2tcyytgg3dvg3jqtu64kc6nzdrwg75nv0c6u78grkh5qqdu804w",
+          "transitions": [
             {
-               "events":[
-                  
-               ],
-               "inner_circuit_id":"ic14z3rtzc25jgjxs6tzat3wtsrf5gees5zel8tggsslzrfyzhxw4xsgdfe4qk6997427zsfl9tqqesq5fzw5q",
-               "ledger_root":"al1enk2kwh9nuzcj2q9kdutekavlf8ayjqcuszgezsfax8qxn9k0yxqfr9fr2",
-               "transaction_id":"at1wqa7u4unjc3p5nah9rgwrcy6cm0nxhykmtpaxlmkuj53v57q6q8sw7s8yp",
-               "transitions":[
-                  {
-                     "ciphertext_ids":[
-                        "ar1j0ak2ahmmhv58nnedk5klp0pvapy4pku30hkzx4j4mtxpnyuwqqqa7s5a2",
-                        "ar1ac980j3ha20pwpqrh56pd4wd2vsqla93xq33lc52lvftt0t82qzsc4r48e"
-                     ],
-                     "ciphertexts":[
-                        "4e74f8677f988b4a2a9f5a1d6d5ed17d8e9c94bc8de39cf60795b6722bacc5066d0743473d47e22cda0765f10556601200ff1b0234e005993b4a121a5c593a07218dfeea0512a1f8f9c40f15f5788998af5d9f0ff988d506631fc5418b024910941b9e696f68517d186c4ad45c6368c71c2bdaea3ecbf37f149e3491d94f260dce9a226095df1c5ab0b6a625b29a878bdeecf466299804b999c30182450d37128b8a91b27b63a028ffe64163b88efdb50a9ed554161be0ec59502678417050089cc5d3bc3092539581e0fb2885cb4eaa59f353a57c78763822716047a858e10c4081efa99d66d79076813216bd97d85d8be39ac07ecc056246c9bf087a20fd04d5c20f3cf5076ecd9f6f8cfeb22d5f0baaab5f628809049f36654d6df83a7c0ad47aef89b99b4fee12006c37a7eb921746135fee398654ad47ce969db19a2610",
-                        "1f51b8a3f69bc9b30345cc782bfa95fd420b15c09f435b92ae450efc7c936d034783f67bdece49660b38e4f257b705f82377aff23680b6d3be7abb93628148083bfa001b40fc439da9f47f09f03f7c395956c5a6a9f548cd79d041cba780bb075144bd4d80d44dd54cf3405f5d82699195f73aa97c2d156147c33c262bdda80e54eedbab214a9a8cc067abb5ee1c4dff2aa0cb91c2978660267a1672680976011cdd073ad56eeefc871d590e8771a47ccf0ded9346b46627e48f99b1219fee00addeea3358c264228454ff3621422abe8910510ab69f66fba6a04c11f7a9c90c3bf93975827a1dd12a19f1d0d7c7bebf1e6b94f2028f197bc9627435586ed00120de877290afdb77927c9b381407bf35a7169aa4e489ec0886c5fc525e28c5031e1b8a4381cbe2a84ff995467109bb946b379b20879b282fa69307846a76a709"
-                     ],
-                     "commitments":[
-                        "cm13marlfxutm46mltm9svuw3zz5ljvdqpv4qdcdemmlrytgj90xcxst2ezcl",
-                        "cm1yc2fxyxf6yuvp9e8qt6r7gw05pzhavca3959muqef74360590ypsncn6jt"
-                     ],
-                     "proof":"ozkp1cljn66grygrsrfa0nv6ynmc83sf5myfqn2ndhtldnna6k3srwd3fq5sgf6vtlvzedccp7xh6zyua4jmm88kj0ga3kcfqnelteyuwxx9xh7sqlrgalcwrjt0td83ljsmxryw78ffwuh8fcph8772kxpnvspngk3q3f3zzzep4s7uldkw5ank7pux8r3cy0pxf4mhlr2g8vkydklq90z6lcvvkqpxjs7j4lelpa0y2g76whz0rgaca4xgqvf6x077wm72jzpzp6elrk68xxlc8ls4z0fvhpjnhs2dzqk8g9t26avjezzqux2jwz2r9sx2ttgjhu8xe2t9hmcpmx3d3tw20xxwchrs6vcn38m962kdxusuea8kv6n69m9rd3xf5ha0ykqwncw7p2mazhe63tg0yzjenskhuz7fwau720ut3tdmprlajtsg0r4drh8qjqtl7xfpuveusqqghqpqqk",
-                     "serial_numbers":[
-                        "sn1d4nmmksyuul63zmsf56p4maf6hd9edpaxjs4mglv6wfs8gmqjggsk8nucl",
-                        "sn1ffck8gzh0gnsqsjujgsg6fpc8jfvfl8krhwceegs7gu6v6s9zgysh83rmr"
-                     ],
-                     "transition_id":"as1lwzgt7r0d22kewedvpwjexwypewjpwzq5e6383fxu0y0esft2yzqxhs6ek",
-                     "value_balance":-150000000
-                  }
-               ]
+              "ciphertexts": [
+                "recd1v76mftwzagt9k9nsjjpdqgytv4ddk24e9q7f240daar7avcv3q9gd9rx6c230n99jhxfj24xpvkrr5vk04fl2kapa0a0a895hvevzq7tnwuat9lzwpy4c4rxys6uaj34098295t9fff7khqctvkcglumqlvg47rwzhqhw9u5zxfhug9dde67dyjc6uflp4x028mrmzkhfa6qn0l6jju8lfhmy5crcqqefjv8m4zwv34tvk03d65gdmv4fe35wtgy6rmy4heq89uwh0hqe40k2g7nyj2rk6xlgqnf724pt6ynkefxwypmvhhjzk806re4njej552jfq74ej0ykhrcxa93l9n6rkchlhuuzz2fpqtt2npqz8avnv442ng4djm8lve4dlqfelpjjn5yj425rs98pvn5k54gvn5vku3wek3ytxe8zpen7n2saf060j97u8yyygt4y9zqklnek3v",
+                "recd1u5chlqz8n80rwem25de9npujv2uh006yajgyum9p5kn4rsu9s5ymgrwgle39pz87s0726g4rg47dx5nl330680gxmyxffyg7p77qvppfql3p3hxncp9fpus8upsa5nlfwfnck7k4hzcjskrnrfza6tqcpgvquuv663ahswju6s3wcawh9ktz87ewzgpj2nc8gc9wd30zc8zsgu5xyen4q352u7y6l985kv2hq6nx9hu4n4mhgglacw7dc026y6qglwh0l302gwxs0s804waax472h4tv2npmprtvp5hkzg7hhm360squhgnxtpdthh0ncyrdklqy57nlfr6z5dm080xd2z9uw3h9fpu9vqsy9q4vakw00wk0prwf92ekmnh9e00v4l2a4sldmcnzcj90p75nqlrd5ek80e6l3xz559meskjeq7kpyhftsxcptc9d009xuh6nxlyszq7uktv"
+              ],
+              "commitments": [
+                "cm1xck4eyf3a3qnz69yyrr3jf698mqzwpjgkqu0j359p0sdr5wyjyqsn0604p",
+                "cm1up0j5cq0k3w96skhsq750m6alw8dcau5msn390h8fpkgny5zdvps9h9dp8"
+              ],
+              "events": [
+                {
+                  "id": 1,
+                  "index": 0,
+                  "record_view_key": "rcvk1mujt98tc2r04l58haxjv48s5a7vnhx8ws24fxpdruuk3z37vscqsjtvlg5"
+                },
+                {
+                  "id": 1,
+                  "index": 1,
+                  "record_view_key": "rcvk1yuqvyczasq876gjt8xwz7d2dxzs3umlp8nccpcg3nmlp4qxs35yqgflhy6"
+                }
+              ],
+              "proof": "ozkp1fhewv363wgl04jcxdnmaznkeszy2svj6ncxr9pl5f5l3lm6mgsr8e6tqxpkhhtxc6pesfd40hxfgwz7luqwwa00uwzu5s8jfq9n743n4y4dldf9htr20jv9zpw59cf4xxwurnpckq0wt8r5hfdn5m2d9qryk20yz9zfeyvv7hrexxvd707qx730q2qeppnu70y0q3rpnqzprtxrclgqptrwlx2cdzg5ywkayn8f04xelpge4d73a3tmyvlyuj5phlv5lxq2afh4zaxnxw8f2e5k32xu9w0vmq7xldqmyv7pxjfj2mzqrwyagg7nzsay34kx2zutx33r0eugfqgtqlhrzrnhqu2npk0kxwcx27rgvpfcwemsns56d7xn0zety5mkcje3ud0usjfhmdwhh3eypzh0x3svs5jhm9nhtpqc7j7ms3gu4rc7d352g42fzv2vvv5lsxuygzqgxrha3j",
+              "serial_numbers": [
+                "sn1m70m3egkxqq5dmalym3hf5arz296k37h87kv4ztge48c3a6hmcysw22avz",
+                "sn1q8y49taxgquprav54nkd42n8dd8egj0rghjfg834q0zlfv3p9cpst9mkj5"
+              ],
+              "transition_id": "as1xuppwj4x7eswxppdlg3pt49vue2kwfw3cw8m8k3uqxe5e7945g9s4s8lz5",
+              "value_balance": -1000000000000000
             }
-         ]
-      }
-   },
-   "id":"1"
+          ]
+        }
+      ]
+    }
+  },
+  "id": "1"
 }
 ```
