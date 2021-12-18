@@ -265,12 +265,12 @@ mod tests {
             // Declare peer state.
             let peer_ip = format!("127.0.0.1:{}", rng.gen::<u16>()).parse().unwrap();
             let peer_is_on_fork = None;
-            let peer_maximum_block_height: u32 = latest_block_height;
+            let peer_maximum_block_height: u32 = latest_block_height + 1;
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
             let peer_first_deviating_locator = None;
 
             // Declare locator state.
-            let maximum_common_ancestor = peer_maximum_block_height - 1;
+            let maximum_common_ancestor = peer_maximum_block_height;
 
             // Determine if block requests or forking is required.
             let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
