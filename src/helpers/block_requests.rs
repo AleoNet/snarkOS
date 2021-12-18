@@ -117,25 +117,25 @@ pub(crate) enum Case {
     TwoB,
     /// Case 2 - You are behind your peer:
     ///     Case 2(c) - `is_on_fork` is `Some(true)`:
-    ///             Case 2(c)(a) - Common ancestor is within `MAXIMUM_FORK_DEPTH`:
-    ///                  - Revert to common ancestor, and send block requests to sync.
+    ///         Case 2(c)(a) - Common ancestor is within `MAXIMUM_FORK_DEPTH`:
+    ///              - Revert to common ancestor, and send block requests to sync.
     TwoCA,
     /// Case 2 - You are behind your peer:
     ///     Case 2(c) - `is_on_fork` is `Some(true)`:
-    ///             Case 2(c)(b) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator exists:
-    ///                  Case 2(c)(b)(a) - You can calculate that you are outside of the `MAXIMUM_FORK_DEPTH`:
-    ///                      - Disconnect from peer.
+    ///         Case 2(c)(b) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator exists:
+    ///              Case 2(c)(b)(a) - You can calculate that you are outside of the `MAXIMUM_FORK_DEPTH`:
+    ///                  - Disconnect from peer.
     TwoCBA,
     /// Case 2 - You are behind your peer:
     ///     Case 2(c) - `is_on_fork` is `Some(true)`:
-    ///             Case 2(c)(b) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator exists:
-    ///                  Case 2(c)(b)(b) - You don't know if you are within the `MAXIMUM_FORK_DEPTH`:
-    ///                      - Revert to most common ancestor and send block requests to sync.
+    ///         Case 2(c)(b) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator exists:
+    ///              Case 2(c)(b)(b) - You don't know if you are within the `MAXIMUM_FORK_DEPTH`:
+    ///                  - Revert to most common ancestor and send block requests to sync.
     TwoCBB,
     /// Case 2 - You are behind your peer:
     ///     Case 2(c) - `is_on_fork` is `Some(true)`:
-    ///             Case 2(c)(c) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator is missing:
-    ///                  - Abort. Peer may be malicious as the first deviating locator must exist.
+    ///         Case 2(c)(c) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator is missing:
+    ///              - Abort. Peer may be malicious as the first deviating locator must exist.
     TwoCC,
 }
 
