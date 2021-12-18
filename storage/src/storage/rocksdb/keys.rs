@@ -41,13 +41,7 @@ impl<'a, K: DeserializeOwned> Iterator for Keys<'a, K> {
             let key = match self
                 .db_iter
                 .key()
-                .and_then(|k| {
-                    if k[0..self.prefix.len()] == self.prefix[..] {
-                        Some(k)
-                    } else {
-                        None
-                    }
-                })
+                .and_then(|k| if k.starts_with(&self.prefix) { Some(k) } else { None })
                 .map(|k| bincode::deserialize(&k[self.prefix.len()..]).ok())
             {
                 Some(key) => key,

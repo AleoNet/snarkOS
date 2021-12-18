@@ -47,7 +47,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The specified type of node.
     const NODE_TYPE: NodeType;
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    const MESSAGE_VERSION: u32 = 10;
+    const MESSAGE_VERSION: u32 = 11;
     /// If `true`, a mining node will craft public coinbase transactions.
     const COINBASE_IS_PUBLIC: bool = false;
 
@@ -65,12 +65,12 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const HEARTBEAT_IN_SECS: u64 = 9;
     /// The maximum duration in seconds permitted for establishing a connection with a node,
     /// before dropping the connection; it should be no greater than the `HEARTBEAT_IN_SECS`.
-    const CONNECTION_TIMEOUT_IN_SECS: u64 = 1;
+    const CONNECTION_TIMEOUT_IN_MILLIS: u64 = 500;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 65;
+    const PING_SLEEP_IN_SECS: u64 = 60;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
-    const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
+    const RADIO_SILENCE_IN_SECS: u64 = 210; // 3.5 minutes
     /// The duration in seconds after which to expire a failure from a peer.
     const FAILURE_EXPIRY_TIME_IN_SECS: u64 = 7200; // 2 hours
 
@@ -86,7 +86,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum size of a message that can be transmitted in the network.
     const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
     /// The maximum number of blocks that may be fetched in one request.
-    const MAXIMUM_BLOCK_REQUEST: u32 = 100;
+    const MAXIMUM_BLOCK_REQUEST: u32 = 250;
     /// The maximum number of blocks that a fork can be.
     const MAXIMUM_FORK_DEPTH: u32 = 4096;
     /// The maximum number of failures tolerated before disconnecting from a peer.
@@ -124,7 +124,7 @@ impl<N: Network> Environment for SyncNode<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Sync;
     const MINIMUM_NUMBER_OF_PEERS: usize = 35;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 512;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 2048;
     const HEARTBEAT_IN_SECS: u64 = 5;
 }
 

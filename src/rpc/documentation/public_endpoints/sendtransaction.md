@@ -5,26 +5,26 @@ If the given transaction is valid, it is added to the memory pool and propagated
 
 ### Arguments
 
-|     Parameter     |  Type  | Required |              Description             |
+|     Parameter     |  Type  | Required |             Description              |
 |:-----------------:|:------:|:--------:|:------------------------------------:|
-| `transaction_hex` | string |    Yes   | The raw transaction hex to broadcast |
+| `transaction_hex` | string |   Yes    | The raw transaction hex to broadcast |
 
 ### Response
 
-| Parameter |  Type  |                 Description                |
+| Parameter |  Type  |                Description                 |
 |:---------:|:------:|:------------------------------------------:|
 | `result`  | string | The transaction id of the sent transaction |
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "sendtransaction", "params": ["transaction_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "sendtransaction", "params": ["transaction_hexstring"] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response
 ```json
 {
    "jsonrpc":"2.0",
-   "result":"at1mka6m3kfsgt5dpnfurk2ydjefqjzng4aawj7lkpc32pjkg86hyysrke9nf",
+   "result":"at1pazplqjlhvyvex64xrykr4egpt77z05n74u5vlnkyv05r3ctgyxs0cgj6w",
    "id":"1"
 }
 ```

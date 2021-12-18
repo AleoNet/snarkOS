@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{Status, Tasks},
+    helpers::{State, Status, Tasks},
     Data,
     Environment,
     LedgerReader,
@@ -108,12 +108,8 @@ pub struct Peers<N: Network, E: Environment> {
     restricted_peers: RwLock<HashMap<SocketAddr, Instant>>,
     /// The map of peers to their first-seen port number, number of attempts, and timestamp of the last inbound connection request.
     seen_inbound_connections: RwLock<HashMap<SocketAddr, ((u16, u32), SystemTime)>>,
-    /// The map of peers to a map of block hashes to their last seen timestamp.
-    seen_outbound_blocks: RwLock<HashMap<SocketAddr, HashMap<N::BlockHash, SystemTime>>>,
     /// The map of peers to the timestamp of their last outbound connection request.
     seen_outbound_connections: RwLock<HashMap<SocketAddr, SystemTime>>,
-    /// The map of peers to a map of transaction IDs to their last seen timestamp.
-    seen_outbound_transactions: RwLock<HashMap<SocketAddr, HashMap<N::TransactionID, SystemTime>>>,
 }
 
 impl<N: Network, E: Environment> Peers<N, E> {
@@ -144,10 +140,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
-            seen_outbound_blocks: Default::default(),
             seen_inbound_connections: Default::default(),
             seen_outbound_connections: Default::default(),
-            seen_outbound_transactions: Default::default(),
         });
 
         // Initialize the peers router process.
@@ -301,7 +295,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         drop(seen_outbound_connections);
 
                         // Initialize the peer handler.
-                        match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_IN_SECS), TcpStream::connect(peer_ip)).await {
+                        match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await {
                             Ok(stream) => match stream {
                                 Ok(stream) => {
                                     Peer::handler(
@@ -332,12 +326,15 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 }
             }
             PeersRequest::Heartbeat(ledger_reader, ledger_router, prover_router) => {
+                // Obtain the number of connected peers.
+                let number_of_connected_peers = self.number_of_connected_peers().await;
+
                 // Ensure the number of connected peers is below the maximum threshold.
-                if self.number_of_connected_peers().await > E::MAXIMUM_NUMBER_OF_PEERS {
+                if number_of_connected_peers > E::MAXIMUM_NUMBER_OF_PEERS {
                     debug!("Exceeded maximum number of connected peers");
 
                     // Determine the peers to disconnect from.
-                    let num_excess_peers = self.number_of_connected_peers().await.saturating_sub(E::MAXIMUM_NUMBER_OF_PEERS);
+                    let num_excess_peers = number_of_connected_peers.saturating_sub(E::MAXIMUM_NUMBER_OF_PEERS);
                     let peer_ips_to_disconnect = self
                         .connected_peers
                         .read()
@@ -365,7 +362,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 let connected_sync_nodes = self.connected_sync_nodes().await;
                 let number_of_connected_sync_nodes = connected_sync_nodes.len();
                 let num_excess_sync_nodes = number_of_connected_sync_nodes.saturating_sub(1);
-                if num_excess_sync_nodes > 0 {
+                if number_of_connected_peers >= E::MINIMUM_NUMBER_OF_PEERS && num_excess_sync_nodes > 0 {
                     // Proceed to send disconnect requests to these peers.
                     for peer_ip in connected_sync_nodes
                         .iter()
@@ -380,14 +377,22 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 }
 
                 // Skip if the number of connected peers is above the minimum threshold.
-                match self.number_of_connected_peers().await < E::MINIMUM_NUMBER_OF_PEERS {
-                    true => trace!("Sending request for more peer connections"),
+                match number_of_connected_peers < E::MINIMUM_NUMBER_OF_PEERS {
+                    true => {
+                        trace!("Sending request for more peer connections");
+                        // Request more peers if the number of connected peers is below the threshold.
+                        for peer_ip in self.connected_peers().await.iter().choose_multiple(&mut OsRng::default(), 3) {
+                            self.send(*peer_ip, Message::PeerRequest).await;
+                        }
+                    }
                     false => return,
                 };
 
                 // Add the sync nodes to the list of candidate peers.
                 let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-                self.add_candidate_peers(&sync_nodes).await;
+                if number_of_connected_sync_nodes == 0 {
+                    self.add_candidate_peers(&sync_nodes).await;
+                }
 
                 // Add the beacon nodes to the list of candidate peers.
                 let beacon_nodes: Vec<SocketAddr> = E::BEACON_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
@@ -395,12 +400,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 // Select the peers randomly from the list of candidate peers.
+                let midpoint_number_of_peers = E::MINIMUM_NUMBER_OF_PEERS.saturating_add(E::MAXIMUM_NUMBER_OF_PEERS) / 2;
                 for peer_ip in self
                     .candidate_peers()
                     .await
                     .iter()
                     .copied()
-                    .choose_multiple(&mut OsRng::default(), E::MINIMUM_NUMBER_OF_PEERS)
+                    .choose_multiple(&mut OsRng::default(), midpoint_number_of_peers)
                 {
                     // Ensure this node is not connected to more than the permitted number of sync nodes.
                     if sync_nodes.contains(&peer_ip) && number_of_connected_sync_nodes >= 1 {
@@ -422,10 +428,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             let _ = handler.await;
                         });
                     }
-                }
-                // Request more peers if the number of connected peers is below the threshold.
-                for peer_ip in self.connected_peers().await.iter().choose_multiple(&mut OsRng::default(), 1) {
-                    self.send(*peer_ip, Message::PeerRequest).await;
                 }
             }
             PeersRequest::MessagePropagate(sender, message) => {
@@ -523,22 +525,12 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 self.connected_peers.write().await.remove(&peer_ip);
                 // Add an entry for this `Peer` in the candidate peers.
                 self.candidate_peers.write().await.insert(peer_ip);
-
-                // Remove an entry for this `Peer` from the seen blocks.
-                self.seen_outbound_blocks.write().await.remove(&peer_ip);
-                // Remove an entry for this `Peer` from the seen transactions.
-                self.seen_outbound_transactions.write().await.remove(&peer_ip);
             }
             PeersRequest::PeerRestricted(peer_ip) => {
                 // Remove an entry for this `Peer` in the connected peers, if it exists.
                 self.connected_peers.write().await.remove(&peer_ip);
                 // Add an entry for this `Peer` in the restricted peers.
                 self.restricted_peers.write().await.insert(peer_ip, Instant::now());
-
-                // Remove an entry for this `Peer` from the seen blocks.
-                self.seen_outbound_blocks.write().await.remove(&peer_ip);
-                // Remove an entry for this `Peer` from the seen transactions.
-                self.seen_outbound_transactions.write().await.remove(&peer_ip);
             }
             PeersRequest::SendPeerResponse(recipient) => {
                 // Send a `PeerResponse` message.
@@ -577,85 +569,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Sends the given message to specified peer.
     ///
-    async fn send(&self, peer: SocketAddr, mut message: Message<N, E>) {
+    async fn send(&self, peer: SocketAddr, message: Message<N, E>) {
         let target_peer = self.connected_peers.read().await.get(&peer).cloned();
         match target_peer {
             Some((_, outbound)) => {
-                // Ensure sufficient time has passed before needing to send the message.
-                let is_ready_to_send = match message {
-                    Message::Ping(_, _, _, _, ref mut data) => {
-                        let block_header = if let Data::Object(block_header) = data {
-                            block_header
-                        } else {
-                            panic!("Logic error: the block header shouldn't have been serialized yet.");
-                        };
-
-                        // Perform non-blocking serialisation of the block header.
-                        let serialized_header = bincode::serialize(&block_header).expect("Block header serialization is bugged");
-                        let _ = std::mem::replace(data, Data::Buffer(serialized_header));
-
-                        true
-                    }
-                    Message::UnconfirmedBlock(_, _, ref mut data) => {
-                        let block = if let Data::Object(block) = data {
-                            block
-                        } else {
-                            panic!("Logic error: the block shouldn't have been serialized yet.");
-                        };
-
-                        // Lock seen_outbound_blocks for further processing.
-                        let mut seen_outbound_blocks = self.seen_outbound_blocks.write().await;
-
-                        // Retrieve the last seen timestamp of this block for this peer.
-                        let seen_blocks = seen_outbound_blocks.entry(peer).or_insert_with(Default::default);
-                        let last_seen = seen_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
-                        let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
-
-                        // Update the timestamp for the peer and sent block.
-                        seen_blocks.insert(block.hash(), SystemTime::now());
-                        // Report the unconfirmed block height.
-                        if is_ready_to_send {
-                            trace!("Preparing to send 'UnconfirmedBlock {}' to {}", block.height(), peer);
-                        }
-
-                        // Perform non-blocking serialization of the block.
-                        let serialized_block = bincode::serialize(&block).expect("Block serialization is bugged");
-                        let _ = std::mem::replace(data, Data::Buffer(serialized_block));
-
-                        is_ready_to_send
-                    }
-                    Message::UnconfirmedTransaction(ref transaction) => {
-                        // Lock seen_outbound_transactions for further processing.
-                        let mut seen_outbound_transactions = self.seen_outbound_transactions.write().await;
-
-                        // Retrieve the last seen timestamp of this transaction for this peer.
-                        let seen_transactions = seen_outbound_transactions.entry(peer).or_insert_with(Default::default);
-                        let last_seen = seen_transactions
-                            .entry(transaction.transaction_id())
-                            .or_insert(SystemTime::UNIX_EPOCH);
-                        let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
-
-                        // Update the timestamp for the peer and sent transaction.
-                        seen_transactions.insert(transaction.transaction_id(), SystemTime::now());
-                        // Report the unconfirmed block height.
-                        if is_ready_to_send {
-                            trace!(
-                                "Preparing to send '{} {}' to {}",
-                                message.name(),
-                                transaction.transaction_id(),
-                                peer
-                            );
-                        }
-                        is_ready_to_send
-                    }
-                    _ => true,
-                };
-                // Send the message if it is ready.
-                if is_ready_to_send {
-                    if let Err(error) = outbound.send(message.clone()).await {
-                        trace!("Outbound channel failed: {}", error);
-                        self.connected_peers.write().await.remove(&peer);
-                    }
+                if let Err(error) = outbound.send(message).await {
+                    trace!("Outbound channel failed: {}", error);
+                    self.connected_peers.write().await.remove(&peer);
                 }
             }
             None => warn!("Attempted to send to a non-connected peer {}", peer),
@@ -719,6 +639,10 @@ struct Peer<N: Network, E: Environment> {
     seen_inbound_blocks: HashMap<N::BlockHash, SystemTime>,
     /// The map of transaction IDs to their last seen timestamp.
     seen_inbound_transactions: HashMap<N::TransactionID, SystemTime>,
+    /// The map of peers to a map of block hashes to their last seen timestamp.
+    seen_outbound_blocks: HashMap<N::BlockHash, SystemTime>,
+    /// The map of peers to a map of transaction IDs to their last seen timestamp.
+    seen_outbound_transactions: HashMap<N::TransactionID, SystemTime>,
 }
 
 impl<N: Network, E: Environment> Peer<N, E> {
@@ -736,11 +660,20 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let mut outbound_socket = Framed::new(stream, Message::<N, E>::PeerRequest);
 
         // Perform the handshake before proceeding.
-        let (peer_ip, peer_nonce) = Peer::handshake(&mut outbound_socket, local_ip, local_nonce, connected_nonces).await?;
+        let (peer_ip, peer_nonce, node_type, status) = Peer::handshake(
+            &mut outbound_socket,
+            local_ip,
+            local_nonce,
+            local_status,
+            ledger_reader.latest_cumulative_weight(),
+            connected_nonces,
+        )
+        .await?;
 
         // Send the first `Ping` message to the peer.
         let message = Message::Ping(
             E::MESSAGE_VERSION,
+            E::MAXIMUM_FORK_DEPTH,
             E::NODE_TYPE,
             local_status.get(),
             ledger_reader.latest_block_hash(),
@@ -760,14 +693,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
         Ok(Peer {
             listener_ip: peer_ip,
             version: 0,
-            node_type: NodeType::Client,
-            status: Status::new(),
+            node_type,
+            status,
             block_header: N::genesis_block().header().clone(),
             last_seen: Instant::now(),
             outbound_socket,
             outbound_handler,
             seen_inbound_blocks: Default::default(),
             seen_inbound_transactions: Default::default(),
+            seen_outbound_blocks: Default::default(),
+            seen_outbound_transactions: Default::default(),
         })
     }
 
@@ -788,39 +723,72 @@ impl<N: Network, E: Environment> Peer<N, E> {
         outbound_socket: &mut Framed<TcpStream, Message<N, E>>,
         local_ip: SocketAddr,
         local_nonce: u64,
+        local_status: &Status,
+        local_cumulative_weight: u128,
         connected_nonces: &[u64],
-    ) -> Result<(SocketAddr, u64)> {
+    ) -> Result<(SocketAddr, u64, NodeType, Status)> {
         // Get the IP address of the peer.
         let mut peer_ip = outbound_socket.get_ref().peer_addr()?;
 
-        // TODO (howardwu): Consider changing this to a random challenge height.
-        //  The tradeoff is that checking genesis ensures your peer is starting at the same genesis block.
-        //  Choosing a random height also requires knowing upfront the height of the peer.
-        //  As such, leaving it at the genesis block height may be the best option here.
         // Retrieve the genesis block header.
         let genesis_header = N::genesis_block().header();
-        let genesis_height = N::genesis_block().height();
 
         // Send a challenge request to the peer.
-        let message = Message::<N, E>::ChallengeRequest(E::MESSAGE_VERSION, local_ip.port(), local_nonce, genesis_height);
+        let message = Message::<N, E>::ChallengeRequest(
+            E::MESSAGE_VERSION,
+            E::MAXIMUM_FORK_DEPTH,
+            E::NODE_TYPE,
+            local_status.get(),
+            local_ip.port(),
+            local_nonce,
+            local_cumulative_weight,
+        );
         trace!("Sending '{}-A' to {}", message.name(), peer_ip);
         outbound_socket.send(message).await?;
 
         // Wait for the counterparty challenge request to come in.
-        let peer_nonce = match outbound_socket.next().await {
+        let (peer_nonce, node_type, status) = match outbound_socket.next().await {
             Some(Ok(message)) => {
                 // Process the message.
                 trace!("Received '{}-B' from {}", message.name(), peer_ip);
                 match message {
-                    Message::ChallengeRequest(version, listener_port, peer_nonce, block_height) => {
+                    Message::ChallengeRequest(
+                        version,
+                        fork_depth,
+                        node_type,
+                        peer_status,
+                        listener_port,
+                        peer_nonce,
+                        peer_cumulative_weight,
+                    ) => {
                         // Ensure the message protocol version is not outdated.
                         if version < E::MESSAGE_VERSION {
                             warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                             return Err(anyhow!("Dropping {} on version {} (outdated)", peer_ip, version));
                         }
-                        // Ensure the block height is correct.
-                        if block_height != genesis_height {
-                            return Err(anyhow!("Incorrect block height of {}", block_height));
+                        // Ensure the maximum fork depth is correct.
+                        if fork_depth != E::MAXIMUM_FORK_DEPTH {
+                            return Err(anyhow!(
+                                "Dropping {} for an incorrect maximum fork depth of {}",
+                                peer_ip,
+                                fork_depth
+                            ));
+                        }
+                        // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
+                        if E::NODE_TYPE != NodeType::Sync
+                            && local_status.is_syncing()
+                            && node_type == NodeType::Sync
+                            && local_cumulative_weight > peer_cumulative_weight
+                        {
+                            return Err(anyhow!("Dropping {} as this node is ahead", peer_ip));
+                        }
+                        // If this node is a sync node, the peer is not a sync node and is syncing, and the peer is ahead, proceed to disconnect.
+                        if E::NODE_TYPE == NodeType::Sync
+                            && node_type != NodeType::Sync
+                            && peer_status == State::Syncing
+                            && peer_cumulative_weight > local_cumulative_weight
+                        {
+                            return Err(anyhow!("Dropping {} as this node is ahead", peer_ip));
                         }
                         // Ensure the peer is not this node.
                         if local_nonce == peer_nonce {
@@ -836,7 +804,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             peer_ip.set_port(listener_port);
                             // Ensure the claimed listener port is open.
                             let stream =
-                                match timeout(Duration::from_secs(E::CONNECTION_TIMEOUT_IN_SECS), TcpStream::connect(peer_ip)).await {
+                                match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await {
                                     Ok(stream) => stream,
                                     Err(error) => return Err(anyhow!("Unable to reach '{}': '{:?}'", peer_ip, error)),
                                 };
@@ -850,7 +818,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                         trace!("Sending '{}-B' to {}", message.name(), peer_ip);
                         outbound_socket.send(message).await?;
 
-                        peer_nonce
+                        // Initialize a status variable.
+                        let status = Status::new();
+                        status.update(peer_status);
+
+                        (peer_nonce, node_type, status)
                     }
                     message => {
                         return Err(anyhow!(
@@ -876,8 +848,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                     Message::ChallengeResponse(block_header) => {
                         // Perform the deferred non-blocking deserialization of the block header.
                         let block_header = block_header.deserialize().await?;
-                        match block_header.height() == genesis_height && &block_header == genesis_header {
-                            true => Ok((peer_ip, peer_nonce)),
+                        match &block_header == genesis_header {
+                            true => Ok((peer_ip, peer_nonce, node_type, status)),
                             false => Err(anyhow!("Challenge response from {} failed, received '{}'", peer_ip, block_header)),
                         }
                     }
@@ -953,15 +925,74 @@ impl<N: Network, E: Environment> Peer<N, E> {
             loop {
                 tokio::select! {
                     // Message channel is routing a message outbound to the peer.
-                    Some(message) = peer.outbound_handler.recv() => {
+                    Some(mut message) = peer.outbound_handler.recv() => {
                         // Disconnect if the peer has not communicated back within the predefined time.
                         if peer.last_seen.elapsed() > Duration::from_secs(E::RADIO_SILENCE_IN_SECS) {
                             warn!("Peer {} has not communicated in {} seconds", peer_ip, peer.last_seen.elapsed().as_secs());
                             break;
                         } else {
-                            // Route a message to the peer.
-                            if let Err(error) = peer.send(message).await {
-                                warn!("[OutboundRouter] {}", error);
+                            // Ensure sufficient time has passed before needing to send the message.
+                            let is_ready_to_send = match message {
+                                Message::Ping(_, _, _, _, _, ref mut data) => {
+                                    // Perform non-blocking serialisation of the block header.
+                                    let serialized_header = Data::serialize(data.clone()).await.expect("Block header serialization is bugged");
+                                    let _ = std::mem::replace(data, Data::Buffer(serialized_header));
+
+                                    true
+                                }
+                                Message::UnconfirmedBlock(_, _, ref mut data) => {
+                                    let block = if let Data::Object(block) = data {
+                                        block
+                                    } else {
+                                        panic!("Logic error: the block shouldn't have been serialized yet.");
+                                    };
+
+                                    // Retrieve the last seen timestamp of this block for this peer.
+                                    let last_seen = peer.seen_outbound_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
+                                    let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+
+                                    // Update the timestamp for the peer and sent block.
+                                    peer.seen_outbound_blocks.insert(block.hash(), SystemTime::now());
+                                    // Report the unconfirmed block height.
+                                    if is_ready_to_send {
+                                        trace!("Preparing to send 'UnconfirmedBlock {}' to {}", block.height(), peer_ip);
+                                    }
+
+                                    // Perform non-blocking serialization of the block.
+                                    let serialized_block = Data::serialize(data.clone()).await.expect("Block serialization is bugged");
+                                    let _ = std::mem::replace(data, Data::Buffer(serialized_block));
+
+                                    is_ready_to_send
+                                }
+                                Message::UnconfirmedTransaction(ref transaction) => {
+                                    // Retrieve the last seen timestamp of this transaction for this peer.
+                                    let last_seen = peer
+                                        .seen_outbound_transactions
+                                        .entry(transaction.transaction_id())
+                                        .or_insert(SystemTime::UNIX_EPOCH);
+                                    let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+
+                                    // Update the timestamp for the peer and sent transaction.
+                                    peer.seen_outbound_transactions.insert(transaction.transaction_id(), SystemTime::now());
+                                    // Report the unconfirmed block height.
+                                    if is_ready_to_send {
+                                        trace!(
+                                            "Preparing to send '{} {}' to {}",
+                                            message.name(),
+                                            transaction.transaction_id(),
+                                            peer_ip
+                                        );
+                                    }
+                                    is_ready_to_send
+                                }
+                                _ => true,
+                            };
+                            // Send the message if it is ready.
+                            if is_ready_to_send {
+                                // Route a message to the peer.
+                                if let Err(error) = peer.send(message).await {
+                                    warn!("[OutboundRouter] {}", error);
+                                }
                             }
                         }
                     }
@@ -1045,18 +1076,26 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[PeerResponse] {}", error);
                                     }
                                 }
-                                Message::Ping(version, node_type, status, block_hash, block_header) => {
+                                Message::Ping(version, fork_depth, node_type, status, block_hash, block_header) => {
                                     // Ensure the message protocol version is not outdated.
                                     if version < E::MESSAGE_VERSION {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
                                         break;
                                     }
-
+                                    // Ensure the maximum fork depth is correct.
+                                    if fork_depth != E::MAXIMUM_FORK_DEPTH {
+                                        warn!("Dropping {} for an incorrect maximum fork depth of {}", peer_ip, fork_depth);
+                                        break;
+                                    }
                                     // Perform the deferred non-blocking deserialization of the block header.
                                     match block_header.deserialize().await {
                                         Ok(block_header) => {
-                                            // If the peer is a sync node, and this node is ahead, proceed to disconnect.
-                                            if node_type == NodeType::Sync && ledger_reader.latest_block_height() > block_header.height() {
+                                            // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
+                                            if E::NODE_TYPE != NodeType::Sync
+                                                && local_status.is_syncing()
+                                                && node_type == NodeType::Sync
+                                                && ledger_reader.latest_cumulative_weight() > block_header.cumulative_weight()
+                                            {
                                                 trace!("Disconnecting from {} (ahead of sync node)", peer_ip);
                                                 break;
                                             }
@@ -1110,7 +1149,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         let latest_block_header = ledger_reader.latest_block_header();
 
                                         // Send a `Ping` request to the peer.
-                                        let message = Message::Ping(E::MESSAGE_VERSION, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
+                                        let message = Message::Ping(E::MESSAGE_VERSION, E::MAXIMUM_FORK_DEPTH, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }
@@ -1119,7 +1158,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 Message::UnconfirmedBlock(block_height, block_hash, block) => {
                                     // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
                                     let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
-                                    if frequency >= 5 {
+                                    if frequency >= 10 {
                                         warn!("Dropping {} for spamming unconfirmed blocks (frequency = {})", peer_ip, frequency);
                                         // Send a `PeerRestricted` message.
                                         if let Err(error) = peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
@@ -1136,11 +1175,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     peer.seen_inbound_blocks.insert(block_hash, SystemTime::now());
 
                                     // Ensure the unconfirmed block is at least within 2 blocks of the latest block height,
-                                    // and no more that 3 blocks ahead of the latest block height.
+                                    // and no more that 2 blocks ahead of the latest block height.
                                     // If it is stale, skip the routing of this unconfirmed block to the ledger.
                                     let latest_block_height = ledger_reader.latest_block_height();
                                     let lower_bound = latest_block_height.saturating_sub(2);
-                                    let upper_bound = latest_block_height.saturating_add(3);
+                                    let upper_bound = latest_block_height.saturating_add(2);
                                     let is_within_range = block_height >= lower_bound && block_height <= upper_bound;
 
                                     // Ensure the node is not peering.

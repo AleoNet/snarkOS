@@ -24,7 +24,7 @@ use crate::{
     Peers,
     ProverRouter,
 };
-use snarkvm::dpc::Network;
+use snarkvm::dpc::{MemoryPool, Network};
 
 use hyper::{
     body::HttpBody,
@@ -36,7 +36,7 @@ use json_rpc_types as jrt;
 use jsonrpc_core::{Metadata, Params};
 use serde::{Deserialize, Serialize};
 use std::{convert::Infallible, net::SocketAddr, sync::Arc};
-use tokio::sync::oneshot;
+use tokio::sync::{oneshot, RwLock};
 
 /// Defines the authentication format for accessing private endpoints on the RPC server.
 #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -91,9 +91,10 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
     peers: &Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
     prover_router: ProverRouter<N>,
+    memory_pool: Arc<RwLock<MemoryPool<N>>>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = RpcCredentials { username, password };
-    let rpc_impl = RpcImpl::new(credentials, status.clone(), peers.clone(), ledger, prover_router);
+    let rpc_impl = RpcImpl::new(credentials, status.clone(), peers.clone(), ledger, prover_router, memory_pool);
 
     let service = make_service_fn(move |conn: &AddrStream| {
         let caller = conn.remote_addr();
@@ -276,6 +277,10 @@ async fn handle_rpc<N: Network, E: Environment>(
                 jrt::Response::error(jrt::Version::V2, err, req.id.clone())
             }
         },
+        "getblocktemplate" => {
+            let result = rpc.get_block_template().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
         "getblocktransactions" => match serde_json::from_value::<u32>(params.remove(0)) {
             Ok(height) => {
                 let result = rpc.get_block_transactions(height).await.map_err(convert_crate_err);
@@ -292,6 +297,10 @@ async fn handle_rpc<N: Network, E: Environment>(
         }
         "getledgerproof" => {
             let result = rpc.get_ledger_proof(params.remove(0)).await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
+        "getmemorypool" => {
+            let result = rpc.get_memory_pool().await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "gettransaction" => {
@@ -410,7 +419,6 @@ fn result_to_response<T: Serialize>(
     match result {
         Ok(res) => {
             let result = serde_json::to_value(&res).unwrap_or_default();
-
             jrt::Response::result(jrt::Version::V2, result, request.id.clone())
         }
         Err(err) => jrt::Response::error(jrt::Version::V2, err, request.id.clone()),
@@ -420,7 +428,7 @@ fn result_to_response<T: Serialize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Client;
+    use crate::{helpers::State, ledger::Ledger, Client, Prover};
 
     use crate::helpers::Tasks;
     use snarkos_storage::{
@@ -440,7 +448,6 @@ mod tests {
         path::{Path, PathBuf},
         sync::atomic::AtomicBool,
     };
-    use tokio::sync::mpsc;
 
     fn temp_dir() -> std::path::PathBuf {
         tempfile::tempdir().expect("Failed to open temporary directory").into_path()
@@ -449,11 +456,6 @@ mod tests {
     /// Returns a dummy caller IP address.
     fn caller() -> SocketAddr {
         "0.0.0.0:3030".to_string().parse().unwrap()
-    }
-
-    /// Initializes a new instance of the `Peers` struct.
-    async fn peers<N: Network, E: Environment>() -> Arc<Peers<N, E>> {
-        Peers::new(&mut Tasks::new(), "0.0.0.0:4130".parse().unwrap(), None, &Status::new()).await
     }
 
     /// Initializes a new instance of the ledger state.
@@ -470,12 +472,48 @@ mod tests {
             username: "root".to_string(),
             password: "pass".to_string(),
         };
-        let ledger = Arc::new(new_ledger_state::<N, S, P>(path));
 
-        // Create a dummy mpsc channel for Prover requests. todo (@collinc97): only get requests will work until this is changed
-        let (prover_router, _prover_handler) = mpsc::channel(1024);
+        // Derive the storage paths.
+        let (ledger_path, prover_path) = match &path {
+            Some(p) => (p.as_ref().to_path_buf(), temp_dir()),
+            None => (temp_dir(), temp_dir()),
+        };
 
-        RpcImpl::<N, E>::new(credentials, Status::new(), peers::<N, E>().await, ledger, prover_router)
+        // Initialize the node.
+        let local_ip: SocketAddr = "0.0.0.0:8888".parse().expect("Failed to parse ip");
+
+        // Initialize the status indicator.
+        let status = Status::new();
+        status.update(State::Ready);
+
+        // Initialize the terminator bit.
+        let terminator = Arc::new(AtomicBool::new(false));
+        // Initialize the tasks handler.
+        let mut tasks = Tasks::new();
+
+        // Initialize a new instance for managing peers.
+        let peers = Peers::new(&mut tasks, local_ip, None, &status).await;
+        // Initialize a new instance for managing the ledger.
+        let ledger = Ledger::<N, E>::open::<S, _>(&mut tasks, &ledger_path, &status, &terminator, peers.router())
+            .await
+            .expect("Failed to initialize ledger");
+
+        // Initialize a new instance for managing the prover.
+        let prover = Prover::open::<S, _>(
+            &mut tasks,
+            &prover_path,
+            None,
+            local_ip,
+            &status,
+            &terminator,
+            peers.router(),
+            ledger.reader(),
+            ledger.router(),
+        )
+        .await
+        .expect("Failed to initialize prover");
+
+        RpcImpl::<N, E>::new(credentials, status, peers, ledger.reader(), prover.router(), prover.memory_pool())
     }
 
     /// Deserializes a rpc response into the given type.
@@ -904,6 +942,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_get_block_template() {
+        // Initialize a new RPC.
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+
+        // Initialize the expected block template values.
+        let expected_previous_block_hash = Testnet2::genesis_block().hash().to_string();
+        let expected_block_height = 1;
+        let expected_ledger_root = rpc.latest_ledger_root().await.unwrap().to_string();
+        let expected_transactions = Vec::<serde_json::Value>::new();
+        let expected_block_reward = Block::<Testnet2>::block_reward(1).0;
+
+        // Initialize a new request that calls the `getblocktemplate` endpoint.
+        let request = Request::new(Body::from(
+            r#"{
+	"jsonrpc":"2.0",
+	"id": "1",
+	"method": "getblocktemplate"
+}"#,
+        ));
+
+        // Send the request to the RPC.
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test RPC failed to process request");
+
+        // Process the response into a ledger root.
+        let actual: serde_json::Value = process_response(response).await;
+
+        // Check the block template state.
+        assert_eq!(expected_previous_block_hash, actual["previous_block_hash"]);
+        assert_eq!(expected_block_height, actual["block_height"]);
+        assert_eq!(expected_ledger_root, actual["ledger_root"].as_str().unwrap());
+        assert_eq!(&expected_transactions, actual["transactions"].as_array().unwrap());
+        assert_eq!(expected_block_reward, actual["coinbase_reward"].as_i64().unwrap());
+    }
+
+    #[tokio::test]
     async fn test_get_block_transactions() {
         // Initialize a new RPC.
         let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
@@ -1049,6 +1124,7 @@ mod tests {
         let expected = serde_json::json!({
             "candidate_peers": Vec::<SocketAddr>::new(),
             "connected_peers": Vec::<SocketAddr>::new(),
+            "latest_block_hash": Testnet2::genesis_block().hash(),
             "latest_block_height": 0,
             "latest_cumulative_weight": 0,
             "number_of_candidate_peers": 0,
@@ -1079,7 +1155,7 @@ mod tests {
 
         println!("get_node_state: {:?}", actual);
 
-        // Check the ledger root.
+        // Check the node state.
         assert_eq!(expected, actual);
     }
 
@@ -1239,5 +1315,67 @@ mod tests {
         // Check the transaction id.
         let expected = transaction.transaction_id();
         assert_eq!(expected, actual);
+    }
+
+    #[tokio::test]
+    async fn test_get_memory_pool() {
+        let mut rng = ChaChaRng::seed_from_u64(123456789);
+
+        // Initialize a new RPC.
+        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+
+        // Send a transaction to the node.
+
+        // Initialize a new account.
+        let account = Account::<Testnet2>::new(&mut rng);
+        let address = account.address();
+
+        // Initialize a new transaction.
+        let (transaction, _) =
+            Transaction::<Testnet2>::new_coinbase(address, AleoAmount(0), true, &mut rng).expect("Failed to create a coinbase transaction");
+
+        // Initialize a new request that calls the `sendtransaction` endpoint.
+        let request = Request::new(Body::from(format!(
+            "{{
+	\"jsonrpc\": \"2.0\",
+	\"id\": \"1\",
+	\"method\": \"sendtransaction\",
+	\"params\": [
+        \"{}\"
+    ]
+}}",
+            hex::encode(transaction.to_bytes_le().unwrap())
+        )));
+
+        // Send the request to the RPC.
+        let _response = handle_rpc(caller(), rpc.clone(), request)
+            .await
+            .expect("Test RPC failed to process request");
+
+        // Give the node some time to process the transaction.
+        tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+
+        // Fetch the transaction from the memory_pool.
+
+        // Initialize a new request that calls the `getmemorypool` endpoint.
+        let request = Request::new(Body::from(
+            r#"{
+	"jsonrpc":"2.0",
+	"id": "1",
+	"method": "getmemorypool"
+}"#,
+        ));
+
+        // Send the request to the RPC.
+        let response = handle_rpc(caller(), rpc, request)
+            .await
+            .expect("Test RPC failed to process request");
+
+        // Process the response into transactions.
+        let actual: Vec<Transaction<Testnet2>> = process_response(response).await;
+
+        // Check the transactions.
+        let expected = vec![transaction];
+        assert_eq!(*expected, actual);
     }
 }
