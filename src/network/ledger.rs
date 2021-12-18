@@ -858,8 +858,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 return;
             }
 
-            // Determine the latest common ancestor.
-            let (latest_common_ancestor, ledger_reverted) =
+            // If the ledger is on a fork, it might need to revert.
+            let (latest_common_ancestor, ledger_needs_reverting) =
                 // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
                 if !is_fork {
                     // Continue to sync from the latest block height of this ledger, if the peer is honest.
@@ -874,20 +874,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     if latest_block_height.saturating_sub(maximum_common_ancestor) <= E::MAXIMUM_FORK_DEPTH {
                         info!("Discovered a canonical chain from {} with common ancestor {} and cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
                         // If the latest block is the same as the maximum common ancestor, do not revert.
-                        if latest_block_height != maximum_common_ancestor && !self.revert_to_block_height(maximum_common_ancestor).await {
-                            return;
-                        }
-                        (maximum_common_ancestor, true)
+                        (maximum_common_ancestor, latest_block_height != maximum_common_ancestor)
                     }
                     // Case 2(c)(b) - If the common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
-                    else
-                    {
-                        // Ensure that the first deviating locator exists.
-                        let first_deviating_locator = match first_deviating_locator {
-                            Some(locator) => locator,
-                            None => return,
-                        };
-
+                    else if let Some(first_deviating_locator) = first_deviating_locator {
                         // Case 2(c)(b)(a) - Check if the real common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
                         // If this peer is outside of the fork range of this ledger, proceed to disconnect from the peer.
                         if latest_block_height.saturating_sub(first_deviating_locator) >= E::MAXIMUM_FORK_DEPTH {
@@ -899,13 +889,26 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         // Revert to the common ancestor anyways.
                         else {
                             info!("Discovered a potentially better canonical chain from {} with common ancestor {} and cumulative weight {}", peer_ip, maximum_common_ancestor, maximum_cumulative_weight);
-                            match self.revert_to_block_height(maximum_common_ancestor).await {
-                                true => (maximum_common_ancestor, true),
-                                false => return
-                            }
+                            (maximum_common_ancestor, true)
                         }
                     }
+                    // The first deviating locator didn't exist; abort.
+                    else {
+                        return;
+                    }
                 };
+
+            // Revert the ledger if needed.
+            let ledger_reverted = if ledger_needs_reverting {
+                // If the revert operation fails, abort.
+                if !self.revert_to_block_height(maximum_common_ancestor).await {
+                    return;
+                } else {
+                    true
+                }
+            } else {
+                false
+            };
 
             // TODO (howardwu): Ensure the start <= end.
             // Determine the start and end block heights to request.
