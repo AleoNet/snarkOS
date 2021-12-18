@@ -3,9 +3,9 @@ Returns the block hash for the given block height, if it exists in the canonical
 
 ### Arguments
 
-|    Parameter   |  Type  | Required |                  Description                 |
+|   Parameter    |  Type  | Required |                 Description                  |
 |:--------------:|:------:|:--------:|:--------------------------------------------:|
-| `block_height` | number |    Yes   | The block height of the requested block hash |
+| `block_height` | number |   Yes    | The block height of the requested block hash |
 
 ### Response
 
@@ -15,14 +15,14 @@ Returns the block hash for the given block height, if it exists in the canonical
 
 ### Example Request
 ```ignore
-curl --data-binary '{"jsonrpc": "2.0", "id":"documentation", "method": "getblockhash", "params": [100] }' -H 'content-type: application/json' http://127.0.0.1:3030/
+curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "getblockhash", "params": [0] }' -H 'content-type: application/json' http://127.0.0.1:3030/
 ```
 
 ### Example Response
 ```json
 {
     "jsonrpc": "2.0",
-    "result": "ab1mkgcrwag6avnp0a0ntxr9y4lt7y2fq9t0tqglkkuysk6jg2rhqrqa9788l",
-    "id": 1
+    "result": "ab18946qsq2ppqylhk03ftpg7wjuknp4gwpqz0hhp8hl2ahn94sg5zqxd8qw8",
+    "id": "1"
 }
 ```

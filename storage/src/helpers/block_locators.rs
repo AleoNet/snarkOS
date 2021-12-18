@@ -27,7 +27,7 @@ use snarkvm::{
     },
 };
 
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::prelude::*;
 use serde::{de, ser, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use std::{collections::BTreeMap, ops::Deref};
 
@@ -65,7 +65,7 @@ impl<N: Network> BlockLocators<N> {
     #[inline]
     pub fn get_cumulative_weight(&self, block_height: u32) -> Option<u128> {
         match self.block_locators.get(&block_height) {
-            Some((_, header)) => header.as_ref().and_then(|header| Some(header.cumulative_weight())),
+            Some((_, header)) => header.as_ref().map(|header| header.cumulative_weight()),
             _ => None,
         }
     }
@@ -76,7 +76,6 @@ impl<N: Network> FromBytes for BlockLocators<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let num_locators: u32 = FromBytes::read_le(&mut reader)?;
 
-        let mut block_locators = BTreeMap::new();
         let mut block_headers_bytes = Vec::with_capacity(num_locators as usize);
 
         for _ in 0..num_locators {
@@ -87,25 +86,16 @@ impl<N: Network> FromBytes for BlockLocators<N> {
             if header_exists {
                 let mut buffer = vec![0u8; N::HEADER_SIZE_IN_BYTES];
                 reader.read_exact(&mut buffer)?;
-                block_headers_bytes.push((height, buffer));
-            };
-
-            block_locators.insert(height, (hash, None));
-        }
-
-        let block_headers = block_headers_bytes
-            .par_iter()
-            .flat_map(|(height, bytes)| match !bytes.is_empty() {
-                true => Some((height, BlockHeader::<N>::read_le(&bytes[..]).unwrap())),
-                false => None,
-            })
-            .collect::<Vec<_>>();
-
-        for (height, block_header) in block_headers.into_iter() {
-            if let Some((_, header)) = block_locators.get_mut(height) {
-                *header = Some(block_header);
+                block_headers_bytes.push((height, hash, Some(buffer)));
+            } else {
+                block_headers_bytes.push((height, hash, None));
             }
         }
+
+        let block_locators = block_headers_bytes
+            .into_par_iter()
+            .map(|(height, hash, bytes)| (height, (hash, bytes.map(|bytes| BlockHeader::<N>::read_le(&bytes[..]).unwrap()))))
+            .collect::<BTreeMap<_, (_, _)>>();
 
         Ok(Self::from(block_locators))
     }

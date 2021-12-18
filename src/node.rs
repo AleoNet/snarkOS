@@ -31,6 +31,7 @@ use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use anyhow::{anyhow, Result};
 use colored::*;
+use crossterm::tty::IsTty;
 use std::{io, net::SocketAddr, path::PathBuf, str::FromStr};
 use structopt::StructOpt;
 use tokio::{signal, sync::mpsc, task};
@@ -139,7 +140,7 @@ impl Node {
             }
             _ => {
                 println!("{}", crate::display::welcome_message());
-                println!("Starting a client node on {}.", N::NETWORK_NAME);
+                println!("Starting a {} node on {}.", E::NODE_TYPE, N::NETWORK_NAME);
                 println!("{}", crate::display::notification_message::<N>(None));
                 None
             }
@@ -195,7 +196,7 @@ pub fn initialize_logger(verbosity: u8, log_sender: Option<mpsc::Sender<Vec<u8>>
     // Initialize tracing.
     let _ = tracing_subscriber::fmt()
         .with_env_filter(filter)
-        .with_ansi(log_sender.is_none())
+        .with_ansi(log_sender.is_none() && io::stdout().is_tty())
         .with_writer(move || LogWriter::new(&log_sender))
         .with_target(verbosity == 3)
         .try_init();
