@@ -832,14 +832,16 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 first_deviating_locator,
             ) {
                 // Abort from the block request update.
-                BlockRequestHandler::Abort => return,
+                BlockRequestHandler::Abort(_) => return,
                 // Disconnect from the peer if it is misbehaving and proceed to abort.
-                BlockRequestHandler::AbortAndDisconnect(ref reason) => {
+                BlockRequestHandler::AbortAndDisconnect(_, ref reason) => {
                     self.disconnect(peer_ip, reason).await;
                     return;
                 }
                 // Proceed to send block requests to a connected peer, if the ledger is out of date.
-                BlockRequestHandler::Proceed(proceed) => (proceed.start_block_height, proceed.end_block_height, proceed.ledger_is_on_fork),
+                BlockRequestHandler::Proceed(_, proceed) => {
+                    (proceed.start_block_height, proceed.end_block_height, proceed.ledger_is_on_fork)
+                }
             };
 
             // Revert the ledger, if it is on a fork.
