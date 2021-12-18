@@ -341,7 +341,7 @@ mod tests {
                 Client::<Testnet2>::MAXIMUM_BLOCK_REQUEST,
             );
             let expected_start_block_height = latest_block_height + 1;
-            let expected_end_block_height = expected_start_block_height + expected_number_of_block_requests;
+            let expected_end_block_height = expected_start_block_height + expected_number_of_block_requests - 1;
 
             // Validate the output.
             assert_eq!(
