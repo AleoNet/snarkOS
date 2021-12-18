@@ -156,7 +156,8 @@ pub(crate) enum BlockRequestHandler {
 }
 
 ///
-/// Determines the appropriate block request update operation, based on the following cases:
+/// Determines the appropriate block request update operation,
+/// based on the cases as described in the `Case` enum.
 ///
 pub(crate) fn handle_block_requests<N: Network, E: Environment>(
     latest_block_height: u32,
