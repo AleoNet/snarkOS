@@ -154,7 +154,7 @@ impl<N: Network> LedgerState<N> {
         assert_eq!(count, latest_block_height.saturating_add(1));
 
         // Iterate and append each block hash from genesis to tip to validate ledger state.
-        const INCREMENT: u32 = 500;
+        const INCREMENT: u32 = 1000;
         let mut start_block_height = 0u32;
         while start_block_height <= latest_block_height {
             // Compute the end block height (inclusive) for this iteration.
@@ -964,7 +964,7 @@ impl<N: Network> LedgerState<N> {
             // Acquire the write lock for the latest block hashes and block headers.
             let mut latest_block_hashes_and_headers = self.latest_block_hashes_and_headers.write();
 
-            // Upon success, clear the latest ledger state.
+            // Upon success, clear the latest block hashes and block headers.
             latest_block_hashes_and_headers.clear();
 
             // Add the latest block hashes and block headers.

@@ -858,8 +858,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 return;
             }
 
-            // If the ledger is on a fork, it might need to revert.
-            let (latest_common_ancestor, ledger_needs_reverting) =
+            // Determine the latest common ancestor, and whether the ledger is on a fork & needs to revert.
+            let (latest_common_ancestor, ledger_is_on_fork) =
                 // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
                 if !is_fork {
                     // Continue to sync from the latest block height of this ledger, if the peer is honest.
@@ -892,23 +892,21 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                             (maximum_common_ancestor, true)
                         }
                     }
-                    // The first deviating locator didn't exist; abort.
+                    // The first deviating locator does not exist; abort.
                     else {
+                        warn!("Peer {} is missing first deviating locator", peer_ip);
                         return;
                     }
                 };
 
-            // Revert the ledger if needed.
-            let ledger_reverted = if ledger_needs_reverting {
+            // Revert the ledger, if it is on a fork.
+            if ledger_is_on_fork {
                 // If the revert operation fails, abort.
                 if !self.revert_to_block_height(maximum_common_ancestor).await {
+                    warn!("Ledger failed to revert to block {}", maximum_common_ancestor);
                     return;
-                } else {
-                    true
                 }
-            } else {
-                false
-            };
+            }
 
             // TODO (howardwu): Ensure the start <= end.
             // Determine the start and end block heights to request.
@@ -942,8 +940,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Log each block request to ensure the peer responds with all requested blocks.
                 if let Some(locked_block_requests) = self.block_requests.write().await.get_mut(&peer_ip) {
                     for block_height in new_block_heights {
-                        // If the ledger was reverted, include the expected new block hash for the fork.
-                        match ledger_reverted {
+                        // If the ledger is on a fork and was reverted, include the expected new block hash for the fork.
+                        match ledger_is_on_fork {
                             true => {
                                 self.add_block_request(
                                     peer_ip,
