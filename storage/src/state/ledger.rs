@@ -464,15 +464,15 @@ impl<N: Network> LedgerState<N> {
         // Determine the number of latest block headers to include as block locators (linear).
         let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS, block_locator_height);
 
+        // Acquire the read lock for the latest block hashes and block headers.
+        let latest_block_hashes_and_headers = self.latest_block_hashes_and_headers.read();
+
         // Construct the list of block locator headers.
-        let block_locator_headers = self
-            .latest_block_hashes_and_headers
-            .read()
+        let block_locator_headers = latest_block_hashes_and_headers
             .asc_iter()
             .take(num_block_headers as usize)
             .cloned()
-            .map(|(hash, header)| (header.height(), (hash, Some(header))))
-            .collect::<Vec<_>>();
+            .map(|(hash, header)| (header.height(), (hash, Some(header))));
 
         // Decrement the block locator height by the number of block headers.
         block_locator_height -= num_block_headers;
@@ -480,7 +480,7 @@ impl<N: Network> LedgerState<N> {
         // Return the block locators if the locator has run out of blocks.
         if block_locator_height == 0 {
             // Initialize the list of block locators.
-            let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> = block_locator_headers.into_iter().collect();
+            let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> = block_locator_headers.collect();
             // Add the genesis locator.
             block_locators.insert(0, (self.get_block_hash(0)?, None));
 
@@ -504,7 +504,7 @@ impl<N: Network> LedgerState<N> {
 
         // Initialize the list of block locators.
         let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> =
-            block_locator_headers.into_iter().chain(block_locator_hashes).collect();
+            block_locator_headers.chain(block_locator_hashes).collect();
         // Add the genesis locator.
         block_locators.insert(0, (self.get_block_hash(0)?, None));
 
@@ -964,7 +964,7 @@ impl<N: Network> LedgerState<N> {
             // Acquire the write lock for the latest block hashes and block headers.
             let mut latest_block_hashes_and_headers = self.latest_block_hashes_and_headers.write();
 
-            // Upon success, clear the latest ledger state.
+            // Upon success, clear the latest block hashes and block headers.
             latest_block_hashes_and_headers.clear();
 
             // Add the latest block hashes and block headers.
