@@ -161,7 +161,7 @@ pub(crate) fn handle_block_requests<N: Network, E: Environment>(
     // Determine the latest common ancestor, and whether the ledger is on a fork & needs to revert.
     let (latest_common_ancestor, ledger_is_on_fork) =
         // Case 2(a) - Peer is malicious or thinks you are ahead. Both are issues, pick a different peer to sync with.
-        if let None = maximal_peer_is_on_fork {
+        if maximal_peer_is_on_fork.is_none() {
             return BlockRequestHandler::Abort;
         }
         // Case 2(b) - This ledger is not a fork of the peer, it is on the same canon chain.
