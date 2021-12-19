@@ -1187,7 +1187,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 Message::PoolRegister(address) => {
                                     if E::NODE_TYPE != NodeType::Operator {
                                         trace!("Skipping 'PoolRegister' from {}", peer_ip);
-                                    } else if let Err(error) = operator_router.send(OperatorRequest::GetBlockTemplate(peer_ip, address)).await {
+                                    } else if let Err(error) = operator_router.send(OperatorRequest::PoolRegister(peer_ip, address)).await {
                                         warn!("[PoolRegister] {}", error);
                                     }
                                 }

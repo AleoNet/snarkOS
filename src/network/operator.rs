@@ -32,7 +32,13 @@ use snarkvm::{algorithms::crh::sha256d_to_u64, dpc::prelude::*, utilities::ToByt
 
 use anyhow::Result;
 use rand::thread_rng;
-use std::{collections::HashMap, net::SocketAddr, path::Path, sync::Arc, time::Duration};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    path::Path,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 use tokio::{
     sync::{mpsc, oneshot, RwLock},
     task,
@@ -50,11 +56,14 @@ type OperatorHandler<N> = mpsc::Receiver<OperatorRequest<N>>;
 ///
 #[derive(Debug)]
 pub enum OperatorRequest<N: Network> {
+    /// PoolRegister := (peer_ip, worker_address)
+    PoolRegister(SocketAddr, Address<N>),
     /// ProposedBlock := (peer_ip, proposed_block, worker_address)
     ProposedBlock(SocketAddr, Block<N>, Address<N>),
-    /// GetBlockTemplate := (peer_ip, worker_address)
-    GetBlockTemplate(SocketAddr, Address<N>),
 }
+
+/// The predefined base share difficulty.
+const BASE_SHARE_DIFFICULTY: u64 = u64::MAX / 2u64.pow(8);
 
 ///
 /// An operator for a program on a specific network in the node server.
@@ -81,9 +90,8 @@ pub struct Operator<N: Network, E: Environment> {
     prover_router: ProverRouter<N>,
     /// The current block template that is being mined on by the operator.
     block_template: RwLock<Option<BlockTemplate<N>>>,
-    /// Peripheral information on each known prover.
-    /// WorkerInfo := (last_submitted, share_difficulty, shares_submitted_since_reset)
-    worker_info: RwLock<HashMap<Address<N>, (i64, u64, u32)>>,
+    /// A list of provers and their associated state := (last_submitted, share_difficulty, shares_submitted_since_reset)
+    provers: RwLock<HashMap<Address<N>, (Instant, u64, u32)>>,
 }
 
 impl<N: Network, E: Environment> Operator<N, E> {
@@ -114,7 +122,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
             ledger_router,
             prover_router,
             block_template: RwLock::new(None),
-            worker_info: RwLock::new(HashMap::new()),
+            provers: RwLock::new(HashMap::new()),
         });
 
         if E::NODE_TYPE == NodeType::Operator {
@@ -122,7 +130,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
             let operator_clone = operator.clone();
             let (router, handler) = oneshot::channel();
             tasks.append(task::spawn(async move {
-                // TODO (julesdesmit): add loop which retargets share difficulty.
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 // Asynchronously wait for a operator request.
@@ -143,6 +150,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                 let recipient = operator_clone
                     .address
                     .expect("A pool should have an available Aleo address at all times");
+                // TODO (julesdesmit): add loop which retargets share difficulty.
                 loop {
                     let mut block_template = operator_clone.block_template.write().await;
                     match &*block_template {
@@ -189,13 +197,33 @@ impl<N: Network, E: Environment> Operator<N, E> {
     }
 
     ///
-    /// Performs the given `request` to the pool.
+    /// Performs the given `request` to the operator.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
     pub(super) async fn update(&self, request: OperatorRequest<N>) {
         match request {
-            OperatorRequest::ProposedBlock(peer_ip, mut block, worker_address) => {
-                if let Some(current_template) = &*self.block_template.read().await {
+            OperatorRequest::PoolRegister(peer_ip, address) => {
+                if let Some(block_template) = &*self.block_template.read().await {
+                    // Ensure this prover exists in the list first, and retrieve their share difficulty.
+                    let share_difficulty = self
+                        .provers
+                        .write()
+                        .await
+                        .entry(address)
+                        .or_insert((Instant::now(), BASE_SHARE_DIFFICULTY, 0))
+                        .1;
+
+                    // Route a `PoolRequest` to the peer.
+                    let message = Message::PoolRequest(share_difficulty, Data::Object(block_template.clone()));
+                    if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
+                        warn!("[PoolRequest] {}", error);
+                    }
+                } else {
+                    warn!("[GetBlockTemplate] No current block template exists");
+                }
+            }
+            OperatorRequest::ProposedBlock(peer_ip, mut block, prover_address) => {
+                if let Some(block_template) = &*self.block_template.read().await {
                     // Check that the block is relevant.
                     if self.ledger_reader.latest_block_height().saturating_add(1) != block.height() {
                         warn!("[ProposedBlock] Peer {} sent a stale candidate block.", peer_ip);
@@ -238,27 +266,25 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                     let hash_difficulty = sha256d_to_u64(&proof_bytes);
                     let share_difficulty = {
-                        let mut info = self.worker_info.write().await;
-                        match info.get(&worker_address) {
+                        let mut provers = self.provers.write().await;
+                        match provers.get(&prover_address) {
                             Some((_, share_difficulty, _)) => *share_difficulty,
                             None => {
-                                let share_difficulty = current_template.difficulty_target().saturating_mul(50);
-                                info.insert(worker_address, (chrono::Utc::now().timestamp(), share_difficulty, 0));
-
-                                share_difficulty
+                                provers.insert(prover_address, (Instant::now(), BASE_SHARE_DIFFICULTY, 0));
+                                BASE_SHARE_DIFFICULTY
                             }
                         }
                     };
 
                     if hash_difficulty > share_difficulty {
-                        warn!("[ProposedBlock] faulty share submitted by {}", worker_address);
+                        warn!("[ProposedBlock] faulty share submitted by {}", prover_address);
                         return;
                     }
 
                     // Update the score for the worker.
                     // TODO: add round stuff
                     // TODO: ensure shares can not be resubmitted
-                    if let Err(error) = self.state.add_shares(block.height(), &worker_address, 1) {
+                    if let Err(error) = self.state.add_shares(block.height(), &prover_address, 1) {
                         warn!("[ProposedBlock] {}", error);
                     }
 
@@ -266,23 +292,23 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         "Operator has received valid share {} ({}) - {} / {}",
                         block.height(),
                         block.hash(),
-                        worker_address,
+                        prover_address,
                         peer_ip
                     );
 
                     {
-                        // Update info for this worker.
-                        let mut info = self.worker_info.write().await;
-                        let mut worker_info = *info.get_mut(&worker_address).expect("worker should have existing info");
-                        worker_info.0 = chrono::Utc::now().timestamp();
-                        worker_info.2 += 1;
-                        info.insert(worker_address, worker_info);
+                        // Update the internal state for this prover.
+                        let mut provers = self.provers.write().await;
+                        let mut prover = *provers.get_mut(&prover_address).expect("worker should have existing info");
+                        prover.0 = Instant::now();
+                        prover.2 += 1;
+                        provers.insert(prover_address, prover);
                     }
 
                     // Since a worker will swap out the difficulty target for their share target,
                     // let's put it back to the original value before checking the POSW for true
                     // validity.
-                    let difficulty_target = current_template.difficulty_target();
+                    let difficulty_target = block_template.difficulty_target();
                     block.set_difficulty_target(difficulty_target);
 
                     // If the block is valid, broadcast it.
@@ -304,29 +330,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     }
                 } else {
                     warn!("[ProposedBlock] No current template exists");
-                }
-            }
-            OperatorRequest::GetBlockTemplate(peer_ip, address) => {
-                if let Some(block_template) = &*self.block_template.read().await {
-                    // Ensure this worker exists in the info list first, so we can get their share difficulty.
-                    let share_difficulty = self
-                        .worker_info
-                        .write()
-                        .await
-                        .entry(address)
-                        .or_insert((
-                            chrono::Utc::now().timestamp(),
-                            block_template.difficulty_target().saturating_mul(50),
-                            0,
-                        ))
-                        .1;
-
-                    let message = Message::PoolRequest(share_difficulty, Data::Object(block_template.clone()));
-                    if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
-                        warn!("[PoolRequest] {}", error);
-                    }
-                } else {
-                    warn!("[GetBlockTemplate] No current block template exists");
                 }
             }
         }
