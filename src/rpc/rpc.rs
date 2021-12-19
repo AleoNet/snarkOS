@@ -424,7 +424,7 @@ fn result_to_response<T: Serialize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{helpers::State, ledger::Ledger, Client, Prover};
+    use crate::{environment::Client, helpers::State, ledger::Ledger, network::Prover};
 
     use crate::helpers::Tasks;
     use snarkos_storage::{
@@ -501,6 +501,7 @@ mod tests {
             &prover_path,
             None,
             local_ip,
+            Some(local_ip),
             &status,
             &terminator,
             peers.router(),
