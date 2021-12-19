@@ -217,14 +217,14 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         warn!("[PoolRequest] {}", error);
                     }
                 } else {
-                    warn!("[GetBlockTemplate] No current block template exists");
+                    warn!("[PoolRegister] No current block template exists");
                 }
             }
             OperatorRequest::PoolResponse(peer_ip, mut block, prover_address) => {
                 if let Some(block_template) = &*self.block_template.read().await {
                     // Check that the block is relevant.
                     if self.ledger_reader.latest_block_height().saturating_add(1) != block.height() {
-                        warn!("[ProposedBlock] Peer {} sent a stale candidate block.", peer_ip);
+                        warn!("[PoolResponse] Peer {} sent a stale candidate block.", peer_ip);
                         return;
                     }
 
@@ -241,28 +241,28 @@ impl<N: Network, E: Environment> Operator<N, E> {
                             coinbase_records
                         }
                         Err(error) => {
-                            warn!("[ProposedBlock] {}", error);
+                            warn!("[PoolResponse] {}", error);
                             return;
                         }
                     };
 
                     // Ensure the block contains a difficulty that is at least the share difficulty.
-                    {
+                    let proof_difficulty = {
                         let proof_bytes = match block.header().proof() {
                             Some(proof) => match proof.to_bytes_le() {
                                 Ok(bytes) => bytes,
                                 Err(error) => {
-                                    warn!("[ProposedBlock] {}", error);
+                                    warn!("[PoolResponse] {}", error);
                                     return;
                                 }
                             },
                             None => {
-                                warn!("[ProposedBlock] Peer {} sent a candidate block with a missing proof.", peer_ip);
+                                warn!("[PoolResponse] Peer {} sent a candidate block with a missing proof.", peer_ip);
                                 return;
                             }
                         };
 
-                        let hash_difficulty = sha256d_to_u64(&proof_bytes);
+                        let proof_difficulty = sha256d_to_u64(&proof_bytes);
                         let share_difficulty = {
                             let mut provers = self.provers.write().await;
                             match provers.get(&prover_address) {
@@ -274,14 +274,13 @@ impl<N: Network, E: Environment> Operator<N, E> {
                             }
                         };
 
-                        if hash_difficulty > share_difficulty {
-                            warn!(
-                                "[ProposedBlock] Block with insufficient share difficulty submitted by {}",
-                                prover_address
-                            );
+                        if proof_difficulty > share_difficulty {
+                            warn!("Block with insufficient share difficulty from {} ({})", peer_ip, prover_address);
                             return;
                         }
-                    }
+
+                        proof_difficulty
+                    };
 
                     // Update the score for the prover.
                     // TODO: add round stuff
@@ -289,14 +288,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     if let Err(error) = self.state.add_shares(block.height(), &prover_address, 1) {
                         error!("{}", error);
                     }
-
-                    info!(
-                        "Operator received a valid share from {} ({}) for block {} ({})",
-                        peer_ip,
-                        prover_address,
-                        block.height(),
-                        block.hash(),
-                    );
 
                     {
                         // Update the internal state for this prover.
@@ -307,15 +298,23 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         provers.insert(prover_address, prover);
                     }
 
+                    info!(
+                        "Operator received a valid share from {} ({}) for block {} ({})",
+                        peer_ip,
+                        prover_address,
+                        block.height(),
+                        block.hash(),
+                    );
+
                     // Since a prover will swap out the difficulty target for their share target,
                     // let's put it back to the original value before checking the POSW for true
                     // validity.
                     let difficulty_target = block_template.difficulty_target();
                     block.set_difficulty_target(difficulty_target);
 
-                    // If the block is valid, broadcast it.
-                    if block.is_valid() {
-                        debug!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
+                    // If the block has satisfactory difficulty and is valid, proceed to broadcast it.
+                    if proof_difficulty < block.difficulty_target() && block.is_valid() {
+                        info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
 
                         // Store the coinbase record(s).
                         coinbase_records.iter().for_each(|r| {
@@ -324,14 +323,14 @@ impl<N: Network, E: Environment> Operator<N, E> {
                             }
                         });
 
-                        // Broadcast the next block.
+                        // Broadcast the unconfirmed block.
                         let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
                         if let Err(error) = self.ledger_router.send(request).await {
                             warn!("Failed to broadcast mined block - {}", error);
                         }
                     }
                 } else {
-                    warn!("[ProposedBlock] No current template exists");
+                    warn!("[PoolResponse] No current block template exists");
                 }
             }
         }
