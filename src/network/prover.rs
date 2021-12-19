@@ -163,12 +163,14 @@ impl<N: Network, E: Environment> Prover<N, E> {
         if E::NODE_TYPE == NodeType::Prover && prover.pool.is_some() {
             let prover = prover.clone();
             task::spawn(async move {
-                // Sleep for `7` seconds.
-                tokio::time::sleep(std::time::Duration::from_secs(7)).await;
+                loop {
+                    // Sleep for `60` seconds.
+                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
 
-                // TODO (howardwu): Check that the prover is connected to the pool before proceeding.
-                //  Currently we use a sleep function to probabilistically ensure the peer is connected.
-                prover.send_pool_register().await;
+                    // TODO (howardwu): Check that the prover is connected to the pool before proceeding.
+                    //  Currently we use a sleep function to probabilistically ensure the peer is connected.
+                    prover.send_pool_register().await;
+                }
             });
         }
 
