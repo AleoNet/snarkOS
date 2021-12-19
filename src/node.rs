@@ -40,12 +40,12 @@ pub struct Node {
     /// Specify this as a mining node, with the given miner address.
     #[structopt(long = "miner")]
     pub miner: Option<String>,
-    /// Specify this as a prover node, with the given prover address.
-    #[structopt(long = "prover")]
-    pub prover: Option<String>,
     /// Specify this as an operating node, with the given operator address.
     #[structopt(long = "operator")]
     pub operator: Option<String>,
+    /// Specify this as a prover node, with the given prover address.
+    #[structopt(long = "prover")]
+    pub prover: Option<String>,
     /// Specify the pool IP address.
     /// TODO (howardwu): Remedy how pool IPs are defined.
     #[structopt(long = "pool_ip")]
@@ -140,17 +140,7 @@ impl Node {
         println!("{}", crate::display::welcome_message());
 
         let address = match (E::NODE_TYPE, address) {
-            (NodeType::Miner, Some(address)) => {
-                let address = Address::<N>::from_str(address)?;
-                println!("Your Aleo address is {}.\n", address);
-                Some(address)
-            }
-            (NodeType::Operator, Some(address)) => {
-                let address = Address::<N>::from_str(address)?;
-                println!("Your Aleo address is {}.\n", address);
-                Some(address)
-            }
-            (NodeType::Prover, Some(address)) => {
+            (NodeType::Miner, Some(address)) | (NodeType::Operator, Some(address)) | (NodeType::Prover, Some(address)) => {
                 let address = Address::<N>::from_str(address)?;
                 println!("Your Aleo address is {}.\n", address);
                 Some(address)
