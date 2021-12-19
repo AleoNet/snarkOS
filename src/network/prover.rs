@@ -27,7 +27,11 @@ use crate::{
     PeersRouter,
 };
 use snarkos_storage::{storage::Storage, ProverState};
-use snarkvm::dpc::prelude::*;
+use snarkvm::{
+    algorithms::{crh::sha256d_to_u64, SNARK},
+    dpc::prelude::*,
+    utilities::{FromBytes, ToBytes},
+};
 
 use anyhow::{anyhow, Result};
 use rand::thread_rng;
@@ -241,13 +245,37 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             self.status.update(State::Mining);
 
                             let process = self.process.clone();
-                            let mut block_template = block_template.clone();
+                            let block_template = block_template.clone();
                             let terminator = self.terminator.clone();
 
                             let result = task::spawn_blocking(move || {
                                 process.install(move || {
-                                    block_template.set_difficulty_target(share_difficulty);
-                                    Block::mine(block_template, &terminator, &mut thread_rng())
+                                    loop {
+                                        let block_header =
+                                            BlockHeader::mine_once_unchecked(&block_template, &terminator, &mut thread_rng())?;
+
+                                        // Verify the proof against the share difficulty target.
+                                        if let Some(proof) = block_header.proof() {
+                                            // Construct the inputs.
+                                            let inputs = vec![
+                                                N::InnerScalarField::read_le(&block_header.to_header_root()?.to_bytes_le()?[..])?,
+                                                *block_header.nonce(),
+                                            ];
+
+                                            // Ensure the proof is valid.
+                                            if !<<N as Network>::PoSWSNARK as SNARK>::verify(N::posw().verifying_key(), &inputs, &*proof)? {
+                                                warn!("PoSW proof verification failed");
+                                                continue;
+                                            }
+
+                                            // Ensure the share difficulty target is met.
+                                            if sha256d_to_u64(&proof.to_bytes_le()?) < share_difficulty {
+                                                return Block::new(&block_template, block_header);
+                                            }
+                                        } else {
+                                            warn!("Block header does not have a corresponding PoSW proof");
+                                        };
+                                    }
                                 })
                             })
                             .await;

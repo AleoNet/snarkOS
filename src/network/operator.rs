@@ -220,7 +220,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     warn!("[PoolRegister] No current block template exists");
                 }
             }
-            OperatorRequest::PoolResponse(peer_ip, mut block, prover_address) => {
+            OperatorRequest::PoolResponse(peer_ip, block, prover_address) => {
                 if let Some(block_template) = &*self.block_template.read().await {
                     // Check that the block is relevant.
                     if self.ledger_reader.latest_block_height().saturating_add(1) != block.height() {
@@ -306,14 +306,11 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         block.hash(),
                     );
 
-                    // Since a prover will swap out the difficulty target for their share target,
-                    // let's put it back to the original value before checking the POSW for true
-                    // validity.
-                    let difficulty_target = block_template.difficulty_target();
-                    block.set_difficulty_target(difficulty_target);
-
                     // If the block has satisfactory difficulty and is valid, proceed to broadcast it.
-                    if proof_difficulty < block.difficulty_target() && block.is_valid() {
+                    if block.difficulty_target() == block_template.difficulty_target()
+                        && proof_difficulty < block.difficulty_target()
+                        && block.is_valid()
+                    {
                         info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
 
                         // Store the coinbase record(s).
