@@ -587,8 +587,8 @@ impl<N: Network> LedgerState<N> {
         Ok(true)
     }
 
-    /// Prepares a block template to be mined.
-    pub fn prepare_block_template<R: Rng + CryptoRng>(
+    /// Returns a block template based on the latest state of the ledger.
+    pub fn get_block_template<R: Rng + CryptoRng>(
         &self,
         recipient: Address<N>,
         is_public: bool,
@@ -678,7 +678,7 @@ impl<N: Network> LedgerState<N> {
         terminator: &AtomicBool,
         rng: &mut R,
     ) -> Result<(Block<N>, Record<N>)> {
-        let (template, coinbase_record) = self.prepare_block_template(recipient, is_public, transactions, rng)?;
+        let (template, coinbase_record) = self.get_block_template(recipient, is_public, transactions, rng)?;
 
         // Mine the next block.
         match Block::mine(template, terminator, rng) {

@@ -351,7 +351,7 @@ impl<N: Network, E: Environment> Pool<N, E> {
         let unconfirmed_transactions = self.memory_pool.read().await.transactions();
         let (block_template, _) =
             self.ledger_reader
-                .prepare_block_template(recipient, E::COINBASE_IS_PUBLIC, &unconfirmed_transactions, &mut thread_rng())?;
+                .get_block_template(recipient, E::COINBASE_IS_PUBLIC, &unconfirmed_transactions, &mut thread_rng())?;
         Ok(block_template)
     }
 }
