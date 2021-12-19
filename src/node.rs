@@ -46,9 +46,8 @@ pub struct Node {
     /// Specify this as a prover node, with the given prover address.
     #[structopt(long = "prover")]
     pub prover: Option<String>,
-    /// Specify the pool IP address.
-    /// TODO (howardwu): Remedy how pool IPs are defined.
-    #[structopt(long = "pool_ip")]
+    /// Specify the pool that a prover node is contributing to.
+    #[structopt(long = "pool")]
     pub pool: Option<SocketAddr>,
     /// Specify the network of this node.
     #[structopt(default_value = "2", long = "network")]
