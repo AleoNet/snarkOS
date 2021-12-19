@@ -153,7 +153,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     loop {
                         // Determine if the current block template is stale.
                         let is_template_stale = match &*operator.block_template.read().await {
-                            Some(template) => operator.ledger_reader.latest_block_height() != template.block_height() - 1,
+                            Some(template) => operator.ledger_reader.latest_block_height().saturating_add(1) != template.block_height(),
                             None => true,
                         };
 

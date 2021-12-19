@@ -57,8 +57,8 @@ type ProverHandler<N> = mpsc::Receiver<ProverRequest<N>>;
 ///
 #[derive(Debug)]
 pub enum ProverRequest<N: Network> {
-    /// BlockTemplate := (peer_ip, share_difficulty, block_template)
-    BlockTemplate(SocketAddr, u64, BlockTemplate<N>),
+    /// PoolRequest := (peer_ip, share_difficulty, block_template)
+    PoolRequest(SocketAddr, u64, BlockTemplate<N>),
     /// MemoryPoolClear := (block)
     MemoryPoolClear(Option<Block<N>>),
     /// UnconfirmedTransaction := (peer_ip, transaction)
@@ -155,6 +155,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
             Self::start_miner(tasks, prover.clone(), local_ip).await;
         }
 
+        // Initialize the prover, if the node type is a prover.
+        if E::NODE_TYPE == NodeType::Prover && prover.pool.is_some() {
+            prover.send_pool_register().await;
+        }
+
         Ok(prover)
     }
 
@@ -179,66 +184,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
     ///
     pub(super) async fn update(&self, request: ProverRequest<N>) {
         match request {
-            ProverRequest::BlockTemplate(peer_ip, share_difficulty, block_template) => {
-                if let Some(pool_address) = self.pool {
-                    // Refuse work from any pool other than our registered one.
-                    if pool_address != peer_ip {
-                        return;
-                    }
-
-                    if let Some(recipient) = self.address {
-                        // Mine the next block continuously until halting. We need to keep going because
-                        // a valid block does not necessarily mean we hit the network difficulty target,
-                        // only our share target.
-                        loop {
-                            // Check if we need to halt.
-                            let latest_block_height = self.ledger_reader.latest_block_height();
-                            if latest_block_height != block_template.block_height() - 1 {
-                                // If so, let's ask for a new block template first.
-                                let request = PeersRequest::MessageSend(peer_ip, Message::PoolRegister(recipient));
-                                if let Err(error) = self.peers_router.send(request).await {
-                                    warn!("[PoolRegister] {}", error);
-                                }
-                                break;
-                            }
-
-                            // If `terminator` is `false` and the status is not `Peering` or `Mining`
-                            // already, mine the next block.
-                            if !self.terminator.load(Ordering::SeqCst) && !self.status.is_peering() && !self.status.is_mining() {
-                                // Set the status to `Mining`.
-                                self.status.update(State::Mining);
-
-                                let process = self.process.clone();
-                                let mut block_template = block_template.clone();
-                                let terminator = self.terminator.clone();
-
-                                let result = task::spawn_blocking(move || {
-                                    process.install(move || {
-                                        block_template.set_difficulty_target(share_difficulty);
-                                        Block::mine(block_template, &terminator, &mut thread_rng())
-                                    })
-                                })
-                                .await;
-
-                                self.status.update(State::Ready);
-
-                                match result {
-                                    Ok(Ok(block)) => {
-                                        debug!("Prover found block for share target {} ({})", block.height(), block.hash());
-
-                                        // Propose it to the pool.
-                                        let message = Message::PoolResponse(recipient, Data::Object(block));
-                                        if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
-                                            warn!("[PoolResponse] {}", error);
-                                        }
-                                    }
-                                    Ok(Err(error)) => trace!("{}", error),
-                                    Err(error) => trace!("{}", anyhow!("Could not mine next block {}", error)),
-                                }
-                            }
-                        }
-                    }
-                }
+            ProverRequest::PoolRequest(operator_ip, share_difficulty, block_template) => {
+                // Process the pool request message.
+                self.process_pool_request(operator_ip, share_difficulty, block_template).await;
+                // Proceed to register the prover to receive the next block template.
+                self.send_pool_register().await;
             }
             ProverRequest::MemoryPoolClear(block) => match block {
                 Some(block) => self.memory_pool.write().await.remove_transactions(block.transactions()),
@@ -249,6 +199,76 @@ impl<N: Network, E: Environment> Prover<N, E> {
                 if !self.status.is_peering() {
                     // Process the unconfirmed transaction.
                     self.add_unconfirmed_transaction(peer_ip, transaction).await
+                }
+            }
+        }
+    }
+
+    ///
+    /// Sends a `PoolRegister` message to the pool IP address.
+    ///
+    async fn send_pool_register(&self) {
+        if E::NODE_TYPE == NodeType::Prover {
+            if let Some(recipient) = self.address {
+                if let Some(pool_ip) = self.pool {
+                    // Proceed to register the prover to receive a block template.
+                    let request = PeersRequest::MessageSend(pool_ip, Message::PoolRegister(recipient));
+                    if let Err(error) = self.peers_router.send(request).await {
+                        warn!("[PoolRegister] {}", error);
+                    }
+                } else {
+                    error!("Missing pool IP address. Please specify a pool IP address in order to run the prover");
+                }
+            } else {
+                error!("Missing prover address. Please specify an Aleo address in order to prove");
+            }
+        }
+    }
+
+    ///
+    /// Processes a `PoolRequest` message from a pool operator.
+    ///
+    async fn process_pool_request(&self, operator_ip: SocketAddr, share_difficulty: u64, block_template: BlockTemplate<N>) {
+        if E::NODE_TYPE == NodeType::Prover {
+            if let Some(recipient) = self.address {
+                if let Some(pool_ip) = self.pool {
+                    // Refuse work from any pool other than the registered one.
+                    if pool_ip == operator_ip {
+                        // If `terminator` is `false` and the status is not `Peering` or `Mining`
+                        // already, mine the next block.
+                        if !self.terminator.load(Ordering::SeqCst) && !self.status.is_peering() && !self.status.is_mining() {
+                            // Set the status to `Mining`.
+                            self.status.update(State::Mining);
+
+                            let process = self.process.clone();
+                            let mut block_template = block_template.clone();
+                            let terminator = self.terminator.clone();
+
+                            let result = task::spawn_blocking(move || {
+                                process.install(move || {
+                                    block_template.set_difficulty_target(share_difficulty);
+                                    Block::mine(block_template, &terminator, &mut thread_rng())
+                                })
+                            })
+                            .await;
+
+                            self.status.update(State::Ready);
+
+                            match result {
+                                Ok(Ok(block)) => {
+                                    info!("Prover found unconfirmed block {} for share target", block.height());
+
+                                    // Send a `PoolResponse` to the operator.
+                                    let message = Message::PoolResponse(recipient, Data::Object(block));
+                                    if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(operator_ip, message)).await {
+                                        warn!("[PoolResponse] {}", error);
+                                    }
+                                }
+                                Ok(Err(error)) => trace!("{}", error),
+                                Err(error) => trace!("{}", anyhow!("Could not mine next block {}", error)),
+                            }
+                        }
+                    }
                 }
             }
         }
@@ -282,7 +302,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
     ///
     async fn start_miner(tasks: &mut Tasks<JoinHandle<()>>, prover: Arc<Self>, local_ip: SocketAddr) {
         // Initialize a new instance of the miner.
-        if E::NODE_TYPE == NodeType::Miner {
+        if E::NODE_TYPE == NodeType::Miner && prover.pool.is_none() {
             if let Some(recipient) = prover.address {
                 // Initialize the prover process.
                 let prover = prover.clone();

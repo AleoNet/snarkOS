@@ -1195,7 +1195,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     if E::NODE_TYPE != NodeType::Prover {
                                         trace!("Skipping 'PoolRequest' from {}", peer_ip);
                                     } else if let Ok(block_template) = block_template.deserialize().await {
-                                        if let Err(error) = prover_router.send(ProverRequest::BlockTemplate(peer_ip, share_difficulty, block_template)).await {
+                                        if let Err(error) = prover_router.send(ProverRequest::PoolRequest(peer_ip, share_difficulty, block_template)).await {
                                             warn!("[PoolRequest] {}", error);
                                         }
                                     } else {

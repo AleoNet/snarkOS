@@ -597,7 +597,7 @@ impl<N: Network> LedgerState<N> {
     ) -> Result<(BlockTemplate<N>, Record<N>)> {
         // Prepare the new block.
         let previous_block_hash = self.latest_block_hash();
-        let block_height = self.latest_block_height() + 1;
+        let block_height = self.latest_block_height().saturating_add(1);
 
         // Compute the block difficulty target.
         let previous_timestamp = self.latest_block_timestamp();
