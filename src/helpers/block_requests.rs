@@ -342,7 +342,7 @@ mod tests {
             // Declare peer state.
             let peer_ip = format!("127.0.0.1:{}", rng.gen::<u16>()).parse().unwrap();
             let peer_is_on_fork = None;
-            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height..latest_block_height * 2);
+            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height + 1..(latest_block_height + 1) * 2);
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
 
             // Declare locator state.
