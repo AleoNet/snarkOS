@@ -1206,7 +1206,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     if E::NODE_TYPE != NodeType::Operator {
                                         trace!("Skipping 'PoolResponse' from {}", peer_ip);
                                     } else if let Ok(block) = block.deserialize().await {
-                                        if let Err(error) = operator_router.send(OperatorRequest::ProposedBlock(peer_ip, block, address)).await {
+                                        if let Err(error) = operator_router.send(OperatorRequest::PoolResponse(peer_ip, block, address)).await {
                                             warn!("[PoolResponse] {}", error);
                                         }
                                     } else {

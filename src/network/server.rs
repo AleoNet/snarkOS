@@ -114,7 +114,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let operator = Operator::open::<RocksDB, _>(
             &mut tasks,
             &operator_storage_path,
-            address.clone(),
+            address,
             local_ip,
             prover.memory_pool(),
             peers.router(),

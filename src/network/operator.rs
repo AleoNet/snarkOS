@@ -58,8 +58,8 @@ type OperatorHandler<N> = mpsc::Receiver<OperatorRequest<N>>;
 pub enum OperatorRequest<N: Network> {
     /// PoolRegister := (peer_ip, worker_address)
     PoolRegister(SocketAddr, Address<N>),
-    /// ProposedBlock := (peer_ip, proposed_block, worker_address)
-    ProposedBlock(SocketAddr, Block<N>, Address<N>),
+    /// PoolResponse := (peer_ip, proposed_block, worker_address)
+    PoolResponse(SocketAddr, Block<N>, Address<N>),
 }
 
 /// The predefined base share difficulty.
@@ -76,6 +76,10 @@ pub struct Operator<N: Network, E: Environment> {
     local_ip: SocketAddr,
     /// The state storage of the operator.
     state: Arc<OperatorState<N>>,
+    /// The current block template that is being mined on by the operator.
+    block_template: RwLock<Option<BlockTemplate<N>>>,
+    /// A list of provers and their associated state := (last_submitted, share_difficulty, shares_submitted_since_reset)
+    provers: RwLock<HashMap<Address<N>, (Instant, u64, u32)>>,
     /// The operator router of the node.
     operator_router: OperatorRouter<N>,
     /// The pool of unconfirmed transactions.
@@ -88,10 +92,6 @@ pub struct Operator<N: Network, E: Environment> {
     ledger_router: LedgerRouter<N>,
     /// The prover router of the node.
     prover_router: ProverRouter<N>,
-    /// The current block template that is being mined on by the operator.
-    block_template: RwLock<Option<BlockTemplate<N>>>,
-    /// A list of provers and their associated state := (last_submitted, share_difficulty, shares_submitted_since_reset)
-    provers: RwLock<HashMap<Address<N>, (Instant, u64, u32)>>,
 }
 
 impl<N: Network, E: Environment> Operator<N, E> {
@@ -115,14 +115,14 @@ impl<N: Network, E: Environment> Operator<N, E> {
             address,
             local_ip,
             state: Arc::new(OperatorState::open_writer::<S, P>(path)?),
+            block_template: RwLock::new(None),
+            provers: RwLock::new(HashMap::new()),
             operator_router,
             memory_pool,
             peers_router,
             ledger_reader,
             ledger_router,
             prover_router,
-            block_template: RwLock::new(None),
-            provers: RwLock::new(HashMap::new()),
         });
 
         if E::NODE_TYPE == NodeType::Operator {
@@ -139,48 +139,46 @@ impl<N: Network, E: Environment> Operator<N, E> {
             }));
             // Wait until the operator handler is ready.
             let _ = handler.await;
+        }
 
-            // Set up an update loop for the block template.
-            let operator_clone = operator.clone();
-            let (router, handler) = oneshot::channel();
-            tasks.append(task::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                // Asynchronously wait for a operator request.
-                let recipient = operator_clone
-                    .address
-                    .expect("A pool should have an available Aleo address at all times");
-                // TODO (julesdesmit): add loop which retargets share difficulty.
-                loop {
-                    let mut block_template = operator_clone.block_template.write().await;
-                    match &*block_template {
-                        Some(t) => {
-                            if operator_clone.ledger_reader.latest_block_height() != t.block_height() - 1 {
-                                *block_template = Some(
-                                    operator_clone
-                                        .generate_block_template(recipient)
-                                        .await
-                                        .expect("Should be able to generate a block template"),
-                                );
-                            }
-                        }
-                        None => {
-                            *block_template = Some(
-                                operator_clone
-                                    .generate_block_template(recipient)
-                                    .await
-                                    .expect("Should be able to generate a block template"),
-                            );
-                        }
-                    };
-                    drop(block_template); // Release lock, to avoid recursively locking.
+        if E::NODE_TYPE == NodeType::Operator {
+            if let Some(recipient) = operator.address {
+                // Initialize an update loop for the block template.
+                let operator = operator.clone();
+                let (router, handler) = oneshot::channel();
+                tasks.append(task::spawn(async move {
+                    // Notify the outer function that the task is ready.
+                    let _ = router.send(());
+                    // TODO (julesdesmit): Add logic to the loop to retarget share difficulty.
+                    loop {
+                        // Determine if the current block template is stale.
+                        let is_template_stale = match &*operator.block_template.read().await {
+                            Some(template) => operator.ledger_reader.latest_block_height() != template.block_height() - 1,
+                            None => true,
+                        };
 
-                    // Sleep for `5` seconds.
-                    tokio::time::sleep(Duration::from_secs(5)).await;
-                }
-            }));
-            // Wait until the pool handler is ready.
-            let _ = handler.await;
+                        // Update the block template if it is stale.
+                        if is_template_stale {
+                            // Construct a new block template.
+                            let transactions = operator.memory_pool.read().await.transactions();
+                            let (block_template, _) = operator
+                                .ledger_reader
+                                .get_block_template(recipient, E::COINBASE_IS_PUBLIC, &transactions, &mut thread_rng())
+                                .expect("Should be able to generate a block template");
+
+                            // Acquire the write lock to update the block template.
+                            *operator.block_template.write().await = Some(block_template);
+                        }
+
+                        // Sleep for `5` seconds.
+                        tokio::time::sleep(Duration::from_secs(5)).await;
+                    }
+                }));
+                // Wait until the operator handler is ready.
+                let _ = handler.await;
+            } else {
+                error!("Missing operator address. Please specify an Aleo address in order to operate a pool");
+            }
         }
 
         Ok(operator)
@@ -222,7 +220,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     warn!("[GetBlockTemplate] No current block template exists");
                 }
             }
-            OperatorRequest::ProposedBlock(peer_ip, mut block, prover_address) => {
+            OperatorRequest::PoolResponse(peer_ip, mut block, prover_address) => {
                 if let Some(block_template) = &*self.block_template.read().await {
                     // Check that the block is relevant.
                     if self.ledger_reader.latest_block_height().saturating_add(1) != block.height() {
@@ -230,82 +228,86 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         return;
                     }
 
-                    // Check that the block's coinbase transaction owner is the pool address.
-                    let records = match block.to_coinbase_transaction() {
-                        Ok(tx) => {
-                            let coinbase_records: Vec<Record<N>> = tx.to_records().collect();
-                            let valid_owner = coinbase_records.iter().any(|r| Some(r.owner()) == self.address);
-
-                            if !valid_owner {
-                                warn!("[ProposedBlock] Peer {} sent a candidate block with an invalid owner.", peer_ip);
+                    // Retrieve the coinbase transaction records.
+                    let coinbase_records = match block.to_coinbase_transaction() {
+                        Ok(transaction) => {
+                            // Ensure the owner of the coinbase transaction in the block is the operator address.
+                            let coinbase_records: Vec<Record<N>> = transaction.to_records().collect();
+                            let is_correct_owner = coinbase_records.iter().any(|r| Some(r.owner()) == self.address);
+                            if !is_correct_owner {
+                                warn!("[ProposedBlock] Peer {} sent a candidate block with an incorrect owner.", peer_ip);
                                 return;
                             }
-
                             coinbase_records
                         }
-                        Err(err) => {
-                            warn!("[ProposedBlock] {}", err);
+                        Err(error) => {
+                            warn!("[ProposedBlock] {}", error);
                             return;
                         }
                     };
 
-                    // Determine the score to add for the miner.
-                    let proof_bytes = match block.header().proof() {
-                        Some(proof) => match proof.to_bytes_le() {
-                            Ok(bytes) => bytes,
-                            Err(err) => {
-                                warn!("[ProposedBlock] {}", err);
+                    // Ensure the block contains a difficulty that is at least the share difficulty.
+                    {
+                        let proof_bytes = match block.header().proof() {
+                            Some(proof) => match proof.to_bytes_le() {
+                                Ok(bytes) => bytes,
+                                Err(error) => {
+                                    warn!("[ProposedBlock] {}", error);
+                                    return;
+                                }
+                            },
+                            None => {
+                                warn!("[ProposedBlock] Peer {} sent a candidate block with a missing proof.", peer_ip);
                                 return;
                             }
-                        },
-                        None => {
-                            warn!("[ProposedBlock] Peer {} sent a candidate block with a missing proof.", peer_ip);
+                        };
+
+                        let hash_difficulty = sha256d_to_u64(&proof_bytes);
+                        let share_difficulty = {
+                            let mut provers = self.provers.write().await;
+                            match provers.get(&prover_address) {
+                                Some((_, share_difficulty, _)) => *share_difficulty,
+                                None => {
+                                    provers.insert(prover_address, (Instant::now(), BASE_SHARE_DIFFICULTY, 0));
+                                    BASE_SHARE_DIFFICULTY
+                                }
+                            }
+                        };
+
+                        if hash_difficulty > share_difficulty {
+                            warn!(
+                                "[ProposedBlock] Block with insufficient share difficulty submitted by {}",
+                                prover_address
+                            );
                             return;
                         }
-                    };
-
-                    let hash_difficulty = sha256d_to_u64(&proof_bytes);
-                    let share_difficulty = {
-                        let mut provers = self.provers.write().await;
-                        match provers.get(&prover_address) {
-                            Some((_, share_difficulty, _)) => *share_difficulty,
-                            None => {
-                                provers.insert(prover_address, (Instant::now(), BASE_SHARE_DIFFICULTY, 0));
-                                BASE_SHARE_DIFFICULTY
-                            }
-                        }
-                    };
-
-                    if hash_difficulty > share_difficulty {
-                        warn!("[ProposedBlock] faulty share submitted by {}", prover_address);
-                        return;
                     }
 
-                    // Update the score for the worker.
+                    // Update the score for the prover.
                     // TODO: add round stuff
                     // TODO: ensure shares can not be resubmitted
                     if let Err(error) = self.state.add_shares(block.height(), &prover_address, 1) {
-                        warn!("[ProposedBlock] {}", error);
+                        error!("{}", error);
                     }
 
-                    debug!(
-                        "Operator has received valid share {} ({}) - {} / {}",
+                    info!(
+                        "Operator received a valid share from {} ({}) for block {} ({})",
+                        peer_ip,
+                        prover_address,
                         block.height(),
                         block.hash(),
-                        prover_address,
-                        peer_ip
                     );
 
                     {
                         // Update the internal state for this prover.
                         let mut provers = self.provers.write().await;
-                        let mut prover = *provers.get_mut(&prover_address).expect("worker should have existing info");
+                        let mut prover = *provers.get_mut(&prover_address).expect("prover should have existing info");
                         prover.0 = Instant::now();
                         prover.2 += 1;
                         provers.insert(prover_address, prover);
                     }
 
-                    // Since a worker will swap out the difficulty target for their share target,
+                    // Since a prover will swap out the difficulty target for their share target,
                     // let's put it back to the original value before checking the POSW for true
                     // validity.
                     let difficulty_target = block_template.difficulty_target();
@@ -313,10 +315,10 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                     // If the block is valid, broadcast it.
                     if block.is_valid() {
-                        debug!("Mining pool has found unconfirmed block {} ({})", block.height(), block.hash());
+                        debug!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
 
-                        // Store coinbase record(s)
-                        records.iter().for_each(|r| {
+                        // Store the coinbase record(s).
+                        coinbase_records.iter().for_each(|r| {
                             if let Err(error) = self.state.add_coinbase_record(block.height(), r.clone()) {
                                 warn!("Could not store coinbase record {}", error);
                             }
@@ -333,13 +335,5 @@ impl<N: Network, E: Environment> Operator<N, E> {
                 }
             }
         }
-    }
-
-    async fn generate_block_template(&self, recipient: Address<N>) -> Result<BlockTemplate<N>> {
-        let unconfirmed_transactions = self.memory_pool.read().await.transactions();
-        let (block_template, _) =
-            self.ledger_reader
-                .get_block_template(recipient, E::COINBASE_IS_PUBLIC, &unconfirmed_transactions, &mut thread_rng())?;
-        Ok(block_template)
     }
 }
