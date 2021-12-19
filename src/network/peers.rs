@@ -1272,36 +1272,30 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 Message::GetWork(address) => {
                                     if E::NODE_TYPE != NodeType::Operator {
                                         trace!("Skipping 'GetWork' from {}", peer_ip);
-                                    } else {
-                                        if let Err(error) = pool_router.send(PoolRequest::GetCurrentBlockTemplate(peer_ip, address)).await {
-                                                warn!("[GetWork] {}", error);
-                                        }
+                                    } else if let Err(error) = pool_router.send(PoolRequest::GetBlockTemplate(peer_ip, address)).await {
+                                        warn!("[GetWork] {}", error);
                                     }
                                 }
                                 Message::BlockTemplate(share_difficulty, block_template) => {
                                     if E::NODE_TYPE != NodeType::Prover {
                                         trace!("Skipping 'BlockTemplate' from {}", peer_ip);
-                                    } else {
-                                        if let Ok(block_template) = block_template.deserialize().await {
-                                            if let Err(error) = prover_router.send(ProverRequest::BlockTemplate(peer_ip, share_difficulty, block_template)).await {
-                                                warn!("[BlockTemplate] {}", error);
-                                            }
-                                        } else {
-                                            warn!("[BlockTemplate] could not deserialize block template");
+                                    } else if let Ok(block_template) = block_template.deserialize().await {
+                                        if let Err(error) = prover_router.send(ProverRequest::BlockTemplate(peer_ip, share_difficulty, block_template)).await {
+                                            warn!("[BlockTemplate] {}", error);
                                         }
+                                    } else {
+                                        warn!("[BlockTemplate] could not deserialize block template");
                                     }
                                 }
                                 Message::SendShare(address, block) => {
                                     if E::NODE_TYPE != NodeType::Operator {
                                         trace!("Skipping 'SendShare' from {}", peer_ip);
-                                    } else {
-                                        if let Ok(block) = block.deserialize().await {
-                                            if let Err(error) = pool_router.send(PoolRequest::ProposedBlock(peer_ip, block, address)).await {
-                                                warn!("[SendShare] {}", error);
-                                            }
-                                        } else {
-                                            warn!("[SendShare] could not deserialize block");
+                                    } else if let Ok(block) = block.deserialize().await {
+                                        if let Err(error) = pool_router.send(PoolRequest::ProposedBlock(peer_ip, block, address)).await {
+                                            warn!("[SendShare] {}", error);
                                         }
+                                    } else {
+                                        warn!("[SendShare] could not deserialize block");
                                     }
                                 }
                                 Message::Unused(_) => break, // Peer is not following the protocol.

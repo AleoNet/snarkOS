@@ -52,8 +52,8 @@ type PoolHandler<N> = mpsc::Receiver<PoolRequest<N>>;
 pub enum PoolRequest<N: Network> {
     /// ProposedBlock := (peer_ip, proposed_block, worker_address)
     ProposedBlock(SocketAddr, Block<N>, Address<N>),
-    /// GetCurrentBlockTemplate := (peer_ip, worker_address)
-    GetCurrentBlockTemplate(SocketAddr, Address<N>),
+    /// GetBlockTemplate := (peer_ip, worker_address)
+    GetBlockTemplate(SocketAddr, Address<N>),
     /// BlockHeightClear := (block_height)
     BlockHeightClear(u32),
 }
@@ -314,10 +314,9 @@ impl<N: Network, E: Environment> Pool<N, E> {
                     warn!("[BlockHeightClear] {}", error);
                 }
             }
-            PoolRequest::GetCurrentBlockTemplate(peer_ip, address) => {
-                if let Some(current_template) = &*self.current_template.read().await {
-                    // Ensure this worker exists in the info list first, so we can get their share
-                    // difficulty.
+            PoolRequest::GetBlockTemplate(peer_ip, address) => {
+                if let Some(block_template) = &*self.current_template.read().await {
+                    // Ensure this worker exists in the info list first, so we can get their share difficulty.
                     let share_difficulty = self
                         .worker_info
                         .write()
@@ -325,19 +324,13 @@ impl<N: Network, E: Environment> Pool<N, E> {
                         .entry(address)
                         .or_insert((
                             chrono::Utc::now().timestamp(),
-                            current_template.difficulty_target().saturating_mul(50),
+                            block_template.difficulty_target().saturating_mul(50),
                             0,
                         ))
                         .1;
 
-                    if let Err(error) = self
-                        .peers_router
-                        .send(PeersRequest::MessageSend(
-                            peer_ip,
-                            Message::BlockTemplate(share_difficulty, Data::Object(current_template.clone())),
-                        ))
-                        .await
-                    {
+                    let message = Message::BlockTemplate(share_difficulty, Data::Object(block_template.clone()));
+                    if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                         warn!("[ProposedBlock] {}", error);
                     }
                 } else {

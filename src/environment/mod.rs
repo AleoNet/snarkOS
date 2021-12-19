@@ -29,9 +29,9 @@ pub enum NodeType {
     Client = 0,
     /// A mining node is a full node, capable of producing new blocks.
     Miner,
-    /// A operating node is a full node, capable of coordinating provers in a pool.
+    /// An operating node is a full node, capable of coordinating provers in a pool.
     Operator,
-    /// A proving node is a full node, capable of producing proofs for programs.
+    /// A proving node is a full node, capable of producing proofs for a pool.
     Prover,
     /// A beacon node is a discovery node, capable of sharing peers of the network.
     Beacon,
