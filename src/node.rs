@@ -123,6 +123,19 @@ impl Node {
         }
     }
 
+    /// Returns the storage path of the operator.
+    pub(crate) fn operator_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "test")] {
+                // Tests may use any available ports, and removes the storage artifacts afterwards,
+                // so that there is no need to adhere to a specific number assignment logic.
+                PathBuf::from(format!("/tmp/snarkos-test-operator-{}", _local_ip.port()))
+            } else {
+                aleo_std::aleo_operator_dir(self.network, self.dev)
+            }
+        }
+    }
+
     /// Returns the storage path of the prover.
     pub(crate) fn prover_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
         cfg_if::cfg_if! {
@@ -358,7 +371,7 @@ impl Experimental {
 
 #[derive(StructOpt, Debug)]
 pub enum ExperimentalCommands {
-    #[structopt(name = "new_account", about = "Generate a new Aleo Account.")]
+    #[structopt(name = "new_account", about = "Generate a new Aleo account.")]
     NewAccount(NewAccount),
 }
 

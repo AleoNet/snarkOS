@@ -84,10 +84,10 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialize the ledger storage path.
         let ledger_storage_path = node.ledger_storage_path(local_ip);
+        // Initialize the operator storage path.
+        let operator_storage_path = node.operator_storage_path(local_ip);
         // Initialize the prover storage path.
         let prover_storage_path = node.prover_storage_path(local_ip);
-        // Initialize the pool storage path.
-        let pool_storage_path = prover_storage_path.join("-pool");
 
         // Initialize the status indicator.
         let status = Status::new();
@@ -115,7 +115,7 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         let pool = Pool::open::<RocksDB, _>(
             &mut tasks,
-            &pool_storage_path,
+            &operator_storage_path,
             address.clone(),
             local_ip,
             prover.memory_pool(),
