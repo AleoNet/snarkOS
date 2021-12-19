@@ -15,20 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    environment::{Client, ClientTrial, Environment, Miner, MinerTrial, NodeType, Operator, OperatorTrial, Prover, ProverTrial, SyncNode},
     helpers::{Tasks, Updater},
     network::Server,
-    Client,
-    ClientTrial,
     Display,
-    Environment,
-    Miner,
-    MinerTrial,
-    NodeType,
-    PoolOperator,
-    PoolOperatorTrial,
-    PoolWorker,
-    PoolWorkerTrial,
-    SyncNode,
 };
 use snarkos_storage::storage::rocksdb::RocksDB;
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
@@ -112,12 +102,12 @@ impl Node {
                 (2, _, _, true, false, false) => self.start_server::<Testnet2, SyncNode<Testnet2>>().await,
                 (2, true, false, false, false, false) => self.start_server::<Testnet2, Miner<Testnet2>>().await,
                 (2, false, false, false, false, false) => self.start_server::<Testnet2, Client<Testnet2>>().await,
-                (2, true, false, false, false, true) => self.start_server::<Testnet2, PoolOperator<Testnet2>>().await,
-                (2, true, false, false, true, false) => self.start_server::<Testnet2, PoolWorker<Testnet2>>().await,
+                (2, true, false, false, false, true) => self.start_server::<Testnet2, Operator<Testnet2>>().await,
+                (2, true, false, false, true, false) => self.start_server::<Testnet2, Prover<Testnet2>>().await,
                 (2, true, true, false, false, false) => self.start_server::<Testnet2, MinerTrial<Testnet2>>().await,
                 (2, false, true, false, false, false) => self.start_server::<Testnet2, ClientTrial<Testnet2>>().await,
-                (2, true, true, false, false, true) => self.start_server::<Testnet2, PoolOperatorTrial<Testnet2>>().await,
-                (2, true, true, false, true, false) => self.start_server::<Testnet2, PoolWorkerTrial<Testnet2>>().await,
+                (2, true, true, false, false, true) => self.start_server::<Testnet2, OperatorTrial<Testnet2>>().await,
+                (2, true, true, false, true, false) => self.start_server::<Testnet2, ProverTrial<Testnet2>>().await,
                 _ => panic!("Unsupported node configuration"),
             },
         }
@@ -150,17 +140,24 @@ impl Node {
     }
 
     async fn start_server<N: Network, E: Environment>(&self) -> Result<()> {
+        println!("{}", crate::display::welcome_message());
+
         let miner = match (E::NODE_TYPE, &self.miner) {
-            (NodeType::Miner, Some(address)) | (NodeType::Worker, Some(address)) | (NodeType::PoolOperator, Some(address)) => {
-                let miner_address = Address::<N>::from_str(address)?;
-                println!("{}", crate::display::welcome_message());
-                println!("Your Aleo address is {}.\n", miner_address);
+            (NodeType::Miner, Some(address)) => {
+                let address = Address::<N>::from_str(address)?;
+                println!("Your Aleo address is {}.\n", address);
                 println!("Starting a mining node on {}.", N::NETWORK_NAME);
-                println!("{}", crate::display::notification_message::<N>(Some(miner_address)));
-                Some(miner_address)
+                println!("{}", crate::display::notification_message::<N>(Some(address)));
+                Some(address)
+            }
+            (NodeType::Prover, Some(address)) | (NodeType::Operator, Some(address)) => {
+                let address = Address::<N>::from_str(address)?;
+                println!("Your Aleo address is {}.\n", address);
+                println!("Starting a proving node on {}.", N::NETWORK_NAME);
+                println!("{}", crate::display::notification_message::<N>(Some(address)));
+                Some(address)
             }
             _ => {
-                println!("{}", crate::display::welcome_message());
                 println!("Starting a {} node on {}.", E::NODE_TYPE, N::NETWORK_NAME);
                 println!("{}", crate::display::notification_message::<N>(None));
                 None

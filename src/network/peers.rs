@@ -1270,7 +1270,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::GetWork(address) => {
-                                    if E::NODE_TYPE != NodeType::PoolOperator {
+                                    if E::NODE_TYPE != NodeType::Operator {
                                         trace!("Skipping 'GetWork' from {}", peer_ip);
                                     } else {
                                         if let Err(error) = pool_router.send(PoolRequest::GetCurrentBlockTemplate(peer_ip, address)).await {
@@ -1279,7 +1279,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::BlockTemplate(share_difficulty, block_template) => {
-                                    if E::NODE_TYPE != NodeType::Worker {
+                                    if E::NODE_TYPE != NodeType::Prover {
                                         trace!("Skipping 'BlockTemplate' from {}", peer_ip);
                                     } else {
                                         if let Ok(block_template) = block_template.deserialize().await {
@@ -1292,7 +1292,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::SendShare(address, block) => {
-                                    if E::NODE_TYPE != NodeType::PoolOperator {
+                                    if E::NODE_TYPE != NodeType::Operator {
                                         trace!("Skipping 'SendShare' from {}", peer_ip);
                                     } else {
                                         if let Ok(block) = block.deserialize().await {

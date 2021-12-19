@@ -29,14 +29,14 @@ pub enum NodeType {
     Client = 0,
     /// A mining node is a full node, capable of producing new blocks.
     Miner,
+    /// A operating node is a full node, capable of coordinating provers in a pool.
+    Operator,
+    /// A proving node is a full node, capable of producing proofs for programs.
+    Prover,
     /// A beacon node is a discovery node, capable of sharing peers of the network.
     Beacon,
     /// A sync node is a discovery node, capable of syncing nodes for the network.
     Sync,
-    /// A pool operator is a full node, capable of coordinating provers.
-    PoolOperator,
-    /// A worker node is a full node, which directs its mining power towards a pool.
-    Worker,
 }
 
 impl fmt::Display for NodeType {
@@ -51,7 +51,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The specified type of node.
     const NODE_TYPE: NodeType;
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    const MESSAGE_VERSION: u32 = 11;
+    const MESSAGE_VERSION: u32 = 12;
     /// If `true`, a mining node will craft public coinbase transactions.
     const COINBASE_IS_PUBLIC: bool = false;
 
@@ -121,24 +121,24 @@ impl<N: Network> Environment for Miner<N> {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct PoolOperator<N: Network>(PhantomData<N>);
+pub struct Operator<N: Network>(PhantomData<N>);
 
 #[rustfmt::skip]
-impl<N: Network> Environment for PoolOperator<N> {
+impl<N: Network> Environment for Operator<N> {
     type Network = N;
-    const NODE_TYPE: NodeType = NodeType::PoolOperator;
+    const NODE_TYPE: NodeType = NodeType::Operator;
     const COINBASE_IS_PUBLIC: bool = true;
     const MINIMUM_NUMBER_OF_PEERS: usize = 11;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 1000;
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct PoolWorker<N: Network>(PhantomData<N>);
+pub struct Prover<N: Network>(PhantomData<N>);
 
 #[rustfmt::skip]
-impl<N: Network> Environment for PoolWorker<N> {
+impl<N: Network> Environment for Prover<N> {
     type Network = N;
-    const NODE_TYPE: NodeType = NodeType::Worker;
+    const NODE_TYPE: NodeType = NodeType::Prover;
     const COINBASE_IS_PUBLIC: bool = true;
     const MINIMUM_NUMBER_OF_PEERS: usize = 1;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
@@ -190,12 +190,12 @@ impl<N: Network> Environment for MinerTrial<N> {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct PoolOperatorTrial<N: Network>(PhantomData<N>);
+pub struct OperatorTrial<N: Network>(PhantomData<N>);
 
 #[rustfmt::skip]
-impl<N: Network> Environment for PoolOperatorTrial<N> {
+impl<N: Network> Environment for OperatorTrial<N> {
     type Network = N;
-    const NODE_TYPE: NodeType = NodeType::PoolOperator;
+    const NODE_TYPE: NodeType = NodeType::Operator;
     const SYNC_NODES: [&'static str; 13] = [
         "144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132",
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
@@ -207,12 +207,12 @@ impl<N: Network> Environment for PoolOperatorTrial<N> {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct PoolWorkerTrial<N: Network>(PhantomData<N>);
+pub struct ProverTrial<N: Network>(PhantomData<N>);
 
 #[rustfmt::skip]
-impl<N: Network> Environment for PoolWorkerTrial<N> {
+impl<N: Network> Environment for ProverTrial<N> {
     type Network = N;
-    const NODE_TYPE: NodeType = NodeType::Worker;
+    const NODE_TYPE: NodeType = NodeType::Prover;
     const SYNC_NODES: [&'static str; 13] = [
         "144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132",
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",

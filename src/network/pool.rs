@@ -119,7 +119,7 @@ impl<N: Network, E: Environment> Pool<N, E> {
             worker_info: RwLock::new(HashMap::new()),
         });
 
-        if E::NODE_TYPE == NodeType::PoolOperator {
+        if E::NODE_TYPE == NodeType::Operator {
             // Initialize the handler for the pool.
             let pool_clone = pool.clone();
             let (router, handler) = oneshot::channel();
