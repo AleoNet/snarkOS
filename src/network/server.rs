@@ -72,7 +72,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     #[inline]
     pub async fn initialize(
         node: &Node,
-        miner: Option<Address<N>>,
+        address: Option<Address<N>>,
         pool_ip: Option<SocketAddr>,
         mut tasks: Tasks<task::JoinHandle<()>>,
     ) -> Result<Self> {
@@ -102,7 +102,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let prover = Prover::open::<RocksDB, _>(
             &mut tasks,
             &prover_storage_path,
-            miner,
+            address,
             local_ip,
             pool_ip,
             &status,
@@ -116,7 +116,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let pool = Pool::open::<RocksDB, _>(
             &mut tasks,
             &pool_storage_path,
-            miner.clone(),
+            address.clone(),
             local_ip,
             prover.memory_pool(),
             peers.router(),
@@ -161,7 +161,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         )
         .await;
         // Initialize a new instance of the notification.
-        Self::initialize_notification(&mut tasks, ledger.reader(), prover.clone(), miner).await;
+        Self::initialize_notification(&mut tasks, ledger.reader(), prover.clone(), address).await;
 
         Ok(Self {
             local_ip,
@@ -372,7 +372,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         tasks: &mut Tasks<task::JoinHandle<()>>,
         ledger: LedgerReader<N>,
         prover: Arc<Prover<N, E>>,
-        miner: Option<Address<N>>,
+        address: Option<Address<N>>,
     ) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
@@ -380,10 +380,10 @@ impl<N: Network, E: Environment> Server<N, E> {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             loop {
-                info!("{}", notification_message(miner));
+                info!("{}", notification_message(address));
 
                 if E::NODE_TYPE == NodeType::Miner {
-                    if let Some(miner) = miner {
+                    if let Some(miner_address) = address {
                         // Retrieve the latest block height.
                         let latest_block_height = ledger.latest_block_height();
 
@@ -396,7 +396,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                             // Filter the coinbase records by determining if they exist on the canonical chain.
                             if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
                                 // Ensure the record owner matches.
-                                if record.owner() == miner {
+                                if record.owner() == miner_address {
                                     // Add the block to the appropriate list.
                                     match block_height + 2048 < latest_block_height {
                                         true => confirmed.push((block_height, record)),
@@ -410,7 +410,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                             "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
                             confirmed.len(),
                             pending.len(),
-                            miner
+                            miner_address
                         );
                     }
                 }

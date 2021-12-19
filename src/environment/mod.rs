@@ -39,6 +39,19 @@ pub enum NodeType {
     Sync,
 }
 
+impl NodeType {
+    pub fn description(&self) -> &str {
+        match self {
+            Self::Client => "a client node",
+            Self::Miner => "a mining node",
+            Self::Operator => "an operating node",
+            Self::Prover => "a proving node",
+            Self::Beacon => "a beacon node",
+            Self::Sync => "a sync node",
+        }
+    }
+}
+
 impl fmt::Display for NodeType {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)

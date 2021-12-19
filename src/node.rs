@@ -40,12 +40,16 @@ pub struct Node {
     /// Specify this as a mining node, with the given miner address.
     #[structopt(long = "miner")]
     pub miner: Option<String>,
-    /// Specify this as a worker node, with the given pool address.
-    #[structopt(long = "pooladdr")]
-    pub pool_address: Option<SocketAddr>,
-    /// Specify this as a pool.
-    #[structopt(long = "miningpool")]
-    pub mining_pool: bool,
+    /// Specify this as a prover node, with the given prover address.
+    #[structopt(long = "prover")]
+    pub prover: Option<String>,
+    /// Specify this as an operating node, with the given operator address.
+    #[structopt(long = "operator")]
+    pub operator: Option<String>,
+    /// Specify the pool IP address.
+    /// TODO (howardwu): Remedy how pool IPs are defined.
+    #[structopt(long = "pool_ip")]
+    pub pool: Option<SocketAddr>,
     /// Specify the network of this node.
     #[structopt(default_value = "2", long = "network")]
     pub network: u16,
@@ -91,23 +95,16 @@ impl Node {
                 println!("{}", command.parse()?);
                 Ok(())
             }
-            None => match (
-                self.network,
-                self.miner.is_some(),
-                self.trial,
-                self.sync,
-                self.pool_address.is_some(),
-                self.mining_pool,
-            ) {
-                (2, _, _, true, false, false) => self.start_server::<Testnet2, SyncNode<Testnet2>>().await,
-                (2, true, false, false, false, false) => self.start_server::<Testnet2, Miner<Testnet2>>().await,
-                (2, false, false, false, false, false) => self.start_server::<Testnet2, Client<Testnet2>>().await,
-                (2, true, false, false, false, true) => self.start_server::<Testnet2, Operator<Testnet2>>().await,
-                (2, true, false, false, true, false) => self.start_server::<Testnet2, Prover<Testnet2>>().await,
-                (2, true, true, false, false, false) => self.start_server::<Testnet2, MinerTrial<Testnet2>>().await,
-                (2, false, true, false, false, false) => self.start_server::<Testnet2, ClientTrial<Testnet2>>().await,
-                (2, true, true, false, false, true) => self.start_server::<Testnet2, OperatorTrial<Testnet2>>().await,
-                (2, true, true, false, true, false) => self.start_server::<Testnet2, ProverTrial<Testnet2>>().await,
+            None => match (self.network, &self.miner, &self.operator, &self.prover, self.trial, self.sync) {
+                (2, None, None, None, false, false) => self.start_server::<Testnet2, Client<Testnet2>>(&None).await,
+                (2, Some(_), None, None, false, false) => self.start_server::<Testnet2, Miner<Testnet2>>(&self.miner).await,
+                (2, None, Some(_), None, false, false) => self.start_server::<Testnet2, Operator<Testnet2>>(&self.operator).await,
+                (2, None, None, Some(_), false, false) => self.start_server::<Testnet2, Prover<Testnet2>>(&self.prover).await,
+                (2, None, None, None, true, false) => self.start_server::<Testnet2, ClientTrial<Testnet2>>(&None).await,
+                (2, Some(_), None, None, true, false) => self.start_server::<Testnet2, MinerTrial<Testnet2>>(&self.miner).await,
+                (2, None, Some(_), None, true, false) => self.start_server::<Testnet2, OperatorTrial<Testnet2>>(&self.operator).await,
+                (2, None, None, Some(_), true, false) => self.start_server::<Testnet2, ProverTrial<Testnet2>>(&self.prover).await,
+                (2, None, None, None, _, true) => self.start_server::<Testnet2, SyncNode<Testnet2>>(&None).await,
                 _ => panic!("Unsupported node configuration"),
             },
         }
@@ -139,36 +136,36 @@ impl Node {
         }
     }
 
-    async fn start_server<N: Network, E: Environment>(&self) -> Result<()> {
+    async fn start_server<N: Network, E: Environment>(&self, address: &Option<String>) -> Result<()> {
         println!("{}", crate::display::welcome_message());
 
-        let miner = match (E::NODE_TYPE, &self.miner) {
+        let address = match (E::NODE_TYPE, address) {
             (NodeType::Miner, Some(address)) => {
                 let address = Address::<N>::from_str(address)?;
                 println!("Your Aleo address is {}.\n", address);
-                println!("Starting a mining node on {}.", N::NETWORK_NAME);
-                println!("{}", crate::display::notification_message::<N>(Some(address)));
                 Some(address)
             }
-            (NodeType::Prover, Some(address)) | (NodeType::Operator, Some(address)) => {
+            (NodeType::Operator, Some(address)) => {
                 let address = Address::<N>::from_str(address)?;
                 println!("Your Aleo address is {}.\n", address);
-                println!("Starting a proving node on {}.", N::NETWORK_NAME);
-                println!("{}", crate::display::notification_message::<N>(Some(address)));
                 Some(address)
             }
-            _ => {
-                println!("Starting a {} node on {}.", E::NODE_TYPE, N::NETWORK_NAME);
-                println!("{}", crate::display::notification_message::<N>(None));
-                None
+            (NodeType::Prover, Some(address)) => {
+                let address = Address::<N>::from_str(address)?;
+                println!("Your Aleo address is {}.\n", address);
+                Some(address)
             }
+            _ => None,
         };
+
+        println!("Starting {} on {}.", E::NODE_TYPE.description(), N::NETWORK_NAME);
+        println!("{}", crate::display::notification_message::<N>(address));
 
         // Initialize the tasks handler.
         let tasks = Tasks::new();
 
         // Initialize the node's server.
-        let server = Server::<N, E>::initialize(self, miner, self.pool_address, tasks.clone()).await?;
+        let server = Server::<N, E>::initialize(self, address, self.pool, tasks.clone()).await?;
 
         // Initialize signal handling; it also maintains ownership of the Server
         // in order for it to not go out of scope.
