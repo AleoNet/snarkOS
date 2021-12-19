@@ -124,6 +124,27 @@ impl<N: Network, E: Environment> Server<N, E> {
         )
         .await?;
 
+        // TODO (howardwu): This is a hack for the prover.
+        //  Check that the prover is connected to the pool before sending a PoolRegister message.
+        if let Some(pool_ip) = pool_ip {
+            // Initialize the connection process.
+            let (router, handler) = oneshot::channel();
+            // Route a `Connect` request to the pool.
+            peers
+                .router()
+                .send(PeersRequest::Connect(
+                    pool_ip,
+                    ledger.reader(),
+                    ledger.router(),
+                    operator.router(),
+                    prover.router(),
+                    router,
+                ))
+                .await?;
+            // Wait until the connection task is initialized.
+            let _ = handler.await;
+        }
+
         // Initialize the connection listener for new peers.
         Self::initialize_listener(
             &mut tasks,
