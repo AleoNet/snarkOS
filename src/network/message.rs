@@ -95,16 +95,16 @@ pub enum Message<N: Network, E: Environment> {
     Ping(u32, u32, NodeType, State, N::BlockHash, Data<BlockHeader<N>>),
     /// Pong := (is_fork, block_locators)
     Pong(Option<bool>, Data<BlockLocators<N>>),
+    /// PoolRegister := (address)
+    PoolRegister(Address<N>),
+    /// PoolRequest := (share_difficulty, block_template)
+    PoolRequest(u64, Data<BlockTemplate<N>>),
+    /// PoolResponse := (address, block)
+    PoolResponse(Address<N>, Data<Block<N>>),
     /// UnconfirmedBlock := (block_height, block_hash, block)
     UnconfirmedBlock(u32, N::BlockHash, Data<Block<N>>),
     /// UnconfirmedTransaction := (transaction)
     UnconfirmedTransaction(Transaction<N>),
-    /// GetWork := (address)
-    GetWork(Address<N>),
-    /// BlockTemplate := (share_difficulty, block_template)
-    BlockTemplate(u64, Data<BlockTemplate<N>>),
-    /// SendShare := (address, block)
-    SendShare(Address<N>, Data<Block<N>>),
     /// Unused
     #[allow(unused)]
     Unused(PhantomData<E>),
@@ -124,11 +124,11 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerResponse(..) => "PeerResponse",
             Self::Ping(..) => "Ping",
             Self::Pong(..) => "Pong",
+            Self::PoolRegister(..) => "PoolRegister",
+            Self::PoolRequest(..) => "PoolRequest",
+            Self::PoolResponse(..) => "PoolResponse",
             Self::UnconfirmedBlock(..) => "UnconfirmedBlock",
             Self::UnconfirmedTransaction(..) => "UnconfirmedTransaction",
-            Self::GetWork(..) => "GetWork",
-            Self::BlockTemplate(..) => "BlockTemplate",
-            Self::SendShare(..) => "SendShare",
             Self::Unused(..) => "Unused",
         }
     }
@@ -146,11 +146,11 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PeerResponse(..) => 6,
             Self::Ping(..) => 7,
             Self::Pong(..) => 8,
-            Self::UnconfirmedBlock(..) => 9,
-            Self::UnconfirmedTransaction(..) => 10,
-            Self::GetWork(..) => 11,
-            Self::BlockTemplate(..) => 12,
-            Self::SendShare(..) => 13,
+            Self::PoolRegister(..) => 9,
+            Self::PoolRequest(..) => 10,
+            Self::PoolResponse(..) => 11,
+            Self::UnconfirmedBlock(..) => 12,
+            Self::UnconfirmedTransaction(..) => 13,
             Self::Unused(..) => 14,
         }
     }
@@ -183,6 +183,11 @@ impl<N: Network, E: Environment> Message<N, E> {
 
                 Ok([vec![serialized_is_fork], block_locators.serialize_blocking()?].concat())
             }
+            Self::PoolRegister(address) => Ok(bincode::serialize(address)?),
+            Self::PoolRequest(share_difficulty, block_template) => {
+                Ok([bincode::serialize(share_difficulty)?, block_template.serialize_blocking()?].concat())
+            }
+            Self::PoolResponse(address, block) => Ok([bincode::serialize(address)?, block.serialize_blocking()?].concat()),
             Self::UnconfirmedBlock(block_height, block_hash, block) => Ok([
                 block_height.to_le_bytes().to_vec(),
                 block_hash.to_bytes_le()?,
@@ -190,11 +195,6 @@ impl<N: Network, E: Environment> Message<N, E> {
             ]
             .concat()),
             Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize(transaction)?),
-            Self::GetWork(address) => Ok(bincode::serialize(address)?),
-            Self::BlockTemplate(share_difficulty, block_template) => {
-                Ok([bincode::serialize(share_difficulty)?, block_template.serialize_blocking()?].concat())
-            }
-            Self::SendShare(address, block) => Ok([bincode::serialize(address)?, block.serialize_blocking()?].concat()),
             Self::Unused(_) => Ok(vec![]),
         }
     }
@@ -250,15 +250,15 @@ impl<N: Network, E: Environment> Message<N, E> {
 
                 Self::Pong(is_fork, Data::Buffer(data[1..].to_vec()))
             }
-            9 => Self::UnconfirmedBlock(
+            9 => Self::PoolRegister(bincode::deserialize(data)?),
+            10 => Self::PoolRequest(bincode::deserialize(&data[0..8])?, Data::Buffer(data[8..].to_vec())),
+            11 => Self::PoolResponse(bincode::deserialize(&data[0..32])?, Data::Buffer(data[32..].to_vec())),
+            12 => Self::UnconfirmedBlock(
                 bincode::deserialize(&data[0..4])?,
                 bincode::deserialize(&data[4..36])?,
                 Data::Buffer(data[36..].to_vec()),
             ),
-            10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
-            11 => Self::GetWork(bincode::deserialize(data)?),
-            12 => Self::BlockTemplate(bincode::deserialize(&data[0..8])?, Data::Buffer(data[8..].to_vec())),
-            13 => Self::SendShare(bincode::deserialize(&data[0..32])?, Data::Buffer(data[32..].to_vec())),
+            13 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };
 

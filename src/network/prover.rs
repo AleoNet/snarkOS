@@ -195,9 +195,9 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             let latest_block_height = self.ledger_reader.latest_block_height();
                             if latest_block_height != block_template.block_height() - 1 {
                                 // If so, let's ask for a new block template first.
-                                let request = PeersRequest::MessageSend(peer_ip, Message::GetWork(recipient));
+                                let request = PeersRequest::MessageSend(peer_ip, Message::PoolRegister(recipient));
                                 if let Err(error) = self.peers_router.send(request).await {
-                                    warn!("Could not send GetWork {}", error);
+                                    warn!("[PoolRegister] {}", error);
                                 }
                                 break;
                             }
@@ -227,9 +227,9 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                         debug!("Prover found block for share target {} ({})", block.height(), block.hash());
 
                                         // Propose it to the pool.
-                                        let message = Message::SendShare(recipient, Data::Object(block));
+                                        let message = Message::PoolResponse(recipient, Data::Object(block));
                                         if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
-                                            warn!("Could not send share to pool {}", error);
+                                            warn!("[PoolResponse] {}", error);
                                         }
                                     }
                                     Ok(Err(error)) => trace!("{}", error),

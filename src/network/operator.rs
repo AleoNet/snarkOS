@@ -321,12 +321,12 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         ))
                         .1;
 
-                    let message = Message::BlockTemplate(share_difficulty, Data::Object(block_template.clone()));
+                    let message = Message::PoolRequest(share_difficulty, Data::Object(block_template.clone()));
                     if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
-                        warn!("[ProposedBlock] {}", error);
+                        warn!("[PoolRequest] {}", error);
                     }
                 } else {
-                    warn!("[ProposedBlock] No current block template exists");
+                    warn!("[GetBlockTemplate] No current block template exists");
                 }
             }
         }
