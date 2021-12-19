@@ -232,9 +232,9 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     let coinbase_records = match block.to_coinbase_transaction() {
                         Ok(transaction) => {
                             // Ensure the owner of the coinbase transaction in the block is the operator address.
-                            let coinbase_records: Vec<Record<N>> = transaction.to_records().collect();
-                            let is_correct_owner = coinbase_records.iter().any(|r| Some(r.owner()) == self.address);
-                            if !is_correct_owner {
+                            let coinbase_records: Vec<Record<N>> =
+                                transaction.to_records().filter(|r| Some(r.owner()) == self.address).collect();
+                            if coinbase_records.len() == 0 {
                                 warn!("[ProposedBlock] Peer {} sent a candidate block with an incorrect owner.", peer_ip);
                                 return;
                             }
@@ -316,7 +316,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         // Store the coinbase record(s).
                         coinbase_records.iter().for_each(|r| {
                             if let Err(error) = self.state.add_coinbase_record(block.height(), r.clone()) {
-                                warn!("Could not store coinbase record {}", error);
+                                warn!("Could not store coinbase record - {}", error);
                             }
                         });
 
