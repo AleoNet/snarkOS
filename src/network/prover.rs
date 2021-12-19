@@ -151,7 +151,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         }
 
         // Initialize the miner, if the node type is a miner.
-        if E::NODE_TYPE == NodeType::Miner {
+        if E::NODE_TYPE == NodeType::Miner && prover.pool.is_none() {
             Self::start_miner(tasks, prover.clone(), local_ip).await;
         }
 
