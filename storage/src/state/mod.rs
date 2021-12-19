@@ -17,8 +17,8 @@
 pub(crate) mod ledger;
 pub use ledger::{LedgerState, Metadata, MAXIMUM_BLOCK_LOCATORS, MAXIMUM_LINEAR_BLOCK_LOCATORS, MAXIMUM_QUADRATIC_BLOCK_LOCATORS};
 
-pub(crate) mod pool;
-pub use pool::PoolState;
+pub(crate) mod operator;
+pub use operator::OperatorState;
 
 pub(crate) mod prover;
 pub use prover::ProverState;

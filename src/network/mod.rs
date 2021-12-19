@@ -20,11 +20,11 @@ pub(crate) use ledger::{LedgerRequest, LedgerRouter};
 pub mod message;
 pub use message::*;
 
+pub mod operator;
+pub use operator::*;
+
 pub(crate) mod peers;
 pub(crate) use peers::*;
-
-pub mod pool;
-pub use pool::*;
 
 pub mod prover;
 pub use prover::*;

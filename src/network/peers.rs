@@ -23,8 +23,8 @@ use crate::{
     LedgerRouter,
     Message,
     NodeType,
-    PoolRequest,
-    PoolRouter,
+    OperatorRequest,
+    OperatorRouter,
     ProverRequest,
     ProverRouter,
 };
@@ -68,29 +68,29 @@ type ConnectionResult = oneshot::Sender<Result<()>>;
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, ledger_reader, ledger_router, prover_router, pool_router, connection_result)
+    /// Connect := (peer_ip, ledger_reader, ledger_router, operator_router, prover_router, connection_result)
     Connect(
         SocketAddr,
         LedgerReader<N>,
         LedgerRouter<N>,
+        OperatorRouter<N>,
         ProverRouter<N>,
-        PoolRouter<N>,
         ConnectionResult,
     ),
-    /// Heartbeat := (ledger_reader, ledger_router, prover_router, pool_router)
-    Heartbeat(LedgerReader<N>, LedgerRouter<N>, ProverRouter<N>, PoolRouter<N>),
+    /// Heartbeat := (ledger_reader, ledger_router, operator_router, prover_router)
+    Heartbeat(LedgerReader<N>, LedgerRouter<N>, OperatorRouter<N>, ProverRouter<N>),
     /// MessagePropagate := (peer_ip, message)
     MessagePropagate(SocketAddr, Message<N, E>),
     /// MessageSend := (peer_ip, message)
     MessageSend(SocketAddr, Message<N, E>),
-    /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router, prover_router, pool_router)
+    /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router, operator_router, prover_router)
     PeerConnecting(
         TcpStream,
         SocketAddr,
         LedgerReader<N>,
         LedgerRouter<N>,
+        OperatorRouter<N>,
         ProverRouter<N>,
-        PoolRouter<N>,
     ),
     /// PeerConnected := (peer_ip, peer_nonce, outbound_router)
     PeerConnected(SocketAddr, u64, OutboundRouter<N, E>),
@@ -274,7 +274,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(super) async fn update(&self, request: PeersRequest<N, E>, tasks: &Tasks<JoinHandle<()>>) {
         match request {
-            PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, prover_router, pool_router, connection_result) => {
+            PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, operator_router, prover_router, connection_result) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -324,7 +324,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                         ledger_reader,
                                         ledger_router,
                                         prover_router,
-                                        pool_router,
+                                        operator_router,
                                         self.connected_nonces().await,
                                         Some(connection_result),
                                         tasks.clone(),
@@ -344,7 +344,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
             }
-            PeersRequest::Heartbeat(ledger_reader, ledger_router, prover_router, pool_router) => {
+            PeersRequest::Heartbeat(ledger_reader, ledger_router, operator_router, prover_router) => {
                 // Obtain the number of connected peers.
                 let number_of_connected_peers = self.number_of_connected_peers().await;
                 // Ensure the number of connected peers is below the maximum threshold.
@@ -440,8 +440,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             peer_ip,
                             ledger_reader.clone(),
                             ledger_router.clone(),
+                            operator_router.clone(),
                             prover_router.clone(),
-                            pool_router.clone(),
                             router,
                         );
                         if let Err(error) = self.peers_router.send(request).await {
@@ -460,7 +460,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::MessageSend(sender, message) => {
                 self.send(sender, message).await;
             }
-            PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader, ledger_router, prover_router, pool_router) => {
+            PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader, ledger_router, operator_router, prover_router) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -531,7 +531,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             ledger_reader,
                             ledger_router,
                             prover_router,
-                            pool_router,
+                            operator_router,
                             self.connected_nonces().await,
                             None,
                             tasks.clone(),
@@ -910,7 +910,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
-        pool_router: PoolRouter<N>,
+        operator_router: OperatorRouter<N>,
         connected_nonces: Vec<u64>,
         connection_result: Option<ConnectionResult>,
         tasks: Tasks<task::JoinHandle<()>>,
@@ -1272,7 +1272,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 Message::GetWork(address) => {
                                     if E::NODE_TYPE != NodeType::Operator {
                                         trace!("Skipping 'GetWork' from {}", peer_ip);
-                                    } else if let Err(error) = pool_router.send(PoolRequest::GetBlockTemplate(peer_ip, address)).await {
+                                    } else if let Err(error) = operator_router.send(OperatorRequest::GetBlockTemplate(peer_ip, address)).await {
                                         warn!("[GetWork] {}", error);
                                     }
                                 }
@@ -1291,7 +1291,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     if E::NODE_TYPE != NodeType::Operator {
                                         trace!("Skipping 'SendShare' from {}", peer_ip);
                                     } else if let Ok(block) = block.deserialize().await {
-                                        if let Err(error) = pool_router.send(PoolRequest::ProposedBlock(peer_ip, block, address)).await {
+                                        if let Err(error) = operator_router.send(OperatorRequest::ProposedBlock(peer_ip, block, address)).await {
                                             warn!("[SendShare] {}", error);
                                         }
                                     } else {

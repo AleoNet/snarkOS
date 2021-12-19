@@ -21,13 +21,13 @@ use anyhow::{anyhow, Result};
 use std::{collections::HashMap, path::Path};
 
 #[derive(Debug)]
-pub struct PoolState<N: Network> {
+pub struct OperatorState<N: Network> {
     shares: SharesState<N>,
 }
 
-impl<N: Network> PoolState<N> {
+impl<N: Network> OperatorState<N> {
     ///
-    /// Opens a new writable instance of `PoolState` from the given storage path.
+    /// Opens a new writable instance of `OperatorState` from the given storage path.
     ///
     pub fn open_writer<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
         // Open storage.
@@ -35,13 +35,13 @@ impl<N: Network> PoolState<N> {
         let is_read_only = false;
         let storage = S::open(path, context, is_read_only)?;
 
-        // Initialize the pool.
-        let pool = Self {
+        // Initialize the operator.
+        let operator = Self {
             shares: SharesState::open(storage)?,
         };
 
-        info!("Pool successfully initialized");
-        Ok(pool)
+        info!("Operator successfully initialized");
+        Ok(operator)
     }
 
     /// Returns all the shares in storage.
@@ -95,7 +95,7 @@ impl<N: Network> PoolState<N> {
 struct SharesState<N: Network> {
     /// The miner shares for each block height.
     shares: DataMap<u32, HashMap<Address<N>, u64>>,
-    /// The coinbase records earned by the pool.
+    /// The coinbase records earned by the operator.
     records: DataMap<N::Commitment, (u32, Record<N>)>,
 }
 

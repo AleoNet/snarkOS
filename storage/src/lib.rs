@@ -24,7 +24,7 @@ pub(crate) mod state;
 pub use state::{
     LedgerState,
     Metadata,
-    PoolState,
+    OperatorState,
     ProverState,
     MAXIMUM_BLOCK_LOCATORS,
     MAXIMUM_LINEAR_BLOCK_LOCATORS,

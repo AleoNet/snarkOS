@@ -27,7 +27,7 @@ use crate::{
     PeersRouter,
     ProverRouter,
 };
-use snarkos_storage::{storage::Storage, PoolState};
+use snarkos_storage::{storage::Storage, OperatorState};
 use snarkvm::{algorithms::crh::sha256d_to_u64, dpc::prelude::*, utilities::ToBytes};
 
 use anyhow::Result;
@@ -39,38 +39,36 @@ use tokio::{
     task::JoinHandle,
 };
 
-/// Shorthand for the parent half of the `Pool` message channel.
-pub(crate) type PoolRouter<N> = mpsc::Sender<PoolRequest<N>>;
+/// Shorthand for the parent half of the `Operator` message channel.
+pub(crate) type OperatorRouter<N> = mpsc::Sender<OperatorRequest<N>>;
 #[allow(unused)]
-/// Shorthand for the child half of the `Pool` message channel.
-type PoolHandler<N> = mpsc::Receiver<PoolRequest<N>>;
+/// Shorthand for the child half of the `Operator` message channel.
+type OperatorHandler<N> = mpsc::Receiver<OperatorRequest<N>>;
 
 ///
-/// An enum of requests that the `Pool` struct processes.
+/// An enum of requests that the `Operator` struct processes.
 ///
 #[derive(Debug)]
-pub enum PoolRequest<N: Network> {
+pub enum OperatorRequest<N: Network> {
     /// ProposedBlock := (peer_ip, proposed_block, worker_address)
     ProposedBlock(SocketAddr, Block<N>, Address<N>),
     /// GetBlockTemplate := (peer_ip, worker_address)
     GetBlockTemplate(SocketAddr, Address<N>),
-    /// BlockHeightClear := (block_height)
-    BlockHeightClear(u32),
 }
 
 ///
-/// A pool for a specific network on the node server.
+/// An operator for a program on a specific network in the node server.
 ///
 #[derive(Debug)]
-pub struct Pool<N: Network, E: Environment> {
-    /// The address of the pool.
-    pool_address: Option<Address<N>>,
+pub struct Operator<N: Network, E: Environment> {
+    /// The address of the operator.
+    address: Option<Address<N>>,
     /// The local address of this node.
     local_ip: SocketAddr,
-    /// The state storage of the pool.
-    state: Arc<PoolState<N>>,
-    /// The pool router of the node.
-    pool_router: PoolRouter<N>,
+    /// The state storage of the operator.
+    state: Arc<OperatorState<N>>,
+    /// The operator router of the node.
+    operator_router: OperatorRouter<N>,
     /// The pool of unconfirmed transactions.
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
     /// The peers router of the node.
@@ -81,19 +79,19 @@ pub struct Pool<N: Network, E: Environment> {
     ledger_router: LedgerRouter<N>,
     /// The prover router of the node.
     prover_router: ProverRouter<N>,
-    /// The current block template that is being mined on by the pool.
-    current_template: RwLock<Option<BlockTemplate<N>>>,
-    /// Peripheral information on each known worker.
+    /// The current block template that is being mined on by the operator.
+    block_template: RwLock<Option<BlockTemplate<N>>>,
+    /// Peripheral information on each known prover.
     /// WorkerInfo := (last_submitted, share_difficulty, shares_submitted_since_reset)
     worker_info: RwLock<HashMap<Address<N>, (i64, u64, u32)>>,
 }
 
-impl<N: Network, E: Environment> Pool<N, E> {
-    /// Initializes a new instance of the pool.
+impl<N: Network, E: Environment> Operator<N, E> {
+    /// Initializes a new instance of the operator.
     pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
         tasks: &Tasks<JoinHandle<()>>,
         path: P,
-        pool_address: Option<Address<N>>,
+        address: Option<Address<N>>,
         local_ip: SocketAddr,
         memory_pool: Arc<RwLock<MemoryPool<N>>>,
         peers_router: PeersRouter<N, E>,
@@ -101,57 +99,57 @@ impl<N: Network, E: Environment> Pool<N, E> {
         ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
     ) -> Result<Arc<Self>> {
-        // Initialize an mpsc channel for sending requests to the `Pool` struct.
-        let (pool_router, mut pool_handler) = mpsc::channel(1024);
+        // Initialize an mpsc channel for sending requests to the `Operator` struct.
+        let (operator_router, mut operator_handler) = mpsc::channel(1024);
 
-        // Initialize the pool.
-        let pool = Arc::new(Self {
-            pool_address,
+        // Initialize the operator.
+        let operator = Arc::new(Self {
+            address,
             local_ip,
-            state: Arc::new(PoolState::open_writer::<S, P>(path)?),
-            pool_router,
+            state: Arc::new(OperatorState::open_writer::<S, P>(path)?),
+            operator_router,
             memory_pool,
             peers_router,
             ledger_reader,
             ledger_router,
             prover_router,
-            current_template: RwLock::new(None),
+            block_template: RwLock::new(None),
             worker_info: RwLock::new(HashMap::new()),
         });
 
         if E::NODE_TYPE == NodeType::Operator {
-            // Initialize the handler for the pool.
-            let pool_clone = pool.clone();
+            // Initialize the handler for the operator.
+            let operator_clone = operator.clone();
             let (router, handler) = oneshot::channel();
             tasks.append(task::spawn(async move {
                 // TODO (julesdesmit): add loop which retargets share difficulty.
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
-                // Asynchronously wait for a pool request.
-                while let Some(request) = pool_handler.recv().await {
-                    pool_clone.update(request).await;
+                // Asynchronously wait for a operator request.
+                while let Some(request) = operator_handler.recv().await {
+                    operator_clone.update(request).await;
                 }
             }));
-            // Wait until the pool handler is ready.
+            // Wait until the operator handler is ready.
             let _ = handler.await;
 
             // Set up an update loop for the block template.
-            let pool_clone = pool.clone();
+            let operator_clone = operator.clone();
             let (router, handler) = oneshot::channel();
             tasks.append(task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
-                // Asynchronously wait for a pool request.
-                let recipient = pool_clone
-                    .pool_address
+                // Asynchronously wait for a operator request.
+                let recipient = operator_clone
+                    .address
                     .expect("A pool should have an available Aleo address at all times");
                 loop {
-                    let mut current_template = pool_clone.current_template.write().await;
-                    match &*current_template {
+                    let mut block_template = operator_clone.block_template.write().await;
+                    match &*block_template {
                         Some(t) => {
-                            if pool_clone.ledger_reader.latest_block_height() != t.block_height() - 1 {
-                                *current_template = Some(
-                                    pool_clone
+                            if operator_clone.ledger_reader.latest_block_height() != t.block_height() - 1 {
+                                *block_template = Some(
+                                    operator_clone
                                         .generate_block_template(recipient)
                                         .await
                                         .expect("Should be able to generate a block template"),
@@ -159,15 +157,15 @@ impl<N: Network, E: Environment> Pool<N, E> {
                             }
                         }
                         None => {
-                            *current_template = Some(
-                                pool_clone
+                            *block_template = Some(
+                                operator_clone
                                     .generate_block_template(recipient)
                                     .await
                                     .expect("Should be able to generate a block template"),
                             );
                         }
                     };
-                    drop(current_template); // Release lock, to avoid recursively locking.
+                    drop(block_template); // Release lock, to avoid recursively locking.
 
                     // Sleep for `5` seconds.
                     tokio::time::sleep(Duration::from_secs(5)).await;
@@ -177,12 +175,12 @@ impl<N: Network, E: Environment> Pool<N, E> {
             let _ = handler.await;
         }
 
-        Ok(pool)
+        Ok(operator)
     }
 
-    /// Returns an instance of the pool router.
-    pub fn router(&self) -> PoolRouter<N> {
-        self.pool_router.clone()
+    /// Returns an instance of the operator router.
+    pub fn router(&self) -> OperatorRouter<N> {
+        self.operator_router.clone()
     }
 
     /// Returns all the shares in storage.
@@ -194,10 +192,10 @@ impl<N: Network, E: Environment> Pool<N, E> {
     /// Performs the given `request` to the pool.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(&self, request: PoolRequest<N>) {
+    pub(super) async fn update(&self, request: OperatorRequest<N>) {
         match request {
-            PoolRequest::ProposedBlock(peer_ip, mut block, worker_address) => {
-                if let Some(current_template) = &*self.current_template.read().await {
+            OperatorRequest::ProposedBlock(peer_ip, mut block, worker_address) => {
+                if let Some(current_template) = &*self.block_template.read().await {
                     // Check that the block is relevant.
                     if self.ledger_reader.latest_block_height().saturating_add(1) != block.height() {
                         warn!("[ProposedBlock] Peer {} sent a stale candidate block.", peer_ip);
@@ -208,7 +206,7 @@ impl<N: Network, E: Environment> Pool<N, E> {
                     let records = match block.to_coinbase_transaction() {
                         Ok(tx) => {
                             let coinbase_records: Vec<Record<N>> = tx.to_records().collect();
-                            let valid_owner = coinbase_records.iter().any(|r| Some(r.owner()) == self.pool_address);
+                            let valid_owner = coinbase_records.iter().any(|r| Some(r.owner()) == self.address);
 
                             if !valid_owner {
                                 warn!("[ProposedBlock] Peer {} sent a candidate block with an invalid owner.", peer_ip);
@@ -265,7 +263,7 @@ impl<N: Network, E: Environment> Pool<N, E> {
                     }
 
                     debug!(
-                        "Pool has received valid share {} ({}) - {} / {}",
+                        "Operator has received valid share {} ({}) - {} / {}",
                         block.height(),
                         block.hash(),
                         worker_address,
@@ -308,14 +306,8 @@ impl<N: Network, E: Environment> Pool<N, E> {
                     warn!("[ProposedBlock] No current template exists");
                 }
             }
-            PoolRequest::BlockHeightClear(block_height) => {
-                // Remove the shares for the given block height.
-                if let Err(error) = self.state.remove_shares(block_height) {
-                    warn!("[BlockHeightClear] {}", error);
-                }
-            }
-            PoolRequest::GetBlockTemplate(peer_ip, address) => {
-                if let Some(block_template) = &*self.current_template.read().await {
+            OperatorRequest::GetBlockTemplate(peer_ip, address) => {
+                if let Some(block_template) = &*self.block_template.read().await {
                     // Ensure this worker exists in the info list first, so we can get their share difficulty.
                     let share_difficulty = self
                         .worker_info

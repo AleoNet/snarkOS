@@ -92,7 +92,7 @@ pub struct Prover<N: Network, E: Environment> {
     ledger_router: LedgerRouter<N>,
 
     /// The IP address of the connected pool.
-    pool_ip: Option<SocketAddr>,
+    pool: Option<SocketAddr>,
 }
 
 impl<N: Network, E: Environment> Prover<N, E> {
@@ -130,7 +130,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
             ledger_reader,
             ledger_router,
 
-            pool_ip,
+            pool: pool_ip,
         });
 
         // Initialize the handler for the prover.
@@ -180,7 +180,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
     pub(super) async fn update(&self, request: ProverRequest<N>) {
         match request {
             ProverRequest::BlockTemplate(peer_ip, share_difficulty, block_template) => {
-                if let Some(pool_address) = self.pool_ip {
+                if let Some(pool_address) = self.pool {
                     // Refuse work from any pool other than our registered one.
                     if pool_address != peer_ip {
                         return;
