@@ -42,9 +42,9 @@ use tracing_subscriber::EnvFilter;
 #[derive(StructOpt, Debug, Deserialize, StructOptToml)]
 #[structopt(name = "snarkos", author = "The Aleo Team <hello@aleo.org>", setting = structopt::clap::AppSettings::ColoredHelp)]
 pub struct Node {
-    /// Specify config.
+    /// Specify the config file path.
     #[structopt(long = "config")]
-    pub config: Option<String>,
+    pub config_file: Option<String>,
     /// Specify the IP address and port of a peer to connect to.
     #[structopt(long = "connect")]
     pub connect: Option<String>,

@@ -30,7 +30,7 @@ fn main() -> Result<()> {
 
     // Parse the provided arguments.
     let mut node = Node::from_args();
-    match node.config {
+    match node.config_file {
         Some(file) => {
             let content = fs::read_to_string(file).expect("failed to read config file");
             node = Node::from_args_with_toml(&content).expect("failed to parse config file")

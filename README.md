@@ -155,6 +155,7 @@ FLAGS:
     -V, --version    Prints version information
 
 OPTIONS:
+        --config <config-file>       Specify the config file path
         --connect <connect>          Specify the IP address and port of a peer to connect to
         --dev <dev>                  Enables development mode, specify a unique ID for the local node
         --miner <miner>              Specify this as a mining node, with the given miner address
