@@ -83,7 +83,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let terminator = Arc::new(AtomicBool::new(false));
 
         // Initialize a new instance for managing peers.
-        let peers = Peers::new(&mut tasks, local_ip, None, &status).await;
+        let peers = Peers::new(tasks.clone(), local_ip, None, &status).await;
         // Initialize a new instance for managing the ledger.
         let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &ledger_storage_path, &status, &terminator, peers.router()).await?;
         // Initialize a new instance for managing the prover.
