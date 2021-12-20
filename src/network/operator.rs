@@ -116,7 +116,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
             local_ip,
             state: Arc::new(OperatorState::open_writer::<S, P>(path)?),
             block_template: RwLock::new(None),
-            provers: RwLock::new(HashMap::new()),
+            provers: Default::default(),
             operator_router,
             memory_pool,
             peers_router,
