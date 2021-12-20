@@ -364,7 +364,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 let connected_sync_nodes = self.connected_sync_nodes().await;
                 let number_of_connected_sync_nodes = connected_sync_nodes.len();
                 let num_excess_sync_nodes = number_of_connected_sync_nodes.saturating_sub(1);
-                if number_of_connected_peers >= E::MINIMUM_NUMBER_OF_PEERS && num_excess_sync_nodes > 0 {
+                if num_excess_sync_nodes > 0 {
                     // Proceed to send disconnect requests to these peers.
                     for peer_ip in connected_sync_nodes
                         .iter()
