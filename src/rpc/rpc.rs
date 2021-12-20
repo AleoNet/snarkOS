@@ -444,6 +444,7 @@ mod tests {
     use hyper::Request;
     use rand::{thread_rng, SeedableRng};
     use rand_chacha::ChaChaRng;
+    use snarkvm::dpc::Record;
     use std::{
         path::{Path, PathBuf},
         sync::atomic::AtomicBool,
@@ -1166,6 +1167,7 @@ mod tests {
         pub struct GetTransactionResponse {
             pub transaction: Transaction<Testnet2>,
             pub metadata: snarkos_storage::Metadata<Testnet2>,
+            pub decrypted_records: Vec<Record<Testnet2>>,
         }
 
         // Initialize a new ledger.
@@ -1199,11 +1201,16 @@ mod tests {
         let actual: GetTransactionResponse = process_response(response).await;
 
         // Check the transaction.
-        assert_eq!(*Testnet2::genesis_block().transactions().first().unwrap(), actual.transaction);
+        let expected_transaction = Testnet2::genesis_block().transactions().first().unwrap();
+        assert_eq!(*expected_transaction, actual.transaction);
 
         // Check the metadata.
         let expected_transaction_metadata = ledger.get_transaction_metadata(&transaction_id).unwrap();
         assert_eq!(expected_transaction_metadata, actual.metadata);
+
+        // Check the records.
+        let expected_decrypted_records: Vec<Record<Testnet2>> = expected_transaction.to_records().collect();
+        assert_eq!(expected_decrypted_records, actual.decrypted_records)
     }
 
     #[tokio::test]
