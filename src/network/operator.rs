@@ -45,6 +45,8 @@ use tokio::{
     task::JoinHandle,
 };
 
+const UPDATE_DELAY: Duration = Duration::from_secs(5);
+
 /// Shorthand for the parent half of the `Operator` message channel.
 pub(crate) type OperatorRouter<N> = mpsc::Sender<OperatorRequest<N>>;
 #[allow(unused)]
@@ -171,7 +173,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         }
 
                         // Sleep for `5` seconds.
-                        tokio::time::sleep(Duration::from_secs(5)).await;
+                        tokio::time::sleep(UPDATE_DELAY).await;
                     }
                 }));
                 // Wait until the operator handler is ready.
