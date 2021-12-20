@@ -14,10 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use std::fs;
+
 use snarkos::{initialize_logger, Node};
 
 use anyhow::Result;
 use structopt::StructOpt;
+use structopt_toml::StructOptToml;
 use tokio::runtime;
 
 fn main() -> Result<()> {
@@ -26,7 +29,14 @@ fn main() -> Result<()> {
     }
 
     // Parse the provided arguments.
-    let node = Node::from_args();
+    let mut node = Node::from_args();
+    match node.config {
+        Some(file) => {
+            let content = fs::read_to_string(file).expect("failed to read config file");
+            node = Node::from_args_with_toml(&content).expect("failed to parse config file")
+        }
+        None => (),
+    }
 
     // Start logging, if enabled.
     if !node.display {

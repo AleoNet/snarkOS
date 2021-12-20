@@ -1,0 +1,35 @@
+# If true, the node will render a read-only display
+display = false
+
+# If  true, the node will not initialize the RPC server
+norpc = false
+
+# Specify the IP address and port of a peer to connect to
+# connect = 
+
+# Enables development mode, specify a unique ID for the local node
+# dev = 132
+
+# Specify this as a mining node, with the given miner address
+# miner =  
+
+# Specify the network of this node [default: 2]
+network = 2
+
+# Specify the IP address and port for the node server [default: 0.0.0.0:4132]
+node = "0.0.0.0:4144"
+
+# Specify the IP address and port for the RPC server [default: 0.0.0.0:3032]
+rpc = "0.0.0.0:3044"
+
+# Specify the password for the RPC server [default: pass]
+rpc_password = "passss"
+
+# Specify the username for the RPC server [default: root]
+rpc_username = "roottt"
+
+# Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
+verbosity = 2
+
+trial = true
+sync = true

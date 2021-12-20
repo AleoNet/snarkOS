@@ -26,6 +26,7 @@ use crate::{
     NodeType,
     SyncNode,
 };
+use serde::Deserialize;
 use snarkos_storage::storage::rocksdb::RocksDB;
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
@@ -34,12 +35,16 @@ use colored::*;
 use crossterm::tty::IsTty;
 use std::{io, net::SocketAddr, path::PathBuf, str::FromStr};
 use structopt::StructOpt;
+use structopt_toml::StructOptToml;
 use tokio::{signal, sync::mpsc, task};
 use tracing_subscriber::EnvFilter;
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Deserialize, StructOptToml)]
 #[structopt(name = "snarkos", author = "The Aleo Team <hello@aleo.org>", setting = structopt::clap::AppSettings::ColoredHelp)]
 pub struct Node {
+    /// Specify config.
+    #[structopt(long = "config")]
+    pub config: Option<String>,
     /// Specify the IP address and port of a peer to connect to.
     #[structopt(long = "connect")]
     pub connect: Option<String>,
@@ -202,7 +207,7 @@ pub fn initialize_logger(verbosity: u8, log_sender: Option<mpsc::Sender<Vec<u8>>
         .try_init();
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Deserialize)]
 pub enum Command {
     #[structopt(name = "clean", about = "Removes the ledger files from storage")]
     Clean(Clean),
@@ -257,7 +262,7 @@ impl io::Write for LogWriter {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Deserialize)]
 pub struct Clean {
     /// Specify the network of the ledger to remove from storage.
     #[structopt(default_value = "2", long = "network")]
@@ -294,7 +299,7 @@ impl Clean {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Deserialize)]
 pub struct Update {
     /// Lists all available versions of snarkOS
     #[structopt(short = "l", long)]
@@ -334,7 +339,7 @@ impl Update {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Deserialize)]
 pub struct Experimental {
     #[structopt(subcommand)]
     commands: ExperimentalCommands,
@@ -348,13 +353,13 @@ impl Experimental {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Deserialize)]
 pub enum ExperimentalCommands {
     #[structopt(name = "new_account", about = "Generate a new Aleo Account.")]
     NewAccount(NewAccount),
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Deserialize)]
 pub struct NewAccount {}
 
 impl NewAccount {
@@ -375,7 +380,7 @@ impl NewAccount {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Deserialize)]
 pub struct MinerSubcommand {
     #[structopt(subcommand)]
     commands: MinerCommands,
@@ -389,13 +394,13 @@ impl MinerSubcommand {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Deserialize)]
 pub enum MinerCommands {
     #[structopt(name = "stats", about = "Prints statistics for the miner.")]
     Stats(MinerStats),
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(StructOpt, Debug, Deserialize)]
 pub struct MinerStats {
     #[structopt()]
     address: String,
