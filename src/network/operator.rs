@@ -236,7 +236,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                             // Ensure the owner of the coinbase transaction in the block is the operator address.
                             let coinbase_records: Vec<Record<N>> =
                                 transaction.to_records().filter(|r| Some(r.owner()) == self.address).collect();
-                            if coinbase_records.len() == 0 {
+                            if coinbase_records.is_empty() {
                                 warn!("[ProposedBlock] Peer {} sent a candidate block with an incorrect owner.", peer_ip);
                                 return;
                             }
