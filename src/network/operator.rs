@@ -297,7 +297,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         let mut prover = *provers.get_mut(&prover_address).expect("prover should have existing info");
                         prover.0 = Instant::now();
                         prover.2 += 1;
-                        provers.insert(prover_address, prover);
                     }
 
                     info!(
