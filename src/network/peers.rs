@@ -588,7 +588,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Sends the given message to every connected peer, excluding the sender.
     ///
-    async fn propagate(&self, sender: SocketAddr, message: Message<N, E>) {
+    async fn propagate(&self, sender: SocketAddr, mut message: Message<N, E>) {
+        // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
+        if let Message::UnconfirmedBlock(_, _, ref mut data) = message {
+            let serialized_block = Data::serialize(data.clone()).await.expect("Block serialization is bugged");
+            let _ = std::mem::replace(data, Data::Buffer(serialized_block));
+        }
+
         // Iterate through all peers that are not the sender, sync node, or beacon node.
         for peer in self
             .connected_peers()
@@ -945,25 +951,19 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                     true
                                 }
-                                Message::UnconfirmedBlock(_, _, ref mut data) => {
-                                    let block = if let Data::Object(block) = data {
-                                        block
-                                    } else {
-                                        panic!("Logic error: the block shouldn't have been serialized yet.");
-                                    };
-
+                                Message::UnconfirmedBlock(block_height, block_hash, ref mut data) => {
                                     // Retrieve the last seen timestamp of this block for this peer.
-                                    let last_seen = peer.seen_outbound_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
+                                    let last_seen = peer.seen_outbound_blocks.entry(block_hash).or_insert(SystemTime::UNIX_EPOCH);
                                     let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                                     // Update the timestamp for the peer and sent block.
-                                    peer.seen_outbound_blocks.insert(block.hash(), SystemTime::now());
+                                    peer.seen_outbound_blocks.insert(block_hash, SystemTime::now());
                                     // Report the unconfirmed block height.
                                     if is_ready_to_send {
-                                        trace!("Preparing to send 'UnconfirmedBlock {}' to {}", block.height(), peer_ip);
+                                        trace!("Preparing to send 'UnconfirmedBlock {}' to {}", block_height, peer_ip);
                                     }
 
-                                    // Perform non-blocking serialization of the block.
+                                    // Perform non-blocking serialization of the block (if it hasn't been serialized yet).
                                     let serialized_block = Data::serialize(data.clone()).await.expect("Block serialization is bugged");
                                     let _ = std::mem::replace(data, Data::Buffer(serialized_block));
 
