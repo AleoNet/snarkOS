@@ -162,7 +162,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         Self::initialize_notification(ledger.reader(), prover.clone(), address).await;
 
         // Initialise the metrics exporter.
-        // TODO (nkls): feature gate.
+        #[cfg(feature = "prometheus")]
         Self::initialize_metrics(&mut tasks);
 
         Ok(Self {
@@ -409,6 +409,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let _ = handler.await;
     }
 
+    #[cfg(feature = "prometheus")]
     fn initialize_metrics(tasks: &mut Tasks<task::JoinHandle<()>>) {
         tasks.append(snarkos_metrics::initialize().expect("couldn't initialise the metrics"));
     }
