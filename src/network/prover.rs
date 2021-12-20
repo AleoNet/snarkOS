@@ -164,12 +164,14 @@ impl<N: Network, E: Environment> Prover<N, E> {
             let prover = prover.clone();
             task::spawn(async move {
                 loop {
-                    // Sleep for `60` seconds.
-                    tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+                    // Sleep for `5` seconds.
+                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
 
                     // TODO (howardwu): Check that the prover is connected to the pool before proceeding.
                     //  Currently we use a sleep function to probabilistically ensure the peer is connected.
-                    prover.send_pool_register().await;
+                    if !prover.terminator.load(Ordering::SeqCst) && !prover.status.is_peering() && !prover.status.is_mining() {
+                        prover.send_pool_register().await;
+                    }
                 }
             });
         }
@@ -202,7 +204,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                 // Process the pool request message.
                 self.process_pool_request(operator_ip, share_difficulty, block_template).await;
                 // Proceed to register the prover to receive the next block template.
-                self.send_pool_register().await;
+                // self.send_pool_register().await;
             }
             ProverRequest::MemoryPoolClear(block) => match block {
                 Some(block) => self.memory_pool.write().await.remove_transactions(block.transactions()),
