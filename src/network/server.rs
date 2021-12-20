@@ -161,6 +161,10 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance of the notification.
         Self::initialize_notification(ledger.reader(), prover.clone(), address).await;
 
+        // Initialise the metrics exporter.
+        // TODO (nkls): feature gate.
+        Self::initialize_metrics(&mut tasks);
+
         Ok(Self {
             local_ip,
             peers,
@@ -403,5 +407,9 @@ impl<N: Network, E: Environment> Server<N, E> {
         }));
         // Wait until the heartbeat task is ready.
         let _ = handler.await;
+    }
+
+    fn initialize_metrics(tasks: &mut Tasks<task::JoinHandle<()>>) {
+        tasks.append(snarkos_metrics::initialize().expect("couldn't initialise the metrics"));
     }
 }
