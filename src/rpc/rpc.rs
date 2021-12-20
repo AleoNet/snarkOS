@@ -492,7 +492,7 @@ mod tests {
         let mut tasks = Tasks::new();
 
         // Initialize a new instance for managing peers.
-        let peers = Peers::new(&mut tasks, local_ip, None, &status).await;
+        let peers = Peers::new(tasks.clone(), local_ip, None, &status).await;
         // Initialize a new instance for managing the ledger.
         let ledger = Ledger::<N, E>::open::<S, _>(&mut tasks, &ledger_path, &status, &terminator, peers.router())
             .await
