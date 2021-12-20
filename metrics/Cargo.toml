@@ -16,8 +16,6 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2018"
 
-[dependencies]
-
 [dependencies.metrics]
 version = "0.17"
 

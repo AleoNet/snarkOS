@@ -25,7 +25,6 @@ cuda = [ "snarkvm/cuda" ]
 prometheus = ["snarkos-metrics"]
 test = []
 
-
 [dependencies]
 snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "48c59e9" }
 #snarkvm = { path = "../snarkVM" }

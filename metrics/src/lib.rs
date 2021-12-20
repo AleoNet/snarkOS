@@ -14,8 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+mod names;
+
 // Re-export the metrics macros.
 pub use metrics::*;
+pub use names::*;
+
 use metrics_exporter_prometheus::PrometheusBuilder;
 
 pub fn initialize() -> Option<tokio::task::JoinHandle<()>> {
