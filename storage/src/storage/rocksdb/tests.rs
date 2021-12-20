@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::storage::{rocksdb::RocksDB, Map, Storage};
+use crate::storage::{rocksdb::RocksDB, Map, MapId, Storage};
 
 fn temp_dir() -> std::path::PathBuf {
     tempfile::tempdir().expect("Failed to open temporary directory").into_path()
@@ -28,13 +28,13 @@ fn test_open() {
 #[test]
 fn test_open_map() {
     let storage = RocksDB::open(temp_dir(), 0, false).expect("Failed to open storage");
-    storage.open_map::<u32, String>("hello world").expect("Failed to open data map");
+    storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
 }
 
 #[test]
 fn test_insert_and_contains_key() {
     let storage = RocksDB::open(temp_dir(), 0, false).expect("Failed to open storage");
-    let map = storage.open_map::<u32, String>("hello world").expect("Failed to open data map");
+    let map = storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
 
     map.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
     assert!(map.contains_key(&123456789).expect("Failed to call contains key"));
@@ -44,7 +44,7 @@ fn test_insert_and_contains_key() {
 #[test]
 fn test_insert_and_get() {
     let storage = RocksDB::open(temp_dir(), 0, false).expect("Failed to open storage");
-    let map = storage.open_map::<u32, String>("hello world").expect("Failed to open data map");
+    let map = storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
 
     map.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
     assert_eq!(Some("123456789".to_string()), map.get(&123456789).expect("Failed to get"));
@@ -54,7 +54,7 @@ fn test_insert_and_get() {
 #[test]
 fn test_insert_and_remove() {
     let storage = RocksDB::open(temp_dir(), 0, false).expect("Failed to open storage");
-    let map = storage.open_map::<u32, String>("hello world").expect("Failed to open data map");
+    let map = storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
 
     map.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
     assert!(map.get(&123456789).expect("Failed to get").is_some());
@@ -66,7 +66,7 @@ fn test_insert_and_remove() {
 #[test]
 fn test_insert_and_iter() {
     let storage = RocksDB::open(temp_dir(), 0, false).expect("Failed to open storage");
-    let map = storage.open_map::<u32, String>("hello world").expect("Failed to open data map");
+    let map = storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
     map.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
 
     let mut iter = map.iter();
@@ -77,7 +77,7 @@ fn test_insert_and_iter() {
 #[test]
 fn test_insert_and_keys() {
     let storage = RocksDB::open(temp_dir(), 0, false).expect("Failed to open storage");
-    let map = storage.open_map::<u32, String>("hello world").expect("Failed to open data map");
+    let map = storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
     map.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
 
     let mut keys = map.keys();
@@ -88,7 +88,7 @@ fn test_insert_and_keys() {
 #[test]
 fn test_insert_and_values() {
     let storage = RocksDB::open(temp_dir(), 0, false).expect("Failed to open storage");
-    let map = storage.open_map::<u32, String>("hello world").expect("Failed to open data map");
+    let map = storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
     map.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
 
     let mut values = map.values();
@@ -101,13 +101,13 @@ fn test_reopen() {
     let directory = temp_dir();
     {
         let storage = RocksDB::open(directory.clone(), 0, false).expect("Failed to open storage");
-        let map = storage.open_map::<u32, String>("hello world").expect("Failed to open data map");
+        let map = storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
         map.insert(&123456789, &"123456789".to_string()).expect("Failed to insert");
         drop(storage);
     }
     {
         let storage = RocksDB::open(directory, 0, false).expect("Failed to open storage");
-        let map = storage.open_map::<u32, String>("hello world").expect("Failed to open data map");
+        let map = storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
         assert_eq!(Some("123456789".to_string()), map.get(&123456789).expect("Failed to get"));
     }
 }
