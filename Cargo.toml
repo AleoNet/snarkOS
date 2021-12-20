@@ -28,7 +28,7 @@ snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "d3ae7e6" }
 #snarkvm = { path = "../snarkVM" }
 
 bytes = "1.0.0"
-futures = { version = "0.3.17", features = ["thread-pool"]}
+futures = { version = "0.3.19", features = ["thread-pool"]}
 
 crossterm = { version = "0.22" }
 tui = { version = "0.16.0", features = ["crossterm"] }
@@ -38,7 +38,7 @@ path = "./storage"
 version = "2.0.0"
 
 [dependencies.aleo-std]
-version = "0.1.4"
+version = "0.1.6"
 
 [dependencies.anyhow]
 version = "1"
