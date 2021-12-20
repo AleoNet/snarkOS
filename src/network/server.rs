@@ -242,12 +242,10 @@ impl<N: Network, E: Environment> Server<N, E> {
                         }
                         Err(error) => error!("Failed to accept a connection: {}", error),
                     }
-                    // Add a small delay to prevent overloading the network from handshakes.
-                    tokio::time::sleep(Duration::from_millis(150)).await;
-                } else {
-                    // Add a sleep delay as the node has reached peer capacity.
-                    tokio::time::sleep(Duration::from_secs(5)).await;
                 }
+
+                // Add a small delay to prevent overloading the network from handshakes.
+                tokio::time::sleep(Duration::from_millis(150)).await;
             }
         }));
         // Wait until the listener task is ready.

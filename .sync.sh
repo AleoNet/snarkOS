@@ -13,8 +13,6 @@ trap exit_node SIGINT
 
 echo "Do not run a sync node, it does nothing..."
 
-ulimit -n 1048576
-
 while :
 do
   echo "Checking for updates..."
