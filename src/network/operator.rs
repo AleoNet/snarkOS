@@ -203,7 +203,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
     pub(super) async fn update(&self, request: OperatorRequest<N>) {
         match request {
             OperatorRequest::PoolRegister(peer_ip, address) => {
-                if let Some(block_template) = &*self.block_template.read().await {
+                if let Some(block_template) = self.block_template.read().await.clone() {
                     // Ensure this prover exists in the list first, and retrieve their share difficulty.
                     let share_difficulty = self
                         .provers
@@ -214,7 +214,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         .1;
 
                     // Route a `PoolRequest` to the peer.
-                    let message = Message::PoolRequest(share_difficulty, Data::Object(block_template.clone()));
+                    let message = Message::PoolRequest(share_difficulty, Data::Object(block_template));
                     if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                         warn!("[PoolRequest] {}", error);
                     }
@@ -223,7 +223,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                 }
             }
             OperatorRequest::PoolResponse(peer_ip, block, prover_address) => {
-                if let Some(block_template) = &*self.block_template.read().await {
+                if let Some(block_template) = self.block_template.read().await.clone() {
                     // Check that the block is relevant.
                     if self.ledger_reader.latest_block_height().saturating_add(1) != block.height() {
                         warn!("[PoolResponse] Peer {} sent a stale candidate block.", peer_ip);
