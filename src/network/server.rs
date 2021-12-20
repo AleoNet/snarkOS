@@ -83,7 +83,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let terminator = Arc::new(AtomicBool::new(false));
 
         // Initialize a new instance for managing peers.
-        let peers = Peers::new(&mut tasks, local_ip, None, &status).await;
+        let peers = Peers::new(tasks.clone(), local_ip, None, &status).await;
         // Initialize a new instance for managing the ledger.
         let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &ledger_storage_path, &status, &terminator, peers.router()).await?;
         // Initialize a new instance for managing the prover.
@@ -106,6 +106,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             local_ip,
             listener,
             peers.router(),
+            peers.clone(),
             ledger.reader(),
             ledger.router(),
             prover.router(),
@@ -210,6 +211,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         local_ip: SocketAddr,
         listener: TcpListener,
         peers_router: PeersRouter<N, E>,
+        peers: Arc<Peers<N, E>>,
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
@@ -221,25 +223,31 @@ impl<N: Network, E: Environment> Server<N, E> {
             let _ = router.send(());
             info!("Listening for peers at {}", local_ip);
             loop {
-                // Asynchronously wait for an inbound TcpStream.
-                match listener.accept().await {
-                    // Process the inbound connection request.
-                    Ok((stream, peer_ip)) => {
-                        let request = PeersRequest::PeerConnecting(
-                            stream,
-                            peer_ip,
-                            ledger_reader.clone(),
-                            ledger_router.clone(),
-                            prover_router.clone(),
-                        );
-                        if let Err(error) = peers_router.send(request).await {
-                            error!("Failed to send request to peers: {}", error)
+                // Don't accept connections if the node is breaching the configured peer limit.
+                if peers.number_of_connected_peers().await < E::MAXIMUM_NUMBER_OF_PEERS {
+                    // Asynchronously wait for an inbound TcpStream.
+                    match listener.accept().await {
+                        // Process the inbound connection request.
+                        Ok((stream, peer_ip)) => {
+                            let request = PeersRequest::PeerConnecting(
+                                stream,
+                                peer_ip,
+                                ledger_reader.clone(),
+                                ledger_router.clone(),
+                                prover_router.clone(),
+                            );
+                            if let Err(error) = peers_router.send(request).await {
+                                error!("Failed to send request to peers: {}", error)
+                            }
                         }
+                        Err(error) => error!("Failed to accept a connection: {}", error),
                     }
-                    Err(error) => error!("Failed to accept a connection: {}", error),
+                    // Add a small delay to prevent overloading the network from handshakes.
+                    tokio::time::sleep(Duration::from_millis(150)).await;
+                } else {
+                    // Add a sleep delay as the node has reached peer capacity.
+                    tokio::time::sleep(Duration::from_secs(5)).await;
                 }
-                // Add a small delay to prevent overloading the network from handshakes.
-                tokio::time::sleep(Duration::from_millis(150)).await;
             }
         }));
         // Wait until the listener task is ready.
