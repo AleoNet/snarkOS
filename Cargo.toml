@@ -104,6 +104,9 @@ features = [ "arbitrary_precision" ]
 [dependencies.structopt]
 version = "0.3"
 
+[dependencies.structopt-toml]
+version = "0.5"
+
 [dependencies.thiserror]
 version = "1.0"
 
