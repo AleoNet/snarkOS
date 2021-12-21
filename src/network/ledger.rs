@@ -900,6 +900,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // If the node is a sync node and the node is currently syncing,
             // reduce the number of connections down to the minimum threshold,
             // to improve the speed with which the node syncs back to tip.
+            // FIXME: causes sync nodes to hang when at maximum peers
+            /*
             if E::NODE_TYPE == NodeType::Sync && self.status.is_syncing() {
                 debug!("Temporarily reducing the number of connected peers to sync");
 
@@ -926,6 +928,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     self.disconnect_and_restrict(peer_ip, "disconnecting to sync").await;
                 }
             }
+            */
         }
     }
 
