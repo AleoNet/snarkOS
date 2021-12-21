@@ -31,7 +31,7 @@ bytes = "1.0.0"
 futures = { version = "0.3.19", features = ["thread-pool"]}
 
 crossterm = { version = "0.22" }
-tui = { version = "0.16.0", features = ["crossterm"] }
+tui = { version = "0.16.0", default-features = false, features = ["crossterm"] }
 
 [dependencies.snarkos-storage]
 path = "./storage"
