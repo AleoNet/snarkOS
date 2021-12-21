@@ -32,6 +32,7 @@ use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 use anyhow::{anyhow, Result};
 use colored::*;
 use crossterm::tty::IsTty;
+use rayon::prelude::*;
 use std::{io, net::SocketAddr, path::PathBuf, str::FromStr};
 use structopt::StructOpt;
 use tokio::{signal, sync::mpsc, task};
@@ -344,6 +345,7 @@ impl Experimental {
     pub fn parse(self) -> Result<String> {
         match self.commands {
             ExperimentalCommands::NewAccount(command) => command.parse(),
+            ExperimentalCommands::LoadRecords(command) => command.parse(),
         }
     }
 }
@@ -352,6 +354,8 @@ impl Experimental {
 pub enum ExperimentalCommands {
     #[structopt(name = "new_account", about = "Generate a new Aleo Account.")]
     NewAccount(NewAccount),
+    #[structopt(name = "load_records", about = "Load all known records owned by the given view key.")]
+    LoadRecords(LoadRecords),
 }
 
 #[derive(StructOpt, Debug)]
@@ -370,6 +374,56 @@ impl NewAccount {
         output += &format!("\n {:>12}  {}\n", "Private Key".cyan().bold(), account.private_key());
         output += &format!(" {:>12}  {}\n", "View Key".cyan().bold(), account.view_key());
         output += &format!(" {:>12}  {}\n", "Address".cyan().bold(), account.address());
+
+        Ok(output)
+    }
+}
+
+#[derive(StructOpt, Debug)]
+pub struct LoadRecords {
+    #[structopt(long)]
+    pub account_view_key: String,
+}
+
+impl LoadRecords {
+    pub fn parse(self) -> Result<String> {
+        // Parse the input account view key.
+        let account_view_key = ViewKey::<Testnet2>::from_str(&self.account_view_key)?;
+
+        // Initialize the node.
+        let node = Node::from_iter(&["snarkos", "--norpc", "--verbosity", "0"]);
+
+        let ip = "0.0.0.0:1000".parse().unwrap();
+
+        // Initialize the ledger storage.
+        let ledger_storage_path = node.ledger_storage_path(ip);
+        let ledger = snarkos_storage::LedgerState::<Testnet2>::open_reader::<RocksDB, _>(ledger_storage_path).unwrap();
+
+        // Retrieve the latest block height.
+        let latest_block_height = ledger.latest_block_height();
+
+        // Iterate through all records in the ledger.
+        let start_block_height = 0;
+        // let latest_block_height = 1000;
+
+        // Retrieve records. todo @collin: collect total balance.
+        let decrypted_records: Vec<Record<Testnet2>> = (start_block_height..latest_block_height)
+            .into_par_iter()
+            .map(|height| ledger.get_block_transactions(height).expect("Failed to get block transactions"))
+            .flat_map(|transactions| transactions.to_decrypted_records(&account_view_key))
+            .collect();
+
+        // todo @collin: separate pending vs confirmed records.
+
+        // Print the decrypted records.
+        let mut output = "".to_string();
+        output += &format!(
+            "\n {:>12}  {}\n",
+            "Number of decrypted records".cyan().bold(),
+            decrypted_records.len()
+        );
+
+        println!("{}", output);
 
         Ok(output)
     }
