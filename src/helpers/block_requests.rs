@@ -342,7 +342,7 @@ mod tests {
             // Declare peer state.
             let peer_ip = format!("127.0.0.1:{}", rng.gen::<u16>()).parse().unwrap();
             let peer_is_on_fork = None;
-            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height..latest_block_height * 2);
+            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height + 1..(latest_block_height + 1) * 2);
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
 
             // Declare locator state.
@@ -429,7 +429,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             // Declare internal state.
             let latest_block_height: u32 =
-                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..Client::<Testnet2>::MAXIMUM_FORK_DEPTH * 2);
+                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1) * 2);
             let latest_cumulative_weight: u128 = latest_block_height as u128;
 
             // Declare peer state.
@@ -437,7 +437,7 @@ mod tests {
             let peer_is_on_fork = Some(true);
 
             // Generate a common ancestor within the maximum fork depth.
-            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height + 1..latest_block_height * 2);
+            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height + 1..(latest_block_height + 1) * 2);
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
 
             // Declare locator state.
@@ -487,7 +487,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             // Declare internal state.
             let latest_block_height: u32 =
-                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..Client::<Testnet2>::MAXIMUM_FORK_DEPTH * 2);
+                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1) * 2);
             let latest_cumulative_weight: u128 = latest_block_height as u128;
 
             // Declare peer state.
@@ -495,7 +495,7 @@ mod tests {
             let peer_is_on_fork = Some(true);
 
             // Generate a common ancestor within the maximum fork depth.
-            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height + 1..latest_block_height * 2);
+            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height + 1..(latest_block_height + 1) * 2);
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
 
             // Declare locator state.
@@ -535,7 +535,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             // Declare internal state.
             let latest_block_height: u32 =
-                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..Client::<Testnet2>::MAXIMUM_FORK_DEPTH * 2);
+                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1) * 2);
             let latest_cumulative_weight: u128 = latest_block_height as u128;
 
             // Declare peer state.
@@ -543,7 +543,7 @@ mod tests {
             let peer_is_on_fork = Some(true);
 
             // Generate a common ancestor within the maximum fork depth.
-            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height + 1..latest_block_height * 2);
+            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height + 1..(latest_block_height + 1) * 2);
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
 
             // Declare locator state.
@@ -593,7 +593,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             // Declare internal state.
             let latest_block_height: u32 =
-                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..Client::<Testnet2>::MAXIMUM_FORK_DEPTH * 2);
+                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1) * 2);
             let latest_cumulative_weight: u128 = latest_block_height as u128;
 
             // Declare peer state.
@@ -601,7 +601,7 @@ mod tests {
             let peer_is_on_fork = Some(true);
 
             // Generate a common ancestor within the maximum fork depth.
-            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height + 1..latest_block_height * 2);
+            let peer_maximum_block_height: u32 = rng.gen_range(latest_block_height + 1..(latest_block_height + 1) * 2);
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
 
             // Declare locator state.

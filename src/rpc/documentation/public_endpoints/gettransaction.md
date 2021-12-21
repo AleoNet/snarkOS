@@ -9,10 +9,11 @@ Returns a transaction with metadata given the transaction ID.
 
 ### Response
 
-|   Parameter   |  Type  |                Description                |
-|:-------------:|:------:|:-----------------------------------------:|
-|  `metadata`   | object | The metadata of the requested transaction |
-| `transaction` | object |          The transaction object           |
+|      Parameter      |  Type  |                            Description                             |
+|:-------------------:|:------:|:------------------------------------------------------------------:|
+| `decrypted_records` | array  | The decrypted records using record view key events, if they exist. |
+|     `metadata`      | object |             The metadata of the requested transaction              |
+|    `transaction`    | object |                       The transaction object                       |
 
 #### Transaction Metadata
 
@@ -31,6 +32,18 @@ Returns a transaction with metadata given the transaction ID.
 |   `ledger_root`    | string | The ledger root used to prove inclusion of ledger-consumed records. |
 |  `transaction_id`  | string |                     The ID of this transaction.                     |
 |   `transitions`    | array  |                       The state transitions.                        |
+
+#### Record
+
+|     Parameter     |  Type  |               Description               |
+|:-----------------:|:------:|:---------------------------------------:|
+|   `commitment`    | string |     The commitment of this record.      |
+|      `owner`      | string |            The record owner.            |
+|     `payload`     | string |           The record payload.           |
+|   `program_id`    | string |     The program id of this record.      |
+|   `randomizer`    | string | The randomizer used for the ciphertext. |
+| `record_view_key` | string |      The view key of this record.       |
+|      `value`      | number |            The record value.            |
 
 ### Example Request
 ```ignore
@@ -83,7 +96,18 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "gettransaction", "pa
           "value_balance": -1000000000000000
         }
       ]
-    }
+    },
+    "decrypted_records": [
+      {
+        "commitment":"cm1xck4eyf3a3qnz69yyrr3jf698mqzwpjgkqu0j359p0sdr5wyjyqsn0604p",
+        "owner":"aleo1h35g4ld7wqahxw3puelmntaeddzr2rukmhty5a8cw5vqe65s2cpsrd4ghl",
+        "payload":"0000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000",
+        "program_id":"ap1lhj3g5uzervu3km7rl0rsd0u5j6pj9ujum6yxrvms4mx8r2qhew88ga849hnjypghswxceh02frszs45qmd",
+        "randomizer":"rr1v76mftwzagt9k9nsjjpdqgytv4ddk24e9q7f240daar7avcv3q9qku3vtg",
+        "record_view_key":"rcvk1mujt98tc2r04l58haxjv48s5a7vnhx8ws24fxpdruuk3z37vscqsjtvlg5",
+        "value":1000000000000000
+      }
+    ]
   },
   "id": "1"
 }

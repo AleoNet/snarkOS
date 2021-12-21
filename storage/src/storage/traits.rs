@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use super::DataMap;
+use super::{DataMap, MapId};
 
 use anyhow::Result;
 use serde::{de::DeserializeOwned, Deserializer, Serialize};
@@ -31,7 +31,7 @@ pub trait Storage: Serialize {
     ///
     /// Opens a map with the given `context` from storage.
     ///
-    fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(&self, context: &str) -> Result<DataMap<K, V>>;
+    fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(&self, map_id: MapId) -> Result<DataMap<K, V>>;
 
     ///
     /// Imports the given serialized bytes to reconstruct storage.
