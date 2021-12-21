@@ -117,7 +117,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Initializes a new instance of `Peers`.
     ///
     pub(crate) async fn new(
-        tasks: &mut Tasks<JoinHandle<()>>,
+        tasks: Tasks<JoinHandle<()>>,
         local_ip: SocketAddr,
         local_nonce: Option<u64>,
         local_status: &Status,
@@ -155,10 +155,11 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Asynchronously wait for a peers request.
                 while let Some(request) = peers_handler.recv().await {
                     let peers = peers.clone();
+                    let tasks = tasks_clone.clone();
                     // Asynchronously process a peers request.
                     tasks_clone.append(task::spawn(async move {
                         // Hold the peers write lock briefly, to update the state of the peers.
-                        peers.update(request).await;
+                        peers.update(request, &tasks).await;
                     }));
                 }
             }));
@@ -255,7 +256,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Performs the given `request` to the peers.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(&self, request: PeersRequest<N, E>) {
+    pub(super) async fn update(&self, request: PeersRequest<N, E>, tasks: &Tasks<JoinHandle<()>>) {
         match request {
             PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, prover_router, connection_result) => {
                 // Ensure the peer IP is not this node.
@@ -309,6 +310,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                         prover_router,
                                         self.connected_nonces().await,
                                         Some(connection_result),
+                                        tasks.clone(),
                                     )
                                     .await
                                 }
@@ -362,7 +364,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 let connected_sync_nodes = self.connected_sync_nodes().await;
                 let number_of_connected_sync_nodes = connected_sync_nodes.len();
                 let num_excess_sync_nodes = number_of_connected_sync_nodes.saturating_sub(1);
-                if number_of_connected_peers >= E::MINIMUM_NUMBER_OF_PEERS && num_excess_sync_nodes > 0 {
+                if num_excess_sync_nodes > 0 {
                     // Proceed to send disconnect requests to these peers.
                     for peer_ip in connected_sync_nodes
                         .iter()
@@ -424,9 +426,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             warn!("Failed to transmit the request: '{}'", error);
                         }
                         // Do not wait for the result of each connection.
-                        task::spawn(async move {
+                        tasks.append(task::spawn(async move {
                             let _ = handler.await;
-                        });
+                        }));
                     }
                 }
             }
@@ -509,6 +511,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             prover_router,
                             self.connected_nonces().await,
                             None,
+                            tasks.clone(),
                         )
                         .await;
                     }
@@ -585,7 +588,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Sends the given message to every connected peer, excluding the sender.
     ///
-    async fn propagate(&self, sender: SocketAddr, message: Message<N, E>) {
+    async fn propagate(&self, sender: SocketAddr, mut message: Message<N, E>) {
+        // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
+        if let Message::UnconfirmedBlock(_, _, ref mut data) = message {
+            let serialized_block = Data::serialize(data.clone()).await.expect("Block serialization is bugged");
+            let _ = std::mem::replace(data, Data::Buffer(serialized_block));
+        }
+
         // Iterate through all peers that are not the sender, sync node, or beacon node.
         for peer in self
             .connected_peers()
@@ -880,10 +889,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
         prover_router: ProverRouter<N>,
         connected_nonces: Vec<u64>,
         connection_result: Option<ConnectionResult>,
+        tasks: Tasks<task::JoinHandle<()>>,
     ) {
         let peers_router = peers_router.clone();
 
-        task::spawn(async move {
+        let tasks_clone = tasks.clone();
+        tasks.append(task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
             let mut peer = match Peer::new(
                 stream,
@@ -940,25 +951,19 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                     true
                                 }
-                                Message::UnconfirmedBlock(_, _, ref mut data) => {
-                                    let block = if let Data::Object(block) = data {
-                                        block
-                                    } else {
-                                        panic!("Logic error: the block shouldn't have been serialized yet.");
-                                    };
-
+                                Message::UnconfirmedBlock(block_height, block_hash, ref mut data) => {
                                     // Retrieve the last seen timestamp of this block for this peer.
-                                    let last_seen = peer.seen_outbound_blocks.entry(block.hash()).or_insert(SystemTime::UNIX_EPOCH);
+                                    let last_seen = peer.seen_outbound_blocks.entry(block_hash).or_insert(SystemTime::UNIX_EPOCH);
                                     let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                                     // Update the timestamp for the peer and sent block.
-                                    peer.seen_outbound_blocks.insert(block.hash(), SystemTime::now());
+                                    peer.seen_outbound_blocks.insert(block_hash, SystemTime::now());
                                     // Report the unconfirmed block height.
                                     if is_ready_to_send {
-                                        trace!("Preparing to send 'UnconfirmedBlock {}' to {}", block.height(), peer_ip);
+                                        trace!("Preparing to send 'UnconfirmedBlock {}' to {}", block_height, peer_ip);
                                     }
 
-                                    // Perform non-blocking serialization of the block.
+                                    // Perform non-blocking serialization of the block (if it hasn't been serialized yet).
                                     let serialized_block = Data::serialize(data.clone()).await.expect("Block serialization is bugged");
                                     let _ = std::mem::replace(data, Data::Buffer(serialized_block));
 
@@ -1140,7 +1145,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     let local_status = local_status.clone();
                                     let peers_router = peers_router.clone();
                                     let ledger_reader = ledger_reader.clone();
-                                    task::spawn(async move {
+                                    tasks_clone.append(task::spawn(async move {
                                         // Sleep for the preset time before sending a `Ping` request.
                                         tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
 
@@ -1153,7 +1158,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }
-                                    });
+                                    }));
                                 }
                                 Message::UnconfirmedBlock(block_height, block_hash, block) => {
                                     // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
@@ -1259,6 +1264,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
             {
                 warn!("[Peer::Disconnect] {}", error);
             }
-        });
+        }));
     }
 }
