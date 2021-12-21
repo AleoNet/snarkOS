@@ -835,6 +835,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 BlockRequestHandler::Abort(_) => return,
                 // Disconnect from the peer if it is misbehaving and proceed to abort.
                 BlockRequestHandler::AbortAndDisconnect(_, ref reason) => {
+                    drop(_block_requests_lock);
                     self.disconnect(peer_ip, reason).await;
                     return;
                 }
