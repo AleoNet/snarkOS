@@ -19,7 +19,6 @@ use self_update::{backends::github, version::bump_is_greater, Status};
 
 pub struct Updater;
 
-// TODO Add logic for users to easily select release versions.
 impl Updater {
     const SNARKOS_BIN_NAME: &'static str = "snarkos";
     const SNARKOS_REPO_NAME: &'static str = "snarkOS";
@@ -40,18 +39,23 @@ impl Updater {
         Ok(output)
     }
 
-    /// Update `aleo` to the latest release.
-    pub fn update_to_latest_release(show_output: bool) -> Result<Status, UpdaterError> {
-        let status = github::Update::configure()
+    /// Update `snarkOS` to the specified release.
+    pub fn update_to_release(show_output: bool, version: Option<String>) -> Result<Status, UpdaterError> {
+        let mut update_builder = github::Update::configure();
+
+        update_builder
             .repo_owner(Self::SNARKOS_REPO_OWNER)
             .repo_name(Self::SNARKOS_REPO_NAME)
             .bin_name(Self::SNARKOS_BIN_NAME)
             .current_version(env!("CARGO_PKG_VERSION"))
             .show_download_progress(show_output)
             .no_confirm(true)
-            .show_output(show_output)
-            .build()?
-            .update()?;
+            .show_output(show_output);
+
+        let status = match version {
+            None => update_builder.build()?.update()?,
+            Some(v) => update_builder.target_version_tag(&v).build()?.update()?,
+        };
 
         Ok(status)
     }
