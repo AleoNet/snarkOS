@@ -39,7 +39,7 @@ impl Updater {
         Ok(output)
     }
 
-    /// Update `aleo` to the specified release.
+    /// Update `snarkOS` to the specified release.
     pub fn update_to_release(show_output: bool, version: Option<String>) -> Result<Status, UpdaterError> {
         let mut update_builder = github::Update::configure();
 
