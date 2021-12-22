@@ -27,7 +27,6 @@ use crate::{
 use snarkvm::dpc::{MemoryPool, Network};
 
 use hyper::{
-    body::HttpBody,
     server::{conn::AddrStream, Server},
     service::{make_service_fn, service_fn},
     Body,
@@ -132,13 +131,11 @@ async fn handle_rpc<N: Network, E: Environment>(
     let headers = req.headers().clone();
 
     // Ready the body of the request
-    let data = match req.body_mut().data().await {
-        Some(Ok(data)) => data,
-        err_or_none => {
+    let data = match hyper::body::to_bytes(req.body_mut()).await {
+        Ok(data) => data,
+        Err(err) => {
             let mut error = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't read the RPC body");
-            if let Some(Err(err)) = err_or_none {
-                error.data = Some(err.to_string());
-            }
+            error.data = Some(err.to_string());
 
             let resp = jrt::Response::<(), String>::error(jrt::Version::V2, error, None);
             let body = serde_json::to_vec(&resp).unwrap_or_default();
@@ -1417,24 +1414,13 @@ mod tests {
         let result = send_transaction(caller()).await;
         assert!(result.is_ok());
 
-        let response = match send_transaction(caller()).await {
-            Ok(response) => {
-                println!("{}", response);
-                response
-            }
-            Err(error) => {
-                error!("[sendtransaction]: {:?}", error);
-                return;
-            }
-        };
+        let response = send_transaction(caller()).await.expect("Test RPC failed to process request");
+        // Process the response into a transaction ID.
+        let actual: <Testnet2 as Network>::TransactionID =
+            serde_json::from_value(response["result"].clone()).expect("Failed to deserialize response from send_transaction");
 
-        println!("{}", response["error"]);
-
-        // // Process the response into a transaction ID.
-        // let actual: <Testnet2 as Network>::TransactionID = process_response(response).await;
-        //
-        // // Check the transaction id.
-        // assert_eq!("at1yh7l65ege8kgzx5fsyuwldtsyk6k73m95pf7cr5tlqt7s2yvpcyssemtwd", actual.to_string());
+        // Check the transaction id.
+        assert_eq!("at1yh7l65ege8kgzx5fsyuwldtsyk6k73m95pf7cr5tlqt7s2yvpcyssemtwd", actual.to_string());
     }
 
     #[tokio::test]
