@@ -266,11 +266,14 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                         let proof_difficulty = sha256d_to_u64(&proof_bytes);
                         let share_difficulty = {
-                            let mut provers = self.provers.write().await;
+                            let provers = self.provers.read().await.clone();
                             match provers.get(&prover_address) {
                                 Some((_, share_difficulty, _)) => *share_difficulty,
                                 None => {
-                                    provers.insert(prover_address, (Instant::now(), BASE_SHARE_DIFFICULTY, 0));
+                                    self.provers
+                                        .write()
+                                        .await
+                                        .insert(prover_address, (Instant::now(), BASE_SHARE_DIFFICULTY, 0));
                                     BASE_SHARE_DIFFICULTY
                                 }
                             }
