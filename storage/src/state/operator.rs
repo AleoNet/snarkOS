@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::storage::{DataMap, Map, Storage};
+use crate::storage::{DataMap, Map, MapId, Storage};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -103,8 +103,8 @@ impl<N: Network> SharesState<N> {
     /// Initializes a new instance of `SharesState`.
     fn open<S: Storage>(storage: S) -> Result<Self> {
         Ok(Self {
-            shares: storage.open_map("shares")?,
-            records: storage.open_map("records")?,
+            shares: storage.open_map(MapId::Shares)?,
+            records: storage.open_map(MapId::PoolRecords)?,
         })
     }
 
