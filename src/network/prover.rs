@@ -309,7 +309,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             }
                         }
                     }
+                } else {
+                    error!("Missing pool IP address. Please specify a pool IP address in order to run the prover");
                 }
+            } else {
+                error!("Missing prover address. Please specify an Aleo address in order to prove");
             }
         }
     }
