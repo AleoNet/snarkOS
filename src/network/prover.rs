@@ -79,7 +79,7 @@ pub struct Prover<N: Network, E: Environment> {
     /// The Aleo address of the prover.
     address: Option<Address<N>>,
     /// The thread pool for the prover.
-    process: Arc<ThreadPool>,
+    thread_pool: Arc<ThreadPool>,
     /// The prover router of the node.
     prover_router: ProverRouter<N>,
     /// The pool of unconfirmed transactions.
@@ -115,8 +115,8 @@ impl<N: Network, E: Environment> Prover<N, E> {
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `Prover` struct.
         let (prover_router, mut prover_handler) = mpsc::channel(1024);
-        // Initialize the prover process.
-        let process = ThreadPoolBuilder::new()
+        // Initialize the prover thread pool.
+        let thread_pool = ThreadPoolBuilder::new()
             .stack_size(8 * 1024 * 1024)
             .num_threads((num_cpus::get() / 8 * 7).max(1))
             .build()?;
@@ -125,7 +125,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         let prover = Arc::new(Self {
             state: Arc::new(ProverState::open_writer::<S, P>(path)?),
             address,
-            process: Arc::new(process),
+            thread_pool: Arc::new(thread_pool),
             prover_router,
             memory_pool: Arc::new(RwLock::new(MemoryPool::new())),
             status: status.clone(),
@@ -256,12 +256,12 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             // Set the status to `Mining`.
                             self.status.update(State::Mining);
 
-                            let process = self.process.clone();
+                            let thread_pool = self.thread_pool.clone();
                             let block_template = block_template.clone();
                             let terminator = self.terminator.clone();
 
                             let result = task::spawn_blocking(move || {
-                                process.install(move || {
+                                thread_pool.install(move || {
                                     loop {
                                         let block_header =
                                             BlockHeader::mine_once_unchecked(&block_template, &terminator, &mut thread_rng())?;
@@ -363,7 +363,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
                             // Prepare the unconfirmed transactions and dependent objects.
                             let state = prover.state.clone();
-                            let process = prover.process.clone();
+                            let thread_pool = prover.thread_pool.clone();
                             let canon = prover.ledger_reader.clone(); // This is *safe* as the ledger only reads.
                             let unconfirmed_transactions = prover.memory_pool.read().await.transactions();
                             let ledger_router = prover.ledger_router.clone();
@@ -372,7 +372,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             tasks_clone.append(task::spawn(async move {
                                 // Mine the next block.
                                 let result = task::spawn_blocking(move || {
-                                    process.install(move || {
+                                    thread_pool.install(move || {
                                         canon.mine_next_block(
                                             recipient,
                                             E::COINBASE_IS_PUBLIC,
