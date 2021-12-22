@@ -294,12 +294,12 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         error!("{}", error);
                     }
 
-                    {
-                        // Update the internal state for this prover.
-                        let mut provers = self.provers.write().await;
-                        let mut prover = *provers.get_mut(&prover_address).expect("prover should have existing info");
+                    // Update the internal state for this prover.
+                    if let Some(ref mut prover) = self.provers.write().await.get_mut(&prover_address) {
                         prover.0 = Instant::now();
                         prover.2 += 1;
+                    } else {
+                        panic!("prover should have existing info");
                     }
 
                     info!(
