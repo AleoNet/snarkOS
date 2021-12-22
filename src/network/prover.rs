@@ -162,7 +162,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
         // Initialize the prover, if the node type is a prover.
         if E::NODE_TYPE == NodeType::Prover && prover.pool.is_some() {
             let prover = prover.clone();
+            let (router, handler) = oneshot::channel();
             task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+
                 loop {
                     // Sleep for `5` seconds.
                     tokio::time::sleep(std::time::Duration::from_secs(5)).await;
@@ -174,6 +178,9 @@ impl<N: Network, E: Environment> Prover<N, E> {
                     }
                 }
             });
+
+            // Wait until the operator handler is ready.
+            let _ = handler.await;
         }
 
         Ok(prover)
