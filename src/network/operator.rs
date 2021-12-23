@@ -177,6 +177,9 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                             // Acquire the write lock to update the block template.
                             *operator.block_template.write().await = Some(block_template);
+
+                            // Clear the known_nonces hash set.
+                            operator.known_nonces.write().await.clear();
                         }
 
                         // Sleep for `5` seconds.
