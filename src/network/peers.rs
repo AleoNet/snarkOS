@@ -1202,11 +1202,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[PoolRequest] could not deserialize block template");
                                     }
                                 }
-                                Message::PoolResponse(address, block) => {
+                                Message::PoolResponse(address, block_header) => {
                                     if E::NODE_TYPE != NodeType::Operator {
                                         trace!("Skipping 'PoolResponse' from {}", peer_ip);
-                                    } else if let Ok(block) = block.deserialize().await {
-                                        if let Err(error) = operator_router.send(OperatorRequest::PoolResponse(peer_ip, block, address)).await {
+                                    } else if let Ok(block_header) = block_header.deserialize().await {
+                                        if let Err(error) = operator_router.send(OperatorRequest::PoolResponse(peer_ip, block_header, address)).await {
                                             warn!("[PoolResponse] {}", error);
                                         }
                                     } else {

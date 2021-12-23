@@ -289,7 +289,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
                                             // Ensure the share difficulty target is met.
                                             if sha256d_to_u64(&proof.to_bytes_le()?) < share_difficulty {
-                                                return Block::new(&block_template, block_header);
+                                                return Ok::<BlockHeader<N>, anyhow::Error>(block_header);
                                             }
                                         } else {
                                             warn!("Block header does not have a corresponding PoSW proof");
@@ -302,11 +302,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             self.status.update(State::Ready);
 
                             match result {
-                                Ok(Ok(block)) => {
-                                    info!("Prover found unconfirmed block {} for share target", block.height());
+                                Ok(Ok(block_header)) => {
+                                    info!("Prover found unconfirmed block {} for share target", block_header.height());
 
                                     // Send a `PoolResponse` to the operator.
-                                    let message = Message::PoolResponse(recipient, Data::Object(block));
+                                    let message = Message::PoolResponse(recipient, Data::Object(block_header));
                                     if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(operator_ip, message)).await {
                                         warn!("[PoolResponse] {}", error);
                                     }

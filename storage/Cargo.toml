@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies]
-snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "d7f6943" }
+snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "c120c62" }
 #snarkvm = { path = "../../snarkVM" }
 
 [dependencies.anyhow]

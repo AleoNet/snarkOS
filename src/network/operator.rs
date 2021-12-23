@@ -60,8 +60,8 @@ type OperatorHandler<N> = mpsc::Receiver<OperatorRequest<N>>;
 pub enum OperatorRequest<N: Network> {
     /// PoolRegister := (peer_ip, worker_address)
     PoolRegister(SocketAddr, Address<N>),
-    /// PoolResponse := (peer_ip, proposed_block, worker_address)
-    PoolResponse(SocketAddr, Block<N>, Address<N>),
+    /// PoolResponse := (peer_ip, proposed_block_header, worker_address)
+    PoolResponse(SocketAddr, BlockHeader<N>, Address<N>),
 }
 
 /// The predefined base share difficulty.
@@ -222,34 +222,38 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     warn!("[PoolRegister] No current block template exists");
                 }
             }
-            OperatorRequest::PoolResponse(peer_ip, block, prover_address) => {
+            OperatorRequest::PoolResponse(peer_ip, block_header, prover_address) => {
                 if let Some(block_template) = self.block_template.read().await.clone() {
                     // Check that the block is relevant.
-                    if self.ledger_reader.latest_block_height().saturating_add(1) != block.height() {
+                    if self.ledger_reader.latest_block_height().saturating_add(1) != block_header.height() {
                         warn!("[PoolResponse] Peer {} sent a stale candidate block.", peer_ip);
                         return;
                     }
 
-                    // Retrieve the coinbase transaction records.
-                    let coinbase_records = match block.to_coinbase_transaction() {
-                        Ok(transaction) => {
-                            // Ensure the owner of the coinbase transaction in the block is the operator address.
-                            let coinbase_records: Vec<Record<N>> =
-                                transaction.to_records().filter(|r| Some(r.owner()) == self.address).collect();
-                            if coinbase_records.is_empty() {
-                                warn!("[ProposedBlock] Peer {} sent a candidate block with an incorrect owner.", peer_ip);
+                    // Reconstruct the block.
+                    let previous_block_hash = block_template.previous_block_hash();
+                    let transactions = block_template.transactions().clone();
+
+                    if let Ok(block) = Block::from_unchecked(previous_block_hash, block_header.clone(), transactions) {
+                        // Retrieve the coinbase transaction records.
+                        let coinbase_records = match block.to_coinbase_transaction() {
+                            Ok(transaction) => {
+                                // Ensure the owner of the coinbase transaction in the block is the operator address.
+                                let coinbase_records: Vec<Record<N>> =
+                                    transaction.to_records().filter(|r| Some(r.owner()) == self.address).collect();
+                                if coinbase_records.is_empty() {
+                                    warn!("[ProposedBlock] Peer {} sent a candidate block with an incorrect owner.", peer_ip);
+                                    return;
+                                }
+                                coinbase_records
+                            }
+                            Err(error) => {
+                                warn!("[PoolResponse] {}", error);
                                 return;
                             }
-                            coinbase_records
-                        }
-                        Err(error) => {
-                            warn!("[PoolResponse] {}", error);
-                            return;
-                        }
-                    };
+                        };
 
-                    // Ensure the block contains a difficulty that is at least the share difficulty.
-                    let proof_difficulty = {
+                        // Ensure the block contains a difficulty that is at least the share difficulty.
                         let proof_bytes = match block.header().proof() {
                             Some(proof) => match proof.to_bytes_le() {
                                 Ok(bytes) => bytes,
@@ -284,51 +288,48 @@ impl<N: Network, E: Environment> Operator<N, E> {
                             return;
                         }
 
-                        proof_difficulty
-                    };
-
-                    // Update the score for the prover.
-                    // TODO: add round stuff
-                    // TODO: ensure shares can not be resubmitted
-                    if let Err(error) = self.state.add_shares(block.height(), &prover_address, 1) {
-                        error!("{}", error);
-                    }
-
-                    // Update the internal state for this prover.
-                    if let Some(ref mut prover) = self.provers.write().await.get_mut(&prover_address) {
-                        prover.0 = Instant::now();
-                        prover.2 += 1;
-                    } else {
-                        panic!("prover should have existing info");
-                    }
-
-                    info!(
-                        "Operator received a valid share from {} ({}) for block {} ({})",
-                        peer_ip,
-                        prover_address,
-                        block.height(),
-                        block.hash(),
-                    );
-
-                    // If the block has satisfactory difficulty and is valid, proceed to broadcast it.
-                    if block.difficulty_target() == block_template.difficulty_target()
-                        && proof_difficulty < block.difficulty_target()
-                        && block.is_valid()
-                    {
-                        info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
-
-                        // Store the coinbase record(s).
-                        coinbase_records.iter().for_each(|r| {
-                            if let Err(error) = self.state.add_coinbase_record(block.height(), r.clone()) {
-                                warn!("Could not store coinbase record - {}", error);
-                            }
-                        });
-
-                        // Broadcast the unconfirmed block.
-                        let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
-                        if let Err(error) = self.ledger_router.send(request).await {
-                            warn!("Failed to broadcast mined block - {}", error);
+                        // Update the score for the prover.
+                        // TODO: add round stuff
+                        // TODO: ensure shares can not be resubmitted
+                        if let Err(error) = self.state.add_shares(block.height(), &prover_address, 1) {
+                            error!("{}", error);
                         }
+
+                        // Update the internal state for this prover.
+                        if let Some(ref mut prover) = self.provers.write().await.get_mut(&prover_address) {
+                            prover.0 = Instant::now();
+                            prover.2 += 1;
+                        } else {
+                            panic!("prover should have existing info");
+                        }
+
+                        info!(
+                            "Operator received a valid share from {} ({}) for block {} ({})",
+                            peer_ip,
+                            prover_address,
+                            block.height(),
+                            block.hash(),
+                        );
+
+                        // If the block has satisfactory difficulty and is valid, proceed to broadcast it.
+                        if let Ok(block) = Block::new(&block_template, block_header) {
+                            info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
+
+                            // Store the coinbase record(s).
+                            coinbase_records.iter().for_each(|r| {
+                                if let Err(error) = self.state.add_coinbase_record(block.height(), r.clone()) {
+                                    warn!("Could not store coinbase record - {}", error);
+                                }
+                            });
+
+                            // Broadcast the unconfirmed block.
+                            let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
+                            if let Err(error) = self.ledger_router.send(request).await {
+                                warn!("Failed to broadcast mined block - {}", error);
+                            }
+                        }
+                    } else {
+                        warn!("[PoolResponse] Invalid block provided");
                     }
                 } else {
                     warn!("[PoolResponse] No current block template exists");

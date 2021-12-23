@@ -99,8 +99,8 @@ pub enum Message<N: Network, E: Environment> {
     PoolRegister(Address<N>),
     /// PoolRequest := (share_difficulty, block_template)
     PoolRequest(u64, Data<BlockTemplate<N>>),
-    /// PoolResponse := (address, block)
-    PoolResponse(Address<N>, Data<Block<N>>),
+    /// PoolResponse := (address, block_header)
+    PoolResponse(Address<N>, Data<BlockHeader<N>>),
     /// UnconfirmedBlock := (block_height, block_hash, block)
     UnconfirmedBlock(u32, N::BlockHash, Data<Block<N>>),
     /// UnconfirmedTransaction := (transaction)
