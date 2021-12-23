@@ -116,6 +116,18 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
     task
 }
 
+/// workaround for https://github.com/serde-rs/json/issues/505
+/// Arbitrary precision confuses serde when deserializing into untagged enums,
+/// this is a workaround
+/// see: jsonrpc_core::serde_from_str()
+fn serde_from_slice<'a, T>(input: &'a [u8]) -> std::result::Result<T, serde_json::Error>
+where
+    T: serde::de::Deserialize<'a>,
+{
+    let val = serde_json::from_slice::<serde_json::Value>(input)?;
+    T::deserialize(val)
+}
+
 async fn handle_rpc<N: Network, E: Environment>(
     caller: SocketAddr,
     rpc: RpcImpl<N, E>,
@@ -149,13 +161,30 @@ async fn handle_rpc<N: Network, E: Environment>(
     };
 
     // Deserialize the JSON-RPC request.
-    let req: jrt::Request<Params> = match serde_json::from_slice(&data) {
+    let req: jsonrpc_core::Request = match serde_from_slice(&data) {
         Ok(req) => req,
-        Err(_) => {
-            let resp = jrt::Response::<(), ()>::error(
-                jrt::Version::V2,
-                jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't parse the RPC body"),
-                None,
+        Err(e) => {
+            println!("##### {}", e);
+            let mut err = jsonrpc_core::Error::new(jsonrpc_core::ErrorCode::ParseError);
+            err.data = Some(serde_json::Value::String(e.to_string()));
+            let resp = new_jrc_response_error(err, jsonrpc_core::Id::Null);
+            let body = serde_json::to_vec(&resp).unwrap_or_default();
+
+            return Ok(hyper::Response::new(body.into()));
+        }
+    };
+
+    let call = match req {
+        jsonrpc_core::Request::Single(call) => call,
+        jsonrpc_core::Request::Batch(calls) => calls[0].clone(),
+    };
+
+    let method_call = match call {
+        jsonrpc_core::Call::MethodCall(methodcall) => methodcall,
+        _other => {
+            let resp = new_jrc_response_error(
+                jsonrpc_core::Error::new(jsonrpc_core::ErrorCode::ParseError),
+                jsonrpc_core::Id::Null,
             );
             let body = serde_json::to_vec(&resp).unwrap_or_default();
 
@@ -163,13 +192,13 @@ async fn handle_rpc<N: Network, E: Environment>(
         }
     };
 
-    debug!("Received '{}' RPC request from {}: {:?}", &*req.method, caller, headers);
+    debug!("Received '{}' RPC request from {}: {:?}", &*method_call.method, caller, headers);
 
     // Read the request params.
-    let mut params = match read_params(&req) {
+    let mut params = match read_params(&method_call) {
         Ok(params) => params,
         Err(err) => {
-            let resp = jrt::Response::<(), ()>::error(jrt::Version::V2, err, req.id.clone());
+            let resp = new_jrc_response_error(err, method_call.id);
             let body = serde_json::to_vec(&resp).unwrap_or_default();
 
             return Ok(hyper::Response::new(body.into()));
@@ -177,44 +206,45 @@ async fn handle_rpc<N: Network, E: Environment>(
     };
 
     // Handle the request method.
-    let response = match &*req.method {
+    let response = match &*method_call.method {
         // Public
         "latestblock" => {
             let result = rpc.latest_block().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "latestblockheight" => {
             let result = rpc.latest_block_height().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "latestcumulativeweight" => {
             let result = rpc.latest_cumulative_weight().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "latestblockhash" => {
             let result = rpc.latest_block_hash().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "latestblockheader" => {
             let result = rpc.latest_block_header().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "latestblocktransactions" => {
             let result = rpc.latest_block_transactions().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "latestledgerroot" => {
             let result = rpc.latest_ledger_root().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "getblock" => match serde_json::from_value::<u32>(params.remove(0)) {
             Ok(height) => {
                 let result = rpc.get_block(height).await.map_err(convert_crate_err);
-                result_to_response(&req, result)
+                result_to_response(&method_call, result)
             }
             Err(_) => {
-                let err = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Invalid block height!");
-                jrt::Response::error(jrt::Version::V2, err, req.id.clone())
+                let mut err = jsonrpc_core::Error::new(jsonrpc_core::ErrorCode::ParseError);
+                err.message = "Invalid block height!".to_string();
+                new_jrc_response_error(err, method_call.id)
             }
         },
         "getblocks" => {
@@ -227,26 +257,28 @@ async fn handle_rpc<N: Network, E: Environment>(
                         .get_blocks(start_block_height, end_block_height)
                         .await
                         .map_err(convert_crate_err);
-                    result_to_response(&req, result)
+                    result_to_response(&method_call, result)
                 }
                 (Err(_), _) | (_, Err(_)) => {
-                    let err = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Invalid block height!");
-                    jrt::Response::error(jrt::Version::V2, err, req.id.clone())
+                    let mut err = jsonrpc_core::Error::new(jsonrpc_core::ErrorCode::ParseError);
+                    err.message = "Invalid block height!".to_string();
+                    new_jrc_response_error(err, method_call.id)
                 }
             }
         }
         "getblockheight" => {
             let result = rpc.get_block_height(params.remove(0)).await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "getblockhash" => match serde_json::from_value::<u32>(params.remove(0)) {
             Ok(height) => {
                 let result = rpc.get_block_hash(height).await.map_err(convert_crate_err);
-                result_to_response(&req, result)
+                result_to_response(&method_call, result)
             }
             Err(_) => {
-                let err = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Invalid block height!");
-                jrt::Response::error(jrt::Version::V2, err, req.id.clone())
+                let mut err = jsonrpc_core::Error::new(jsonrpc_core::ErrorCode::ParseError);
+                err.message = "Invalid block height!".to_string();
+                new_jrc_response_error(err, method_call.id)
             }
         },
         "getblockhashes" => {
@@ -259,72 +291,75 @@ async fn handle_rpc<N: Network, E: Environment>(
                         .get_block_hashes(start_block_height, end_block_height)
                         .await
                         .map_err(convert_crate_err);
-                    result_to_response(&req, result)
+                    result_to_response(&method_call, result)
                 }
                 (Err(_), _) | (_, Err(_)) => {
-                    let err = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Invalid block height!");
-                    jrt::Response::error(jrt::Version::V2, err, req.id.clone())
+                    let mut err = jsonrpc_core::Error::new(jsonrpc_core::ErrorCode::ParseError);
+                    err.message = "Invalid block height!".to_string();
+                    new_jrc_response_error(err, method_call.id)
                 }
             }
         }
         "getblockheader" => match serde_json::from_value::<u32>(params.remove(0)) {
             Ok(height) => {
                 let result = rpc.get_block_header(height).await.map_err(convert_crate_err);
-                result_to_response(&req, result)
+                result_to_response(&method_call, result)
             }
             Err(_) => {
-                let err = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Invalid block height!");
-                jrt::Response::error(jrt::Version::V2, err, req.id.clone())
+                let mut err = jsonrpc_core::Error::new(jsonrpc_core::ErrorCode::ParseError);
+                err.message = "Invalid block height!".to_string();
+                new_jrc_response_error(err, method_call.id)
             }
         },
         "getblocktemplate" => {
             let result = rpc.get_block_template().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "getblocktransactions" => match serde_json::from_value::<u32>(params.remove(0)) {
             Ok(height) => {
                 let result = rpc.get_block_transactions(height).await.map_err(convert_crate_err);
-                result_to_response(&req, result)
+                result_to_response(&method_call, result)
             }
             Err(_) => {
-                let err = jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Invalid block height!");
-                jrt::Response::error(jrt::Version::V2, err, req.id.clone())
+                let mut err = jsonrpc_core::Error::new(jsonrpc_core::ErrorCode::ParseError);
+                err.message = "Invalid block height!".to_string();
+                new_jrc_response_error(err, method_call.id)
             }
         },
         "getciphertext" => {
             let result = rpc.get_ciphertext(params.remove(0)).await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "getledgerproof" => {
             let result = rpc.get_ledger_proof(params.remove(0)).await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "getmemorypool" => {
             let result = rpc.get_memory_pool().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "gettransaction" => {
             let result = rpc.get_transaction(params.remove(0)).await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "gettransition" => {
             let result = rpc.get_transition(params.remove(0)).await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "getconnectedpeers" => {
             let result = rpc.get_connected_peers().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "getnodestate" => {
             let result = rpc.get_node_state().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         "sendtransaction" => {
             let result = rpc
                 .send_transaction(params[0].as_str().unwrap_or("").into())
                 .await
                 .map_err(convert_crate_err);
-            result_to_response(&req, result)
+            result_to_response(&method_call, result)
         }
         // "getblocktemplate" => {
         //     let result = rpc.get_block_template().await.map_err(convert_crate_err);
@@ -374,8 +409,8 @@ async fn handle_rpc<N: Network, E: Environment>(
         //     result_to_response(&req, result)
         // }
         _ => {
-            let err = jrt::Error::from_code(jrt::ErrorCode::MethodNotFound);
-            jrt::Response::error(jrt::Version::V2, err, req.id.clone())
+            let err = jsonrpc_core::Error::new(jsonrpc_core::ErrorCode::MethodNotFound);
+            new_jrc_response_error(err, method_call.id)
         }
     };
 
@@ -387,12 +422,12 @@ async fn handle_rpc<N: Network, E: Environment>(
 }
 
 /// Ensures that the params are a non-empty (this assumption is taken advantage of later) array and returns them.
-fn read_params(req: &jrt::Request<Params>) -> Result<Vec<serde_json::Value>, jrt::Error<()>> {
-    if METHODS_EXPECTING_PARAMS.contains(&&*req.method) {
-        match &req.params {
-            Some(Params::Array(arr)) if !arr.is_empty() => Ok(arr.clone()),
-            Some(_) => Err(jrt::Error::from_code(jrt::ErrorCode::InvalidParams)),
-            None => Err(jrt::Error::from_code(jrt::ErrorCode::InvalidParams)),
+fn read_params(method_call: &jsonrpc_core::MethodCall) -> Result<Vec<serde_json::Value>, jsonrpc_core::Error> {
+    if METHODS_EXPECTING_PARAMS.contains(&&*method_call.method) {
+        match &method_call.params {
+            Params::None => Err(jsonrpc_core::Error::new(jsonrpc_core::ErrorCode::InvalidParams)),
+            Params::Array(arr) => Ok(arr.clone()),
+            Params::Map(_) => Err(jsonrpc_core::Error::new(jsonrpc_core::ErrorCode::InvalidParams)),
         }
     } else {
         Ok(vec![]) // unused in methods other than METHODS_EXPECTING_PARAMS
@@ -400,28 +435,35 @@ fn read_params(req: &jrt::Request<Params>) -> Result<Vec<serde_json::Value>, jrt
 }
 
 /// Converts the crate's RpcError into a jrt::RpcError
-fn convert_crate_err(err: crate::rpc::rpc_impl::RpcError) -> jrt::Error<String> {
-    let error = jrt::Error::with_custom_msg(jrt::ErrorCode::ServerError(-32000), "internal error");
-    error.set_data(err.to_string())
+fn convert_crate_err(err: crate::rpc::rpc_impl::RpcError) -> jsonrpc_core::Error {
+    let mut error = jsonrpc_core::Error::new(jsonrpc_core::ErrorCode::ServerError(-32000));
+    error.data = Some(serde_json::Value::String(err.to_string()));
+    error
 }
 
-/// Converts the jsonrpc-core's Error into a jrt::RpcError
-#[allow(unused)]
-fn convert_core_err(err: jsonrpc_core::Error) -> jrt::Error<String> {
-    let error = jrt::Error::with_custom_msg(jrt::ErrorCode::InternalError, "JSONRPC server error");
-    error.set_data(err.to_string())
+fn new_jrc_response_error(error: jsonrpc_core::Error, id: jsonrpc_core::Id) -> jsonrpc_core::Response {
+    jsonrpc_core::Response::Single(jsonrpc_core::Output::Failure(jsonrpc_core::Failure {
+        jsonrpc: Some(jsonrpc_core::Version::V2),
+        error,
+        id,
+    }))
 }
 
-fn result_to_response<T: Serialize>(
-    request: &jrt::Request<Params>,
-    result: Result<T, jrt::Error<String>>,
-) -> jrt::Response<serde_json::Value, String> {
+fn result_to_response<T: Serialize>(request: &jsonrpc_core::MethodCall, result: Result<T, jsonrpc_core::Error>) -> jsonrpc_core::Response {
     match result {
         Ok(res) => {
             let result = serde_json::to_value(&res).unwrap_or_default();
-            jrt::Response::result(jrt::Version::V2, result, request.id.clone())
+            jsonrpc_core::Response::Single(jsonrpc_core::Output::Success(jsonrpc_core::Success {
+                jsonrpc: Some(jsonrpc_core::Version::V2),
+                result,
+                id: request.id.clone(),
+            }))
         }
-        Err(err) => jrt::Response::error(jrt::Version::V2, err, request.id.clone()),
+        Err(err) => jsonrpc_core::Response::Single(jsonrpc_core::Output::Failure(jsonrpc_core::Failure {
+            jsonrpc: Some(jsonrpc_core::Version::V2),
+            error: err,
+            id: request.id.clone(),
+        })),
     }
 }
 
