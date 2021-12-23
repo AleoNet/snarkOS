@@ -28,7 +28,11 @@ use crate::{
     ProverRouter,
 };
 use snarkos_storage::{storage::Storage, OperatorState};
-use snarkvm::{algorithms::crh::sha256d_to_u64, dpc::prelude::*, utilities::ToBytes};
+use snarkvm::{
+    algorithms::{crh::sha256d_to_u64, SNARK},
+    dpc::prelude::*,
+    utilities::{FromBytes, ToBytes},
+};
 
 use anyhow::Result;
 use rand::thread_rng;
@@ -235,6 +239,27 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     let transactions = block_template.transactions().clone();
 
                     if let Ok(block) = Block::from_unchecked(previous_block_hash, block_header.clone(), transactions) {
+                        // Ensure the proof is valid.
+                        let proof = match block.header().proof() {
+                            Some(proof) => proof,
+                            None => {
+                                warn!("[PoolResponse] proof is missing on header");
+                                return;
+                            }
+                        };
+
+                        // NOTE (julesdesmit): Unwraps are here for brevity's sake, and since we do
+                        // it exactly the same in snarkVM, I don't see why we shouldn't use them here.
+                        let inputs = vec![
+                            N::InnerScalarField::read_le(&block_header.to_header_root().unwrap().to_bytes_le().unwrap()[..]).unwrap(),
+                            *block_header.nonce(),
+                        ];
+
+                        if !<<N as Network>::PoSWSNARK as SNARK>::verify(N::posw().verifying_key(), &inputs, proof).unwrap() {
+                            warn!("[PoolResponse] PoSW proof verification failed");
+                            return;
+                        }
+
                         // Retrieve the coinbase transaction records.
                         let coinbase_records = match block.to_coinbase_transaction() {
                             Ok(transaction) => {
@@ -242,7 +267,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                                 let coinbase_records: Vec<Record<N>> =
                                     transaction.to_records().filter(|r| Some(r.owner()) == self.address).collect();
                                 if coinbase_records.is_empty() {
-                                    warn!("[ProposedBlock] Peer {} sent a candidate block with an incorrect owner.", peer_ip);
+                                    warn!("[PoolResponse] Peer {} sent a candidate block with an incorrect owner.", peer_ip);
                                     return;
                                 }
                                 coinbase_records
@@ -254,16 +279,10 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         };
 
                         // Ensure the block contains a difficulty that is at least the share difficulty.
-                        let proof_bytes = match block.header().proof() {
-                            Some(proof) => match proof.to_bytes_le() {
-                                Ok(bytes) => bytes,
-                                Err(error) => {
-                                    warn!("[PoolResponse] {}", error);
-                                    return;
-                                }
-                            },
-                            None => {
-                                warn!("[PoolResponse] Peer {} sent a candidate block with a missing proof.", peer_ip);
+                        let proof_bytes = match proof.to_bytes_le() {
+                            Ok(bytes) => bytes,
+                            Err(error) => {
+                                warn!("[PoolResponse] {}", error);
                                 return;
                             }
                         };
