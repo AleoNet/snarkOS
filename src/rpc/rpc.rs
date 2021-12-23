@@ -1413,8 +1413,8 @@ mod tests {
         // Send a new request that calls the `sendtransaction` endpoint to the RPC server.
         let result = send_transaction(caller()).await;
         assert!(result.is_ok());
+        let response = result.expect("Test RPC failed to process request");
 
-        let response = send_transaction(caller()).await.expect("Test RPC failed to process request");
         // Process the response into a transaction ID.
         let actual: <Testnet2 as Network>::TransactionID =
             serde_json::from_value(response["result"].clone()).expect("Failed to deserialize response from send_transaction");
