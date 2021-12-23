@@ -88,6 +88,8 @@ pub struct Operator<N: Network, E: Environment> {
     provers: RwLock<HashMap<Address<N>, (Instant, u64, u32)>>,
     /// A list of the known nonces for the current round.
     known_nonces: RwLock<HashSet<N::PoSWNonce>>,
+    /// Current pool round.
+    round: RwLock<u32>,
     /// The operator router of the node.
     operator_router: OperatorRouter<N>,
     /// The pool of unconfirmed transactions.
@@ -126,6 +128,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
             block_template: RwLock::new(None),
             provers: Default::default(),
             known_nonces: Default::default(),
+            round: Default::default(),
             operator_router,
             memory_pool,
             peers_router,
@@ -133,6 +136,9 @@ impl<N: Network, E: Environment> Operator<N, E> {
             ledger_router,
             prover_router,
         });
+
+        // Set pool round to last known round.
+        *operator.round.write().await = operator.state.to_shares().iter().map(|x| x.0).max().unwrap_or_default();
 
         if E::NODE_TYPE == NodeType::Operator {
             // Initialize the handler for the operator.
@@ -321,8 +327,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         }
 
                         // Update the score for the prover.
-                        // TODO: add round stuff
-                        if let Err(error) = self.state.add_shares(block.height(), &prover_address, 1) {
+                        if let Err(error) = self.state.add_shares(self.round.read().await.clone(), &prover_address, 1) {
                             error!("{}", error);
                         }
 
@@ -361,6 +366,9 @@ impl<N: Network, E: Environment> Operator<N, E> {
                             if let Err(error) = self.ledger_router.send(request).await {
                                 warn!("Failed to broadcast mined block - {}", error);
                             }
+
+                            // Increment round.
+                            *self.round.write().await += 1;
                         }
                     } else {
                         warn!("[PoolResponse] Invalid block provided");
