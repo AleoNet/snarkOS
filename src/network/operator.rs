@@ -37,7 +37,7 @@ use snarkvm::{
 use anyhow::Result;
 use rand::thread_rng;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     net::SocketAddr,
     path::Path,
     sync::Arc,
@@ -86,6 +86,8 @@ pub struct Operator<N: Network, E: Environment> {
     block_template: RwLock<Option<BlockTemplate<N>>>,
     /// A list of provers and their associated state := (last_submitted, share_difficulty, shares_submitted_since_reset)
     provers: RwLock<HashMap<Address<N>, (Instant, u64, u32)>>,
+    /// A list of the known nonces for the current round.
+    known_nonces: RwLock<HashSet<N::PoSWNonce>>,
     /// The operator router of the node.
     operator_router: OperatorRouter<N>,
     /// The pool of unconfirmed transactions.
@@ -123,6 +125,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
             state: Arc::new(OperatorState::open_writer::<S, P>(path)?),
             block_template: RwLock::new(None),
             provers: Default::default(),
+            known_nonces: Default::default(),
             operator_router,
             memory_pool,
             peers_router,
@@ -234,6 +237,13 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         return;
                     }
 
+                    // Ensure the nonce hasn't been seen before.
+                    if self.known_nonces.read().await.contains(&block_header.nonce()) {
+                        warn!("[PoolResponse] Peer {} sent a duplicate share", peer_ip);
+                        // TODO (julesdesmit): punish?
+                        return;
+                    }
+
                     // Reconstruct the block.
                     let previous_block_hash = block_template.previous_block_hash();
                     let transactions = block_template.transactions().clone();
@@ -309,10 +319,12 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                         // Update the score for the prover.
                         // TODO: add round stuff
-                        // TODO: ensure shares can not be resubmitted
                         if let Err(error) = self.state.add_shares(block.height(), &prover_address, 1) {
                             error!("{}", error);
                         }
+
+                        // Update known nonces.
+                        self.known_nonces.write().await.insert(block.header().nonce());
 
                         // Update the internal state for this prover.
                         if let Some(ref mut prover) = self.provers.write().await.get_mut(&prover_address) {
