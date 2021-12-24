@@ -70,7 +70,7 @@ pub enum OperatorRequest<N: Network> {
 }
 
 /// The predefined base share difficulty.
-const BASE_SHARE_DIFFICULTY: u64 = u64::MAX / 2u64.pow(1);
+const BASE_SHARE_DIFFICULTY: u64 = u64::MAX;
 
 ///
 /// An operator for a program on a specific network in the node server.
