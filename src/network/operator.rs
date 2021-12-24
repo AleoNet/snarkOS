@@ -36,6 +36,7 @@ use snarkvm::{
 
 use anyhow::Result;
 use rand::thread_rng;
+use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::{
     collections::{HashMap, HashSet},
     net::SocketAddr,
@@ -80,6 +81,8 @@ pub struct Operator<N: Network, E: Environment> {
     address: Option<Address<N>>,
     /// The local address of this node.
     local_ip: SocketAddr,
+    /// The thread pool of the operator.
+    thread_pool: Arc<ThreadPool>,
     /// The state storage of the operator.
     state: Arc<OperatorState<N>>,
     /// The current block template that is being mined on by the operator.
@@ -119,12 +122,18 @@ impl<N: Network, E: Environment> Operator<N, E> {
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `Operator` struct.
         let (operator_router, mut operator_handler) = mpsc::channel(1024);
+        // Initialize the operator thread pool.
+        let thread_pool = ThreadPoolBuilder::new()
+            .stack_size(8 * 1024 * 1024)
+            .num_threads((num_cpus::get() / 8 * 7).max(1))
+            .build()?;
 
         // Initialize the operator.
         let operator = Arc::new(Self {
             address,
             local_ip,
             state: Arc::new(OperatorState::open_writer::<S, P>(path)?),
+            thread_pool: Arc::new(thread_pool),
             block_template: RwLock::new(None),
             provers: Default::default(),
             known_nonces: Default::default(),
@@ -176,10 +185,21 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         if is_template_stale {
                             // Construct a new block template.
                             let transactions = operator.memory_pool.read().await.transactions();
-                            let (block_template, _) = operator
-                                .ledger_reader
-                                .get_block_template(recipient, E::COINBASE_IS_PUBLIC, &transactions, &mut thread_rng())
-                                .expect("Should be able to generate a block template");
+                            let ledger_reader = operator.ledger_reader.clone();
+                            let thread_pool = operator.thread_pool.clone();
+                            let result = task::spawn_blocking(move || {
+                                thread_pool.install(move || {
+                                    ledger_reader
+                                        .get_block_template(recipient, E::COINBASE_IS_PUBLIC, &transactions, &mut thread_rng())
+                                        .expect("Should be able to generate a block template")
+                                })
+                            })
+                            .await;
+
+                            let block_template = match result {
+                                Ok((block_template, _)) => block_template,
+                                Err(error) => panic!("{}", error),
+                            };
 
                             // Acquire the write lock to update the block template.
                             *operator.block_template.write().await = Some(block_template);
