@@ -168,8 +168,8 @@ impl<N: Network, E: Environment> Prover<N, E> {
                 let _ = router.send(());
 
                 loop {
-                    // Sleep for `5` seconds.
-                    tokio::time::sleep(std::time::Duration::from_secs(5)).await;
+                    // Sleep for `1` second.
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
 
                     // TODO (howardwu): Check that the prover is connected to the pool before proceeding.
                     //  Currently we use a sleep function to probabilistically ensure the peer is connected.
