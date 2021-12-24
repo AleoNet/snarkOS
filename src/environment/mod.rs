@@ -88,7 +88,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum number of blocks that may be fetched in one request.
     const MAXIMUM_BLOCK_REQUEST: u32 = 250;
     /// The maximum number of blocks that a fork can be.
-    const MAXIMUM_FORK_DEPTH: u32 = 4096;
+    const MAXIMUM_FORK_DEPTH: u32 = Self::Network::MAXIMUM_FORK_DEPTH;
     /// The maximum number of failures tolerated before disconnecting from a peer.
     const MAXIMUM_NUMBER_OF_FAILURES: usize = 1024;
 }

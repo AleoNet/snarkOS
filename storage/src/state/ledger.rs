@@ -45,8 +45,6 @@ pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 32;
 /// The total maximum number of block locators.
 pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
 
-/// TODO (howardwu): Reconcile this with the equivalent in `Environment`.
-const MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 /// The maximum future block time - 2 minutes.
 const MAXIMUM_FUTURE_BLOCK_TIME: i64 = 120;
@@ -821,9 +819,9 @@ impl<N: Network> LedgerState<N> {
         // Determine the number of blocks to remove.
         let latest_block_height = self.latest_block_height();
         let number_of_blocks = latest_block_height.saturating_sub(block_height);
-
         // Ensure the reverted block height is within a permitted range and well-formed.
-        if block_height >= latest_block_height || number_of_blocks > MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
+        let max_fork_depth = N::MAXIMUM_FORK_DEPTH;
+        if block_height >= latest_block_height || number_of_blocks > max_fork_depth || self.get_block(block_height).is_err() {
             return Err(anyhow!("Attempted to return to block height {}, which is invalid", block_height));
         }
 
