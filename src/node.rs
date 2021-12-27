@@ -473,9 +473,6 @@ impl MinerRevert {
         let ledger_storage_path = node.ledger_storage_path(ip);
         let ledger = snarkos_storage::LedgerState::<Testnet2>::open_writer::<RocksDB, _>(ledger_storage_path).unwrap();
         let block_height = ledger.latest_block_height().saturating_sub(self.revert);
-        if block_height <= 0u32 {
-            return Err(anyhow!("revert height must before latest_block_height"));
-        }
         let block = ledger
             .revert_to_block_height(block_height)
             .expect("Failed to remove the last block");
