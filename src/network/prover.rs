@@ -43,12 +43,15 @@ use std::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
+    time::Duration,
 };
 use tokio::{
     sync::{mpsc, oneshot, RwLock},
     task,
     task::JoinHandle,
 };
+
+const MINER_SLEEP: Duration = Duration::from_secs(2);
 
 /// Shorthand for the parent half of the `Prover` message channel.
 pub(crate) type ProverRouter<N> = mpsc::Sender<ProverRequest<N>>;
@@ -210,8 +213,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
             ProverRequest::PoolRequest(operator_ip, share_difficulty, block_template) => {
                 // Process the pool request message.
                 self.process_pool_request(operator_ip, share_difficulty, block_template).await;
-                // Proceed to register the prover to receive the next block template.
-                // self.send_pool_register().await;
             }
             ProverRequest::MemoryPoolClear(block) => match block {
                 Some(block) => self.memory_pool.write().await.remove_transactions(block.transactions()),
@@ -418,7 +419,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             }));
                         }
                         // Sleep for 2 seconds.
-                        tokio::time::sleep(std::time::Duration::from_secs(2)).await;
+                        tokio::time::sleep(MINER_SLEEP).await;
                     }
                 }));
                 // Wait until the miner task is ready.
