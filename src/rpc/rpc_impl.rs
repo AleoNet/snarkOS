@@ -34,7 +34,7 @@ use snarkvm::{
 };
 
 use jsonrpc_core::Value;
-use snarkvm::utilities::ToBytes;
+use snarkvm::{dpc::Record, utilities::ToBytes};
 use std::{cmp::max, net::SocketAddr, ops::Deref, sync::Arc};
 use tokio::sync::RwLock;
 
@@ -264,12 +264,13 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         Ok(self.memory_pool.read().await.transactions())
     }
 
-    /// Returns a transaction with metadata given the transaction ID.
+    /// Returns a transaction with metadata and decrypted records given the transaction ID.
     async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<Value, RpcError> {
         let transaction_id: N::TransactionID = serde_json::from_value(transaction_id)?;
         let transaction: Transaction<N> = self.ledger.get_transaction(&transaction_id)?;
         let metadata: Metadata<N> = self.ledger.get_transaction_metadata(&transaction_id)?;
-        Ok(serde_json::json!({ "transaction": transaction, "metadata": metadata }))
+        let decrypted_records: Vec<Record<N>> = transaction.to_records().collect();
+        Ok(serde_json::json!({ "transaction": transaction, "metadata": metadata, "decrypted_records": decrypted_records }))
     }
 
     /// Returns a transition given the transition ID.

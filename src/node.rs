@@ -302,6 +302,9 @@ pub struct Update {
     /// Suppress outputs to terminal
     #[structopt(short = "q", long)]
     quiet: bool,
+    /// Update to specified version
+    #[structopt(short = "v", long)]
+    version: Option<String>,
 }
 
 impl Update {
@@ -312,7 +315,7 @@ impl Update {
                 Err(error) => Ok(format!("Failed to list the available versions of snarkOS\n{}\n", error)),
             },
             false => {
-                let result = Updater::update_to_latest_release(!self.quiet);
+                let result = Updater::update_to_release(!self.quiet, self.version);
                 if !self.quiet {
                     match result {
                         Ok(status) => {

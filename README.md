@@ -182,7 +182,7 @@ cargo run --release -- --dev 1 --node 0.0.0.0:4135 --rpc 0.0.0.0:3035 --miner al
 
 After the first node starts, in a second terminal, run:
 ```
-cargo run --release --dev 2
+cargo run --release -- --dev 2
 ```
 
 We welcome all contributions to snarkOS. Please refer to the [license](#7-license) for the terms of contributions.
