@@ -45,7 +45,6 @@ pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 32;
 /// The total maximum number of block locators.
 pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
 
-
 /// The maximum future block time - 2 minutes.
 const MAXIMUM_FUTURE_BLOCK_TIME: i64 = 120;
 
