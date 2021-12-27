@@ -20,3 +20,5 @@ pub(crate) use rpc::*;
 pub(crate) mod rpc_impl;
 
 pub(crate) mod rpc_trait;
+
+pub mod rpc2;
