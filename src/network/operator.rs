@@ -273,6 +273,9 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         return;
                     }
 
+                    // Update known nonces.
+                    self.known_nonces.write().await.insert(block_header.nonce());
+
                     // Reconstruct the block.
                     let previous_block_hash = block_template.previous_block_hash();
                     let transactions = block_template.transactions().clone();
@@ -350,9 +353,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         if let Err(error) = self.state.add_shares(self.round.read().await.clone(), &prover_address, 1) {
                             error!("{}", error);
                         }
-
-                        // Update known nonces.
-                        self.known_nonces.write().await.insert(block.header().nonce());
 
                         // Update the internal state for this prover.
                         if let Some(ref mut prover) = self.provers.write().await.get_mut(&prover_address) {
