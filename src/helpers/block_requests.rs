@@ -487,7 +487,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             // Declare internal state.
             let latest_block_height: u32 =
-                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1) * 2);
+                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 2..(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 2) * 2);
             let latest_cumulative_weight: u128 = latest_block_height as u128;
 
             // Declare peer state.
