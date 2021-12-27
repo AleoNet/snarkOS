@@ -388,6 +388,8 @@ impl MinerSubcommand {
     pub fn parse(self) -> Result<String> {
         match self.commands {
             MinerCommands::Stats(command) => command.parse(),
+            MinerCommands::Revert(command) => command.parse(),
+
         }
     }
 }
@@ -396,6 +398,8 @@ impl MinerSubcommand {
 pub enum MinerCommands {
     #[structopt(name = "stats", about = "Prints statistics for the miner.")]
     Stats(MinerStats),
+    #[structopt(name = "revert", about = "Revert block to specify height.")]
+    Revert(MinerRevert),
 }
 
 #[derive(StructOpt, Debug)]
@@ -449,6 +453,36 @@ impl MinerStats {
             confirmed.len(),
             pending.len(),
             miner
+        ));
+    }
+}
+
+#[derive(StructOpt, Debug)]
+pub struct MinerRevert {
+    #[structopt()]
+    revert: u32,
+}
+
+impl MinerRevert {
+    pub fn parse(self) -> Result<String> {
+        // Initialize the node.
+        let node = Node::from_iter(&["snarkos", "--norpc", "--verbosity", "0"]);
+
+        let ip = "0.0.0.0:1000".parse().unwrap();
+
+        // Initialize the ledger storage.
+        let ledger_storage_path = node.ledger_storage_path(ip);
+        let ledger = snarkos_storage::LedgerState::<Testnet2>::open_writer::<RocksDB, _>(ledger_storage_path).unwrap();
+        let block_height = ledger.latest_block_height().saturating_sub(self.revert);
+        if block_height <= 0u32 {
+            return Err(anyhow!("revert height must before latest_block_height"));
+        }
+        let block = ledger
+            .revert_to_block_height(block_height)
+            .expect("Failed to remove the last block");
+        return Ok(format!(
+            "Revert len={} success",
+            block.len(),
         ));
     }
 }
