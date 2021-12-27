@@ -548,6 +548,7 @@ mod tests {
             &prover_path,
             None,
             local_ip,
+            Some(local_ip),
             &status,
             &terminator,
             peers.router(),
