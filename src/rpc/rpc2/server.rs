@@ -1,7 +1,14 @@
-use std::{net::SocketAddr, sync::Arc};
+use std::{convert::Infallible, net::SocketAddr, sync::Arc};
 
-use jsonrpc_core::{types::error::Error, BoxFuture, Result};
-use tokio::sync::RwLock;
+use jsonrpc_core::{types::error::Error, BoxFuture, IoHandler, Result};
+use jsonrpc_http_server::{
+    cors,
+    hyper::{server::Server, service::make_service_fn, Body, Request},
+    RestApi,
+    Rpc,
+    ServerHandler,
+};
+use tokio::sync::{oneshot, RwLock};
 
 use snarkos_storage::Metadata;
 use snarkvm::{
@@ -24,6 +31,55 @@ fn from_internal_string(s: String) -> Error {
     err
 }
 
+pub async fn initialize_rpc_server<N: Network, E: Environment>(
+    rpc_addr: SocketAddr,
+    _username: String,
+    _password: String,
+    status: &Status,
+    peers: &Arc<Peers<N, E>>,
+    ledger: LedgerReader<N>,
+    prover_router: ProverRouter<N>,
+    memory_pool: Arc<RwLock<MemoryPool<N>>>,
+) -> tokio::task::JoinHandle<()> {
+    let node_impl = NodeRPCImpl::new(rpc_addr, status.clone(), peers.clone(), ledger, prover_router, memory_pool);
+    let mut io_hdl = IoHandler::new();
+    io_hdl.extend_with(node_impl.to_delegate());
+
+    let r = Rpc {
+        handler: Arc::new(io_hdl.into()),
+        extractor: Arc::new(|_: &Request<Body>| ()),
+    };
+
+    let service_fn = make_service_fn(move |_addr_stream| {
+        let srv_hdl = ServerHandler::new(
+            r.downgrade(),
+            None,
+            None,
+            cors::AccessControlAllowHeaders::Any,
+            None,
+            Arc::new(|req: Request<Body>| req.into()),
+            RestApi::Disabled,
+            None,
+            5 * 1024 * 1024,
+            true,
+        );
+        async { Ok::<_, Infallible>(srv_hdl) }
+    });
+
+    let server = Server::bind(&rpc_addr).serve(service_fn);
+
+    let (router, handler) = oneshot::channel();
+    let task = tokio::spawn(async move {
+        // Notify the outer function that the task is ready.
+        let _ = router.send(());
+        server.await.expect("Failed to start the RPC server");
+    });
+    // Wait until the spawned task is ready.
+    let _ = handler.await;
+
+    task
+}
+
 pub struct NodeRPCImpl<N: Network, E: Environment> {
     local_addr: SocketAddr,
     status: Status,
@@ -31,6 +87,26 @@ pub struct NodeRPCImpl<N: Network, E: Environment> {
     ledger: LedgerReader<N>,
     prover_router: ProverRouter<N>,
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
+}
+
+impl<N: Network, E: Environment> NodeRPCImpl<N, E> {
+    pub fn new(
+        local_addr: SocketAddr,
+        status: Status,
+        peers: Arc<Peers<N, E>>,
+        ledger: LedgerReader<N>,
+        prover_router: ProverRouter<N>,
+        memory_pool: Arc<RwLock<MemoryPool<N>>>,
+    ) -> Self {
+        Self {
+            local_addr,
+            status,
+            peers,
+            ledger,
+            prover_router,
+            memory_pool,
+        }
+    }
 }
 
 impl<N: Network, E: Environment> NodeRPC<N> for NodeRPCImpl<N, E> {

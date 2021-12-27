@@ -37,3 +37,4 @@ pub mod node;
 pub use node::*;
 
 pub(crate) mod rpc;
+pub use rpc::rpc2;

@@ -1,12 +1,14 @@
 use std::net::SocketAddr;
 
+use anyhow::anyhow;
 use jsonrpc_core::{BoxFuture, Result};
+use jsonrpc_core_client::transports::http;
 use jsonrpc_derive::rpc;
 
 use snarkvm::dpc::{Block, BlockHeader, Network, Transaction, Transactions, Transition};
 
 mod server;
-pub use server::NodeRPCImpl;
+pub use server::initialize_rpc_server;
 
 #[rpc]
 pub trait NodeRPC<N>
@@ -81,4 +83,9 @@ where
 
     #[rpc(name = "send_transaction")]
     fn send_transaction(&self, transaction_bytes: String) -> BoxFuture<Result<N::TransactionID>>;
+}
+
+pub async fn new_client<N: Network>(host: &str) -> anyhow::Result<NodeRPCClient<N>> {
+    let client = http::connect(host).await.map_err(|e| anyhow!("connect to {}: {}", host, e))?;
+    Ok(client)
 }

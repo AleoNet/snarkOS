@@ -82,6 +82,14 @@ version = "18"
 [dependencies.jsonrpc-core-client]
 version = "18"
 
+[dependencies.jsonrpc-client-transports]
+version = "18"
+default = false
+features = [ "http",  "tls", "arbitrary_precision" ]
+
+[dependencies.jsonrpc-http-server]
+version = "18"
+
 [dependencies.num_cpus]
 version = "1"
 
