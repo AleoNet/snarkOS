@@ -212,6 +212,18 @@ impl<N: Network> LedgerState<N> {
         ledger.regenerate_ledger_tree()?;
         assert_eq!(ledger.ledger_tree.read().root(), latest_ledger_root);
 
+        // TODO (howardwu): TEMPORARY - Remove this after testnet2.
+        // Sanity check for a V12 ledger.
+        if N::NETWORK_ID == 2
+            && ledger.latest_block_height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
+            && ledger.latest_block().header().proof().as_ref().unwrap().is_hiding()
+        {
+            let revert_block_height = snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT.saturating_sub(1);
+            warn!("Ledger is not V12-compliant, reverting to block {}", revert_block_height);
+            ledger.revert_to_block_height(revert_block_height)?;
+            info!("Ledger successfully transitioned and is now V12-compliant");
+        }
+
         // let value = storage.export()?;
         // println!("{}", value);
         // let storage_2 = S::open(".ledger_2", context)?;
