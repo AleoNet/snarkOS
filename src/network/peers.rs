@@ -1053,9 +1053,20 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 Message::BlockResponse(block) => {
                                     // Perform the deferred non-blocking deserialization of the block.
                                     match block.deserialize().await {
-                                        // Route the `BlockResponse` to the ledger.
-                                        Ok(block) => if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block, prover_router.clone())).await {
-                                            warn!("[BlockResponse] {}", error);
+                                        Ok(block) => {
+                                            // TODO (howardwu): TEMPORARY - Remove this after testnet2.
+                                            // Sanity check for a V12 ledger.
+                                            if N::NETWORK_ID == 2 && block.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+                                                if block.header().proof().as_ref().unwrap_or(N::genesis_block().header().proof().as_ref().unwrap()).is_hiding() {
+                                                    warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
+                                                    break;
+                                                }
+                                            }
+
+                                            // Route the `BlockResponse` to the ledger.
+                                            if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block, prover_router.clone())).await {
+                                                warn!("[BlockResponse] {}", error);
+                                            }
                                         },
                                         // Route the `Failure` to the ledger.
                                         Err(error) => if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
@@ -1104,6 +1115,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                                 trace!("Disconnecting from {} (ahead of sync node)", peer_ip);
                                                 break;
                                             }
+
+                                            // TODO (howardwu): TEMPORARY - Remove this after testnet2.
+                                            // Sanity check for a V12 ledger.
+                                            if N::NETWORK_ID == 2 && block_header.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+                                                if block_header.proof().as_ref().unwrap_or(N::genesis_block().header().proof().as_ref().unwrap()).is_hiding() {
+                                                    warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
+                                                    break;
+                                                }
+                                            }
+
                                             // Update the block header of the peer.
                                             peer.block_header = block_header;
                                         }
