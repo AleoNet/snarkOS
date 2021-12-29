@@ -1,6 +1,7 @@
 .vscode
 **/*.idea/
 **/target
+**/debug
 **/.DS_Store
 **/.ledger*
 **/.operator*
@@ -9,3 +10,6 @@
 **outer.proving*
 **posw.proving*
 **universal.srs*
+Cargo.lock
+**/*.rs.bk
+*.pdb
