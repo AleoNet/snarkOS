@@ -147,6 +147,18 @@ impl<N: Network> LedgerState<N> {
         let count = ledger.get_block_header_count()?;
         assert_eq!(count, latest_block_height.saturating_add(1));
 
+        // TODO (howardwu): TEMPORARY - Remove this after testnet2.
+        // Sanity check for a V12 ledger.
+        if N::NETWORK_ID == 2
+            && latest_block_height > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
+            && ledger.get_block(latest_block_height).is_err()
+        {
+            let revert_block_height = snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT.saturating_sub(1);
+            warn!("Ledger is not V12-compliant, reverting to block {}", revert_block_height);
+            latest_block_height = ledger.clear_incompatible_blocks(latest_block_height, revert_block_height)?;
+            info!("Ledger successfully transitioned and is now V12-compliant");
+        }
+
         // Iterate and append each block hash from genesis to tip to validate ledger state.
         const INCREMENT: u32 = 2000;
         let mut start_block_height = 0u32;
@@ -201,19 +213,6 @@ impl<N: Network> LedgerState<N> {
         if start_block_height == 0u32 {
             // Add the genesis block hash to the ledger tree.
             ledger.ledger_tree.write().add(&N::genesis_block().hash())?;
-        }
-
-        // TODO (howardwu): TEMPORARY - Remove this after testnet2.
-        // Sanity check for a V12 ledger.
-        if N::NETWORK_ID == 2
-            && ledger.latest_block_height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
-            && ledger.latest_block().header().proof().as_ref().unwrap().is_hiding()
-        {
-            let revert_block_height = snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT.saturating_sub(1);
-            warn!("Ledger is not V12-compliant, reverting to block {}", revert_block_height);
-            ledger.revert_to_block_height(revert_block_height)?;
-            latest_block_height = revert_block_height;
-            info!("Ledger successfully transitioned and is now V12-compliant");
         }
 
         // Update the latest ledger state.
@@ -1134,6 +1133,64 @@ impl<N: Network> LedgerState<N> {
             (None, None) => Ok(0u32),
             _ => Err(anyhow!("Ledger storage state is inconsistent")),
         }
+    }
+
+    /// Attempts to revert from the latest block height to the given revert block height.
+    fn clear_incompatible_blocks(&self, latest_block_height: u32, revert_block_height: u32) -> Result<u32> {
+        // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+        let _map_lock = self.map_lock.read();
+
+        // Process the block removals.
+        let mut current_block_height = latest_block_height;
+        while current_block_height > revert_block_height {
+            // Update the internal storage state of the ledger.
+            // Ensure the block height is not the genesis block.
+            if current_block_height == 0 {
+                break;
+            }
+
+            // Retrieve the block hash.
+            let block_hash = match self.blocks.block_heights.get(&current_block_height)? {
+                Some(block_hash) => block_hash,
+                None => {
+                    warn!("Block {} missing from block heights map", current_block_height);
+                    break;
+                }
+            };
+            // Retrieve the block transaction IDs.
+            let transaction_ids = match self.blocks.block_transactions.get(&block_hash)? {
+                Some(transaction_ids) => transaction_ids,
+                None => {
+                    warn!("Block {} missing from block transactions map", block_hash);
+                    break;
+                }
+            };
+
+            // Remove the block height.
+            self.blocks.block_heights.remove(&current_block_height)?;
+            // Remove the block header.
+            self.blocks.block_headers.remove(&block_hash)?;
+            // Remove the block transactions.
+            self.blocks.block_transactions.remove(&block_hash)?;
+            // Remove the transactions.
+            for transaction_ids in transaction_ids.iter() {
+                self.blocks.transactions.remove_transaction(transaction_ids)?;
+            }
+
+            // Remove the ledger root corresponding to the current block height.
+            let remove_ledger_root = self
+                .ledger_roots
+                .iter()
+                .filter(|(_, block_height)| current_block_height == *block_height)
+                .collect::<Vec<_>>();
+            for (ledger_root, _) in remove_ledger_root {
+                self.ledger_roots.remove(&ledger_root)?;
+            }
+
+            // Decrement the current block height, and update the current block.
+            current_block_height = current_block_height.saturating_sub(1);
+        }
+        Ok(current_block_height)
     }
 
     /// Gracefully shuts down the ledger state.
