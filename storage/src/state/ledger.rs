@@ -214,13 +214,14 @@ impl<N: Network> LedgerState<N> {
 
         // TODO (howardwu): TEMPORARY - Remove this after testnet2.
         // Sanity check for a V12 ledger.
-        if N::NETWORK_ID == 2 && ledger.latest_block_height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
-            if ledger.latest_block().header().proof().as_ref().unwrap().is_hiding() {
-                let revert_block_height = snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT.saturating_sub(1);
-                warn!("Ledger is not V12-compliant, reverting to block {}", revert_block_height);
-                ledger.revert_to_block_height(revert_block_height)?;
-                info!("Ledger successfully transitioned and is now V12-compliant");
-            }
+        if N::NETWORK_ID == 2
+            && ledger.latest_block_height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
+            && ledger.latest_block().header().proof().as_ref().unwrap().is_hiding()
+        {
+            let revert_block_height = snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT.saturating_sub(1);
+            warn!("Ledger is not V12-compliant, reverting to block {}", revert_block_height);
+            ledger.revert_to_block_height(revert_block_height)?;
+            info!("Ledger successfully transitioned and is now V12-compliant");
         }
 
         // let value = storage.export()?;
