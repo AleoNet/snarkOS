@@ -45,12 +45,6 @@ pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 32;
 /// The total maximum number of block locators.
 pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
 
-/// TODO (howardwu): Reconcile this with the equivalent in `Environment`.
-const MAXIMUM_FORK_DEPTH: u32 = 4096;
-
-/// The maximum future block time - 2 minutes.
-const MAXIMUM_FUTURE_BLOCK_TIME: i64 = 120;
-
 ///
 /// A helper struct containing transaction metadata.
 ///
@@ -587,38 +581,41 @@ impl<N: Network> LedgerState<N> {
         Ok(true)
     }
 
-    /// Mines a new block using the latest state of the given ledger.
-    pub fn mine_next_block<R: Rng + CryptoRng>(
+    /// Returns a block template based on the latest state of the ledger.
+    pub fn get_block_template<R: Rng + CryptoRng>(
         &self,
         recipient: Address<N>,
         is_public: bool,
         transactions: &[Transaction<N>],
-        terminator: &AtomicBool,
         rng: &mut R,
-    ) -> Result<(Block<N>, Record<N>)> {
+    ) -> Result<(BlockTemplate<N>, Record<N>)> {
         // Prepare the new block.
         let previous_block_hash = self.latest_block_hash();
-        let block_height = self.latest_block_height() + 1;
-
-        // Compute the block difficulty target.
-        let previous_timestamp = self.latest_block_timestamp();
-        let previous_difficulty_target = self.latest_block_difficulty_target();
+        let block_height = self.latest_block_height().saturating_add(1);
 
         // Ensure that the new timestamp is ahead of the previous timestamp.
-        let block_timestamp = std::cmp::max(chrono::Utc::now().timestamp(), previous_timestamp.saturating_add(1));
+        let block_timestamp = std::cmp::max(chrono::Utc::now().timestamp(), self.latest_block_timestamp().saturating_add(1));
 
-        let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
+        // Compute the block difficulty target.
+        let difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+            Blocks::<N>::compute_difficulty_target(self.latest_block().header(), block_timestamp, block_height)
+        } else if N::NETWORK_ID == 2 {
+            let anchor_block_header = self.get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
+            Blocks::<N>::compute_difficulty_target(&anchor_block_header, block_timestamp, block_height)
+        } else {
+            Blocks::<N>::compute_difficulty_target(N::genesis_block().header(), block_timestamp, block_height)
+        };
+
+        // Compute the cumulative weight.
         let cumulative_weight = self
             .latest_cumulative_weight()
             .saturating_add((u64::MAX / difficulty_target) as u128);
 
         // Construct the ledger root.
         let ledger_root = self.latest_ledger_root();
-
         // Craft a coinbase transaction.
         let amount = Block::<N>::block_reward(block_height);
         let (coinbase_transaction, coinbase_record) = Transaction::<N>::new_coinbase(recipient, amount, is_public, rng)?;
-
         // Filter the transactions to ensure they are new, and append the coinbase transaction.
         // TODO (howardwu): Improve the performance and design of this.
         let mut transactions: Vec<Transaction<N>> = transactions
@@ -634,7 +631,6 @@ impl<N: Network> LedgerState<N> {
                         return false;
                     }
                 }
-
                 for commitment in transaction.commitments() {
                     if let Ok(true) = self.contains_commitment(commitment) {
                         trace!(
@@ -645,19 +641,17 @@ impl<N: Network> LedgerState<N> {
                         return false;
                     }
                 }
-
                 trace!("Miner is adding transaction {}", transaction.transaction_id());
                 true
             })
             .cloned()
             .collect();
         transactions.push(coinbase_transaction);
-
         // Construct the new block transactions.
         let transactions = Transactions::from(&transactions)?;
 
-        // Mine the next block.
-        match Block::mine(
+        // Construct the block template.
+        let template = BlockTemplate::new(
             previous_block_hash,
             block_height,
             block_timestamp,
@@ -665,9 +659,24 @@ impl<N: Network> LedgerState<N> {
             cumulative_weight,
             ledger_root,
             transactions,
-            terminator,
-            rng,
-        ) {
+        );
+
+        Ok((template, coinbase_record))
+    }
+
+    /// Mines a new block using the latest state of the given ledger.
+    pub fn mine_next_block<R: Rng + CryptoRng>(
+        &self,
+        recipient: Address<N>,
+        is_public: bool,
+        transactions: &[Transaction<N>],
+        terminator: &AtomicBool,
+        rng: &mut R,
+    ) -> Result<(Block<N>, Record<N>)> {
+        let (template, coinbase_record) = self.get_block_template(recipient, is_public, transactions, rng)?;
+
+        // Mine the next block.
+        match Block::mine(template, terminator, rng) {
             Ok(block) => Ok((block, coinbase_record)),
             Err(error) => Err(anyhow!("Unable to mine the next block: {}", error)),
         }
@@ -708,7 +717,7 @@ impl<N: Network> LedgerState<N> {
 
         // Ensure the next block timestamp is within the declared time limit.
         let now = chrono::Utc::now().timestamp();
-        if block.timestamp() > (now + MAXIMUM_FUTURE_BLOCK_TIME) {
+        if block.timestamp() > (now + N::ALEO_FUTURE_TIME_LIMIT_IN_SECS) {
             return Err(anyhow!("The given block timestamp exceeds the time limit"));
         }
 
@@ -718,8 +727,14 @@ impl<N: Network> LedgerState<N> {
         }
 
         // Compute the expected difficulty target.
-        let expected_difficulty_target =
-            Blocks::<N>::compute_difficulty_target(current_block.timestamp(), current_block.difficulty_target(), block.timestamp());
+        let expected_difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+            Blocks::<N>::compute_difficulty_target(current_block.header(), block.timestamp(), block.height())
+        } else if N::NETWORK_ID == 2 {
+            let anchor_block_header = self.get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
+            Blocks::<N>::compute_difficulty_target(&anchor_block_header, block.timestamp(), block.height())
+        } else {
+            Blocks::<N>::compute_difficulty_target(N::genesis_block().header(), block.timestamp(), block.height())
+        };
 
         // Ensure the expected difficulty target is met.
         if block.difficulty_target() != expected_difficulty_target {
@@ -823,7 +838,7 @@ impl<N: Network> LedgerState<N> {
         let number_of_blocks = latest_block_height.saturating_sub(block_height);
 
         // Ensure the reverted block height is within a permitted range and well-formed.
-        if block_height >= latest_block_height || number_of_blocks > MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
+        if block_height >= latest_block_height || number_of_blocks > N::ALEO_MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
             return Err(anyhow!("Attempted to return to block height {}, which is invalid", block_height));
         }
 

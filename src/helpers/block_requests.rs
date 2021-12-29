@@ -117,24 +117,24 @@ pub(crate) enum Case {
     TwoB,
     /// Case 2 - You are behind your peer:
     ///     Case 2(c) - `is_on_fork` is `Some(true)`:
-    ///         Case 2(c)(a) - Common ancestor is within `MAXIMUM_FORK_DEPTH`:
+    ///         Case 2(c)(a) - Common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH`:
     ///              - Revert to common ancestor, and send block requests to sync.
     TwoCA,
     /// Case 2 - You are behind your peer:
     ///     Case 2(c) - `is_on_fork` is `Some(true)`:
-    ///         Case 2(c)(b) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator exists:
-    ///              Case 2(c)(b)(a) - You can calculate that you are outside of the `MAXIMUM_FORK_DEPTH`:
+    ///         Case 2(c)(b) - Common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`, and the first deviating locator exists:
+    ///              Case 2(c)(b)(a) - You can calculate that you are outside of the `ALEO_MAXIMUM_FORK_DEPTH`:
     ///                  - Disconnect from peer.
     TwoCBA,
     /// Case 2 - You are behind your peer:
     ///     Case 2(c) - `is_on_fork` is `Some(true)`:
-    ///         Case 2(c)(b) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator exists:
-    ///              Case 2(c)(b)(b) - You don't know if you are within the `MAXIMUM_FORK_DEPTH`:
+    ///         Case 2(c)(b) - Common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`, and the first deviating locator exists:
+    ///              Case 2(c)(b)(b) - You don't know if you are within the `ALEO_MAXIMUM_FORK_DEPTH`:
     ///                  - Revert to most common ancestor and send block requests to sync.
     TwoCBB,
     /// Case 2 - You are behind your peer:
     ///     Case 2(c) - `is_on_fork` is `Some(true)`:
-    ///         Case 2(c)(c) - Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and the first deviating locator is missing:
+    ///         Case 2(c)(c) - Common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`, and the first deviating locator is missing:
     ///              - Abort. Peer may be malicious as the first deviating locator must exist.
     TwoCC,
 }
@@ -201,20 +201,20 @@ pub(crate) fn handle_block_requests<N: Network, E: Environment>(
         // Case 2(c) - This ledger is on a fork of the peer.
         else {
             // Case 2(c)(a) - If the common ancestor is within the fork range of this ledger, proceed to switch to the fork.
-            if latest_block_height.saturating_sub(maximum_common_ancestor) <= E::MAXIMUM_FORK_DEPTH {
+            if latest_block_height.saturating_sub(maximum_common_ancestor) <= N::ALEO_MAXIMUM_FORK_DEPTH {
                 info!("Discovered a canonical chain from {} with common ancestor {} and cumulative weight {}", maximal_peer, maximum_common_ancestor, maximum_cumulative_weight);
                 // If the latest block is the same as the maximum common ancestor, do not revert.
                 (Case::TwoCA, maximum_common_ancestor, latest_block_height != maximum_common_ancestor)
             }
-            // Case 2(c)(b) - If the common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
+            // Case 2(c)(b) - If the common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`.
             else if let Some(first_deviating_locator) = first_deviating_locator {
-                // Case 2(c)(b)(a) - Check if the real common ancestor is NOT within `MAXIMUM_FORK_DEPTH`.
+                // Case 2(c)(b)(a) - Check if the real common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`.
                 // If this peer is outside of the fork range of this ledger, proceed to disconnect from the peer.
-                if latest_block_height.saturating_sub(first_deviating_locator) >= E::MAXIMUM_FORK_DEPTH {
+                if latest_block_height.saturating_sub(first_deviating_locator) >= N::ALEO_MAXIMUM_FORK_DEPTH {
                     debug!("Peer {} exceeded the permitted fork range, disconnecting", maximal_peer);
                     return BlockRequestHandler::AbortAndDisconnect(Case::TwoCBA, "exceeded fork range".into());
                 }
-                // Case 2(c)(b)(b) - You don't know if your real common ancestor is within `MAXIMUM_FORK_DEPTH`.
+                // Case 2(c)(b)(b) - You don't know if your real common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH`.
                 // Revert to the common ancestor anyways.
                 else {
                     info!("Discovered a potentially better canonical chain from {} with common ancestor {} and cumulative weight {}", maximal_peer, maximum_common_ancestor, maximum_cumulative_weight);
@@ -421,7 +421,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_block_requests_case_2ca() {
-        // Case 2(c)(a) - You are behind your peer, `is_on_fork` is `Some(true)`, and common ancestor is within `MAXIMUM_FORK_DEPTH`:
+        // Case 2(c)(a) - You are behind your peer, `is_on_fork` is `Some(true)`, and common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH`:
         // Request blocks from your latest state.
 
         let rng = &mut thread_rng();
@@ -429,7 +429,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             // Declare internal state.
             let latest_block_height: u32 =
-                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1) * 2);
+                rng.gen_range(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 1..(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 1) * 2);
             let latest_cumulative_weight: u128 = latest_block_height as u128;
 
             // Declare peer state.
@@ -442,7 +442,7 @@ mod tests {
 
             // Declare locator state.
             let maximum_common_ancestor =
-                rng.gen_range(latest_block_height.saturating_sub(Client::<Testnet2>::MAXIMUM_FORK_DEPTH)..latest_block_height);
+                rng.gen_range(latest_block_height.saturating_sub(Testnet2::ALEO_MAXIMUM_FORK_DEPTH)..latest_block_height);
             let peer_first_deviating_locator = Some(rng.gen_range(maximum_common_ancestor + 1..latest_block_height));
 
             // Determine if block requests or forking is required.
@@ -479,7 +479,7 @@ mod tests {
     #[tokio::test]
     async fn test_block_requests_case_2cba() {
         // Case 2(c)(b)(a) - You are behind your peer, `is_on_fork` is `Some(true)`,
-        //    Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and you can calculate that you are outside of the `MAXIMUM_FORK_DEPTH`:
+        //    Common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`, and you can calculate that you are outside of the `ALEO_MAXIMUM_FORK_DEPTH`:
         // Disconnect from peer.
 
         let rng = &mut thread_rng();
@@ -487,7 +487,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             // Declare internal state.
             let latest_block_height: u32 =
-                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 2..(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 2) * 2);
+                rng.gen_range(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 2..(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 2) * 2);
             let latest_cumulative_weight: u128 = latest_block_height as u128;
 
             // Declare peer state.
@@ -499,10 +499,9 @@ mod tests {
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
 
             // Declare locator state.
-            let maximum_common_ancestor = rng.gen_range(0..latest_block_height.saturating_sub(Client::<Testnet2>::MAXIMUM_FORK_DEPTH) / 2);
-            let peer_first_deviating_locator = Some(
-                rng.gen_range(maximum_common_ancestor + 1..latest_block_height.saturating_sub(Client::<Testnet2>::MAXIMUM_FORK_DEPTH)),
-            );
+            let maximum_common_ancestor = rng.gen_range(0..latest_block_height.saturating_sub(Testnet2::ALEO_MAXIMUM_FORK_DEPTH) / 2);
+            let peer_first_deviating_locator =
+                Some(rng.gen_range(maximum_common_ancestor + 1..latest_block_height.saturating_sub(Testnet2::ALEO_MAXIMUM_FORK_DEPTH)));
 
             // Determine if block requests or forking is required.
             let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
@@ -527,7 +526,7 @@ mod tests {
     #[tokio::test]
     async fn test_block_requests_case_2cbb() {
         // Case 2(c)(b)(b) - You are behind your peer, `is_on_fork` is `Some(true)`,
-        //    Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and you don't know if you are within the `MAXIMUM_FORK_DEPTH`::
+        //    Common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`, and you don't know if you are within the `ALEO_MAXIMUM_FORK_DEPTH`::
         // Revert to most common ancestor and send block requests to sync.
 
         let rng = &mut thread_rng();
@@ -535,7 +534,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             // Declare internal state.
             let latest_block_height: u32 =
-                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1) * 2);
+                rng.gen_range(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 1..(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 1) * 2);
             let latest_cumulative_weight: u128 = latest_block_height as u128;
 
             // Declare peer state.
@@ -547,9 +546,9 @@ mod tests {
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
 
             // Declare locator state.
-            let maximum_common_ancestor = rng.gen_range(0..latest_block_height.saturating_sub(Client::<Testnet2>::MAXIMUM_FORK_DEPTH));
+            let maximum_common_ancestor = rng.gen_range(0..latest_block_height.saturating_sub(Testnet2::ALEO_MAXIMUM_FORK_DEPTH));
             let peer_first_deviating_locator =
-                Some(rng.gen_range(latest_block_height.saturating_sub(Client::<Testnet2>::MAXIMUM_FORK_DEPTH)..latest_block_height));
+                Some(rng.gen_range(latest_block_height.saturating_sub(Testnet2::ALEO_MAXIMUM_FORK_DEPTH)..latest_block_height));
 
             // Determine if block requests or forking is required.
             let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
@@ -585,7 +584,7 @@ mod tests {
     #[tokio::test]
     async fn test_block_requests_case_2cc() {
         // Case 2(c)(b)(b) - You are behind your peer, `is_on_fork` is `Some(true)`,
-        //    Common ancestor is NOT within `MAXIMUM_FORK_DEPTH`, and you don't know if you are within the `MAXIMUM_FORK_DEPTH`::
+        //    Common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`, and you don't know if you are within the `ALEO_MAXIMUM_FORK_DEPTH`::
         // Revert to most common ancestor and send block requests to sync.
 
         let rng = &mut thread_rng();
@@ -593,7 +592,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             // Declare internal state.
             let latest_block_height: u32 =
-                rng.gen_range(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1..(Client::<Testnet2>::MAXIMUM_FORK_DEPTH + 1) * 2);
+                rng.gen_range(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 1..(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 1) * 2);
             let latest_cumulative_weight: u128 = latest_block_height as u128;
 
             // Declare peer state.
@@ -605,7 +604,7 @@ mod tests {
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
 
             // Declare locator state.
-            let maximum_common_ancestor = rng.gen_range(0..latest_block_height.saturating_sub(Client::<Testnet2>::MAXIMUM_FORK_DEPTH));
+            let maximum_common_ancestor = rng.gen_range(0..latest_block_height.saturating_sub(Testnet2::ALEO_MAXIMUM_FORK_DEPTH));
             let peer_first_deviating_locator = None;
 
             // Determine if block requests or forking is required.

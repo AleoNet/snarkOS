@@ -682,7 +682,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         // Send the first `Ping` message to the peer.
         let message = Message::Ping(
             E::MESSAGE_VERSION,
-            E::MAXIMUM_FORK_DEPTH,
+            N::ALEO_MAXIMUM_FORK_DEPTH,
             E::NODE_TYPE,
             local_status.get(),
             ledger_reader.latest_block_hash(),
@@ -745,7 +745,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         // Send a challenge request to the peer.
         let message = Message::<N, E>::ChallengeRequest(
             E::MESSAGE_VERSION,
-            E::MAXIMUM_FORK_DEPTH,
+            N::ALEO_MAXIMUM_FORK_DEPTH,
             E::NODE_TYPE,
             local_status.get(),
             local_ip.port(),
@@ -776,7 +776,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             return Err(anyhow!("Dropping {} on version {} (outdated)", peer_ip, version));
                         }
                         // Ensure the maximum fork depth is correct.
-                        if fork_depth != E::MAXIMUM_FORK_DEPTH {
+                        if fork_depth != N::ALEO_MAXIMUM_FORK_DEPTH {
                             return Err(anyhow!(
                                 "Dropping {} for an incorrect maximum fork depth of {}",
                                 peer_ip,
@@ -1088,7 +1088,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         break;
                                     }
                                     // Ensure the maximum fork depth is correct.
-                                    if fork_depth != E::MAXIMUM_FORK_DEPTH {
+                                    if fork_depth != N::ALEO_MAXIMUM_FORK_DEPTH {
                                         warn!("Dropping {} for an incorrect maximum fork depth of {}", peer_ip, fork_depth);
                                         break;
                                     }
@@ -1154,7 +1154,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         let latest_block_header = ledger_reader.latest_block_header();
 
                                         // Send a `Ping` request to the peer.
-                                        let message = Message::Ping(E::MESSAGE_VERSION, E::MAXIMUM_FORK_DEPTH, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
+                                        let message = Message::Ping(E::MESSAGE_VERSION, N::ALEO_MAXIMUM_FORK_DEPTH, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }
