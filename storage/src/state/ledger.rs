@@ -118,7 +118,7 @@ impl<N: Network> LedgerState<N> {
         };
 
         // Determine the latest block height.
-        let latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
+        let mut latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
             (Some(latest_block_height_0), Some(latest_block_height_1)) => match latest_block_height_0 == latest_block_height_1 {
                 true => latest_block_height_0,
                 false => match ledger.try_fixing_inconsistent_state() {
@@ -148,7 +148,7 @@ impl<N: Network> LedgerState<N> {
         assert_eq!(count, latest_block_height.saturating_add(1));
 
         // Iterate and append each block hash from genesis to tip to validate ledger state.
-        const INCREMENT: u32 = 1000;
+        const INCREMENT: u32 = 2000;
         let mut start_block_height = 0u32;
         while start_block_height <= latest_block_height {
             // Compute the end block height (inclusive) for this iteration.
@@ -203,15 +203,6 @@ impl<N: Network> LedgerState<N> {
             ledger.ledger_tree.write().add(&N::genesis_block().hash())?;
         }
 
-        // Update the latest ledger state.
-        *ledger.latest_block.write() = ledger.get_block(latest_block_height)?;
-        ledger.regenerate_latest_ledger_state()?;
-
-        // Validate the ledger root one final time.
-        let latest_ledger_root = ledger.ledger_tree.read().root();
-        ledger.regenerate_ledger_tree()?;
-        assert_eq!(ledger.ledger_tree.read().root(), latest_ledger_root);
-
         // TODO (howardwu): TEMPORARY - Remove this after testnet2.
         // Sanity check for a V12 ledger.
         if N::NETWORK_ID == 2
@@ -221,8 +212,18 @@ impl<N: Network> LedgerState<N> {
             let revert_block_height = snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT.saturating_sub(1);
             warn!("Ledger is not V12-compliant, reverting to block {}", revert_block_height);
             ledger.revert_to_block_height(revert_block_height)?;
+            latest_block_height = revert_block_height;
             info!("Ledger successfully transitioned and is now V12-compliant");
         }
+
+        // Update the latest ledger state.
+        *ledger.latest_block.write() = ledger.get_block(latest_block_height)?;
+        ledger.regenerate_latest_ledger_state()?;
+
+        // Validate the ledger root one final time.
+        let latest_ledger_root = ledger.ledger_tree.read().root();
+        ledger.regenerate_ledger_tree()?;
+        assert_eq!(ledger.ledger_tree.read().root(), latest_ledger_root);
 
         // let value = storage.export()?;
         // println!("{}", value);
