@@ -29,8 +29,8 @@ use crate::{
 };
 use snarkos_storage::{storage::Storage, OperatorState};
 use snarkvm::{
-    algorithms::{crh::sha256d_to_u64, SNARK},
-    dpc::prelude::*,
+    algorithms::crh::sha256d_to_u64,
+    dpc::{posw::PoSWProof, prelude::*},
     utilities::{FromBytes, ToBytes},
 };
 
@@ -297,7 +297,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                             *block_header.nonce(),
                         ];
 
-                        if !<<N as Network>::PoSWSNARK as SNARK>::verify(N::posw().verifying_key(), &inputs, proof).unwrap() {
+                        if !PoSWProof::<N>::verify(proof, N::posw().verifying_key(), &inputs) {
                             warn!("[PoolResponse] PoSW proof verification failed");
                             return;
                         }

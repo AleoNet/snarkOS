@@ -28,8 +28,8 @@ use crate::{
 };
 use snarkos_storage::{storage::Storage, ProverState};
 use snarkvm::{
-    algorithms::{crh::sha256d_to_u64, SNARK},
-    dpc::prelude::*,
+    algorithms::crh::sha256d_to_u64,
+    dpc::{posw::PoSWProof, prelude::*},
     utilities::{FromBytes, ToBytes},
 };
 
@@ -283,7 +283,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                             ];
 
                                             // Ensure the proof is valid.
-                                            if !<<N as Network>::PoSWSNARK as SNARK>::verify(N::posw().verifying_key(), &inputs, &*proof)? {
+                                            if !PoSWProof::<N>::verify(proof, N::posw().verifying_key(), &inputs) {
                                                 warn!("PoSW proof verification failed");
                                                 continue;
                                             }

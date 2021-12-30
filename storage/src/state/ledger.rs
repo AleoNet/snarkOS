@@ -45,12 +45,6 @@ pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 32;
 /// The total maximum number of block locators.
 pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
 
-/// TODO (howardwu): Reconcile this with the equivalent in `Environment`.
-const MAXIMUM_FORK_DEPTH: u32 = 4096;
-
-/// The maximum future block time - 2 minutes.
-const MAXIMUM_FUTURE_BLOCK_TIME: i64 = 120;
-
 ///
 /// A helper struct containing transaction metadata.
 ///
@@ -124,7 +118,7 @@ impl<N: Network> LedgerState<N> {
         };
 
         // Determine the latest block height.
-        let latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
+        let mut latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
             (Some(latest_block_height_0), Some(latest_block_height_1)) => match latest_block_height_0 == latest_block_height_1 {
                 true => latest_block_height_0,
                 false => match ledger.try_fixing_inconsistent_state() {
@@ -153,8 +147,20 @@ impl<N: Network> LedgerState<N> {
         let count = ledger.get_block_header_count()?;
         assert_eq!(count, latest_block_height.saturating_add(1));
 
+        // TODO (howardwu): TEMPORARY - Remove this after testnet2.
+        // Sanity check for a V12 ledger.
+        if N::NETWORK_ID == 2
+            && latest_block_height > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
+            && ledger.get_block(latest_block_height).is_err()
+        {
+            let revert_block_height = snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT.saturating_sub(1);
+            warn!("Ledger is not V12-compliant, reverting to block {}", revert_block_height);
+            latest_block_height = ledger.clear_incompatible_blocks(latest_block_height, revert_block_height)?;
+            info!("Ledger successfully transitioned and is now V12-compliant");
+        }
+
         // Iterate and append each block hash from genesis to tip to validate ledger state.
-        const INCREMENT: u32 = 1000;
+        const INCREMENT: u32 = 2000;
         let mut start_block_height = 0u32;
         while start_block_height <= latest_block_height {
             // Compute the end block height (inclusive) for this iteration.
@@ -599,25 +605,29 @@ impl<N: Network> LedgerState<N> {
         let previous_block_hash = self.latest_block_hash();
         let block_height = self.latest_block_height().saturating_add(1);
 
-        // Compute the block difficulty target.
-        let previous_timestamp = self.latest_block_timestamp();
-        let previous_difficulty_target = self.latest_block_difficulty_target();
-
         // Ensure that the new timestamp is ahead of the previous timestamp.
-        let block_timestamp = std::cmp::max(chrono::Utc::now().timestamp(), previous_timestamp.saturating_add(1));
+        let block_timestamp = std::cmp::max(chrono::Utc::now().timestamp(), self.latest_block_timestamp().saturating_add(1));
 
-        let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
+        // Compute the block difficulty target.
+        let difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+            Blocks::<N>::compute_difficulty_target(self.latest_block().header(), block_timestamp, block_height)
+        } else if N::NETWORK_ID == 2 {
+            let anchor_block_header = self.get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
+            Blocks::<N>::compute_difficulty_target(&anchor_block_header, block_timestamp, block_height)
+        } else {
+            Blocks::<N>::compute_difficulty_target(N::genesis_block().header(), block_timestamp, block_height)
+        };
+
+        // Compute the cumulative weight.
         let cumulative_weight = self
             .latest_cumulative_weight()
             .saturating_add((u64::MAX / difficulty_target) as u128);
 
         // Construct the ledger root.
         let ledger_root = self.latest_ledger_root();
-
         // Craft a coinbase transaction.
         let amount = Block::<N>::block_reward(block_height);
         let (coinbase_transaction, coinbase_record) = Transaction::<N>::new_coinbase(recipient, amount, is_public, rng)?;
-
         // Filter the transactions to ensure they are new, and append the coinbase transaction.
         // TODO (howardwu): Improve the performance and design of this.
         let mut transactions: Vec<Transaction<N>> = transactions
@@ -633,7 +643,6 @@ impl<N: Network> LedgerState<N> {
                         return false;
                     }
                 }
-
                 for commitment in transaction.commitments() {
                     if let Ok(true) = self.contains_commitment(commitment) {
                         trace!(
@@ -644,14 +653,12 @@ impl<N: Network> LedgerState<N> {
                         return false;
                     }
                 }
-
                 trace!("Miner is adding transaction {}", transaction.transaction_id());
                 true
             })
             .cloned()
             .collect();
         transactions.push(coinbase_transaction);
-
         // Construct the new block transactions.
         let transactions = Transactions::from(&transactions)?;
 
@@ -722,7 +729,7 @@ impl<N: Network> LedgerState<N> {
 
         // Ensure the next block timestamp is within the declared time limit.
         let now = chrono::Utc::now().timestamp();
-        if block.timestamp() > (now + MAXIMUM_FUTURE_BLOCK_TIME) {
+        if block.timestamp() > (now + N::ALEO_FUTURE_TIME_LIMIT_IN_SECS) {
             return Err(anyhow!("The given block timestamp exceeds the time limit"));
         }
 
@@ -732,8 +739,14 @@ impl<N: Network> LedgerState<N> {
         }
 
         // Compute the expected difficulty target.
-        let expected_difficulty_target =
-            Blocks::<N>::compute_difficulty_target(current_block.timestamp(), current_block.difficulty_target(), block.timestamp());
+        let expected_difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+            Blocks::<N>::compute_difficulty_target(current_block.header(), block.timestamp(), block.height())
+        } else if N::NETWORK_ID == 2 {
+            let anchor_block_header = self.get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
+            Blocks::<N>::compute_difficulty_target(&anchor_block_header, block.timestamp(), block.height())
+        } else {
+            Blocks::<N>::compute_difficulty_target(N::genesis_block().header(), block.timestamp(), block.height())
+        };
 
         // Ensure the expected difficulty target is met.
         if block.difficulty_target() != expected_difficulty_target {
@@ -837,7 +850,7 @@ impl<N: Network> LedgerState<N> {
         let number_of_blocks = latest_block_height.saturating_sub(block_height);
 
         // Ensure the reverted block height is within a permitted range and well-formed.
-        if block_height >= latest_block_height || number_of_blocks > MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
+        if block_height >= latest_block_height || number_of_blocks > N::ALEO_MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
             return Err(anyhow!("Attempted to return to block height {}, which is invalid", block_height));
         }
 
@@ -1120,6 +1133,64 @@ impl<N: Network> LedgerState<N> {
             (None, None) => Ok(0u32),
             _ => Err(anyhow!("Ledger storage state is inconsistent")),
         }
+    }
+
+    /// Attempts to revert from the latest block height to the given revert block height.
+    fn clear_incompatible_blocks(&self, latest_block_height: u32, revert_block_height: u32) -> Result<u32> {
+        // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+        let _map_lock = self.map_lock.read();
+
+        // Process the block removals.
+        let mut current_block_height = latest_block_height;
+        while current_block_height > revert_block_height {
+            // Update the internal storage state of the ledger.
+            // Ensure the block height is not the genesis block.
+            if current_block_height == 0 {
+                break;
+            }
+
+            // Retrieve the block hash.
+            let block_hash = match self.blocks.block_heights.get(&current_block_height)? {
+                Some(block_hash) => block_hash,
+                None => {
+                    warn!("Block {} missing from block heights map", current_block_height);
+                    break;
+                }
+            };
+            // Retrieve the block transaction IDs.
+            let transaction_ids = match self.blocks.block_transactions.get(&block_hash)? {
+                Some(transaction_ids) => transaction_ids,
+                None => {
+                    warn!("Block {} missing from block transactions map", block_hash);
+                    break;
+                }
+            };
+
+            // Remove the block height.
+            self.blocks.block_heights.remove(&current_block_height)?;
+            // Remove the block header.
+            self.blocks.block_headers.remove(&block_hash)?;
+            // Remove the block transactions.
+            self.blocks.block_transactions.remove(&block_hash)?;
+            // Remove the transactions.
+            for transaction_ids in transaction_ids.iter() {
+                self.blocks.transactions.remove_transaction(transaction_ids)?;
+            }
+
+            // Remove the ledger root corresponding to the current block height.
+            let remove_ledger_root = self
+                .ledger_roots
+                .iter()
+                .filter(|(_, block_height)| current_block_height == *block_height)
+                .collect::<Vec<_>>();
+            for (ledger_root, _) in remove_ledger_root {
+                self.ledger_roots.remove(&ledger_root)?;
+            }
+
+            // Decrement the current block height, and update the current block.
+            current_block_height = current_block_height.saturating_sub(1);
+        }
+        Ok(current_block_height)
     }
 
     /// Gracefully shuts down the ledger state.

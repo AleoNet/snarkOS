@@ -705,7 +705,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         // Send the first `Ping` message to the peer.
         let message = Message::Ping(
             E::MESSAGE_VERSION,
-            E::MAXIMUM_FORK_DEPTH,
+            N::ALEO_MAXIMUM_FORK_DEPTH,
             E::NODE_TYPE,
             local_status.get(),
             ledger_reader.latest_block_hash(),
@@ -768,7 +768,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         // Send a challenge request to the peer.
         let message = Message::<N, E>::ChallengeRequest(
             E::MESSAGE_VERSION,
-            E::MAXIMUM_FORK_DEPTH,
+            N::ALEO_MAXIMUM_FORK_DEPTH,
             E::NODE_TYPE,
             local_status.get(),
             local_ip.port(),
@@ -799,7 +799,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             return Err(anyhow!("Dropping {} on version {} (outdated)", peer_ip, version));
                         }
                         // Ensure the maximum fork depth is correct.
-                        if fork_depth != E::MAXIMUM_FORK_DEPTH {
+                        if fork_depth != N::ALEO_MAXIMUM_FORK_DEPTH {
                             return Err(anyhow!(
                                 "Dropping {} for an incorrect maximum fork depth of {}",
                                 peer_ip,
@@ -1077,9 +1077,20 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 Message::BlockResponse(block) => {
                                     // Perform the deferred non-blocking deserialization of the block.
                                     match block.deserialize().await {
-                                        // Route the `BlockResponse` to the ledger.
-                                        Ok(block) => if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block, prover_router.clone())).await {
-                                            warn!("[BlockResponse] {}", error);
+                                        Ok(block) => {
+                                            // TODO (howardwu): TEMPORARY - Remove this after testnet2.
+                                            // Sanity check for a V12 ledger.
+                                            if N::NETWORK_ID == 2 && block.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+                                                if block.header().proof().as_ref().unwrap_or(N::genesis_block().header().proof().as_ref().unwrap()).is_hiding() {
+                                                    warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
+                                                    break;
+                                                }
+                                            }
+
+                                            // Route the `BlockResponse` to the ledger.
+                                            if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block, prover_router.clone())).await {
+                                                warn!("[BlockResponse] {}", error);
+                                            }
                                         },
                                         // Route the `Failure` to the ledger.
                                         Err(error) => if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
@@ -1112,7 +1123,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         break;
                                     }
                                     // Ensure the maximum fork depth is correct.
-                                    if fork_depth != E::MAXIMUM_FORK_DEPTH {
+                                    if fork_depth != N::ALEO_MAXIMUM_FORK_DEPTH {
                                         warn!("Dropping {} for an incorrect maximum fork depth of {}", peer_ip, fork_depth);
                                         break;
                                     }
@@ -1128,6 +1139,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                                 trace!("Disconnecting from {} (ahead of sync node)", peer_ip);
                                                 break;
                                             }
+
+                                            // TODO (howardwu): TEMPORARY - Remove this after testnet2.
+                                            // Sanity check for a V12 ledger.
+                                            if N::NETWORK_ID == 2 && block_header.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+                                                if block_header.proof().as_ref().unwrap_or(N::genesis_block().header().proof().as_ref().unwrap()).is_hiding() {
+                                                    warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
+                                                    break;
+                                                }
+                                            }
+
                                             // Update the block header of the peer.
                                             peer.block_header = block_header;
                                         }
@@ -1178,7 +1199,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         let latest_block_header = ledger_reader.latest_block_header();
 
                                         // Send a `Ping` request to the peer.
-                                        let message = Message::Ping(E::MESSAGE_VERSION, E::MAXIMUM_FORK_DEPTH, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
+                                        let message = Message::Ping(E::MESSAGE_VERSION, N::ALEO_MAXIMUM_FORK_DEPTH, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }
