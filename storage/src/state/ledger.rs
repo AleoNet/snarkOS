@@ -1198,6 +1198,8 @@ impl<N: Network> LedgerState<N> {
 
             // Decrement the current block height, and update the current block.
             current_block_height = current_block_height.saturating_sub(1);
+
+            trace!("Ledger successfully reverted to block {}", current_block_height);
         }
         Ok(current_block_height)
     }
