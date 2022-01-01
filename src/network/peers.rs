@@ -1080,11 +1080,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         Ok(block) => {
                                             // TODO (howardwu): TEMPORARY - Remove this after testnet2.
                                             // Sanity check for a V12 ledger.
-                                            if N::NETWORK_ID == 2 && block.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
-                                                if block.header().proof().as_ref().unwrap_or(N::genesis_block().header().proof().as_ref().unwrap()).is_hiding() {
-                                                    warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
-                                                    break;
-                                                }
+                                            if N::NETWORK_ID == 2
+                                                && block.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
+                                                && block.header().proof().as_ref().unwrap_or_else(|| N::genesis_block().header().proof().as_ref().unwrap()).is_hiding()
+                                            {
+                                                warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
+                                                break;
                                             }
 
                                             // Route the `BlockResponse` to the ledger.
@@ -1142,11 +1143,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                             // TODO (howardwu): TEMPORARY - Remove this after testnet2.
                                             // Sanity check for a V12 ledger.
-                                            if N::NETWORK_ID == 2 && block_header.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
-                                                if block_header.proof().as_ref().unwrap_or(N::genesis_block().header().proof().as_ref().unwrap()).is_hiding() {
-                                                    warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
-                                                    break;
-                                                }
+                                            if N::NETWORK_ID == 2
+                                                && block_header.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
+                                                && block_header.proof().as_ref().unwrap_or_else(|| N::genesis_block().header().proof().as_ref().unwrap()).is_hiding()
+                                            {
+                                                warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
+                                                break;
                                             }
 
                                             // Update the block header of the peer.
