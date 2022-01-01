@@ -371,20 +371,18 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                         // If the block has satisfactory difficulty and is valid, proceed to broadcast it.
                         if let Ok(block) = Block::new(&block_template, block_header) {
-                            info!("Operator has found unconfirmed block {} ({})", block_height, block.hash());
-
                             // Store the coinbase record.
-                            if let Err(error) = self
-                                .state
-                                .add_coinbase_record(block_height, block_template.coinbase_record().clone())
-                            {
-                                warn!("Could not store coinbase record - {}", error);
-                            }
-
-                            // Broadcast the unconfirmed block.
-                            let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
-                            if let Err(error) = self.ledger_router.send(request).await {
-                                warn!("Failed to broadcast mined block - {}", error);
+                            let coinbase_record = block_template.coinbase_record().clone();
+                            match self.state.add_coinbase_record(block_height, coinbase_record) {
+                                // Broadcast the unconfirmed block.
+                                Ok(()) => {
+                                    info!("Operator has found unconfirmed block {} ({})", block_height, block.hash());
+                                    let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
+                                    if let Err(error) = self.ledger_router.send(request).await {
+                                        warn!("Failed to broadcast mined block - {}", error);
+                                    }
+                                }
+                                Err(error) => warn!("Could not store coinbase record - {}", error),
                             }
                         }
                     } else {

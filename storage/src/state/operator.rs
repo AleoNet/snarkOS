@@ -80,8 +80,8 @@ impl<N: Network> OperatorState<N> {
     }
 
     /// Adds the given coinbase record to storage.
-    pub fn add_coinbase_record(&self, block_height: u32, record: Record<N>) -> Result<()> {
-        self.shares.add_record(block_height, record)
+    pub fn add_coinbase_record(&self, block_height: u32, coinbase_record: Record<N>) -> Result<()> {
+        self.shares.add_record(block_height, coinbase_record)
     }
 
     /// Removes the given record from storage.
