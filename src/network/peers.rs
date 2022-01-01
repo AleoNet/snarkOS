@@ -1207,35 +1207,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         }
                                     }));
                                 }
-                                Message::PoolRegister(address) => {
-                                    if E::NODE_TYPE != NodeType::Operator {
-                                        trace!("Skipping 'PoolRegister' from {}", peer_ip);
-                                    } else if let Err(error) = operator_router.send(OperatorRequest::PoolRegister(peer_ip, address)).await {
-                                        warn!("[PoolRegister] {}", error);
-                                    }
-                                }
-                                Message::PoolRequest(share_difficulty, block_template) => {
-                                    if E::NODE_TYPE != NodeType::Prover {
-                                        trace!("Skipping 'PoolRequest' from {}", peer_ip);
-                                    } else if let Ok(block_template) = block_template.deserialize().await {
-                                        if let Err(error) = prover_router.send(ProverRequest::PoolRequest(peer_ip, share_difficulty, block_template)).await {
-                                            warn!("[PoolRequest] {}", error);
-                                        }
-                                    } else {
-                                        warn!("[PoolRequest] could not deserialize block template");
-                                    }
-                                }
-                                Message::PoolResponse(address, block_header) => {
-                                    if E::NODE_TYPE != NodeType::Operator {
-                                        trace!("Skipping 'PoolResponse' from {}", peer_ip);
-                                    } else if let Ok(block_header) = block_header.deserialize().await {
-                                        if let Err(error) = operator_router.send(OperatorRequest::PoolResponse(peer_ip, block_header, address)).await {
-                                            warn!("[PoolResponse] {}", error);
-                                        }
-                                    } else {
-                                        warn!("[PoolResponse] could not deserialize block");
-                                    }
-                                }
                                 Message::UnconfirmedBlock(block_height, block_hash, block) => {
                                     // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
                                     let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
@@ -1319,6 +1290,35 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         if let Err(error) = prover_router.send(ProverRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
                                             warn!("[UnconfirmedTransaction] {}", error);
                                         }
+                                    }
+                                }
+                                Message::PoolRegister(address) => {
+                                    if E::NODE_TYPE != NodeType::Operator {
+                                        trace!("Skipping 'PoolRegister' from {}", peer_ip);
+                                    } else if let Err(error) = operator_router.send(OperatorRequest::PoolRegister(peer_ip, address)).await {
+                                        warn!("[PoolRegister] {}", error);
+                                    }
+                                }
+                                Message::PoolRequest(share_difficulty, block_template) => {
+                                    if E::NODE_TYPE != NodeType::Prover {
+                                        trace!("Skipping 'PoolRequest' from {}", peer_ip);
+                                    } else if let Ok(block_template) = block_template.deserialize().await {
+                                        if let Err(error) = prover_router.send(ProverRequest::PoolRequest(peer_ip, share_difficulty, block_template)).await {
+                                            warn!("[PoolRequest] {}", error);
+                                        }
+                                    } else {
+                                        warn!("[PoolRequest] could not deserialize block template");
+                                    }
+                                }
+                                Message::PoolResponse(address, block_header) => {
+                                    if E::NODE_TYPE != NodeType::Operator {
+                                        trace!("Skipping 'PoolResponse' from {}", peer_ip);
+                                    } else if let Ok(block_header) = block_header.deserialize().await {
+                                        if let Err(error) = operator_router.send(OperatorRequest::PoolResponse(peer_ip, block_header, address)).await {
+                                            warn!("[PoolResponse] {}", error);
+                                        }
+                                    } else {
+                                        warn!("[PoolResponse] could not deserialize block");
                                     }
                                 }
                                 Message::Unused(_) => break, // Peer is not following the protocol.

@@ -29,14 +29,14 @@ pub enum NodeType {
     Client = 0,
     /// A mining node is a full node, capable of producing new blocks.
     Miner,
-    /// An operating node is a full node, capable of coordinating provers in a pool.
-    Operator,
-    /// A proving node is a full node, capable of producing proofs for a pool.
-    Prover,
     /// A beacon node is a discovery node, capable of sharing peers of the network.
     Beacon,
     /// A sync node is a discovery node, capable of syncing nodes for the network.
     Sync,
+    /// An operating node is a full node, capable of coordinating provers in a pool.
+    Operator,
+    /// A proving node is a full node, capable of producing proofs for a pool.
+    Prover,
 }
 
 impl NodeType {
@@ -44,10 +44,10 @@ impl NodeType {
         match self {
             Self::Client => "a client node",
             Self::Miner => "a mining node",
-            Self::Operator => "an operating node",
-            Self::Prover => "a proving node",
             Self::Beacon => "a beacon node",
             Self::Sync => "a sync node",
+            Self::Operator => "an operating node",
+            Self::Prover => "a proving node",
         }
     }
 }
@@ -64,7 +64,7 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The specified type of node.
     const NODE_TYPE: NodeType;
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    const MESSAGE_VERSION: u32 = 13;
+    const MESSAGE_VERSION: u32 = 12;
     /// If `true`, a mining node will craft public coinbase transactions.
     const COINBASE_IS_PUBLIC: bool = false;
 
