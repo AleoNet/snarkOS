@@ -288,7 +288,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             match result {
                                 Ok(Ok((block_header, proof_difficulty))) => {
                                     info!(
-                                        "Prover successfully mined a zero-knowledge proof for unconfirmed block {} with share difficulty of {}",
+                                        "Prover successfully mined a share for unconfirmed block {} with proof difficulty of {}",
                                         block_header.height(),
                                         proof_difficulty
                                     );

@@ -28,7 +28,6 @@ pub enum MapId {
     Transactions,
     Transitions,
     Shares,
-    PoolRecords,
     #[cfg(test)]
     Test,
 }
@@ -46,7 +45,6 @@ impl MapId {
             Self::Transactions => b"transactions",
             Self::Transitions => b"transitions",
             Self::Shares => b"shares",
-            Self::PoolRecords => b"pool_records",
             #[cfg(test)]
             Self::Test => b"hello world",
         }

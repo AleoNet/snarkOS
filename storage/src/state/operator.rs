@@ -48,33 +48,8 @@ impl<N: Network> OperatorState<N> {
     }
 
     /// Returns all the shares in storage.
-    pub fn to_shares(&self) -> Vec<((u32, N::Commitment), HashMap<Address<N>, u64>)> {
+    pub fn to_shares(&self) -> Vec<((u32, Record<N>), HashMap<Address<N>, u64>)> {
         self.shares.to_shares()
-    }
-
-    /// Returns the shares for a specific block, given the block height and coinbase record commitment.
-    pub fn get_shares_for_block(&self, block_height: u32, coinbase_commitment: N::Commitment) -> Result<HashMap<Address<N>, u64>> {
-        self.shares.get_shares_for_block(block_height, coinbase_commitment)
-    }
-
-    /// Returns the shares for a specific prover, given a ledger and the prover address.
-    pub fn get_shares_for_prover(&self, ledger: &Arc<LedgerState<N>>, prover: &Address<N>) -> u64 {
-        self.shares.get_shares_for_prover(ledger, prover)
-    }
-
-    /// Increments the share count by one for a given block height, coinbase record commitment and prover address.
-    pub fn increment_share(&self, block_height: u32, coinbase_commitment: N::Commitment, prover: &Address<N>) -> Result<()> {
-        self.shares.increment_share(block_height, coinbase_commitment, prover)
-    }
-
-    /// Removes the shares for a given block height and coinbase record commitment in storage.
-    pub fn remove_shares(&self, block_height: u32, coinbase_commitment: N::Commitment) -> Result<()> {
-        self.shares.remove_shares(block_height, coinbase_commitment)
-    }
-
-    /// Returns `true` if the given commitment exists in storage.
-    pub fn contains_coinbase_record(&self, commitment: &N::Commitment) -> Result<bool> {
-        self.shares.contains_record(commitment)
     }
 
     /// Returns all coinbase records in storage.
@@ -82,19 +57,24 @@ impl<N: Network> OperatorState<N> {
         self.shares.to_records()
     }
 
-    /// Returns the coinbase record for a given commitment.
-    pub fn get_coinbase_record(&self, commitment: &N::Commitment) -> Result<(u32, Record<N>)> {
-        self.shares.get_record(commitment)
+    /// Returns the shares for a specific block, given the block height and coinbase record.
+    pub fn get_shares_for_block(&self, block_height: u32, coinbase_record: Record<N>) -> Result<HashMap<Address<N>, u64>> {
+        self.shares.get_shares_for_block(block_height, coinbase_record)
     }
 
-    /// Adds the given coinbase record to storage.
-    pub fn add_coinbase_record(&self, block_height: u32, coinbase_record: Record<N>) -> Result<()> {
-        self.shares.add_record(block_height, coinbase_record)
+    /// Returns the shares for a specific prover, given a ledger and the prover address.
+    pub fn get_shares_for_prover(&self, ledger: &Arc<LedgerState<N>>, prover: &Address<N>) -> u64 {
+        self.shares.get_shares_for_prover(ledger, prover)
     }
 
-    /// Removes the given record from storage.
-    pub fn remove_coinbase_record(&self, commitment: &N::Commitment) -> Result<()> {
-        self.shares.remove_record(commitment)
+    /// Increments the share count by one for a given block height, coinbase record and prover address.
+    pub fn increment_share(&self, block_height: u32, coinbase_record: Record<N>, prover: &Address<N>) -> Result<()> {
+        self.shares.increment_share(block_height, coinbase_record, prover)
+    }
+
+    /// Removes the shares for a given block height and coinbase record in storage.
+    pub fn remove_shares(&self, block_height: u32, coinbase_record: Record<N>) -> Result<()> {
+        self.shares.remove_shares(block_height, coinbase_record)
     }
 }
 
@@ -102,9 +82,7 @@ impl<N: Network> OperatorState<N> {
 #[allow(clippy::type_complexity)]
 struct SharesState<N: Network> {
     /// The miner shares for each block.
-    shares: DataMap<(u32, N::Commitment), HashMap<Address<N>, u64>>,
-    /// The coinbase records earned by the operator.
-    records: DataMap<N::Commitment, (u32, Record<N>)>,
+    shares: DataMap<(u32, Record<N>), HashMap<Address<N>, u64>>,
 }
 
 impl<N: Network> SharesState<N> {
@@ -112,20 +90,24 @@ impl<N: Network> SharesState<N> {
     fn open<S: Storage>(storage: S) -> Result<Self> {
         Ok(Self {
             shares: storage.open_map(MapId::Shares)?,
-            records: storage.open_map(MapId::PoolRecords)?,
         })
     }
 
     /// Returns all shares in storage.
-    fn to_shares(&self) -> Vec<((u32, N::Commitment), HashMap<Address<N>, u64>)> {
+    fn to_shares(&self) -> Vec<((u32, Record<N>), HashMap<Address<N>, u64>)> {
         self.shares.iter().collect()
     }
 
-    /// Returns the shares for a specific block, given the block height and coinbase record commitment.
-    fn get_shares_for_block(&self, block_height: u32, coinbase_commitment: N::Commitment) -> Result<HashMap<Address<N>, u64>> {
-        match self.shares.get(&(block_height, coinbase_commitment))? {
+    /// Returns all records in storage.
+    fn to_records(&self) -> Vec<(u32, Record<N>)> {
+        self.shares.keys().collect()
+    }
+
+    /// Returns the shares for a specific block, given the block height and coinbase record.
+    fn get_shares_for_block(&self, block_height: u32, coinbase_record: Record<N>) -> Result<HashMap<Address<N>, u64>> {
+        match self.shares.get(&(block_height, coinbase_record))? {
             Some(shares) => Ok(shares),
-            None => return Err(anyhow!("Block height {} does not have any shares in storage", block_height)),
+            None => return Err(anyhow!("Block {} does not exist in shares storage", block_height)),
         }
     }
 
@@ -133,11 +115,11 @@ impl<N: Network> SharesState<N> {
     fn get_shares_for_prover(&self, ledger: &Arc<LedgerState<N>>, prover: &Address<N>) -> u64 {
         self.shares
             .iter()
-            .filter_map(|((_, coinbase_commitment), shares)| {
+            .filter_map(|((_, coinbase_record), shares)| {
                 if !shares.contains_key(prover) {
                     None
                 } else {
-                    match ledger.contains_commitment(&coinbase_commitment) {
+                    match ledger.contains_commitment(&coinbase_record.commitment()) {
                         Ok(true) => shares.get(prover).copied(),
                         Ok(false) | Err(_) => None,
                     }
@@ -146,10 +128,10 @@ impl<N: Network> SharesState<N> {
             .sum()
     }
 
-    /// Increments the share count by one for a given block height, coinbase record commitment, and prover address.
-    fn increment_share(&self, block_height: u32, coinbase_commitment: N::Commitment, prover: &Address<N>) -> Result<()> {
+    /// Increments the share count by one for a given block height, coinbase record, and prover address.
+    fn increment_share(&self, block_height: u32, coinbase_record: Record<N>, prover: &Address<N>) -> Result<()> {
         // Retrieve the current shares for a given block height.
-        let mut shares = match self.shares.get(&(block_height, coinbase_commitment))? {
+        let mut shares = match self.shares.get(&(block_height, coinbase_record.clone()))? {
             Some(shares) => shares,
             None => HashMap::new(),
         };
@@ -159,49 +141,11 @@ impl<N: Network> SharesState<N> {
         *entry = entry.saturating_add(1);
 
         // Insert the updated shares for the given block height.
-        self.shares.insert(&(block_height, coinbase_commitment), &shares)
+        self.shares.insert(&(block_height, coinbase_record), &shares)
     }
 
-    /// Removes all of the shares for a given block height and coinbase record commitment.
-    fn remove_shares(&self, block_height: u32, coinbase_commitment: N::Commitment) -> Result<()> {
-        self.shares.remove(&(block_height, coinbase_commitment))
-    }
-
-    /// Returns `true` if the given commitment exists in storage.
-    fn contains_record(&self, commitment: &N::Commitment) -> Result<bool> {
-        self.records.contains_key(commitment)
-    }
-
-    /// Returns all records in storage.
-    fn to_records(&self) -> Vec<(u32, Record<N>)> {
-        self.records.values().collect()
-    }
-
-    /// Returns the record for a given commitment.
-    fn get_record(&self, commitment: &N::Commitment) -> Result<(u32, Record<N>)> {
-        match self.records.get(commitment)? {
-            Some((block_height, record)) => Ok((block_height, record)),
-            None => return Err(anyhow!("Record with commitment {} does not exist in storage", commitment)),
-        }
-    }
-
-    /// Adds the given block height and record to storage.
-    fn add_record(&self, block_height: u32, record: Record<N>) -> Result<()> {
-        // Ensure the record does not exist.
-        let commitment = record.commitment();
-        if self.records.contains_key(&commitment)? {
-            Err(anyhow!("Record with commitment {} already exists in storage", commitment))
-        } else {
-            // Insert the record.
-            self.records.insert(&commitment, &(block_height, record))?;
-            Ok(())
-        }
-    }
-
-    /// Removes the given record from storage.
-    fn remove_record(&self, commitment: &N::Commitment) -> Result<()> {
-        // Remove the record entry.
-        self.records.remove(commitment)?;
-        Ok(())
+    /// Removes all of the shares for a given block height and coinbase record.
+    fn remove_shares(&self, block_height: u32, coinbase_record: Record<N>) -> Result<()> {
+        self.shares.remove(&(block_height, coinbase_record))
     }
 }

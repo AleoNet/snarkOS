@@ -64,7 +64,7 @@ pub enum OperatorRequest<N: Network> {
 }
 
 /// The predefined base share difficulty.
-const BASE_SHARE_DIFFICULTY: u64 = u64::MAX;
+const BASE_SHARE_DIFFICULTY: u64 = u64::MAX / 2;
 /// The operator heartbeat in seconds.
 const HEARTBEAT_IN_SECONDS: Duration = Duration::from_secs(5);
 
@@ -225,13 +225,13 @@ impl<N: Network, E: Environment> Operator<N, E> {
     }
 
     /// Returns all the shares in storage.
-    pub fn to_shares(&self) -> Vec<((u32, N::Commitment), HashMap<Address<N>, u64>)> {
+    pub fn to_shares(&self) -> Vec<((u32, Record<N>), HashMap<Address<N>, u64>)> {
         self.state.to_shares()
     }
 
     /// Returns the shares for a specific block, given the block height and coinbase record commitment.
-    pub fn get_shares_for_block(&self, block_height: u32, coinbase_commitment: N::Commitment) -> Result<HashMap<Address<N>, u64>> {
-        self.state.get_shares_for_block(block_height, coinbase_commitment)
+    pub fn get_shares_for_block(&self, block_height: u32, coinbase_record: Record<N>) -> Result<HashMap<Address<N>, u64>> {
+        self.state.get_shares_for_block(block_height, coinbase_record)
     }
 
     /// Returns the shares for a specific prover, given a ledger and the prover address.
@@ -336,30 +336,22 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                     // Increment the share count for the prover.
                     let coinbase_record = block_template.coinbase_record().clone();
-                    if let Err(error) = self.state.increment_share(block_height, coinbase_record.commitment(), &prover) {
-                        error!("{}", error);
+                    match self.state.increment_share(block_height, coinbase_record, &prover) {
+                        Ok(..) => info!(
+                            "Operator received a valid share from {} ({}) for block {}",
+                            peer_ip, prover, block_height,
+                        ),
+                        Err(error) => error!("{}", error),
                     }
-
-                    info!(
-                        "Operator received a valid share from {} ({}) for block {}",
-                        peer_ip, prover, block_height,
-                    );
 
                     // If the block has satisfactory difficulty and is valid, proceed to broadcast it.
                     let previous_block_hash = block_template.previous_block_hash();
                     let transactions = block_template.transactions().clone();
                     if let Ok(block) = Block::from(previous_block_hash, block_header, transactions) {
-                        // Store the coinbase record.
-                        match self.state.add_coinbase_record(block_height, coinbase_record) {
-                            // Broadcast the unconfirmed block.
-                            Ok(()) => {
-                                info!("Operator has found unconfirmed block {} ({})", block_height, block.hash());
-                                let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
-                                if let Err(error) = self.ledger_router.send(request).await {
-                                    warn!("Failed to broadcast mined block - {}", error);
-                                }
-                            }
-                            Err(error) => warn!("Could not store coinbase record - {}", error),
+                        info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
+                        let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
+                        if let Err(error) = self.ledger_router.send(request).await {
+                            warn!("Failed to broadcast mined block - {}", error);
                         }
                     }
                 } else {
