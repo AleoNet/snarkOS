@@ -30,7 +30,7 @@ use crate::{
 use snarkos_storage::{storage::Storage, OperatorState};
 use snarkvm::{
     algorithms::crh::sha256d_to_u64,
-    dpc::{posw::PoSWProof, prelude::*},
+    dpc::prelude::*,
     utilities::{FromBytes, ToBytes},
 };
 
@@ -294,6 +294,22 @@ impl<N: Network, E: Environment> Operator<N, E> {
                             }
                         };
 
+                        // TODO (howardwu): TEMPORARY - Remove this after testnet2 period.
+                        let block_height = block_header.height();
+                        // [pre-V12] Ensure the proof type is hiding.
+                        if <N as Network>::NETWORK_ID == 2
+                            && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
+                            && !proof.is_hiding()
+                        {
+                            warn!("[PoolResponse] [deprecated] PoSW proof for block {} should be hiding", block_height);
+                            return;
+                        }
+                        // [post-V12] Ensure the proof type is not hiding.
+                        else if proof.is_hiding() {
+                            warn!("[PoolResponse] PoSW proof for block {} should not be hiding", block_height);
+                            return;
+                        }
+
                         // NOTE (julesdesmit): Unwraps are here for brevity's sake, and since we do
                         // it exactly the same in snarkVM, I don't see why we shouldn't use them here.
                         let inputs = vec![
@@ -301,21 +317,19 @@ impl<N: Network, E: Environment> Operator<N, E> {
                             *block_header.nonce(),
                         ];
 
-                        if !PoSWProof::<N>::verify(proof, N::posw().verifying_key(), &inputs) {
+                        if !proof.verify(N::posw().verifying_key(), &inputs) {
                             warn!("[PoolResponse] PoSW proof verification failed");
                             return;
                         }
 
                         // Ensure the block contains a difficulty that is at least the share difficulty.
-                        let proof_bytes = match proof.to_bytes_le() {
-                            Ok(bytes) => bytes,
+                        let proof_difficulty = match proof.to_bytes_le() {
+                            Ok(proof_bytes) => sha256d_to_u64(&proof_bytes),
                             Err(error) => {
                                 warn!("[PoolResponse] {}", error);
                                 return;
                             }
                         };
-
-                        let proof_difficulty = sha256d_to_u64(&proof_bytes);
                         let share_difficulty = {
                             let provers = self.provers.read().await.clone();
                             match provers.get(&prover_address) {
@@ -329,14 +343,13 @@ impl<N: Network, E: Environment> Operator<N, E> {
                                 }
                             }
                         };
-
                         if proof_difficulty > share_difficulty {
                             warn!("Block with insufficient share difficulty from {} ({})", peer_ip, prover_address);
                             return;
                         }
 
                         // Update the score for the prover.
-                        if let Err(error) = self.state.add_shares(block_header.height(), &prover_address, 1) {
+                        if let Err(error) = self.state.add_shares(block_height, &prover_address, 1) {
                             error!("{}", error);
                         }
 
@@ -358,12 +371,12 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                         // If the block has satisfactory difficulty and is valid, proceed to broadcast it.
                         if let Ok(block) = Block::new(&block_template, block_header) {
-                            info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
+                            info!("Operator has found unconfirmed block {} ({})", block_height, block.hash());
 
                             // Store the coinbase record.
                             if let Err(error) = self
                                 .state
-                                .add_coinbase_record(block.height(), block_template.coinbase_record().clone())
+                                .add_coinbase_record(block_height, block_template.coinbase_record().clone())
                             {
                                 warn!("Could not store coinbase record - {}", error);
                             }
