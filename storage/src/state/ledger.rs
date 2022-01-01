@@ -601,16 +601,19 @@ impl<N: Network> LedgerState<N> {
         transactions: &[Transaction<N>],
         rng: &mut R,
     ) -> Result<BlockTemplate<N>> {
-        // Prepare the new block.
-        let previous_block_hash = self.latest_block_hash();
-        let block_height = self.latest_block_height().saturating_add(1);
+        // Fetch the latest state of the ledger.
+        let latest_block = self.latest_block();
+        let previous_ledger_root = self.latest_ledger_root();
 
+        // Prepare the new block.
+        let previous_block_hash = latest_block.hash();
+        let block_height = latest_block.height().saturating_add(1);
         // Ensure that the new timestamp is ahead of the previous timestamp.
-        let block_timestamp = std::cmp::max(chrono::Utc::now().timestamp(), self.latest_block_timestamp().saturating_add(1));
+        let block_timestamp = std::cmp::max(chrono::Utc::now().timestamp(), latest_block.timestamp().saturating_add(1));
 
         // Compute the block difficulty target.
         let difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
-            Blocks::<N>::compute_difficulty_target(self.latest_block().header(), block_timestamp, block_height)
+            Blocks::<N>::compute_difficulty_target(latest_block.header(), block_timestamp, block_height)
         } else if N::NETWORK_ID == 2 {
             let anchor_block_header = self.get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
             Blocks::<N>::compute_difficulty_target(&anchor_block_header, block_timestamp, block_height)
@@ -619,24 +622,22 @@ impl<N: Network> LedgerState<N> {
         };
 
         // Compute the cumulative weight.
-        let cumulative_weight = self
-            .latest_cumulative_weight()
+        let cumulative_weight = latest_block
+            .cumulative_weight()
             .saturating_add((u64::MAX / difficulty_target) as u128);
 
-        // Construct the ledger root.
-        let ledger_root = self.latest_ledger_root();
-        // Craft a coinbase transaction.
-        let amount = Block::<N>::block_reward(block_height);
-        let (coinbase_transaction, coinbase_record) = Transaction::<N>::new_coinbase(recipient, amount, is_public, rng)?;
+        // Compute the coinbase reward (not including the transaction fees).
+        let mut coinbase_reward = Block::<N>::block_reward(block_height);
+        let mut transaction_fees = AleoAmount::ZERO;
+
         // Filter the transactions to ensure they are new, and append the coinbase transaction.
-        // TODO (howardwu): Improve the performance and design of this.
         let mut transactions: Vec<Transaction<N>> = transactions
             .iter()
             .filter(|transaction| {
                 for serial_number in transaction.serial_numbers() {
                     if let Ok(true) = self.contains_serial_number(serial_number) {
                         trace!(
-                            "Miner is filtering out transaction {} (serial_number {})",
+                            "Ledger is filtering out transaction {} (serial_number {})",
                             transaction.transaction_id(),
                             serial_number
                         );
@@ -646,19 +647,27 @@ impl<N: Network> LedgerState<N> {
                 for commitment in transaction.commitments() {
                     if let Ok(true) = self.contains_commitment(commitment) {
                         trace!(
-                            "Miner is filtering out transaction {} (commitment {})",
+                            "Ledger is filtering out transaction {} (commitment {})",
                             transaction.transaction_id(),
                             commitment
                         );
                         return false;
                     }
                 }
-                trace!("Miner is adding transaction {}", transaction.transaction_id());
+                trace!("Adding transaction {} to block template", transaction.transaction_id());
+                transaction_fees = transaction_fees.add(transaction.value_balance());
                 true
             })
             .cloned()
             .collect();
+
+        // Calculate the final coinbase reward (including the transaction fees).
+        coinbase_reward = coinbase_reward.add(transaction_fees);
+
+        // Craft a coinbase transaction, and append it to the list of transactions.
+        let (coinbase_transaction, coinbase_record) = Transaction::<N>::new_coinbase(recipient, coinbase_reward, is_public, rng)?;
         transactions.push(coinbase_transaction);
+
         // Construct the new block transactions.
         let transactions = Transactions::from(&transactions)?;
 
@@ -669,7 +678,7 @@ impl<N: Network> LedgerState<N> {
             block_timestamp,
             difficulty_target,
             cumulative_weight,
-            ledger_root,
+            previous_ledger_root,
             transactions,
             coinbase_record,
         ))
