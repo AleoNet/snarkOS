@@ -278,7 +278,8 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                             &vec![*block_header.to_header_root().unwrap(), *block_header.nonce()],
                                             block_header.proof(),
                                         ) {
-                                            return Ok::<BlockHeader<N>, anyhow::Error>(block_header);
+                                            let proof_difficulty = block_header.proof().to_proof_difficulty()?;
+                                            return Ok::<(BlockHeader<N>, u64), anyhow::Error>((block_header, proof_difficulty));
                                         }
                                     }
                                 })
@@ -288,8 +289,12 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             self.status.update(State::Ready);
 
                             match result {
-                                Ok(Ok(block_header)) => {
-                                    info!("Prover found unconfirmed block {} for share target", block_header.height());
+                                Ok(Ok((block_header, proof_difficulty))) => {
+                                    info!(
+                                        "Prover successfully mined a zero-knowledge proof for unconfirmed block {} with share difficulty of {}",
+                                        block_header.height(),
+                                        proof_difficulty
+                                    );
 
                                     // Send a `PoolResponse` to the operator.
                                     let message = Message::PoolResponse(recipient, Data::Object(block_header));
