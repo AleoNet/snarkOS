@@ -51,13 +51,14 @@ use tokio::{
     task::JoinHandle,
 };
 
-const MINER_SLEEP: Duration = Duration::from_secs(2);
-
 /// Shorthand for the parent half of the `Prover` message channel.
 pub(crate) type ProverRouter<N> = mpsc::Sender<ProverRequest<N>>;
 #[allow(unused)]
 /// Shorthand for the child half of the `Prover` message channel.
 type ProverHandler<N> = mpsc::Receiver<ProverRequest<N>>;
+
+/// The miner heartbeat in seconds.
+const MINER_HEARTBEAT_IN_SECONDS: Duration = Duration::from_secs(2);
 
 ///
 /// An enum of requests that the `Prover` struct processes.
@@ -418,8 +419,8 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                 }
                             }));
                         }
-                        // Sleep for 2 seconds.
-                        tokio::time::sleep(MINER_SLEEP).await;
+                        // Proceed to sleep for a preset amount of time.
+                        tokio::time::sleep(MINER_HEARTBEAT_IN_SECONDS).await;
                     }
                 }));
                 // Wait until the miner task is ready.

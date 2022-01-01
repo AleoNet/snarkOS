@@ -15,7 +15,16 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::Tasks, Data, Environment, LedgerReader, LedgerRequest, LedgerRouter, Message, NodeType, PeersRequest, PeersRouter,
+    helpers::Tasks,
+    Data,
+    Environment,
+    LedgerReader,
+    LedgerRequest,
+    LedgerRouter,
+    Message,
+    NodeType,
+    PeersRequest,
+    PeersRouter,
     ProverRouter,
 };
 use snarkos_storage::{storage::Storage, OperatorState};
@@ -167,39 +176,46 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     // TODO (julesdesmit): Add logic to the loop to retarget share difficulty.
                     loop {
                         // Determine if the current block template is stale.
-                        let is_template_stale = match &*operator.block_template.read().await {
+                        let is_block_template_stale = match &*operator.block_template.read().await {
                             Some(template) => operator.ledger_reader.latest_block_height().saturating_add(1) != template.block_height(),
                             None => true,
                         };
 
                         // Update the block template if it is stale.
-                        if is_template_stale {
+                        if is_block_template_stale {
                             // Construct a new block template.
                             let transactions = operator.memory_pool.read().await.transactions();
                             let ledger_reader = operator.ledger_reader.clone();
                             let thread_pool = operator.thread_pool.clone();
                             let result = task::spawn_blocking(move || {
                                 thread_pool.install(move || {
-                                    ledger_reader
-                                        .get_block_template(recipient, E::COINBASE_IS_PUBLIC, &transactions, &mut thread_rng())
-                                        .expect("Should be able to generate a block template")
+                                    match ledger_reader.get_block_template(
+                                        recipient,
+                                        E::COINBASE_IS_PUBLIC,
+                                        &transactions,
+                                        &mut thread_rng(),
+                                    ) {
+                                        Ok((block_template, _)) => Ok(block_template),
+                                        Err(error) => Err(format!("Failed to produce a new block template: {}", error)),
+                                    }
                                 })
                             })
                             .await;
 
-                            let block_template = match result {
-                                Ok((block_template, _)) => block_template,
+                            // Update the block template.
+                            match result {
+                                Ok(Ok(block_template)) => {
+                                    // Acquire the write lock to update the block template.
+                                    *operator.block_template.write().await = Some(block_template);
+                                    // Clear the set of known nonces.
+                                    operator.known_nonces.write().await.clear();
+                                }
+                                Ok(Err(error_message)) => error!("{}", error_message),
                                 Err(error) => panic!("{}", error),
                             };
-
-                            // Acquire the write lock to update the block template.
-                            *operator.block_template.write().await = Some(block_template);
-
-                            // Clear the known_nonces hash set.
-                            operator.known_nonces.write().await.clear();
                         }
 
-                        // Sleep for `5` seconds.
+                        // Proceed to sleep for a preset amount of time.
                         tokio::time::sleep(HEARTBEAT_IN_SECONDS).await;
                     }
                 }));
@@ -257,7 +273,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         return;
                     }
 
-                    // Ensure the nonce hasn't been seen before.
+                    // Ensure the nonce has not been seen before.
                     if self.known_nonces.read().await.contains(&block_header.nonce()) {
                         warn!("[PoolResponse] Peer {} sent a duplicate share", peer_ip);
                         // TODO (julesdesmit): punish?
