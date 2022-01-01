@@ -54,9 +54,9 @@ impl<N: Network> OperatorState<N> {
         self.shares.get_shares(block_height)
     }
 
-    /// Adds the given number of shares for a given block height to a given address.
-    pub fn add_shares(&self, block_height: u32, address: &Address<N>, number_of_shares: u64) -> Result<()> {
-        self.shares.add_shares(block_height, address, number_of_shares)
+    /// Increments the share count by one for a given block height and address.
+    pub fn increment_share(&self, block_height: u32, address: &Address<N>) -> Result<()> {
+        self.shares.increment_share(block_height, address)
     }
 
     /// Removes the shares for a given block height in storage.
@@ -121,17 +121,17 @@ impl<N: Network> SharesState<N> {
         }
     }
 
-    /// Adds the given number of shares for a given block height to a given address.
-    fn add_shares(&self, block_height: u32, address: &Address<N>, number_of_shares: u64) -> Result<()> {
+    /// Increments the share count by one for a given block height and address.
+    fn increment_share(&self, block_height: u32, address: &Address<N>) -> Result<()> {
         // Retrieve the current shares for a given block height.
         let mut shares = match self.shares.get(&block_height)? {
             Some(shares) => shares,
             None => HashMap::new(),
         };
 
-        // Add the number of shares to the given address.
+        // Increment the share count for the given address.
         let entry = shares.entry(*address).or_insert(0);
-        *entry = entry.saturating_add(number_of_shares);
+        *entry = entry.saturating_add(1);
 
         // Insert the updated shares for the given block height.
         self.shares.insert(&block_height, &shares)

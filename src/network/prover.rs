@@ -29,7 +29,7 @@ use crate::{
 use snarkos_storage::{storage::Storage, ProverState};
 use snarkvm::{
     algorithms::crh::sha256d_to_u64,
-    dpc::{posw::PoSWProof, prelude::*},
+    dpc::prelude::*,
     utilities::{FromBytes, ToBytes},
 };
 
@@ -275,27 +275,22 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                         let block_header =
                                             BlockHeader::mine_once_unchecked(&block_template, &terminator, &mut thread_rng())?;
 
-                                        // Verify the proof against the share difficulty target.
-                                        if let Some(proof) = block_header.proof() {
-                                            // Construct the inputs.
-                                            let inputs = vec![
-                                                N::InnerScalarField::read_le(&block_header.to_header_root()?.to_bytes_le()?[..])?,
-                                                *block_header.nonce(),
-                                            ];
+                                        // Construct the inputs.
+                                        let inputs = vec![
+                                            N::InnerScalarField::read_le(&block_header.to_header_root()?.to_bytes_le()?[..])?,
+                                            *block_header.nonce(),
+                                        ];
 
-                                            // Ensure the proof is valid.
-                                            if !PoSWProof::<N>::verify(proof, N::posw().verifying_key(), &inputs) {
-                                                warn!("PoSW proof verification failed");
-                                                continue;
-                                            }
+                                        // Ensure the proof is valid.
+                                        if !block_header.proof().verify(N::posw().verifying_key(), &inputs) {
+                                            warn!("PoSW proof verification failed");
+                                            continue;
+                                        }
 
-                                            // Ensure the share difficulty target is met.
-                                            if sha256d_to_u64(&proof.to_bytes_le()?) < share_difficulty {
-                                                return Ok::<BlockHeader<N>, anyhow::Error>(block_header);
-                                            }
-                                        } else {
-                                            warn!("Block header does not have a corresponding PoSW proof");
-                                        };
+                                        // Ensure the share difficulty target is met.
+                                        if sha256d_to_u64(&block_header.proof().to_bytes_le()?) < share_difficulty {
+                                            return Ok::<BlockHeader<N>, anyhow::Error>(block_header);
+                                        }
                                     }
                                 })
                             })

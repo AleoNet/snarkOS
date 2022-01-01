@@ -297,13 +297,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     self.known_nonces.write().await.insert(block_header.nonce());
 
                     // Retrieve the PoSW proof from the block header.
-                    let proof = match block_header.proof() {
-                        Some(proof) => proof,
-                        None => {
-                            warn!("[PoolResponse] proof is missing on header");
-                            return;
-                        }
-                    };
+                    let proof = block_header.proof();
 
                     // TODO (howardwu): TEMPORARY - Remove this after testnet2 period.
                     let block_height = block_header.height();
@@ -368,8 +362,8 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         panic!("prover should have existing info");
                     }
 
-                    // Update the score for the prover.
-                    if let Err(error) = self.state.add_shares(block_height, &prover_address, 1) {
+                    // Increment the share count for the prover.
+                    if let Err(error) = self.state.increment_share(block_height, &prover_address) {
                         error!("{}", error);
                     }
 
@@ -379,7 +373,9 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     );
 
                     // If the block has satisfactory difficulty and is valid, proceed to broadcast it.
-                    if let Ok(block) = Block::new(&block_template, block_header) {
+                    let previous_block_hash = block_template.previous_block_hash();
+                    let transactions = block_template.transactions().clone();
+                    if let Ok(block) = Block::from(previous_block_hash, block_header, transactions) {
                         // Store the coinbase record.
                         let coinbase_record = block_template.coinbase_record().clone();
                         match self.state.add_coinbase_record(block_height, coinbase_record) {

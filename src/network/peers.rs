@@ -1082,7 +1082,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                             // Sanity check for a V12 ledger.
                                             if N::NETWORK_ID == 2
                                                 && block.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
-                                                && block.header().proof().as_ref().unwrap_or_else(|| N::genesis_block().header().proof().as_ref().unwrap()).is_hiding()
+                                                && block.header().proof().is_hiding()
                                             {
                                                 warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
                                                 break;
@@ -1145,7 +1145,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                             // Sanity check for a V12 ledger.
                                             if N::NETWORK_ID == 2
                                                 && block_header.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
-                                                && block_header.proof().as_ref().unwrap_or_else(|| N::genesis_block().header().proof().as_ref().unwrap()).is_hiding()
+                                                && block_header.proof().is_hiding()
                                             {
                                                 warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
                                                 break;
