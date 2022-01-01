@@ -27,7 +27,7 @@ use crate::{
     ProverRequest,
     ProverRouter,
 };
-use chrono::{Utc, DateTime};
+use chrono::{DateTime, Utc};
 use snarkos_storage::Metadata;
 use snarkvm::{
     dpc::{AleoAmount, Block, BlockHeader, Blocks, MemoryPool, Network, Transaction, Transactions, Transition},
