@@ -281,112 +281,103 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     // Update known nonces.
                     self.known_nonces.write().await.insert(block_header.nonce());
 
-                    // Reconstruct the block.
-                    let previous_block_hash = block_template.previous_block_hash();
-                    let transactions = block_template.transactions().clone();
-                    if let Ok(block) = Block::from_unchecked(previous_block_hash, block_header.clone(), transactions) {
-                        // Ensure the proof is valid.
-                        let proof = match block.header().proof() {
-                            Some(proof) => proof,
+                    // Retrieve the PoSW proof from the block header.
+                    let proof = match block_header.proof() {
+                        Some(proof) => proof,
+                        None => {
+                            warn!("[PoolResponse] proof is missing on header");
+                            return;
+                        }
+                    };
+
+                    // TODO (howardwu): TEMPORARY - Remove this after testnet2 period.
+                    let block_height = block_header.height();
+                    // [pre-V12] Ensure the proof type is hiding.
+                    if <N as Network>::NETWORK_ID == 2
+                        && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
+                        && !proof.is_hiding()
+                    {
+                        warn!("[PoolResponse] [deprecated] PoSW proof for block {} should be hiding", block_height);
+                        return;
+                    }
+                    // [post-V12] Ensure the proof type is not hiding.
+                    else if proof.is_hiding() {
+                        warn!("[PoolResponse] PoSW proof for block {} should not be hiding", block_height);
+                        return;
+                    }
+
+                    // NOTE (julesdesmit): Unwraps are here for brevity's sake, and since we do
+                    // it exactly the same in snarkVM, I don't see why we shouldn't use them here.
+                    let inputs = vec![
+                        N::InnerScalarField::read_le(&block_header.to_header_root().unwrap().to_bytes_le().unwrap()[..]).unwrap(),
+                        *block_header.nonce(),
+                    ];
+
+                    // Ensure the proof is valid.
+                    if !proof.verify(N::posw().verifying_key(), &inputs) {
+                        warn!("[PoolResponse] PoSW proof verification failed");
+                        return;
+                    }
+
+                    // Ensure the block contains a difficulty that is at least the share difficulty.
+                    let proof_difficulty = match proof.to_bytes_le() {
+                        Ok(proof_bytes) => sha256d_to_u64(&proof_bytes),
+                        Err(error) => {
+                            warn!("[PoolResponse] {}", error);
+                            return;
+                        }
+                    };
+                    let share_difficulty = {
+                        let provers = self.provers.read().await.clone();
+                        match provers.get(&prover_address) {
+                            Some((_, share_difficulty, _)) => *share_difficulty,
                             None => {
-                                warn!("[PoolResponse] proof is missing on header");
-                                return;
-                            }
-                        };
-
-                        // TODO (howardwu): TEMPORARY - Remove this after testnet2 period.
-                        let block_height = block_header.height();
-                        // [pre-V12] Ensure the proof type is hiding.
-                        if <N as Network>::NETWORK_ID == 2
-                            && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
-                            && !proof.is_hiding()
-                        {
-                            warn!("[PoolResponse] [deprecated] PoSW proof for block {} should be hiding", block_height);
-                            return;
-                        }
-                        // [post-V12] Ensure the proof type is not hiding.
-                        else if proof.is_hiding() {
-                            warn!("[PoolResponse] PoSW proof for block {} should not be hiding", block_height);
-                            return;
-                        }
-
-                        // NOTE (julesdesmit): Unwraps are here for brevity's sake, and since we do
-                        // it exactly the same in snarkVM, I don't see why we shouldn't use them here.
-                        let inputs = vec![
-                            N::InnerScalarField::read_le(&block_header.to_header_root().unwrap().to_bytes_le().unwrap()[..]).unwrap(),
-                            *block_header.nonce(),
-                        ];
-
-                        if !proof.verify(N::posw().verifying_key(), &inputs) {
-                            warn!("[PoolResponse] PoSW proof verification failed");
-                            return;
-                        }
-
-                        // Ensure the block contains a difficulty that is at least the share difficulty.
-                        let proof_difficulty = match proof.to_bytes_le() {
-                            Ok(proof_bytes) => sha256d_to_u64(&proof_bytes),
-                            Err(error) => {
-                                warn!("[PoolResponse] {}", error);
-                                return;
-                            }
-                        };
-                        let share_difficulty = {
-                            let provers = self.provers.read().await.clone();
-                            match provers.get(&prover_address) {
-                                Some((_, share_difficulty, _)) => *share_difficulty,
-                                None => {
-                                    self.provers
-                                        .write()
-                                        .await
-                                        .insert(prover_address, (Instant::now(), BASE_SHARE_DIFFICULTY, 0));
-                                    BASE_SHARE_DIFFICULTY
-                                }
-                            }
-                        };
-                        if proof_difficulty > share_difficulty {
-                            warn!("Block with insufficient share difficulty from {} ({})", peer_ip, prover_address);
-                            return;
-                        }
-
-                        // Update the score for the prover.
-                        if let Err(error) = self.state.add_shares(block_height, &prover_address, 1) {
-                            error!("{}", error);
-                        }
-
-                        // Update the internal state for this prover.
-                        if let Some(ref mut prover) = self.provers.write().await.get_mut(&prover_address) {
-                            prover.0 = Instant::now();
-                            prover.2 += 1;
-                        } else {
-                            panic!("prover should have existing info");
-                        }
-
-                        info!(
-                            "Operator received a valid share from {} ({}) for block {} ({})",
-                            peer_ip,
-                            prover_address,
-                            block.height(),
-                            block.hash(),
-                        );
-
-                        // If the block has satisfactory difficulty and is valid, proceed to broadcast it.
-                        if let Ok(block) = Block::new(&block_template, block_header) {
-                            // Store the coinbase record.
-                            let coinbase_record = block_template.coinbase_record().clone();
-                            match self.state.add_coinbase_record(block_height, coinbase_record) {
-                                // Broadcast the unconfirmed block.
-                                Ok(()) => {
-                                    info!("Operator has found unconfirmed block {} ({})", block_height, block.hash());
-                                    let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
-                                    if let Err(error) = self.ledger_router.send(request).await {
-                                        warn!("Failed to broadcast mined block - {}", error);
-                                    }
-                                }
-                                Err(error) => warn!("Could not store coinbase record - {}", error),
+                                self.provers
+                                    .write()
+                                    .await
+                                    .insert(prover_address, (Instant::now(), BASE_SHARE_DIFFICULTY, 0));
+                                BASE_SHARE_DIFFICULTY
                             }
                         }
+                    };
+                    if proof_difficulty > share_difficulty {
+                        warn!("Block with insufficient share difficulty from {} ({})", peer_ip, prover_address);
+                        return;
+                    }
+
+                    // Update the score for the prover.
+                    if let Err(error) = self.state.add_shares(block_height, &prover_address, 1) {
+                        error!("{}", error);
+                    }
+
+                    // Update the internal state for this prover.
+                    if let Some(ref mut prover) = self.provers.write().await.get_mut(&prover_address) {
+                        prover.0 = Instant::now();
+                        prover.2 += 1;
                     } else {
-                        warn!("[PoolResponse] Invalid block provided");
+                        panic!("prover should have existing info");
+                    }
+
+                    info!(
+                        "Operator received a valid share from {} ({}) for block {}",
+                        peer_ip, prover_address, block_height,
+                    );
+
+                    // If the block has satisfactory difficulty and is valid, proceed to broadcast it.
+                    if let Ok(block) = Block::new(&block_template, block_header) {
+                        // Store the coinbase record.
+                        let coinbase_record = block_template.coinbase_record().clone();
+                        match self.state.add_coinbase_record(block_height, coinbase_record) {
+                            // Broadcast the unconfirmed block.
+                            Ok(()) => {
+                                info!("Operator has found unconfirmed block {} ({})", block_height, block.hash());
+                                let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
+                                if let Err(error) = self.ledger_router.send(request).await {
+                                    warn!("Failed to broadcast mined block - {}", error);
+                                }
+                            }
+                            Err(error) => warn!("Could not store coinbase record - {}", error),
+                        }
                     }
                 } else {
                     warn!("[PoolResponse] No current block template exists");
