@@ -45,23 +45,23 @@ impl<N: Network> OperatorState<N> {
     }
 
     /// Returns all the shares in storage.
-    pub fn to_shares(&self) -> Vec<(u32, HashMap<Address<N>, u64>)> {
+    pub fn to_shares(&self) -> Vec<((u32, N::BlockHeaderRoot), HashMap<Address<N>, u64>)> {
         self.shares.to_shares()
     }
 
-    /// Returns the number of shares for a given block height.
-    pub fn get_shares(&self, block_height: u32) -> Result<HashMap<Address<N>, u64>> {
-        self.shares.get_shares(block_height)
+    /// Returns the number of shares for a given block height and block header root.
+    pub fn get_shares(&self, block_height: u32, block_header_root: N::BlockHeaderRoot) -> Result<HashMap<Address<N>, u64>> {
+        self.shares.get_shares(block_height, block_header_root)
     }
 
-    /// Increments the share count by one for a given block height and address.
-    pub fn increment_share(&self, block_height: u32, address: &Address<N>) -> Result<()> {
-        self.shares.increment_share(block_height, address)
+    /// Increments the share count by one for a given block height, block header root and address.
+    pub fn increment_share(&self, block_height: u32, block_header_root: N::BlockHeaderRoot, address: &Address<N>) -> Result<()> {
+        self.shares.increment_share(block_height, block_header_root, address)
     }
 
-    /// Removes the shares for a given block height in storage.
-    pub fn remove_shares(&self, block_height: u32) -> Result<()> {
-        self.shares.remove_shares(block_height)
+    /// Removes the shares for a given block height and block header root in storage.
+    pub fn remove_shares(&self, block_height: u32, block_header_root: N::BlockHeaderRoot) -> Result<()> {
+        self.shares.remove_shares(block_height, block_header_root)
     }
 
     /// Returns `true` if the given commitment exists in storage.
@@ -93,8 +93,8 @@ impl<N: Network> OperatorState<N> {
 #[derive(Clone, Debug)]
 #[allow(clippy::type_complexity)]
 struct SharesState<N: Network> {
-    /// The miner shares for each block height.
-    shares: DataMap<u32, HashMap<Address<N>, u64>>,
+    /// The miner shares for each block.
+    shares: DataMap<(u32, N::BlockHeaderRoot), HashMap<Address<N>, u64>>,
     /// The coinbase records earned by the operator.
     records: DataMap<N::Commitment, (u32, Record<N>)>,
 }
@@ -109,22 +109,22 @@ impl<N: Network> SharesState<N> {
     }
 
     /// Returns all shares in storage.
-    fn to_shares(&self) -> Vec<(u32, HashMap<Address<N>, u64>)> {
+    fn to_shares(&self) -> Vec<((u32, N::BlockHeaderRoot), HashMap<Address<N>, u64>)> {
         self.shares.iter().collect()
     }
 
-    /// Returns the shares for a given block height.
-    fn get_shares(&self, block_height: u32) -> Result<HashMap<Address<N>, u64>> {
-        match self.shares.get(&block_height)? {
+    /// Returns the shares for a given block height and block header root.
+    fn get_shares(&self, block_height: u32, block_header_root: N::BlockHeaderRoot) -> Result<HashMap<Address<N>, u64>> {
+        match self.shares.get(&(block_height, block_header_root))? {
             Some(shares) => Ok(shares),
             None => return Err(anyhow!("Block height {} does not have any shares in storage", block_height)),
         }
     }
 
-    /// Increments the share count by one for a given block height and address.
-    fn increment_share(&self, block_height: u32, address: &Address<N>) -> Result<()> {
+    /// Increments the share count by one for a given block height, block header root, and address.
+    fn increment_share(&self, block_height: u32, block_header_root: N::BlockHeaderRoot, address: &Address<N>) -> Result<()> {
         // Retrieve the current shares for a given block height.
-        let mut shares = match self.shares.get(&block_height)? {
+        let mut shares = match self.shares.get(&(block_height, block_header_root))? {
             Some(shares) => shares,
             None => HashMap::new(),
         };
@@ -134,12 +134,12 @@ impl<N: Network> SharesState<N> {
         *entry = entry.saturating_add(1);
 
         // Insert the updated shares for the given block height.
-        self.shares.insert(&block_height, &shares)
+        self.shares.insert(&(block_height, block_header_root), &shares)
     }
 
-    /// Removes all of the shares for a given block height.
-    fn remove_shares(&self, block_height: u32) -> Result<()> {
-        self.shares.remove(&block_height)
+    /// Removes all of the shares for a given block height and block header root.
+    fn remove_shares(&self, block_height: u32, block_header_root: N::BlockHeaderRoot) -> Result<()> {
+        self.shares.remove(&(block_height, block_header_root))
     }
 
     /// Returns `true` if the given commitment exists in storage.

@@ -225,7 +225,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
     }
 
     /// Returns all the shares in storage.
-    pub fn to_shares(&self) -> Vec<(u32, HashMap<Address<N>, u64>)> {
+    pub fn to_shares(&self) -> Vec<((u32, N::BlockHeaderRoot), HashMap<Address<N>, u64>)> {
         self.state.to_shares()
     }
 
@@ -309,10 +309,11 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                     // Ensure the share difficulty target is met, and the PoSW proof is valid.
                     let block_height = block_header.height();
+                    let block_header_root = block_header.to_header_root().unwrap();
                     if !N::posw().verify(
                         block_height,
                         share_difficulty,
-                        &vec![*block_header.to_header_root().unwrap(), *block_header.nonce()],
+                        &vec![*block_header_root, *block_header.nonce()],
                         block_header.proof(),
                     ) {
                         warn!("[PoolResponse] PoSW proof verification failed");
@@ -328,7 +329,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     }
 
                     // Increment the share count for the prover.
-                    if let Err(error) = self.state.increment_share(block_height, &prover_address) {
+                    if let Err(error) = self.state.increment_share(block_height, block_header_root, &prover_address) {
                         error!("{}", error);
                     }
 
