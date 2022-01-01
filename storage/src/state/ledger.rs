@@ -155,6 +155,7 @@ impl<N: Network> LedgerState<N> {
         {
             let revert_block_height = snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT.saturating_sub(1);
             warn!("Ledger is not V12-compliant, reverting to block {}", revert_block_height);
+            warn!("{:?}", ledger.get_block(latest_block_height));
             latest_block_height = ledger.clear_incompatible_blocks(latest_block_height, revert_block_height)?;
             info!("Ledger successfully transitioned and is now V12-compliant");
         }
