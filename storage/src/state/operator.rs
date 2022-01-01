@@ -121,25 +121,20 @@ impl<N: Network> SharesState<N> {
         }
     }
 
-    /// Adds the given number of shares to the block height and address in storage.
-    fn add_shares(&self, block_height: u32, address: &Address<N>, num_shares: u64) -> Result<()> {
-        if let Some(current_shares) = self.shares.get(&block_height)? {
-            let mut new_shares = current_shares.clone();
+    /// Adds the given number of shares for a block height to a given address.
+    fn add_shares(&self, block_height: u32, address: &Address<N>, number_of_shares: u64) -> Result<()> {
+        // Retrieve the current shares for a given block height.
+        let mut shares = match self.shares.get(&block_height)? {
+            Some(shares) => shares,
+            None => HashMap::new(),
+        };
 
-            // Add the num shares for the address.
-            let address_entry = new_shares.entry(*address).or_insert(0);
-            *address_entry = address_entry.saturating_add(num_shares);
+        // Add the number of shares to the given address.
+        let entry = shares.entry(*address).or_insert(0);
+        *entry = entry.saturating_add(number_of_shares);
 
-            // Insert the shares for the address.
-            self.shares.insert(&block_height, &new_shares)?;
-            Ok(())
-        } else {
-            // Insert the shares for the address.
-            let mut new_shares = HashMap::new();
-            new_shares.insert(*address, num_shares);
-            self.shares.insert(&block_height, &new_shares)?;
-            Ok(())
-        }
+        // Insert the updated shares for the given block height.
+        self.shares.insert(&block_height, &shares)
     }
 
     /// Removes all of the shares for a given block height.
