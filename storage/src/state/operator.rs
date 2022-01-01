@@ -14,11 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::storage::{DataMap, Map, MapId, Storage};
+use crate::{
+    state::LedgerState,
+    storage::{DataMap, Map, MapId, Storage},
+};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
-use std::{collections::HashMap, path::Path};
+use std::{collections::HashMap, path::Path, sync::Arc};
 
 #[derive(Debug)]
 pub struct OperatorState<N: Network> {
@@ -45,23 +48,28 @@ impl<N: Network> OperatorState<N> {
     }
 
     /// Returns all the shares in storage.
-    pub fn to_shares(&self) -> Vec<((u32, N::BlockHeaderRoot), HashMap<Address<N>, u64>)> {
+    pub fn to_shares(&self) -> Vec<((u32, N::Commitment), HashMap<Address<N>, u64>)> {
         self.shares.to_shares()
     }
 
-    /// Returns the number of shares for a given block height and block header root.
-    pub fn get_shares(&self, block_height: u32, block_header_root: N::BlockHeaderRoot) -> Result<HashMap<Address<N>, u64>> {
-        self.shares.get_shares(block_height, block_header_root)
+    /// Returns the shares for a specific block, given the block height and coinbase record commitment.
+    pub fn get_shares_for_block(&self, block_height: u32, coinbase_commitment: N::Commitment) -> Result<HashMap<Address<N>, u64>> {
+        self.shares.get_shares_for_block(block_height, coinbase_commitment)
     }
 
-    /// Increments the share count by one for a given block height, block header root and address.
-    pub fn increment_share(&self, block_height: u32, block_header_root: N::BlockHeaderRoot, address: &Address<N>) -> Result<()> {
-        self.shares.increment_share(block_height, block_header_root, address)
+    /// Returns the shares for a specific prover, given a ledger and the prover address.
+    pub fn get_shares_for_prover(&self, ledger: &Arc<LedgerState<N>>, prover: &Address<N>) -> u64 {
+        self.shares.get_shares_for_prover(ledger, prover)
     }
 
-    /// Removes the shares for a given block height and block header root in storage.
-    pub fn remove_shares(&self, block_height: u32, block_header_root: N::BlockHeaderRoot) -> Result<()> {
-        self.shares.remove_shares(block_height, block_header_root)
+    /// Increments the share count by one for a given block height, coinbase record commitment and prover address.
+    pub fn increment_share(&self, block_height: u32, coinbase_commitment: N::Commitment, prover: &Address<N>) -> Result<()> {
+        self.shares.increment_share(block_height, coinbase_commitment, prover)
+    }
+
+    /// Removes the shares for a given block height and coinbase record commitment in storage.
+    pub fn remove_shares(&self, block_height: u32, coinbase_commitment: N::Commitment) -> Result<()> {
+        self.shares.remove_shares(block_height, coinbase_commitment)
     }
 
     /// Returns `true` if the given commitment exists in storage.
@@ -94,7 +102,7 @@ impl<N: Network> OperatorState<N> {
 #[allow(clippy::type_complexity)]
 struct SharesState<N: Network> {
     /// The miner shares for each block.
-    shares: DataMap<(u32, N::BlockHeaderRoot), HashMap<Address<N>, u64>>,
+    shares: DataMap<(u32, N::Commitment), HashMap<Address<N>, u64>>,
     /// The coinbase records earned by the operator.
     records: DataMap<N::Commitment, (u32, Record<N>)>,
 }
@@ -109,37 +117,54 @@ impl<N: Network> SharesState<N> {
     }
 
     /// Returns all shares in storage.
-    fn to_shares(&self) -> Vec<((u32, N::BlockHeaderRoot), HashMap<Address<N>, u64>)> {
+    fn to_shares(&self) -> Vec<((u32, N::Commitment), HashMap<Address<N>, u64>)> {
         self.shares.iter().collect()
     }
 
-    /// Returns the shares for a given block height and block header root.
-    fn get_shares(&self, block_height: u32, block_header_root: N::BlockHeaderRoot) -> Result<HashMap<Address<N>, u64>> {
-        match self.shares.get(&(block_height, block_header_root))? {
+    /// Returns the shares for a specific block, given the block height and coinbase record commitment.
+    fn get_shares_for_block(&self, block_height: u32, coinbase_commitment: N::Commitment) -> Result<HashMap<Address<N>, u64>> {
+        match self.shares.get(&(block_height, coinbase_commitment))? {
             Some(shares) => Ok(shares),
             None => return Err(anyhow!("Block height {} does not have any shares in storage", block_height)),
         }
     }
 
-    /// Increments the share count by one for a given block height, block header root, and address.
-    fn increment_share(&self, block_height: u32, block_header_root: N::BlockHeaderRoot, address: &Address<N>) -> Result<()> {
+    /// Returns the shares for a specific prover, given a ledger and the prover address.
+    fn get_shares_for_prover(&self, ledger: &Arc<LedgerState<N>>, prover: &Address<N>) -> u64 {
+        self.shares
+            .iter()
+            .filter_map(|((_, coinbase_commitment), shares)| {
+                if !shares.contains_key(prover) {
+                    None
+                } else {
+                    match ledger.contains_commitment(&coinbase_commitment) {
+                        Ok(true) => shares.get(prover).copied(),
+                        Ok(false) | Err(_) => None,
+                    }
+                }
+            })
+            .sum()
+    }
+
+    /// Increments the share count by one for a given block height, coinbase record commitment, and prover address.
+    fn increment_share(&self, block_height: u32, coinbase_commitment: N::Commitment, prover: &Address<N>) -> Result<()> {
         // Retrieve the current shares for a given block height.
-        let mut shares = match self.shares.get(&(block_height, block_header_root))? {
+        let mut shares = match self.shares.get(&(block_height, coinbase_commitment))? {
             Some(shares) => shares,
             None => HashMap::new(),
         };
 
         // Increment the share count for the given address.
-        let entry = shares.entry(*address).or_insert(0);
+        let entry = shares.entry(*prover).or_insert(0);
         *entry = entry.saturating_add(1);
 
         // Insert the updated shares for the given block height.
-        self.shares.insert(&(block_height, block_header_root), &shares)
+        self.shares.insert(&(block_height, coinbase_commitment), &shares)
     }
 
-    /// Removes all of the shares for a given block height and block header root.
-    fn remove_shares(&self, block_height: u32, block_header_root: N::BlockHeaderRoot) -> Result<()> {
-        self.shares.remove(&(block_height, block_header_root))
+    /// Removes all of the shares for a given block height and coinbase record commitment.
+    fn remove_shares(&self, block_height: u32, coinbase_commitment: N::Commitment) -> Result<()> {
+        self.shares.remove(&(block_height, coinbase_commitment))
     }
 
     /// Returns `true` if the given commitment exists in storage.

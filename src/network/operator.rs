@@ -83,8 +83,8 @@ pub struct Operator<N: Network, E: Environment> {
     state: Arc<OperatorState<N>>,
     /// The current block template that is being mined on by the operator.
     block_template: RwLock<Option<BlockTemplate<N>>>,
-    /// A list of provers and their associated state := (last_submitted, share_difficulty, shares_submitted_since_reset)
-    provers: RwLock<HashMap<Address<N>, (Instant, u64, u32)>>,
+    /// A list of provers and their associated state := (last_submitted, share_difficulty)
+    provers: RwLock<HashMap<Address<N>, (Instant, u64)>>,
     /// A list of the known nonces for the current round.
     known_nonces: RwLock<HashSet<N::PoSWNonce>>,
     /// The operator router of the node.
@@ -201,7 +201,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                                     operator.known_nonces.write().await.clear();
                                 }
                                 Ok(Err(error_message)) => error!("{}", error_message),
-                                Err(error) => panic!("{}", error),
+                                Err(error) => error!("{}", error),
                             };
                         }
 
@@ -225,8 +225,18 @@ impl<N: Network, E: Environment> Operator<N, E> {
     }
 
     /// Returns all the shares in storage.
-    pub fn to_shares(&self) -> Vec<((u32, N::BlockHeaderRoot), HashMap<Address<N>, u64>)> {
+    pub fn to_shares(&self) -> Vec<((u32, N::Commitment), HashMap<Address<N>, u64>)> {
         self.state.to_shares()
+    }
+
+    /// Returns the shares for a specific block, given the block height and coinbase record commitment.
+    pub fn get_shares_for_block(&self, block_height: u32, coinbase_commitment: N::Commitment) -> Result<HashMap<Address<N>, u64>> {
+        self.state.get_shares_for_block(block_height, coinbase_commitment)
+    }
+
+    /// Returns the shares for a specific prover, given a ledger and the prover address.
+    pub fn get_shares_for_prover(&self, prover: &Address<N>) -> u64 {
+        self.state.get_shares_for_prover(&self.ledger_reader, prover)
     }
 
     ///
@@ -243,7 +253,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         .write()
                         .await
                         .entry(address)
-                        .or_insert((Instant::now(), BASE_SHARE_DIFFICULTY, 0))
+                        .or_insert((Instant::now(), BASE_SHARE_DIFFICULTY))
                         .1;
 
                     // Route a `PoolRequest` to the peer.
@@ -255,7 +265,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     warn!("[PoolRegister] No current block template exists");
                 }
             }
-            OperatorRequest::PoolResponse(peer_ip, block_header, prover_address) => {
+            OperatorRequest::PoolResponse(peer_ip, block_header, prover) => {
                 if let Some(block_template) = self.block_template.read().await.clone() {
                     // Ensure the given block header corresponds to the correct block height.
                     if block_template.block_height() != block_header.height() {
@@ -295,13 +305,10 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     // Retrieve the share difficulty for the given prover.
                     let share_difficulty = {
                         let provers = self.provers.read().await.clone();
-                        match provers.get(&prover_address) {
-                            Some((_, share_difficulty, _)) => *share_difficulty,
+                        match provers.get(&prover) {
+                            Some((_, share_difficulty)) => *share_difficulty,
                             None => {
-                                self.provers
-                                    .write()
-                                    .await
-                                    .insert(prover_address, (Instant::now(), BASE_SHARE_DIFFICULTY, 0));
+                                self.provers.write().await.insert(prover, (Instant::now(), BASE_SHARE_DIFFICULTY));
                                 BASE_SHARE_DIFFICULTY
                             }
                         }
@@ -309,11 +316,10 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                     // Ensure the share difficulty target is met, and the PoSW proof is valid.
                     let block_height = block_header.height();
-                    let block_header_root = block_header.to_header_root().unwrap();
                     if !N::posw().verify(
                         block_height,
                         share_difficulty,
-                        &vec![*block_header_root, *block_header.nonce()],
+                        &vec![*block_header.to_header_root().unwrap(), *block_header.nonce()],
                         block_header.proof(),
                     ) {
                         warn!("[PoolResponse] PoSW proof verification failed");
@@ -321,21 +327,22 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     }
 
                     // Update the internal state for this prover.
-                    if let Some(ref mut prover) = self.provers.write().await.get_mut(&prover_address) {
+                    if let Some(ref mut prover) = self.provers.write().await.get_mut(&prover) {
                         prover.0 = Instant::now();
-                        prover.2 += 1;
                     } else {
-                        panic!("prover should have existing info");
+                        error!("Prover should have existing info");
+                        return;
                     }
 
                     // Increment the share count for the prover.
-                    if let Err(error) = self.state.increment_share(block_height, block_header_root, &prover_address) {
+                    let coinbase_record = block_template.coinbase_record().clone();
+                    if let Err(error) = self.state.increment_share(block_height, coinbase_record.commitment(), &prover) {
                         error!("{}", error);
                     }
 
                     info!(
                         "Operator received a valid share from {} ({}) for block {}",
-                        peer_ip, prover_address, block_height,
+                        peer_ip, prover, block_height,
                     );
 
                     // If the block has satisfactory difficulty and is valid, proceed to broadcast it.
@@ -343,7 +350,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     let transactions = block_template.transactions().clone();
                     if let Ok(block) = Block::from(previous_block_hash, block_header, transactions) {
                         // Store the coinbase record.
-                        let coinbase_record = block_template.coinbase_record().clone();
                         match self.state.add_coinbase_record(block_height, coinbase_record) {
                             // Broadcast the unconfirmed block.
                             Ok(()) => {
