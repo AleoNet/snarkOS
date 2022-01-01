@@ -263,7 +263,22 @@ impl<N: Network, E: Environment> Operator<N, E> {
                 if let Some(block_template) = self.block_template.read().await.clone() {
                     // Ensure the given block header corresponds to the correct block height.
                     if block_template.block_height() != block_header.height() {
-                        warn!("[PoolResponse] Peer {} sent a stale candidate block.", peer_ip);
+                        warn!("[PoolResponse] Peer {} sent a stale block.", peer_ip);
+                        return;
+                    }
+                    // Ensure the timestamp in the block template matches in the block header.
+                    if block_template.block_timestamp() != block_header.timestamp() {
+                        warn!("[PoolResponse] Peer {} sent a block with an incorrect timestamp.", peer_ip);
+                        return;
+                    }
+                    // Ensure the difficulty target in the block template matches in the block header.
+                    if block_template.difficulty_target() != block_header.difficulty_target() {
+                        warn!("[PoolResponse] Peer {} sent a block with an incorrect difficulty target.", peer_ip);
+                        return;
+                    }
+                    // Ensure the previous ledger root in the block template matches in the block header.
+                    if block_template.previous_ledger_root() != block_header.previous_ledger_root() {
+                        warn!("[PoolResponse] Peer {} sent a block with an incorrect ledger root.", peer_ip);
                         return;
                     }
                     // Ensure the transactions root in the block header matches the one from the block template.
@@ -345,17 +360,17 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         return;
                     }
 
-                    // Update the score for the prover.
-                    if let Err(error) = self.state.add_shares(block_height, &prover_address, 1) {
-                        error!("{}", error);
-                    }
-
                     // Update the internal state for this prover.
                     if let Some(ref mut prover) = self.provers.write().await.get_mut(&prover_address) {
                         prover.0 = Instant::now();
                         prover.2 += 1;
                     } else {
                         panic!("prover should have existing info");
+                    }
+
+                    // Update the score for the prover.
+                    if let Err(error) = self.state.add_shares(block_height, &prover_address, 1) {
+                        error!("{}", error);
                     }
 
                     info!(
