@@ -28,11 +28,7 @@ use crate::{
     ProverRouter,
 };
 use snarkos_storage::{storage::Storage, OperatorState};
-use snarkvm::{
-    algorithms::crh::sha256d_to_u64,
-    dpc::prelude::*,
-    utilities::{FromBytes, ToBytes},
-};
+use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
 use rand::thread_rng;
@@ -296,46 +292,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     // Update known nonces.
                     self.known_nonces.write().await.insert(block_header.nonce());
 
-                    // Retrieve the PoSW proof from the block header.
-                    let proof = block_header.proof();
-
-                    // TODO (howardwu): TEMPORARY - Remove this after testnet2 period.
-                    let block_height = block_header.height();
-                    // [pre-V12] Ensure the proof type is hiding.
-                    if <N as Network>::NETWORK_ID == 2
-                        && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
-                        && !proof.is_hiding()
-                    {
-                        warn!("[PoolResponse] [deprecated] PoSW proof for block {} should be hiding", block_height);
-                        return;
-                    }
-                    // [post-V12] Ensure the proof type is not hiding.
-                    else if proof.is_hiding() {
-                        warn!("[PoolResponse] PoSW proof for block {} should not be hiding", block_height);
-                        return;
-                    }
-
-                    // NOTE (julesdesmit): Unwraps are here for brevity's sake, and since we do
-                    // it exactly the same in snarkVM, I don't see why we shouldn't use them here.
-                    let inputs = vec![
-                        N::InnerScalarField::read_le(&block_header.to_header_root().unwrap().to_bytes_le().unwrap()[..]).unwrap(),
-                        *block_header.nonce(),
-                    ];
-
-                    // Ensure the proof is valid.
-                    if !proof.verify(N::posw().verifying_key(), &inputs) {
-                        warn!("[PoolResponse] PoSW proof verification failed");
-                        return;
-                    }
-
-                    // Ensure the block contains a difficulty that is at least the share difficulty.
-                    let proof_difficulty = match proof.to_bytes_le() {
-                        Ok(proof_bytes) => sha256d_to_u64(&proof_bytes),
-                        Err(error) => {
-                            warn!("[PoolResponse] {}", error);
-                            return;
-                        }
-                    };
+                    // Retrieve the share difficulty for the given prover.
                     let share_difficulty = {
                         let provers = self.provers.read().await.clone();
                         match provers.get(&prover_address) {
@@ -349,8 +306,16 @@ impl<N: Network, E: Environment> Operator<N, E> {
                             }
                         }
                     };
-                    if proof_difficulty > share_difficulty {
-                        warn!("Block with insufficient share difficulty from {} ({})", peer_ip, prover_address);
+
+                    // Ensure the share difficulty target is met, and the PoSW proof is valid.
+                    let block_height = block_header.height();
+                    if !N::posw().verify(
+                        block_height,
+                        share_difficulty,
+                        &vec![*block_header.to_header_root().unwrap(), *block_header.nonce()],
+                        block_header.proof(),
+                    ) {
+                        warn!("[PoolResponse] PoSW proof verification failed");
                         return;
                     }
 
