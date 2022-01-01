@@ -78,6 +78,8 @@ pub struct Prover<N: Network, E: Environment> {
     state: Arc<ProverState<N>>,
     /// The Aleo address of the prover.
     address: Option<Address<N>>,
+    /// The IP address of the connected pool.
+    pool: Option<SocketAddr>,
     /// The thread pool for the prover.
     thread_pool: Arc<ThreadPool>,
     /// The prover router of the node.
@@ -94,9 +96,6 @@ pub struct Prover<N: Network, E: Environment> {
     ledger_reader: LedgerReader<N>,
     /// The ledger router of the node.
     ledger_router: LedgerRouter<N>,
-
-    /// The IP address of the connected pool.
-    pool: Option<SocketAddr>,
 }
 
 impl<N: Network, E: Environment> Prover<N, E> {
@@ -125,6 +124,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         let prover = Arc::new(Self {
             state: Arc::new(ProverState::open_writer::<S, P>(path)?),
             address,
+            pool: pool_ip,
             thread_pool: Arc::new(thread_pool),
             prover_router,
             memory_pool: Arc::new(RwLock::new(MemoryPool::new())),
@@ -133,8 +133,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
             peers_router,
             ledger_reader,
             ledger_router,
-
-            pool: pool_ip,
         });
 
         // Initialize the handler for the prover.
@@ -166,7 +164,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
             task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
-
                 loop {
                     // Sleep for `1` second.
                     tokio::time::sleep(std::time::Duration::from_secs(1)).await;
