@@ -25,7 +25,7 @@ path = "../storage"
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "8b19baa"
+rev = "ac55a6f"
 #path = "../../snarkVM"
 
 [dependencies.anyhow]
