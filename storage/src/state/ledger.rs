@@ -600,7 +600,7 @@ impl<N: Network> LedgerState<N> {
         is_public: bool,
         transactions: &[Transaction<N>],
         rng: &mut R,
-    ) -> Result<(BlockTemplate<N>, Record<N>)> {
+    ) -> Result<BlockTemplate<N>> {
         // Prepare the new block.
         let previous_block_hash = self.latest_block_hash();
         let block_height = self.latest_block_height().saturating_add(1);
@@ -663,7 +663,7 @@ impl<N: Network> LedgerState<N> {
         let transactions = Transactions::from(&transactions)?;
 
         // Construct the block template.
-        let template = BlockTemplate::new(
+        Ok(BlockTemplate::new(
             previous_block_hash,
             block_height,
             block_timestamp,
@@ -671,9 +671,8 @@ impl<N: Network> LedgerState<N> {
             cumulative_weight,
             ledger_root,
             transactions,
-        );
-
-        Ok((template, coinbase_record))
+            coinbase_record,
+        ))
     }
 
     /// Mines a new block using the latest state of the given ledger.
@@ -685,10 +684,11 @@ impl<N: Network> LedgerState<N> {
         terminator: &AtomicBool,
         rng: &mut R,
     ) -> Result<(Block<N>, Record<N>)> {
-        let (template, coinbase_record) = self.get_block_template(recipient, is_public, transactions, rng)?;
+        let template = self.get_block_template(recipient, is_public, transactions, rng)?;
+        let coinbase_record = template.coinbase_record().clone();
 
         // Mine the next block.
-        match Block::mine(template, terminator, rng) {
+        match Block::mine(&template, terminator, rng) {
             Ok(block) => Ok((block, coinbase_record)),
             Err(error) => Err(anyhow!("Unable to mine the next block: {}", error)),
         }

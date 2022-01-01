@@ -24,11 +24,11 @@ default = []
 test = []
 
 [dependencies]
-snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "02c814c", features = ["algorithms"] }
-#snarkvm = { path = "../snarkVM" }
+snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "259f008", features = ["algorithms"] }
+#snarkvm = { path = "../snarkVM", features = ["algorithms"] }
 
 bytes = "1.0.0"
-futures = { version = "0.3.19", features = ["thread-pool"]}
+futures = { version = "0.3.19", features = ["thread-pool"] }
 
 crossterm = { version = "0.22" }
 tui = { version = "0.16.0", default-features = false, features = ["crossterm"] }

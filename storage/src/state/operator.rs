@@ -54,9 +54,9 @@ impl<N: Network> OperatorState<N> {
         self.shares.get_shares(block_height)
     }
 
-    /// Adds the given `num_shares` for an address in storage.
-    pub fn add_shares(&self, block_height: u32, address: &Address<N>, num_shares: u64) -> Result<()> {
-        self.shares.add_shares(block_height, address, num_shares)
+    /// Adds the given number of shares for a given block height to a given address.
+    pub fn add_shares(&self, block_height: u32, address: &Address<N>, number_of_shares: u64) -> Result<()> {
+        self.shares.add_shares(block_height, address, number_of_shares)
     }
 
     /// Removes the shares for a given block height in storage.
@@ -121,7 +121,7 @@ impl<N: Network> SharesState<N> {
         }
     }
 
-    /// Adds the given number of shares for a block height to a given address.
+    /// Adds the given number of shares for a given block height to a given address.
     fn add_shares(&self, block_height: u32, address: &Address<N>, number_of_shares: u64) -> Result<()> {
         // Retrieve the current shares for a given block height.
         let mut shares = match self.shares.get(&block_height)? {

@@ -189,7 +189,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                                         &transactions,
                                         &mut thread_rng(),
                                     ) {
-                                        Ok((block_template, _)) => Ok(block_template),
+                                        Ok(block_template) => Ok(block_template),
                                         Err(error) => Err(format!("Failed to produce a new block template: {}", error)),
                                     }
                                 })
@@ -261,13 +261,17 @@ impl<N: Network, E: Environment> Operator<N, E> {
             }
             OperatorRequest::PoolResponse(peer_ip, block_header, prover_address) => {
                 if let Some(block_template) = self.block_template.read().await.clone() {
-                    // Check that the block is relevant.
-                    if self.ledger_reader.latest_block_height().saturating_add(1) != block_header.height() {
+                    // Ensure the given block header corresponds to the correct block height.
+                    if block_template.block_height() != block_header.height() {
                         warn!("[PoolResponse] Peer {} sent a stale candidate block.", peer_ip);
                         return;
                     }
-
-                    // Ensure the nonce has not been seen before.
+                    // Ensure the transactions root in the block header matches the one from the block template.
+                    if block_template.transactions().transactions_root() != block_header.transactions_root() {
+                        warn!("[PoolResponse] Peer {} has changed the list of block transactions.", peer_ip);
+                        return;
+                    }
+                    // Ensure the given nonce from the prover is new.
                     if self.known_nonces.read().await.contains(&block_header.nonce()) {
                         warn!("[PoolResponse] Peer {} sent a duplicate share", peer_ip);
                         // TODO (julesdesmit): punish?
@@ -280,7 +284,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     // Reconstruct the block.
                     let previous_block_hash = block_template.previous_block_hash();
                     let transactions = block_template.transactions().clone();
-
                     if let Ok(block) = Block::from_unchecked(previous_block_hash, block_header.clone(), transactions) {
                         // Ensure the proof is valid.
                         let proof = match block.header().proof() {
@@ -302,24 +305,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
                             warn!("[PoolResponse] PoSW proof verification failed");
                             return;
                         }
-
-                        // Retrieve the coinbase transaction records.
-                        let coinbase_records = match block.to_coinbase_transaction() {
-                            Ok(transaction) => {
-                                // Ensure the owner of the coinbase transaction in the block is the operator address.
-                                let coinbase_records: Vec<Record<N>> =
-                                    transaction.to_records().filter(|r| Some(r.owner()) == self.address).collect();
-                                if coinbase_records.is_empty() {
-                                    warn!("[PoolResponse] Peer {} sent a candidate block with an incorrect owner.", peer_ip);
-                                    return;
-                                }
-                                coinbase_records
-                            }
-                            Err(error) => {
-                                warn!("[PoolResponse] {}", error);
-                                return;
-                            }
-                        };
 
                         // Ensure the block contains a difficulty that is at least the share difficulty.
                         let proof_bytes = match proof.to_bytes_le() {
@@ -375,12 +360,13 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         if let Ok(block) = Block::new(&block_template, block_header) {
                             info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
 
-                            // Store the coinbase record(s).
-                            coinbase_records.iter().for_each(|r| {
-                                if let Err(error) = self.state.add_coinbase_record(block.height(), r.clone()) {
-                                    warn!("Could not store coinbase record - {}", error);
-                                }
-                            });
+                            // Store the coinbase record.
+                            if let Err(error) = self
+                                .state
+                                .add_coinbase_record(block.height(), block_template.coinbase_record().clone())
+                            {
+                                warn!("Could not store coinbase record - {}", error);
+                            }
 
                             // Broadcast the unconfirmed block.
                             let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
