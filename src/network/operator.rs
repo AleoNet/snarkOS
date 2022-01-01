@@ -15,16 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::Tasks,
-    Data,
-    Environment,
-    LedgerReader,
-    LedgerRequest,
-    LedgerRouter,
-    Message,
-    NodeType,
-    PeersRequest,
-    PeersRouter,
+    helpers::Tasks, Data, Environment, LedgerReader, LedgerRequest, LedgerRouter, Message, NodeType, PeersRequest, PeersRouter,
     ProverRouter,
 };
 use snarkos_storage::{storage::Storage, OperatorState};
@@ -50,8 +41,6 @@ use tokio::{
     task::JoinHandle,
 };
 
-const UPDATE_DELAY: Duration = Duration::from_secs(5);
-
 /// Shorthand for the parent half of the `Operator` message channel.
 pub(crate) type OperatorRouter<N> = mpsc::Sender<OperatorRequest<N>>;
 #[allow(unused)]
@@ -71,6 +60,8 @@ pub enum OperatorRequest<N: Network> {
 
 /// The predefined base share difficulty.
 const BASE_SHARE_DIFFICULTY: u64 = u64::MAX;
+/// The operator heartbeat in seconds.
+const HEARTBEAT_IN_SECONDS: Duration = Duration::from_secs(5);
 
 ///
 /// An operator for a program on a specific network in the node server.
@@ -209,7 +200,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         }
 
                         // Sleep for `5` seconds.
-                        tokio::time::sleep(UPDATE_DELAY).await;
+                        tokio::time::sleep(HEARTBEAT_IN_SECONDS).await;
                     }
                 }));
                 // Wait until the operator handler is ready.
