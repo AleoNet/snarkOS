@@ -64,9 +64,9 @@ pub enum OperatorRequest<N: Network> {
 }
 
 /// The predefined base share difficulty.
-const BASE_SHARE_DIFFICULTY: u64 = u64::MAX / 2;
+const BASE_SHARE_DIFFICULTY: u64 = u64::MAX;
 /// The operator heartbeat in seconds.
-const HEARTBEAT_IN_SECONDS: Duration = Duration::from_secs(5);
+const HEARTBEAT_IN_SECONDS: Duration = Duration::from_secs(1);
 
 ///
 /// An operator for a program on a specific network in the node server.
