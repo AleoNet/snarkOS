@@ -24,7 +24,7 @@ use crate::{
     Peers,
     ProverRouter,
 };
-use snarkvm::dpc::{MemoryPool, Network};
+use snarkvm::dpc::{Address, MemoryPool, Network};
 
 use hyper::{
     server::{conn::AddrStream, Server},
@@ -69,14 +69,10 @@ const METHODS_EXPECTING_PARAMS: [&str; 12] = [
     "gettransaction",
     "gettransition",
     "sendtransaction",
-    // "validaterawtransaction",
     // // private
-    // "createrawtransaction",
     // "createtransaction",
     // "getrawrecord",
-    // "decoderecord",
     // "decryptrecord",
-    // "disconnect",
     // "connect",
 ];
 
@@ -87,13 +83,22 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
     username: String,
     password: String,
     status: &Status,
+    address: Option<Address<N>>,
     peers: &Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
     prover_router: ProverRouter<N>,
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = RpcCredentials { username, password };
-    let rpc = RpcImpl::new(credentials, status.clone(), peers.clone(), ledger, prover_router, memory_pool);
+    let rpc = RpcImpl::new(
+        credentials,
+        status.clone(),
+        address,
+        peers.clone(),
+        ledger,
+        prover_router,
+        memory_pool,
+    );
 
     let service = make_service_fn(move |conn: &AddrStream| {
         let caller = conn.remote_addr();
@@ -322,18 +327,7 @@ async fn handle_rpc<N: Network, E: Environment>(
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
-        // "getblocktemplate" => {
-        //     let result = rpc.get_block_template().await.map_err(convert_crate_err);
-        //     result_to_response(&req, result)
-        // }
         // // private
-        // "createaccount" => {
-        //     let result = rpc
-        //         .create_account_protected(Params::Array(params), meta)
-        //         .await
-        //         .map_err(convert_core_err);
-        //     result_to_response(&req, result)
-        // }
         // "createtransaction" => {
         //     let result = rpc
         //         .create_transaction_protected(Params::Array(params), meta)
@@ -511,7 +505,15 @@ mod tests {
         .await
         .expect("Failed to initialize prover");
 
-        RpcImpl::<N, E>::new(credentials, status, peers, ledger.reader(), prover.router(), prover.memory_pool())
+        RpcImpl::<N, E>::new(
+            credentials,
+            status,
+            None,
+            peers,
+            ledger.reader(),
+            prover.router(),
+            prover.memory_pool(),
+        )
     }
 
     /// Initializes a new instance of the rpc.
@@ -564,6 +566,7 @@ mod tests {
                 "hello".to_string(),
                 "world".to_string(),
                 &status,
+                None,
                 &peers,
                 ledger.reader(),
                 prover.router(),
@@ -1179,12 +1182,13 @@ mod tests {
 
         // Declare the expected node state.
         let expected = serde_json::json!({
+            "address": Option::<Address<Testnet2>>::None,
             "candidate_peers": Vec::<SocketAddr>::new(),
             "connected_peers": Vec::<SocketAddr>::new(),
             "latest_block_hash": Testnet2::genesis_block().hash(),
             "latest_block_height": 0,
             "latest_cumulative_weight": 0,
-            "launched": rpc.launched,
+            "launched": format!("{} minutes ago", 0),
             "number_of_candidate_peers": 0,
             "number_of_connected_peers": 0,
             "number_of_connected_sync_nodes": 0,

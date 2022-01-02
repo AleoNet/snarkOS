@@ -29,7 +29,7 @@ use crate::{
 };
 use snarkos_storage::Metadata;
 use snarkvm::{
-    dpc::{AleoAmount, Block, BlockHeader, Blocks, MemoryPool, Network, Transaction, Transactions, Transition},
+    dpc::{Address, AleoAmount, Block, BlockHeader, Blocks, MemoryPool, Network, Transaction, Transactions, Transition},
     utilities::FromBytes,
 };
 
@@ -65,6 +65,7 @@ impl From<RpcError> for std::io::Error {
 #[doc(hidden)]
 pub struct RpcInner<N: Network, E: Environment> {
     pub(crate) status: Status,
+    address: Option<Address<N>>,
     peers: Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
     prover_router: ProverRouter<N>,
@@ -92,6 +93,7 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
     pub fn new(
         credentials: RpcCredentials,
         status: Status,
+        address: Option<Address<N>>,
         peers: Arc<Peers<N, E>>,
         ledger: LedgerReader<N>,
         prover_router: ProverRouter<N>,
@@ -99,6 +101,7 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
     ) -> Self {
         Self(Arc::new(RpcInner {
             status,
+            address,
             peers,
             ledger,
             prover_router,
@@ -306,6 +309,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         let latest_cumulative_weight = self.ledger.latest_cumulative_weight();
 
         Ok(serde_json::json!({
+            "address": self.address,
             "candidate_peers": candidate_peers,
             "connected_peers": connected_peers,
             "latest_block_hash": latest_block_hash,
