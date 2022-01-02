@@ -27,6 +27,7 @@ pub enum MapId {
     SerialNumbers,
     Transactions,
     Transitions,
+    Shares,
     #[cfg(test)]
     Test,
 }
@@ -43,6 +44,7 @@ impl MapId {
             Self::SerialNumbers => b"serial_numbers",
             Self::Transactions => b"transactions",
             Self::Transitions => b"transitions",
+            Self::Shares => b"shares",
             #[cfg(test)]
             Self::Test => b"hello world",
         }
