@@ -15,8 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    environment::{Client, ClientTrial, Environment, Miner, MinerTrial, NodeType, Operator, OperatorTrial, Prover, ProverTrial, SyncNode},
-    helpers::Updater,
+    environment::{Client, ClientTrial, Environment, Miner, MinerTrial, Operator, OperatorTrial, Prover, ProverTrial, SyncNode},
+    helpers::{NodeType, Updater},
     network::Server,
     Display,
 };

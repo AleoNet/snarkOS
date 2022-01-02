@@ -15,12 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{block_requests::*, CircularMap, State},
+    helpers::{block_requests::*, CircularMap, NodeType, State},
     Data,
     Environment,
     LedgerReader,
     Message,
-    NodeType,
     PeersRequest,
     PeersRouter,
     ProverRequest,

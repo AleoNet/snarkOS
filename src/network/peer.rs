@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{State, Status},
+    helpers::{NodeType, State, Status},
     network::{
         ConnectionResult,
         LedgerReader,
@@ -31,7 +31,6 @@ use crate::{
     },
     Data,
     Environment,
-    NodeType,
 };
 use snarkvm::dpc::prelude::*;
 

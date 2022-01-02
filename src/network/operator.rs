@@ -14,7 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Data, Environment, LedgerReader, LedgerRequest, LedgerRouter, Message, NodeType, PeersRequest, PeersRouter, ProverRouter};
+use crate::{
+    helpers::NodeType,
+    Data,
+    Environment,
+    LedgerReader,
+    LedgerRequest,
+    LedgerRouter,
+    Message,
+    PeersRequest,
+    PeersRouter,
+    ProverRouter,
+};
 use snarkos_storage::{storage::Storage, OperatorState};
 use snarkvm::dpc::prelude::*;
 

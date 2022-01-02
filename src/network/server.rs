@@ -16,8 +16,8 @@
 
 use crate::{
     display::notification_message,
-    environment::{Environment, NodeType},
-    helpers::State,
+    environment::Environment,
+    helpers::{NodeType, State},
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     operator::{Operator, OperatorRouter},
     peers::{Peers, PeersRequest, PeersRouter},
