@@ -14,49 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::helpers::{NodeType, Status, Tasks};
 use snarkvm::dpc::Network;
 
-use serde::{Deserialize, Serialize};
+use once_cell::sync::OnceCell;
 use std::{
-    fmt::{self, Debug},
+    fmt::Debug,
     marker::PhantomData,
+    sync::{atomic::AtomicBool, Arc},
 };
-
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
-#[repr(u8)]
-pub enum NodeType {
-    /// A client node is a full node, capable of sending and receiving blocks.
-    Client = 0,
-    /// A mining node is a full node, capable of producing new blocks.
-    Miner,
-    /// A beacon node is a discovery node, capable of sharing peers of the network.
-    Beacon,
-    /// A sync node is a discovery node, capable of syncing nodes for the network.
-    Sync,
-    /// An operating node is a full node, capable of coordinating provers in a pool.
-    Operator,
-    /// A proving node is a full node, capable of producing proofs for a pool.
-    Prover,
-}
-
-impl NodeType {
-    pub fn description(&self) -> &str {
-        match self {
-            Self::Client => "a client node",
-            Self::Miner => "a mining node",
-            Self::Beacon => "a beacon node",
-            Self::Sync => "a sync node",
-            Self::Operator => "an operating node",
-            Self::Prover => "a proving node",
-        }
-    }
-}
-
-impl fmt::Display for NodeType {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
-    }
-}
 
 #[rustfmt::skip]
 pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
@@ -106,6 +72,24 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const MAXIMUM_BLOCK_REQUEST: u32 = 250;
     /// The maximum number of failures tolerated before disconnecting from a peer.
     const MAXIMUM_NUMBER_OF_FAILURES: usize = 1024;
+
+    /// Returns the tasks handler for the node.
+    fn tasks() -> &'static Tasks<tokio::task::JoinHandle<()>> {
+        static TASKS: OnceCell<Tasks<tokio::task::JoinHandle<()>>> = OnceCell::new();
+        TASKS.get_or_init(Tasks::new)
+    }
+    
+    /// Returns the status of the node.
+    fn status() -> &'static Status {
+        static STATUS: OnceCell<Status> = OnceCell::new();
+        STATUS.get_or_init(Status::new)
+    }
+    
+    /// Returns the terminator bit for the prover.
+    fn terminator() -> &'static Arc<AtomicBool> {
+        static TERMINATOR: OnceCell<Arc<AtomicBool>> = OnceCell::new();
+        TERMINATOR.get_or_init(|| Arc::new(AtomicBool::new(false)))
+    }
 }
 
 #[derive(Clone, Debug, Default)]

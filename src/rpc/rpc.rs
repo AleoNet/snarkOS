@@ -17,14 +17,13 @@
 //! Logic for instantiating the RPC server.
 
 use crate::{
-    helpers::Status,
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
     Environment,
     LedgerReader,
     Peers,
     ProverRouter,
 };
-use snarkvm::dpc::{MemoryPool, Network};
+use snarkvm::dpc::{Address, MemoryPool, Network};
 
 use hyper::{
     server::{conn::AddrStream, Server},
@@ -69,31 +68,28 @@ const METHODS_EXPECTING_PARAMS: [&str; 12] = [
     "gettransaction",
     "gettransition",
     "sendtransaction",
-    // "validaterawtransaction",
     // // private
-    // "createrawtransaction",
     // "createtransaction",
     // "getrawrecord",
-    // "decoderecord",
     // "decryptrecord",
-    // "disconnect",
     // "connect",
 ];
 
 /// Starts a local RPC HTTP server at `rpc_port` in a dedicated `tokio` task.
 /// RPC failures do not affect the rest of the node.
+#[allow(clippy::too_many_arguments)]
 pub async fn initialize_rpc_server<N: Network, E: Environment>(
     rpc_addr: SocketAddr,
     username: String,
     password: String,
-    status: &Status,
+    address: Option<Address<N>>,
     peers: &Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
     prover_router: ProverRouter<N>,
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = RpcCredentials { username, password };
-    let rpc = RpcImpl::new(credentials, status.clone(), peers.clone(), ledger, prover_router, memory_pool);
+    let rpc = RpcImpl::new(credentials, address, peers.clone(), ledger, prover_router, memory_pool);
 
     let service = make_service_fn(move |conn: &AddrStream| {
         let caller = conn.remote_addr();
@@ -322,18 +318,7 @@ async fn handle_rpc<N: Network, E: Environment>(
                 .map_err(convert_crate_err);
             result_to_response(&req, result)
         }
-        // "getblocktemplate" => {
-        //     let result = rpc.get_block_template().await.map_err(convert_crate_err);
-        //     result_to_response(&req, result)
-        // }
         // // private
-        // "createaccount" => {
-        //     let result = rpc
-        //         .create_account_protected(Params::Array(params), meta)
-        //         .await
-        //         .map_err(convert_core_err);
-        //     result_to_response(&req, result)
-        // }
         // "createtransaction" => {
         //     let result = rpc
         //         .create_transaction_protected(Params::Array(params), meta)
@@ -425,8 +410,6 @@ fn result_to_response<T: Serialize>(
 mod tests {
     use super::*;
     use crate::{environment::Client, helpers::State, ledger::Ledger, network::Prover};
-
-    use crate::helpers::Tasks;
     use snarkos_storage::{
         storage::{rocksdb::RocksDB, Storage},
         LedgerState,
@@ -480,30 +463,21 @@ mod tests {
         let local_ip: SocketAddr = "0.0.0.0:8888".parse().expect("Failed to parse ip");
 
         // Initialize the status indicator.
-        let status = Status::new();
-        status.update(State::Ready);
-
-        // Initialize the terminator bit.
-        let terminator = Arc::new(AtomicBool::new(false));
-        // Initialize the tasks handler.
-        let mut tasks = Tasks::new();
+        E::status().update(State::Ready);
 
         // Initialize a new instance for managing peers.
-        let peers = Peers::new(tasks.clone(), local_ip, None, &status).await;
+        let peers = Peers::new(local_ip, None).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<S, _>(&mut tasks, &ledger_path, &status, &terminator, peers.router())
+        let ledger = Ledger::<N, E>::open::<S, _>(&ledger_path, peers.router())
             .await
             .expect("Failed to initialize ledger");
 
         // Initialize a new instance for managing the prover.
         let prover = Prover::open::<S, _>(
-            &mut tasks,
             &prover_path,
             None,
             local_ip,
             Some(local_ip),
-            &status,
-            &terminator,
             peers.router(),
             ledger.reader(),
             ledger.router(),
@@ -511,14 +485,11 @@ mod tests {
         .await
         .expect("Failed to initialize prover");
 
-        RpcImpl::<N, E>::new(credentials, status, peers, ledger.reader(), prover.router(), prover.memory_pool())
+        RpcImpl::<N, E>::new(credentials, None, peers, ledger.reader(), prover.router(), prover.memory_pool())
     }
 
     /// Initializes a new instance of the rpc.
-    async fn new_rpc_server<N: Network, E: Environment, S: Storage, P: AsRef<Path>>(
-        path: Option<P>,
-        tasks: &mut Tasks<tokio::task::JoinHandle<()>>,
-    ) {
+    async fn new_rpc_server<N: Network, E: Environment, S: Storage, P: AsRef<Path>>(path: Option<P>) {
         // Derive the storage paths.
         let (ledger_path, prover_path) = match &path {
             Some(p) => (p.as_ref().to_path_buf(), temp_dir()),
@@ -529,28 +500,21 @@ mod tests {
         let local_ip: SocketAddr = caller();
 
         // Initialize the status indicator.
-        let status = Status::new();
-        status.update(State::Ready);
-
-        // Initialize the terminator bit.
-        let terminator = Arc::new(AtomicBool::new(false));
+        E::status().update(State::Ready);
 
         // Initialize a new instance for managing peers.
-        let peers = Peers::new(tasks.clone(), local_ip, None, &status).await;
+        let peers = Peers::new(local_ip, None).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<S, _>(tasks, &ledger_path, &status, &terminator, peers.router())
+        let ledger = Ledger::<N, E>::open::<S, _>(&ledger_path, peers.router())
             .await
             .expect("Failed to initialize ledger");
 
         // Initialize a new instance for managing the prover.
         let prover = Prover::open::<S, _>(
-            tasks,
             &prover_path,
             None,
             local_ip,
             Some(local_ip),
-            &status,
-            &terminator,
             peers.router(),
             ledger.reader(),
             ledger.router(),
@@ -558,12 +522,12 @@ mod tests {
         .await
         .expect("Failed to initialize prover");
 
-        tasks.append(
+        E::tasks().append(
             initialize_rpc_server(
                 local_ip,
                 "hello".to_string(),
                 "world".to_string(),
-                &status,
+                None,
                 &peers,
                 ledger.reader(),
                 prover.router(),
@@ -1179,16 +1143,18 @@ mod tests {
 
         // Declare the expected node state.
         let expected = serde_json::json!({
+            "address": Option::<Address<Testnet2>>::None,
             "candidate_peers": Vec::<SocketAddr>::new(),
             "connected_peers": Vec::<SocketAddr>::new(),
             "latest_block_hash": Testnet2::genesis_block().hash(),
             "latest_block_height": 0,
             "latest_cumulative_weight": 0,
+            "launched": format!("{} minutes ago", 0),
             "number_of_candidate_peers": 0,
             "number_of_connected_peers": 0,
             "number_of_connected_sync_nodes": 0,
             "software": format!("snarkOS {}", env!("CARGO_PKG_VERSION")),
-            "status": rpc.status.to_string(),
+            "status": Client::<Testnet2>::status().to_string(),
             "type": Client::<Testnet2>::NODE_TYPE,
             "version": Client::<Testnet2>::MESSAGE_VERSION,
         });
@@ -1382,11 +1348,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_send_transaction_large() {
-        // Initialize the tasks handler.
-        let mut tasks = Tasks::new();
-
         // Initialize a new RPC.
-        new_rpc_server::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None, &mut tasks).await;
+        new_rpc_server::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
 
         ///
         /// Sends a `sendtransaction` RPC request to the given node address.

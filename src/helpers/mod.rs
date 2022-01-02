@@ -20,6 +20,9 @@ pub use block_requests::*;
 pub mod circular_map;
 pub use circular_map::*;
 
+pub mod node_type;
+pub use node_type::*;
+
 pub mod tasks;
 pub use tasks::*;
 

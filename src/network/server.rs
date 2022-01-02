@@ -16,8 +16,8 @@
 
 use crate::{
     display::notification_message,
-    environment::{Environment, NodeType},
-    helpers::{State, Status, Tasks},
+    environment::Environment,
+    helpers::{NodeType, State},
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     operator::{Operator, OperatorRouter},
     peers::{Peers, PeersRequest, PeersRouter},
@@ -29,11 +29,7 @@ use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
 
 use anyhow::Result;
-use std::{
-    net::SocketAddr,
-    sync::{atomic::AtomicBool, Arc},
-    time::Duration,
-};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
     sync::{oneshot, RwLock},
@@ -49,8 +45,6 @@ pub type LedgerReader<N> = Arc<LedgerState<N>>;
 pub struct Server<N: Network, E: Environment> {
     /// The local address of the node.
     local_ip: SocketAddr,
-    /// The status of the node.
-    status: Status,
     /// The list of peers for the node.
     peers: Arc<Peers<N, E>>,
     /// The ledger of the node.
@@ -59,8 +53,6 @@ pub struct Server<N: Network, E: Environment> {
     operator: Arc<Operator<N, E>>,
     /// The prover of the node.
     prover: Arc<Prover<N, E>>,
-    /// The list of tasks spawned by the node.
-    tasks: Tasks<task::JoinHandle<()>>,
 }
 
 impl<N: Network, E: Environment> Server<N, E> {
@@ -68,12 +60,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Starts the connection listener for peers.
     ///
     #[inline]
-    pub async fn initialize(
-        node: &Node,
-        address: Option<Address<N>>,
-        pool_ip: Option<SocketAddr>,
-        mut tasks: Tasks<task::JoinHandle<()>>,
-    ) -> Result<Self> {
+    pub async fn initialize(node: &Node, address: Option<Address<N>>, pool_ip: Option<SocketAddr>) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(node.node).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
@@ -87,24 +74,16 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize the prover storage path.
         let prover_storage_path = node.prover_storage_path(local_ip);
 
-        // Initialize the status indicator.
-        let status = Status::new();
-        // Initialize the terminator bit.
-        let terminator = Arc::new(AtomicBool::new(false));
-
         // Initialize a new instance for managing peers.
-        let peers = Peers::new(tasks.clone(), local_ip, None, &status).await;
+        let peers = Peers::new(local_ip, None).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &ledger_storage_path, &status, &terminator, peers.router()).await?;
+        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&ledger_storage_path, peers.router()).await?;
         // Initialize a new instance for managing the prover.
         let prover = Prover::open::<RocksDB, _>(
-            &mut tasks,
             &prover_storage_path,
             address,
             local_ip,
             pool_ip,
-            &status,
-            &terminator,
             peers.router(),
             ledger.reader(),
             ledger.router(),
@@ -112,7 +91,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         .await?;
         // Initialize a new instance for managing the operator.
         let operator = Operator::open::<RocksDB, _>(
-            &mut tasks,
             &operator_storage_path,
             address,
             local_ip,
@@ -147,10 +125,8 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialize the connection listener for new peers.
         Self::initialize_listener(
-            &mut tasks,
             local_ip,
             listener,
-            peers.router(),
             peers.clone(),
             ledger.reader(),
             ledger.router(),
@@ -159,48 +135,24 @@ impl<N: Network, E: Environment> Server<N, E> {
         )
         .await;
         // Initialize a new instance of the heartbeat.
-        Self::initialize_heartbeat(
-            &mut tasks,
-            peers.router(),
-            ledger.reader(),
-            ledger.router(),
-            operator.router(),
-            prover.router(),
-        )
-        .await;
+        Self::initialize_heartbeat(peers.router(), ledger.reader(), ledger.router(), operator.router(), prover.router()).await;
         // Initialize a new instance of the RPC server.
-        Self::initialize_rpc(
-            &mut tasks,
-            node,
-            &status,
-            &peers,
-            ledger.reader(),
-            prover.router(),
-            prover.memory_pool(),
-        )
-        .await;
+        Self::initialize_rpc(node, address, &peers, ledger.reader(), prover.router(), prover.memory_pool()).await;
         // Initialize a new instance of the notification.
-        Self::initialize_notification(&mut tasks, ledger.reader(), prover.clone(), address).await;
+        Self::initialize_notification(ledger.reader(), prover.clone(), address).await;
 
         Ok(Self {
             local_ip,
-            status,
             peers,
             ledger,
             operator,
             prover,
-            tasks,
         })
     }
 
     /// Returns the IP address of this node.
     pub fn local_ip(&self) -> SocketAddr {
         self.local_ip
-    }
-
-    /// Returns the status of this node.
-    pub fn status(&self) -> Status {
-        self.status.clone()
     }
 
     /// Returns the peer manager of this node.
@@ -240,7 +192,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     pub async fn shut_down(&self) {
         info!("Shutting down...");
         // Update the node status.
-        self.status.update(State::ShuttingDown);
+        E::status().update(State::ShuttingDown);
 
         // Shut down the ledger.
         trace!("Proceeding to shut down the ledger...");
@@ -254,7 +206,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         trace!("Ledger has shut down, proceeding to flush tasks...");
 
         // Flush the tasks.
-        self.tasks.flush();
+        E::tasks().flush();
         trace!("Node has shut down.");
     }
 
@@ -263,10 +215,8 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     async fn initialize_listener(
-        tasks: &mut Tasks<task::JoinHandle<()>>,
         local_ip: SocketAddr,
         listener: TcpListener,
-        peers_router: PeersRouter<N, E>,
         peers: Arc<Peers<N, E>>,
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
@@ -275,7 +225,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) {
         // Initialize the listener process.
         let (router, handler) = oneshot::channel();
-        tasks.append(task::spawn(async move {
+        E::tasks().append(task::spawn(async move {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             info!("Listening for peers at {}", local_ip);
@@ -294,7 +244,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                                 operator_router.clone(),
                                 prover_router.clone(),
                             );
-                            if let Err(error) = peers_router.send(request).await {
+                            if let Err(error) = peers.router().send(request).await {
                                 error!("Failed to send request to peers: {}", error)
                             }
                         }
@@ -317,7 +267,6 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     async fn initialize_heartbeat(
-        tasks: &mut Tasks<task::JoinHandle<()>>,
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
@@ -326,7 +275,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
-        tasks.append(task::spawn(async move {
+        E::tasks().append(task::spawn(async move {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             loop {
@@ -357,9 +306,8 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     async fn initialize_rpc(
-        tasks: &mut Tasks<task::JoinHandle<()>>,
         node: &Node,
-        status: &Status,
+        address: Option<Address<N>>,
         peers: &Arc<Peers<N, E>>,
         ledger_reader: LedgerReader<N>,
         prover_router: ProverRouter<N>,
@@ -367,12 +315,12 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) {
         if !node.norpc {
             // Initialize a new instance of the RPC server.
-            tasks.append(
+            E::tasks().append(
                 initialize_rpc_server::<N, E>(
                     node.rpc,
                     node.rpc_username.clone(),
                     node.rpc_password.clone(),
-                    status,
+                    address,
                     peers,
                     ledger_reader,
                     prover_router,
@@ -387,15 +335,10 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize a new instance of the notification.
     ///
     #[inline]
-    async fn initialize_notification(
-        tasks: &mut Tasks<task::JoinHandle<()>>,
-        ledger: LedgerReader<N>,
-        prover: Arc<Prover<N, E>>,
-        address: Option<Address<N>>,
-    ) {
+    async fn initialize_notification(ledger: LedgerReader<N>, prover: Arc<Prover<N, E>>, address: Option<Address<N>>) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
-        tasks.append(task::spawn(async move {
+        E::tasks().append(task::spawn(async move {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             loop {
