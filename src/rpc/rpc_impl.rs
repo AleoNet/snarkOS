@@ -27,7 +27,6 @@ use crate::{
     ProverRequest,
     ProverRouter,
 };
-use chrono::{DateTime, Utc};
 use snarkos_storage::Metadata;
 use snarkvm::{
     dpc::{AleoAmount, Block, BlockHeader, Blocks, MemoryPool, Network, Transaction, Transactions, Transition},
@@ -36,7 +35,7 @@ use snarkvm::{
 
 use jsonrpc_core::Value;
 use snarkvm::{dpc::Record, utilities::ToBytes};
-use std::{cmp::max, net::SocketAddr, ops::Deref, sync::Arc};
+use std::{cmp::max, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
 use tokio::sync::RwLock;
 
 #[derive(Debug, Error)]
@@ -73,7 +72,7 @@ pub struct RpcInner<N: Network, E: Environment> {
     /// RPC credentials for accessing guarded endpoints
     #[allow(unused)]
     pub(crate) credentials: RpcCredentials,
-    pub launched: DateTime<Utc>,
+    launched: Instant,
 }
 
 /// Implements RPC HTTP endpoint functions for a node.
@@ -105,7 +104,7 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
             prover_router,
             memory_pool,
             credentials,
-            launched: Utc::now(),
+            launched: Instant::now(),
         }))
     }
 }
@@ -312,6 +311,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
             "latest_block_hash": latest_block_hash,
             "latest_block_height": latest_block_height,
             "latest_cumulative_weight": latest_cumulative_weight,
+            "launched": format!("{} minutes ago", self.launched.elapsed().as_secs() / 60),
             "number_of_candidate_peers": number_of_candidate_peers,
             "number_of_connected_peers": number_of_connected_peers,
             "number_of_connected_sync_nodes": number_of_connected_sync_nodes,
@@ -319,7 +319,6 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
             "status": self.status.to_string(),
             "type": E::NODE_TYPE,
             "version": E::MESSAGE_VERSION,
-            "launched": self.launched,
         }))
     }
 
