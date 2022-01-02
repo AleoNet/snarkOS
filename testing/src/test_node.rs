@@ -15,12 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos::{
-    helpers::{State, Status},
+    helpers::{NodeType, State, Status},
     Client,
     Data,
     Environment,
     Message,
-    NodeType,
 };
 use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};

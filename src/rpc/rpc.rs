@@ -410,8 +410,6 @@ fn result_to_response<T: Serialize>(
 mod tests {
     use super::*;
     use crate::{environment::Client, helpers::State, ledger::Ledger, network::Prover};
-
-    use crate::helpers::Tasks;
     use snarkos_storage::{
         storage::{rocksdb::RocksDB, Storage},
         LedgerState,
