@@ -16,6 +16,7 @@
 
 #![allow(clippy::module_inception)]
 #![allow(clippy::suspicious_else_formatting)]
+#![allow(clippy::type_complexity)]
 
 #[macro_use]
 extern crate thiserror;

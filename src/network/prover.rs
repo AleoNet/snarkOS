@@ -257,7 +257,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                         if N::posw().verify(
                                             block_header.height(),
                                             share_difficulty,
-                                            &vec![*block_header.to_header_root().unwrap(), *block_header.nonce()],
+                                            &[*block_header.to_header_root().unwrap(), *block_header.nonce()],
                                             block_header.proof(),
                                         ) {
                                             let proof_difficulty = block_header.proof().to_proof_difficulty()?;
