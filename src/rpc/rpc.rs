@@ -1184,6 +1184,7 @@ mod tests {
             "latest_block_hash": Testnet2::genesis_block().hash(),
             "latest_block_height": 0,
             "latest_cumulative_weight": 0,
+            "launched": rpc.launched,
             "number_of_candidate_peers": 0,
             "number_of_connected_peers": 0,
             "number_of_connected_sync_nodes": 0,

@@ -27,6 +27,7 @@ use crate::{
     ProverRequest,
     ProverRouter,
 };
+use chrono::{DateTime, Utc};
 use snarkos_storage::Metadata;
 use snarkvm::{
     dpc::{AleoAmount, Block, BlockHeader, Blocks, MemoryPool, Network, Transaction, Transactions, Transition},
@@ -72,6 +73,7 @@ pub struct RpcInner<N: Network, E: Environment> {
     /// RPC credentials for accessing guarded endpoints
     #[allow(unused)]
     pub(crate) credentials: RpcCredentials,
+    pub launched: DateTime<Utc>,
 }
 
 /// Implements RPC HTTP endpoint functions for a node.
@@ -103,6 +105,7 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
             prover_router,
             memory_pool,
             credentials,
+            launched: Utc::now(),
         }))
     }
 }
@@ -316,6 +319,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
             "status": self.status.to_string(),
             "type": E::NODE_TYPE,
             "version": E::MESSAGE_VERSION,
+            "launched": self.launched,
         }))
     }
 
