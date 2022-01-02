@@ -23,6 +23,9 @@ pub use message::*;
 pub mod operator;
 pub use operator::*;
 
+pub(crate) mod peer;
+pub(crate) use peer::*;
+
 pub(crate) mod peers;
 pub(crate) use peers::*;
 
