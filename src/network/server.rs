@@ -17,7 +17,7 @@
 use crate::{
     display::notification_message,
     environment::{Environment, NodeType},
-    helpers::{State, Status, Tasks},
+    helpers::{State, Tasks},
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     operator::{Operator, OperatorRouter},
     peers::{Peers, PeersRequest, PeersRouter},
@@ -49,8 +49,6 @@ pub type LedgerReader<N> = Arc<LedgerState<N>>;
 pub struct Server<N: Network, E: Environment> {
     /// The local address of the node.
     local_ip: SocketAddr,
-    /// The status of the node.
-    status: Status,
     /// The list of peers for the node.
     peers: Arc<Peers<N, E>>,
     /// The ledger of the node.
@@ -87,15 +85,13 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize the prover storage path.
         let prover_storage_path = node.prover_storage_path(local_ip);
 
-        // Initialize the status indicator.
-        let status = Status::new();
         // Initialize the terminator bit.
         let terminator = Arc::new(AtomicBool::new(false));
 
         // Initialize a new instance for managing peers.
-        let peers = Peers::new(tasks.clone(), local_ip, None, &status).await;
+        let peers = Peers::new(tasks.clone(), local_ip, None).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &ledger_storage_path, &status, &terminator, peers.router()).await?;
+        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &ledger_storage_path, &terminator, peers.router()).await?;
         // Initialize a new instance for managing the prover.
         let prover = Prover::open::<RocksDB, _>(
             &mut tasks,
@@ -103,7 +99,6 @@ impl<N: Network, E: Environment> Server<N, E> {
             address,
             local_ip,
             pool_ip,
-            &status,
             &terminator,
             peers.router(),
             ledger.reader(),
@@ -172,7 +167,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         Self::initialize_rpc(
             &mut tasks,
             node,
-            &status,
             address,
             &peers,
             ledger.reader(),
@@ -185,7 +179,6 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         Ok(Self {
             local_ip,
-            status,
             peers,
             ledger,
             operator,
@@ -197,11 +190,6 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Returns the IP address of this node.
     pub fn local_ip(&self) -> SocketAddr {
         self.local_ip
-    }
-
-    /// Returns the status of this node.
-    pub fn status(&self) -> Status {
-        self.status.clone()
     }
 
     /// Returns the peer manager of this node.
@@ -241,7 +229,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     pub async fn shut_down(&self) {
         info!("Shutting down...");
         // Update the node status.
-        self.status.update(State::ShuttingDown);
+        E::status().update(State::ShuttingDown);
 
         // Shut down the ledger.
         trace!("Proceeding to shut down the ledger...");
@@ -360,7 +348,6 @@ impl<N: Network, E: Environment> Server<N, E> {
     async fn initialize_rpc(
         tasks: &mut Tasks<task::JoinHandle<()>>,
         node: &Node,
-        status: &Status,
         address: Option<Address<N>>,
         peers: &Arc<Peers<N, E>>,
         ledger_reader: LedgerReader<N>,
@@ -374,7 +361,6 @@ impl<N: Network, E: Environment> Server<N, E> {
                     node.rpc,
                     node.rpc_username.clone(),
                     node.rpc_password.clone(),
-                    status,
                     address,
                     peers,
                     ledger_reader,

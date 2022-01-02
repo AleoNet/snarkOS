@@ -17,7 +17,6 @@
 //! Logic for instantiating the RPC server.
 
 use crate::{
-    helpers::Status,
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
     Environment,
     LedgerReader,
@@ -82,7 +81,6 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
     rpc_addr: SocketAddr,
     username: String,
     password: String,
-    status: &Status,
     address: Option<Address<N>>,
     peers: &Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
@@ -90,15 +88,7 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = RpcCredentials { username, password };
-    let rpc = RpcImpl::new(
-        credentials,
-        status.clone(),
-        address,
-        peers.clone(),
-        ledger,
-        prover_router,
-        memory_pool,
-    );
+    let rpc = RpcImpl::new(credentials, address, peers.clone(), ledger, prover_router, memory_pool);
 
     let service = make_service_fn(move |conn: &AddrStream| {
         let caller = conn.remote_addr();
@@ -474,8 +464,7 @@ mod tests {
         let local_ip: SocketAddr = "0.0.0.0:8888".parse().expect("Failed to parse ip");
 
         // Initialize the status indicator.
-        let status = Status::new();
-        status.update(State::Ready);
+        E::status().update(State::Ready);
 
         // Initialize the terminator bit.
         let terminator = Arc::new(AtomicBool::new(false));
@@ -483,9 +472,9 @@ mod tests {
         let mut tasks = Tasks::new();
 
         // Initialize a new instance for managing peers.
-        let peers = Peers::new(tasks.clone(), local_ip, None, &status).await;
+        let peers = Peers::new(tasks.clone(), local_ip, None).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<S, _>(&mut tasks, &ledger_path, &status, &terminator, peers.router())
+        let ledger = Ledger::<N, E>::open::<S, _>(&mut tasks, &ledger_path, &terminator, peers.router())
             .await
             .expect("Failed to initialize ledger");
 
@@ -496,7 +485,6 @@ mod tests {
             None,
             local_ip,
             Some(local_ip),
-            &status,
             &terminator,
             peers.router(),
             ledger.reader(),
@@ -505,15 +493,7 @@ mod tests {
         .await
         .expect("Failed to initialize prover");
 
-        RpcImpl::<N, E>::new(
-            credentials,
-            status,
-            None,
-            peers,
-            ledger.reader(),
-            prover.router(),
-            prover.memory_pool(),
-        )
+        RpcImpl::<N, E>::new(credentials, None, peers, ledger.reader(), prover.router(), prover.memory_pool())
     }
 
     /// Initializes a new instance of the rpc.
@@ -531,16 +511,15 @@ mod tests {
         let local_ip: SocketAddr = caller();
 
         // Initialize the status indicator.
-        let status = Status::new();
-        status.update(State::Ready);
+        E::status().update(State::Ready);
 
         // Initialize the terminator bit.
         let terminator = Arc::new(AtomicBool::new(false));
 
         // Initialize a new instance for managing peers.
-        let peers = Peers::new(tasks.clone(), local_ip, None, &status).await;
+        let peers = Peers::new(tasks.clone(), local_ip, None).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<S, _>(tasks, &ledger_path, &status, &terminator, peers.router())
+        let ledger = Ledger::<N, E>::open::<S, _>(tasks, &ledger_path, &terminator, peers.router())
             .await
             .expect("Failed to initialize ledger");
 
@@ -551,7 +530,6 @@ mod tests {
             None,
             local_ip,
             Some(local_ip),
-            &status,
             &terminator,
             peers.router(),
             ledger.reader(),
@@ -565,7 +543,6 @@ mod tests {
                 local_ip,
                 "hello".to_string(),
                 "world".to_string(),
-                &status,
                 None,
                 &peers,
                 ledger.reader(),
@@ -1193,7 +1170,7 @@ mod tests {
             "number_of_connected_peers": 0,
             "number_of_connected_sync_nodes": 0,
             "software": format!("snarkOS {}", env!("CARGO_PKG_VERSION")),
-            "status": rpc.status.to_string(),
+            "status": Client::<Testnet2>::status().to_string(),
             "type": Client::<Testnet2>::NODE_TYPE,
             "version": Client::<Testnet2>::MESSAGE_VERSION,
         });

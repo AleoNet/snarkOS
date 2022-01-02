@@ -14,8 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::helpers::Status;
 use snarkvm::dpc::Network;
 
+use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Debug},
@@ -106,6 +108,12 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const MAXIMUM_BLOCK_REQUEST: u32 = 250;
     /// The maximum number of failures tolerated before disconnecting from a peer.
     const MAXIMUM_NUMBER_OF_FAILURES: usize = 1024;
+
+    /// Returns the status of the node.
+    fn status() -> &'static Status {
+        static STATUS: OnceCell<Status> = OnceCell::new();
+        STATUS.get_or_init(|| Status::new())
+    }
 }
 
 #[derive(Clone, Debug, Default)]

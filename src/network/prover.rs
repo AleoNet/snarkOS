@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{State, Status, Tasks},
+    helpers::{State, Tasks},
     Data,
     Environment,
     LedgerReader,
@@ -86,8 +86,6 @@ pub struct Prover<N: Network, E: Environment> {
     prover_router: ProverRouter<N>,
     /// The pool of unconfirmed transactions.
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
-    /// The status of the node.
-    status: Status,
     /// A terminator bit for the prover.
     terminator: Arc<AtomicBool>,
     /// The peers router of the node.
@@ -106,7 +104,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
         address: Option<Address<N>>,
         local_ip: SocketAddr,
         pool_ip: Option<SocketAddr>,
-        status: &Status,
         terminator: &Arc<AtomicBool>,
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
@@ -128,7 +125,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
             thread_pool: Arc::new(thread_pool),
             prover_router,
             memory_pool: Arc::new(RwLock::new(MemoryPool::new())),
-            status: status.clone(),
             terminator: terminator.clone(),
             peers_router,
             ledger_reader,
@@ -170,7 +166,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
                     // TODO (howardwu): Check that the prover is connected to the pool before proceeding.
                     //  Currently we use a sleep function to probabilistically ensure the peer is connected.
-                    if !prover.terminator.load(Ordering::SeqCst) && !prover.status.is_peering() && !prover.status.is_mining() {
+                    if !prover.terminator.load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
                         prover.send_pool_register().await;
                     }
                 }
@@ -214,7 +210,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
             },
             ProverRequest::UnconfirmedTransaction(peer_ip, transaction) => {
                 // Ensure the node is not peering.
-                if !self.status.is_peering() {
+                if !E::status().is_peering() {
                     // Process the unconfirmed transaction.
                     self.add_unconfirmed_transaction(peer_ip, transaction).await
                 }
@@ -254,9 +250,9 @@ impl<N: Network, E: Environment> Prover<N, E> {
                     if pool_ip == operator_ip {
                         // If `terminator` is `false` and the status is not `Peering` or `Mining`
                         // already, mine the next block.
-                        if !self.terminator.load(Ordering::SeqCst) && !self.status.is_peering() && !self.status.is_mining() {
+                        if !self.terminator.load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
                             // Set the status to `Mining`.
-                            self.status.update(State::Mining);
+                            E::status().update(State::Mining);
 
                             let thread_pool = self.thread_pool.clone();
                             let block_template = block_template.clone();
@@ -283,7 +279,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             })
                             .await;
 
-                            self.status.update(State::Ready);
+                            E::status().update(State::Ready);
 
                             match result {
                                 Ok(Ok((block_header, proof_difficulty))) => {
@@ -351,14 +347,13 @@ impl<N: Network, E: Environment> Prover<N, E> {
                     // Notify the outer function that the task is ready.
                     let _ = router.send(());
                     loop {
-                        // Prepare the status and terminator.
-                        let status = prover.status.clone();
+                        // Prepare the terminator.
                         let terminator = prover.terminator.clone();
 
                         // If `terminator` is `false` and the status is not `Peering` or `Mining` already, mine the next block.
-                        if !terminator.load(Ordering::SeqCst) && !status.is_peering() && !status.is_mining() {
+                        if !terminator.load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
                             // Set the status to `Mining`.
-                            status.update(State::Mining);
+                            E::status().update(State::Mining);
 
                             // Prepare the unconfirmed transactions and dependent objects.
                             let state = prover.state.clone();
@@ -385,7 +380,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                 .map_err(|e| e.into());
 
                                 // Set the status to `Ready`.
-                                status.update(State::Ready);
+                                E::status().update(State::Ready);
 
                                 match result {
                                     Ok(Ok((block, coinbase_record))) => {

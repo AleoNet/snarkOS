@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{block_requests::*, CircularMap, State, Status, Tasks},
+    helpers::{block_requests::*, CircularMap, State, Tasks},
     Data,
     Environment,
     LedgerReader,
@@ -150,8 +150,6 @@ pub struct Ledger<N: Network, E: Environment> {
     last_block_update_timestamp: RwLock<Instant>,
     /// The map of each peer to their failure messages := (failure_message, timestamp).
     failures: RwLock<HashMap<SocketAddr, Vec<(String, i64)>>>,
-    /// The status of the node.
-    status: Status,
     /// A terminator bit for the prover.
     terminator: Arc<AtomicBool>,
     /// The peers router of the node.
@@ -163,7 +161,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
         tasks: &mut Tasks<JoinHandle<()>>,
         path: P,
-        status: &Status,
         terminator: &Arc<AtomicBool>,
         peers_router: PeersRouter<N, E>,
     ) -> Result<Arc<Self>> {
@@ -182,7 +179,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             block_requests_lock: Arc::new(Mutex::new(())),
             last_block_update_timestamp: RwLock::new(Instant::now()),
             failures: Default::default(),
-            status: status.clone(),
             terminator: terminator.clone(),
             peers_router,
         });
@@ -300,7 +296,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 debug!(
                     "Status Report (type = {}, status = {}, block_height = {}, cumulative_weight = {}, block_requests = {}, connected_peers = {})",
                     E::NODE_TYPE,
-                    self.status,
+                    E::status(),
                     self.canon.latest_block_height(),
                     self.canon.latest_cumulative_weight(),
                     self.number_of_block_requests().await,
@@ -315,7 +311,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
             LedgerRequest::UnconfirmedBlock(peer_ip, block, prover_router) => {
                 // Ensure the node is not peering.
-                if !self.status.is_peering() {
+                if !E::status().is_peering() {
                     // Process the unconfirmed block.
                     self.add_block(block.clone(), &prover_router).await;
                     // Propagate the unconfirmed block to the connected peers.
@@ -436,7 +432,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         // If the timestamp of the last block increment has surpassed the preset limit,
         // the ledger is likely syncing from invalid state, and should revert by one block.
-        if self.status.is_syncing()
+        if E::status().is_syncing()
             && self.last_block_update_timestamp.read().await.elapsed() > 2 * Duration::from_secs(E::RADIO_SILENCE_IN_SECS)
         {
             // Acquire the lock for block requests.
@@ -465,7 +461,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     async fn update_status(&self) {
         // Retrieve the status variable.
-        let mut status = self.status.get();
+        let mut status = E::status().get();
 
         // If the node is shutting down, skip the update.
         if status == State::ShuttingDown {
@@ -516,7 +512,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
 
         // Update the ledger to the determined status.
-        self.status.update(status);
+        E::status().update(status);
     }
 
     ///

@@ -19,7 +19,6 @@
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
 use crate::{
-    helpers::Status,
     rpc::{rpc::*, rpc_trait::RpcFunctions},
     Environment,
     LedgerReader,
@@ -64,7 +63,6 @@ impl From<RpcError> for std::io::Error {
 
 #[doc(hidden)]
 pub struct RpcInner<N: Network, E: Environment> {
-    pub(crate) status: Status,
     address: Option<Address<N>>,
     peers: Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
@@ -92,7 +90,6 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
     /// Creates a new struct for calling public and private RPC endpoints.
     pub fn new(
         credentials: RpcCredentials,
-        status: Status,
         address: Option<Address<N>>,
         peers: Arc<Peers<N, E>>,
         ledger: LedgerReader<N>,
@@ -100,7 +97,6 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
         memory_pool: Arc<RwLock<MemoryPool<N>>>,
     ) -> Self {
         Self(Arc::new(RpcInner {
-            status,
             address,
             peers,
             ledger,
@@ -320,7 +316,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
             "number_of_connected_peers": number_of_connected_peers,
             "number_of_connected_sync_nodes": number_of_connected_sync_nodes,
             "software": format!("snarkOS {}", env!("CARGO_PKG_VERSION")),
-            "status": self.status.to_string(),
+            "status": E::status().to_string(),
             "type": E::NODE_TYPE,
             "version": E::MESSAGE_VERSION,
         }))

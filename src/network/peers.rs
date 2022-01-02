@@ -14,18 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    helpers::{Status, Tasks},
-    Data,
-    Environment,
-    LedgerReader,
-    LedgerRouter,
-    Message,
-    OperatorRouter,
-    OutboundRouter,
-    Peer,
-    ProverRouter,
-};
+use crate::{helpers::Tasks, Data, Environment, LedgerReader, LedgerRouter, Message, OperatorRouter, OutboundRouter, Peer, ProverRouter};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
@@ -104,8 +93,6 @@ pub struct Peers<N: Network, E: Environment> {
     local_ip: SocketAddr,
     /// The local nonce for this node session.
     local_nonce: u64,
-    /// The local status of this node.
-    local_status: Status,
     /// The map connected peer IPs to their nonce and outbound message router.
     connected_peers: RwLock<HashMap<SocketAddr, (u64, OutboundRouter<N, E>)>>,
     /// The set of candidate peer IPs.
@@ -122,12 +109,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Initializes a new instance of `Peers`.
     ///
-    pub(crate) async fn new(
-        tasks: Tasks<JoinHandle<()>>,
-        local_ip: SocketAddr,
-        local_nonce: Option<u64>,
-        local_status: &Status,
-    ) -> Arc<Self> {
+    pub(crate) async fn new(tasks: Tasks<JoinHandle<()>>, local_ip: SocketAddr, local_nonce: Option<u64>) -> Arc<Self> {
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
         let (peers_router, mut peers_handler) = mpsc::channel(1024);
 
@@ -142,7 +124,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
             peers_router,
             local_ip,
             local_nonce,
-            local_status: local_status.clone(),
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
@@ -309,7 +290,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                         stream,
                                         self.local_ip,
                                         self.local_nonce,
-                                        self.local_status.clone(),
                                         &self.peers_router,
                                         ledger_reader,
                                         ledger_router,
@@ -516,7 +496,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             stream,
                             self.local_ip,
                             self.local_nonce,
-                            self.local_status.clone(),
                             &self.peers_router,
                             ledger_reader,
                             ledger_router,

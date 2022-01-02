@@ -88,7 +88,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
         stream: TcpStream,
         local_ip: SocketAddr,
         local_nonce: u64,
-        local_status: &Status,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: &LedgerReader<N>,
         connected_nonces: &[u64],
@@ -101,7 +100,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
             &mut outbound_socket,
             local_ip,
             local_nonce,
-            local_status,
             ledger_reader.latest_cumulative_weight(),
             connected_nonces,
         )
@@ -112,7 +110,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             E::MESSAGE_VERSION,
             N::ALEO_MAXIMUM_FORK_DEPTH,
             E::NODE_TYPE,
-            local_status.get(),
+            E::status().get(),
             ledger_reader.latest_block_hash(),
             Data::Object(ledger_reader.latest_block_header()),
         );
@@ -160,7 +158,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
         outbound_socket: &mut Framed<TcpStream, Message<N, E>>,
         local_ip: SocketAddr,
         local_nonce: u64,
-        local_status: &Status,
         local_cumulative_weight: u128,
         connected_nonces: &[u64],
     ) -> Result<(SocketAddr, u64, NodeType, Status)> {
@@ -175,7 +172,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             E::MESSAGE_VERSION,
             N::ALEO_MAXIMUM_FORK_DEPTH,
             E::NODE_TYPE,
-            local_status.get(),
+            E::status().get(),
             local_ip.port(),
             local_nonce,
             local_cumulative_weight,
@@ -213,7 +210,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                         }
                         // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
                         if E::NODE_TYPE != NodeType::Sync
-                            && local_status.is_syncing()
+                            && E::status().is_syncing()
                             && node_type == NodeType::Sync
                             && local_cumulative_weight > peer_cumulative_weight
                         {
@@ -310,7 +307,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
         stream: TcpStream,
         local_ip: SocketAddr,
         local_nonce: u64,
-        local_status: Status,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
@@ -329,7 +325,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
                 stream,
                 local_ip,
                 local_nonce,
-                &local_status,
                 &peers_router,
                 &ledger_reader,
                 &connected_nonces,
@@ -538,7 +533,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         Ok(block_header) => {
                                             // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
                                             if E::NODE_TYPE != NodeType::Sync
-                                                && local_status.is_syncing()
+                                                && E::status().is_syncing()
                                                 && node_type == NodeType::Sync
                                                 && ledger_reader.latest_cumulative_weight() > block_header.cumulative_weight()
                                             {
@@ -594,7 +589,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
 
                                     // Spawn an asynchronous task for the `Ping` request.
-                                    let local_status = local_status.clone();
                                     let peers_router = peers_router.clone();
                                     let ledger_reader = ledger_reader.clone();
                                     tasks_clone.append(task::spawn(async move {
@@ -606,7 +600,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         let latest_block_header = ledger_reader.latest_block_header();
 
                                         // Send a `Ping` request to the peer.
-                                        let message = Message::Ping(E::MESSAGE_VERSION, N::ALEO_MAXIMUM_FORK_DEPTH, E::NODE_TYPE, local_status.get(), latest_block_hash, Data::Object(latest_block_header));
+                                        let message = Message::Ping(E::MESSAGE_VERSION, N::ALEO_MAXIMUM_FORK_DEPTH, E::NODE_TYPE, E::status().get(), latest_block_hash, Data::Object(latest_block_header));
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }
@@ -640,7 +634,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     let is_within_range = block_height >= lower_bound && block_height <= upper_bound;
 
                                     // Ensure the node is not peering.
-                                    let is_node_ready = !local_status.is_peering();
+                                    let is_node_ready = !E::status().is_peering();
 
                                     // If this node is a beacon or sync node, skip this message, after updating the timestamp.
                                     if E::NODE_TYPE == NodeType::Beacon || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_within_range || !is_node_ready {
@@ -685,7 +679,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     peer.seen_inbound_transactions.insert(transaction.transaction_id(), SystemTime::now());
 
                                     // Ensure the node is not peering.
-                                    let is_node_ready = !local_status.is_peering();
+                                    let is_node_ready = !E::status().is_peering();
 
                                     // If this node is a beacon or sync node, skip this message, after updating the timestamp.
                                     if E::NODE_TYPE == NodeType::Beacon || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_node_ready {
