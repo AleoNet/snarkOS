@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::helpers::Status;
+use crate::helpers::{Status, Tasks};
 use snarkvm::dpc::Network;
 
 use once_cell::sync::OnceCell;
@@ -110,6 +110,12 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum number of failures tolerated before disconnecting from a peer.
     const MAXIMUM_NUMBER_OF_FAILURES: usize = 1024;
 
+    /// Returns the tasks handler for the node.
+    fn tasks() -> &'static Tasks<tokio::task::JoinHandle<()>> {
+        static TASKS: OnceCell<Tasks<tokio::task::JoinHandle<()>>> = OnceCell::new();
+        TASKS.get_or_init(|| Tasks::new())
+    }
+    
     /// Returns the status of the node.
     fn status() -> &'static Status {
         static STATUS: OnceCell<Status> = OnceCell::new();

@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{block_requests::*, CircularMap, State, Tasks},
+    helpers::{block_requests::*, CircularMap, State},
     Data,
     Environment,
     LedgerReader,
@@ -42,7 +42,6 @@ use std::{
 use tokio::{
     sync::{mpsc, oneshot, Mutex, RwLock},
     task,
-    task::JoinHandle,
 };
 
 /// The maximum number of unconfirmed blocks that can be held by the ledger.
@@ -153,11 +152,7 @@ pub struct Ledger<N: Network, E: Environment> {
 
 impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger.
-    pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
-        tasks: &mut Tasks<JoinHandle<()>>,
-        path: P,
-        peers_router: PeersRouter<N, E>,
-    ) -> Result<Arc<Self>> {
+    pub async fn open<S: Storage, P: AsRef<Path> + Copy>(path: P, peers_router: PeersRouter<N, E>) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
         let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
 
@@ -180,7 +175,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         {
             let ledger = ledger.clone();
             let (router, handler) = oneshot::channel();
-            tasks.append(task::spawn(async move {
+            E::tasks().append(task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 // Asynchronously wait for a ledger request.

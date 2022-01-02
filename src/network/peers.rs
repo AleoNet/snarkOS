@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Tasks, Data, Environment, LedgerReader, LedgerRouter, Message, OperatorRouter, OutboundRouter, Peer, ProverRouter};
+use crate::{Data, Environment, LedgerReader, LedgerRouter, Message, OperatorRouter, OutboundRouter, Peer, ProverRouter};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
@@ -29,7 +29,6 @@ use tokio::{
     net::TcpStream,
     sync::{mpsc, oneshot, RwLock},
     task,
-    task::JoinHandle,
     time::timeout,
 };
 
@@ -109,7 +108,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Initializes a new instance of `Peers`.
     ///
-    pub(crate) async fn new(tasks: Tasks<JoinHandle<()>>, local_ip: SocketAddr, local_nonce: Option<u64>) -> Arc<Self> {
+    pub(crate) async fn new(local_ip: SocketAddr, local_nonce: Option<u64>) -> Arc<Self> {
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
         let (peers_router, mut peers_handler) = mpsc::channel(1024);
 
@@ -134,19 +133,17 @@ impl<N: Network, E: Environment> Peers<N, E> {
         // Initialize the peers router process.
         {
             let peers = peers.clone();
-            let tasks_clone = tasks.clone();
             let (router, handler) = oneshot::channel();
-            tasks.append(task::spawn(async move {
+            E::tasks().append(task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 // Asynchronously wait for a peers request.
                 while let Some(request) = peers_handler.recv().await {
                     let peers = peers.clone();
-                    let tasks = tasks_clone.clone();
                     // Asynchronously process a peers request.
-                    tasks_clone.append(task::spawn(async move {
+                    E::tasks().append(task::spawn(async move {
                         // Hold the peers write lock briefly, to update the state of the peers.
-                        peers.update(request, &tasks).await;
+                        peers.update(request).await;
                     }));
                 }
             }));
@@ -243,7 +240,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Performs the given `request` to the peers.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(&self, request: PeersRequest<N, E>, tasks: &Tasks<JoinHandle<()>>) {
+    pub(super) async fn update(&self, request: PeersRequest<N, E>) {
         match request {
             PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, operator_router, prover_router, connection_result) => {
                 // Ensure the peer IP is not this node.
@@ -297,7 +294,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                         operator_router,
                                         self.connected_nonces().await,
                                         Some(connection_result),
-                                        tasks.clone(),
                                     )
                                     .await
                                 }
@@ -418,7 +414,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             warn!("Failed to transmit the request: '{}'", error);
                         }
                         // Do not wait for the result of each connection.
-                        tasks.append(task::spawn(async move {
+                        E::tasks().append(task::spawn(async move {
                             let _ = handler.await;
                         }));
                     }
@@ -503,7 +499,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             operator_router,
                             self.connected_nonces().await,
                             None,
-                            tasks.clone(),
                         )
                         .await;
                     }

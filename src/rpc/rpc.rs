@@ -466,19 +466,15 @@ mod tests {
         // Initialize the status indicator.
         E::status().update(State::Ready);
 
-        // Initialize the tasks handler.
-        let mut tasks = Tasks::new();
-
         // Initialize a new instance for managing peers.
-        let peers = Peers::new(tasks.clone(), local_ip, None).await;
+        let peers = Peers::new(local_ip, None).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<S, _>(&mut tasks, &ledger_path, peers.router())
+        let ledger = Ledger::<N, E>::open::<S, _>(&ledger_path, peers.router())
             .await
             .expect("Failed to initialize ledger");
 
         // Initialize a new instance for managing the prover.
         let prover = Prover::open::<S, _>(
-            &mut tasks,
             &prover_path,
             None,
             local_ip,
@@ -494,10 +490,7 @@ mod tests {
     }
 
     /// Initializes a new instance of the rpc.
-    async fn new_rpc_server<N: Network, E: Environment, S: Storage, P: AsRef<Path>>(
-        path: Option<P>,
-        tasks: &mut Tasks<tokio::task::JoinHandle<()>>,
-    ) {
+    async fn new_rpc_server<N: Network, E: Environment, S: Storage, P: AsRef<Path>>(path: Option<P>) {
         // Derive the storage paths.
         let (ledger_path, prover_path) = match &path {
             Some(p) => (p.as_ref().to_path_buf(), temp_dir()),
@@ -511,15 +504,14 @@ mod tests {
         E::status().update(State::Ready);
 
         // Initialize a new instance for managing peers.
-        let peers = Peers::new(tasks.clone(), local_ip, None).await;
+        let peers = Peers::new(local_ip, None).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<S, _>(tasks, &ledger_path, peers.router())
+        let ledger = Ledger::<N, E>::open::<S, _>(&ledger_path, peers.router())
             .await
             .expect("Failed to initialize ledger");
 
         // Initialize a new instance for managing the prover.
         let prover = Prover::open::<S, _>(
-            tasks,
             &prover_path,
             None,
             local_ip,
@@ -531,7 +523,7 @@ mod tests {
         .await
         .expect("Failed to initialize prover");
 
-        tasks.append(
+        E::tasks().append(
             initialize_rpc_server(
                 local_ip,
                 "hello".to_string(),
@@ -1357,11 +1349,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_send_transaction_large() {
-        // Initialize the tasks handler.
-        let mut tasks = Tasks::new();
-
         // Initialize a new RPC.
-        new_rpc_server::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None, &mut tasks).await;
+        new_rpc_server::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
 
         ///
         /// Sends a `sendtransaction` RPC request to the given node address.

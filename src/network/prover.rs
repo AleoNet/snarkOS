@@ -14,18 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    helpers::{State, Tasks},
-    Data,
-    Environment,
-    LedgerReader,
-    LedgerRequest,
-    LedgerRouter,
-    Message,
-    NodeType,
-    PeersRequest,
-    PeersRouter,
-};
+use crate::{helpers::State, Data, Environment, LedgerReader, LedgerRequest, LedgerRouter, Message, NodeType, PeersRequest, PeersRouter};
 use snarkos_storage::{storage::Storage, ProverState};
 use snarkvm::dpc::prelude::*;
 
@@ -41,7 +30,6 @@ use std::{
 use tokio::{
     sync::{mpsc, oneshot, RwLock},
     task,
-    task::JoinHandle,
 };
 
 /// Shorthand for the parent half of the `Prover` message channel.
@@ -94,7 +82,6 @@ pub struct Prover<N: Network, E: Environment> {
 impl<N: Network, E: Environment> Prover<N, E> {
     /// Initializes a new instance of the prover.
     pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
-        tasks: &mut Tasks<JoinHandle<()>>,
         path: P,
         address: Option<Address<N>>,
         local_ip: SocketAddr,
@@ -128,7 +115,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         {
             let prover = prover.clone();
             let (router, handler) = oneshot::channel();
-            tasks.append(task::spawn(async move {
+            E::tasks().append(task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 // Asynchronously wait for a prover request.
@@ -143,7 +130,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
         // Initialize the miner, if the node type is a miner.
         if E::NODE_TYPE == NodeType::Miner && prover.pool.is_none() {
-            Self::start_miner(tasks, prover.clone(), local_ip).await;
+            Self::start_miner(prover.clone(), local_ip).await;
         }
 
         // Initialize the prover, if the node type is a prover.
@@ -327,15 +314,14 @@ impl<N: Network, E: Environment> Prover<N, E> {
     ///
     /// Initialize the miner, if the node type is a miner.
     ///
-    async fn start_miner(tasks: &mut Tasks<JoinHandle<()>>, prover: Arc<Self>, local_ip: SocketAddr) {
+    async fn start_miner(prover: Arc<Self>, local_ip: SocketAddr) {
         // Initialize a new instance of the miner.
         if E::NODE_TYPE == NodeType::Miner && prover.pool.is_none() {
             if let Some(recipient) = prover.address {
                 // Initialize the prover process.
                 let prover = prover.clone();
-                let tasks_clone = tasks.clone();
                 let (router, handler) = oneshot::channel();
-                tasks.append(task::spawn(async move {
+                E::tasks().append(task::spawn(async move {
                     // Notify the outer function that the task is ready.
                     let _ = router.send(());
                     loop {
@@ -352,7 +338,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             let ledger_router = prover.ledger_router.clone();
                             let prover_router = prover.prover_router.clone();
 
-                            tasks_clone.append(task::spawn(async move {
+                            E::tasks().append(task::spawn(async move {
                                 // Mine the next block.
                                 let result = task::spawn_blocking(move || {
                                     thread_pool.install(move || {

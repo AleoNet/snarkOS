@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{State, Status, Tasks},
+    helpers::{State, Status},
     network::{
         ConnectionResult,
         LedgerReader,
@@ -314,12 +314,10 @@ impl<N: Network, E: Environment> Peer<N, E> {
         operator_router: OperatorRouter<N>,
         connected_nonces: Vec<u64>,
         connection_result: Option<ConnectionResult>,
-        tasks: Tasks<task::JoinHandle<()>>,
     ) {
         let peers_router = peers_router.clone();
 
-        let tasks_clone = tasks.clone();
-        tasks.append(task::spawn(async move {
+        E::tasks().append(task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
             let mut peer = match Peer::new(
                 stream,
@@ -591,7 +589,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Spawn an asynchronous task for the `Ping` request.
                                     let peers_router = peers_router.clone();
                                     let ledger_reader = ledger_reader.clone();
-                                    tasks_clone.append(task::spawn(async move {
+                                    E::tasks().append(task::spawn(async move {
                                         // Sleep for the preset time before sending a `Ping` request.
                                         tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
 

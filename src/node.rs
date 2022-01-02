@@ -16,7 +16,7 @@
 
 use crate::{
     environment::{Client, ClientTrial, Environment, Miner, MinerTrial, NodeType, Operator, OperatorTrial, Prover, ProverTrial, SyncNode},
-    helpers::{Tasks, Updater},
+    helpers::Updater,
     network::Server,
     Display,
 };
@@ -163,11 +163,8 @@ impl Node {
         println!("Starting {} on {}.", E::NODE_TYPE.description(), N::NETWORK_NAME);
         println!("{}", crate::display::notification_message::<N>(address));
 
-        // Initialize the tasks handler.
-        let tasks = Tasks::new();
-
         // Initialize the node's server.
-        let server = Server::<N, E>::initialize(self, address, self.pool, tasks.clone()).await?;
+        let server = Server::<N, E>::initialize(self, address, self.pool).await?;
 
         // Initialize signal handling; it also maintains ownership of the Server
         // in order for it to not go out of scope.

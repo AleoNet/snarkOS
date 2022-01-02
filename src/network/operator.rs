@@ -14,19 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    helpers::Tasks,
-    Data,
-    Environment,
-    LedgerReader,
-    LedgerRequest,
-    LedgerRouter,
-    Message,
-    NodeType,
-    PeersRequest,
-    PeersRouter,
-    ProverRouter,
-};
+use crate::{Data, Environment, LedgerReader, LedgerRequest, LedgerRouter, Message, NodeType, PeersRequest, PeersRouter, ProverRouter};
 use snarkos_storage::{storage::Storage, OperatorState};
 use snarkvm::dpc::prelude::*;
 
@@ -43,7 +31,6 @@ use std::{
 use tokio::{
     sync::{mpsc, oneshot, RwLock},
     task,
-    task::JoinHandle,
 };
 
 /// Shorthand for the parent half of the `Operator` message channel.
@@ -104,7 +91,6 @@ pub struct Operator<N: Network, E: Environment> {
 impl<N: Network, E: Environment> Operator<N, E> {
     /// Initializes a new instance of the operator.
     pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
-        tasks: &Tasks<JoinHandle<()>>,
         path: P,
         address: Option<Address<N>>,
         local_ip: SocketAddr,
@@ -143,7 +129,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
             // Initialize the handler for the operator.
             let operator_clone = operator.clone();
             let (router, handler) = oneshot::channel();
-            tasks.append(task::spawn(async move {
+            E::tasks().append(task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 // Asynchronously wait for a operator request.
@@ -160,7 +146,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                 // Initialize an update loop for the block template.
                 let operator = operator.clone();
                 let (router, handler) = oneshot::channel();
-                tasks.append(task::spawn(async move {
+                E::tasks().append(task::spawn(async move {
                     // Notify the outer function that the task is ready.
                     let _ = router.send(());
                     // TODO (julesdesmit): Add logic to the loop to retarget share difficulty.

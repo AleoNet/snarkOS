@@ -58,9 +58,7 @@ impl ClientNode {
         let permanent_args = &["snarkos", "--norpc"];
         let combined_args = permanent_args.iter().chain(extra_args.iter());
         let config = snarkos::Node::from_iter(combined_args);
-        let server = Server::<Testnet2, Client<Testnet2>>::initialize(&config, None, None, Tasks::new())
-            .await
-            .unwrap();
+        let server = Server::<Testnet2, Client<Testnet2>>::initialize(&config, None, None).await.unwrap();
 
         ClientNode { server }
     }
