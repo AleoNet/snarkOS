@@ -23,6 +23,8 @@ use crate::{
     LedgerRouter,
     Message,
     NodeType,
+    OperatorRequest,
+    OperatorRouter,
     ProverRequest,
     ProverRouter,
 };
@@ -66,16 +68,30 @@ type ConnectionResult = oneshot::Sender<Result<()>>;
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, ledger_reader, ledger_router, prover_router, connection_result)
-    Connect(SocketAddr, LedgerReader<N>, LedgerRouter<N>, ProverRouter<N>, ConnectionResult),
-    /// Heartbeat := (ledger_reader, ledger_router, prover_router)
-    Heartbeat(LedgerReader<N>, LedgerRouter<N>, ProverRouter<N>),
+    /// Connect := (peer_ip, ledger_reader, ledger_router, operator_router, prover_router, connection_result)
+    Connect(
+        SocketAddr,
+        LedgerReader<N>,
+        LedgerRouter<N>,
+        OperatorRouter<N>,
+        ProverRouter<N>,
+        ConnectionResult,
+    ),
+    /// Heartbeat := (ledger_reader, ledger_router, operator_router, prover_router)
+    Heartbeat(LedgerReader<N>, LedgerRouter<N>, OperatorRouter<N>, ProverRouter<N>),
     /// MessagePropagate := (peer_ip, message)
     MessagePropagate(SocketAddr, Message<N, E>),
     /// MessageSend := (peer_ip, message)
     MessageSend(SocketAddr, Message<N, E>),
-    /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router, prover_router)
-    PeerConnecting(TcpStream, SocketAddr, LedgerReader<N>, LedgerRouter<N>, ProverRouter<N>),
+    /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router, operator_router, prover_router)
+    PeerConnecting(
+        TcpStream,
+        SocketAddr,
+        LedgerReader<N>,
+        LedgerRouter<N>,
+        OperatorRouter<N>,
+        ProverRouter<N>,
+    ),
     /// PeerConnected := (peer_ip, peer_nonce, outbound_router)
     PeerConnected(SocketAddr, u64, OutboundRouter<N, E>),
     /// PeerDisconnected := (peer_ip)
@@ -258,7 +274,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(super) async fn update(&self, request: PeersRequest<N, E>, tasks: &Tasks<JoinHandle<()>>) {
         match request {
-            PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, prover_router, connection_result) => {
+            PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, operator_router, prover_router, connection_result) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -308,6 +324,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                         ledger_reader,
                                         ledger_router,
                                         prover_router,
+                                        operator_router,
                                         self.connected_nonces().await,
                                         Some(connection_result),
                                         tasks.clone(),
@@ -327,10 +344,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
             }
-            PeersRequest::Heartbeat(ledger_reader, ledger_router, prover_router) => {
+            PeersRequest::Heartbeat(ledger_reader, ledger_router, operator_router, prover_router) => {
                 // Obtain the number of connected peers.
                 let number_of_connected_peers = self.number_of_connected_peers().await;
-
                 // Ensure the number of connected peers is below the maximum threshold.
                 if number_of_connected_peers > E::MAXIMUM_NUMBER_OF_PEERS {
                     debug!("Exceeded maximum number of connected peers");
@@ -420,8 +436,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                         // Initialize the connection process.
                         let (router, handler) = oneshot::channel();
-                        let request =
-                            PeersRequest::Connect(peer_ip, ledger_reader.clone(), ledger_router.clone(), prover_router.clone(), router);
+                        let request = PeersRequest::Connect(
+                            peer_ip,
+                            ledger_reader.clone(),
+                            ledger_router.clone(),
+                            operator_router.clone(),
+                            prover_router.clone(),
+                            router,
+                        );
                         if let Err(error) = self.peers_router.send(request).await {
                             warn!("Failed to transmit the request: '{}'", error);
                         }
@@ -438,7 +460,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::MessageSend(sender, message) => {
                 self.send(sender, message).await;
             }
-            PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader, ledger_router, prover_router) => {
+            PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader, ledger_router, operator_router, prover_router) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -509,6 +531,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             ledger_reader,
                             ledger_router,
                             prover_router,
+                            operator_router,
                             self.connected_nonces().await,
                             None,
                             tasks.clone(),
@@ -887,6 +910,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
+        operator_router: OperatorRouter<N>,
         connected_nonces: Vec<u64>,
         connection_result: Option<ConnectionResult>,
         tasks: Tasks<task::JoinHandle<()>>,
@@ -1056,11 +1080,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         Ok(block) => {
                                             // TODO (howardwu): TEMPORARY - Remove this after testnet2.
                                             // Sanity check for a V12 ledger.
-                                            if N::NETWORK_ID == 2 && block.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
-                                                if block.header().proof().as_ref().unwrap_or(N::genesis_block().header().proof().as_ref().unwrap()).is_hiding() {
-                                                    warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
-                                                    break;
-                                                }
+                                            if N::NETWORK_ID == 2
+                                                && block.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
+                                                && block.header().proof().is_hiding()
+                                            {
+                                                warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
+                                                break;
                                             }
 
                                             // Route the `BlockResponse` to the ledger.
@@ -1118,11 +1143,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                             // TODO (howardwu): TEMPORARY - Remove this after testnet2.
                                             // Sanity check for a V12 ledger.
-                                            if N::NETWORK_ID == 2 && block_header.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
-                                                if block_header.proof().as_ref().unwrap_or(N::genesis_block().header().proof().as_ref().unwrap()).is_hiding() {
-                                                    warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
-                                                    break;
-                                                }
+                                            if N::NETWORK_ID == 2
+                                                && block_header.height() > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
+                                                && block_header.proof().is_hiding()
+                                            {
+                                                warn!("Peer {} is not V12-compliant, proceeding to disconnect", peer_ip);
+                                                break;
                                             }
 
                                             // Update the block header of the peer.
@@ -1264,6 +1290,35 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         if let Err(error) = prover_router.send(ProverRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
                                             warn!("[UnconfirmedTransaction] {}", error);
                                         }
+                                    }
+                                }
+                                Message::PoolRegister(address) => {
+                                    if E::NODE_TYPE != NodeType::Operator {
+                                        trace!("Skipping 'PoolRegister' from {}", peer_ip);
+                                    } else if let Err(error) = operator_router.send(OperatorRequest::PoolRegister(peer_ip, address)).await {
+                                        warn!("[PoolRegister] {}", error);
+                                    }
+                                }
+                                Message::PoolRequest(share_difficulty, block_template) => {
+                                    if E::NODE_TYPE != NodeType::Prover {
+                                        trace!("Skipping 'PoolRequest' from {}", peer_ip);
+                                    } else if let Ok(block_template) = block_template.deserialize().await {
+                                        if let Err(error) = prover_router.send(ProverRequest::PoolRequest(peer_ip, share_difficulty, block_template)).await {
+                                            warn!("[PoolRequest] {}", error);
+                                        }
+                                    } else {
+                                        warn!("[PoolRequest] could not deserialize block template");
+                                    }
+                                }
+                                Message::PoolResponse(address, block_header) => {
+                                    if E::NODE_TYPE != NodeType::Operator {
+                                        trace!("Skipping 'PoolResponse' from {}", peer_ip);
+                                    } else if let Ok(block_header) = block_header.deserialize().await {
+                                        if let Err(error) = operator_router.send(OperatorRequest::PoolResponse(peer_ip, block_header, address)).await {
+                                            warn!("[PoolResponse] {}", error);
+                                        }
+                                    } else {
+                                        warn!("[PoolResponse] could not deserialize block");
                                     }
                                 }
                                 Message::Unused(_) => break, // Peer is not following the protocol.

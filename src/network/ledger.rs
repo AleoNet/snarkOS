@@ -896,40 +896,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     }
                 }
             }
-
-            // TODO (howardwu): TEMPORARY - Evaluate the merits of this experiment after seeing the results.
-            // If the node is a sync node and the node is currently syncing,
-            // reduce the number of connections down to the minimum threshold,
-            // to improve the speed with which the node syncs back to tip.
-            // FIXME: causes sync nodes to hang when at maximum peers
-            /*
-            if E::NODE_TYPE == NodeType::Sync && self.status.is_syncing() {
-                debug!("Temporarily reducing the number of connected peers to sync");
-
-                // Lock peers_state for further processing.
-                let peers_state = self.peers_state.read().await;
-
-                // Determine the peers to disconnect from.
-                // Attention - We are reducing this to the `MINIMUM_NUMBER_OF_PEERS`, *not* `MAXIMUM_NUMBER_OF_PEERS`.
-                let num_excess_peers = peers_state.len().saturating_sub(E::MINIMUM_NUMBER_OF_PEERS);
-                let peer_ips_to_disconnect = peers_state
-                    .iter()
-                    .filter(|(&ip, _)| ip != peer_ip)
-                    .take(num_excess_peers)
-                    .map(|(&ip, _)| ip)
-                    .collect::<Vec<SocketAddr>>();
-
-                // Release the lock over peers_state.
-                drop(peers_state);
-
-                trace!("Found {} peers to temporarily disconnect", peer_ips_to_disconnect.len());
-
-                // Proceed to disconnect and restrict these peers.
-                for peer_ip in peer_ips_to_disconnect {
-                    self.disconnect_and_restrict(peer_ip, "disconnecting to sync").await;
-                }
-            }
-            */
         }
     }
 
