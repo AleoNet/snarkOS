@@ -127,7 +127,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         Self::initialize_listener(
             local_ip,
             listener,
-            peers.router(),
             peers.clone(),
             ledger.reader(),
             ledger.router(),
@@ -218,7 +217,6 @@ impl<N: Network, E: Environment> Server<N, E> {
     async fn initialize_listener(
         local_ip: SocketAddr,
         listener: TcpListener,
-        peers_router: PeersRouter<N, E>,
         peers: Arc<Peers<N, E>>,
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
@@ -246,7 +244,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                                 operator_router.clone(),
                                 prover_router.clone(),
                             );
-                            if let Err(error) = peers_router.send(request).await {
+                            if let Err(error) = peers.router().send(request).await {
                                 error!("Failed to send request to peers: {}", error)
                             }
                         }

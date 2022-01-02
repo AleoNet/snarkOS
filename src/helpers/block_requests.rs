@@ -159,6 +159,7 @@ pub(crate) enum BlockRequestHandler {
 /// Determines the appropriate block request update operation,
 /// based on the cases as described in the `Case` enum.
 ///
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn handle_block_requests<N: Network, E: Environment>(
     latest_block_height: u32,
     latest_cumulative_weight: u128,

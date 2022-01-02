@@ -76,13 +76,13 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// Returns the tasks handler for the node.
     fn tasks() -> &'static Tasks<tokio::task::JoinHandle<()>> {
         static TASKS: OnceCell<Tasks<tokio::task::JoinHandle<()>>> = OnceCell::new();
-        TASKS.get_or_init(|| Tasks::new())
+        TASKS.get_or_init(Tasks::new)
     }
     
     /// Returns the status of the node.
     fn status() -> &'static Status {
         static STATUS: OnceCell<Status> = OnceCell::new();
-        STATUS.get_or_init(|| Status::new())
+        STATUS.get_or_init(Status::new)
     }
     
     /// Returns the terminator bit for the prover.

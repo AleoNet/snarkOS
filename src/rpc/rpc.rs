@@ -77,6 +77,7 @@ const METHODS_EXPECTING_PARAMS: [&str; 12] = [
 
 /// Starts a local RPC HTTP server at `rpc_port` in a dedicated `tokio` task.
 /// RPC failures do not affect the rest of the node.
+#[allow(clippy::too_many_arguments)]
 pub async fn initialize_rpc_server<N: Network, E: Environment>(
     rpc_addr: SocketAddr,
     username: String,

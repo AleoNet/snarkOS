@@ -101,6 +101,7 @@ pub struct Operator<N: Network, E: Environment> {
 
 impl<N: Network, E: Environment> Operator<N, E> {
     /// Initializes a new instance of the operator.
+    #[allow(clippy::too_many_arguments)]
     pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
         path: P,
         address: Option<Address<N>>,
