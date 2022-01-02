@@ -317,7 +317,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     if !N::posw().verify(
                         block_height,
                         share_difficulty,
-                        &vec![*block_header.to_header_root().unwrap(), *block_header.nonce()],
+                        &[*block_header.to_header_root().unwrap(), *block_header.nonce()],
                         block_header.proof(),
                     ) {
                         warn!("[PoolResponse] PoSW proof verification failed");
