@@ -29,11 +29,7 @@ use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
 
 use anyhow::Result;
-use std::{
-    net::SocketAddr,
-    sync::{atomic::AtomicBool, Arc},
-    time::Duration,
-};
+use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpListener,
     sync::{oneshot, RwLock},
@@ -85,13 +81,10 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize the prover storage path.
         let prover_storage_path = node.prover_storage_path(local_ip);
 
-        // Initialize the terminator bit.
-        let terminator = Arc::new(AtomicBool::new(false));
-
         // Initialize a new instance for managing peers.
         let peers = Peers::new(tasks.clone(), local_ip, None).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &ledger_storage_path, &terminator, peers.router()).await?;
+        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&mut tasks, &ledger_storage_path, peers.router()).await?;
         // Initialize a new instance for managing the prover.
         let prover = Prover::open::<RocksDB, _>(
             &mut tasks,
@@ -99,7 +92,6 @@ impl<N: Network, E: Environment> Server<N, E> {
             address,
             local_ip,
             pool_ip,
-            &terminator,
             peers.router(),
             ledger.reader(),
             ledger.router(),

@@ -35,10 +35,7 @@ use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::{
     net::SocketAddr,
     path::Path,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::{atomic::Ordering, Arc},
     time::Duration,
 };
 use tokio::{
@@ -86,8 +83,6 @@ pub struct Prover<N: Network, E: Environment> {
     prover_router: ProverRouter<N>,
     /// The pool of unconfirmed transactions.
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
-    /// A terminator bit for the prover.
-    terminator: Arc<AtomicBool>,
     /// The peers router of the node.
     peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
@@ -104,7 +99,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
         address: Option<Address<N>>,
         local_ip: SocketAddr,
         pool_ip: Option<SocketAddr>,
-        terminator: &Arc<AtomicBool>,
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
@@ -125,7 +119,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
             thread_pool: Arc::new(thread_pool),
             prover_router,
             memory_pool: Arc::new(RwLock::new(MemoryPool::new())),
-            terminator: terminator.clone(),
             peers_router,
             ledger_reader,
             ledger_router,
@@ -166,7 +159,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
                     // TODO (howardwu): Check that the prover is connected to the pool before proceeding.
                     //  Currently we use a sleep function to probabilistically ensure the peer is connected.
-                    if !prover.terminator.load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
+                    if !E::terminator().load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
                         prover.send_pool_register().await;
                     }
                 }
@@ -250,19 +243,18 @@ impl<N: Network, E: Environment> Prover<N, E> {
                     if pool_ip == operator_ip {
                         // If `terminator` is `false` and the status is not `Peering` or `Mining`
                         // already, mine the next block.
-                        if !self.terminator.load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
+                        if !E::terminator().load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
                             // Set the status to `Mining`.
                             E::status().update(State::Mining);
 
                             let thread_pool = self.thread_pool.clone();
                             let block_template = block_template.clone();
-                            let terminator = self.terminator.clone();
 
                             let result = task::spawn_blocking(move || {
                                 thread_pool.install(move || {
                                     loop {
                                         let block_header =
-                                            BlockHeader::mine_once_unchecked(&block_template, &terminator, &mut thread_rng())?;
+                                            BlockHeader::mine_once_unchecked(&block_template, E::terminator(), &mut thread_rng())?;
 
                                         // Ensure the share difficulty target is met.
                                         if N::posw().verify(
@@ -347,11 +339,8 @@ impl<N: Network, E: Environment> Prover<N, E> {
                     // Notify the outer function that the task is ready.
                     let _ = router.send(());
                     loop {
-                        // Prepare the terminator.
-                        let terminator = prover.terminator.clone();
-
                         // If `terminator` is `false` and the status is not `Peering` or `Mining` already, mine the next block.
-                        if !terminator.load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
+                        if !E::terminator().load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
                             // Set the status to `Mining`.
                             E::status().update(State::Mining);
 
@@ -371,7 +360,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                             recipient,
                                             E::COINBASE_IS_PUBLIC,
                                             &unconfirmed_transactions,
-                                            &terminator,
+                                            E::terminator(),
                                             &mut thread_rng(),
                                         )
                                     })

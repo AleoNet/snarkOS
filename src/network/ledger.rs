@@ -36,10 +36,7 @@ use std::{
     hash::{Hash, Hasher},
     net::SocketAddr,
     path::Path,
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::{atomic::Ordering, Arc},
     time::{Duration, Instant},
 };
 use tokio::{
@@ -150,8 +147,6 @@ pub struct Ledger<N: Network, E: Environment> {
     last_block_update_timestamp: RwLock<Instant>,
     /// The map of each peer to their failure messages := (failure_message, timestamp).
     failures: RwLock<HashMap<SocketAddr, Vec<(String, i64)>>>,
-    /// A terminator bit for the prover.
-    terminator: Arc<AtomicBool>,
     /// The peers router of the node.
     peers_router: PeersRouter<N, E>,
 }
@@ -161,7 +156,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
         tasks: &mut Tasks<JoinHandle<()>>,
         path: P,
-        terminator: &Arc<AtomicBool>,
         peers_router: PeersRouter<N, E>,
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
@@ -179,7 +173,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             block_requests_lock: Arc::new(Mutex::new(())),
             last_block_update_timestamp: RwLock::new(Instant::now()),
             failures: Default::default(),
-            terminator: terminator.clone(),
             peers_router,
         });
 
@@ -223,7 +216,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         debug!("Ledger is shutting down...");
 
         // Set the terminator bit to `true` to ensure it stops mining.
-        self.terminator.store(true, Ordering::SeqCst);
+        E::terminator().store(true, Ordering::SeqCst);
         trace!("[ShuttingDown] Terminator bit has been enabled");
 
         // Clear the unconfirmed blocks.
@@ -467,7 +460,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         if status == State::ShuttingDown {
             trace!("Ledger is shutting down");
             // Set the terminator bit to `true` to ensure it stops mining.
-            self.terminator.store(true, Ordering::SeqCst);
+            E::terminator().store(true, Ordering::SeqCst);
             return;
         }
         // If there is an insufficient number of connected peers, set the status to `Peering`.
@@ -505,10 +498,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // If the node is `Peering` or `Syncing`, it should not be mining.
         if status == State::Peering || status == State::Syncing {
             // Set the terminator bit to `true` to ensure it does not mine.
-            self.terminator.store(true, Ordering::SeqCst);
+            E::terminator().store(true, Ordering::SeqCst);
         } else {
             // Set the terminator bit to `false` to ensure it is allowed to mine.
-            self.terminator.store(false, Ordering::SeqCst);
+            E::terminator().store(false, Ordering::SeqCst);
         }
 
         // Update the ledger to the determined status.
@@ -577,7 +570,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         // Update the timestamp of the last block increment.
                         *self.last_block_update_timestamp.write().await = Instant::now();
                         // Set the terminator bit to `true` to ensure the miner updates state.
-                        self.terminator.store(true, Ordering::SeqCst);
+                        E::terminator().store(true, Ordering::SeqCst);
                         // On success, filter the unconfirmed blocks of this block, if it exists.
                         self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash);
 
@@ -625,7 +618,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Update the last block update timestamp.
                 *self.last_block_update_timestamp.write().await = Instant::now();
                 // Set the terminator bit to `true` to ensure the miner resets state.
-                self.terminator.store(true, Ordering::SeqCst);
+                E::terminator().store(true, Ordering::SeqCst);
 
                 // Lock unconfirmed_blocks for further processing.
                 let mut unconfirmed_blocks = self.unconfirmed_blocks.write().await;
@@ -640,7 +633,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 warn!("{}", error);
 
                 // Set the terminator bit to `true` to ensure the miner resets state.
-                self.terminator.store(true, Ordering::SeqCst);
+                E::terminator().store(true, Ordering::SeqCst);
                 // Reset the unconfirmed blocks.
                 self.unconfirmed_blocks.write().await.clear();
 

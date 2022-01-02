@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use std::{
     fmt::{self, Debug},
     marker::PhantomData,
+    sync::{atomic::AtomicBool, Arc},
 };
 
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
@@ -113,6 +114,12 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     fn status() -> &'static Status {
         static STATUS: OnceCell<Status> = OnceCell::new();
         STATUS.get_or_init(|| Status::new())
+    }
+    
+    /// Returns the terminator bit for the prover.
+    fn terminator() -> &'static Arc<AtomicBool> {
+        static TERMINATOR: OnceCell<Arc<AtomicBool>> = OnceCell::new();
+        TERMINATOR.get_or_init(|| Arc::new(AtomicBool::new(false)))
     }
 }
 

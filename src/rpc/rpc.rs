@@ -466,15 +466,13 @@ mod tests {
         // Initialize the status indicator.
         E::status().update(State::Ready);
 
-        // Initialize the terminator bit.
-        let terminator = Arc::new(AtomicBool::new(false));
         // Initialize the tasks handler.
         let mut tasks = Tasks::new();
 
         // Initialize a new instance for managing peers.
         let peers = Peers::new(tasks.clone(), local_ip, None).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<S, _>(&mut tasks, &ledger_path, &terminator, peers.router())
+        let ledger = Ledger::<N, E>::open::<S, _>(&mut tasks, &ledger_path, peers.router())
             .await
             .expect("Failed to initialize ledger");
 
@@ -485,7 +483,6 @@ mod tests {
             None,
             local_ip,
             Some(local_ip),
-            &terminator,
             peers.router(),
             ledger.reader(),
             ledger.router(),
@@ -513,13 +510,10 @@ mod tests {
         // Initialize the status indicator.
         E::status().update(State::Ready);
 
-        // Initialize the terminator bit.
-        let terminator = Arc::new(AtomicBool::new(false));
-
         // Initialize a new instance for managing peers.
         let peers = Peers::new(tasks.clone(), local_ip, None).await;
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<S, _>(tasks, &ledger_path, &terminator, peers.router())
+        let ledger = Ledger::<N, E>::open::<S, _>(tasks, &ledger_path, peers.router())
             .await
             .expect("Failed to initialize ledger");
 
@@ -530,7 +524,6 @@ mod tests {
             None,
             local_ip,
             Some(local_ip),
-            &terminator,
             peers.router(),
             ledger.reader(),
             ledger.router(),
