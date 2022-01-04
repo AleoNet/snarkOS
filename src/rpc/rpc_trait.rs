@@ -97,12 +97,6 @@ pub trait RpcFunctions<N: Network> {
 // /// Definition of private RPC endpoints that require authentication.
 // #[async_trait::async_trait]
 // pub trait ProtectedRpcFunctions {
-//     #[doc = include_str!("../documentation/private_endpoints/createrawtransaction.md")]
-//     async fn create_raw_transaction(
-//         &self,
-//         transaction_input: TransactionInputs,
-//     ) -> Result<CreateRawTransactionOuput, RpcError>;
-//
 //     #[doc = include_str!("../documentation/private_endpoints/createtransaction.md")]
 //     async fn create_transaction(
 //         &self,
@@ -112,9 +106,6 @@ pub trait RpcFunctions<N: Network> {
 //
 //     #[doc = include_str!("../documentation/private_endpoints/getrecordcommitments.md")]
 //     async fn get_record_commitments(&self) -> Result<Vec<String>, RpcError>;
-//
-//     #[doc = include_str!("../documentation/private_endpoints/getrecordcommitmentcount.md")]
-//     async fn get_record_commitment_count(&self) -> Result<usize, RpcError>;
 //
 //     #[doc = include_str!("../documentation/private_endpoints/getrawrecord.md")]
 //     async fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError>;

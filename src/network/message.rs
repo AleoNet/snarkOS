@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::State, Environment, NodeType};
+use crate::{
+    helpers::{NodeType, State},
+    Environment,
+};
 use snarkos_storage::BlockLocators;
 use snarkvm::prelude::*;
 
@@ -99,6 +102,12 @@ pub enum Message<N: Network, E: Environment> {
     UnconfirmedBlock(u32, N::BlockHash, Data<Block<N>>),
     /// UnconfirmedTransaction := (transaction)
     UnconfirmedTransaction(Transaction<N>),
+    /// PoolRegister := (address)
+    PoolRegister(Address<N>),
+    /// PoolRequest := (share_difficulty, block_template)
+    PoolRequest(u64, Data<BlockTemplate<N>>),
+    /// PoolResponse := (address, block_header)
+    PoolResponse(Address<N>, Data<BlockHeader<N>>),
     /// Unused
     #[allow(unused)]
     Unused(PhantomData<E>),
@@ -120,6 +129,9 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Pong(..) => "Pong",
             Self::UnconfirmedBlock(..) => "UnconfirmedBlock",
             Self::UnconfirmedTransaction(..) => "UnconfirmedTransaction",
+            Self::PoolRegister(..) => "PoolRegister",
+            Self::PoolRequest(..) => "PoolRequest",
+            Self::PoolResponse(..) => "PoolResponse",
             Self::Unused(..) => "Unused",
         }
     }
@@ -139,7 +151,10 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Pong(..) => 8,
             Self::UnconfirmedBlock(..) => 9,
             Self::UnconfirmedTransaction(..) => 10,
-            Self::Unused(..) => 11,
+            Self::PoolRegister(..) => 11,
+            Self::PoolRequest(..) => 12,
+            Self::PoolResponse(..) => 13,
+            Self::Unused(..) => 14,
         }
     }
 
@@ -178,6 +193,11 @@ impl<N: Network, E: Environment> Message<N, E> {
             ]
             .concat()),
             Self::UnconfirmedTransaction(transaction) => Ok(bincode::serialize(transaction)?),
+            Self::PoolRegister(address) => Ok(bincode::serialize(address)?),
+            Self::PoolRequest(share_difficulty, block_template) => {
+                Ok([bincode::serialize(share_difficulty)?, block_template.serialize_blocking()?].concat())
+            }
+            Self::PoolResponse(address, block) => Ok([bincode::serialize(address)?, block.serialize_blocking()?].concat()),
             Self::Unused(_) => Ok(vec![]),
         }
     }
@@ -239,6 +259,9 @@ impl<N: Network, E: Environment> Message<N, E> {
                 Data::Buffer(data[36..].to_vec()),
             ),
             10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
+            11 => Self::PoolRegister(bincode::deserialize(data)?),
+            12 => Self::PoolRequest(bincode::deserialize(&data[0..8])?, Data::Buffer(data[8..].to_vec())),
+            13 => Self::PoolResponse(bincode::deserialize(&data[0..32])?, Data::Buffer(data[32..].to_vec())),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };
 

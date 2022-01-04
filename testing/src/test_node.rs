@@ -15,12 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos::{
-    helpers::{State, Status},
+    helpers::{NodeType, State, Status},
     Client,
     Data,
     Environment,
     Message,
-    NodeType,
 };
 use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
@@ -54,7 +53,7 @@ const PING_INTERVAL_SECS: u64 = 5;
 const PEER_INTERVAL_SECS: u64 = 3;
 const DESIRED_CONNECTIONS: usize = <Client<Testnet2>>::MINIMUM_NUMBER_OF_PEERS * 3;
 const MESSAGE_VERSION: u32 = <Client<Testnet2>>::MESSAGE_VERSION;
-const MAXIMUM_FORK_DEPTH: u32 = <Client<Testnet2>>::MAXIMUM_FORK_DEPTH;
+const MAXIMUM_FORK_DEPTH: u32 = Testnet2::ALEO_MAXIMUM_FORK_DEPTH;
 
 pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<Testnet2>>::MAXIMUM_NUMBER_OF_PEERS;
 

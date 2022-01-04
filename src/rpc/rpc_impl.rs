@@ -19,7 +19,6 @@
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
 use crate::{
-    helpers::Status,
     rpc::{rpc::*, rpc_trait::RpcFunctions},
     Environment,
     LedgerReader,
@@ -29,13 +28,13 @@ use crate::{
 };
 use snarkos_storage::Metadata;
 use snarkvm::{
-    dpc::{AleoAmount, Block, BlockHeader, Blocks, MemoryPool, Network, Transaction, Transactions, Transition},
+    dpc::{Address, AleoAmount, Block, BlockHeader, Blocks, MemoryPool, Network, Transaction, Transactions, Transition},
     utilities::FromBytes,
 };
 
 use jsonrpc_core::Value;
 use snarkvm::{dpc::Record, utilities::ToBytes};
-use std::{cmp::max, net::SocketAddr, ops::Deref, sync::Arc};
+use std::{cmp::max, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
 use tokio::sync::RwLock;
 
 #[derive(Debug, Error)]
@@ -64,7 +63,7 @@ impl From<RpcError> for std::io::Error {
 
 #[doc(hidden)]
 pub struct RpcInner<N: Network, E: Environment> {
-    pub(crate) status: Status,
+    address: Option<Address<N>>,
     peers: Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
     prover_router: ProverRouter<N>,
@@ -72,6 +71,7 @@ pub struct RpcInner<N: Network, E: Environment> {
     /// RPC credentials for accessing guarded endpoints
     #[allow(unused)]
     pub(crate) credentials: RpcCredentials,
+    launched: Instant,
 }
 
 /// Implements RPC HTTP endpoint functions for a node.
@@ -90,19 +90,20 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
     /// Creates a new struct for calling public and private RPC endpoints.
     pub fn new(
         credentials: RpcCredentials,
-        status: Status,
+        address: Option<Address<N>>,
         peers: Arc<Peers<N, E>>,
         ledger: LedgerReader<N>,
         prover_router: ProverRouter<N>,
         memory_pool: Arc<RwLock<MemoryPool<N>>>,
     ) -> Self {
         Self(Arc::new(RpcInner {
-            status,
+            address,
             peers,
             ledger,
             prover_router,
             memory_pool,
             credentials,
+            launched: Instant::now(),
         }))
     }
 }
@@ -188,10 +189,17 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         let block_height = self.ledger.latest_block_height() + 1;
         let block_timestamp = chrono::Utc::now().timestamp();
 
-        // Compute the block difficulty target and cumulative_weight.
-        let previous_timestamp = latest_block.timestamp();
-        let previous_difficulty_target = latest_block.difficulty_target();
-        let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
+        // Compute the block difficulty target.
+        let difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+            Blocks::<N>::compute_difficulty_target(latest_block.header(), block_timestamp, block_height)
+        } else if N::NETWORK_ID == 2 {
+            let anchor_block_header = self.ledger.get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
+            Blocks::<N>::compute_difficulty_target(&anchor_block_header, block_timestamp, block_height)
+        } else {
+            Blocks::<N>::compute_difficulty_target(N::genesis_block().header(), block_timestamp, block_height)
+        };
+
+        // Compute the cumulative weight.
         let cumulative_weight = latest_block
             .cumulative_weight()
             .saturating_add((u64::MAX / difficulty_target) as u128);
@@ -297,16 +305,18 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         let latest_cumulative_weight = self.ledger.latest_cumulative_weight();
 
         Ok(serde_json::json!({
+            "address": self.address,
             "candidate_peers": candidate_peers,
             "connected_peers": connected_peers,
             "latest_block_hash": latest_block_hash,
             "latest_block_height": latest_block_height,
             "latest_cumulative_weight": latest_cumulative_weight,
+            "launched": format!("{} minutes ago", self.launched.elapsed().as_secs() / 60),
             "number_of_candidate_peers": number_of_candidate_peers,
             "number_of_connected_peers": number_of_connected_peers,
             "number_of_connected_sync_nodes": number_of_connected_sync_nodes,
             "software": format!("snarkOS {}", env!("CARGO_PKG_VERSION")),
-            "status": self.status.to_string(),
+            "status": E::status().to_string(),
             "type": E::NODE_TYPE,
             "version": E::MESSAGE_VERSION,
         }))

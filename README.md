@@ -160,6 +160,9 @@ OPTIONS:
         --miner <miner>              Specify this as a mining node, with the given miner address
         --network <network>          Specify the network of this node [default: 2]
         --node <node>                Specify the IP address and port for the node server [default: 0.0.0.0:4132]
+        --operator <operator>        Specify this as an operating node, with the given operator address
+        --pool <pool>                Specify the pool that a prover node is contributing to
+        --prover <prover>            Specify this as a prover node, with the given prover address
         --rpc <rpc>                  Specify the IP address and port for the RPC server [default: 0.0.0.0:3032]
         --password <rpc-password>    Specify the password for the RPC server [default: pass]
         --username <rpc-username>    Specify the username for the RPC server [default: root]
