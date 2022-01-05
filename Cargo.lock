@@ -2176,7 +2176,7 @@ dependencies = [
  "pea2pea",
  "rand",
  "snarkos",
- "snarkvm 0.7.5 (git+https://github.com/AleoHQ/snarkVM.git?rev=471e03b)",
+ "snarkvm 0.7.5 (git+https://github.com/AleoHQ/snarkVM.git?rev=ff10c20)",
  "tokio",
  "tracing",
  "tracing-subscriber",
