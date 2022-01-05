@@ -28,7 +28,7 @@ path = "../snode"
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "471e03b"
+rev = "ff10c20"
 #path = "../../snarkVM"
 
 [dependencies.async-trait]
