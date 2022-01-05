@@ -41,7 +41,7 @@ use tracing::*;
 pub const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
 pub const CHALLENGE_HEIGHT: u32 = 0;
 pub const MESSAGE_VERSION: u32 = <Client<Testnet2>>::MESSAGE_VERSION;
-pub const MAXIMUM_FORK_DEPTH: u32 = <Client<Testnet2>>::MAXIMUM_FORK_DEPTH;
+pub const MAXIMUM_FORK_DEPTH: u32 = Testnet2::ALEO_MAXIMUM_FORK_DEPTH;
 
 pub type ClientMessage = Message<Testnet2, Client<Testnet2>>;
 pub type ClientNonce = u64;
