@@ -278,8 +278,10 @@ impl Crawler {
                 if !node.node().is_connected(peer_ip) && !node.state.peers.lock().await.iter().any(|peer| peer.listening_addr == peer_ip) {
                     info!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, peer_ip);
 
-                    // TODO: only connect if this address is unknown.
-                    let _ = node.node().connect(peer_ip).await;
+                    // Only connect if this address is unknown.
+                    if !node.known_network.nodes().contains_key(&peer_ip) {
+                        let _ = node.node().connect(peer_ip).await;
+                    }
                 }
             }
         });
