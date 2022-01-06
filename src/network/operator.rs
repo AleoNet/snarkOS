@@ -311,8 +311,8 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     let coinbase_record = block_template.coinbase_record().clone();
                     match self.state.increment_share(block_height, coinbase_record, &prover) {
                         Ok(..) => info!(
-                            "Operator received a valid share from {} ({}) for block {}",
-                            peer_ip, prover, block_height,
+                            "Operator has received a valid share from {} ({}) for block {}",
+                            prover, peer_ip, block_height,
                         ),
                         Err(error) => error!("{}", error),
                     }
