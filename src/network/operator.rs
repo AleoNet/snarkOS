@@ -27,7 +27,7 @@ use crate::{
     ProverRouter,
 };
 use snarkos_storage::{storage::Storage, OperatorState};
-use snarkvm::dpc::{prelude::*, PoSWProof};
+use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
 use rand::thread_rng;
@@ -55,10 +55,10 @@ type OperatorHandler<N> = mpsc::Receiver<OperatorRequest<N>>;
 ///
 #[derive(Debug)]
 pub enum OperatorRequest<N: Network> {
-    /// PoolRegister := (peer_ip, prover_address)
+    /// PoolRegister := (peer_ip, worker_address)
     PoolRegister(SocketAddr, Address<N>),
-    /// PoolResponse := (peer_ip, prover_address, nonce, proof)
-    PoolResponse(SocketAddr, Address<N>, N::PoSWNonce, PoSWProof<N>),
+    /// PoolResponse := (peer_ip, proposed_block_header, worker_address)
+    PoolResponse(SocketAddr, BlockHeader<N>, Address<N>),
 }
 
 /// The predefined base share difficulty.
@@ -263,17 +263,42 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     warn!("[PoolRegister] No current block template exists");
                 }
             }
-            OperatorRequest::PoolResponse(peer_ip, prover, nonce, proof) => {
+            OperatorRequest::PoolResponse(peer_ip, block_header, prover) => {
                 if let Some(block_template) = self.block_template.read().await.clone() {
+                    // Ensure the given block header corresponds to the correct block height.
+                    if block_template.block_height() != block_header.height() {
+                        warn!("[PoolResponse] Peer {} sent a stale block.", peer_ip);
+                        return;
+                    }
+                    // Ensure the timestamp in the block template matches in the block header.
+                    if block_template.block_timestamp() != block_header.timestamp() {
+                        warn!("[PoolResponse] Peer {} sent a block with an incorrect timestamp.", peer_ip);
+                        return;
+                    }
+                    // Ensure the difficulty target in the block template matches in the block header.
+                    if block_template.difficulty_target() != block_header.difficulty_target() {
+                        warn!("[PoolResponse] Peer {} sent a block with an incorrect difficulty target.", peer_ip);
+                        return;
+                    }
+                    // Ensure the previous ledger root in the block template matches in the block header.
+                    if block_template.previous_ledger_root() != block_header.previous_ledger_root() {
+                        warn!("[PoolResponse] Peer {} sent a block with an incorrect ledger root.", peer_ip);
+                        return;
+                    }
+                    // Ensure the transactions root in the block header matches the one from the block template.
+                    if block_template.transactions().transactions_root() != block_header.transactions_root() {
+                        warn!("[PoolResponse] Peer {} has changed the list of block transactions.", peer_ip);
+                        return;
+                    }
                     // Ensure the given nonce from the prover is new.
-                    if self.known_nonces.read().await.contains(&nonce) {
+                    if self.known_nonces.read().await.contains(&block_header.nonce()) {
                         warn!("[PoolResponse] Peer {} sent a duplicate share", peer_ip);
                         // TODO (julesdesmit): punish?
                         return;
                     }
 
                     // Update known nonces.
-                    self.known_nonces.write().await.insert(nonce);
+                    self.known_nonces.write().await.insert(block_header.nonce());
 
                     // Retrieve the share difficulty for the given prover.
                     let share_difficulty = {
@@ -288,12 +313,12 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     };
 
                     // Ensure the share difficulty target is met, and the PoSW proof is valid.
-                    let block_height = block_template.block_height();
+                    let block_height = block_header.height();
                     if !N::posw().verify(
                         block_height,
                         share_difficulty,
-                        &[*block_template.to_header_root().unwrap(), *nonce],
-                        &proof,
+                        &[*block_header.to_header_root().unwrap(), *block_header.nonce()],
+                        block_header.proof(),
                     ) {
                         warn!("[PoolResponse] PoSW proof verification failed");
                         return;
@@ -311,8 +336,8 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     let coinbase_record = block_template.coinbase_record().clone();
                     match self.state.increment_share(block_height, coinbase_record, &prover) {
                         Ok(..) => info!(
-                            "Operator has received a valid share from {} ({}) for block {}",
-                            prover, peer_ip, block_height,
+                            "Operator received a valid share from {} ({}) for block {}",
+                            peer_ip, prover, block_height,
                         ),
                         Err(error) => error!("{}", error),
                     }
@@ -320,19 +345,11 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     // If the block has satisfactory difficulty and is valid, proceed to broadcast it.
                     let previous_block_hash = block_template.previous_block_hash();
                     let transactions = block_template.transactions().clone();
-                    if let Ok(block_header) = BlockHeader::<N>::from(
-                        block_template.previous_ledger_root(),
-                        block_template.transactions().transactions_root(),
-                        BlockHeaderMetadata::new(&block_template),
-                        nonce,
-                        proof,
-                    ) {
-                        if let Ok(block) = Block::from(previous_block_hash, block_header, transactions) {
-                            info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
-                            let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
-                            if let Err(error) = self.ledger_router.send(request).await {
-                                warn!("Failed to broadcast mined block - {}", error);
-                            }
+                    if let Ok(block) = Block::from(previous_block_hash, block_header, transactions) {
+                        info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
+                        let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
+                        if let Err(error) = self.ledger_router.send(request).await {
+                            warn!("Failed to broadcast mined block - {}", error);
                         }
                     }
                 } else {
