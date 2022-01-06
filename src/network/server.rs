@@ -105,21 +105,41 @@ impl<N: Network, E: Environment> Server<N, E> {
         // TODO (howardwu): This is a hack for the prover.
         //  Check that the prover is connected to the pool before sending a PoolRegister message.
         if let Some(pool_ip) = pool_ip {
-            // Initialize the connection process.
+            let peers_router = peers.router();
+            let ledger_reader = ledger.reader();
+            let ledger_router = ledger.router();
+            let operator_router = operator.router();
+            let prover_router = prover.router();
+
             let (router, handler) = oneshot::channel();
-            // Route a `Connect` request to the pool.
-            peers
-                .router()
-                .send(PeersRequest::Connect(
-                    pool_ip,
-                    ledger.reader(),
-                    ledger.router(),
-                    operator.router(),
-                    prover.router(),
-                    router,
-                ))
-                .await?;
-            // Wait until the connection task is initialized.
+            E::tasks().append(task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                loop {
+                    // Initialize the connection process.
+                    let (router, handler) = oneshot::channel();
+                    // Route a `Connect` request to the pool.
+                    if let Err(error) = peers_router
+                        .send(PeersRequest::Connect(
+                            pool_ip,
+                            ledger_reader.clone(),
+                            ledger_router.clone(),
+                            operator_router.clone(),
+                            prover_router.clone(),
+                            router,
+                        ))
+                        .await
+                    {
+                        trace!("[Connect] {}", error);
+                    }
+                    // Wait until the connection task is initialized.
+                    let _ = handler.await;
+
+                    // Sleep for `30` seconds.
+                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                }
+            }));
+            // Wait until the prover handler is ready.
             let _ = handler.await;
         }
 
