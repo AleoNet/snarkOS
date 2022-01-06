@@ -322,10 +322,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         .read()
                         .await
                         .iter()
-                        .filter(|(&peer_ip, _)| {
-                            let peer_str = peer_ip.to_string();
-                            !E::sync_nodes().contains(&peer_ip) && !E::BEACON_NODES.contains(&peer_str.as_str())
-                        })
+                        .filter(|(peer_ip, _)| !E::sync_nodes().contains(peer_ip) && !E::beacon_nodes().contains(peer_ip))
                         .take(num_excess_peers)
                         .map(|(&peer_ip, _)| peer_ip)
                         .collect::<Vec<SocketAddr>>();
@@ -378,8 +375,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 }
 
                 // Add the beacon nodes to the list of candidate peers.
-                let beacon_nodes: Vec<SocketAddr> = E::BEACON_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-                self.add_candidate_peers(beacon_nodes.iter()).await;
+                self.add_candidate_peers(E::beacon_nodes().iter()).await;
 
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 // Select the peers randomly from the list of candidate peers.
@@ -584,10 +580,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             .connected_peers()
             .await
             .iter()
-            .filter(|peer_ip| {
-                let peer_str = peer_ip.to_string();
-                *peer_ip != &sender && !E::sync_nodes().contains(peer_ip) && !E::BEACON_NODES.contains(&peer_str.as_str())
-            })
+            .filter(|peer_ip| *peer_ip != &sender && !E::sync_nodes().contains(peer_ip) && !E::beacon_nodes().contains(peer_ip))
             .copied()
             .collect::<Vec<_>>()
         {

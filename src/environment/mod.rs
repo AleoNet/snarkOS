@@ -75,6 +75,12 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum number of failures tolerated before disconnecting from a peer.
     const MAXIMUM_NUMBER_OF_FAILURES: usize = 1024;
 
+    /// Returns the beacon nodes preset for the node.
+    fn beacon_nodes() -> &'static HashSet<SocketAddr> {
+        static NODES: OnceCell<HashSet<SocketAddr>> = OnceCell::new();
+        NODES.get_or_init(|| Self::BEACON_NODES.iter().map(|ip| ip.parse().unwrap()).collect())
+    }
+
     /// Returns the sync nodes preset for the node.
     fn sync_nodes() -> &'static HashSet<SocketAddr> {
         static NODES: OnceCell<HashSet<SocketAddr>> = OnceCell::new();
