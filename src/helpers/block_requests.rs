@@ -18,7 +18,7 @@ use crate::{network::ledger::PeersState, Environment};
 use snarkos_storage::{BlockLocators, LedgerState};
 use snarkvm::dpc::prelude::*;
 
-use std::{collections::HashSet, net::SocketAddr};
+use std::net::SocketAddr;
 
 /// Checks if any of the peers are ahead and have a larger block height, if they are on a fork, and their block locators.
 /// The maximum known block height and cumulative weight are tracked for the purposes of further operations.
@@ -27,8 +27,6 @@ pub fn find_maximal_peer<N: Network, E: Environment>(
     maximum_block_height: &mut u32,
     maximum_cumulative_weight: &mut u128,
 ) -> Option<(SocketAddr, bool, BlockLocators<N>)> {
-    let sync_nodes: HashSet<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-
     // Determine if the peers state has any sync nodes.
     // TODO: have nodes sync up to tip - 4096 with only sync nodes, then switch to syncing with the longest chain.
     let peers_contains_sync_node = false;
@@ -40,7 +38,7 @@ pub fn find_maximal_peer<N: Network, E: Environment>(
 
     for (peer_ip, peer_state) in peers_state.iter() {
         // Only update the maximal peer if there are no sync nodes or the peer is a sync node.
-        if !peers_contains_sync_node || sync_nodes.contains(peer_ip) {
+        if !peers_contains_sync_node || E::sync_nodes().contains(peer_ip) {
             // Update the maximal peer state if the peer is ahead and the peer knows if you are a fork or not.
             // This accounts for (Case 1 and Case 2(a))
             if let Some((_, _, is_on_fork, block_height, block_locators)) = peer_state {

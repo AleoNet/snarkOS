@@ -19,8 +19,10 @@ use snarkvm::dpc::Network;
 
 use once_cell::sync::OnceCell;
 use std::{
+    collections::HashSet,
     fmt::Debug,
     marker::PhantomData,
+    net::SocketAddr,
     sync::{atomic::AtomicBool, Arc},
 };
 
@@ -40,9 +42,9 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const DEFAULT_RPC_PORT: u16 = 3030 + Self::Network::NETWORK_ID;
 
     /// The list of beacon nodes to bootstrap the node server with.
-    const BEACON_NODES: [&'static str; 0] = [];
+    const BEACON_NODES: &'static [&'static str] = &[];
     /// The list of sync nodes to bootstrap the node server with.
-    const SYNC_NODES: [&'static str; 13] = ["127.0.0.1:4131", "127.0.0.1:4133", "127.0.0.1:4134", "127.0.0.1:4135", "127.0.0.1:4136", "127.0.0.1:4137", "127.0.0.1:4138", "127.0.0.1:4139", "127.0.0.1:4140", "127.0.0.1:4141", "127.0.0.1:4142", "127.0.0.1:4143", "127.0.0.1:4144"];
+    const SYNC_NODES: &'static [&'static str] = &["127.0.0.1:4135"];
 
     /// The duration in seconds to sleep in between heartbeat executions.
     const HEARTBEAT_IN_SECS: u64 = 9;
@@ -73,6 +75,18 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum number of failures tolerated before disconnecting from a peer.
     const MAXIMUM_NUMBER_OF_FAILURES: usize = 1024;
 
+    /// Returns the list of beacon nodes to bootstrap the node server with.
+    fn beacon_nodes() -> &'static HashSet<SocketAddr> {
+        static NODES: OnceCell<HashSet<SocketAddr>> = OnceCell::new();
+        NODES.get_or_init(|| Self::BEACON_NODES.iter().map(|ip| ip.parse().unwrap()).collect())
+    }
+
+    /// Returns the list of sync nodes to bootstrap the node server with.
+    fn sync_nodes() -> &'static HashSet<SocketAddr> {
+        static NODES: OnceCell<HashSet<SocketAddr>> = OnceCell::new();
+        NODES.get_or_init(|| Self::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect())
+    }
+    
     /// Returns the tasks handler for the node.
     fn tasks() -> &'static Tasks<tokio::task::JoinHandle<()>> {
         static TASKS: OnceCell<Tasks<tokio::task::JoinHandle<()>>> = OnceCell::new();
@@ -135,7 +149,7 @@ impl<N: Network> Environment for Prover<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Prover;
     const COINBASE_IS_PUBLIC: bool = true;
-    const MINIMUM_NUMBER_OF_PEERS: usize = 1;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 2;
     const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
 }
 
@@ -158,7 +172,7 @@ pub struct ClientTrial<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for ClientTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Client;
-    const SYNC_NODES: [&'static str; 13] = [
+    const SYNC_NODES: &'static [&'static str] = &[
         "144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132",
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
         "161.35.106.91:4132", "157.245.133.62:4132", "143.198.166.150:4132",
@@ -174,7 +188,7 @@ pub struct MinerTrial<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for MinerTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Miner;
-    const SYNC_NODES: [&'static str; 13] = [
+    const SYNC_NODES: &'static [&'static str] = &[
         "144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132",
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
         "161.35.106.91:4132", "157.245.133.62:4132", "143.198.166.150:4132",
@@ -191,7 +205,7 @@ pub struct OperatorTrial<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for OperatorTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Operator;
-    const SYNC_NODES: [&'static str; 13] = [
+    const SYNC_NODES: &'static [&'static str] = &[
         "144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132",
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
         "161.35.106.91:4132", "157.245.133.62:4132", "143.198.166.150:4132",
@@ -208,7 +222,7 @@ pub struct ProverTrial<N: Network>(PhantomData<N>);
 impl<N: Network> Environment for ProverTrial<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Prover;
-    const SYNC_NODES: [&'static str; 13] = [
+    const SYNC_NODES: &'static [&'static str] = &[
         "144.126.219.193:4132", "165.232.145.194:4132", "143.198.164.241:4132", "188.166.7.13:4132", "167.99.40.226:4132",
         "159.223.124.150:4132", "137.184.192.155:4132", "147.182.213.228:4132", "137.184.202.162:4132", "159.223.118.35:4132",
         "161.35.106.91:4132", "157.245.133.62:4132", "143.198.166.150:4132",

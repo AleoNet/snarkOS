@@ -196,8 +196,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub async fn connected_sync_nodes(&self) -> HashSet<SocketAddr> {
         let connected_peers: HashSet<SocketAddr> = self.connected_peers.read().await.keys().into_iter().copied().collect();
-        let sync_nodes: HashSet<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-        connected_peers.intersection(&sync_nodes).copied().collect()
+        connected_peers.intersection(E::sync_nodes()).copied().collect()
     }
 
     ///
@@ -206,8 +205,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub async fn number_of_connected_sync_nodes(&self) -> usize {
         let connected_peers: HashSet<SocketAddr> = self.connected_peers.read().await.keys().into_iter().copied().collect();
-        let sync_nodes: HashSet<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-        connected_peers.intersection(&sync_nodes).count()
+        connected_peers.intersection(E::sync_nodes()).count()
     }
 
     ///
@@ -324,10 +322,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         .read()
                         .await
                         .iter()
-                        .filter(|(&peer_ip, _)| {
-                            let peer_str = peer_ip.to_string();
-                            !E::SYNC_NODES.contains(&peer_str.as_str()) && !E::BEACON_NODES.contains(&peer_str.as_str())
-                        })
+                        .filter(|(peer_ip, _)| !E::sync_nodes().contains(peer_ip) && !E::beacon_nodes().contains(peer_ip))
                         .take(num_excess_peers)
                         .map(|(&peer_ip, _)| peer_ip)
                         .collect::<Vec<SocketAddr>>();
@@ -347,6 +342,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 let number_of_connected_sync_nodes = connected_sync_nodes.len();
                 let num_excess_sync_nodes = number_of_connected_sync_nodes.saturating_sub(1);
                 if num_excess_sync_nodes > 0 {
+                    debug!("Exceeded maximum number of sync nodes");
+
                     // Proceed to send disconnect requests to these peers.
                     for peer_ip in connected_sync_nodes
                         .iter()
@@ -373,14 +370,12 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 };
 
                 // Add the sync nodes to the list of candidate peers.
-                let sync_nodes: Vec<SocketAddr> = E::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
                 if number_of_connected_sync_nodes == 0 {
-                    self.add_candidate_peers(&sync_nodes).await;
+                    self.add_candidate_peers(E::sync_nodes().iter()).await;
                 }
 
                 // Add the beacon nodes to the list of candidate peers.
-                let beacon_nodes: Vec<SocketAddr> = E::BEACON_NODES.iter().map(|ip| ip.parse().unwrap()).collect();
-                self.add_candidate_peers(&beacon_nodes).await;
+                self.add_candidate_peers(E::beacon_nodes().iter()).await;
 
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 // Select the peers randomly from the list of candidate peers.
@@ -393,7 +388,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     .choose_multiple(&mut OsRng::default(), midpoint_number_of_peers)
                 {
                     // Ensure this node is not connected to more than the permitted number of sync nodes.
-                    if sync_nodes.contains(&peer_ip) && number_of_connected_sync_nodes >= 1 {
+                    if E::sync_nodes().contains(&peer_ip) && number_of_connected_sync_nodes >= 1 {
                         continue;
                     }
 
@@ -528,7 +523,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 self.send(recipient, Message::PeerResponse(connected_peers)).await;
             }
             PeersRequest::ReceivePeerResponse(peer_ips) => {
-                self.add_candidate_peers(&peer_ips).await;
+                self.add_candidate_peers(peer_ips.iter()).await;
             }
         }
     }
@@ -539,19 +534,17 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// This method skips adding any given peers if the combined size exceeds the threshold,
     /// as the peer providing this list could be subverting the protocol.
     ///
-    async fn add_candidate_peers(&self, peers: &[SocketAddr]) {
+    async fn add_candidate_peers<'a, T: ExactSizeIterator<Item = &'a SocketAddr> + IntoIterator>(&self, peers: T) {
         // Acquire the candidate peers write lock.
         let mut candidate_peers = self.candidate_peers.write().await;
         // Ensure the combined number of peers does not surpass the threshold.
-        if candidate_peers.len() + peers.len() < E::MAXIMUM_CANDIDATE_PEERS {
-            // Proceed to insert each new candidate peer IP.
-            for peer_ip in peers.iter().take(E::MAXIMUM_CANDIDATE_PEERS) {
-                // Ensure the peer is not self and is a new candidate peer.
-                let is_self = *peer_ip == self.local_ip
-                    || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port();
-                if !is_self && !self.is_connected_to(*peer_ip).await {
-                    candidate_peers.insert(*peer_ip);
-                }
+        for peer_ip in peers.take(E::MAXIMUM_CANDIDATE_PEERS.saturating_sub(candidate_peers.len())) {
+            // Ensure the peer is not self and is a new candidate peer.
+            let is_self = *peer_ip == self.local_ip
+                || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port();
+            if !is_self && !self.is_connected_to(*peer_ip).await {
+                // Proceed to insert each new candidate peer IP.
+                candidate_peers.insert(*peer_ip);
             }
         }
     }
@@ -587,10 +580,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             .connected_peers()
             .await
             .iter()
-            .filter(|peer_ip| {
-                let peer_str = peer_ip.to_string();
-                *peer_ip != &sender && !E::SYNC_NODES.contains(&peer_str.as_str()) && !E::BEACON_NODES.contains(&peer_str.as_str())
-            })
+            .filter(|peer_ip| *peer_ip != &sender && !E::sync_nodes().contains(peer_ip) && !E::beacon_nodes().contains(peer_ip))
             .copied()
             .collect::<Vec<_>>()
         {
