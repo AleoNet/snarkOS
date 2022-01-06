@@ -26,7 +26,7 @@ use crate::{
     PeersRouter,
 };
 use snarkos_storage::{storage::Storage, ProverState};
-use snarkvm::dpc::prelude::*;
+use snarkvm::dpc::{posw::PoSWProof, prelude::*};
 
 use anyhow::{anyhow, Result};
 use rand::thread_rng;
@@ -245,6 +245,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             E::status().update(State::Mining);
 
                             let thread_pool = self.thread_pool.clone();
+                            let block_height = block_template.block_height();
                             let block_template = block_template.clone();
 
                             let result = task::spawn_blocking(move || {
@@ -260,8 +261,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                             &[*block_header.to_header_root().unwrap(), *block_header.nonce()],
                                             block_header.proof(),
                                         ) {
-                                            let proof_difficulty = block_header.proof().to_proof_difficulty()?;
-                                            return Ok::<(BlockHeader<N>, u64), anyhow::Error>((block_header, proof_difficulty));
+                                            return Ok::<(N::PoSWNonce, PoSWProof<N>, u64), anyhow::Error>((
+                                                block_header.nonce(),
+                                                block_header.proof().clone(),
+                                                block_header.proof().to_proof_difficulty()?,
+                                            ));
                                         }
                                     }
                                 })
@@ -271,21 +275,20 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             E::status().update(State::Ready);
 
                             match result {
-                                Ok(Ok((block_header, proof_difficulty))) => {
+                                Ok(Ok((nonce, proof, proof_difficulty))) => {
                                     info!(
                                         "Prover successfully mined a share for unconfirmed block {} with proof difficulty of {}",
-                                        block_header.height(),
-                                        proof_difficulty
+                                        block_height, proof_difficulty
                                     );
 
                                     // Send a `PoolResponse` to the operator.
-                                    let message = Message::PoolResponse(recipient, Data::Object(block_header));
+                                    let message = Message::PoolResponse(recipient, nonce, Data::Object(proof));
                                     if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(operator_ip, message)).await {
                                         warn!("[PoolResponse] {}", error);
                                     }
                                 }
                                 Ok(Err(error)) => trace!("{}", error),
-                                Err(error) => trace!("{}", anyhow!("Could not mine next block {}", error)),
+                                Err(error) => trace!("{}", anyhow!("Failed to mine the next block {}", error)),
                             }
                         }
                     }

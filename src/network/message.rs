@@ -19,7 +19,7 @@ use crate::{
     Environment,
 };
 use snarkos_storage::BlockLocators;
-use snarkvm::prelude::*;
+use snarkvm::{dpc::posw::PoSWProof, prelude::*};
 
 use ::bytes::{Buf, BytesMut};
 use anyhow::{anyhow, Result};
@@ -106,8 +106,8 @@ pub enum Message<N: Network, E: Environment> {
     PoolRegister(Address<N>),
     /// PoolRequest := (share_difficulty, block_template)
     PoolRequest(u64, Data<BlockTemplate<N>>),
-    /// PoolResponse := (address, block_header)
-    PoolResponse(Address<N>, Data<BlockHeader<N>>),
+    /// PoolResponse := (address, nonce, proof)
+    PoolResponse(Address<N>, N::PoSWNonce, Data<PoSWProof<N>>),
     /// Unused
     #[allow(unused)]
     Unused(PhantomData<E>),
@@ -197,7 +197,12 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::PoolRequest(share_difficulty, block_template) => {
                 Ok([bincode::serialize(share_difficulty)?, block_template.serialize_blocking()?].concat())
             }
-            Self::PoolResponse(address, block) => Ok([bincode::serialize(address)?, block.serialize_blocking()?].concat()),
+            Self::PoolResponse(address, nonce, proof) => Ok([
+                bincode::serialize(address)?,
+                bincode::serialize(nonce)?,
+                proof.serialize_blocking()?,
+            ]
+            .concat()),
             Self::Unused(_) => Ok(vec![]),
         }
     }
@@ -261,7 +266,11 @@ impl<N: Network, E: Environment> Message<N, E> {
             10 => Self::UnconfirmedTransaction(bincode::deserialize(data)?),
             11 => Self::PoolRegister(bincode::deserialize(data)?),
             12 => Self::PoolRequest(bincode::deserialize(&data[0..8])?, Data::Buffer(data[8..].to_vec())),
-            13 => Self::PoolResponse(bincode::deserialize(&data[0..32])?, Data::Buffer(data[32..].to_vec())),
+            13 => Self::PoolResponse(
+                bincode::deserialize(&data[0..32])?,
+                bincode::deserialize(&data[32..64])?,
+                Data::Buffer(data[64..].to_vec()),
+            ),
             _ => return Err(anyhow!("Invalid message ID {}", id)),
         };
 
