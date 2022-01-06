@@ -104,8 +104,8 @@ impl Crawler {
     /// Creates a default crawler node with the most basic network protocols enabled.
     pub async fn default() -> Self {
         let config = Config {
-            listener_ip: Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)),
-            desired_listening_port: Some(4132),
+            listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            desired_listening_port: Some(4133),
             max_connections: MAXIMUM_NUMBER_OF_PEERS as u16,
             ..Default::default()
         };
@@ -162,6 +162,18 @@ impl Crawler {
         let node = self.clone();
         task::spawn(async move {
             loop {
+                // Disconnect from peers we have just crawled.
+                for addr in node.known_network.addrs_to_disconnect() {
+                    node.node().disconnect(addr).await;
+                }
+
+                // Connect to peers we haven't crawled in a while.
+                for addr in node.known_network.addrs_to_connect() {
+                    if !node.node().is_connected(addr) {
+                        let _ = node.node().connect(addr).await;
+                    }
+                }
+
                 info!(parent: node.node().span(), "Crawling the netowrk for more peers; asking peers for their peers");
                 node.send_broadcast(ClientMessage::PeerRequest);
                 tokio::time::sleep(Duration::from_secs(PEER_INTERVAL_SECS)).await;
@@ -253,16 +265,20 @@ impl Crawler {
 
     async fn process_peer_response(&self, source: SocketAddr, mut peer_ips: Vec<SocketAddr>) -> io::Result<()> {
         let num_connections = self.node().num_connected() + self.node().num_connecting();
-        let node = self.clone();
 
+        let node = self.clone();
         task::spawn(async move {
-            // Insert the address into the known network.
             peer_ips.retain(|addr| node.node().listening_addr().unwrap() != *addr);
+
+            // Insert the address into the known network and update the crawl state.
             node.known_network.update_connections(source, peer_ips.clone());
+            node.known_network.received_peers(source);
 
             for peer_ip in peer_ips {
                 if !node.node().is_connected(peer_ip) && !node.state.peers.lock().await.iter().any(|peer| peer.listening_addr == peer_ip) {
                     info!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, peer_ip);
+
+                    // TODO: only connect if this address is unknown.
                     let _ = node.node().connect(peer_ip).await;
                 }
             }
@@ -279,6 +295,10 @@ impl Crawler {
         }
 
         debug!(parent: self.node().span(), "peer {} is at height {}", source, block_height);
+
+        // Update the known network nodes and update the crawl state.
+        self.known_network.update_height(source, block_height);
+        self.known_network.received_height(source);
 
         let genesis = Testnet2::genesis_block();
         let msg = ClientMessage::Pong(

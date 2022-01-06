@@ -26,11 +26,35 @@ use crate::connection::{nodes_from_connections, Connection};
 // Purges connections that haven't been seen within this time (in hours).
 const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
 
+const CRAWL_INTERVAL_MINS: i64 = 10;
+
+/// Node information collected while crawling.
+#[derive(Debug, Default, Clone)]
+pub struct NodeMeta {
+    last_height: u32,
+    // Set on disconnect.
+    last_crawled: Option<OffsetDateTime>,
+
+    // Useful for keeping track of crawl round state.
+    received_peers: bool,
+    received_height: bool,
+}
+
+impl NodeMeta {
+    fn new(last_height: u32, last_crawled: Option<OffsetDateTime>) -> Self {
+        Self {
+            last_height,
+            last_crawled,
+            ..Default::default()
+        }
+    }
+}
+
 /// Keeps track of crawled peers and their connections.
 #[derive(Debug, Default)]
 pub struct KnownNetwork {
-    // The nodes and their block height if known.
-    nodes: RwLock<HashMap<SocketAddr, u32>>,
+    // The nodes and their information.
+    nodes: RwLock<HashMap<SocketAddr, NodeMeta>>,
     // The connections map.
     connections: RwLock<HashSet<Connection>>,
 }
@@ -88,7 +112,53 @@ impl KnownNetwork {
 
     /// Update the height stored for this particular node.
     pub fn update_height(&self, source: SocketAddr, height: u32) {
-        self.nodes.write().insert(source, height);
+        if let Some(meta) = self.nodes.write().get_mut(&source) {
+            meta.last_height = height
+        } else {
+            let meta = NodeMeta::new(height, None);
+            self.nodes.write().insert(source, meta);
+        }
+    }
+
+    pub fn received_peers(&self, source: SocketAddr) {
+        if let Some(meta) = self.nodes.write().get_mut(&source) {
+            meta.received_peers = true;
+        }
+    }
+
+    pub fn received_height(&self, source: SocketAddr) {
+        if let Some(meta) = self.nodes.write().get_mut(&source) {
+            meta.received_height = true;
+        }
+    }
+
+    pub fn addrs_to_connect(&self) -> HashSet<SocketAddr> {
+        // Snapshot is safe to use as disconnected peers won't have their state updated at the
+        // moment.
+        self.nodes()
+            .iter()
+            .filter(|(_, meta)| {
+                if let Some(last_crawled) = meta.last_crawled {
+                    (OffsetDateTime::now_utc() - last_crawled).whole_minutes() > CRAWL_INTERVAL_MINS
+                } else {
+                    false
+                }
+            })
+            .map(|(&addr, _)| addr)
+            .collect()
+    }
+
+    pub fn addrs_to_disconnect(&self) -> HashSet<SocketAddr> {
+        let mut addrs = HashSet::new();
+        for (addr, meta) in self.nodes.write().iter() {
+            // Disconnect from peers we have received a height and peers for.
+            if meta.received_height && meta.received_peers {
+                self.reset_crawl_state(*addr);
+                addrs.insert(*addr);
+            }
+        }
+
+        addrs
     }
 
     /// Returns `true` if the known network contains any connections, `false` otherwise.
@@ -107,8 +177,17 @@ impl KnownNetwork {
     }
 
     /// Returns a snapshot of all the nodes.
-    pub fn nodes(&self) -> HashMap<SocketAddr, u32> {
+    pub fn nodes(&self) -> HashMap<SocketAddr, NodeMeta> {
         self.nodes.read().clone()
+    }
+
+    fn reset_crawl_state(&self, source: SocketAddr) {
+        if let Some(meta) = self.nodes.write().get_mut(&source) {
+            meta.received_peers = false;
+            meta.received_height = false;
+
+            meta.last_crawled = Some(OffsetDateTime::now_utc());
+        }
     }
 }
 
