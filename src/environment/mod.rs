@@ -19,8 +19,10 @@ use snarkvm::dpc::Network;
 
 use once_cell::sync::OnceCell;
 use std::{
+    collections::HashSet,
     fmt::Debug,
     marker::PhantomData,
+    net::SocketAddr,
     sync::{atomic::AtomicBool, Arc},
 };
 
@@ -73,6 +75,12 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     /// The maximum number of failures tolerated before disconnecting from a peer.
     const MAXIMUM_NUMBER_OF_FAILURES: usize = 1024;
 
+    /// Returns the sync nodes preset for the node.
+    fn sync_nodes() -> &'static HashSet<SocketAddr> {
+        static NODES: OnceCell<HashSet<SocketAddr>> = OnceCell::new();
+        NODES.get_or_init(|| Self::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect())
+    }
+    
     /// Returns the tasks handler for the node.
     fn tasks() -> &'static Tasks<tokio::task::JoinHandle<()>> {
         static TASKS: OnceCell<Tasks<tokio::task::JoinHandle<()>>> = OnceCell::new();
