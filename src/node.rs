@@ -476,7 +476,7 @@ impl MinerRevert {
         let block = ledger
             .revert_to_block_height(block_height)
             .expect("Failed to remove the last block");
-        return Ok(format!("Revert len={} success", block.len()));
+        Ok(format!("Revert len={} success", block.len()))
     }
 }
 
