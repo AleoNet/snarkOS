@@ -48,6 +48,13 @@ impl NodeMeta {
             ..Default::default()
         }
     }
+
+    fn reset_crawl_state(&mut self) {
+        self.received_peers = false;
+        self.received_height = false;
+
+        self.last_crawled = Some(OffsetDateTime::now_utc());
+    }
 }
 
 /// Keeps track of crawled peers and their connections.
@@ -112,11 +119,12 @@ impl KnownNetwork {
 
     /// Update the height stored for this particular node.
     pub fn update_height(&self, source: SocketAddr, height: u32) {
-        if let Some(meta) = self.nodes.write().get_mut(&source) {
+        let mut nodes_g = self.nodes.write();
+        if let Some(meta) = nodes_g.get_mut(&source) {
             meta.last_height = height
         } else {
             let meta = NodeMeta::new(height, None);
-            self.nodes.write().insert(source, meta);
+            nodes_g.insert(source, meta);
         }
     }
 
@@ -150,11 +158,16 @@ impl KnownNetwork {
 
     pub fn addrs_to_disconnect(&self) -> HashSet<SocketAddr> {
         let mut addrs = HashSet::new();
-        for (addr, meta) in self.nodes.write().iter() {
-            // Disconnect from peers we have received a height and peers for.
-            if meta.received_height && meta.received_peers {
-                self.reset_crawl_state(*addr);
-                addrs.insert(*addr);
+
+        // Scope the write lock.
+        {
+            let mut nodes_g = self.nodes.write();
+            for (addr, meta) in nodes_g.iter_mut() {
+                // Disconnect from peers we have received a height and peers for.
+                if meta.received_height && meta.received_peers {
+                    meta.reset_crawl_state();
+                    addrs.insert(*addr);
+                }
             }
         }
 
@@ -179,15 +192,6 @@ impl KnownNetwork {
     /// Returns a snapshot of all the nodes.
     pub fn nodes(&self) -> HashMap<SocketAddr, NodeMeta> {
         self.nodes.read().clone()
-    }
-
-    fn reset_crawl_state(&self, source: SocketAddr) {
-        if let Some(meta) = self.nodes.write().get_mut(&source) {
-            meta.received_peers = false;
-            meta.received_height = false;
-
-            meta.last_crawled = Some(OffsetDateTime::now_utc());
-        }
     }
 }
 

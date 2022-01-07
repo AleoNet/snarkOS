@@ -64,8 +64,8 @@ async fn main() {
     tokio::spawn(async move {
         loop {
             tokio::time::sleep(Duration::from_secs(5)).await;
-            dbg!(crawler.known_network.nodes().len());
-            dbg!(crawler.known_network.connections().len());
+            println!("Nodes: {}", crawler.known_network.nodes().len());
+            println!("Connections: {}", crawler.known_network.connections().len());
         }
     });
 
