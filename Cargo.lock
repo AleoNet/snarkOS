@@ -2137,24 +2137,10 @@ dependencies = [
  "pea2pea",
  "rand",
  "snarkos",
- "snarkos-snode",
  "snarkos-storage",
+ "snarkos-synthetic-node",
  "snarkvm 0.7.5 (git+https://github.com/AleoHQ/snarkVM.git?rev=ff10c20)",
  "time 0.3.5",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "snarkos-snode"
-version = "2.0.0"
-dependencies = [
- "async-trait",
- "pea2pea",
- "rand",
- "snarkos",
- "snarkvm 0.7.5 (git+https://github.com/AleoHQ/snarkVM.git?rev=ff10c20)",
  "tokio",
  "tracing",
  "tracing-subscriber",
@@ -2181,6 +2167,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-synthetic-node"
+version = "2.0.0"
+dependencies = [
+ "async-trait",
+ "pea2pea",
+ "rand",
+ "snarkos",
+ "snarkvm 0.7.5 (git+https://github.com/AleoHQ/snarkVM.git?rev=ff10c20)",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "snarkos-testing"
 version = "2.0.0"
 dependencies = [
@@ -2191,8 +2191,8 @@ dependencies = [
  "peak_alloc",
  "rand",
  "snarkos",
- "snarkos-snode",
  "snarkos-storage",
+ "snarkos-synthetic-node",
  "snarkvm 0.7.5 (git+https://github.com/AleoHQ/snarkVM.git?rev=48c59e9)",
  "structopt",
  "tokio",

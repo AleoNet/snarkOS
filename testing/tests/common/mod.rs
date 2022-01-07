@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_snode::{ClientNonce, ClientState};
+use snarkos_synthetic_node::{ClientNonce, ClientState};
 use snarkos_testing::test_node::TestNode;
 
 use pea2pea::{protocols::*, Config};

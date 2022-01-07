@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = ["storage", "snode", "testing", "crawler"]
+members = ["storage", "synthetic_node", "testing", "crawler"]
 
 [features]
 default = []

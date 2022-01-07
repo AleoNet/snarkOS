@@ -15,8 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos::{Client, ClientTrial, Data, Environment};
-use snarkos_snode::{enable_tracing, ClientMessage, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
 use snarkos_storage::BlockLocators;
+use snarkos_synthetic_node::{enable_tracing, ClientMessage, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
 
 use pea2pea::{
