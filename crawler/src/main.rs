@@ -15,15 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos::{Client, ClientTrial, Data, Environment};
-use snarkos_snode::{
-    enable_tracing,
-    ClientMessage,
-    ClientState,
-    SynthNode,
-    MAXIMUM_FORK_DEPTH,
-    MESSAGE_LENGTH_PREFIX_SIZE,
-    MESSAGE_VERSION,
-};
+use snarkos_snode::{enable_tracing, ClientMessage, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
 use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
 
@@ -123,14 +115,6 @@ impl Crawler {
         node.enable_writing();
 
         node
-    }
-
-    /// Creates a crawler node using the given `Pea2Pea` node.
-    pub fn new(node: Pea2PeaNode, state: ClientState) -> Self {
-        Self {
-            synth_node: SynthNode::new(node, state),
-            known_network: Arc::new(KnownNetwork::default()),
-        }
     }
 
     /// Spawns a task dedicated to broadcasting Ping messages.
@@ -264,8 +248,6 @@ impl Crawler {
     }
 
     async fn process_peer_response(&self, source: SocketAddr, mut peer_ips: Vec<SocketAddr>) -> io::Result<()> {
-        let num_connections = self.node().num_connected() + self.node().num_connecting();
-
         let node = self.clone();
         task::spawn(async move {
             peer_ips.retain(|addr| node.node().listening_addr().unwrap() != *addr);
