@@ -17,19 +17,22 @@ norpc = false
 network = 2
 
 # Specify the IP address and port for the node server [default: 0.0.0.0:4132]
-node = "0.0.0.0:4144"
+node = "0.0.0.0:4132"
 
 # Specify the IP address and port for the RPC server [default: 0.0.0.0:3032]
-rpc = "0.0.0.0:3044"
+rpc = "0.0.0.0:3032"
 
 # Specify the password for the RPC server [default: pass]
-rpc_password = "passss"
+rpc_password = "pass"
 
 # Specify the username for the RPC server [default: root]
-rpc_username = "roottt"
+rpc_username = "root"
 
 # Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
 verbosity = 2
 
-trial = true
-sync = true
+# Specify whether connect to offical nodes
+trial = false
+
+# Specify if this node is a sync node
+sync = false
