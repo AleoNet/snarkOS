@@ -22,7 +22,7 @@ features = ["test"]
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "ff10c20"
+rev = "459ea96"
 #path = "../../snarkVM"
 
 [dependencies.async-trait]
