@@ -97,7 +97,7 @@ impl Crawler {
     pub async fn default() -> Self {
         let config = Config {
             listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
-            desired_listening_port: Some(4133),
+            desired_listening_port: Some(4132),
             max_connections: MAXIMUM_NUMBER_OF_PEERS as u16,
             ..Default::default()
         };
