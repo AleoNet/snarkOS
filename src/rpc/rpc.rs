@@ -141,18 +141,32 @@ async fn handle_rpc<N: Network, E: Environment>(
     };
 
     // Deserialize the JSON-RPC request.
-    let req: jrt::Request<Params> = match serde_json::from_slice(&data) {
-        Ok(req) => req,
-        Err(_) => {
-            let resp = jrt::Response::<(), ()>::error(
-                jrt::Version::V2,
-                jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't parse the RPC body"),
-                None,
-            );
-            let body = serde_json::to_vec(&resp).unwrap_or_default();
+    // First deserialize into serde_json::Value - a workaround https://github.com/serde-rs/json/issues/505 
+    // for https://github.com/AleoHQ/snarkOS/issues/1369
+    let req = if let Ok(req_data) = serde_json::from_slice::<serde_json::Value>(&data) {
+        match serde_json::from_value::<jrt::Request<Params>>(req_data) {
+            Ok(req) => req,
+            Err(e) => {
+                debug!("Request Parsing Error: {:?}", e);
+                let resp = jrt::Response::<(), ()>::error(
+                    jrt::Version::V2,
+                    jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't parse the RPC body"),
+                    None,
+                );
+                let body = serde_json::to_vec(&resp).unwrap_or_default();
 
-            return Ok(hyper::Response::new(body.into()));
+                return Ok(hyper::Response::new(body.into()));
+            }
         }
+    } else {
+        let resp = jrt::Response::<(), ()>::error(
+            jrt::Version::V2,
+            jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't parse the RPC body into Value"),
+            None,
+        );
+        let body = serde_json::to_vec(&resp).unwrap_or_default();
+
+        return Ok(hyper::Response::new(body.into()));
     };
 
     debug!("Received '{}' RPC request from {}: {:?}", &*req.method, caller, headers);

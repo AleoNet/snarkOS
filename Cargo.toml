@@ -72,7 +72,7 @@ features = [ "http1", "runtime", "server", "tcp" ]
 
 [dependencies.json-rpc-types]
 git = "https://github.com/whalelephant/json-rpc-types"
-branch = "deserialise-id-with-map"
+branch = "deserialize-version-with-str"
 version = "1.0"
 
 [dependencies.jsonrpc-core]
