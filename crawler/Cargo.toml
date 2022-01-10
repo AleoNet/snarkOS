@@ -18,7 +18,6 @@ edition = "2018"
 
 [dependencies.snarkos]
 path = ".."
-features = ["test"]
 
 [dependencies.snarkos-storage]
 path = "../storage"
