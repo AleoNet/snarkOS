@@ -2,7 +2,7 @@
 name = "snarkos-crawler"
 version = "2.0.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "A decentralized operating system"
+description = "A network protocol-based crawler"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
