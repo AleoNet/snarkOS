@@ -53,19 +53,12 @@ async fn main() {
 
     crawler.run_periodic_tasks();
 
-    tokio::spawn(async move {
-        loop {
-            tokio::time::sleep(Duration::from_secs(5)).await;
-            println!("Nodes: {}", crawler.known_network.nodes().len());
-            println!("Connections: {}", crawler.known_network.connections().len());
-        }
-    });
-
     std::future::pending::<()>().await;
 }
 
 const PING_INTERVAL_SECS: u64 = 10;
 const PEER_INTERVAL_SECS: u64 = 10;
+const LOG_INTERVAL_SECS: u64 = 10;
 
 const SYNC_NODES: &'static [&'static str] = <ClientTrial<Testnet2>>::SYNC_NODES;
 
@@ -165,10 +158,22 @@ impl Crawler {
         });
     }
 
+    fn log_known_network(&self) {
+        let node = self.clone();
+        tokio::spawn(async move {
+            loop {
+                info!(parent: node.node().span(), "Known addresses: {}", node.known_network.nodes().len());
+                info!(parent: node.node().span(), "Known connections: {}", node.known_network.connections().len());
+                tokio::time::sleep(Duration::from_secs(LOG_INTERVAL_SECS)).await;
+            }
+        });
+    }
+
     /// Starts the usual periodic activities of a crawler node.
     pub fn run_periodic_tasks(&self) {
         self.send_pings();
         self.update_peers();
+        self.log_known_network();
     }
 }
 
