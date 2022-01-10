@@ -26,6 +26,7 @@ use crate::connection::{nodes_from_connections, Connection};
 // Purges connections that haven't been seen within this time (in hours).
 const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
 
+// The interval for revisiting connections.
 const CRAWL_INTERVAL_MINS: i64 = 10;
 
 /// Node information collected while crawling.
