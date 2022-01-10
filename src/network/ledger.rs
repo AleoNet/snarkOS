@@ -696,16 +696,16 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Verify the integrity of the block hashes sent by the peer.
             for (block_height, (block_hash, _)) in block_locators.iter() {
                 // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
-                if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
-                    if expected_block_height != *block_height {
-                        let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
+                if let Ok(expected_block_hash) = self.canon.get_block_hash(*block_height) {
+                    if expected_block_hash != *block_hash {
+                        let error = format!("Invalid block height {} for block hash {}", block_height, block_hash);
                         trace!("{}", error);
                         self.add_failure(peer_ip, error).await;
                         return;
                     } else {
                         // Update the common ancestor, as this block hash exists in this ledger.
-                        if expected_block_height > common_ancestor {
-                            common_ancestor = expected_block_height
+                        if *block_height > common_ancestor {
+                            common_ancestor = *block_height
                         }
                     }
                 }
