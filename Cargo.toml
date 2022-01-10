@@ -71,9 +71,7 @@ version = "0.14"
 features = [ "http1", "runtime", "server", "tcp" ]
 
 [dependencies.json-rpc-types]
-git = "https://github.com/whalelephant/json-rpc-types"
-branch = "deserialize-version-with-str"
-version = "1.0"
+version = "1.0.2"
 
 [dependencies.jsonrpc-core]
 version = "18"
@@ -107,7 +105,7 @@ version = "1"
 
 [dependencies.serde_json]
 version = "1"
-features = [ "arbitrary_precision", "raw_value" ]
+features = [ "arbitrary_precision" ]
 
 [dependencies.structopt]
 version = "0.3"

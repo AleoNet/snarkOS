@@ -141,8 +141,6 @@ async fn handle_rpc<N: Network, E: Environment>(
     };
 
     // Deserialize the JSON-RPC request.
-    // First deserialize into serde_json::Value - a workaround https://github.com/serde-rs/json/issues/505 
-    // for https://github.com/AleoHQ/snarkOS/issues/1369
     let req = if let Ok(req_data) = serde_json::from_slice::<serde_json::Value>(&data) {
         match serde_json::from_value::<jrt::Request<Params>>(req_data) {
             Ok(req) => req,
