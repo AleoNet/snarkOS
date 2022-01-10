@@ -61,7 +61,7 @@ version = "1"
 version = "0.1"
 
 [dev-dependencies.tempfile]
-version = "3.2"
+version = "3.3"
 
 [features]
 default = ["rocks"]

@@ -150,7 +150,7 @@ features = ["json"]
 version = "0.11"
 
 [dev-dependencies.tempfile]
-version = "3.2"
+version = "3.3"
 
 [profile.release]
 opt-level = 3
