@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos::{Client, ClientTrial, Data, Environment};
+use snarkos_crawler::known_network::KnownNetwork;
 use snarkos_storage::BlockLocators;
 use snarkos_synthetic_node::{enable_tracing, ClientMessage, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
@@ -25,23 +26,18 @@ use pea2pea::{
     Node as Pea2PeaNode,
     Pea2Pea,
 };
-use std::{
-    convert::TryInto,
-    io,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    ops::Deref,
-    sync::Arc,
-    time::Duration,
-};
+use std::{convert::TryInto, io, net::SocketAddr, ops::Deref, sync::Arc, time::Duration};
+use structopt::StructOpt;
 use tokio::task;
 use tracing::*;
 
-use snarkos_crawler::known_network::KnownNetwork;
-
 #[tokio::main]
 async fn main() {
+    // Read configuration options.
+    let opts = Opts::from_args();
+
     // Configure and start crawler.
-    let crawler = Crawler::default().await;
+    let crawler = Crawler::new(opts).await;
 
     // Enable tracing for the crawler.
     enable_tracing();
@@ -65,6 +61,14 @@ const SYNC_NODES: &'static [&'static str] = <ClientTrial<Testnet2>>::SYNC_NODES;
 // pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<Testnet2>>::MAXIMUM_NUMBER_OF_PEERS;
 pub const MAXIMUM_NUMBER_OF_PEERS: usize = 10000;
 
+#[derive(Debug, StructOpt)]
+struct Opts {
+    /// Specify the IP address and port for the node server.
+    /// Naming and defaults kept consistent with snarkOS.
+    #[structopt(parse(try_from_str), default_value = "0.0.0.0:4132", long = "node")]
+    pub node: SocketAddr,
+}
+
 #[derive(Clone)]
 struct Crawler {
     synth_node: SynthNode,
@@ -87,10 +91,10 @@ impl Deref for Crawler {
 
 impl Crawler {
     /// Creates a default crawler node with the most basic network protocols enabled.
-    pub async fn default() -> Self {
+    pub async fn new(opts: Opts) -> Self {
         let config = Config {
-            listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
-            desired_listening_port: Some(4132),
+            listener_ip: Some(opts.node.ip()),
+            desired_listening_port: Some(opts.node.port()),
             max_connections: MAXIMUM_NUMBER_OF_PEERS as u16,
             ..Default::default()
         };
