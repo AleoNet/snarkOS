@@ -172,6 +172,9 @@ impl Reading for TestNode {
             ClientMessage::Pong(_is_fork, _block_locators) => {}
             ClientMessage::UnconfirmedBlock(_block_height, _block_hash, _block) => {}
             ClientMessage::UnconfirmedTransaction(_transaction) => {}
+            ClientMessage::PoolRegister(_address) => {}
+            ClientMessage::PoolRequest(_share_difficulty, _block_template) => {}
+            ClientMessage::PoolResponse(_address, _nonce, _proof) => {}
             _ => return Err(io::ErrorKind::InvalidData.into()), // Peer is not following the protocol.
         }
 
