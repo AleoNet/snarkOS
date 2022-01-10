@@ -238,17 +238,6 @@ impl Reading for Crawler {
 
 impl Crawler {
     async fn process_peer_request(&self, source: SocketAddr) -> io::Result<()> {
-        // Don't share peers for the time being.
-        // let peers = self
-        //     .state
-        //     .peers
-        //     .lock()
-        //     .await
-        //     .iter()
-        //     .map(|peer| peer.listening_addr)
-        //     .take()
-        //     .collect::<Vec<_>>();
-
         let peers = vec![];
         let msg = ClientMessage::PeerResponse(peers);
         info!(parent: self.node().span(), "sending a PeerResponse to {}", source);
