@@ -159,7 +159,7 @@ async fn handle_rpc<N: Network, E: Environment>(
     } else {
         let resp = jrt::Response::<(), ()>::error(
             jrt::Version::V2,
-            jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Couldn't parse the RPC body into Value"),
+            jrt::Error::with_custom_msg(jrt::ErrorCode::ParseError, "Deserialize to Value failed"),
             None,
         );
         let body = serde_json::to_vec(&resp).unwrap_or_default();
