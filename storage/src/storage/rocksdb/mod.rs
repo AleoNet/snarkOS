@@ -99,9 +99,8 @@ impl Storage for RocksDB {
         context_bytes.extend_from_slice(new_context);
 
         Ok(DataMap {
-            rocksdb: self.rocksdb.clone(),
+            storage: self.clone(),
             context: context_bytes,
-            is_read_only: self.is_read_only,
             _phantom: PhantomData,
         })
     }
