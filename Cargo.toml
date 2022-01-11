@@ -24,7 +24,7 @@ default = []
 test = []
 
 [dependencies]
-snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "459ea96" }
+snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "2af7756" }
 #snarkvm = { path = "../snarkVM" }
 
 bytes = "1.0.0"
@@ -69,6 +69,9 @@ version = "0.4"
 [dependencies.hyper]
 version = "0.14"
 features = [ "http1", "runtime", "server", "tcp" ]
+
+[dependencies.indexmap]
+version = "1.8.0"
 
 [dependencies.json-rpc-types]
 version = "1.0"
