@@ -233,15 +233,10 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Shut down the ledger.
         trace!("Proceeding to shut down the ledger...");
-        let (canon_lock, block_requests_lock) = self.ledger.shut_down().await;
-
-        // Acquire the locks for ledger.
-        trace!("Proceeding to lock the ledger...");
-        let _block_requests_lock = block_requests_lock.lock().await;
-        let _canon_lock = canon_lock.lock().await;
-        trace!("Ledger has shut down, proceeding to flush tasks...");
+        self.ledger.shut_down().await;
 
         // Flush the tasks.
+        trace!("Flushing tasks...");
         E::tasks().flush();
         trace!("Node has shut down.");
     }

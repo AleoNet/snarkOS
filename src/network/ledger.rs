@@ -163,7 +163,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.ledger_router.clone()
     }
 
-    pub(super) async fn shut_down(&self) -> (Arc<Mutex<()>>, Arc<Mutex<()>>) {
+    pub(super) async fn shut_down(&self) {
         debug!("Ledger is shutting down...");
 
         // Set the terminator bit to `true` to ensure it stops mining.
@@ -180,13 +180,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             self.disconnect(peer_ip, DisconnectReason::ShuttingDown).await;
         }
         trace!("[ShuttingDown] Disconnect message has been sent to all connected peers");
-
-        // Return the lock for the canon chain and block requests.
-        let canon_lock = self.canon_lock.clone();
-        let block_requests_lock = self.block_requests_lock.clone();
-        trace!("[ShuttingDown] Block requests lock has been cloned");
-
-        (canon_lock, block_requests_lock)
     }
 
     ///
