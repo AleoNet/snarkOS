@@ -66,17 +66,21 @@ pub trait Map<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwn
         Q: Serialize + ?Sized;
 
     ///
-    /// Inserts the given key-value pair into the map.
+    /// Inserts the given key-value pair into the map. Can be paired with a numeric
+    /// batch id, which defers the operation until `execute_batch` is called using
+    /// the same id.
     ///
-    fn insert<Q>(&self, key: &Q, value: &V) -> Result<()>
+    fn insert<Q>(&self, key: &Q, value: &V, batch: Option<usize>) -> Result<()>
     where
         K: Borrow<Q>,
         Q: Serialize + ?Sized;
 
     ///
-    /// Removes the key-value pair for the given key from the map.
+    /// Removes the key-value pair for the given key from the map. Can be paired with a
+    /// numeric batch id, which defers the operation until `execute_batch` is called using
+    /// the same id.
     ///
-    fn remove<Q>(&self, key: &Q) -> Result<()>
+    fn remove<Q>(&self, key: &Q, batch: Option<usize>) -> Result<()>
     where
         K: Borrow<Q>,
         Q: Serialize + ?Sized;
@@ -104,4 +108,21 @@ pub trait Map<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwn
         // Currently, this method is implemented for RocksDB to catch up a reader (secondary) database.
         true
     }
+
+    ///
+    /// Prepares an atomic batch of writes and returns its numeric id which can later be used to include
+    /// operations within it. `execute_batch` has to be called in order for any of the writes to actually
+    /// take place.
+    ///
+    fn prepare_batch(&self) -> usize;
+
+    ///
+    /// Atomically executes a write batch with the given id.
+    ///
+    fn execute_batch(&self, batch: usize) -> Result<()>;
+
+    ///
+    /// Discards a write batch with the given id.
+    ///
+    fn discard_batch(&self, batch: usize) -> Result<()>;
 }

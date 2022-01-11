@@ -32,6 +32,7 @@ mod tests;
 use crate::storage::{Map, Storage};
 
 use anyhow::Result;
+use parking_lot::Mutex;
 use serde::{
     de::{self, DeserializeOwned},
     ser::SerializeSeq,
@@ -39,7 +40,7 @@ use serde::{
     Serialize,
     Serializer,
 };
-use std::{borrow::Borrow, fmt, marker::PhantomData, path::Path, sync::Arc};
+use std::{borrow::Borrow, collections::HashMap, fmt, marker::PhantomData, path::Path, sync::Arc};
 
 ///
 /// An instance of a RocksDB database.
@@ -48,6 +49,7 @@ use std::{borrow::Borrow, fmt, marker::PhantomData, path::Path, sync::Arc};
 pub struct RocksDB {
     rocksdb: Arc<rocksdb::DB>,
     context: Vec<u8>,
+    batches: Arc<Mutex<HashMap<usize, rocksdb::WriteBatch>>>,
     is_read_only: bool,
 }
 
@@ -82,6 +84,7 @@ impl Storage for RocksDB {
         Ok(RocksDB {
             rocksdb,
             context: context_bytes,
+            batches: Default::default(),
             is_read_only,
         })
     }
