@@ -1915,7 +1915,6 @@ dependencies = [
  "futures",
  "hex",
  "hyper",
- "indexmap",
  "json-rpc-types",
  "jsonrpc-core",
  "num_cpus",

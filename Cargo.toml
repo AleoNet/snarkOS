@@ -70,9 +70,6 @@ version = "0.4"
 version = "0.14"
 features = [ "http1", "runtime", "server", "tcp" ]
 
-[dependencies.indexmap]
-version = "1.8.0"
-
 [dependencies.json-rpc-types]
 version = "1.0"
 
