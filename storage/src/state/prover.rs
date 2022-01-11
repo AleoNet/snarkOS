@@ -116,7 +116,7 @@ impl<N: Network> CoinbaseState<N> {
             Err(anyhow!("Record with commitment {} already exists in storage", commitment))
         } else {
             // Insert the record.
-            self.records.insert(&commitment, &(block_height, record))?;
+            self.records.insert(&commitment, &(block_height, record), None)?;
             Ok(())
         }
     }
@@ -124,7 +124,7 @@ impl<N: Network> CoinbaseState<N> {
     /// Removes the given record from storage.
     fn remove_record(&self, commitment: &N::Commitment) -> Result<()> {
         // Remove the record entry.
-        self.records.remove(commitment)?;
+        self.records.remove(commitment, None)?;
         Ok(())
     }
 }

@@ -135,12 +135,12 @@ impl<N: Network> SharesState<N> {
         *entry = entry.saturating_add(1);
 
         // Insert the updated shares for the given block height.
-        self.shares.insert(&(block_height, coinbase_record), &shares)
+        self.shares.insert(&(block_height, coinbase_record), &shares, None)
     }
 
     /// Removes all of the shares for a given block height and coinbase record.
     fn remove_shares(&self, block_height: u32, coinbase_record: Record<N>) -> Result<()> {
-        self.shares.remove(&(block_height, coinbase_record))
+        self.shares.remove(&(block_height, coinbase_record), None)
     }
 
     fn get_provers(&self) -> Vec<Address<N>> {

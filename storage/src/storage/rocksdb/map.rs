@@ -16,6 +16,8 @@
 
 use super::*;
 
+use anyhow::bail;
+use rand::{thread_rng, Rng};
 use std::fmt;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -114,9 +116,11 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
     }
 
     ///
-    /// Inserts the given key-value pair into the map.
+    /// Inserts the given key-value pair into the map. Can be paired with a numeric
+    /// batch id, which defers the operation until `execute_batch` is called using
+    /// the same id.
     ///
-    fn insert<Q>(&self, key: &Q, value: &V) -> Result<()>
+    fn insert<Q>(&self, key: &Q, value: &V, batch: Option<usize>) -> Result<()>
     where
         K: Borrow<Q>,
         Q: Serialize + ?Sized,
@@ -126,14 +130,21 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         bincode::serialize_into(&mut key_buf, &key)?;
         let value_buf = bincode::serialize(value)?;
 
-        self.storage.rocksdb.put(&key_buf, &value_buf)?;
+        if let Some(batch_id) = batch {
+            self.storage.batches.lock().entry(batch_id).or_default().put(&key_buf, &value_buf);
+        } else {
+            self.storage.rocksdb.put(&key_buf, &value_buf)?;
+        }
+
         Ok(())
     }
 
     ///
-    /// Removes the key-value pair for the given key from the map.
+    /// Removes the key-value pair for the given key from the map. Can be paired with a
+    /// numeric batch id, which defers the operation until `execute_batch` is called using
+    /// the same id.
     ///
-    fn remove<Q>(&self, key: &Q) -> Result<()>
+    fn remove<Q>(&self, key: &Q, batch: Option<usize>) -> Result<()>
     where
         K: Borrow<Q>,
         Q: Serialize + ?Sized,
@@ -142,7 +153,12 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         key_buf.reserve(bincode::serialized_size(&key)? as usize);
         bincode::serialize_into(&mut key_buf, &key)?;
 
-        self.storage.rocksdb.delete(&key_buf)?;
+        if let Some(batch_id) = batch {
+            self.storage.batches.lock().entry(batch_id).or_default().delete(&key_buf);
+        } else {
+            self.storage.rocksdb.delete(&key_buf)?;
+        }
+
         Ok(())
     }
 
@@ -191,5 +207,42 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
             }
         }
         false
+    }
+
+    ///
+    /// Prepares an atomic batch of writes and returns its numeric id which can later be used to include
+    /// operations within it. `execute_batch` has to be called in order for any of the writes to actually
+    /// take place.
+    ///
+    fn prepare_batch(&self) -> usize {
+        let mut id = thread_rng().gen();
+
+        while self.storage.batches.lock().contains_key(&id) {
+            id = thread_rng().gen();
+        }
+
+        id
+    }
+
+    ///
+    /// Atomically executes a write batch with the given id.
+    ///
+    fn execute_batch(&self, batch: usize) -> Result<()> {
+        if let Some(batch) = self.storage.batches.lock().remove(&batch) {
+            Ok(self.storage.rocksdb.write(batch)?)
+        } else {
+            bail!("There is no pending storage batch with id = {}", batch);
+        }
+    }
+
+    ///
+    /// Discards a write batch with the given id.
+    ///
+    fn discard_batch(&self, batch: usize) -> Result<()> {
+        if self.storage.batches.lock().remove(&batch).is_none() {
+            bail!("Attempted to discard a non-existent storage batch (id = {})", batch)
+        } else {
+            Ok(())
+        }
     }
 }
