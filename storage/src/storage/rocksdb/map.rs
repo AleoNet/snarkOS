@@ -16,6 +16,8 @@
 
 use super::*;
 
+use std::fmt;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MapId {
     BlockHeaders,
@@ -51,11 +53,10 @@ impl MapId {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct DataMap<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
-    pub(super) rocksdb: Arc<rocksdb::DB>,
+    pub(super) storage: RocksDB,
     pub(super) context: Vec<u8>,
-    pub(super) is_read_only: bool,
     pub(super) _phantom: PhantomData<(K, V)>,
 }
 
@@ -68,10 +69,16 @@ impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> DataMap<K
         let mut key_buf = self.context.clone();
         key_buf.reserve(bincode::serialized_size(&key)? as usize);
         bincode::serialize_into(&mut key_buf, &key)?;
-        match self.rocksdb.get(&key_buf)? {
+        match self.storage.rocksdb.get(&key_buf)? {
             Some(data) => Ok(Some(data)),
             None => Ok(None),
         }
+    }
+}
+
+impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> fmt::Debug for DataMap<K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DataMap").field("context", &self.context).finish()
     }
 }
 
@@ -119,7 +126,7 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         bincode::serialize_into(&mut key_buf, &key)?;
         let value_buf = bincode::serialize(value)?;
 
-        self.rocksdb.put(&key_buf, &value_buf)?;
+        self.storage.rocksdb.put(&key_buf, &value_buf)?;
         Ok(())
     }
 
@@ -135,7 +142,7 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         key_buf.reserve(bincode::serialized_size(&key)? as usize);
         bincode::serialize_into(&mut key_buf, &key)?;
 
-        self.rocksdb.delete(&key_buf)?;
+        self.storage.rocksdb.delete(&key_buf)?;
         Ok(())
     }
 
@@ -143,7 +150,7 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
     /// Returns an iterator visiting each key-value pair in the map.
     ///
     fn iter(&'a self) -> Self::Iterator {
-        let mut db_iter = self.rocksdb.raw_iterator();
+        let mut db_iter = self.storage.rocksdb.raw_iterator();
         db_iter.seek(&self.context);
 
         Iter::new(db_iter, self.context.clone())
@@ -153,7 +160,7 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
     /// Returns an iterator over each key in the map.
     ///
     fn keys(&'a self) -> Self::Keys {
-        let mut db_iter = self.rocksdb.raw_iterator();
+        let mut db_iter = self.storage.rocksdb.raw_iterator();
         db_iter.seek(&self.context);
 
         Keys::new(db_iter, self.context.clone())
@@ -163,7 +170,7 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
     /// Returns an iterator over each value in the map.
     ///
     fn values(&'a self) -> Self::Values {
-        let mut db_iter = self.rocksdb.raw_iterator();
+        let mut db_iter = self.storage.rocksdb.raw_iterator();
         db_iter.seek(&self.context);
 
         Values::new(db_iter, self.context.clone())
@@ -176,10 +183,10 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
     ///
     fn refresh(&self) -> bool {
         // If the storage is in read-only mode, catch it up to its writable storage.
-        if self.is_read_only {
-            let original_sequence_number = self.rocksdb.latest_sequence_number();
-            if self.rocksdb.try_catch_up_with_primary().is_ok() {
-                let new_sequence_number = self.rocksdb.latest_sequence_number();
+        if self.storage.is_read_only {
+            let original_sequence_number = self.storage.rocksdb.latest_sequence_number();
+            if self.storage.rocksdb.try_catch_up_with_primary().is_ok() {
+                let new_sequence_number = self.storage.rocksdb.latest_sequence_number();
                 return new_sequence_number > original_sequence_number;
             }
         }
