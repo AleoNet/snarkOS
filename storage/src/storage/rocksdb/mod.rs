@@ -39,7 +39,7 @@ use std::{
     fs::File,
     io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
     marker::PhantomData,
-    path::Path,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
@@ -79,11 +79,17 @@ impl Storage for RocksDB {
             }
         };
 
-        Ok(RocksDB {
+        let mut storage = RocksDB {
             rocksdb,
             context,
             is_read_only,
-        })
+        };
+
+        if !is_read_only {
+            storage.migrate(path)?;
+        }
+
+        Ok(storage)
     }
 
     ///
@@ -159,6 +165,124 @@ impl Storage for RocksDB {
                 writer.write_all(value)?;
             }
             iterator.next();
+        }
+
+        Ok(())
+    }
+
+    ///
+    /// Performs storage schema migration.
+    ///
+    fn migrate<P: AsRef<Path>>(&mut self, path: P) -> Result<()> {
+        // Check if migration is needed.
+        let needs_prefix_shortening = {
+            // This is the raw byte legacy format for the height of the genesis block.
+            // This check transcends all `DataMap`s, as it is performed directly on the rocksdb instance.
+            let key_with_long_prefix = vec![
+                2, 0, 0, 0, 2, 0, 13, 0, 0, 0, 98, 108, 111, 99, 107, 95, 104, 101, 105, 103, 104, 116, 115, 0, 0, 0, 0,
+            ];
+
+            self.rocksdb.get(&key_with_long_prefix)?.is_some()
+        };
+
+        // An early return in case the db is empty or the schema is up to date.
+        if !needs_prefix_shortening {
+            debug!("The storage schema format is up to date");
+            return Ok(());
+        }
+
+        debug!("The storage schema is out of date; performing migration");
+
+        // Perform a backup of the whole storage at a neighboring location.
+        let mut backup_path = path.as_ref().to_owned();
+        backup_path.pop();
+        backup_path = PathBuf::from(backup_path.to_string_lossy().into_owned());
+        backup_path.set_extension("bak");
+        debug!("Backing up storage at {}", backup_path.to_string_lossy());
+        self.export(&backup_path)?;
+
+        debug!("Migrating the storage to the new schema");
+        // This is basically `Storage::import` which shortens the keys by removing the records with the legacy
+        // format and inserting ones with the new one. It's not the fastest way to do it, but it's the safest.
+        {
+            let file = File::open(backup_path)?;
+            let mut reader = BufReader::new(file);
+
+            let len = reader.seek(SeekFrom::End(0))?;
+            reader.rewind()?;
+
+            let mut buf = vec![0u8; 16 * 1024];
+
+            while reader.stream_position()? < len {
+                reader.read_exact(&mut buf[..4])?;
+                let key_len = u32::from_le_bytes(buf[..4].try_into().unwrap()) as usize;
+
+                if key_len + 4 > buf.len() {
+                    buf.resize(key_len + 4, 0);
+                }
+
+                reader.read_exact(&mut buf[..key_len + 4])?;
+                let value_len = u32::from_le_bytes(buf[key_len..][..4].try_into().unwrap()) as usize;
+
+                if key_len + value_len > buf.len() {
+                    buf.resize(key_len + value_len, 0);
+                }
+
+                reader.read_exact(&mut buf[key_len..][..value_len])?;
+
+                // This part is where the code deviates from `Storage::import`.
+
+                let old_key = &buf[..key_len];
+                let value = &buf[key_len..][..value_len];
+
+                // Remember the N::NETWORK_ID for later.
+                let network_id = &old_key[4..][..2];
+
+                // Remove the N::NETWORK_ID bits and the label length.
+                if old_key.len() <= 10 {
+                    // The storage iterator can stumble across the updated records; ignore them.
+                    continue;
+                }
+                let mut old_key_shortened = &old_key[10..];
+
+                // Determine which map the record belongs to.
+                let mut new_map_id = None;
+
+                for (i, label) in [
+                    &b"block_headers"[..],
+                    &b"block_heights"[..],
+                    &b"block_transactions"[..],
+                    &b"commitments"[..],
+                    &b"ledger_roots"[..],
+                    &b"records"[..],
+                    &b"serial_numbers"[..],
+                    &b"transactions"[..],
+                    &b"transitions"[..],
+                    &b"shares"[..],
+                ]
+                .iter()
+                .enumerate()
+                {
+                    if old_key_shortened.starts_with(label) {
+                        new_map_id = Some(i as u16);
+                        old_key_shortened = &old_key_shortened[label.len()..];
+                    }
+                }
+
+                let new_map_id = if let Some(id) = new_map_id {
+                    id
+                } else {
+                    // The storage iterator can stumble across the updated records; ignore them.
+                    continue;
+                };
+
+                let mut new_key = network_id.to_vec();
+                new_key.extend_from_slice(&new_map_id.to_le_bytes());
+                new_key.extend_from_slice(old_key_shortened);
+
+                self.rocksdb.put(&new_key, value)?;
+                self.rocksdb.delete(old_key)?;
+            }
         }
 
         Ok(())

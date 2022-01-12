@@ -42,6 +42,11 @@ pub trait Storage {
     /// Exports the current state of storage to a single file at the specified location.
     ///
     fn export<P: AsRef<Path>>(&self, path: P) -> Result<()>;
+
+    ///
+    /// Performs storage schema migration.
+    ///
+    fn migrate<P: AsRef<Path>>(&mut self, path: P) -> Result<()>;
 }
 
 pub trait Map<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
