@@ -24,7 +24,7 @@ default = []
 test = []
 
 [dependencies]
-snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "2af7756" }
+snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "48c59e9" }
 #snarkvm = { path = "../snarkVM" }
 
 bytes = "1.0.0"
