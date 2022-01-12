@@ -662,6 +662,11 @@ impl<N: Network> LedgerState<N> {
             .cloned()
             .collect();
 
+        // Enforce that the transaction fee is positive or zero.
+        if transaction_fees.is_negative() {
+            return Err(anyhow!("Invalid transaction fees"));
+        }
+
         // Calculate the final coinbase reward (including the transaction fees).
         coinbase_reward = coinbase_reward.add(transaction_fees);
 
