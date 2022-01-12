@@ -842,7 +842,6 @@ impl<N: Network> LedgerState<N> {
             .write()
             .push((block.hash(), block.header().clone()));
         *self.latest_block_locators.write() = self.get_block_locators(block.height())?;
-
         *self.latest_block.write() = block.clone();
 
         // The map lock goes out of scope on its own.
