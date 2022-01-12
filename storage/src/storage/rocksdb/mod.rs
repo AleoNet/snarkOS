@@ -32,14 +32,16 @@ mod tests;
 use crate::storage::{Map, Storage};
 
 use anyhow::Result;
-use serde::{
-    de::{self, DeserializeOwned},
-    ser::SerializeSeq,
-    Deserializer,
-    Serialize,
-    Serializer,
+use serde::{de::DeserializeOwned, Serialize};
+use std::{
+    borrow::Borrow,
+    convert::TryInto,
+    fs::File,
+    io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
+    marker::PhantomData,
+    path::Path,
+    sync::Arc,
 };
-use std::{borrow::Borrow, fmt, marker::PhantomData, path::Path, sync::Arc};
 
 ///
 /// An instance of a RocksDB database.
@@ -107,54 +109,61 @@ impl Storage for RocksDB {
     }
 
     ///
-    /// Imports the given serialized bytes to reconstruct storage.
+    /// Imports a file with the given path to reconstruct storage.
     ///
-    fn import<'de, D: Deserializer<'de>>(&self, deserializer: D) -> Result<(), D::Error> {
-        struct RocksDBVisitor {
-            rocksdb: RocksDB,
-        }
+    fn import<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let file = File::open(path)?;
+        let mut reader = BufReader::new(file);
 
-        impl<'de> de::Visitor<'de> for RocksDBVisitor {
-            type Value = ();
+        let len = reader.seek(SeekFrom::End(0))?;
+        reader.rewind()?;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                write!(formatter, "a rocksdb seq")
+        let mut buf = vec![0u8; 16 * 1024];
+
+        while reader.stream_position()? < len {
+            reader.read_exact(&mut buf[..4])?;
+            let key_len = u32::from_le_bytes(buf[..4].try_into().unwrap()) as usize;
+
+            if key_len + 4 > buf.len() {
+                buf.resize(key_len + 4, 0);
             }
 
-            fn visit_seq<A: de::SeqAccess<'de>>(self, mut map: A) -> std::result::Result<(), A::Error> {
-                while let Some((key, value)) = map.next_element::<(Vec<_>, Vec<_>)>()? {
-                    self.rocksdb.rocksdb.put(&key, &value).map_err(serde::de::Error::custom)?;
-                }
+            reader.read_exact(&mut buf[..key_len + 4])?;
+            let value_len = u32::from_le_bytes(buf[key_len..][..4].try_into().unwrap()) as usize;
 
-                Ok(())
+            if key_len + value_len > buf.len() {
+                buf.resize(key_len + value_len, 0);
             }
-        }
 
-        deserializer.deserialize_seq(RocksDBVisitor { rocksdb: self.clone() })?;
+            reader.read_exact(&mut buf[key_len..][..value_len])?;
+
+            self.rocksdb.put(&buf[..key_len], &buf[key_len..][..value_len])?;
+        }
 
         Ok(())
     }
 
     ///
-    /// Exports the current state of storage into serialized bytes.
+    /// Exports the current state of storage to a single file at the specified location.
     ///
-    fn export(&self) -> Result<serde_json::Value> {
-        Ok(serde_json::to_value(&self)?)
-    }
-}
+    fn export<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let file = File::create(path)?;
+        let mut writer = BufWriter::new(file);
 
-impl Serialize for RocksDB {
-    fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
         let mut iterator = self.rocksdb.raw_iterator();
         iterator.seek_to_first();
 
-        let mut map = serializer.serialize_seq(None)?;
         while iterator.valid() {
             if let (Some(key), Some(value)) = (iterator.key(), iterator.value()) {
-                map.serialize_element(&(key, value))?;
+                writer.write_all(&(key.len() as u32).to_le_bytes())?;
+                writer.write_all(key)?;
+
+                writer.write_all(&(value.len() as u32).to_le_bytes())?;
+                writer.write_all(value)?;
             }
             iterator.next();
         }
-        map.end()
+
+        Ok(())
     }
 }
