@@ -1344,10 +1344,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0daa0ab3a0ae956d0e2c1f42511422850e577d36a255357d1a7d08d45ee3a2f1"
 dependencies = [
  "lazy_static",
- "proc-macro2 1.0.34",
- "quote 1.0.10",
+ "proc-macro2 1.0.36",
+ "quote 1.0.14",
  "regex",
- "syn 1.0.82",
+ "syn 1.0.85",
 ]
 
 [[package]]

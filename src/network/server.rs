@@ -412,7 +412,5 @@ impl<N: Network, E: Environment> Server<N, E> {
     #[cfg(feature = "prometheus")]
     fn initialize_metrics(tasks: &mut Tasks<task::JoinHandle<()>>) {
         tasks.append(snarkos_metrics::initialize().expect("couldn't initialise the metrics"));
-
-        // TODO: set the block height here, as it could be non-zero.
     }
 }
