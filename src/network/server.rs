@@ -163,7 +163,7 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialise the metrics exporter.
         #[cfg(feature = "prometheus")]
-        Self::initialize_metrics(&mut tasks);
+        Self::initialize_metrics();
 
         Ok(Self {
             local_ip,
@@ -410,7 +410,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     }
 
     #[cfg(feature = "prometheus")]
-    fn initialize_metrics(tasks: &mut Tasks<task::JoinHandle<()>>) {
-        tasks.append(snarkos_metrics::initialize().expect("couldn't initialise the metrics"));
+    fn initialize_metrics() {
+        E::tasks().append(snarkos_metrics::initialize().expect("couldn't initialise the metrics"));
     }
 }
