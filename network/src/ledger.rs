@@ -31,6 +31,9 @@ use snarkos_environment::{
 use snarkos_storage::{storage::Storage, BlockLocators, LedgerState, MAXIMUM_LINEAR_BLOCK_LOCATORS};
 use snarkvm::dpc::prelude::*;
 
+#[cfg(feature = "prometheus")]
+use snarkos_metrics as metrics;
+
 use anyhow::Result;
 use std::{
     collections::HashMap,
@@ -510,11 +513,16 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Attempt to add the unconfirmed block as the next block in the canonical chain.
                 false => match self.canon.add_next_block(&unconfirmed_block) {
                     Ok(()) => {
+                        // Allocation necessary if prometheus is enabled.
+                        let latest_block_height = self.canon.latest_block_height();
                         info!(
                             "Ledger successfully advanced to block {} ({})",
-                            self.canon.latest_block_height(),
+                            latest_block_height,
                             self.canon.latest_block_hash()
                         );
+
+                        #[cfg(feature = "prometheus")]
+                        metrics::gauge!(metrics::blocks::HEIGHT, latest_block_height as f64);
 
                         // Update the timestamp of the last block increment.
                         *self.last_block_update_timestamp.write().await = Instant::now();
@@ -562,7 +570,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         match self.canon.revert_to_block_height(block_height) {
             Ok(removed_blocks) => {
-                info!("Ledger successfully reverted to block {}", self.canon.latest_block_height());
+                // Allocation necessary if prometheus is enabled.
+                let latest_block_height = self.canon.latest_block_height();
+                info!("Ledger successfully reverted to block {}", latest_block_height);
+
+                #[cfg(feature = "prometheus")]
+                metrics::gauge!(metrics::blocks::HEIGHT, latest_block_height as f64);
 
                 // Update the last block update timestamp.
                 *self.last_block_update_timestamp.write().await = Instant::now();

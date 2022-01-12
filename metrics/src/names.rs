@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2021 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -14,22 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod names;
-
-// Re-export the metrics macros.
-pub use metrics::*;
-pub use names::*;
-
-use metrics_exporter_prometheus::PrometheusBuilder;
-
-pub fn initialize() -> Option<tokio::task::JoinHandle<()>> {
-    let (recorder, exporter) = PrometheusBuilder::new().build().expect("can't build the prometheus exporter");
-
-    metrics::set_boxed_recorder(Box::new(recorder)).expect("can't set the prometheus exporter");
-
-    let metrics_exporter_task = tokio::task::spawn(async move {
-        exporter.await.expect("can't await the prometheus exporter");
-    });
-
-    Some(metrics_exporter_task)
+pub mod blocks {
+    pub const HEIGHT: &str = "snarkos_blocks_height_total";
 }

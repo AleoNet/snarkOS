@@ -32,6 +32,8 @@ use snarkvm::prelude::*;
 use snarkos_rpc::{initialize_rpc_server, RpcContext};
 #[cfg(feature = "rpc")]
 use tokio::sync::RwLock;
+#[cfg(feature = "prometheus")]
+use snarkos_metrics as metrics;
 
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -175,7 +177,7 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialise the metrics exporter.
         #[cfg(feature = "prometheus")]
-        Self::initialize_metrics();
+        Self::initialize_metrics(ledger.reader());
 
         Ok(Self {
             local_ip,
@@ -424,7 +426,10 @@ impl<N: Network, E: Environment> Server<N, E> {
     }
 
     #[cfg(feature = "prometheus")]
-    fn initialize_metrics() {
+    fn initialize_metrics(ledger: LedgerReader<N>) {
         E::tasks().append(snarkos_metrics::initialize().expect("couldn't initialise the metrics"));
+
+        // Set the block height as it could already be non-zero.
+        metrics::gauge!(metrics::blocks::HEIGHT, ledger.latest_block_height() as f64);
     }
 }
