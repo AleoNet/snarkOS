@@ -58,9 +58,7 @@ impl Storage for RocksDB {
     /// Opens storage at the given `path` and `context`.
     ///
     fn open<P: AsRef<Path>>(path: P, context: u16, is_read_only: bool) -> Result<Self> {
-        let context = context.to_le_bytes();
-        let mut context_bytes = bincode::serialize(&(context.len() as u32)).unwrap();
-        context_bytes.extend_from_slice(&context);
+        let context = context.to_le_bytes().to_vec();
 
         // Customize database options.
         let mut options = rocksdb::Options::default();
@@ -83,7 +81,7 @@ impl Storage for RocksDB {
 
         Ok(RocksDB {
             rocksdb,
-            context: context_bytes,
+            context,
             is_read_only,
         })
     }
@@ -93,12 +91,11 @@ impl Storage for RocksDB {
     ///
     fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(&self, map_id: MapId) -> Result<DataMap<K, V>> {
         // Convert the new context into bytes.
-        let new_context = map_id.as_bytes();
+        let new_context = (map_id as u16).to_le_bytes();
 
         // Combine contexts to create a new scope.
         let mut context_bytes = self.context.clone();
-        bincode::serialize_into(&mut context_bytes, &(new_context.len() as u32))?;
-        context_bytes.extend_from_slice(new_context);
+        context_bytes.extend_from_slice(&new_context);
 
         Ok(DataMap {
             rocksdb: self.rocksdb.clone(),
