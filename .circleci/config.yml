@@ -269,6 +269,8 @@ workflows:
   main-workflow:
     jobs:
       - tests
+      - storage
+      - testing
       # - codecov:
       #     requires:
       #       - rust-stable
