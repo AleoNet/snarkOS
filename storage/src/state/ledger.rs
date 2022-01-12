@@ -476,7 +476,7 @@ impl<N: Network> LedgerState<N> {
             .latest_block_hashes_and_headers
             .read()
             .asc_iter()
-            .skip_while(|(_, header)| header.height() == 0) // Skip the genesis block.
+            .filter(|(_, header)| header.height() != 0) // Skip the genesis block.
             .take(num_block_headers as usize)
             .cloned()
             .map(|(hash, header)| (header.height(), (hash, Some(header))))
@@ -841,9 +841,7 @@ impl<N: Network> LedgerState<N> {
         self.latest_block_hashes_and_headers
             .write()
             .push((block.hash(), block.header().clone()));
-        println!("got to here");
         *self.latest_block_locators.write() = self.get_block_locators(block.height())?;
-        println!("got to here after");
 
         *self.latest_block.write() = block.clone();
 
