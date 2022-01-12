@@ -50,7 +50,7 @@ commands:
 jobs:
   tests:
     docker:
-      - image: cimg/rust:1.56.1
+      - image: cimg/rust:1.57.1
     resource_class: 2xlarge
     parallelism: 10
     steps:
@@ -72,7 +72,7 @@ jobs:
 
   storage:
     docker:
-      - image: cimg/rust:1.56.1
+      - image: cimg/rust:1.57.1
     resource_class: 2xlarge
     parallelism: 5
     steps:
@@ -95,7 +95,7 @@ jobs:
 
   testing:
     docker:
-      - image: cimg/rust:1.56.1
+      - image: cimg/rust:1.57.1
     resource_class: 2xlarge
     parallelism: 5
     steps:
@@ -134,7 +134,7 @@ jobs:
 
   fmt:
     docker:
-      - image: cimg/rust:1.56.1
+      - image: cimg/rust:1.57.1
     resource_class: 2xlarge
     steps:
       - checkout
@@ -150,7 +150,7 @@ jobs:
 
   clippy:
     docker:
-      - image: cimg/rust:1.56.1
+      - image: cimg/rust:1.57.1
     resource_class: 2xlarge
     steps:
       - checkout
