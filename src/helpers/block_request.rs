@@ -80,13 +80,11 @@ mod tests {
 
     use rand::{thread_rng, Rng};
 
-    const ITERATIONS: usize = 1_000_000;
-
     #[test]
     fn test_block_request() {
         let rng = &mut thread_rng();
 
-        for _ in 0..ITERATIONS {
+        for _ in 0..5 {
             let block_height: u32 = rng.gen();
             let block_hash = <Testnet2 as Network>::BlockHash::rand(rng);
 
@@ -108,13 +106,13 @@ mod tests {
     fn test_block_request_eq() {
         let rng = &mut thread_rng();
 
-        let a = BlockRequest::<Testnet2>::from(1000);
-        let b = BlockRequest::<Testnet2>::from((1000, None));
-        assert_eq!(a, b);
-
-        for _ in 0..ITERATIONS {
+        for _ in 0..5 {
             let block_height: u32 = rng.gen();
             let block_hash = <Testnet2 as Network>::BlockHash::rand(rng);
+
+            let a = BlockRequest::<Testnet2>::from(block_height);
+            let b = BlockRequest::<Testnet2>::from((block_height, None));
+            assert_eq!(a, b);
 
             let a = BlockRequest::<Testnet2>::from(block_height);
             let b = BlockRequest::<Testnet2>::from((block_height, Some(block_hash)));
