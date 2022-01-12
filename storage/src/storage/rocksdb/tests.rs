@@ -20,6 +20,13 @@ fn temp_dir() -> std::path::PathBuf {
     tempfile::tempdir().expect("Failed to open temporary directory").into_path()
 }
 
+fn temp_file() -> std::path::PathBuf {
+    tempfile::NamedTempFile::new()
+        .expect("Failed to open temporary file")
+        .path()
+        .to_owned()
+}
+
 #[test]
 fn test_open() {
     let _storage = RocksDB::open(temp_dir(), 0, false).expect("Failed to open storage");
@@ -103,7 +110,6 @@ fn test_reopen() {
         let storage = RocksDB::open(directory.clone(), 0, false).expect("Failed to open storage");
         let map = storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
         map.insert(&123456789, &"123456789".to_string(), None).expect("Failed to insert");
-        drop(storage);
     }
     {
         let storage = RocksDB::open(directory, 0, false).expect("Failed to open storage");
@@ -201,4 +207,29 @@ fn test_discard_batch() {
 
     assert!(map.get(&1).expect("Failed to get").is_none());
     assert!(map.get(&2).expect("Failed to get").is_none());
+}
+
+#[test]
+fn test_export_import() {
+    let file = temp_file();
+
+    {
+        let storage = RocksDB::open(temp_dir(), 0, false).expect("Failed to open storage");
+        let map = storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
+
+        for i in 0..100 {
+            map.insert(&i, &i.to_string()).expect("Failed to insert");
+        }
+
+        storage.export(&file).expect("Failed to export storage");
+    }
+
+    let storage = RocksDB::open(temp_dir(), 0, false).expect("Failed to open storage");
+    storage.import(&file).expect("Failed to import storage");
+
+    let map = storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
+
+    for i in 0..100 {
+        assert_eq!(map.get(&i).expect("Failed to insert"), Some(i.to_string()));
+    }
 }
