@@ -20,7 +20,7 @@ use crate::{
 };
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
-use rand::thread_rng;
+use rand::{thread_rng, Rng};
 use std::sync::atomic::AtomicBool;
 
 fn temp_dir() -> std::path::PathBuf {
@@ -271,4 +271,76 @@ fn test_get_block_locators() {
             .check_block_locators(&block_locators)
             .expect("Failed to check block locators")
     );
+}
+
+#[test]
+fn test_transaction_fees() {
+    let rng = &mut thread_rng();
+    let terminator = AtomicBool::new(false);
+
+    // Initialize a new ledger.
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
+    assert_eq!(0, ledger.latest_block_height());
+
+    // Initialize a new account.
+    let account = Account::<Testnet2>::new(&mut thread_rng());
+    let private_key = account.private_key();
+    let view_key = account.view_key();
+    let address = account.address();
+
+    // Mine the next block.
+    let (block, _record) = ledger
+        .mine_next_block(address, true, &[], &terminator, rng)
+        .expect("Failed to mine");
+    ledger.add_next_block(&block).expect("Failed to add next block to ledger");
+
+    // Craft the transaction variables.
+    let coinbase_transaction = &block.transactions()[0];
+
+    let available_balance = AleoAmount::from_i64(-1 * coinbase_transaction.value_balance().0);
+    let fee = AleoAmount::from_i64(rng.gen_range(1..available_balance.0));
+    let amount = available_balance.sub(fee.clone());
+    let coinbase_record = coinbase_transaction.to_decrypted_records(view_key);
+
+    let ledger_proof = ledger.get_ledger_inclusion_proof(coinbase_record[0].commitment()).unwrap();
+
+    // Initialize a recipient account.
+    let recipient_account = Account::<Testnet2>::new(rng);
+    let recipient_view_key = recipient_account.view_key();
+    let recipient = recipient_account.address();
+
+    // Craft the transaction with a random fee.
+    let transfer_request = Request::new_transfer(
+        private_key,
+        coinbase_record,
+        vec![ledger_proof.clone(), LedgerProof::default()],
+        recipient,
+        amount,
+        fee.clone(),
+        true,
+        rng,
+    )
+    .unwrap();
+
+    let (vm, _response) = VirtualMachine::new(ledger.latest_ledger_root())
+        .unwrap()
+        .execute(&transfer_request, rng)
+        .unwrap();
+
+    let new_transaction = vm.finalize().unwrap();
+
+    // Mine the next block.
+    let (block_2, _record) = ledger
+        .mine_next_block(address, true, &[new_transaction], &terminator, rng)
+        .expect("Failed to mine");
+    ledger.add_next_block(&block_2).expect("Failed to add next block to ledger");
+    assert_eq!(2, ledger.latest_block_height());
+
+    let expected_block_reward = Block::<Testnet2>::block_reward(2).add(fee);
+    let output_record = &block_2.transactions()[0].to_decrypted_records(recipient_view_key)[0];
+    let new_coinbase_record = &block_2.transactions()[1].to_decrypted_records(view_key)[0];
+
+    // Check that the output record balances are correct.
+    assert_eq!(new_coinbase_record.value(), expected_block_reward);
+    assert_eq!(output_record.value(), amount);
 }
