@@ -18,6 +18,7 @@ use crate::helpers::{NodeType, Status, Tasks};
 use snarkvm::dpc::Network;
 
 use once_cell::sync::OnceCell;
+use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::{
     collections::HashSet,
     fmt::Debug,
@@ -103,6 +104,18 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     fn terminator() -> &'static Arc<AtomicBool> {
         static TERMINATOR: OnceCell<Arc<AtomicBool>> = OnceCell::new();
         TERMINATOR.get_or_init(|| Arc::new(AtomicBool::new(false)))
+    }
+
+    /// Returns a thread pool for the node to perform intensive operations.
+    fn thread_pool() -> &'static Arc<ThreadPool> {
+        static POOL: OnceCell<Arc<ThreadPool>> = OnceCell::new();
+        POOL.get_or_init(|| {
+            Arc::new(ThreadPoolBuilder::new()
+                .stack_size(8 * 1024 * 1024)
+                .num_threads((num_cpus::get() * 7 / 8).max(2))
+                .build()
+                .expect("Failed to initialize a thread pool for the node"))
+        })
     }
 }
 
