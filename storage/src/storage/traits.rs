@@ -66,6 +66,14 @@ pub trait Map<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwn
         Q: Serialize + ?Sized;
 
     ///
+    /// Returns the raw value for the given key from the map, if it exists.
+    ///
+    fn get_raw<Q>(&self, key: &Q) -> Result<Option<Vec<u8>>>
+    where
+        K: Borrow<Q>,
+        Q: Serialize + ?Sized;
+
+    ///
     /// Inserts the given key-value pair into the map.
     ///
     fn insert<Q>(&self, key: &Q, value: &V) -> Result<()>

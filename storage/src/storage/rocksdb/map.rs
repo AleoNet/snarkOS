@@ -93,6 +93,23 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
     }
 
     ///
+    /// Returns the raw value for the given key from the map, if it exists.
+    ///
+    fn get_raw<Q>(&self, key: &Q) -> Result<Option<Vec<u8>>>
+    where
+        K: Borrow<Q>,
+        Q: Serialize + ?Sized,
+    {
+        let mut key_buf = self.context.clone();
+        key_buf.reserve(bincode::serialized_size(&key)? as usize);
+        bincode::serialize_into(&mut key_buf, &key)?;
+        match self.rocksdb.get(&key_buf)? {
+            Some(data) => Ok(Some(data)),
+            None => Ok(None),
+        }
+    }
+
+    ///
     /// Inserts the given key-value pair into the map.
     ///
     fn insert<Q>(&self, key: &Q, value: &V) -> Result<()>
