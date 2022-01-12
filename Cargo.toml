@@ -21,6 +21,7 @@ members = ["storage", "testing"]
 
 [features]
 default = []
+cuda = [ "snarkvm/cuda" ]
 test = []
 
 [dependencies]
