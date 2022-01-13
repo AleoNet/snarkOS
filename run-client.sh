@@ -17,6 +17,7 @@ function exit_node()
 trap exit_node SIGINT
 
 echo "Running client node..."
+$COMMAND &
 
 while :
 do
@@ -24,14 +25,13 @@ do
   git stash
   rm Cargo.lock
   STATUS=$(git pull)
-
-  echo "Running the node..."
   
   if [ "$STATUS" != "Already up to date." ]; then
+    echo "Updated code found, rebuilding and relaunching client node"
     cargo clean
+    kill -INT $!; sleep 2; $COMMAND &
   fi
+  
+  sleep 1800
 
-  $COMMAND & sleep 1800; kill -INT $!
-
-  sleep 2;
 done
