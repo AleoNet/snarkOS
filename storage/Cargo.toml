@@ -16,6 +16,10 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2018"
 
+[[bench]]
+name = "lookups"
+harness = false
+
 [dependencies]
 snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "48c59e9" }
 #snarkvm = { path = "../../snarkVM" }
@@ -59,6 +63,12 @@ version = "1"
 
 [dependencies.tracing]
 version = "0.1"
+
+[dev-dependencies.criterion]
+version = "0.3"
+
+[dev-dependencies.rand_xorshift]
+version = "0.3"
 
 [dev-dependencies.tempfile]
 version = "3.2"
