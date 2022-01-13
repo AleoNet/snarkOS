@@ -83,12 +83,10 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         K: Borrow<Q>,
         Q: Serialize + ?Sized,
     {
-        let mut key_buf = self.context.clone();
-        key_buf.reserve(bincode::serialized_size(&key)? as usize);
-        bincode::serialize_into(&mut key_buf, &key)?;
-        match self.rocksdb.get(&key_buf)? {
-            Some(data) => Ok(Some(bincode::deserialize(&data)?)),
-            None => Ok(None),
+        match self.get_raw(key) {
+            Ok(Some(bytes)) => Ok(Some(bincode::deserialize(&bytes)?)),
+            Ok(None) => Ok(None),
+            Err(e) => Err(e),
         }
     }
 
