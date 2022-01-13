@@ -32,8 +32,8 @@ impl ClientNode {
     }
 
     /// Returns the list of connected peers of the node.
-    pub async fn connected_peers(&self) -> Vec<SocketAddr> {
-        self.server.peers().connected_peers().await
+    pub fn connected_peers(&self) -> Vec<SocketAddr> {
+        self.server.peers().connected_peers()
     }
 
     /// Resets the node's known peers. This is practical, as it makes the node not reconnect

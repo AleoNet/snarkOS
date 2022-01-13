@@ -60,7 +60,7 @@ async fn inbound_connect_and_disconnect_doesnt_leak() {
 
         // Disconnect the test node from the snarkOS node.
         assert!(test_node.node().disconnect(client_node.local_addr()).await);
-        wait_until!(1, client_node.connected_peers().await.is_empty());
+        wait_until!(1, client_node.connected_peers().is_empty());
         client_node.reset_known_peers().await;
 
         if i == 0 {
@@ -104,7 +104,7 @@ async fn outbound_connect_and_disconnect_doesnt_leak() {
         wait_until!(1, test_node.node().num_connected() == 1);
         let client_node_addr = test_node.node().connected_addrs()[0];
         assert!(test_node.node().disconnect(client_node_addr).await);
-        wait_until!(1, client_node.connected_peers().await.is_empty());
+        wait_until!(1, client_node.connected_peers().is_empty());
         client_node.reset_known_peers().await;
 
         if i == 0 {

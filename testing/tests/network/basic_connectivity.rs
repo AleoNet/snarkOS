@@ -81,7 +81,7 @@ async fn handshake_as_responder_works() {
     test_node.node().connect(client_node.local_addr()).await.unwrap();
 
     // Double-check with the snarkOS node.
-    assert!(client_node.connected_peers().await.len() == 1)
+    assert!(client_node.connected_peers().len() == 1)
 }
 
 #[tokio::test]
@@ -181,7 +181,7 @@ async fn peer_accounting_works() {
     let test_node_addr = test_node.node().listening_addr().unwrap();
 
     // Double-check that the initial list of peers is empty.
-    assert!(client_node.connected_peers().await.is_empty());
+    assert!(client_node.connected_peers().is_empty());
 
     // Perform the connect+disconnect routine a few fimes.
     for _ in 0..3 {
@@ -189,7 +189,7 @@ async fn peer_accounting_works() {
         client_node.connect(test_node_addr).await.unwrap();
 
         // Verify that the list of peers is not empty anymore.
-        assert!(client_node.connected_peers().await.len() == 1);
+        assert!(client_node.connected_peers().len() == 1);
 
         // The test node disconnects from the snarkOS node.
         wait_until!(1, test_node.node().num_connected() == 1);
@@ -197,7 +197,7 @@ async fn peer_accounting_works() {
         assert!(test_node.node().disconnect(client_node_addr).await);
 
         // The list of snarkOS peers should be empty again.
-        wait_until!(1, client_node.connected_peers().await.is_empty());
+        wait_until!(1, client_node.connected_peers().is_empty());
 
         // The snarkOS node should not attempt to connect on its own.
         client_node.reset_known_peers().await;
