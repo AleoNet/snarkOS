@@ -97,7 +97,7 @@ pub struct Peers<N: Network, E: Environment> {
     /// The set of candidate peer IPs.
     candidate_peers: parking_lot::RwLock<HashSet<SocketAddr>>,
     /// The set of restricted peer IPs.
-    restricted_peers: RwLock<HashMap<SocketAddr, Instant>>,
+    restricted_peers: parking_lot::RwLock<HashMap<SocketAddr, Instant>>,
     /// The map of peers to their first-seen port number, number of attempts, and timestamp of the last inbound connection request.
     seen_inbound_connections: RwLock<HashMap<SocketAddr, ((u16, u32), SystemTime)>>,
     /// The map of peers to the timestamp of their last outbound connection request.
@@ -169,8 +169,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Returns `true` if the given IP is restricted.
     ///
-    pub async fn is_restricted(&self, ip: SocketAddr) -> bool {
-        match self.restricted_peers.read().await.get(&ip) {
+    pub fn is_restricted(&self, ip: SocketAddr) -> bool {
+        match self.restricted_peers.read().get(&ip) {
             Some(timestamp) => timestamp.elapsed().as_secs() < E::RADIO_SILENCE_IN_SECS,
             None => false,
         }
@@ -251,7 +251,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     debug!("Skipping connection request to {} (already connected)", peer_ip);
                 }
                 // Ensure the peer is not restricted.
-                else if self.is_restricted(peer_ip).await {
+                else if self.is_restricted(peer_ip) {
                     debug!("Skipping connection request to {} (restricted)", peer_ip);
                 }
                 // Attempt to open a TCP stream.
@@ -326,7 +326,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
                         self.send(peer_ip, Message::Disconnect).await;
                         // Add an entry for this `Peer` in the restricted peers.
-                        self.restricted_peers.write().await.insert(peer_ip, Instant::now());
+                        self.restricted_peers.write().insert(peer_ip, Instant::now());
                     }
                 }
 
@@ -347,7 +347,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
                         self.send(peer_ip, Message::Disconnect).await;
                         // Add an entry for this `Peer` in the restricted peers.
-                        self.restricted_peers.write().await.insert(peer_ip, Instant::now());
+                        self.restricted_peers.write().insert(peer_ip, Instant::now());
                     }
                 }
 
@@ -430,7 +430,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     debug!("Dropping connection request from {} (already connected)", peer_ip);
                 }
                 // Ensure the peer is not restricted.
-                else if self.is_restricted(peer_ip).await {
+                else if self.is_restricted(peer_ip) {
                     debug!("Dropping connection request from {} (restricted)", peer_ip);
                 }
                 // Spawn a handler to be run asynchronously.
@@ -466,7 +466,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     if *initial_port < peer_port && *num_attempts > E::MAXIMUM_CONNECTION_FAILURES {
                         trace!("Dropping connection request from {} (tried {} secs ago)", peer_ip, elapsed);
                         // Add an entry for this `Peer` in the restricted peers.
-                        self.restricted_peers.write().await.insert(peer_ip, Instant::now());
+                        self.restricted_peers.write().insert(peer_ip, Instant::now());
                     } else {
                         debug!("Received a connection request from {}", peer_ip);
                         // Update the number of attempts for this peer.
@@ -508,7 +508,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Remove an entry for this `Peer` in the connected peers, if it exists.
                 self.connected_peers.write().remove(&peer_ip);
                 // Add an entry for this `Peer` in the restricted peers.
-                self.restricted_peers.write().await.insert(peer_ip, Instant::now());
+                self.restricted_peers.write().insert(peer_ip, Instant::now());
             }
             PeersRequest::SendPeerResponse(recipient) => {
                 // Send a `PeerResponse` message.
@@ -586,7 +586,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     #[cfg(feature = "test")]
     pub async fn reset_known_peers(&self) {
         self.candidate_peers.write().clear();
-        self.restricted_peers.write().await.clear();
+        self.restricted_peers.write().clear();
         self.seen_inbound_connections.write().await.clear();
         self.seen_outbound_connections.write().await.clear();
     }
