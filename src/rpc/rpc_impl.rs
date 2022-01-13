@@ -304,11 +304,11 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
 
     /// Returns the current state of this node.
     async fn get_node_state(&self) -> Result<Value, RpcError> {
-        let candidate_peers = self.peers.candidate_peers().await;
+        let candidate_peers = self.peers.candidate_peers();
         let connected_peers = self.peers.connected_peers();
         let number_of_candidate_peers = candidate_peers.len();
         let number_of_connected_peers = connected_peers.len();
-        let number_of_connected_sync_nodes = self.peers.number_of_connected_sync_nodes().await;
+        let number_of_connected_sync_nodes = self.peers.number_of_connected_sync_nodes();
 
         let latest_block_hash = self.ledger.latest_block_hash();
         let latest_block_height = self.ledger.latest_block_height();

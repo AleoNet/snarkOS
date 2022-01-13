@@ -95,7 +95,7 @@ pub struct Peers<N: Network, E: Environment> {
     /// The map connected peer IPs to their nonce and outbound message router.
     connected_peers: parking_lot::RwLock<HashMap<SocketAddr, (u64, OutboundRouter<N, E>)>>,
     /// The set of candidate peer IPs.
-    candidate_peers: RwLock<HashSet<SocketAddr>>,
+    candidate_peers: parking_lot::RwLock<HashSet<SocketAddr>>,
     /// The set of restricted peer IPs.
     restricted_peers: RwLock<HashMap<SocketAddr, Instant>>,
     /// The map of peers to their first-seen port number, number of attempts, and timestamp of the last inbound connection request.
@@ -162,7 +162,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Returns `true` if the node is connected to the given IP.
     ///
-    pub async fn is_connected_to(&self, ip: SocketAddr) -> bool {
+    pub fn is_connected_to(&self, ip: SocketAddr) -> bool {
         self.connected_peers.read().contains_key(&ip)
     }
 
@@ -186,15 +186,15 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Returns the list of candidate peers.
     ///
-    pub async fn candidate_peers(&self) -> HashSet<SocketAddr> {
-        self.candidate_peers.read().await.clone()
+    pub fn candidate_peers(&self) -> HashSet<SocketAddr> {
+        self.candidate_peers.read().clone()
     }
 
     ///
     /// TODO (howardwu): Make this operation more efficient.
     /// Returns the number of connected sync nodes.
     ///
-    pub async fn connected_sync_nodes(&self) -> HashSet<SocketAddr> {
+    pub fn connected_sync_nodes(&self) -> HashSet<SocketAddr> {
         let connected_peers: HashSet<SocketAddr> = self.connected_peers.read().keys().into_iter().copied().collect();
         connected_peers.intersection(E::sync_nodes()).copied().collect()
     }
@@ -203,7 +203,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// TODO (howardwu): Make this operation more efficient.
     /// Returns the number of connected sync nodes.
     ///
-    pub async fn number_of_connected_sync_nodes(&self) -> usize {
+    pub fn number_of_connected_sync_nodes(&self) -> usize {
         let connected_peers: HashSet<SocketAddr> = self.connected_peers.read().keys().into_iter().copied().collect();
         connected_peers.intersection(E::sync_nodes()).count()
     }
@@ -218,14 +218,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Returns the number of candidate peers.
     ///
-    pub async fn number_of_candidate_peers(&self) -> usize {
-        self.candidate_peers.read().await.len()
+    pub fn number_of_candidate_peers(&self) -> usize {
+        self.candidate_peers.read().len()
     }
 
     ///
     /// Returns the list of nonces for the connected peers.
     ///
-    pub(crate) async fn connected_nonces(&self) -> Vec<u64> {
+    pub(crate) fn connected_nonces(&self) -> Vec<u64> {
         self.connected_peers.read().values().map(|(peer_nonce, _)| *peer_nonce).collect()
     }
 
@@ -247,7 +247,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     debug!("Skipping connection request to {} (maximum peers reached)", peer_ip);
                 }
                 // Ensure the peer is a new connection.
-                else if self.is_connected_to(peer_ip).await {
+                else if self.is_connected_to(peer_ip) {
                     debug!("Skipping connection request to {} (already connected)", peer_ip);
                 }
                 // Ensure the peer is not restricted.
@@ -285,19 +285,19 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                         ledger_router,
                                         prover_router,
                                         operator_router,
-                                        self.connected_nonces().await,
+                                        self.connected_nonces(),
                                         Some(connection_result),
                                     )
                                     .await
                                 }
                                 Err(error) => {
                                     trace!("Failed to connect to '{}': '{:?}'", peer_ip, error);
-                                    self.candidate_peers.write().await.remove(&peer_ip);
+                                    self.candidate_peers.write().remove(&peer_ip);
                                 }
                             },
                             Err(error) => {
                                 error!("Unable to reach '{}': '{:?}'", peer_ip, error);
-                                self.candidate_peers.write().await.remove(&peer_ip);
+                                self.candidate_peers.write().remove(&peer_ip);
                             }
                         };
                     }
@@ -332,7 +332,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                 // TODO (howardwu): This logic can be optimized and unified with the context around it.
                 // Determine if the node is connected to more sync nodes than expected.
-                let connected_sync_nodes = self.connected_sync_nodes().await;
+                let connected_sync_nodes = self.connected_sync_nodes();
                 let number_of_connected_sync_nodes = connected_sync_nodes.len();
                 let num_excess_sync_nodes = number_of_connected_sync_nodes.saturating_sub(1);
                 if num_excess_sync_nodes > 0 {
@@ -376,7 +376,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 let midpoint_number_of_peers = E::MINIMUM_NUMBER_OF_PEERS.saturating_add(E::MAXIMUM_NUMBER_OF_PEERS) / 2;
                 for peer_ip in self
                     .candidate_peers()
-                    .await
                     .iter()
                     .copied()
                     .choose_multiple(&mut OsRng::default(), midpoint_number_of_peers)
@@ -386,7 +385,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         continue;
                     }
 
-                    if !self.is_connected_to(peer_ip).await {
+                    if !self.is_connected_to(peer_ip) {
                         trace!("Attempting connection to {}...", peer_ip);
 
                         // Initialize the connection process.
@@ -427,7 +426,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     debug!("Dropping connection request from {} (maximum peers reached)", peer_ip);
                 }
                 // Ensure the node is not already connected to this peer.
-                else if self.is_connected_to(peer_ip).await {
+                else if self.is_connected_to(peer_ip) {
                     debug!("Dropping connection request from {} (already connected)", peer_ip);
                 }
                 // Ensure the peer is not restricted.
@@ -486,7 +485,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             ledger_router,
                             prover_router,
                             operator_router,
-                            self.connected_nonces().await,
+                            self.connected_nonces(),
                             None,
                         )
                         .await;
@@ -497,13 +496,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Add an entry for this `Peer` in the connected peers.
                 self.connected_peers.write().insert(peer_ip, (peer_nonce, outbound));
                 // Remove an entry for this `Peer` in the candidate peers, if it exists.
-                self.candidate_peers.write().await.remove(&peer_ip);
+                self.candidate_peers.write().remove(&peer_ip);
             }
             PeersRequest::PeerDisconnected(peer_ip) => {
                 // Remove an entry for this `Peer` in the connected peers, if it exists.
                 self.connected_peers.write().remove(&peer_ip);
                 // Add an entry for this `Peer` in the candidate peers.
-                self.candidate_peers.write().await.insert(peer_ip);
+                self.candidate_peers.write().insert(peer_ip);
             }
             PeersRequest::PeerRestricted(peer_ip) => {
                 // Remove an entry for this `Peer` in the connected peers, if it exists.
@@ -530,13 +529,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     async fn add_candidate_peers<'a, T: ExactSizeIterator<Item = &'a SocketAddr> + IntoIterator>(&self, peers: T) {
         // Acquire the candidate peers write lock.
-        let mut candidate_peers = self.candidate_peers.write().await;
+        let mut candidate_peers = self.candidate_peers.write();
         // Ensure the combined number of peers does not surpass the threshold.
         for peer_ip in peers.take(E::MAXIMUM_CANDIDATE_PEERS.saturating_sub(candidate_peers.len())) {
             // Ensure the peer is not self and is a new candidate peer.
             let is_self = *peer_ip == self.local_ip
                 || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port();
-            if !is_self && !self.is_connected_to(*peer_ip).await {
+            if !is_self && !self.is_connected_to(*peer_ip) {
                 // Proceed to insert each new candidate peer IP.
                 candidate_peers.insert(*peer_ip);
             }
@@ -586,7 +585,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     #[cfg(feature = "test")]
     pub async fn reset_known_peers(&self) {
-        self.candidate_peers.write().await.clear();
+        self.candidate_peers.write().clear();
         self.restricted_peers.write().await.clear();
         self.seen_inbound_connections.write().await.clear();
         self.seen_outbound_connections.write().await.clear();
