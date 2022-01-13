@@ -72,7 +72,7 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         K: Borrow<Q>,
         Q: Serialize + ?Sized,
     {
-        self.get(key).map(|v| v.is_some())
+        self.get_raw(key).map(|v| v.is_some())
     }
 
     ///
