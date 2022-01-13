@@ -299,13 +299,13 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
 
     /// Returns the peers currently connected to this node.
     async fn get_connected_peers(&self) -> Result<Vec<SocketAddr>, RpcError> {
-        Ok(self.peers.connected_peers().await)
+        Ok(self.peers.connected_peers())
     }
 
     /// Returns the current state of this node.
     async fn get_node_state(&self) -> Result<Value, RpcError> {
         let candidate_peers = self.peers.candidate_peers().await;
-        let connected_peers = self.peers.connected_peers().await;
+        let connected_peers = self.peers.connected_peers();
         let number_of_candidate_peers = candidate_peers.len();
         let number_of_connected_peers = connected_peers.len();
         let number_of_connected_sync_nodes = self.peers.number_of_connected_sync_nodes().await;
