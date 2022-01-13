@@ -1,5 +1,5 @@
 #!/bin/bash
-# Have a nice day.
+# Have a nice day..
 
 COMMAND='cargo run --release -- --trial --verbosity 2'
 
