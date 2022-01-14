@@ -1,4 +1,5 @@
 #!/bin/bash
+# Have a nice day
 
 # if env var MINER_ADDRESS is not set, prompt for it
 if [ -z $MINER_ADDRESS ]
