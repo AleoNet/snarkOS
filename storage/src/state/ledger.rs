@@ -520,13 +520,6 @@ impl<N: Network> LedgerState<N> {
 
     /// Check that the block locators are well formed.
     pub fn check_block_locators(&self, block_locators: &BlockLocators<N>) -> Result<bool> {
-        // Check that the number of block_locators is less than the total MAXIMUM_BLOCK_LOCATORS.
-        if block_locators.len() > MAXIMUM_BLOCK_LOCATORS as usize {
-            return Ok(false);
-        }
-
-        let block_locators = &**block_locators;
-
         // Ensure the genesis block locator exists and is well-formed.
         let (expected_genesis_block_hash, expected_genesis_header) = match block_locators.get(&0) {
             Some((expected_genesis_block_hash, expected_genesis_header)) => (expected_genesis_block_hash, expected_genesis_header),
