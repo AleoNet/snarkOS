@@ -4,7 +4,7 @@
 # if env var MINER_ADDRESS is not set, prompt for it
 if [ -z $MINER_ADDRESS ]
 then
-  read -p "Enter your miner address: "
+  read -p "Enter your miner address for your operator: "
   MINER_ADDRESS=$REPLY
 fi
 
@@ -13,7 +13,7 @@ then
   MINER_ADDRESS="aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah"
 fi
 
-COMMAND="cargo run --release -- --miner ${MINER_ADDRESS} --trial --verbosity 2"
+COMMAND="cargo run --release -- --operator ${MINER_ADDRESS} --trial --verbosity 2"
 
 for word in $*;
 do
@@ -45,5 +45,6 @@ do
     kill -INT $!; sleep 2; $COMMAND &
   fi
 
-  sleep 1800;
+  #sleep 1800;
+  sleep 60;
 done

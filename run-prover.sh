@@ -13,7 +13,22 @@ then
   MINER_ADDRESS="aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah"
 fi
 
-COMMAND="cargo run --release -- --miner ${MINER_ADDRESS} --trial --verbosity 2"
+
+
+# if env var OPERATOR_IP_ADDR is not set, prompt for it
+if [ -z $OPERATOR_IP_ADDRESS ]
+then
+  read -p "Enter your Operator Server's IP address: "
+  OPERATOR_IP_ADDR=$REPLY
+fi
+
+if [ "${OPERATOR_IP_ADDR}" == "" ]
+then
+  echo "IP Address of Operator server is required to run a prover"
+  exit 1
+fi
+
+COMMAND="cargo run --release -- --prover ${MINER_ADDRESS} --pool $(OPERATOR_IP_ADDR}:4132 --trial --verbosity 2"
 
 for word in $*;
 do
