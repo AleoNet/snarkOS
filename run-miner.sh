@@ -38,8 +38,6 @@ do
   rm Cargo.lock
   STATUS=$(git pull)
 
-  echo "Running the node..."
-
   if [ "$STATUS" != "Already up to date." ]; then
     echo "Updated code found, rebuilding and relaunching miner"
     cargo clean
