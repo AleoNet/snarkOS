@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#![forbid(unsafe_code)]
+#![allow(clippy::type_complexity)]
+
 #[macro_use]
 extern crate tracing;
 
@@ -24,6 +27,7 @@ pub(crate) mod state;
 pub use state::{
     LedgerState,
     Metadata,
+    OperatorState,
     ProverState,
     MAXIMUM_BLOCK_LOCATORS,
     MAXIMUM_LINEAR_BLOCK_LOCATORS,

@@ -21,7 +21,7 @@ mod keys;
 use keys::*;
 
 mod map;
-pub(crate) use map::*;
+pub use map::*;
 
 mod values;
 use values::*;
@@ -89,9 +89,9 @@ impl Storage for RocksDB {
     ///
     /// Opens a map with the given `context` from storage.
     ///
-    fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(&self, context: &str) -> Result<DataMap<K, V>> {
+    fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(&self, map_id: MapId) -> Result<DataMap<K, V>> {
         // Convert the new context into bytes.
-        let new_context = context.as_bytes();
+        let new_context = map_id.as_bytes();
 
         // Combine contexts to create a new scope.
         let mut context_bytes = self.context.clone();

@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::MAXIMUM_BLOCK_LOCATORS;
 use snarkvm::{
     dpc::{BlockHeader, Network},
     utilities::{
@@ -27,9 +28,9 @@ use snarkvm::{
     },
 };
 
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use rayon::prelude::*;
 use serde::{de, ser, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
-use std::{collections::BTreeMap, ops::Deref};
+use std::{collections::BTreeMap, io::ErrorKind, ops::Deref};
 
 ///
 /// A helper struct to represent block locators from the ledger.
@@ -65,7 +66,7 @@ impl<N: Network> BlockLocators<N> {
     #[inline]
     pub fn get_cumulative_weight(&self, block_height: u32) -> Option<u128> {
         match self.block_locators.get(&block_height) {
-            Some((_, header)) => header.as_ref().and_then(|header| Some(header.cumulative_weight())),
+            Some((_, header)) => header.as_ref().map(|header| header.cumulative_weight()),
             _ => None,
         }
     }
@@ -76,7 +77,12 @@ impl<N: Network> FromBytes for BlockLocators<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let num_locators: u32 = FromBytes::read_le(&mut reader)?;
 
-        let mut block_locators = BTreeMap::new();
+        // Check that the number of block_locators is less than the total MAXIMUM_BLOCK_LOCATORS.
+        if num_locators > MAXIMUM_BLOCK_LOCATORS {
+            error!("The list of block locators is too long");
+            return Err(ErrorKind::Other.into());
+        }
+
         let mut block_headers_bytes = Vec::with_capacity(num_locators as usize);
 
         for _ in 0..num_locators {
@@ -87,25 +93,16 @@ impl<N: Network> FromBytes for BlockLocators<N> {
             if header_exists {
                 let mut buffer = vec![0u8; N::HEADER_SIZE_IN_BYTES];
                 reader.read_exact(&mut buffer)?;
-                block_headers_bytes.push((height, buffer));
-            };
-
-            block_locators.insert(height, (hash, None));
-        }
-
-        let block_headers = block_headers_bytes
-            .par_iter()
-            .flat_map(|(height, bytes)| match !bytes.is_empty() {
-                true => Some((height, BlockHeader::<N>::read_le(&bytes[..]).unwrap())),
-                false => None,
-            })
-            .collect::<Vec<_>>();
-
-        for (height, block_header) in block_headers.into_iter() {
-            if let Some((_, header)) = block_locators.get_mut(height) {
-                *header = Some(block_header);
+                block_headers_bytes.push((height, hash, Some(buffer)));
+            } else {
+                block_headers_bytes.push((height, hash, None));
             }
         }
+
+        let block_locators = block_headers_bytes
+            .into_par_iter()
+            .map(|(height, hash, bytes)| (height, (hash, bytes.map(|bytes| BlockHeader::<N>::read_le(&bytes[..]).unwrap()))))
+            .collect::<BTreeMap<_, (_, _)>>();
 
         Ok(Self::from(block_locators))
     }
@@ -203,7 +200,7 @@ mod tests {
         // Serialize
         let expected_string = expected_block_locators.to_string();
         let candidate_string = serde_json::to_string(&expected_block_locators).unwrap();
-        assert_eq!(1692, candidate_string.len(), "Update me if serialization has changed");
+        assert_eq!(1703, candidate_string.len(), "Update me if serialization has changed");
         assert_eq!(expected_string, candidate_string);
 
         // Deserialize

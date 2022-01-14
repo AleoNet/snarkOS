@@ -15,22 +15,17 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{Tasks, Updater},
+    environment::{Client, ClientTrial, Environment, Miner, MinerTrial, Operator, OperatorTrial, Prover, ProverTrial, SyncNode},
+    helpers::{NodeType, Updater},
     network::Server,
-    Client,
-    ClientTrial,
     Display,
-    Environment,
-    Miner,
-    MinerTrial,
-    NodeType,
-    SyncNode,
 };
 use snarkos_storage::storage::rocksdb::RocksDB;
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use anyhow::{anyhow, Result};
 use colored::*;
+use crossterm::tty::IsTty;
 use std::{io, net::SocketAddr, path::PathBuf, str::FromStr};
 use structopt::StructOpt;
 use tokio::{signal, sync::mpsc, task};
@@ -45,6 +40,15 @@ pub struct Node {
     /// Specify this as a mining node, with the given miner address.
     #[structopt(long = "miner")]
     pub miner: Option<String>,
+    /// Specify this as an operating node, with the given operator address.
+    #[structopt(long = "operator")]
+    pub operator: Option<String>,
+    /// Specify this as a prover node, with the given prover address.
+    #[structopt(long = "prover")]
+    pub prover: Option<String>,
+    /// Specify the pool that a prover node is contributing to.
+    #[structopt(long = "pool")]
+    pub pool: Option<SocketAddr>,
     /// Specify the network of this node.
     #[structopt(default_value = "2", long = "network")]
     pub network: u16,
@@ -90,12 +94,16 @@ impl Node {
                 println!("{}", command.parse()?);
                 Ok(())
             }
-            None => match (self.network, self.miner.is_some(), self.trial, self.sync) {
-                (2, _, _, true) => self.start_server::<Testnet2, SyncNode<Testnet2>>().await,
-                (2, true, false, false) => self.start_server::<Testnet2, Miner<Testnet2>>().await,
-                (2, false, false, false) => self.start_server::<Testnet2, Client<Testnet2>>().await,
-                (2, true, true, false) => self.start_server::<Testnet2, MinerTrial<Testnet2>>().await,
-                (2, false, true, false) => self.start_server::<Testnet2, ClientTrial<Testnet2>>().await,
+            None => match (self.network, &self.miner, &self.operator, &self.prover, self.trial, self.sync) {
+                (2, None, None, None, false, false) => self.start_server::<Testnet2, Client<Testnet2>>(&None).await,
+                (2, Some(_), None, None, false, false) => self.start_server::<Testnet2, Miner<Testnet2>>(&self.miner).await,
+                (2, None, Some(_), None, false, false) => self.start_server::<Testnet2, Operator<Testnet2>>(&self.operator).await,
+                (2, None, None, Some(_), false, false) => self.start_server::<Testnet2, Prover<Testnet2>>(&self.prover).await,
+                (2, None, None, None, true, false) => self.start_server::<Testnet2, ClientTrial<Testnet2>>(&None).await,
+                (2, Some(_), None, None, true, false) => self.start_server::<Testnet2, MinerTrial<Testnet2>>(&self.miner).await,
+                (2, None, Some(_), None, true, false) => self.start_server::<Testnet2, OperatorTrial<Testnet2>>(&self.operator).await,
+                (2, None, None, Some(_), true, false) => self.start_server::<Testnet2, ProverTrial<Testnet2>>(&self.prover).await,
+                (2, None, None, None, _, true) => self.start_server::<Testnet2, SyncNode<Testnet2>>(&None).await,
                 _ => panic!("Unsupported node configuration"),
             },
         }
@@ -114,6 +122,19 @@ impl Node {
         }
     }
 
+    /// Returns the storage path of the operator.
+    pub(crate) fn operator_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
+        cfg_if::cfg_if! {
+            if #[cfg(feature = "test")] {
+                // Tests may use any available ports, and removes the storage artifacts afterwards,
+                // so that there is no need to adhere to a specific number assignment logic.
+                PathBuf::from(format!("/tmp/snarkos-test-operator-{}", _local_ip.port()))
+            } else {
+                aleo_std::aleo_operator_dir(self.network, self.dev)
+            }
+        }
+    }
+
     /// Returns the storage path of the prover.
     pub(crate) fn prover_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
         cfg_if::cfg_if! {
@@ -127,29 +148,23 @@ impl Node {
         }
     }
 
-    async fn start_server<N: Network, E: Environment>(&self) -> Result<()> {
-        let miner = match (E::NODE_TYPE, &self.miner) {
-            (NodeType::Miner, Some(address)) => {
-                let miner_address = Address::<N>::from_str(address)?;
-                println!("{}", crate::display::welcome_message());
-                println!("Your Aleo address is {}.\n", miner_address);
-                println!("Starting a mining node on {}.", N::NETWORK_NAME);
-                println!("{}", crate::display::notification_message::<N>(Some(miner_address)));
-                Some(miner_address)
+    async fn start_server<N: Network, E: Environment>(&self, address: &Option<String>) -> Result<()> {
+        println!("{}", crate::display::welcome_message());
+
+        let address = match (E::NODE_TYPE, address) {
+            (NodeType::Miner, Some(address)) | (NodeType::Operator, Some(address)) | (NodeType::Prover, Some(address)) => {
+                let address = Address::<N>::from_str(address)?;
+                println!("Your Aleo address is {}.\n", address);
+                Some(address)
             }
-            _ => {
-                println!("{}", crate::display::welcome_message());
-                println!("Starting a client node on {}.", N::NETWORK_NAME);
-                println!("{}", crate::display::notification_message::<N>(None));
-                None
-            }
+            _ => None,
         };
 
-        // Initialize the tasks handler.
-        let tasks = Tasks::new();
+        println!("Starting {} on {}.", E::NODE_TYPE.description(), N::NETWORK_NAME);
+        println!("{}", crate::display::notification_message::<N>(address));
 
         // Initialize the node's server.
-        let server = Server::<N, E>::initialize(self, miner, tasks.clone()).await?;
+        let server = Server::<N, E>::initialize(self, address, self.pool).await?;
 
         // Initialize signal handling; it also maintains ownership of the Server
         // in order for it to not go out of scope.
@@ -195,7 +210,7 @@ pub fn initialize_logger(verbosity: u8, log_sender: Option<mpsc::Sender<Vec<u8>>
     // Initialize tracing.
     let _ = tracing_subscriber::fmt()
         .with_env_filter(filter)
-        .with_ansi(log_sender.is_none())
+        .with_ansi(log_sender.is_none() && io::stdout().is_tty())
         .with_writer(move || LogWriter::new(&log_sender))
         .with_target(verbosity == 3)
         .try_init();
@@ -301,6 +316,9 @@ pub struct Update {
     /// Suppress outputs to terminal
     #[structopt(short = "q", long)]
     quiet: bool,
+    /// Update to specified version
+    #[structopt(short = "v", long)]
+    version: Option<String>,
 }
 
 impl Update {
@@ -311,7 +329,7 @@ impl Update {
                 Err(error) => Ok(format!("Failed to list the available versions of snarkOS\n{}\n", error)),
             },
             false => {
-                let result = Updater::update_to_latest_release(!self.quiet);
+                let result = Updater::update_to_release(!self.quiet, self.version);
                 if !self.quiet {
                     match result {
                         Ok(status) => {
@@ -349,7 +367,7 @@ impl Experimental {
 
 #[derive(StructOpt, Debug)]
 pub enum ExperimentalCommands {
-    #[structopt(name = "new_account", about = "Generate a new Aleo Account.")]
+    #[structopt(name = "new_account", about = "Generate a new Aleo account.")]
     NewAccount(NewAccount),
 }
 

@@ -15,12 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos::{
-    helpers::{State, Status},
+    helpers::{NodeType, State, Status},
     Client,
     Data,
     Environment,
     Message,
-    NodeType,
 };
 use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
@@ -54,7 +53,7 @@ const PING_INTERVAL_SECS: u64 = 5;
 const PEER_INTERVAL_SECS: u64 = 3;
 const DESIRED_CONNECTIONS: usize = <Client<Testnet2>>::MINIMUM_NUMBER_OF_PEERS * 3;
 const MESSAGE_VERSION: u32 = <Client<Testnet2>>::MESSAGE_VERSION;
-const MAXIMUM_FORK_DEPTH: u32 = <Client<Testnet2>>::MAXIMUM_FORK_DEPTH;
+const MAXIMUM_FORK_DEPTH: u32 = Testnet2::ALEO_MAXIMUM_FORK_DEPTH;
 
 pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<Testnet2>>::MAXIMUM_NUMBER_OF_PEERS;
 
@@ -204,7 +203,8 @@ impl Handshake for TestNode {
             0,
         );
         trace!(parent: self.node().span(), "sending a challenge request to {}", peer_ip);
-        let msg = own_request.serialize().unwrap();
+        let mut msg = Vec::new();
+        own_request.serialize_into(&mut msg).unwrap();
         let len = u32::to_le_bytes(msg.len() as u32);
         connection.writer().write_all(&len).await?;
         connection.writer().write_all(&msg).await?;
@@ -253,7 +253,8 @@ impl Handshake for TestNode {
         // Respond with own challenge request.
         let own_response = ClientMessage::ChallengeResponse(Data::Object(genesis_block_header.clone()));
         trace!(parent: self.node().span(), "sending a challenge response to {}", peer_ip);
-        let msg = own_response.serialize().unwrap();
+        let mut msg = Vec::new();
+        own_response.serialize_into(&mut msg).unwrap();
         let len = u32::to_le_bytes(msg.len() as u32);
         connection.writer().write_all(&len).await?;
         connection.writer().write_all(&msg).await?;
@@ -344,11 +345,12 @@ impl Writing for TestNode {
     type Message = ClientMessage;
 
     fn write_message<W: io::Write>(&self, _target: SocketAddr, payload: &Self::Message, writer: &mut W) -> io::Result<()> {
-        let serialized = payload.serialize().unwrap();
-        let len = u32::to_le_bytes(serialized.len() as u32);
+        let mut msg = Vec::new();
+        payload.serialize_into(&mut msg).unwrap();
+        let len = u32::to_le_bytes(msg.len() as u32);
 
         writer.write_all(&len)?;
-        writer.write_all(&serialized)
+        writer.write_all(&msg)
     }
 }
 

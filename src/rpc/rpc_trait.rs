@@ -30,7 +30,7 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/latestblockheight.md")]
     async fn latest_block_height(&self) -> Result<u32, RpcError>;
 
-    // #[doc = include_str!("./documentation/public_endpoints/latestcumulativeweight.md")]
+    #[doc = include_str!("./documentation/public_endpoints/latestcumulativeweight.md")]
     async fn latest_cumulative_weight(&self) -> Result<u128, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/latestblockhash.md")]
@@ -63,16 +63,13 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/getblockheader.md")]
     async fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>, RpcError>;
 
-    // #[doc = include_str!("./documentation/public_endpoints/getblocktemplate.md")]
+    #[doc = include_str!("./documentation/public_endpoints/getblocktemplate.md")]
     async fn get_block_template(&self) -> Result<serde_json::Value, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getblocktransactions.md")]
     async fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>, RpcError>;
 
-    // TODO (howardwu): @collin - I have commented out the previous function signature for reference.
-    //  Notice both the input and return type have changed.
-    // #[doc = include_str!("./documentation/public_endpoints/getciphertext.md")]
-    // async fn get_ciphertext(&self, ciphertext_id: serde_json::Value) -> Result<RecordCiphertext<N>, RpcError>;
+    #[doc = include_str!("./documentation/public_endpoints/getciphertext.md")]
     async fn get_ciphertext(&self, commitment: serde_json::Value) -> Result<N::RecordCiphertext, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getledgerproof.md")]
@@ -90,7 +87,7 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/getconnectedpeers.md")]
     async fn get_connected_peers(&self) -> Result<Vec<SocketAddr>, RpcError>;
 
-    // #[doc = include_str!("../documentation/public_endpoints/getnodestate.md")]
+    #[doc = include_str!("./documentation/public_endpoints/getnodestate.md")]
     async fn get_node_state(&self) -> Result<serde_json::Value, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/sendtransaction.md")]
@@ -100,12 +97,6 @@ pub trait RpcFunctions<N: Network> {
 // /// Definition of private RPC endpoints that require authentication.
 // #[async_trait::async_trait]
 // pub trait ProtectedRpcFunctions {
-//     #[doc = include_str!("../documentation/private_endpoints/createrawtransaction.md")]
-//     async fn create_raw_transaction(
-//         &self,
-//         transaction_input: TransactionInputs,
-//     ) -> Result<CreateRawTransactionOuput, RpcError>;
-//
 //     #[doc = include_str!("../documentation/private_endpoints/createtransaction.md")]
 //     async fn create_transaction(
 //         &self,
@@ -115,9 +106,6 @@ pub trait RpcFunctions<N: Network> {
 //
 //     #[doc = include_str!("../documentation/private_endpoints/getrecordcommitments.md")]
 //     async fn get_record_commitments(&self) -> Result<Vec<String>, RpcError>;
-//
-//     #[doc = include_str!("../documentation/private_endpoints/getrecordcommitmentcount.md")]
-//     async fn get_record_commitment_count(&self) -> Result<usize, RpcError>;
 //
 //     #[doc = include_str!("../documentation/private_endpoints/getrawrecord.md")]
 //     async fn get_raw_record(&self, record_commitment: String) -> Result<String, RpcError>;
