@@ -1,7 +1,11 @@
 #!/bin/bash
 
-echo "Enter your miner address:";
-read MINER_ADDRESS
+# if env var MINER_ADDRESS is not set, prompt for it
+if [ -z $MINER_ADDRESS ]
+then
+  read -p "Enter your miner address: "
+  MINER_ADDRESS=$REPLY
+fi
 
 if [ "${MINER_ADDRESS}" == "" ]
 then
@@ -25,6 +29,7 @@ function exit_node()
 trap exit_node SIGINT
 
 echo "Running miner node..."
+$COMMAND &
 
 while :
 do
@@ -36,9 +41,10 @@ do
   echo "Running the node..."
 
   if [ "$STATUS" != "Already up to date." ]; then
+    echo "Updated code found, rebuilding and relaunching miner"
     cargo clean
+    kill -INT $!; sleep 2; $COMMAND &
   fi
-  $COMMAND & sleep 1800; kill -INT $!
 
-  sleep 2;
+  sleep 1800;
 done
