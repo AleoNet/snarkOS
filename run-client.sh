@@ -33,6 +33,6 @@ do
     kill -INT $!; sleep 2; $COMMAND &
   fi
   
-  sleep 60
+  sleep 1800
 
 done
