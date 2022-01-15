@@ -52,7 +52,7 @@ impl<N: Network> BlockLocators<N> {
     pub fn from(block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)>) -> Result<Self> {
         // Check that the number of block_locators is greater than 0 and less than the MAXIMUM_BLOCK_LOCATORS.
         let num_locators = block_locators.len();
-        match num_locators == 0 || num_locators > MAXIMUM_BLOCK_LOCATORS as usize {
+        match num_locators > 0 && num_locators <= MAXIMUM_BLOCK_LOCATORS as usize {
             true => Ok(Self { block_locators }),
             false => {
                 let error = format!(
