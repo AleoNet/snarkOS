@@ -676,8 +676,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             let is_fork = match is_fork {
                 Some(is_fork) => Some(is_fork),
                 None => match common_ancestor == latest_block_height_of_peer || common_ancestor == self.canon.latest_block_height() {
-                    // If the common ancestor matches the latest block height of the peer / this node,
-                    // the peer is clearly / likely on the same canonical chain as this node.
+                    // If the common ancestor matches the latest block height of (the peer || this node),
+                    // the peer (is clearly || is likely) on the same canonical chain as this node.
                     true => Some(false),
                     false => None,
                 },

@@ -28,9 +28,14 @@ use snarkvm::{
     },
 };
 
+use anyhow::{anyhow, Result};
 use rayon::prelude::*;
 use serde::{de, ser, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
-use std::{collections::BTreeMap, io::ErrorKind, ops::Deref};
+use std::{
+    collections::BTreeMap,
+    io::{Error, ErrorKind},
+    ops::Deref,
+};
 
 ///
 /// A helper struct to represent block locators from the ledger.
@@ -44,8 +49,15 @@ pub struct BlockLocators<N: Network> {
 
 impl<N: Network> BlockLocators<N> {
     #[inline]
-    pub fn from(block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)>) -> Self {
-        Self { block_locators }
+    pub fn from(block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)>) -> Result<Self> {
+        // Check that the number of block_locators is less than the total MAXIMUM_BLOCK_LOCATORS.
+        match block_locators.len() <= MAXIMUM_BLOCK_LOCATORS as usize {
+            true => Ok(Self { block_locators }),
+            false => {
+                error!("The number of block locators exceeds the preset limit");
+                Err(anyhow!("The number of block locators exceeds the preset limit"))
+            }
+        }
     }
 
     #[inline]
@@ -79,7 +91,7 @@ impl<N: Network> FromBytes for BlockLocators<N> {
 
         // Check that the number of block_locators is less than the total MAXIMUM_BLOCK_LOCATORS.
         if num_locators > MAXIMUM_BLOCK_LOCATORS {
-            error!("The list of block locators is too long");
+            error!("The number of block locators exceeds the predefined limit");
             return Err(ErrorKind::Other.into());
         }
 
@@ -104,7 +116,7 @@ impl<N: Network> FromBytes for BlockLocators<N> {
             .map(|(height, hash, bytes)| (height, (hash, bytes.map(|bytes| BlockHeader::<N>::read_le(&bytes[..]).unwrap()))))
             .collect::<BTreeMap<_, (_, _)>>();
 
-        Ok(Self::from(block_locators))
+        Self::from(block_locators).map_err(|error| Error::new(ErrorKind::Other, format!("{}", error)))
     }
 }
 
@@ -162,7 +174,7 @@ impl<'de, N: Network> Deserialize<'de> for BlockLocators<N> {
                 let block_locators = serde_json::Value::deserialize(deserializer)?;
                 let block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> =
                     serde_json::from_value(block_locators["block_locators"].clone()).map_err(de::Error::custom)?;
-                Ok(Self::from(block_locators))
+                Self::from(block_locators).map_err(de::Error::custom)
             }
             false => FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "block locators"),
         }
@@ -172,7 +184,12 @@ impl<'de, N: Network> Deserialize<'de> for BlockLocators<N> {
 impl<N: Network> Default for BlockLocators<N> {
     #[inline]
     fn default() -> Self {
-        Self::from(Default::default())
+        // Initialize the list of block locators.
+        let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> = Default::default();
+        // Add the genesis locator.
+        block_locators.insert(0, (N::genesis_block().hash(), None));
+
+        Self { block_locators }
     }
 }
 
