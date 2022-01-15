@@ -50,12 +50,17 @@ pub struct BlockLocators<N: Network> {
 impl<N: Network> BlockLocators<N> {
     #[inline]
     pub fn from(block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)>) -> Result<Self> {
-        // Check that the number of block_locators is less than the total MAXIMUM_BLOCK_LOCATORS.
-        match block_locators.len() <= MAXIMUM_BLOCK_LOCATORS as usize {
+        // Check that the number of block_locators is greater than 0 and less than the MAXIMUM_BLOCK_LOCATORS.
+        let num_locators = block_locators.len();
+        match num_locators == 0 || num_locators > MAXIMUM_BLOCK_LOCATORS as usize {
             true => Ok(Self { block_locators }),
             false => {
-                error!("The number of block locators exceeds the preset limit");
-                Err(anyhow!("The number of block locators exceeds the preset limit"))
+                let error = format!(
+                    "Invalid number of block locators. Expected between 1 and {}, found {}",
+                    MAXIMUM_BLOCK_LOCATORS, num_locators
+                );
+                error!("{}", error);
+                Err(anyhow!("{}", error))
             }
         }
     }
@@ -89,9 +94,12 @@ impl<N: Network> FromBytes for BlockLocators<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let num_locators: u32 = FromBytes::read_le(&mut reader)?;
 
-        // Check that the number of block_locators is less than the total MAXIMUM_BLOCK_LOCATORS.
-        if num_locators > MAXIMUM_BLOCK_LOCATORS {
-            error!("The number of block locators exceeds the predefined limit");
+        // Check that the number of block_locators is greater than 0 and less than the MAXIMUM_BLOCK_LOCATORS.
+        if num_locators == 0 || num_locators > MAXIMUM_BLOCK_LOCATORS {
+            error!(
+                "Invalid number of block locators. Expected between 1 and {}, found {}",
+                MAXIMUM_BLOCK_LOCATORS, num_locators
+            );
             return Err(ErrorKind::Other.into());
         }
 
@@ -212,7 +220,7 @@ mod tests {
         let expected_block_hash = Testnet2::genesis_block().hash();
         let expected_block_header = Testnet2::genesis_block().header().clone();
         let expected_block_locators =
-            BlockLocators::<Testnet2>::from([(expected_block_height, (expected_block_hash, Some(expected_block_header)))].into());
+            BlockLocators::<Testnet2>::from([(expected_block_height, (expected_block_hash, Some(expected_block_header)))].into()).unwrap();
 
         // Serialize
         let expected_string = expected_block_locators.to_string();
@@ -231,7 +239,7 @@ mod tests {
         let expected_block_hash = Testnet2::genesis_block().hash();
         let expected_block_header = Testnet2::genesis_block().header().clone();
         let expected_block_locators =
-            BlockLocators::<Testnet2>::from([(expected_block_height, (expected_block_hash, Some(expected_block_header)))].into());
+            BlockLocators::<Testnet2>::from([(expected_block_height, (expected_block_hash, Some(expected_block_header)))].into()).unwrap();
 
         // Serialize
         let expected_bytes = expected_block_locators.to_bytes_le().unwrap();
