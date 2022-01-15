@@ -476,6 +476,7 @@ impl<N: Network> LedgerState<N> {
             .latest_block_hashes_and_headers
             .read()
             .asc_iter()
+            .filter(|(_, header)| header.height() != 0) // Skip the genesis block.
             .take(num_block_headers as usize)
             .cloned()
             .map(|(hash, header)| (header.height(), (hash, Some(header))))
