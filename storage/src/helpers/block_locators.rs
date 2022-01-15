@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::MAXIMUM_BLOCK_LOCATORS;
 use snarkvm::{
     dpc::{BlockHeader, Network},
     utilities::{
@@ -29,7 +30,7 @@ use snarkvm::{
 
 use rayon::prelude::*;
 use serde::{de, ser, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
-use std::{collections::BTreeMap, ops::Deref};
+use std::{collections::BTreeMap, io::ErrorKind, ops::Deref};
 
 ///
 /// A helper struct to represent block locators from the ledger.
@@ -75,6 +76,12 @@ impl<N: Network> FromBytes for BlockLocators<N> {
     #[inline]
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let num_locators: u32 = FromBytes::read_le(&mut reader)?;
+
+        // Check that the number of block_locators is less than the total MAXIMUM_BLOCK_LOCATORS.
+        if num_locators > MAXIMUM_BLOCK_LOCATORS {
+            error!("The list of block locators is too long");
+            return Err(ErrorKind::Other.into());
+        }
 
         let mut block_headers_bytes = Vec::with_capacity(num_locators as usize);
 
