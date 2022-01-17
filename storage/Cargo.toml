@@ -50,6 +50,8 @@ version = "1"
 [dependencies.rocksdb]
 version = "0.17"
 optional = true
+default-features = false
+features = ["snappy"]
 
 [dependencies.serde]
 version = "1"
