@@ -487,7 +487,7 @@ impl<N: Network> LedgerState<N> {
             // Add the genesis locator.
             block_locators.insert(0, (self.get_block_hash(0)?, None));
 
-            return Ok(BlockLocators::<N>::from(block_locators));
+            return BlockLocators::<N>::from(block_locators);
         }
 
         // Determine the number of latest block hashes to include as block locators (power of two).
@@ -511,7 +511,7 @@ impl<N: Network> LedgerState<N> {
         // Add the genesis locator.
         block_locators.insert(0, (self.get_block_hash(0)?, None));
 
-        Ok(BlockLocators::<N>::from(block_locators))
+        BlockLocators::<N>::from(block_locators)
     }
 
     /// Check that the block locators are well formed.
