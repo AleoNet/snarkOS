@@ -126,7 +126,8 @@ impl Handshake for SynthNode {
             0,
         );
         trace!(parent: self.node().span(), "sending a challenge request to {}", peer_ip);
-        let msg = own_request.serialize().unwrap();
+        let mut msg = Vec::new();
+        own_request.serialize_into(&mut msg).unwrap();
         let len = u32::to_le_bytes(msg.len() as u32);
         connection.writer().write_all(&len).await?;
         connection.writer().write_all(&msg).await?;
@@ -175,7 +176,8 @@ impl Handshake for SynthNode {
         // Respond with own challenge request.
         let own_response = ClientMessage::ChallengeResponse(Data::Object(genesis_block_header.clone()));
         trace!(parent: self.node().span(), "sending a challenge response to {}", peer_ip);
-        let msg = own_response.serialize().unwrap();
+        let mut msg = Vec::new();
+        own_response.serialize_into(&mut msg).unwrap();
         let len = u32::to_le_bytes(msg.len() as u32);
         connection.writer().write_all(&len).await?;
         connection.writer().write_all(&msg).await?;
@@ -216,11 +218,12 @@ impl Writing for SynthNode {
     type Message = ClientMessage;
 
     fn write_message<W: io::Write>(&self, _target: SocketAddr, payload: &Self::Message, writer: &mut W) -> io::Result<()> {
-        let serialized = payload.serialize().unwrap();
-        let len = u32::to_le_bytes(serialized.len() as u32);
+        let mut msg = Vec::new();
+        payload.serialize_into(&mut msg).unwrap();
+        let len = u32::to_le_bytes(msg.len() as u32);
 
         writer.write_all(&len)?;
-        writer.write_all(&serialized)
+        writer.write_all(&msg)
     }
 }
 
