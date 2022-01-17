@@ -94,19 +94,33 @@ impl Node {
                 println!("{}", command.parse()?);
                 Ok(())
             }
-            None => match (self.network, &self.miner, &self.operator, &self.prover, self.trial, self.sync) {
-                (2, None, None, None, false, false) => self.start_server::<Testnet2, Client<Testnet2>>(&None).await,
-                (2, Some(_), None, None, false, false) => self.start_server::<Testnet2, Miner<Testnet2>>(&self.miner).await,
-                (2, None, Some(_), None, false, false) => self.start_server::<Testnet2, Operator<Testnet2>>(&self.operator).await,
-                (2, None, None, Some(_), false, false) => self.start_server::<Testnet2, Prover<Testnet2>>(&self.prover).await,
-                (2, None, None, None, true, false) => self.start_server::<Testnet2, ClientTrial<Testnet2>>(&None).await,
-                (2, Some(_), None, None, true, false) => self.start_server::<Testnet2, MinerTrial<Testnet2>>(&self.miner).await,
-                (2, None, Some(_), None, true, false) => self.start_server::<Testnet2, OperatorTrial<Testnet2>>(&self.operator).await,
-                (2, None, None, Some(_), true, false) => self.start_server::<Testnet2, ProverTrial<Testnet2>>(&self.prover).await,
-                (2, None, None, None, _, true) => self.start_server::<Testnet2, SyncNode<Testnet2>>(&None).await,
+            None => match &self.get_node_type() {
+                (NodeType::Client, false) => self.start_server::<Testnet2, Client<Testnet2>>(&None).await,
+                (NodeType::Miner, false) => self.start_server::<Testnet2, Miner<Testnet2>>(&self.miner).await,
+                (NodeType::Operator, false) => self.start_server::<Testnet2, Operator<Testnet2>>(&self.operator).await,
+                (NodeType::Prover, false) => self.start_server::<Testnet2, Prover<Testnet2>>(&self.prover).await,
+                (NodeType::Client, true) => self.start_server::<Testnet2, ClientTrial<Testnet2>>(&None).await,
+                (NodeType::Miner, true) => self.start_server::<Testnet2, MinerTrial<Testnet2>>(&self.miner).await,
+                (NodeType::Operator, true) => self.start_server::<Testnet2, OperatorTrial<Testnet2>>(&self.operator).await,
+                (NodeType::Prover, true) => self.start_server::<Testnet2, ProverTrial<Testnet2>>(&self.prover).await,
+                (NodeType::Sync, _) => self.start_server::<Testnet2, SyncNode<Testnet2>>(&None).await,
                 _ => panic!("Unsupported node configuration"),
             },
         }
+    }
+
+    fn get_node_type(&self) -> (NodeType, bool) {
+        (
+            match (self.network, &self.miner, &self.operator, &self.prover, self.sync) {
+                (2, None, None, None, false) => NodeType::Client,
+                (2, Some(_), None, None, false) => NodeType::Miner,
+                (2, None, Some(_), None, false) => NodeType::Operator,
+                (2, None, None, Some(_), false) => NodeType::Prover,
+                (2, None, None, None, true) => NodeType::Sync,
+                _ => panic!("Unsupported node configuration"),
+            },
+            self.trial,
+        )
     }
 
     /// Returns the storage path of the ledger.
