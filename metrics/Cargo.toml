@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [dependencies.metrics]
-version = "0.17"
+version = "0.18"
 
 [dependencies.metrics-exporter-prometheus]
 version = "0.7"
