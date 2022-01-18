@@ -30,7 +30,13 @@ then
   exit 1
 fi
 
-COMMAND="cargo run --release -- --prover ${MINER_ADDRESS} --pool ${OPERATOR_IP_ADDRESS}:4132 --trial --verbosity 2"
+# if env var OPERATOR_IP_ADDRESS is not set, use default port of 4132
+if [ -z "${OPERATOR_IP_PORT}" ]
+then
+  OPERATOR_IP_PORT=4132
+fi
+
+COMMAND="cargo run --release -- --prover ${MINER_ADDRESS} --pool ${OPERATOR_IP_ADDRESS}:${OPERATOR_IP_PORT} --trial --verbosity 2"
 
 for word in $*;
 do
@@ -46,8 +52,12 @@ function exit_node()
 
 trap exit_node SIGINT
 
+echo "$COMMAND"
+exit 99
+
 echo "Running prover node..."
 $COMMAND &
+
 
 while :
 do
