@@ -413,9 +413,7 @@ impl TestNode {
         let genesis = Testnet2::genesis_block();
         let msg = ClientMessage::Pong(
             None,
-            Data::Object(BlockLocators::<Testnet2>::from(
-                vec![(genesis.height(), (genesis.hash(), None))].into_iter().collect(),
-            )),
+            Data::Object(BlockLocators::<Testnet2>::from(vec![(genesis.height(), (genesis.hash(), None))].into_iter().collect()).unwrap()),
         );
 
         info!(parent: self.node().span(), "sending a Pong to {}", source);

@@ -50,9 +50,9 @@ commands:
 jobs:
   tests:
     docker:
-      - image: cimg/rust:1.56.1
+      - image: cimg/rust:1.57.0
     resource_class: 2xlarge
-    parallelism: 20
+    parallelism: 10
     steps:
       - checkout
       - setup_environment:
@@ -70,6 +70,51 @@ jobs:
       - clear_environment:
           cache_key: snarkos-stable-cache
 
+  storage:
+    docker:
+      - image: cimg/rust:1.57.0
+    resource_class: 2xlarge
+    parallelism: 5
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-storage-cache
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: |
+            cd storage
+            cargo test -- --list --format terse | sed 's/: test//' > test_names.txt
+            TEST_NAMES=$(circleci tests split test_names.txt)
+            for i in $(echo $TEST_NAMES | sed "s/ / /g")
+            do
+                RUST_MIN_STACK=8388608 cargo test --workspace $i 
+            done
+      - clear_environment:
+          cache_key: snarkos-storage-cache
+
+  testing:
+    docker:
+      - image: cimg/rust:1.57.0
+    resource_class: 2xlarge
+    parallelism: 5
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-testing-cache
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: |
+            cd testing
+            cargo test -- --list --format terse | sed 's/: test//' > test_names.txt
+            TEST_NAMES=$(circleci tests split test_names.txt)
+            for i in $(echo $TEST_NAMES | sed "s/ / /g")
+            do
+                RUST_MIN_STACK=8388608 cargo test --workspace $i 
+            done
+      - clear_environment:
+          cache_key: snarkos-testing-cache
 
   # codecov:
   #   machine:
@@ -89,7 +134,7 @@ jobs:
 
   fmt:
     docker:
-      - image: cimg/rust:1.56.1
+      - image: cimg/rust:1.57.0
     resource_class: 2xlarge
     steps:
       - checkout
@@ -105,7 +150,7 @@ jobs:
 
   clippy:
     docker:
-      - image: cimg/rust:1.56.1
+      - image: cimg/rust:1.57.0
     resource_class: 2xlarge
     steps:
       - checkout
@@ -224,6 +269,8 @@ workflows:
   main-workflow:
     jobs:
       - tests
+      - storage
+      - testing
       # - codecov:
       #     requires:
       #       - rust-stable
