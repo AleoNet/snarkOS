@@ -1,6 +1,11 @@
 #!/bin/bash
 # Have a nice day
 
+# USAGE examples: 
+  # CLI with env vars: MINER_ADDRESS=aleoABCD...  ./run-miner.sh
+  # CLI with prompts for vars:  ./run-miner.sh
+
+
 # if env var MINER_ADDRESS is not set, prompt for it
 if [ -z "${MINER_ADDRESS}" ]
 then

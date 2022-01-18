@@ -1,5 +1,9 @@
 #!/bin/bash
-# Have a nice day
+
+# USAGE examples: 
+  # CLI with env vars: MINER_ADDRESS=aleoABCD...  OPERATOR_IP_ADDRESS=a.b.c.d ./run-prover.sh
+  # CLI with prompts for vars:  ./run-prover.sh
+
 
 # if env var MINER_ADDRESS is not set, prompt for it
 if [ -z "${MINER_ADDRESS}" ]
@@ -13,22 +17,20 @@ then
   MINER_ADDRESS="aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah"
 fi
 
-
-
-# if env var OPERATOR_IP_ADDR is not set, prompt for it
+# if env var OPERATOR_IP_ADDRESS is not set, prompt for it
 if [ -z "${OPERATOR_IP_ADDRESS}" ]
 then
-  read -r -p "Enter your Operator Server's IP address: "
-  OPERATOR_IP_ADDR=$REPLY
+  read -r -p "Enter your Operator Servers IP address: "
+  OPERATOR_IP_ADDRESS=$REPLY
 fi
 
-if [ "${OPERATOR_IP_ADDR}" == "" ]
+if [ "${OPERATOR_IP_ADDRESS}" == "" ]
 then
   echo "IP Address of Operator server is required to run a prover"
   exit 1
 fi
 
-COMMAND="cargo run --release -- --prover ${MINER_ADDRESS} --pool ${OPERATOR_IP_ADDR}:4132 --trial --verbosity 2"
+COMMAND="cargo run --release -- --prover ${MINER_ADDRESS} --pool ${OPERATOR_IP_ADDRESS}:4132 --trial --verbosity 2"
 
 for word in $*;
 do
@@ -44,7 +46,7 @@ function exit_node()
 
 trap exit_node SIGINT
 
-echo "Running miner node..."
+echo "Running prover node..."
 $COMMAND &
 
 while :
@@ -54,7 +56,7 @@ do
   rm Cargo.lock
   STATUS=$(git pull)
 
-  if [ "$STATUS" != "Already up to date." ]; then
+  if [ "${STATUS}" != "Already up to date." ]; then
     echo "Updated code found, rebuilding and relaunching miner"
     cargo clean
     kill -INT $!; sleep 2; $COMMAND &

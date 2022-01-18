@@ -1,5 +1,7 @@
 #!/bin/bash
-# Have a nice day..
+
+# USAGE examples: 
+  # CLI :  ./run-client.sh
 
 COMMAND='cargo run --release -- --trial --verbosity 2'
 

@@ -1,5 +1,8 @@
 #!/bin/bash
-# Have a nice day
+
+# USAGE examples: 
+  # CLI with env vars: MINER_ADDRESS=aleoABCD...   ./run-operator.sh
+
 
 # if env var MINER_ADDRESS is not set, prompt for it
 if [ -z "${MINER_ADDRESS}" ]
@@ -45,6 +48,5 @@ do
     kill -INT $!; sleep 2; $COMMAND &
   fi
 
-  #sleep 1800;
-  sleep 60;
+  sleep 1800;
 done
