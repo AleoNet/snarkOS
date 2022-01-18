@@ -17,11 +17,12 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = ["storage", "testing"]
+members = ["metrics", "storage", "testing"]
 
 [features]
 default = []
 cuda = [ "snarkvm/cuda" ]
+prometheus = ["snarkos-metrics"]
 test = []
 
 [dependencies]
@@ -33,6 +34,11 @@ futures = { version = "0.3.19", features = ["thread-pool"] }
 
 crossterm = { version = "0.22" }
 tui = { version = "0.16.0", default-features = false, features = ["crossterm"] }
+
+[dependencies.snarkos-metrics]
+path = "./metrics"
+version = "2.0.0"
+optional = true
 
 [dependencies.snarkos-storage]
 path = "./storage"
