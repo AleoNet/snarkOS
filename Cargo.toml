@@ -49,6 +49,9 @@ version = "2.0"
 version = "0.23"
 optional = true
 
+[dependencies.igd]
+version = "0.12"
+
 [dependencies.num_cpus]
 version = "1"
 

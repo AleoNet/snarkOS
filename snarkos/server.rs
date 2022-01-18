@@ -38,6 +38,7 @@ use snarkos_metrics as metrics;
 use tokio::sync::RwLock;
 
 use anyhow::Result;
+use igd::{AddPortError, PortMappingProtocol};
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, sync::oneshot, task};
 
@@ -64,6 +65,29 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     pub async fn initialize(node: &Node, address: Option<Address<N>>, pool_ip: Option<SocketAddr>) -> Result<Self> {
+        // Use UPnP to detect the gateway, if the upnp option is enabled.
+        if node.upnp {
+            let gateway_search_opts = igd::SearchOptions {
+                timeout: Some(Duration::from_secs(1)),
+                ..Default::default()
+            };
+            let gateway = igd::search_gateway(gateway_search_opts)
+                .map_err(|e| warn!("Can't obtain the node's gateway details: {}; perhaps it's not UPnP-enabled?", e))
+                .ok();
+
+            if let Some(ref gateway) = gateway {
+                if let SocketAddr::V4(internal_addr) = node.node {
+                    let external_port = internal_addr.port();
+
+                    match gateway.add_port(PortMappingProtocol::TCP, external_port, internal_addr, 0, "snarkOS") {
+                        Err(AddPortError::PortInUse) => debug!("Port {} is already forwarded", external_port),
+                        Err(e) => error!("Can't map external port {} to address {}: {}", external_port, internal_addr, e),
+                        Ok(_) => info!("Enabled port forwarding via UPnP"),
+                    }
+                }
+            }
+        }
+
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(node.node).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
