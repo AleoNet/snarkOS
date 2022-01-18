@@ -41,6 +41,8 @@ fn lookups(c: &mut Criterion) {
     let mut block_hashes = Vec::with_capacity(NUM_BLOCKS);
     block_hashes.push(Testnet2::genesis_block().hash());
 
+    let mut ledger_roots = Vec::with_capacity(NUM_BLOCKS);
+
     let mut tx_ids = Vec::with_capacity(NUM_BLOCKS);
     for tx_id in Testnet2::genesis_block().transactions().transaction_ids() {
         tx_ids.push(tx_id);
@@ -60,12 +62,20 @@ fn lookups(c: &mut Criterion) {
     for block in &blocks {
         ledger.add_next_block(block).expect("Failed to add a test block");
         block_hashes.push(block.hash());
+        ledger_roots.push(ledger.latest_ledger_root());
     }
     assert_eq!(block_hashes.len(), NUM_BLOCKS);
 
     // Seed a fast random number generator.
     let seed: u64 = thread_rng().gen();
     let mut rng = XorShiftRng::seed_from_u64(seed);
+
+    c.bench_function("ledger_roots_lookup", |b| {
+        b.iter(|| {
+            let root = ledger_roots.choose(&mut rng).unwrap();
+            ledger.contains_ledger_root(root).expect("Lookup by ledger root failed");
+        })
+    });
 
     c.bench_function("blocks_lookup_by_height", |b| {
         b.iter(|| {
