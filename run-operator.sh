@@ -2,9 +2,9 @@
 # Have a nice day
 
 # if env var MINER_ADDRESS is not set, prompt for it
-if [ -z $MINER_ADDRESS ]
+if [ -z "${MINER_ADDRESS}" ]
 then
-  read -p "Enter your miner address for your operator: "
+  read -r -p "Enter your miner address for your operator: "
   MINER_ADDRESS=$REPLY
 fi
 

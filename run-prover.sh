@@ -2,9 +2,9 @@
 # Have a nice day
 
 # if env var MINER_ADDRESS is not set, prompt for it
-if [ -z $MINER_ADDRESS ]
+if [ -z "${MINER_ADDRESS}" ]
 then
-  read -p "Enter your miner address: "
+  read -r -p "Enter your miner address: "
   MINER_ADDRESS=$REPLY
 fi
 
@@ -16,9 +16,9 @@ fi
 
 
 # if env var OPERATOR_IP_ADDR is not set, prompt for it
-if [ -z $OPERATOR_IP_ADDRESS ]
+if [ -z "${OPERATOR_IP_ADDRESS}" ]
 then
-  read -p "Enter your Operator Server's IP address: "
+  read -r -p "Enter your Operator Server's IP address: "
   OPERATOR_IP_ADDR=$REPLY
 fi
 
@@ -28,7 +28,7 @@ then
   exit 1
 fi
 
-COMMAND="cargo run --release -- --prover ${MINER_ADDRESS} --pool $(OPERATOR_IP_ADDR}:4132 --trial --verbosity 2"
+COMMAND="cargo run --release -- --prover ${MINER_ADDRESS} --pool ${OPERATOR_IP_ADDR}:4132 --trial --verbosity 2"
 
 for word in $*;
 do
