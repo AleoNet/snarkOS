@@ -1,0 +1,85 @@
+#!/usr/bin/env bash
+
+# $1 - Git repository name
+# $2 - Branch name
+startup() {
+    echo "[INFO] Watch started: $*"
+}
+
+# $1 - Git repository name
+# $2 - Branch name
+no_changes() {
+    echo "[INFO] Nothing changed: $*"
+}
+
+# $1 - Git repository name
+# $2 - Branch name
+# $3 - Commit details
+change_pulled() {
+    echo "[NOTICE] Changes pulled: $*"
+    BRANCH=$2
+    if [ "${BRANCH}" = "testnet2" ] ; then
+        echo "[INFO] triggering deployment automation..."
+        #run cargo clean
+        echo "[INFO]Running cargo clean"
+       	cargo clean
+        wait
+
+        #Modify src/environment/mod.rs
+        echo "[INFO] Modifying src/environment/mod.rs"
+        sed -i ':a;N;$!ba;s/const MINIMUM_NUMBER_OF_PEERS: usize = 11;/const MINIMUM_NUMBER_OF_PEERS: usize = 1;/4' /home/snarkos/repos/snarkOS/src/environment/mod.rs
+        sed -i ':a;N;$!ba;s/const MAXIMUM_NUMBER_OF_PEERS: usize = 21;/const MAXIMUM_NUMBER_OF_PEERS: usize = 32;/5' /home/snarkos/repos/snarkOS/src/environment/mod.rs
+
+        #### Rebuild snarkos
+        echo "[INFO] Rebuilding snarkos"
+        cargo build --release
+
+        wait
+        echo "[INFO]Finished rebuilding"
+
+        #### Remove symlink snarkos, copy new snarkos-<gitHEAD> to /home/snarkos/bin/snarkos-builds, create new soft link /home/snarkos/bin/snarkos
+        echo "[INFO]Remove symlink snarkos, copy new snarkos-<gitHEAD> to /home/snarkos/bin/snarkos-builds, create soft link /home/snarkos/bin/snarkos"
+        rm /home/snarkos/bin/snarkos
+        cp /home/snarkos/repos/snarkOS/target/release/snarkos /home/snarkos/bin/snarkos-builds/snarkos-$(git rev-parse --short HEAD)
+        ln -s /home/snarkos/bin/snarkos-builds/snarkos-$(git rev-parse --short HEAD) /home/snarkos/bin/snarkos
+            #### Start the operator
+        echo "[INFO]Start snarkos-operator.service"
+        systemctl start snarkos-operator.service
+        echo "[INFO] Snarkos deployment automation completed."
+    else
+        echo "[INFO] Changes detected on a branch that does not trigger any actions."
+    fi
+}
+# $1 - Git repository name
+# $2 - Branch name
+# $3 - Commit details
+pull_failed() {
+    echo "[ERROR] Pull failed --> Exiting: $*"
+    exit 1
+}
+
+# $1 - Git repository name
+# $2 - New branch name
+# $3 - Old branch name
+branch_changed() {
+    echo "[INFO] Branch changed: $*"
+}
+
+# $1 - Git repository name
+# $2 - Branch name
+upstream_not_set() {
+    echo "[WARN] Upstream not set: $*"
+}
+
+# $1 - Git repository name
+# $2 - Branch name
+local_change() {
+    echo "[WARN] local file changed: $*"
+}
+
+# $1 - Git repository name
+# $2 - Branch name
+diverged() {
+    echo "[ERROR] Diverged --> Exiting: $*"
+    exit 1
+}
