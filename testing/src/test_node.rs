@@ -17,12 +17,13 @@
 use snarkos::{
     helpers::{NodeType, State, Status},
     Client,
+    CurrentNetwork,
     Data,
     Environment,
     Message,
 };
 use snarkos_storage::BlockLocators;
-use snarkvm::{dpc::testnet2::Testnet2, traits::Network};
+use snarkvm::traits::Network;
 
 use pea2pea::{
     protocols::{Disconnect, Handshake, Reading, Writing},
@@ -51,13 +52,13 @@ const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
 const CHALLENGE_HEIGHT: u32 = 0;
 const PING_INTERVAL_SECS: u64 = 5;
 const PEER_INTERVAL_SECS: u64 = 3;
-const DESIRED_CONNECTIONS: usize = <Client<Testnet2>>::MINIMUM_NUMBER_OF_PEERS * 3;
-const MESSAGE_VERSION: u32 = <Client<Testnet2>>::MESSAGE_VERSION;
-const MAXIMUM_FORK_DEPTH: u32 = Testnet2::ALEO_MAXIMUM_FORK_DEPTH;
+const DESIRED_CONNECTIONS: usize = <Client<CurrentNetwork>>::MINIMUM_NUMBER_OF_PEERS * 3;
+const MESSAGE_VERSION: u32 = <Client<CurrentNetwork>>::MESSAGE_VERSION;
+const MAXIMUM_FORK_DEPTH: u32 = CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH;
 
-pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<Testnet2>>::MAXIMUM_NUMBER_OF_PEERS;
+pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<CurrentNetwork>>::MAXIMUM_NUMBER_OF_PEERS;
 
-type ClientMessage = Message<Testnet2, Client<Testnet2>>;
+type ClientMessage = Message<CurrentNetwork, Client<CurrentNetwork>>;
 pub type ClientNonce = u64;
 
 /// The test node; it consists of a `Node` that handles networking and `State`
@@ -138,7 +139,7 @@ impl TestNode {
     pub fn send_pings(&self) {
         let node = self.clone();
         task::spawn(async move {
-            let genesis = Testnet2::genesis_block();
+            let genesis = CurrentNetwork::genesis_block();
             let ping_msg = ClientMessage::Ping(
                 MESSAGE_VERSION,
                 MAXIMUM_FORK_DEPTH,
@@ -190,7 +191,7 @@ impl Handshake for TestNode {
         let own_ip = self.node().listening_addr()?;
         let peer_ip = connection.addr;
 
-        let genesis_block_header = Testnet2::genesis_block().header();
+        let genesis_block_header = CurrentNetwork::genesis_block().header();
 
         // Send a challenge request to the peer.
         let own_request = ClientMessage::ChallengeRequest(
@@ -403,17 +404,19 @@ impl TestNode {
 
     async fn process_ping(&self, source: SocketAddr, version: u32, block_height: u32) -> io::Result<()> {
         // Ensure the message protocol version is not outdated.
-        if version < <Client<Testnet2>>::MESSAGE_VERSION {
+        if version < <Client<CurrentNetwork>>::MESSAGE_VERSION {
             warn!(parent: self.node().span(), "dropping {} due to outdated version ({})", source, version);
             return Err(io::ErrorKind::InvalidData.into());
         }
 
         debug!(parent: self.node().span(), "peer {} is at height {}", source, block_height);
 
-        let genesis = Testnet2::genesis_block();
+        let genesis = CurrentNetwork::genesis_block();
         let msg = ClientMessage::Pong(
             None,
-            Data::Object(BlockLocators::<Testnet2>::from(vec![(genesis.height(), (genesis.hash(), None))].into_iter().collect()).unwrap()),
+            Data::Object(
+                BlockLocators::<CurrentNetwork>::from(vec![(genesis.height(), (genesis.hash(), None))].into_iter().collect()).unwrap(),
+            ),
         );
 
         info!(parent: self.node().span(), "sending a Pong to {}", source);

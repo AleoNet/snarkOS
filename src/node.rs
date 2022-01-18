@@ -18,10 +18,11 @@ use crate::{
     environment::{Client, ClientTrial, Environment, Miner, MinerTrial, Operator, OperatorTrial, Prover, ProverTrial, SyncNode},
     helpers::{NodeType, Updater},
     network::Server,
+    CurrentNetwork,
     Display,
 };
 use snarkos_storage::storage::rocksdb::RocksDB;
-use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
+use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
 use colored::*;
@@ -95,15 +96,18 @@ impl Node {
                 Ok(())
             }
             None => match &self.get_node_type() {
-                (NodeType::Client, false) => self.start_server::<Testnet2, Client<Testnet2>>(&None).await,
-                (NodeType::Miner, false) => self.start_server::<Testnet2, Miner<Testnet2>>(&self.miner).await,
-                (NodeType::Operator, false) => self.start_server::<Testnet2, Operator<Testnet2>>(&self.operator).await,
-                (NodeType::Prover, false) => self.start_server::<Testnet2, Prover<Testnet2>>(&self.prover).await,
-                (NodeType::Client, true) => self.start_server::<Testnet2, ClientTrial<Testnet2>>(&None).await,
-                (NodeType::Miner, true) => self.start_server::<Testnet2, MinerTrial<Testnet2>>(&self.miner).await,
-                (NodeType::Operator, true) => self.start_server::<Testnet2, OperatorTrial<Testnet2>>(&self.operator).await,
-                (NodeType::Prover, true) => self.start_server::<Testnet2, ProverTrial<Testnet2>>(&self.prover).await,
-                (NodeType::Sync, _) => self.start_server::<Testnet2, SyncNode<Testnet2>>(&None).await,
+                (NodeType::Client, false) => self.start_server::<CurrentNetwork, Client<CurrentNetwork>>(&None).await,
+                (NodeType::Miner, false) => self.start_server::<CurrentNetwork, Miner<CurrentNetwork>>(&self.miner).await,
+                (NodeType::Operator, false) => self.start_server::<CurrentNetwork, Operator<CurrentNetwork>>(&self.operator).await,
+                (NodeType::Prover, false) => self.start_server::<CurrentNetwork, Prover<CurrentNetwork>>(&self.prover).await,
+                (NodeType::Client, true) => self.start_server::<CurrentNetwork, ClientTrial<CurrentNetwork>>(&None).await,
+                (NodeType::Miner, true) => self.start_server::<CurrentNetwork, MinerTrial<CurrentNetwork>>(&self.miner).await,
+                (NodeType::Operator, true) => {
+                    self.start_server::<CurrentNetwork, OperatorTrial<CurrentNetwork>>(&self.operator)
+                        .await
+                }
+                (NodeType::Prover, true) => self.start_server::<CurrentNetwork, ProverTrial<CurrentNetwork>>(&self.prover).await,
+                (NodeType::Sync, _) => self.start_server::<CurrentNetwork, SyncNode<CurrentNetwork>>(&None).await,
                 _ => panic!("Unsupported node configuration"),
             },
         }
@@ -390,7 +394,7 @@ pub struct NewAccount {}
 
 impl NewAccount {
     pub fn parse(self) -> Result<String> {
-        let account = Account::<Testnet2>::new(&mut rand::thread_rng());
+        let account = Account::<CurrentNetwork>::new(&mut rand::thread_rng());
 
         // Print the new Aleo account.
         let mut output = "".to_string();
@@ -435,7 +439,7 @@ pub struct MinerStats {
 impl MinerStats {
     pub fn parse(self) -> Result<String> {
         // Parse the input address.
-        let miner = Address::<Testnet2>::from_str(&self.address)?;
+        let miner = Address::<CurrentNetwork>::from_str(&self.address)?;
 
         // Initialize the node.
         let node = Node::from_iter(&["snarkos", "--norpc", "--verbosity", "0"]);
@@ -444,11 +448,11 @@ impl MinerStats {
 
         // Initialize the ledger storage.
         let ledger_storage_path = node.ledger_storage_path(ip);
-        let ledger = snarkos_storage::LedgerState::<Testnet2>::open_reader::<RocksDB, _>(ledger_storage_path).unwrap();
+        let ledger = snarkos_storage::LedgerState::<CurrentNetwork>::open_reader::<RocksDB, _>(ledger_storage_path).unwrap();
 
         // Initialize the prover storage.
         let prover_storage_path = node.prover_storage_path(ip);
-        let prover = snarkos_storage::ProverState::<Testnet2>::open_writer::<RocksDB, _>(prover_storage_path).unwrap();
+        let prover = snarkos_storage::ProverState::<CurrentNetwork>::open_writer::<RocksDB, _>(prover_storage_path).unwrap();
 
         // Retrieve the latest block height.
         let latest_block_height = ledger.latest_block_height();

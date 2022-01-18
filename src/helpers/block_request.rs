@@ -76,7 +76,8 @@ impl<N: Network> Hash for BlockRequest<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::{dpc::testnet2::Testnet2, prelude::UniformRand};
+    use crate::CurrentNetwork;
+    use snarkvm::prelude::UniformRand;
 
     use rand::{thread_rng, Rng};
 
@@ -86,17 +87,17 @@ mod tests {
 
         for _ in 0..5 {
             let block_height: u32 = rng.gen();
-            let block_hash = <Testnet2 as Network>::BlockHash::rand(rng);
+            let block_hash = <CurrentNetwork as Network>::BlockHash::rand(rng);
 
-            let request = BlockRequest::<Testnet2>::from(block_height);
+            let request = BlockRequest::<CurrentNetwork>::from(block_height);
             assert_eq!(block_height, request.block_height());
             assert_eq!(None, request.block_hash());
 
-            let request = BlockRequest::<Testnet2>::from((block_height, None));
+            let request = BlockRequest::<CurrentNetwork>::from((block_height, None));
             assert_eq!(block_height, request.block_height());
             assert_eq!(None, request.block_hash());
 
-            let request = BlockRequest::<Testnet2>::from((block_height, Some(block_hash)));
+            let request = BlockRequest::<CurrentNetwork>::from((block_height, Some(block_hash)));
             assert_eq!(block_height, request.block_height());
             assert_eq!(Some(block_hash), request.block_hash());
         }
@@ -108,14 +109,14 @@ mod tests {
 
         for _ in 0..5 {
             let block_height: u32 = rng.gen();
-            let block_hash = <Testnet2 as Network>::BlockHash::rand(rng);
+            let block_hash = <CurrentNetwork as Network>::BlockHash::rand(rng);
 
-            let a = BlockRequest::<Testnet2>::from(block_height);
-            let b = BlockRequest::<Testnet2>::from((block_height, None));
+            let a = BlockRequest::<CurrentNetwork>::from(block_height);
+            let b = BlockRequest::<CurrentNetwork>::from((block_height, None));
             assert_eq!(a, b);
 
-            let a = BlockRequest::<Testnet2>::from(block_height);
-            let b = BlockRequest::<Testnet2>::from((block_height, Some(block_hash)));
+            let a = BlockRequest::<CurrentNetwork>::from(block_height);
+            let b = BlockRequest::<CurrentNetwork>::from((block_height, Some(block_hash)));
             assert_eq!(a, b);
         }
     }

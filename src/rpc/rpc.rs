@@ -421,13 +421,13 @@ fn result_to_response<T: Serialize>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{environment::Client, helpers::State, ledger::Ledger, network::Prover};
+    use crate::{environment::Client, helpers::State, ledger::Ledger, network::Prover, CurrentNetwork};
     use snarkos_storage::{
         storage::{rocksdb::RocksDB, Storage},
         LedgerState,
     };
     use snarkvm::{
-        dpc::{testnet2::Testnet2, AccountScheme, AleoAmount, Transaction, Transactions, Transition},
+        dpc::{AccountScheme, AleoAmount, Transaction, Transactions, Transition},
         prelude::{Account, Block, BlockHeader},
         utilities::ToBytes,
     };
@@ -562,7 +562,7 @@ mod tests {
     #[tokio::test]
     async fn test_handle_rpc() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Initialize a new request with an empty body.
         let request = Request::new(Body::empty());
@@ -578,7 +578,7 @@ mod tests {
     #[tokio::test]
     async fn test_latest_block() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Initialize a new request that calls the `latestblock` endpoint.
         let request = Request::new(Body::from(
@@ -595,17 +595,17 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into a block.
-        let actual: Block<Testnet2> = process_response(response).await;
+        let actual: Block<CurrentNetwork> = process_response(response).await;
 
         // Check the block.
-        let expected = Testnet2::genesis_block();
+        let expected = CurrentNetwork::genesis_block();
         assert_eq!(*expected, actual);
     }
 
     #[tokio::test]
     async fn test_latest_block_height() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Initialize a new request that calls the `latestblockheight` endpoint.
         let request = Request::new(Body::from(
@@ -625,14 +625,14 @@ mod tests {
         let actual: u32 = process_response(response).await;
 
         // Check the block height.
-        let expected = Testnet2::genesis_block().height();
+        let expected = CurrentNetwork::genesis_block().height();
         assert_eq!(expected, actual);
     }
 
     #[tokio::test]
     async fn test_latest_block_hash() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Initialize a new request that calls the `latestblockhash` endpoint.
         let request = Request::new(Body::from(
@@ -649,17 +649,17 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into a block hash.
-        let actual: <Testnet2 as Network>::BlockHash = process_response(response).await;
+        let actual: <CurrentNetwork as Network>::BlockHash = process_response(response).await;
 
         // Check the block hash.
-        let expected = Testnet2::genesis_block().hash();
+        let expected = CurrentNetwork::genesis_block().hash();
         assert_eq!(expected, actual);
     }
 
     #[tokio::test]
     async fn test_latest_block_header() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Initialize a new request that calls the `latestblockheader` endpoint.
         let request = Request::new(Body::from(
@@ -676,17 +676,17 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into a block header.
-        let actual: BlockHeader<Testnet2> = process_response(response).await;
+        let actual: BlockHeader<CurrentNetwork> = process_response(response).await;
 
         // Check the block header.
-        let expected = Testnet2::genesis_block().header();
+        let expected = CurrentNetwork::genesis_block().header();
         assert_eq!(*expected, actual);
     }
 
     #[tokio::test]
     async fn test_latest_block_transactions() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Initialize a new request that calls the `latestblocktransactions` endpoint.
         let request = Request::new(Body::from(
@@ -703,17 +703,17 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into transactions.
-        let actual: Transactions<Testnet2> = process_response(response).await;
+        let actual: Transactions<CurrentNetwork> = process_response(response).await;
 
         // Check the transactions.
-        let expected = Testnet2::genesis_block().transactions();
+        let expected = CurrentNetwork::genesis_block().transactions();
         assert_eq!(*expected, actual);
     }
 
     #[tokio::test]
     async fn test_latest_ledger_root() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         let expected = rpc.latest_ledger_root().await.unwrap();
 
@@ -732,7 +732,7 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into a ledger root.
-        let actual: <Testnet2 as Network>::LedgerRoot = process_response(response).await;
+        let actual: <CurrentNetwork as Network>::LedgerRoot = process_response(response).await;
 
         // Check the ledger root.
         assert_eq!(expected, actual);
@@ -741,7 +741,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_block() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Initialize a new request that calls the `getblock` endpoint.
         let request = Request::new(Body::from(
@@ -761,10 +761,10 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into a block.
-        let actual: Block<Testnet2> = process_response(response).await;
+        let actual: Block<CurrentNetwork> = process_response(response).await;
 
         // Check the block.
-        let expected = Testnet2::genesis_block();
+        let expected = CurrentNetwork::genesis_block();
         assert_eq!(*expected, actual);
     }
 
@@ -777,11 +777,11 @@ mod tests {
         let directory = temp_dir();
 
         // Initialize a new ledger state at the temporary directory.
-        let ledger_state = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
+        let ledger_state = new_ledger_state::<CurrentNetwork, RocksDB, PathBuf>(Some(directory.clone()));
         assert_eq!(0, ledger_state.latest_block_height());
 
         // Initialize a new account.
-        let account = Account::<Testnet2>::new(&mut thread_rng());
+        let account = Account::<CurrentNetwork>::new(&mut thread_rng());
         let address = account.address();
 
         // Mine the next block.
@@ -795,7 +795,7 @@ mod tests {
         drop(ledger_state);
 
         // Initialize a new RPC with the ledger state containing the genesis block and block_1.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(Some(directory.clone())).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(Some(directory.clone())).await;
 
         // Initialize a new request that calls the `getblocks` endpoint.
         let request = Request::new(Body::from(
@@ -815,10 +815,10 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into blocks.
-        let actual: Vec<Block<Testnet2>> = process_response(response).await;
+        let actual: Vec<Block<CurrentNetwork>> = process_response(response).await;
 
         // Check the blocks.
-        let expected = vec![Testnet2::genesis_block(), &block_1];
+        let expected = vec![CurrentNetwork::genesis_block(), &block_1];
         expected.into_iter().zip(actual.into_iter()).for_each(|(expected, actual)| {
             assert_eq!(*expected, actual);
         });
@@ -827,10 +827,10 @@ mod tests {
     #[tokio::test]
     async fn test_get_block_height() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Get the genesis block hash.
-        let block_hash = Testnet2::genesis_block().hash().to_string();
+        let block_hash = CurrentNetwork::genesis_block().hash().to_string();
 
         // Initialize a new request that calls the `getblockheight` endpoint.
         let request = Request::new(Body::from(format!(
@@ -854,14 +854,14 @@ mod tests {
         let actual: u32 = process_response(response).await;
 
         // Check the block height.
-        let expected = Testnet2::genesis_block().height();
+        let expected = CurrentNetwork::genesis_block().height();
         assert_eq!(expected, actual);
     }
 
     #[tokio::test]
     async fn test_get_block_hash() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Initialize a new request that calls the `getblockhash` endpoint.
         let request = Request::new(Body::from(
@@ -881,10 +881,10 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into a block hash.
-        let actual: <Testnet2 as Network>::BlockHash = process_response(response).await;
+        let actual: <CurrentNetwork as Network>::BlockHash = process_response(response).await;
 
         // Check the block hash.
-        let expected = Testnet2::genesis_block().hash();
+        let expected = CurrentNetwork::genesis_block().hash();
         assert_eq!(expected, actual);
     }
 
@@ -897,11 +897,11 @@ mod tests {
         let directory = temp_dir();
 
         // Initialize a new ledger state at the temporary directory.
-        let ledger_state = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
+        let ledger_state = new_ledger_state::<CurrentNetwork, RocksDB, PathBuf>(Some(directory.clone()));
         assert_eq!(0, ledger_state.latest_block_height());
 
         // Initialize a new account.
-        let account = Account::<Testnet2>::new(&mut thread_rng());
+        let account = Account::<CurrentNetwork>::new(&mut thread_rng());
         let address = account.address();
 
         // Mine the next block.
@@ -915,7 +915,7 @@ mod tests {
         drop(ledger_state);
 
         // Initialize a new RPC with the ledger state containing the genesis block and block_1.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(Some(directory.clone())).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(Some(directory.clone())).await;
 
         // Initialize a new request that calls the `getblockhashes` endpoint.
         let request = Request::new(Body::from(
@@ -935,10 +935,10 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into block hashes.
-        let actual: Vec<<Testnet2 as Network>::BlockHash> = process_response(response).await;
+        let actual: Vec<<CurrentNetwork as Network>::BlockHash> = process_response(response).await;
 
         // Check the block hashes.
-        let expected = vec![Testnet2::genesis_block().hash(), block_1.hash()];
+        let expected = vec![CurrentNetwork::genesis_block().hash(), block_1.hash()];
         expected.into_iter().zip(actual.into_iter()).for_each(|(expected, actual)| {
             assert_eq!(expected, actual);
         });
@@ -947,7 +947,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_block_header() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Initialize a new request that calls the `getblockheader` endpoint.
         let request = Request::new(Body::from(
@@ -967,24 +967,24 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into a block header.
-        let actual: BlockHeader<Testnet2> = process_response(response).await;
+        let actual: BlockHeader<CurrentNetwork> = process_response(response).await;
 
         // Check the block header.
-        let expected = Testnet2::genesis_block().header();
+        let expected = CurrentNetwork::genesis_block().header();
         assert_eq!(*expected, actual);
     }
 
     #[tokio::test]
     async fn test_get_block_template() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Initialize the expected block template values.
-        let expected_previous_block_hash = Testnet2::genesis_block().hash().to_string();
+        let expected_previous_block_hash = CurrentNetwork::genesis_block().hash().to_string();
         let expected_block_height = 1;
         let expected_ledger_root = rpc.latest_ledger_root().await.unwrap().to_string();
         let expected_transactions = Vec::<serde_json::Value>::new();
-        let expected_block_reward = Block::<Testnet2>::block_reward(1).0;
+        let expected_block_reward = Block::<CurrentNetwork>::block_reward(1).0;
 
         // Initialize a new request that calls the `getblocktemplate` endpoint.
         let request = Request::new(Body::from(
@@ -1014,7 +1014,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_block_transactions() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Initialize a new request that calls the `getblocktransactions` endpoint.
         let request = Request::new(Body::from(
@@ -1034,20 +1034,20 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into transactions.
-        let actual: Transactions<Testnet2> = process_response(response).await;
+        let actual: Transactions<CurrentNetwork> = process_response(response).await;
 
         // Check the transactions.
-        let expected = Testnet2::genesis_block().transactions();
+        let expected = CurrentNetwork::genesis_block().transactions();
         assert_eq!(*expected, actual);
     }
 
     #[tokio::test]
     async fn test_get_ciphertext() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Get the commitment from the genesis coinbase transaction.
-        let commitment = Testnet2::genesis_block().to_coinbase_transaction().unwrap().transitions()[0]
+        let commitment = CurrentNetwork::genesis_block().to_coinbase_transaction().unwrap().transitions()[0]
             .commitments()
             .next()
             .unwrap()
@@ -1072,11 +1072,11 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into a ciphertext.
-        let actual: <Testnet2 as Network>::RecordCiphertext = process_response(response).await;
+        let actual: <CurrentNetwork as Network>::RecordCiphertext = process_response(response).await;
 
         // Check the ciphertext.
         assert!(
-            Testnet2::genesis_block()
+            CurrentNetwork::genesis_block()
                 .transactions()
                 .first()
                 .unwrap()
@@ -1094,11 +1094,11 @@ mod tests {
         let directory = temp_dir();
 
         // Initialize a new ledger state at the temporary directory.
-        let ledger_state = new_ledger_state::<Testnet2, RocksDB, PathBuf>(Some(directory.clone()));
+        let ledger_state = new_ledger_state::<CurrentNetwork, RocksDB, PathBuf>(Some(directory.clone()));
         assert_eq!(0, ledger_state.latest_block_height());
 
         // Initialize a new account.
-        let account = Account::<Testnet2>::new(&mut rng);
+        let account = Account::<CurrentNetwork>::new(&mut rng);
         let address = account.address();
 
         // Mine the next block.
@@ -1120,7 +1120,7 @@ mod tests {
         drop(ledger_state);
 
         // Initialize a new RPC with the ledger state containing the genesis block and block_1.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(Some(directory.clone())).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(Some(directory.clone())).await;
 
         // Initialize a new request that calls the `getledgerproof` endpoint.
         let request = Request::new(Body::from(format!(
@@ -1151,14 +1151,14 @@ mod tests {
     #[tokio::test]
     async fn test_get_node_state() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Declare the expected node state.
         let expected = serde_json::json!({
-            "address": Option::<Address<Testnet2>>::None,
+            "address": Option::<Address<CurrentNetwork>>::None,
             "candidate_peers": Vec::<SocketAddr>::new(),
             "connected_peers": Vec::<SocketAddr>::new(),
-            "latest_block_hash": Testnet2::genesis_block().hash(),
+            "latest_block_hash": CurrentNetwork::genesis_block().hash(),
             "latest_block_height": 0,
             "latest_cumulative_weight": 0,
             "launched": format!("{} minutes ago", 0),
@@ -1166,9 +1166,9 @@ mod tests {
             "number_of_connected_peers": 0,
             "number_of_connected_sync_nodes": 0,
             "software": format!("snarkOS {}", env!("CARGO_PKG_VERSION")),
-            "status": Client::<Testnet2>::status().to_string(),
-            "type": Client::<Testnet2>::NODE_TYPE,
-            "version": Client::<Testnet2>::MESSAGE_VERSION,
+            "status": Client::<CurrentNetwork>::status().to_string(),
+            "type": Client::<CurrentNetwork>::NODE_TYPE,
+            "version": Client::<CurrentNetwork>::MESSAGE_VERSION,
         });
 
         // Initialize a new request that calls the `getnodestate` endpoint.
@@ -1199,19 +1199,19 @@ mod tests {
         /// Additional metadata included with a transaction response
         #[derive(Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
         pub struct GetTransactionResponse {
-            pub transaction: Transaction<Testnet2>,
-            pub metadata: snarkos_storage::Metadata<Testnet2>,
-            pub decrypted_records: Vec<Record<Testnet2>>,
+            pub transaction: Transaction<CurrentNetwork>,
+            pub metadata: snarkos_storage::Metadata<CurrentNetwork>,
+            pub decrypted_records: Vec<Record<CurrentNetwork>>,
         }
 
         // Initialize a new ledger.
-        let ledger = new_ledger_state::<Testnet2, RocksDB, PathBuf>(None);
+        let ledger = new_ledger_state::<CurrentNetwork, RocksDB, PathBuf>(None);
 
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Get the genesis coinbase transaction ID.
-        let transaction_id = Testnet2::genesis_block().to_coinbase_transaction().unwrap().transaction_id();
+        let transaction_id = CurrentNetwork::genesis_block().to_coinbase_transaction().unwrap().transaction_id();
 
         // Initialize a new request that calls the `gettransaction` endpoint.
         let request = Request::new(Body::from(format!(
@@ -1235,7 +1235,7 @@ mod tests {
         let actual: GetTransactionResponse = process_response(response).await;
 
         // Check the transaction.
-        let expected_transaction = Testnet2::genesis_block().transactions().first().unwrap();
+        let expected_transaction = CurrentNetwork::genesis_block().transactions().first().unwrap();
         assert_eq!(*expected_transaction, actual.transaction);
 
         // Check the metadata.
@@ -1243,17 +1243,17 @@ mod tests {
         assert_eq!(expected_transaction_metadata, actual.metadata);
 
         // Check the records.
-        let expected_decrypted_records: Vec<Record<Testnet2>> = expected_transaction.to_records().collect();
+        let expected_decrypted_records: Vec<Record<CurrentNetwork>> = expected_transaction.to_records().collect();
         assert_eq!(expected_decrypted_records, actual.decrypted_records)
     }
 
     #[tokio::test]
     async fn test_get_transition() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Get a transition ID from the genesis coinbase transaction.
-        let transition_id = Testnet2::genesis_block().to_coinbase_transaction().unwrap().transitions()[0]
+        let transition_id = CurrentNetwork::genesis_block().to_coinbase_transaction().unwrap().transitions()[0]
             .transition_id()
             .to_string();
 
@@ -1276,11 +1276,11 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into a transition.
-        let actual: Transition<Testnet2> = process_response(response).await;
+        let actual: Transition<CurrentNetwork> = process_response(response).await;
 
         // Check the transition.
         assert!(
-            Testnet2::genesis_block()
+            CurrentNetwork::genesis_block()
                 .transactions()
                 .first()
                 .unwrap()
@@ -1293,7 +1293,7 @@ mod tests {
     #[tokio::test]
     async fn test_get_connected_peers() {
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Initialize a new request that calls the `gettransition` endpoint.
         let request = Request::new(Body::from(
@@ -1322,15 +1322,15 @@ mod tests {
         let mut rng = ChaChaRng::seed_from_u64(123456789);
 
         // Initialize a new account.
-        let account = Account::<Testnet2>::new(&mut rng);
+        let account = Account::<CurrentNetwork>::new(&mut rng);
         let address = account.address();
 
         // Initialize a new transaction.
-        let (transaction, _) = Transaction::<Testnet2>::new_coinbase(address, AleoAmount(1234), true, &mut rng)
+        let (transaction, _) = Transaction::<CurrentNetwork>::new_coinbase(address, AleoAmount(1234), true, &mut rng)
             .expect("Failed to create a coinbase transaction");
 
         // Initialize a new rpc.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Initialize a new request that calls the `sendtransaction` endpoint.
         let request = Request::new(Body::from(format!(
@@ -1351,7 +1351,7 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into a ciphertext.
-        let actual: <Testnet2 as Network>::TransactionID = process_response(response).await;
+        let actual: <CurrentNetwork as Network>::TransactionID = process_response(response).await;
 
         // Check the transaction id.
         let expected = transaction.transaction_id();
@@ -1361,7 +1361,7 @@ mod tests {
     #[tokio::test]
     async fn test_send_transaction_large() {
         // Initialize a new RPC.
-        new_rpc_server::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        new_rpc_server::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         ///
         /// Sends a `sendtransaction` RPC request to the given node address.
@@ -1393,7 +1393,7 @@ mod tests {
         let response = result.expect("Test RPC failed to process request");
 
         // Process the response into a transaction ID.
-        let actual: <Testnet2 as Network>::TransactionID =
+        let actual: <CurrentNetwork as Network>::TransactionID =
             serde_json::from_value(response["result"].clone()).expect("Failed to deserialize response from send_transaction");
 
         // Check the transaction id.
@@ -1405,17 +1405,17 @@ mod tests {
         let mut rng = ChaChaRng::seed_from_u64(123456789);
 
         // Initialize a new RPC.
-        let rpc = new_rpc::<Testnet2, Client<Testnet2>, RocksDB, PathBuf>(None).await;
+        let rpc = new_rpc::<CurrentNetwork, Client<CurrentNetwork>, RocksDB, PathBuf>(None).await;
 
         // Send a transaction to the node.
 
         // Initialize a new account.
-        let account = Account::<Testnet2>::new(&mut rng);
+        let account = Account::<CurrentNetwork>::new(&mut rng);
         let address = account.address();
 
         // Initialize a new transaction.
-        let (transaction, _) =
-            Transaction::<Testnet2>::new_coinbase(address, AleoAmount(0), true, &mut rng).expect("Failed to create a coinbase transaction");
+        let (transaction, _) = Transaction::<CurrentNetwork>::new_coinbase(address, AleoAmount(0), true, &mut rng)
+            .expect("Failed to create a coinbase transaction");
 
         // Initialize a new request that calls the `sendtransaction` endpoint.
         let request = Request::new(Body::from(format!(
@@ -1455,7 +1455,7 @@ mod tests {
             .expect("Test RPC failed to process request");
 
         // Process the response into transactions.
-        let actual: Vec<Transaction<Testnet2>> = process_response(response).await;
+        let actual: Vec<Transaction<CurrentNetwork>> = process_response(response).await;
 
         // Check the transactions.
         let expected = vec![transaction];

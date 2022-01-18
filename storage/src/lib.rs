@@ -35,3 +35,5 @@ pub use state::{
 };
 
 pub mod storage;
+
+pub type CurrentNetwork = snarkvm::dpc::testnet2::Testnet2;
