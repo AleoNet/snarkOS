@@ -678,6 +678,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         break;
                                     }
 
+                                    // Perform the deferred non-blocking deserialisation of the
+                                    // transaction.
                                     match transaction.deserialize().await {
                                         Ok(transaction) => {
                                             // Retrieve the last seen timestamp of the received transaction.
