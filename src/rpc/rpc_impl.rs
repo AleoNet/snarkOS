@@ -234,6 +234,11 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
             .map(|tx| tx.to_string())
             .collect();
 
+        // Enforce that the transaction fee is positive or zero.
+        if transaction_fees.is_negative() {
+            return Err(RpcError::Message("Invalid transaction fees".to_string()));
+        }
+
         // Calculate the final coinbase reward (including the transaction fees).
         coinbase_reward = coinbase_reward.add(transaction_fees);
 
