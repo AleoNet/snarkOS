@@ -20,12 +20,12 @@ change_pulled() {
     BRANCH=$2
     if [ "${BRANCH}" = "testnet2" ] ; then
         echo "[INFO] triggering deployment automation..."
-        #run cargo clean
+        #### Run cargo clean
         echo "[INFO]Running cargo clean"
        	cargo clean
         wait
 
-        #Modify src/environment/mod.rs
+        #### Modify src/environment/mod.rs
         echo "[INFO] Modifying src/environment/mod.rs"
         sed -i ':a;N;$!ba;s/const MINIMUM_NUMBER_OF_PEERS: usize = 11;/const MINIMUM_NUMBER_OF_PEERS: usize = 1;/4' /home/snarkos/repos/snarkOS/src/environment/mod.rs
         sed -i ':a;N;$!ba;s/const MAXIMUM_NUMBER_OF_PEERS: usize = 21;/const MAXIMUM_NUMBER_OF_PEERS: usize = 32;/5' /home/snarkos/repos/snarkOS/src/environment/mod.rs
@@ -33,7 +33,6 @@ change_pulled() {
         #### Rebuild snarkos
         echo "[INFO] Rebuilding snarkos"
         cargo build --release
-
         wait
         echo "[INFO]Finished rebuilding"
 
@@ -42,7 +41,8 @@ change_pulled() {
         rm /home/snarkos/bin/snarkos
         cp /home/snarkos/repos/snarkOS/target/release/snarkos /home/snarkos/bin/snarkos-builds/snarkos-$(git rev-parse --short HEAD)
         ln -s /home/snarkos/bin/snarkos-builds/snarkos-$(git rev-parse --short HEAD) /home/snarkos/bin/snarkos
-            #### Start the operator
+        
+        #### Start the operator
         echo "[INFO]Start snarkos-operator.service"
         systemctl start snarkos-operator.service
         echo "[INFO] Snarkos deployment automation completed."
