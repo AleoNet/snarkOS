@@ -390,7 +390,13 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                     is_ready_to_send
                                 }
-                                Message::UnconfirmedTransaction(ref transaction) => {
+                                Message::UnconfirmedTransaction(ref mut data) => {
+                                    let transaction = if let Data::Object(transaction) = data {
+                                        transaction
+                                    } else {
+                                        panic!("Logic error: the transaction shouldn't have been serialized yet.");
+                                    };
+
                                     // Retrieve the last seen timestamp of this transaction for this peer.
                                     let last_seen = peer
                                         .seen_outbound_transactions
@@ -403,12 +409,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     // Report the unconfirmed block height.
                                     if is_ready_to_send {
                                         trace!(
-                                            "Preparing to send '{} {}' to {}",
-                                            message.name(),
+                                            "Preparing to send 'UnconfirmedTransaction {}' to {}",
                                             transaction.transaction_id(),
                                             peer_ip
                                         );
                                     }
+
+                                    // Perform non-blocking serialization of the transaction.
+                                    let serialized_transaction = Data::serialize(data.clone()).await.expect("Transaction serialization is bugged");
+                                    let _ = std::mem::replace(data, Data::Buffer(serialized_transaction));
+
                                     is_ready_to_send
                                 }
                                 _ => true,
@@ -668,24 +678,31 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         break;
                                     }
 
-                                    // Retrieve the last seen timestamp of the received transaction.
-                                    let last_seen = peer.seen_inbound_transactions.entry(transaction.transaction_id()).or_insert(SystemTime::UNIX_EPOCH);
-                                    let is_router_ready = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+                                    match transaction.deserialize().await {
+                                        Ok(transaction) => {
+                                            // Retrieve the last seen timestamp of the received transaction.
+                                            let last_seen = peer.seen_inbound_transactions.entry(transaction.transaction_id()).or_insert(SystemTime::UNIX_EPOCH);
+                                            let is_router_ready = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
-                                    // Update the timestamp for the received transaction.
-                                    peer.seen_inbound_transactions.insert(transaction.transaction_id(), SystemTime::now());
+                                            // Update the timestamp for the received transaction.
+                                            peer.seen_inbound_transactions.insert(transaction.transaction_id(), SystemTime::now());
 
-                                    // Ensure the node is not peering.
-                                    let is_node_ready = !E::status().is_peering();
+                                            // Ensure the node is not peering.
+                                            let is_node_ready = !E::status().is_peering();
 
-                                    // If this node is a beacon or sync node, skip this message, after updating the timestamp.
-                                    if E::NODE_TYPE == NodeType::Beacon || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_node_ready {
-                                        trace!("Skipping 'UnconfirmedTransaction {}' from {}", transaction.transaction_id(), peer_ip);
-                                    } else {
-                                        // Route the `UnconfirmedTransaction` to the prover.
-                                        if let Err(error) = prover_router.send(ProverRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
-                                            warn!("[UnconfirmedTransaction] {}", error);
+                                            // If this node is a beacon or sync node, skip this message, after updating the timestamp.
+                                            if E::NODE_TYPE == NodeType::Beacon || E::NODE_TYPE == NodeType::Sync || !is_router_ready || !is_node_ready {
+                                                trace!("Skipping 'UnconfirmedTransaction {}' from {}", transaction.transaction_id(), peer_ip);
+                                            } else {
+                                                // Route the `UnconfirmedTransaction` to the prover.
+                                                if let Err(error) = prover_router.send(ProverRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
+                                                    warn!("[UnconfirmedTransaction] {}", error);
+
+                                                }
+                                            }
+
                                         }
+                                        Err(error) => warn!("[UnconfirmedTransaction] {}", error)
                                     }
                                 }
                                 Message::PoolRegister(address) => {
