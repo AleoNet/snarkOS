@@ -1,0 +1,16 @@
+[Unit]
+Description=Aleo Git Repo Watcher
+After=NetworkManager.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=snarkos
+Group=snarkos
+WorkingDirectory=/home/snarkos/
+Environment=
+ExecStart=/home/snarkos/bin/git-repo-watcher -d "/home/snarkos/repos/snarkOS" -i 60
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
