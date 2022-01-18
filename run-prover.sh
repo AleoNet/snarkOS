@@ -52,9 +52,6 @@ function exit_node()
 
 trap exit_node SIGINT
 
-echo "$COMMAND"
-exit 99
-
 echo "Running prover node..."
 $COMMAND &
 
