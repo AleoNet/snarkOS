@@ -5,11 +5,12 @@ Wants=network-online.target
 
 [Service]
 Type=simple
-User=snarkos
+User=root
 Group=snarkos
 WorkingDirectory=/home/snarkos/
 Environment=
-ExecStart=/home/snarkos/bin/git-repo-watcher -d "/home/snarkos/repos/snarkOS" -i 60
+PATH=/home/ubuntu/.cargo/bin/
+ExecStart=/bin/bash -c 'PATH=/home/ubuntu/.cargo/bin/:$PATH /home/snarkos/bin/git-repo-watcher -d "/home/snarkos/repos/snarkOS/"'
 Restart=on-failure
 
 [Install]
