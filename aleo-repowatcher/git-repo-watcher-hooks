@@ -29,6 +29,8 @@ change_pulled() {
         echo "[INFO] Modifying src/environment/mod.rs"
         sed -i ':a;N;$!ba;s/const MINIMUM_NUMBER_OF_PEERS: usize = 11;/const MINIMUM_NUMBER_OF_PEERS: usize = 1;/4' /home/snarkos/repos/snarkOS/src/environment/mod.rs
         sed -i ':a;N;$!ba;s/const MAXIMUM_NUMBER_OF_PEERS: usize = 21;/const MAXIMUM_NUMBER_OF_PEERS: usize = 32;/5' /home/snarkos/repos/snarkOS/src/environment/mod.rs
+        sed -i ':a;N;$!ba;s/.num_threads((num_cpus::get() \* 7 \/ 8).max(2))/.num_threads(num_cpus::get() * 3)/1' /home/snarkos/repos/snarkOS/src/environment/mod.rs
+
 
         #### Rebuild snarkos
         echo "[INFO] Rebuilding snarkos"
@@ -83,4 +85,3 @@ diverged() {
     echo "[ERROR] Diverged --> Exiting: $*"
     exit 1
 }
-#t1
