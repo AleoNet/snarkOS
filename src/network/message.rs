@@ -25,7 +25,7 @@ use ::bytes::{Buf, BufMut, Bytes, BytesMut};
 use anyhow::{anyhow, Result};
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
-    io::{Cursor, Write},
+    io::{Cursor, Seek, Write},
     marker::PhantomData,
     net::SocketAddr,
 };
@@ -227,7 +227,7 @@ impl<N: Network, E: Environment> Message<N, E> {
 
     /// Deserializes the given buffer into a message.
     #[inline]
-    pub fn deserialize<R: Read>(reader: &mut R) -> Result<Self> {
+    pub fn deserialize<R: Read + Seek>(reader: &mut R) -> Result<Self> {
         // Read the message ID.
         let id: u16 = bincode::deserialize_from(&mut *reader)?;
 
