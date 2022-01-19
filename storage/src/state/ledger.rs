@@ -16,7 +16,7 @@
 
 use crate::{
     helpers::BlockLocators,
-    storage::{DataMap, Map, Storage},
+    storage::{DataMap, Map, MapId, Storage},
 };
 use snarkvm::dpc::prelude::*;
 
@@ -28,7 +28,7 @@ use rand::{CryptoRng, Rng};
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     path::Path,
     sync::{
         atomic::{AtomicBool, AtomicU32, Ordering},
@@ -38,18 +38,12 @@ use std::{
     thread::JoinHandle,
 };
 
-/// The number of seconds in two hours.
-const TWO_HOURS_UNIX: i64 = 7200;
-
 /// The maximum number of linear block locators.
 pub const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 64;
 /// The maximum number of quadratic block locators.
 pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 32;
 /// The total maximum number of block locators.
 pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
-
-/// TODO (howardwu): Reconcile this with the equivalent in `Environment`.
-const MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 ///
 /// A helper struct containing transaction metadata.
@@ -83,10 +77,8 @@ pub struct LedgerState<N: Network> {
     ledger_tree: RwLock<LedgerTree<N>>,
     /// The latest block of the ledger.
     latest_block: RwLock<Block<N>>,
-    /// The latest block hashes of the ledger.
-    latest_block_hashes: RwLock<CircularQueue<N::BlockHash>>,
-    /// The latest block headers of the ledger.
-    latest_block_headers: RwLock<CircularQueue<BlockHeader<N>>>,
+    /// The latest block hashes and headers in the ledger.
+    latest_block_hashes_and_headers: RwLock<CircularQueue<(N::BlockHash, BlockHeader<N>)>>,
     /// The block locators from the latest block of the ledger.
     latest_block_locators: RwLock<BlockLocators<N>>,
     /// The ledger root corresponding to each block height.
@@ -95,6 +87,8 @@ pub struct LedgerState<N: Network> {
     blocks: BlockState<N>,
     /// The indicator bit and tracker for a ledger in read-only mode.
     read_only: (bool, Arc<AtomicU32>, RwLock<Option<Arc<JoinHandle<()>>>>),
+    /// Used to ensure the database operations aren't interrupted by a shutdown.
+    map_lock: Arc<RwLock<()>>,
 }
 
 impl<N: Network> LedgerState<N> {
@@ -115,16 +109,16 @@ impl<N: Network> LedgerState<N> {
         let ledger = Self {
             ledger_tree: RwLock::new(LedgerTree::<N>::new()?),
             latest_block: RwLock::new(N::genesis_block().clone()),
-            latest_block_hashes: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
-            latest_block_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
+            latest_block_hashes_and_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
             latest_block_locators: Default::default(),
-            ledger_roots: storage.open_map("ledger_roots")?,
+            ledger_roots: storage.open_map(MapId::LedgerRoots)?,
             blocks: BlockState::open(storage)?,
             read_only: (is_read_only, Arc::new(AtomicU32::new(0)), RwLock::new(None)),
+            map_lock: Default::default(),
         };
 
         // Determine the latest block height.
-        let latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
+        let mut latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
             (Some(latest_block_height_0), Some(latest_block_height_1)) => match latest_block_height_0 == latest_block_height_1 {
                 true => latest_block_height_0,
                 false => match ledger.try_fixing_inconsistent_state() {
@@ -140,29 +134,49 @@ impl<N: Network> LedgerState<N> {
         if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
             let genesis = N::genesis_block();
             ledger.ledger_roots.insert(&genesis.previous_ledger_root(), &genesis.height())?;
+
+            // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+            let _map_lock = ledger.map_lock.read();
+
             ledger.blocks.add_block(genesis)?;
+
+            // The map lock goes out of scope on its own.
+        }
+
+        // Check that all canonical block headers exist in storage.
+        let count = ledger.blocks.get_block_header_count()?;
+        assert_eq!(count, latest_block_height.saturating_add(1));
+
+        // TODO (howardwu): TEMPORARY - Remove this after testnet2.
+        // Sanity check for a V12 ledger.
+        if N::NETWORK_ID == 2
+            && latest_block_height > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
+            && ledger.get_block(latest_block_height).is_err()
+        {
+            let revert_block_height = snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT.saturating_sub(1);
+            warn!("Ledger is not V12-compliant, reverting to block {}", revert_block_height);
+            warn!("{:?}", ledger.get_block(latest_block_height));
+            latest_block_height = ledger.clear_incompatible_blocks(latest_block_height, revert_block_height)?;
+            info!("Ledger successfully transitioned and is now V12-compliant");
         }
 
         // Iterate and append each block hash from genesis to tip to validate ledger state.
-        const INCREMENT: u32 = 500;
+        const INCREMENT: u32 = 2000;
         let mut start_block_height = 0u32;
-        while start_block_height < latest_block_height {
+        while start_block_height <= latest_block_height {
             // Compute the end block height (inclusive) for this iteration.
             let end_block_height = std::cmp::min(start_block_height.saturating_add(INCREMENT), latest_block_height);
-
-            // Perform a spot check that the block headers for this iteration exists in storage.
-            if start_block_height % 2 == 0 {
-                let block_headers = ledger.get_block_headers(start_block_height, end_block_height)?;
-                assert_eq!(end_block_height - start_block_height + 1, block_headers.len() as u32);
-            }
 
             // Retrieve the block hashes.
             let block_hashes = ledger.get_block_hashes(start_block_height, end_block_height)?;
 
             // Split the block hashes into (last_block_hash, [start_block_hash, ..., penultimate_block_hash]).
-            if let Some((end_block_hash, block_hashes_excluding_last)) = block_hashes.split_last() {
-                // Add the block hashes (up to penultimate) to the ledger tree.
-                ledger.ledger_tree.write().add_all(block_hashes_excluding_last)?;
+            if let Some((last_block_hash, block_hashes_excluding_last)) = block_hashes.split_last() {
+                // It's possible that the batch only contains one block.
+                if !block_hashes_excluding_last.is_empty() {
+                    // Add the block hashes (up to penultimate) to the ledger tree.
+                    ledger.ledger_tree.write().add_all(block_hashes_excluding_last)?;
+                }
 
                 // Check 1 - Ensure the root of the ledger tree matches the one saved in the ledger roots map.
                 let ledger_root = ledger.get_previous_ledger_root(end_block_height)?;
@@ -184,15 +198,15 @@ impl<N: Network> LedgerState<N> {
                 }
 
                 // Add the last block hash to the ledger tree.
-                ledger.ledger_tree.write().add(end_block_hash)?;
+                ledger.ledger_tree.write().add(last_block_hash)?;
             }
 
-            // Update the starting block height for the next iteration.
-            start_block_height = std::cmp::min(end_block_height.saturating_add(1), latest_block_height);
-
             // Log the progress of the validation procedure.
-            let progress = (start_block_height as f64 / latest_block_height as f64 * 100f64) as u8;
-            debug!("Validating the ledger up to block {} ({}%)", start_block_height, progress);
+            let progress = (end_block_height as f64 / latest_block_height as f64 * 100f64) as u8;
+            debug!("Validating the ledger up to block {} ({}%)", end_block_height, progress);
+
+            // Update the starting block height for the next iteration.
+            start_block_height = end_block_height.saturating_add(1);
         }
 
         // If this is new storage, the while loop above did not execute,
@@ -237,12 +251,12 @@ impl<N: Network> LedgerState<N> {
         let ledger = Arc::new(Self {
             ledger_tree: RwLock::new(LedgerTree::<N>::new()?),
             latest_block: RwLock::new(N::genesis_block().clone()),
-            latest_block_hashes: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
-            latest_block_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
+            latest_block_hashes_and_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
             latest_block_locators: Default::default(),
-            ledger_roots: storage.open_map("ledger_roots")?,
+            ledger_roots: storage.open_map(MapId::LedgerRoots)?,
             blocks: BlockState::open(storage)?,
             read_only: (is_read_only, Arc::new(AtomicU32::new(0)), RwLock::new(None)),
+            map_lock: Default::default(),
         });
 
         // Determine the latest block height.
@@ -262,8 +276,14 @@ impl<N: Network> LedgerState<N> {
         // If this is new storage, initialize it with the genesis block.
         if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
             let genesis = N::genesis_block();
+
+            // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+            let _map_lock = ledger.map_lock.read();
+
             ledger.ledger_roots.insert(&genesis.previous_ledger_root(), &genesis.height())?;
             ledger.blocks.add_block(genesis)?;
+
+            // The map lock goes out of scope on its own.
         }
 
         // Update the latest ledger state.
@@ -446,17 +466,16 @@ impl<N: Network> LedgerState<N> {
         // Determine the number of latest block headers to include as block locators (linear).
         let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS, block_locator_height);
 
-        // Acquire the read lock for the latest block hashes and block headers.
-        let latest_block_hashes = self.latest_block_hashes.read();
-        let latest_block_headers = self.latest_block_headers.read();
-
         // Construct the list of block locator headers.
-        let block_hashes = latest_block_hashes.iter().cloned();
-        let block_headers = latest_block_headers.iter().cloned();
-        let block_locator_headers = block_hashes
-            .zip_eq(block_headers)
+        let block_locator_headers = self
+            .latest_block_hashes_and_headers
+            .read()
+            .asc_iter()
+            .filter(|(_, header)| header.height() != 0) // Skip the genesis block.
             .take(num_block_headers as usize)
-            .map(|(hash, header)| (header.height(), (hash, Some(header))));
+            .cloned()
+            .map(|(hash, header)| (header.height(), (hash, Some(header))))
+            .collect::<Vec<_>>();
 
         // Decrement the block locator height by the number of block headers.
         block_locator_height -= num_block_headers;
@@ -464,11 +483,11 @@ impl<N: Network> LedgerState<N> {
         // Return the block locators if the locator has run out of blocks.
         if block_locator_height == 0 {
             // Initialize the list of block locators.
-            let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> = block_locator_headers.collect();
+            let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> = block_locator_headers.into_iter().collect();
             // Add the genesis locator.
             block_locators.insert(0, (self.get_block_hash(0)?, None));
 
-            return Ok(BlockLocators::<N>::from(block_locators));
+            return BlockLocators::<N>::from(block_locators);
         }
 
         // Determine the number of latest block hashes to include as block locators (power of two).
@@ -488,22 +507,15 @@ impl<N: Network> LedgerState<N> {
 
         // Initialize the list of block locators.
         let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> =
-            block_locator_headers.chain(block_locator_hashes).collect();
+            block_locator_headers.into_iter().chain(block_locator_hashes).collect();
         // Add the genesis locator.
         block_locators.insert(0, (self.get_block_hash(0)?, None));
 
-        Ok(BlockLocators::<N>::from(block_locators))
+        BlockLocators::<N>::from(block_locators)
     }
 
     /// Check that the block locators are well formed.
     pub fn check_block_locators(&self, block_locators: &BlockLocators<N>) -> Result<bool> {
-        // Check that the number of block_locators is less than the total MAXIMUM_BLOCK_LOCATORS.
-        if block_locators.len() > MAXIMUM_BLOCK_LOCATORS as usize {
-            return Ok(false);
-        }
-
-        let block_locators = &**block_locators;
-
         // Ensure the genesis block locator exists and is well-formed.
         let (expected_genesis_block_hash, expected_genesis_header) = match block_locators.get(&0) {
             Some((expected_genesis_block_hash, expected_genesis_header)) => (expected_genesis_block_hash, expected_genesis_header),
@@ -571,6 +583,102 @@ impl<N: Network> LedgerState<N> {
         Ok(true)
     }
 
+    /// Returns a block template based on the latest state of the ledger.
+    pub fn get_block_template<R: Rng + CryptoRng>(
+        &self,
+        recipient: Address<N>,
+        is_public: bool,
+        transactions: &[Transaction<N>],
+        rng: &mut R,
+    ) -> Result<BlockTemplate<N>> {
+        // Fetch the latest state of the ledger.
+        let latest_block = self.latest_block();
+        let previous_ledger_root = self.latest_ledger_root();
+
+        // Prepare the new block.
+        let previous_block_hash = latest_block.hash();
+        let block_height = latest_block.height().saturating_add(1);
+        // Ensure that the new timestamp is ahead of the previous timestamp.
+        let block_timestamp = std::cmp::max(chrono::Utc::now().timestamp(), latest_block.timestamp().saturating_add(1));
+
+        // Compute the block difficulty target.
+        let difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+            Blocks::<N>::compute_difficulty_target(latest_block.header(), block_timestamp, block_height)
+        } else if N::NETWORK_ID == 2 {
+            let anchor_block_header = self.get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
+            Blocks::<N>::compute_difficulty_target(&anchor_block_header, block_timestamp, block_height)
+        } else {
+            Blocks::<N>::compute_difficulty_target(N::genesis_block().header(), block_timestamp, block_height)
+        };
+
+        // Compute the cumulative weight.
+        let cumulative_weight = latest_block
+            .cumulative_weight()
+            .saturating_add((u64::MAX / difficulty_target) as u128);
+
+        // Compute the coinbase reward (not including the transaction fees).
+        let mut coinbase_reward = Block::<N>::block_reward(block_height);
+        let mut transaction_fees = AleoAmount::ZERO;
+
+        // Filter the transactions to ensure they are new, and append the coinbase transaction.
+        let mut transactions: Vec<Transaction<N>> = transactions
+            .iter()
+            .filter(|transaction| {
+                for serial_number in transaction.serial_numbers() {
+                    if let Ok(true) = self.contains_serial_number(serial_number) {
+                        trace!(
+                            "Ledger is filtering out transaction {} (serial_number {})",
+                            transaction.transaction_id(),
+                            serial_number
+                        );
+                        return false;
+                    }
+                }
+                for commitment in transaction.commitments() {
+                    if let Ok(true) = self.contains_commitment(commitment) {
+                        trace!(
+                            "Ledger is filtering out transaction {} (commitment {})",
+                            transaction.transaction_id(),
+                            commitment
+                        );
+                        return false;
+                    }
+                }
+                trace!("Adding transaction {} to block template", transaction.transaction_id());
+                transaction_fees = transaction_fees.add(transaction.value_balance());
+                true
+            })
+            .cloned()
+            .collect();
+
+        // Enforce that the transaction fee is positive or zero.
+        if transaction_fees.is_negative() {
+            return Err(anyhow!("Invalid transaction fees"));
+        }
+
+        // Calculate the final coinbase reward (including the transaction fees).
+        coinbase_reward = coinbase_reward.add(transaction_fees);
+
+        // Craft a coinbase transaction, and append it to the list of transactions.
+        let (coinbase_transaction, coinbase_record) = Transaction::<N>::new_coinbase(recipient, coinbase_reward, is_public, rng)?;
+        transactions.push(coinbase_transaction);
+
+        // Construct the new block transactions.
+        let transactions = Transactions::from(&transactions)?;
+
+        // Construct the block template.
+        Ok(BlockTemplate::new(
+            previous_block_hash,
+            block_height,
+            block_timestamp,
+            difficulty_target,
+            cumulative_weight,
+            previous_ledger_root,
+            transactions,
+            coinbase_record,
+        ))
+    }
+
     /// Mines a new block using the latest state of the given ledger.
     pub fn mine_next_block<R: Rng + CryptoRng>(
         &self,
@@ -580,75 +688,11 @@ impl<N: Network> LedgerState<N> {
         terminator: &AtomicBool,
         rng: &mut R,
     ) -> Result<(Block<N>, Record<N>)> {
-        // Prepare the new block.
-        let previous_block_hash = self.latest_block_hash();
-        let block_height = self.latest_block_height() + 1;
-
-        // Compute the block difficulty target.
-        let previous_timestamp = self.latest_block_timestamp();
-        let previous_difficulty_target = self.latest_block_difficulty_target();
-        let block_timestamp = chrono::Utc::now().timestamp();
-        let difficulty_target = Blocks::<N>::compute_difficulty_target(previous_timestamp, previous_difficulty_target, block_timestamp);
-        let cumulative_weight = self
-            .latest_cumulative_weight()
-            .saturating_add((u64::MAX / difficulty_target) as u128);
-
-        // Construct the ledger root.
-        let ledger_root = self.latest_ledger_root();
-
-        // Craft a coinbase transaction.
-        let amount = Block::<N>::block_reward(block_height);
-        let (coinbase_transaction, coinbase_record) = Transaction::<N>::new_coinbase(recipient, amount, is_public, rng)?;
-
-        // Filter the transactions to ensure they are new, and append the coinbase transaction.
-        // TODO (howardwu): Improve the performance and design of this.
-        let mut transactions: Vec<Transaction<N>> = transactions
-            .iter()
-            .filter(|transaction| {
-                for serial_number in transaction.serial_numbers() {
-                    if let Ok(true) = self.contains_serial_number(serial_number) {
-                        trace!(
-                            "Miner is filtering out transaction {} (serial_number {})",
-                            transaction.transaction_id(),
-                            serial_number
-                        );
-                        return false;
-                    }
-                }
-
-                for commitment in transaction.commitments() {
-                    if let Ok(true) = self.contains_commitment(commitment) {
-                        trace!(
-                            "Miner is filtering out transaction {} (commitment {})",
-                            transaction.transaction_id(),
-                            commitment
-                        );
-                        return false;
-                    }
-                }
-
-                trace!("Miner is adding transaction {}", transaction.transaction_id());
-                true
-            })
-            .cloned()
-            .collect();
-        transactions.push(coinbase_transaction);
-
-        // Construct the new block transactions.
-        let transactions = Transactions::from(&transactions)?;
+        let template = self.get_block_template(recipient, is_public, transactions, rng)?;
+        let coinbase_record = template.coinbase_record().clone();
 
         // Mine the next block.
-        match Block::mine(
-            previous_block_hash,
-            block_height,
-            block_timestamp,
-            difficulty_target,
-            cumulative_weight,
-            ledger_root,
-            transactions,
-            terminator,
-            rng,
-        ) {
+        match Block::mine(&template, terminator, rng) {
             Ok(block) => Ok((block, coinbase_record)),
             Err(error) => Err(anyhow!("Unable to mine the next block: {}", error)),
         }
@@ -689,7 +733,7 @@ impl<N: Network> LedgerState<N> {
 
         // Ensure the next block timestamp is within the declared time limit.
         let now = chrono::Utc::now().timestamp();
-        if block.timestamp() > (now + TWO_HOURS_UNIX) {
+        if block.timestamp() > (now + N::ALEO_FUTURE_TIME_LIMIT_IN_SECS) {
             return Err(anyhow!("The given block timestamp exceeds the time limit"));
         }
 
@@ -699,8 +743,14 @@ impl<N: Network> LedgerState<N> {
         }
 
         // Compute the expected difficulty target.
-        let expected_difficulty_target =
-            Blocks::<N>::compute_difficulty_target(current_block.timestamp(), current_block.difficulty_target(), block.timestamp());
+        let expected_difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+            Blocks::<N>::compute_difficulty_target(current_block.header(), block.timestamp(), block.height())
+        } else if N::NETWORK_ID == 2 {
+            let anchor_block_header = self.get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
+            Blocks::<N>::compute_difficulty_target(&anchor_block_header, block.timestamp(), block.height())
+        } else {
+            Blocks::<N>::compute_difficulty_target(N::genesis_block().header(), block.timestamp(), block.height())
+        };
 
         // Ensure the expected difficulty target is met.
         if block.difficulty_target() != expected_difficulty_target {
@@ -775,13 +825,20 @@ impl<N: Network> LedgerState<N> {
             }
         }
 
+        // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+        let _map_lock = self.map_lock.read();
+
         self.blocks.add_block(block)?;
         self.ledger_tree.write().add(&block.hash())?;
         self.ledger_roots.insert(&block.previous_ledger_root(), &block.height())?;
-        self.latest_block_hashes.write().push(block.hash());
-        self.latest_block_headers.write().push(block.header().clone());
+        self.latest_block_hashes_and_headers
+            .write()
+            .push((block.hash(), block.header().clone()));
         *self.latest_block_locators.write() = self.get_block_locators(block.height())?;
         *self.latest_block.write() = block.clone();
+
+        // The map lock goes out of scope on its own.
+
         Ok(())
     }
 
@@ -797,7 +854,7 @@ impl<N: Network> LedgerState<N> {
         let number_of_blocks = latest_block_height.saturating_sub(block_height);
 
         // Ensure the reverted block height is within a permitted range and well-formed.
-        if block_height >= latest_block_height || number_of_blocks > MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
+        if block_height >= latest_block_height || number_of_blocks > N::ALEO_MAXIMUM_FORK_DEPTH || self.get_block(block_height).is_err() {
             return Err(anyhow!("Attempted to return to block height {}, which is invalid", block_height));
         }
 
@@ -809,6 +866,9 @@ impl<N: Network> LedgerState<N> {
             .iter()
             .map(|block| (block.height(), block.clone()))
             .collect();
+
+        // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+        let _map_lock = self.map_lock.read();
 
         // Process the block removals.
         let mut current_block_height = latest_block_height;
@@ -839,6 +899,8 @@ impl<N: Network> LedgerState<N> {
         self.regenerate_latest_ledger_state()?;
         // Regenerate the ledger tree.
         self.regenerate_ledger_tree()?;
+
+        // The map lock goes out of scope on its own.
 
         // Return the removed blocks, in increasing order (i.e. 1, 2, 3...).
         Ok(blocks.values().skip(1).cloned().collect())
@@ -931,17 +993,14 @@ impl<N: Network> LedgerState<N> {
 
         {
             // Acquire the write lock for the latest block hashes and block headers.
-            let mut latest_block_hashes = self.latest_block_hashes.write();
-            let mut latest_block_headers = self.latest_block_headers.write();
+            let mut latest_block_hashes_and_headers = self.latest_block_hashes_and_headers.write();
 
-            // Upon success, clear the latest ledger state.
-            latest_block_hashes.clear();
-            latest_block_headers.clear();
+            // Upon success, clear the latest block hashes and block headers.
+            latest_block_hashes_and_headers.clear();
 
             // Add the latest block hashes and block headers.
             for (block_hash, block_header) in block_hashes.into_iter().zip_eq(block_headers) {
-                latest_block_hashes.push(block_hash);
-                latest_block_headers.push(block_header);
+                latest_block_hashes_and_headers.push((block_hash, block_header));
             }
         }
 
@@ -1079,6 +1138,98 @@ impl<N: Network> LedgerState<N> {
             _ => Err(anyhow!("Ledger storage state is inconsistent")),
         }
     }
+
+    /// Attempts to revert from the latest block height to the given revert block height.
+    fn clear_incompatible_blocks(&self, latest_block_height: u32, revert_block_height: u32) -> Result<u32> {
+        // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
+        let _map_lock = self.map_lock.read();
+
+        // Process the block removals.
+        let mut current_block_height = latest_block_height;
+        while current_block_height > revert_block_height {
+            // Update the internal storage state of the ledger.
+            // Ensure the block height is not the genesis block.
+            if current_block_height == 0 {
+                break;
+            }
+
+            // Retrieve the block hash.
+            let block_hash = match self.blocks.block_heights.get(&current_block_height)? {
+                Some(block_hash) => block_hash,
+                None => {
+                    warn!("Block {} missing from block heights map", current_block_height);
+                    break;
+                }
+            };
+            // Retrieve the block transaction IDs.
+            let transaction_ids = match self.blocks.block_transactions.get(&block_hash)? {
+                Some(transaction_ids) => transaction_ids,
+                None => {
+                    warn!("Block {} missing from block transactions map", block_hash);
+                    break;
+                }
+            };
+
+            // Remove the block height.
+            self.blocks.block_heights.remove(&current_block_height)?;
+            // Remove the block header.
+            self.blocks.block_headers.remove(&block_hash)?;
+            // Remove the block transactions.
+            self.blocks.block_transactions.remove(&block_hash)?;
+            // Remove the transactions.
+            for transaction_ids in transaction_ids.iter() {
+                self.blocks.transactions.remove_transaction(transaction_ids)?;
+            }
+
+            // Remove the ledger root corresponding to the current block height.
+            let remove_ledger_root = self
+                .ledger_roots
+                .iter()
+                .filter(|(_, block_height)| current_block_height == *block_height)
+                .collect::<Vec<_>>();
+            for (ledger_root, _) in remove_ledger_root {
+                self.ledger_roots.remove(&ledger_root)?;
+            }
+
+            // Decrement the current block height, and update the current block.
+            current_block_height = current_block_height.saturating_sub(1);
+
+            trace!("Ledger successfully reverted to block {}", current_block_height);
+        }
+        Ok(current_block_height)
+    }
+
+    /// Gracefully shuts down the ledger state.
+    // FIXME: currently only obtains the lock that is used to ensure that map operations
+    // can't be interrupted by a shutdown; the real solution is to use batch writes in
+    // rocksdb.
+    pub fn shut_down(&self) -> Arc<RwLock<()>> {
+        self.map_lock.clone()
+    }
+
+    ///
+    /// Dump the specified number of blocks to the given location.
+    ///
+    #[cfg(test)]
+    #[allow(dead_code)]
+    fn dump_blocks<P: AsRef<Path>>(&self, path: P, count: u32) -> Result<()> {
+        let mut file = std::fs::File::create(path)?;
+        let mut blocks = Vec::with_capacity(count as usize);
+
+        println!("Commencing block dump");
+        for i in 1..count {
+            if i % 10 == 0 {
+                println!("Dumping block {}/{}", i, count);
+            }
+            let block = self.get_block(i)?;
+            blocks.push(block);
+        }
+        println!("Block dump complete");
+
+        bincode::serialize_into(&mut file, &blocks)?;
+
+        Ok(())
+    }
 }
 
 #[derive(Clone, Debug)]
@@ -1093,9 +1244,9 @@ impl<N: Network> BlockState<N> {
     /// Initializes a new instance of `BlockState`.
     fn open<S: Storage>(storage: S) -> Result<Self> {
         Ok(Self {
-            block_heights: storage.open_map("block_heights")?,
-            block_headers: storage.open_map("block_headers")?,
-            block_transactions: storage.open_map("block_transactions")?,
+            block_heights: storage.open_map(MapId::BlockHeights)?,
+            block_headers: storage.open_map(MapId::BlockHeaders)?,
+            block_transactions: storage.open_map(MapId::BlockTransactions)?,
             transactions: TransactionState::open(storage)?,
         })
     }
@@ -1209,6 +1360,13 @@ impl<N: Network> BlockState<N> {
             .into_par_iter()
             .map(|height| self.get_block_header(height))
             .collect()
+    }
+
+    /// Returns the number of all block headers belonging to canonical blocks.
+    fn get_block_header_count(&self) -> Result<u32> {
+        let block_hashes = self.block_heights.values().collect::<HashSet<_>>();
+        let count = self.block_headers.keys().filter(|hash| block_hashes.contains(hash)).count();
+        Ok(count as u32)
     }
 
     /// Returns the transactions from the block of the given block height.
@@ -1352,10 +1510,10 @@ impl<N: Network> TransactionState<N> {
     /// Initializes a new instance of `TransactionState`.
     fn open<S: Storage>(storage: S) -> Result<Self> {
         Ok(Self {
-            transactions: storage.open_map("transactions")?,
-            transitions: storage.open_map("transitions")?,
-            serial_numbers: storage.open_map("serial_numbers")?,
-            commitments: storage.open_map("commitments")?,
+            transactions: storage.open_map(MapId::Transactions)?,
+            transitions: storage.open_map(MapId::Transitions)?,
+            serial_numbers: storage.open_map(MapId::SerialNumbers)?,
+            commitments: storage.open_map(MapId::Commitments)?,
         })
     }
 

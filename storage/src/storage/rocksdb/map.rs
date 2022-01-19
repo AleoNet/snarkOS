@@ -16,6 +16,41 @@
 
 use super::*;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum MapId {
+    BlockHeaders,
+    BlockHeights,
+    BlockTransactions,
+    Commitments,
+    LedgerRoots,
+    Records,
+    SerialNumbers,
+    Transactions,
+    Transitions,
+    Shares,
+    #[cfg(test)]
+    Test,
+}
+
+impl MapId {
+    pub fn as_bytes(&self) -> &'static [u8] {
+        match self {
+            Self::BlockHeaders => b"block_headers",
+            Self::BlockHeights => b"block_heights",
+            Self::BlockTransactions => b"block_transactions",
+            Self::Commitments => b"commitments",
+            Self::LedgerRoots => b"ledger_roots",
+            Self::Records => b"records",
+            Self::SerialNumbers => b"serial_numbers",
+            Self::Transactions => b"transactions",
+            Self::Transitions => b"transitions",
+            Self::Shares => b"shares",
+            #[cfg(test)]
+            Self::Test => b"hello world",
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct DataMap<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
     pub(super) rocksdb: Arc<rocksdb::DB>,

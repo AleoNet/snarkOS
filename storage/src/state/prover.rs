@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::storage::{DataMap, Map, Storage};
+use crate::storage::{DataMap, Map, MapId, Storage};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -86,7 +86,7 @@ impl<N: Network> CoinbaseState<N> {
     /// Initializes a new instance of `CoinbaseState`.
     fn open<S: Storage>(storage: S) -> Result<Self> {
         Ok(Self {
-            records: storage.open_map("records")?,
+            records: storage.open_map(MapId::Records)?,
         })
     }
 

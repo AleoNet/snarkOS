@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::MAXIMUM_BLOCK_LOCATORS;
 use snarkvm::{
     dpc::{BlockHeader, Network},
     utilities::{
@@ -27,9 +28,14 @@ use snarkvm::{
     },
 };
 
-use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
+use anyhow::{anyhow, Result};
+use rayon::prelude::*;
 use serde::{de, ser, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
-use std::{collections::BTreeMap, ops::Deref};
+use std::{
+    collections::BTreeMap,
+    io::{Error, ErrorKind},
+    ops::Deref,
+};
 
 ///
 /// A helper struct to represent block locators from the ledger.
@@ -43,8 +49,20 @@ pub struct BlockLocators<N: Network> {
 
 impl<N: Network> BlockLocators<N> {
     #[inline]
-    pub fn from(block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)>) -> Self {
-        Self { block_locators }
+    pub fn from(block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)>) -> Result<Self> {
+        // Check that the number of block_locators is greater than 0 and less than the MAXIMUM_BLOCK_LOCATORS.
+        let num_locators = block_locators.len();
+        match num_locators > 0 && num_locators <= MAXIMUM_BLOCK_LOCATORS as usize {
+            true => Ok(Self { block_locators }),
+            false => {
+                let error = format!(
+                    "Invalid number of block locators. Expected between 1 and {}, found {}",
+                    MAXIMUM_BLOCK_LOCATORS, num_locators
+                );
+                error!("{}", error);
+                Err(anyhow!("{}", error))
+            }
+        }
     }
 
     #[inline]
@@ -65,7 +83,7 @@ impl<N: Network> BlockLocators<N> {
     #[inline]
     pub fn get_cumulative_weight(&self, block_height: u32) -> Option<u128> {
         match self.block_locators.get(&block_height) {
-            Some((_, header)) => header.as_ref().and_then(|header| Some(header.cumulative_weight())),
+            Some((_, header)) => header.as_ref().map(|header| header.cumulative_weight()),
             _ => None,
         }
     }
@@ -76,7 +94,15 @@ impl<N: Network> FromBytes for BlockLocators<N> {
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let num_locators: u32 = FromBytes::read_le(&mut reader)?;
 
-        let mut block_locators = BTreeMap::new();
+        // Check that the number of block_locators is greater than 0 and less than the MAXIMUM_BLOCK_LOCATORS.
+        if num_locators == 0 || num_locators > MAXIMUM_BLOCK_LOCATORS {
+            error!(
+                "Invalid number of block locators. Expected between 1 and {}, found {}",
+                MAXIMUM_BLOCK_LOCATORS, num_locators
+            );
+            return Err(ErrorKind::Other.into());
+        }
+
         let mut block_headers_bytes = Vec::with_capacity(num_locators as usize);
 
         for _ in 0..num_locators {
@@ -87,27 +113,18 @@ impl<N: Network> FromBytes for BlockLocators<N> {
             if header_exists {
                 let mut buffer = vec![0u8; N::HEADER_SIZE_IN_BYTES];
                 reader.read_exact(&mut buffer)?;
-                block_headers_bytes.push((height, buffer));
-            };
-
-            block_locators.insert(height, (hash, None));
-        }
-
-        let block_headers = block_headers_bytes
-            .par_iter()
-            .flat_map(|(height, bytes)| match !bytes.is_empty() {
-                true => Some((height, BlockHeader::<N>::read_le(&bytes[..]).unwrap())),
-                false => None,
-            })
-            .collect::<Vec<_>>();
-
-        for (height, block_header) in block_headers.into_iter() {
-            if let Some((_, header)) = block_locators.get_mut(height) {
-                *header = Some(block_header);
+                block_headers_bytes.push((height, hash, Some(buffer)));
+            } else {
+                block_headers_bytes.push((height, hash, None));
             }
         }
 
-        Ok(Self::from(block_locators))
+        let block_locators = block_headers_bytes
+            .into_par_iter()
+            .map(|(height, hash, bytes)| (height, (hash, bytes.map(|bytes| BlockHeader::<N>::read_le(&bytes[..]).unwrap()))))
+            .collect::<BTreeMap<_, (_, _)>>();
+
+        Self::from(block_locators).map_err(|error| Error::new(ErrorKind::Other, format!("{}", error)))
     }
 }
 
@@ -165,7 +182,7 @@ impl<'de, N: Network> Deserialize<'de> for BlockLocators<N> {
                 let block_locators = serde_json::Value::deserialize(deserializer)?;
                 let block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> =
                     serde_json::from_value(block_locators["block_locators"].clone()).map_err(de::Error::custom)?;
-                Ok(Self::from(block_locators))
+                Self::from(block_locators).map_err(de::Error::custom)
             }
             false => FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "block locators"),
         }
@@ -175,7 +192,12 @@ impl<'de, N: Network> Deserialize<'de> for BlockLocators<N> {
 impl<N: Network> Default for BlockLocators<N> {
     #[inline]
     fn default() -> Self {
-        Self::from(Default::default())
+        // Initialize the list of block locators.
+        let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> = Default::default();
+        // Add the genesis locator.
+        block_locators.insert(0, (N::genesis_block().hash(), None));
+
+        Self { block_locators }
     }
 }
 
@@ -198,12 +220,12 @@ mod tests {
         let expected_block_hash = Testnet2::genesis_block().hash();
         let expected_block_header = Testnet2::genesis_block().header().clone();
         let expected_block_locators =
-            BlockLocators::<Testnet2>::from([(expected_block_height, (expected_block_hash, Some(expected_block_header)))].into());
+            BlockLocators::<Testnet2>::from([(expected_block_height, (expected_block_hash, Some(expected_block_header)))].into()).unwrap();
 
         // Serialize
         let expected_string = expected_block_locators.to_string();
         let candidate_string = serde_json::to_string(&expected_block_locators).unwrap();
-        assert_eq!(1692, candidate_string.len(), "Update me if serialization has changed");
+        assert_eq!(1703, candidate_string.len(), "Update me if serialization has changed");
         assert_eq!(expected_string, candidate_string);
 
         // Deserialize
@@ -217,7 +239,7 @@ mod tests {
         let expected_block_hash = Testnet2::genesis_block().hash();
         let expected_block_header = Testnet2::genesis_block().header().clone();
         let expected_block_locators =
-            BlockLocators::<Testnet2>::from([(expected_block_height, (expected_block_hash, Some(expected_block_header)))].into());
+            BlockLocators::<Testnet2>::from([(expected_block_height, (expected_block_hash, Some(expected_block_header)))].into()).unwrap();
 
         // Serialize
         let expected_bytes = expected_block_locators.to_bytes_le().unwrap();

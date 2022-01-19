@@ -18,6 +18,8 @@
 pub mod rocksdb;
 #[cfg(feature = "rocks")]
 pub type DataMap<K, V> = crate::storage::rocksdb::DataMap<K, V>;
+#[cfg(feature = "rocks")]
+pub use crate::storage::rocksdb::MapId;
 
 pub mod traits;
 pub use traits::*;

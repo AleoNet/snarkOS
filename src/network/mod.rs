@@ -20,6 +20,12 @@ pub(crate) use ledger::{LedgerRequest, LedgerRouter};
 pub mod message;
 pub use message::*;
 
+pub mod operator;
+pub use operator::*;
+
+pub(crate) mod peer;
+pub(crate) use peer::*;
+
 pub(crate) mod peers;
 pub(crate) use peers::*;
 
