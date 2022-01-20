@@ -18,7 +18,7 @@ no_changes() {
 change_pulled() {
     echo "[NOTICE] Changes pulled: $*"
     BRANCH=$2
-    if [ "${BRANCH}" = $2 ] ; then
+    if [ "${BRANCH}" = "testnet2" ] ; then
         echo "[INFO] triggering deployment automation..."
         #### Run cargo clean
         echo "[INFO]Running cargo clean"
