@@ -303,7 +303,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
             match self.memory_pool.write().await.add_transaction(&transaction) {
                 Ok(()) => {
                     // Upon success, propagate the unconfirmed transaction to the connected peers.
-                    let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedTransaction(transaction));
+                    let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedTransaction(Data::Object(transaction)));
                     if let Err(error) = self.peers_router.send(request).await {
                         warn!("[UnconfirmedTransaction] {}", error);
                     }
