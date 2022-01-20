@@ -94,6 +94,7 @@ hook() {
 pull_change() {
     echo "Stopping snarkos-operator.service"
     systemctl stop snarkos-operator
+    wait
     echo "Running git stash and rm Cargo.lock"
     git stash
     rm Cargo.lock
