@@ -1109,7 +1109,12 @@ mod tests {
         assert_eq!(1, ledger_state.latest_block_height());
 
         // Get the record commitment.
-        let decrypted_records = block_1.transactions().first().unwrap().to_decrypted_records(account.view_key());
+        let decrypted_records = block_1
+            .transactions()
+            .first()
+            .unwrap()
+            .to_decrypted_records(&account.view_key().into())
+            .collect::<Vec<_>>();
         assert!(!decrypted_records.is_empty());
         let record_commitment = decrypted_records[0].commitment();
 
