@@ -300,7 +300,7 @@ fn test_transaction_fees() {
     let available_balance = AleoAmount::from_i64(-1 * coinbase_transaction.value_balance().0);
     let fee = AleoAmount::from_i64(rng.gen_range(1..available_balance.0));
     let amount = available_balance.sub(fee.clone());
-    let coinbase_record = coinbase_transaction.to_decrypted_records(view_key);
+    let coinbase_record = coinbase_transaction.to_decrypted_records(&view_key.into()).collect::<Vec<_>>();
 
     let ledger_proof = ledger.get_ledger_inclusion_proof(coinbase_record[0].commitment()).unwrap();
 
@@ -337,8 +337,10 @@ fn test_transaction_fees() {
     assert_eq!(2, ledger.latest_block_height());
 
     let expected_block_reward = Block::<Testnet2>::block_reward(2).add(fee);
-    let output_record = &block_2.transactions()[0].to_decrypted_records(recipient_view_key)[0];
-    let new_coinbase_record = &block_2.transactions()[1].to_decrypted_records(view_key)[0];
+    let output_record = &block_2.transactions()[0]
+        .to_decrypted_records(&recipient_view_key.into())
+        .collect::<Vec<_>>()[0];
+    let new_coinbase_record = &block_2.transactions()[1].to_decrypted_records(&view_key.into()).collect::<Vec<_>>()[0];
 
     // Check that the output record balances are correct.
     assert_eq!(new_coinbase_record.value(), expected_block_reward);

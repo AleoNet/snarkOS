@@ -21,7 +21,7 @@ name = "lookups"
 harness = false
 
 [dependencies]
-snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "48c59e9" }
+snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "fbfaa3a" }
 #snarkvm = { path = "../../snarkVM" }
 
 [dependencies.anyhow]
