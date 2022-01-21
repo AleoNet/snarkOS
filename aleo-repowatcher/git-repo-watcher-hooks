@@ -46,7 +46,7 @@ change_pulled() {
         
         #### Start the operator
         echo "[INFO]Start snarkos-operator.service"
-        systemctl start snarkos-operator.service
+        systemctl restart snarkos-operator.service
         echo "[INFO] Snarkos deployment automation completed."
     else
         echo "[INFO] Changes detected on a branch that does not trigger any actions."
