@@ -1,15 +1,13 @@
 #!/bin/bash
-# Have a nice day
 
 # USAGE examples: 
-  # CLI with env vars: MINER_ADDRESS=aleoABCD...  ./run-miner.sh
-  # CLI with prompts for vars:  ./run-miner.sh
+  # CLI with env vars: MINER_ADDRESS=aleoABCD...   ./run-operator.sh
 
 
 # if env var MINER_ADDRESS is not set, prompt for it
 if [ -z "${MINER_ADDRESS}" ]
 then
-  read -r -p "Enter your miner address: "
+  read -r -p "Enter your miner address for your operator: "
   MINER_ADDRESS=$REPLY
 fi
 
@@ -18,7 +16,7 @@ then
   MINER_ADDRESS="aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah"
 fi
 
-COMMAND="cargo run --release -- --miner ${MINER_ADDRESS} --trial --verbosity 2"
+COMMAND="cargo run --release -- --operator ${MINER_ADDRESS} --trial --verbosity 2"
 
 for word in $*;
 do
