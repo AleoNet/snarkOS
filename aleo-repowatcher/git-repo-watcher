@@ -92,12 +92,10 @@ hook() {
 # $1 - Git repository name
 # $2 - Branch name
 pull_change() {
-    echo "Stopping snarkos-operator.service"
-    systemctl stop snarkos-operator
-    wait
     echo "Running git stash and rm Cargo.lock"
     git stash
     rm Cargo.lock
+    wait
     echo "Pulling changes from git repo"
     git pull
     exit_code=$?
