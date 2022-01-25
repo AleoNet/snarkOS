@@ -481,9 +481,9 @@ mod tests {
         };
 
         // Derive the storage paths.
-        let (ledger_path, prover_path) = match &path {
-            Some(p) => (p.as_ref().to_path_buf(), temp_dir()),
-            None => (temp_dir(), temp_dir()),
+        let (ledger_path, prover_path, operator_storage_path) = match &path {
+            Some(p) => (p.as_ref().to_path_buf(), temp_dir(), temp_dir()),
+            None => (temp_dir(), temp_dir(), temp_dir()),
         };
 
         // Initialize the node.
@@ -498,7 +498,6 @@ mod tests {
         let ledger = Ledger::<N, E>::open::<S, _>(&ledger_path, peers.router())
             .await
             .expect("Failed to initialize ledger");
-
         // Initialize a new instance for managing the prover.
         let prover = Prover::open::<S, _>(
             &prover_path,
@@ -511,16 +510,37 @@ mod tests {
         )
         .await
         .expect("Failed to initialize prover");
+        // Initialize a new instance for managing the operator.
+        let operator = Operator::open::<RocksDB, _>(
+            &operator_storage_path,
+            None,
+            local_ip,
+            prover.memory_pool(),
+            peers.router(),
+            ledger.reader(),
+            ledger.router(),
+            prover.router(),
+        )
+        .await
+        .expect("Failed to initialize operator");
 
-        RpcImpl::<N, E>::new(credentials, None, peers, ledger.reader(), prover.router(), prover.memory_pool())
+        RpcImpl::<N, E>::new(
+            credentials,
+            None,
+            peers,
+            ledger.reader(),
+            operator,
+            prover.router(),
+            prover.memory_pool(),
+        )
     }
 
     /// Initializes a new instance of the rpc.
     async fn new_rpc_server<N: Network, E: Environment, S: Storage, P: AsRef<Path>>(path: Option<P>) {
         // Derive the storage paths.
-        let (ledger_path, prover_path) = match &path {
-            Some(p) => (p.as_ref().to_path_buf(), temp_dir()),
-            None => (temp_dir(), temp_dir()),
+        let (ledger_path, prover_path, operator_storage_path) = match &path {
+            Some(p) => (p.as_ref().to_path_buf(), temp_dir(), temp_dir()),
+            None => (temp_dir(), temp_dir(), temp_dir()),
         };
 
         // Initialize the node.
@@ -548,6 +568,19 @@ mod tests {
         )
         .await
         .expect("Failed to initialize prover");
+        // Initialize a new instance for managing the operator.
+        let operator = Operator::open::<RocksDB, _>(
+            &operator_storage_path,
+            None,
+            local_ip,
+            prover.memory_pool(),
+            peers.router(),
+            ledger.reader(),
+            ledger.router(),
+            prover.router(),
+        )
+        .await
+        .expect("Failed to initialize operator");
 
         E::tasks().append(
             initialize_rpc_server(
@@ -557,6 +590,7 @@ mod tests {
                 None,
                 &peers,
                 ledger.reader(),
+                operator,
                 prover.router(),
                 prover.memory_pool(),
             )
