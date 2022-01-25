@@ -343,7 +343,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     }
 
     /// Returns the amount of shares submitted by a given prover.
-    async fn get_share_for_prover(&self, prover: Value) -> Result<u64, RpcError> {
+    async fn get_shares_for_prover(&self, prover: Value) -> Result<u64, RpcError> {
         let prover: Address<N> = serde_json::from_value(prover)?;
         Ok(self.operator.get_shares_for_prover(&prover))
     }

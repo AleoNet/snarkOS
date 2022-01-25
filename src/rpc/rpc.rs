@@ -69,7 +69,7 @@ const METHODS_EXPECTING_PARAMS: [&str; 13] = [
     "gettransaction",
     "gettransition",
     "sendtransaction",
-    "getshareforprover",
+    "getsharesforprover",
     // // private
     // "createtransaction",
     // "getrawrecord",
@@ -369,8 +369,8 @@ async fn handle_rpc<N: Network, E: Environment>(
         //         .map_err(convert_core_err);
         //     result_to_response(&req, result)
         // }
-        "getshareforprover" => {
-            let result = rpc.get_share_for_prover(params.remove(0)).await.map_err(convert_crate_err);
+        "getsharesforprover" => {
+            let result = rpc.get_shares_for_prover(params.remove(0)).await.map_err(convert_crate_err);
             result_to_response(&req, result)
         }
         "getshares" => {

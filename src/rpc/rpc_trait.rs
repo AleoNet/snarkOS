@@ -93,10 +93,13 @@ pub trait RpcFunctions<N: Network> {
     #[doc = include_str!("./documentation/public_endpoints/sendtransaction.md")]
     async fn send_transaction(&self, transaction_bytes: String) -> Result<N::TransactionID, RpcError>;
 
-    async fn get_share_for_prover(&self, prover: serde_json::Value) -> Result<u64, RpcError>;
+    #[doc = include_str!("./documentation/public_endpoints/getsharesforprover.md")]
+    async fn get_shares_for_prover(&self, prover: serde_json::Value) -> Result<u64, RpcError>;
 
+    #[doc = include_str!("./documentation/public_endpoints/getshares.md")]
     async fn get_shares(&self) -> Result<u64, RpcError>;
 
+    #[doc = include_str!("./documentation/public_endpoints/getprovers.md")]
     async fn get_provers(&self) -> Result<serde_json::Value, RpcError>;
 }
 
