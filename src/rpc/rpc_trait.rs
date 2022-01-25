@@ -92,6 +92,12 @@ pub trait RpcFunctions<N: Network> {
 
     #[doc = include_str!("./documentation/public_endpoints/sendtransaction.md")]
     async fn send_transaction(&self, transaction_bytes: String) -> Result<N::TransactionID, RpcError>;
+
+    async fn get_share_for_prover(&self, prover: serde_json::Value) -> Result<u64, RpcError>;
+
+    async fn get_shares(&self) -> Result<u64, RpcError>;
+
+    async fn get_provers(&self) -> Result<serde_json::Value, RpcError>;
 }
 
 // /// Definition of private RPC endpoints that require authentication.

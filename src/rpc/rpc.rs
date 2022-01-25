@@ -17,6 +17,7 @@
 //! Logic for instantiating the RPC server.
 
 use crate::{
+    network::Operator,
     rpc::{rpc_impl::RpcImpl, rpc_trait::RpcFunctions},
     Environment,
     LedgerReader,
@@ -54,7 +55,7 @@ pub struct Meta {
 
 impl Metadata for Meta {}
 
-const METHODS_EXPECTING_PARAMS: [&str; 12] = [
+const METHODS_EXPECTING_PARAMS: [&str; 13] = [
     // public
     "getblock",
     "getblocks",
@@ -68,6 +69,7 @@ const METHODS_EXPECTING_PARAMS: [&str; 12] = [
     "gettransaction",
     "gettransition",
     "sendtransaction",
+    "getshareforprover",
     // // private
     // "createtransaction",
     // "getrawrecord",
@@ -85,11 +87,12 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
     address: Option<Address<N>>,
     peers: &Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
+    operator: Arc<Operator<N, E>>,
     prover_router: ProverRouter<N>,
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
 ) -> tokio::task::JoinHandle<()> {
     let credentials = RpcCredentials { username, password };
-    let rpc = RpcImpl::new(credentials, address, peers.clone(), ledger, prover_router, memory_pool);
+    let rpc = RpcImpl::new(credentials, address, peers.clone(), ledger, operator, prover_router, memory_pool);
 
     let service = make_service_fn(move |conn: &AddrStream| {
         let caller = conn.remote_addr();
@@ -366,6 +369,18 @@ async fn handle_rpc<N: Network, E: Environment>(
         //         .map_err(convert_core_err);
         //     result_to_response(&req, result)
         // }
+        "getshareforprover" => {
+            let result = rpc.get_share_for_prover(params.remove(0)).await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
+        "getshares" => {
+            let result = rpc.get_shares().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
+        "getprovers" => {
+            let result = rpc.get_provers().await.map_err(convert_crate_err);
+            result_to_response(&req, result)
+        }
         _ => {
             let err = jrt::Error::from_code(jrt::ErrorCode::MethodNotFound);
             jrt::Response::error(jrt::Version::V2, err, req.id.clone())
