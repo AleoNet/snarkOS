@@ -227,7 +227,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
     }
 
     ///
-    /// Returns all registered provers on this operator.
+    /// Returns a list of all provers which have submitted shares to this operator.
     ///
     pub fn get_provers(&self) -> Vec<Address<N>> {
         self.state.get_provers()

@@ -374,12 +374,12 @@ async fn handle_rpc<N: Network, E: Environment>(
             result_to_response(&req, result)
         }
         "getshares" => {
-            let result = rpc.get_shares().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            let result = rpc.get_shares().await;
+            result_to_response(&req, Ok(result))
         }
         "getprovers" => {
-            let result = rpc.get_provers().await.map_err(convert_crate_err);
-            result_to_response(&req, result)
+            let result = rpc.get_provers().await;
+            result_to_response(&req, Ok(result))
         }
         _ => {
             let err = jrt::Error::from_code(jrt::ErrorCode::MethodNotFound);

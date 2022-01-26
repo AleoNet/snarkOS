@@ -348,19 +348,15 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         Ok(self.operator.get_shares_for_prover(&prover))
     }
 
-    /// Returns the amount of shares submitted to an operator in total.
-    async fn get_shares(&self) -> Result<u64, RpcError> {
+    /// Returns the amount of shares submitted to the operator in total.
+    async fn get_shares(&self) -> u64 {
         let shares = self.operator.to_shares();
-        let mut res = 0;
-        for (_, share) in shares {
-            res += share.values().sum::<u64>();
-        }
-        Ok(res)
+        shares.iter().map(|(_, share)| share.values().sum::<u64>()).sum()
     }
 
-    /// Returns a list of provers registered on an operator.
-    async fn get_provers(&self) -> Result<Value, RpcError> {
+    /// Returns a list of all provers that have submitted shares to the operator.
+    async fn get_provers(&self) -> Value {
         let provers = self.operator.get_provers();
-        Ok(serde_json::json!(provers))
+        serde_json::json!(provers)
     }
 }

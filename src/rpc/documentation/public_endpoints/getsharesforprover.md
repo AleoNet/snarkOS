@@ -1,17 +1,17 @@
 # Get Shares For Prover
-Returns the amount of shares submitted by a prover, given their address.
+Returns the number of shares submitted by a prover, given their address.
 
 ### Arguments
 
 | Parameter |  Type  | Required |          Description           |
 |:---------:|:------:|:--------:|:------------------------------:|
-| `prover`  | string |   Yes    | The aleo address of the prover |
+| `prover`  | string |   Yes    | The Aleo address of the prover |
 
 ### Response
 
 | Parameter |  Type  |                 Description                  |
 |:---------:|:------:|:--------------------------------------------:|
-| `result`  |  u64   | The amount of shares submitted by the prover |
+| `result`  |  u64   | The number of shares submitted by the prover |
 
 ### Example Request
 ```ignore

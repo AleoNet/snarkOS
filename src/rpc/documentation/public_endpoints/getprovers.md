@@ -1,5 +1,5 @@
 # Get Provers
-Returns the addresses of all provers that are registered on an operator.
+Returns the Aleo addresses of all provers which have submitted shares to an operator.
 
 ### Arguments
 
@@ -7,9 +7,9 @@ None
 
 ### Response
 
-| Parameter |  Type  |                Description                 |
-|:---------:|:------:|:------------------------------------------:|
-| `result`  | array  | All of the addresses known to the operator |
+| Parameter |  Type  |                              Description                              |
+|:---------:|:------:|:---------------------------------------------------------------------:|
+| `result`  | array  | All of the Aleo addresses which have submitted shares to the operator |
 
 ### Example Request
 ```ignore

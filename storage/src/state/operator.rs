@@ -82,7 +82,7 @@ impl<N: Network> OperatorState<N> {
         self.shares.remove_shares(block_height, coinbase_record)
     }
 
-    /// Returns a list of provers registered on an operator.
+    /// Returns a list of provers which have submitted shares to an operator.
     pub fn get_provers(&self) -> Vec<Address<N>> {
         self.shares.get_provers()
     }

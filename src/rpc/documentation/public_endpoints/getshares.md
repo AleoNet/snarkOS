@@ -1,5 +1,5 @@
 # Get Shares
-Returns the amount of shares submitted to an operator in total.
+Returns the total number of shares submitted to an operator.
 
 ### Arguments
 
@@ -7,9 +7,9 @@ None
 
 ### Response
 
-| Parameter |  Type  |                       Description                       |
-|:---------:|:------:|:-------------------------------------------------------:|
-| `result`  |  u64   | The amount of shares submitted to the operator in total |
+| Parameter |  Type  |                     Description                      |
+|:---------:|:------:|:----------------------------------------------------:|
+| `result`  |  u64   | The total number of shares submitted to the operator |
 
 ### Example Request
 ```ignore
