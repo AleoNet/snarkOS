@@ -40,9 +40,9 @@ async fn spawn_inert_node_at_port() {
     };
 
     let test_node = TestNode::new(Pea2PeaNode::new(Some(config)).await.unwrap(), Default::default());
-    test_node.enable_handshake();
-    test_node.enable_reading();
-    test_node.enable_writing();
+    test_node.enable_handshake().await;
+    test_node.enable_reading().await;
+    test_node.enable_writing().await;
     // test_node.run_periodic_tasks();
 
     std::future::pending::<()>().await;

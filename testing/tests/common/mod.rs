@@ -57,9 +57,9 @@ pub async fn spawn_test_node_with_nonce(local_nonce: ClientNonce) -> TestNode {
     };
 
     let node = TestNode::new(pea2pea_node, client_state);
-    node.enable_handshake();
-    node.enable_reading();
-    node.enable_writing();
+    node.enable_handshake().await;
+    node.enable_reading().await;
+    node.enable_writing().await;
     node
 }
 
