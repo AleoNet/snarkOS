@@ -32,8 +32,8 @@ fn lookups(c: &mut Criterion) {
 
     // Read the test blocks.
     // note: the `blocks_100` and `blocks_1000` files were generated on a testnet2 storage using `LedgerState::dump_blocks`.
-    let mut test_blocks = fs::read(format!("benches/blocks_{}", NUM_BLOCKS)).expect(&format!("Missing the test blocks file"));
-    let blocks: Vec<Block<Testnet2>> = bincode::deserialize(&mut test_blocks).expect("Failed to deserialize a block dump");
+    let test_blocks = fs::read(format!("benches/blocks_{}", NUM_BLOCKS)).unwrap_or_else(|_| panic!("Missing the test blocks file"));
+    let blocks: Vec<Block<Testnet2>> = bincode::deserialize(&test_blocks).expect("Failed to deserialize a block dump");
     assert_eq!(blocks.len(), NUM_BLOCKS - 1);
 
     // Prepare the collections for block component ids.
@@ -77,7 +77,7 @@ fn lookups(c: &mut Criterion) {
     c.bench_function("blocks_lookup_by_hash", |b| {
         b.iter(|| {
             let hash = block_hashes.choose(&mut rng).unwrap();
-            ledger.contains_block_hash(&hash).expect("Lookup by block hash failed");
+            ledger.contains_block_hash(hash).expect("Lookup by block hash failed");
         })
     });
 
