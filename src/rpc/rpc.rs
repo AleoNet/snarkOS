@@ -1137,7 +1137,7 @@ mod tests {
         \"{}\"
     ]
 }}",
-            record_commitment.to_string()
+            record_commitment
         )));
 
         // Send the request to the RPC.
@@ -1228,7 +1228,7 @@ mod tests {
         \"{}\"
     ]
 }}",
-            transaction_id.to_string()
+            transaction_id
         )));
 
         // Send the request to the RPC.
