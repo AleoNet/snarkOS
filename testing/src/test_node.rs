@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021 Aleo Systems Inc.
+// Copyright (C) 2019-2022 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -215,7 +215,7 @@ impl Handshake for TestNode {
         connection.reader().read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE]).await?;
         let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
         connection.reader().read_exact(&mut buf[..len]).await?;
-        let peer_request = ClientMessage::deserialize(&buf[..len]);
+        let peer_request = ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len]));
 
         // Register peer's nonce.
         let (peer_listening_addr, peer_nonce) = if let Ok(Message::ChallengeRequest(
@@ -263,7 +263,7 @@ impl Handshake for TestNode {
         connection.reader().read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE]).await?;
         let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
         connection.reader().read_exact(&mut buf[..len]).await?;
-        let peer_response = ClientMessage::deserialize(&buf[..len]);
+        let peer_response = ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len]));
 
         if let Ok(Message::ChallengeResponse(block_header)) = peer_response {
             let block_header = block_header.deserialize().await.unwrap();
@@ -306,7 +306,7 @@ impl Reading for TestNode {
             return Ok(None);
         }
 
-        match ClientMessage::deserialize(&buf[..len]) {
+        match ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len])) {
             Ok(msg) => {
                 info!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
                 Ok(Some(msg))

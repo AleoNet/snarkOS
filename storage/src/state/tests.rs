@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021 Aleo Systems Inc.
+// Copyright (C) 2019-2022 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -297,9 +297,9 @@ fn test_transaction_fees() {
     // Craft the transaction variables.
     let coinbase_transaction = &block.transactions()[0];
 
-    let available_balance = AleoAmount::from_i64(-1 * coinbase_transaction.value_balance().0);
+    let available_balance = AleoAmount::from_i64(-coinbase_transaction.value_balance().0);
     let fee = AleoAmount::from_i64(rng.gen_range(1..available_balance.0));
-    let amount = available_balance.sub(fee.clone());
+    let amount = available_balance.sub(fee);
     let coinbase_record = coinbase_transaction.to_decrypted_records(&view_key.into()).collect::<Vec<_>>();
 
     let ledger_proof = ledger.get_ledger_inclusion_proof(coinbase_record[0].commitment()).unwrap();
@@ -313,10 +313,10 @@ fn test_transaction_fees() {
     let transfer_request = Request::new_transfer(
         private_key,
         coinbase_record,
-        vec![ledger_proof.clone(), LedgerProof::default()],
+        vec![ledger_proof, LedgerProof::default()],
         recipient,
         amount,
-        fee.clone(),
+        fee,
         true,
         rng,
     )

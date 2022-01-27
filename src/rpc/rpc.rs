@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021 Aleo Systems Inc.
+// Copyright (C) 2019-2022 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -1186,7 +1186,7 @@ mod tests {
         \"{}\"
     ]
 }}",
-            record_commitment.to_string()
+            record_commitment
         )));
 
         // Send the request to the RPC.
@@ -1277,7 +1277,7 @@ mod tests {
         \"{}\"
     ]
 }}",
-            transaction_id.to_string()
+            transaction_id
         )));
 
         // Send the request to the RPC.
