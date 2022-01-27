@@ -236,14 +236,17 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Update the block requests.
                 self.update_block_requests().await;
 
+                let block_requests = self.number_of_block_requests().await;
+                let connected_peers = self.peers_state.read().await.len();
+
                 debug!(
                     "Status Report (type = {}, status = {}, block_height = {}, cumulative_weight = {}, block_requests = {}, connected_peers = {})",
                     E::NODE_TYPE,
                     E::status(),
                     self.canon.latest_block_height(),
                     self.canon.latest_cumulative_weight(),
-                    self.number_of_block_requests().await,
-                    self.peers_state.read().await.len()
+                    block_requests,
+                    connected_peers,
                 );
             }
             LedgerRequest::Pong(peer_ip, node_type, status, is_fork, block_locators) => {
