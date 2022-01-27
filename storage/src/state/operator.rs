@@ -21,7 +21,12 @@ use crate::{
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
-use std::{collections::HashMap, path::Path, sync::Arc};
+use std::{
+    collections::{HashMap, HashSet},
+    iter::FromIterator,
+    path::Path,
+    sync::Arc,
+};
 
 #[derive(Debug)]
 pub struct OperatorState<N: Network> {
@@ -75,6 +80,11 @@ impl<N: Network> OperatorState<N> {
     /// Removes the shares for a given block height and coinbase record in storage.
     pub fn remove_shares(&self, block_height: u32, coinbase_record: Record<N>) -> Result<()> {
         self.shares.remove_shares(block_height, coinbase_record)
+    }
+
+    /// Returns a list of provers which have submitted shares to an operator.
+    pub fn get_provers(&self) -> Vec<Address<N>> {
+        self.shares.get_provers()
     }
 }
 
@@ -147,5 +157,14 @@ impl<N: Network> SharesState<N> {
     /// Removes all of the shares for a given block height and coinbase record.
     fn remove_shares(&self, block_height: u32, coinbase_record: Record<N>) -> Result<()> {
         self.shares.remove(&(block_height, coinbase_record))
+    }
+
+    fn get_provers(&self) -> Vec<Address<N>> {
+        let set: HashSet<Address<N>> = self
+            .shares
+            .iter()
+            .flat_map(|((_, _), shares)| shares.keys().copied().collect::<Vec<_>>())
+            .collect();
+        Vec::from_iter(set)
     }
 }

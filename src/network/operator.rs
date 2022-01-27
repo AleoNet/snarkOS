@@ -227,6 +227,13 @@ impl<N: Network, E: Environment> Operator<N, E> {
     }
 
     ///
+    /// Returns a list of all provers which have submitted shares to this operator.
+    ///
+    pub fn get_provers(&self) -> Vec<Address<N>> {
+        self.state.get_provers()
+    }
+
+    ///
     /// Performs the given `request` to the operator.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///

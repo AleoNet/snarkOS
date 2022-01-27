@@ -19,6 +19,7 @@
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
 use crate::{
+    network::Operator,
     rpc::{rpc::*, rpc_trait::RpcFunctions},
     Environment,
     LedgerReader,
@@ -66,6 +67,7 @@ pub struct RpcInner<N: Network, E: Environment> {
     address: Option<Address<N>>,
     peers: Arc<Peers<N, E>>,
     ledger: LedgerReader<N>,
+    operator: Arc<Operator<N, E>>,
     prover_router: ProverRouter<N>,
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
     /// RPC credentials for accessing guarded endpoints
@@ -93,6 +95,7 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
         address: Option<Address<N>>,
         peers: Arc<Peers<N, E>>,
         ledger: LedgerReader<N>,
+        operator: Arc<Operator<N, E>>,
         prover_router: ProverRouter<N>,
         memory_pool: Arc<RwLock<MemoryPool<N>>>,
     ) -> Self {
@@ -100,6 +103,7 @@ impl<N: Network, E: Environment> RpcImpl<N, E> {
             address,
             peers,
             ledger,
+            operator,
             prover_router,
             memory_pool,
             credentials,
@@ -336,5 +340,23 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
             warn!("[UnconfirmedTransaction] {}", error);
         }
         Ok(transaction.transaction_id())
+    }
+
+    /// Returns the amount of shares submitted by a given prover.
+    async fn get_shares_for_prover(&self, prover: Value) -> Result<u64, RpcError> {
+        let prover: Address<N> = serde_json::from_value(prover)?;
+        Ok(self.operator.get_shares_for_prover(&prover))
+    }
+
+    /// Returns the amount of shares submitted to the operator in total.
+    async fn get_shares(&self) -> u64 {
+        let shares = self.operator.to_shares();
+        shares.iter().map(|(_, share)| share.values().sum::<u64>()).sum()
+    }
+
+    /// Returns a list of all provers that have submitted shares to the operator.
+    async fn get_provers(&self) -> Value {
+        let provers = self.operator.get_provers();
+        serde_json::json!(provers)
     }
 }

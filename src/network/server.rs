@@ -157,7 +157,16 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance of the heartbeat.
         Self::initialize_heartbeat(peers.router(), ledger.reader(), ledger.router(), operator.router(), prover.router()).await;
         // Initialize a new instance of the RPC server.
-        Self::initialize_rpc(node, address, &peers, ledger.reader(), prover.router(), prover.memory_pool()).await;
+        Self::initialize_rpc(
+            node,
+            address,
+            &peers,
+            ledger.reader(),
+            operator.clone(),
+            prover.router(),
+            prover.memory_pool(),
+        )
+        .await;
         // Initialize a new instance of the notification.
         Self::initialize_notification(ledger.reader(), prover.clone(), address).await;
 
@@ -334,6 +343,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         address: Option<Address<N>>,
         peers: &Arc<Peers<N, E>>,
         ledger_reader: LedgerReader<N>,
+        operator: Arc<Operator<N, E>>,
         prover_router: ProverRouter<N>,
         memory_pool: Arc<RwLock<MemoryPool<N>>>,
     ) {
@@ -347,6 +357,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                     address,
                     peers,
                     ledger_reader,
+                    operator,
                     prover_router,
                     memory_pool,
                 )
