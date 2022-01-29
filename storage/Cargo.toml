@@ -20,6 +20,14 @@ edition = "2018"
 name = "lookups"
 harness = false
 
+[[bench]]
+name = "insertion"
+harness = false
+
+[[bench]]
+name = "opening"
+harness = false
+
 [dependencies]
 snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e0462bf" }
 #snarkvm = { path = "../../snarkVM" }
