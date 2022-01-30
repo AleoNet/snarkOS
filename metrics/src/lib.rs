@@ -20,9 +20,7 @@ pub use metrics::*;
 use metrics_exporter_prometheus::PrometheusBuilder;
 
 pub fn initialize() -> Option<tokio::task::JoinHandle<()>> {
-    let (recorder, exporter) = PrometheusBuilder::new()
-        .build_with_exporter()
-        .expect("can't build the prometheus exporter");
+    let (recorder, exporter) = PrometheusBuilder::new().build().expect("can't build the prometheus exporter");
 
     metrics::set_boxed_recorder(Box::new(recorder)).expect("can't set the prometheus exporter");
 

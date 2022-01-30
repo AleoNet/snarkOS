@@ -114,10 +114,10 @@ impl TestNode {
         let pea2pea_node = Pea2PeaNode::new(Some(config)).await.unwrap();
         let client_state = Default::default();
         let node = Self::new(pea2pea_node, client_state);
-        node.enable_disconnect();
-        node.enable_handshake();
-        node.enable_reading();
-        node.enable_writing();
+        node.enable_disconnect().await;
+        node.enable_handshake().await;
+        node.enable_reading().await;
+        node.enable_writing().await;
         node
     }
 
