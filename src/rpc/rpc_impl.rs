@@ -36,6 +36,7 @@ use snarkvm::{
 use jsonrpc_core::Value;
 use snarkvm::{dpc::Record, utilities::ToBytes};
 use std::{cmp::max, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
+use time::OffsetDateTime;
 use tokio::sync::RwLock;
 
 #[derive(Debug, Error)]
@@ -191,7 +192,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
         // Prepare the new block.
         let previous_block_hash = latest_block.hash();
         let block_height = self.ledger.latest_block_height() + 1;
-        let block_timestamp = chrono::Utc::now().timestamp();
+        let block_timestamp = OffsetDateTime::now_utc().unix_timestamp();
 
         // Compute the block difficulty target.
         let difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
