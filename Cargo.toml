@@ -68,15 +68,9 @@ version = "2.0"
 [dependencies.hex]
 version = "0.4"
 
-[dependencies.hyper]
-version = "0.14"
-features = [ "http1", "runtime", "server", "tcp" ]
-
-[dependencies.json-rpc-types]
-version = "1.0.2"
-
-[dependencies.jsonrpc-core]
-version = "18"
+[dependencies.jsonrpsee]
+version = "0.8"
+features = [ "http-server" ]
 
 [dependencies.num_cpus]
 version = "1"
@@ -107,7 +101,6 @@ version = "1"
 
 [dependencies.serde_json]
 version = "1"
-features = [ "arbitrary_precision" ]
 
 [dependencies.structopt]
 version = "0.3"
@@ -144,12 +137,12 @@ version = "0.1"
 version = "0.3"
 features = ["env-filter", "parking_lot"]
 
+[dev-dependencies.jsonrpsee]
+version = "0.8"
+features = [ "http-client" ]
+
 [dev-dependencies.rand_chacha]
 version = "0.3"
-
-[dev-dependencies.reqwest]
-version = "0.11"
-features = ["json"]
 
 [dev-dependencies.rusty-hook]
 version = "0.11"

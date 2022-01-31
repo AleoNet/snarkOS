@@ -22,7 +22,7 @@ use crate::{
     operator::{Operator, OperatorRouter},
     peers::{Peers, PeersRequest, PeersRouter},
     prover::{Prover, ProverRouter},
-    rpc::initialize_rpc_server,
+    rpc::{context::RpcContext, initialize_rpc_server},
     Node,
 };
 use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
@@ -160,7 +160,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         Self::initialize_rpc(
             node,
             address,
-            &peers,
+            peers.clone(),
             ledger.reader(),
             operator.clone(),
             prover.router(),
@@ -341,7 +341,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     async fn initialize_rpc(
         node: &Node,
         address: Option<Address<N>>,
-        peers: &Arc<Peers<N, E>>,
+        peers: Arc<Peers<N, E>>,
         ledger_reader: LedgerReader<N>,
         operator: Arc<Operator<N, E>>,
         prover_router: ProverRouter<N>,
@@ -349,20 +349,21 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) {
         if !node.norpc {
             // Initialize a new instance of the RPC server.
-            E::tasks().append(
-                initialize_rpc_server::<N, E>(
-                    node.rpc,
-                    node.rpc_username.clone(),
-                    node.rpc_password.clone(),
-                    address,
-                    peers,
-                    ledger_reader,
-                    operator,
-                    prover_router,
-                    memory_pool,
-                )
-                .await,
+            let rpc_context = RpcContext::new(
+                node.rpc_username.clone(),
+                node.rpc_password.clone(),
+                address,
+                peers,
+                ledger_reader,
+                operator,
+                prover_router,
+                memory_pool,
             );
+            let (rpc_server_addr, rpc_server_handle) = initialize_rpc_server::<N, E>(node.rpc, rpc_context).await;
+
+            debug!("JSON-RPC server listening on {}", rpc_server_addr);
+
+            E::tasks().append(rpc_server_handle);
         }
     }
 

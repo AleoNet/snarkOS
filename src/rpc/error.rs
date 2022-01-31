@@ -14,19 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub(crate) mod context;
-pub(crate) use context::*;
+#[derive(Debug, Error)]
+pub enum RpcError {
+    #[error("{}", _0)]
+    AnyhowError(#[from] anyhow::Error),
+    #[error("{}: {}", _0, _1)]
+    Crate(&'static str, String),
+    #[error("{}", _0)]
+    FromHexError(#[from] hex::FromHexError),
+    #[error("{}", _0)]
+    Message(String),
+    #[error("{}", _0)]
+    ParseIntError(#[from] std::num::ParseIntError),
+    #[error("{}", _0)]
+    SerdeJson(#[from] serde_json::Error),
+    #[error("{}", _0)]
+    StdIOError(#[from] std::io::Error),
+}
 
-pub(crate) mod error;
-pub(crate) use error::*;
-
-pub(crate) mod resources;
-pub(crate) use resources::*;
-
-pub(crate) mod rpc_impl;
-
-pub(crate) mod rpc_trait;
-pub(crate) use rpc_trait::*;
-
-#[cfg(test)]
-mod tests;
+impl From<RpcError> for std::io::Error {
+    fn from(error: RpcError) -> Self {
+        std::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", error))
+    }
+}

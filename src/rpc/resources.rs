@@ -14,19 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub(crate) mod context;
-pub(crate) use context::*;
+// The details on resource-limiting can be found at https://github.com/paritytech/jsonrpsee/blob/master/core/src/server/resource_limiting.rs
 
-pub(crate) mod error;
-pub(crate) use error::*;
+// note: jsonrpsee expects string literals as resource names; we'll be distinguishing
+// them by the const name, so in order for the actual lookups to be faster, we can make
+// the underlying strings short, as long as they are unique.
 
-pub(crate) mod resources;
-pub(crate) use resources::*;
-
-pub(crate) mod rpc_impl;
-
-pub(crate) mod rpc_trait;
-pub(crate) use rpc_trait::*;
-
-#[cfg(test)]
-mod tests;
+/// The resource label corresponding to the number of all active RPC calls.
+pub(crate) const ALL_CONCURRENT_REQUESTS: &str = "0";
+/// The maximum number of RPC requests that can be handled at once at any given time.
+pub(crate) const ALL_CONCURRENT_REQUESTS_LIMIT: u16 = 10;
