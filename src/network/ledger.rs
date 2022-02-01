@@ -29,7 +29,6 @@ use snarkos_storage::{storage::Storage, BlockLocators, LedgerState, MAXIMUM_LINE
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
-use chrono::Utc;
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -37,6 +36,7 @@ use std::{
     sync::{atomic::Ordering, Arc},
     time::{Duration, Instant},
 };
+use time::OffsetDateTime;
 use tokio::{
     sync::{mpsc, oneshot, Mutex, RwLock},
     task,
@@ -847,7 +847,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         block_hash: Option<N::BlockHash>,
         locked_block_requests: &mut HashMap<BlockRequest<N>, i64>,
     ) {
-        match locked_block_requests.insert((block_height, block_hash).into(), Utc::now().timestamp()) {
+        match locked_block_requests.insert((block_height, block_hash).into(), OffsetDateTime::now_utc().unix_timestamp()) {
             None => debug!("Requesting block {} from {}", block_height, peer_ip),
             Some(_old_request) => self.add_failure(peer_ip, format!("Duplicate block request for {}", peer_ip)).await,
         }
@@ -892,7 +892,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     async fn remove_expired_block_requests(&self) {
         // Clear all block requests that have lived longer than `E::RADIO_SILENCE_IN_SECS`.
-        let now = Utc::now().timestamp();
+        let now = OffsetDateTime::now_utc().unix_timestamp();
         self.block_requests.write().await.iter_mut().for_each(|(_peer, block_requests)| {
             block_requests.retain(|_, time_of_request| now.saturating_sub(*time_of_request) < E::RADIO_SILENCE_IN_SECS as i64)
         });
@@ -904,7 +904,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     async fn add_failure(&self, peer_ip: SocketAddr, failure: String) {
         trace!("Adding failure for {}: {}", peer_ip, failure);
         match self.failures.write().await.get_mut(&peer_ip) {
-            Some(failures) => failures.push((failure, Utc::now().timestamp())),
+            Some(failures) => failures.push((failure, OffsetDateTime::now_utc().unix_timestamp())),
             None => error!("Missing failure entry for {}", peer_ip),
         };
     }
@@ -914,7 +914,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     async fn remove_expired_failures(&self) {
         // Clear all failures that have lived longer than `E::FAILURE_EXPIRY_TIME_IN_SECS`.
-        let now = Utc::now().timestamp();
+        let now = OffsetDateTime::now_utc().unix_timestamp();
         self.failures.write().await.iter_mut().for_each(|(_, failures)| {
             failures.retain(|(_, time_of_fail)| now.saturating_sub(*time_of_fail) < E::FAILURE_EXPIRY_TIME_IN_SECS as i64)
         });
