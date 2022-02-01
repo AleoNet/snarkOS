@@ -95,12 +95,14 @@ pub struct LedgerState<N: Network> {
 impl<N: Network> LedgerState<N> {
     ///
     /// Opens a new writable instance of `LedgerState` from the given storage path.
+    /// The `validation_increment` parameter determines the number of blocks to be
+    /// handled during the incremental validation process.
     /// For a read-only instance of `LedgerState`, use `LedgerState::open_reader`.
     ///
     /// A writable instance of `LedgerState` possesses full functionality, whereas
     /// a read-only instance of `LedgerState` may only call immutable methods.
     ///
-    pub fn open_writer<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open_writer<S: Storage, P: AsRef<Path>>(path: P, validation_increment: u32) -> Result<Self> {
         // Open storage.
         let context = N::NETWORK_ID;
         let is_read_only = false;
@@ -162,11 +164,10 @@ impl<N: Network> LedgerState<N> {
         }
 
         // Iterate and append each block hash from genesis to tip to validate ledger state.
-        const INCREMENT: u32 = 2000;
         let mut start_block_height = 0u32;
         while start_block_height <= latest_block_height {
             // Compute the end block height (inclusive) for this iteration.
-            let end_block_height = std::cmp::min(start_block_height.saturating_add(INCREMENT), latest_block_height);
+            let end_block_height = std::cmp::min(start_block_height.saturating_add(validation_increment), latest_block_height);
 
             // Retrieve the block hashes.
             let block_hashes = ledger.get_block_hashes(start_block_height, end_block_height)?;
