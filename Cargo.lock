@@ -1547,6 +1547,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "num_threads"
+version = "0.1.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97ba99ba6393e2c3734791401b66902d981cb03bf190af674ca69949b6d5fb15"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "number_prefix"
 version = "0.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2354,7 +2363,6 @@ dependencies = [
  "bincode",
  "bytes",
  "cfg-if 1.0.0",
- "chrono",
  "circular-queue",
  "colored",
  "crossterm",
@@ -2380,6 +2388,7 @@ dependencies = [
  "structopt",
  "tempfile",
  "thiserror",
+ "time 0.3.7",
  "tokio",
  "tokio-stream",
  "tokio-util",
@@ -2403,7 +2412,6 @@ version = "2.0.0"
 dependencies = [
  "anyhow",
  "bincode",
- "chrono",
  "circular-queue",
  "criterion",
  "itertools",
@@ -2416,6 +2424,7 @@ dependencies = [
  "serde_json",
  "snarkvm",
  "tempfile",
+ "time 0.3.7",
  "tracing",
 ]
 
@@ -2830,6 +2839,16 @@ checksum = "ca8a50ef2360fbd1eeb0ecd46795a87a19024eb4b53c5dc916ca1fd95fe62438"
 dependencies = [
  "libc",
  "winapi",
+]
+
+[[package]]
+name = "time"
+version = "0.3.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "004cbc98f30fa233c61a38bc77e96a9106e65c88f2d3bef182ae952027e5753d"
+dependencies = [
+ "libc",
+ "num_threads",
 ]
 
 [[package]]
@@ -3296,5 +3315,5 @@ dependencies = [
  "crc32fast",
  "flate2",
  "thiserror",
- "time",
+ "time 0.1.43",
 ]

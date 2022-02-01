@@ -37,6 +37,7 @@ use std::{
     thread,
     thread::JoinHandle,
 };
+use time::OffsetDateTime;
 
 /// The maximum number of linear block locators.
 pub const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 64;
@@ -599,7 +600,10 @@ impl<N: Network> LedgerState<N> {
         let previous_block_hash = latest_block.hash();
         let block_height = latest_block.height().saturating_add(1);
         // Ensure that the new timestamp is ahead of the previous timestamp.
-        let block_timestamp = std::cmp::max(chrono::Utc::now().timestamp(), latest_block.timestamp().saturating_add(1));
+        let block_timestamp = std::cmp::max(
+            OffsetDateTime::now_utc().unix_timestamp(),
+            latest_block.timestamp().saturating_add(1),
+        );
 
         // Compute the block difficulty target.
         let difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
@@ -732,7 +736,7 @@ impl<N: Network> LedgerState<N> {
         }
 
         // Ensure the next block timestamp is within the declared time limit.
-        let now = chrono::Utc::now().timestamp();
+        let now = OffsetDateTime::now_utc().unix_timestamp();
         if block.timestamp() > (now + N::ALEO_FUTURE_TIME_LIMIT_IN_SECS) {
             return Err(anyhow!("The given block timestamp exceeds the time limit"));
         }
