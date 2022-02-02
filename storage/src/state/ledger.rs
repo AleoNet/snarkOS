@@ -1333,7 +1333,7 @@ impl<N: Network> BlockState<N> {
         }
 
         (start_block_height..=end_block_height)
-            .into_iter()
+            .into_par_iter()
             .map(|height| self.get_block_hash(height))
             .collect()
     }
