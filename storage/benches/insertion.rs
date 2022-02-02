@@ -32,7 +32,7 @@ fn insertion(c: &mut Criterion) {
 
     // Prepare a test ledger and an iterator of blocks to insert.
     let temp_dir = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
-    let ledger = LedgerState::open_writer::<RocksDB, _>(temp_dir, NUM_BLOCKS as u32).expect("Failed to initialize ledger");
+    let ledger = LedgerState::open_writer_inner::<RocksDB, _>(temp_dir, 1).expect("Failed to initialize ledger");
     let mut block_iter = blocks.iter();
 
     c.bench_function("add_block", |b| {

@@ -95,14 +95,20 @@ pub struct LedgerState<N: Network> {
 impl<N: Network> LedgerState<N> {
     ///
     /// Opens a new writable instance of `LedgerState` from the given storage path.
-    /// The `validation_increment` parameter determines the number of blocks to be
-    /// handled during the incremental validation process.
     /// For a read-only instance of `LedgerState`, use `LedgerState::open_reader`.
     ///
     /// A writable instance of `LedgerState` possesses full functionality, whereas
     /// a read-only instance of `LedgerState` may only call immutable methods.
     ///
-    pub fn open_writer<S: Storage, P: AsRef<Path>>(path: P, validation_increment: u32) -> Result<Self> {
+    pub fn open_writer<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::open_writer_inner::<S, P>(path, 2_000)
+    }
+
+    /// This function is hidden, as it's intended to be used directly in tests only.
+    /// The `validation_increment` parameter determines the number of blocks to be
+    /// handled during the incremental validation process.
+    #[doc(hidden)]
+    pub fn open_writer_inner<S: Storage, P: AsRef<Path>>(path: P, validation_increment: u32) -> Result<Self> {
         // Open storage.
         let context = N::NETWORK_ID;
         let is_read_only = false;

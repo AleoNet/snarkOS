@@ -33,7 +33,7 @@ fn opening(c: &mut Criterion) {
     // Prepare a test ledger and insert all the test blocks.
     let temp_dir = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
     {
-        let ledger = LedgerState::open_writer::<RocksDB, _>(&temp_dir, NUM_BLOCKS as u32).expect("Failed to initialize ledger");
+        let ledger = LedgerState::open_writer_inner::<RocksDB, _>(&temp_dir, 1).expect("Failed to initialize ledger");
         for block in &blocks {
             ledger.add_next_block(block).expect("Failed to add a test block");
         }
@@ -42,7 +42,7 @@ fn opening(c: &mut Criterion) {
     c.bench_function("Ledger::open_writer", |b| {
         b.iter(|| {
             let _ledger: LedgerState<Testnet2> =
-                LedgerState::open_writer::<RocksDB, _>(&temp_dir, NUM_BLOCKS as u32).expect("Failed to initialize ledger");
+                LedgerState::open_writer_inner::<RocksDB, _>(&temp_dir, NUM_BLOCKS as u32).expect("Failed to initialize ledger");
         })
     });
 }

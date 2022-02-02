@@ -114,7 +114,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Initialize the ledger.
         let ledger = Arc::new(Self {
             ledger_router,
-            canon: Arc::new(LedgerState::open_writer::<S, P>(path, 2_000)?),
+            canon: Arc::new(LedgerState::open_writer::<S, P>(path)?),
             canon_reader: LedgerState::open_reader::<S, P>(path)?,
             canon_lock: Arc::new(Mutex::new(())),
             unconfirmed_blocks: Default::default(),
