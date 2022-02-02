@@ -38,4 +38,5 @@ pub use network::*;
 pub mod node;
 pub use node::*;
 
+#[cfg(feature = "rpc")]
 pub(crate) mod rpc;

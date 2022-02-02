@@ -22,19 +22,19 @@ use crate::{
     operator::{Operator, OperatorRouter},
     peers::{Peers, PeersRequest, PeersRouter},
     prover::{Prover, ProverRouter},
-    rpc::{context::RpcContext, initialize_rpc_server},
     Node,
 };
 use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
 use snarkvm::prelude::*;
 
+#[cfg(feature = "rpc")]
+use crate::rpc::{context::RpcContext, initialize_rpc_server};
+#[cfg(feature = "rpc")]
+use tokio::sync::RwLock;
+
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{
-    net::TcpListener,
-    sync::{oneshot, RwLock},
-    task,
-};
+use tokio::{net::TcpListener, sync::oneshot, task};
 
 pub type LedgerReader<N> = Arc<LedgerState<N>>;
 
@@ -154,8 +154,11 @@ impl<N: Network, E: Environment> Server<N, E> {
             prover.router(),
         )
         .await;
+
         // Initialize a new instance of the heartbeat.
         Self::initialize_heartbeat(peers.router(), ledger.reader(), ledger.router(), operator.router(), prover.router()).await;
+
+        #[cfg(feature = "rpc")]
         // Initialize a new instance of the RPC server.
         Self::initialize_rpc(
             node,
@@ -167,6 +170,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             prover.memory_pool(),
         )
         .await;
+
         // Initialize a new instance of the notification.
         Self::initialize_notification(ledger.reader(), prover.clone(), address).await;
 
@@ -338,6 +342,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize a new instance of the RPC server.
     ///
     #[inline]
+    #[cfg(feature = "rpc")]
     async fn initialize_rpc(
         node: &Node,
         address: Option<Address<N>>,

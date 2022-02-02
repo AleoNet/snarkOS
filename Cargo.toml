@@ -20,9 +20,10 @@ edition = "2018"
 members = ["metrics", "storage", "testing"]
 
 [features]
-default = []
+default = [ "rpc" ]
 cuda = [ "snarkvm/cuda" ]
 prometheus = ["snarkos-metrics"]
+rpc = [ "jsonrpsee" ]
 test = []
 
 [dependencies]
@@ -70,6 +71,7 @@ version = "0.4"
 
 [dependencies.jsonrpsee]
 version = "0.8"
+optional = true
 features = [ "http-server" ]
 
 [dependencies.num_cpus]
