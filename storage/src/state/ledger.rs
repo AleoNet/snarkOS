@@ -1027,10 +1027,7 @@ impl<N: Network> LedgerState<N> {
         let mut ledger_tree = self.ledger_tree.write();
 
         // Retrieve all of the block hashes.
-        let mut block_hashes = Vec::with_capacity(self.latest_block_height() as usize);
-        for height in 0..=self.latest_block_height() {
-            block_hashes.push(self.get_block_hash(height)?);
-        }
+        let block_hashes = self.get_block_hashes(0, self.latest_block_height())?;
 
         // Add the block hashes to create the new ledger tree.
         let mut new_ledger_tree = LedgerTree::<N>::new()?;
