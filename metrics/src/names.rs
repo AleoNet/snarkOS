@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2021 Aleo Systems Inc.
+// Copyright (C) 2019-2022 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -16,4 +16,10 @@
 
 pub mod blocks {
     pub const HEIGHT: &str = "snarkos_blocks_height_total";
+}
+
+pub mod peers {
+    pub const CONNECTED: &str = "snarkos_peers_connected_total";
+    pub const CANDIDATE: &str = "snarkos_peers_candidate_total";
+    pub const RESTRICTED: &str = "snarkos_peers_restricted_total";
 }
