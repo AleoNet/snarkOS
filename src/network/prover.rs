@@ -115,12 +115,12 @@ impl<N: Network, E: Environment> Prover<N, E> {
         {
             let prover = prover.clone();
             let (router, handler) = oneshot::channel();
-            E::tasks().append(task::spawn(async move {
+            E::resources().register_task(task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 // Asynchronously wait for a prover request.
                 while let Some(request) = prover_handler.recv().await {
-                    // Hold the prover write lock briefly, to update the state of the prover.
+                    // Update the state of the prover.
                     prover.update(request).await;
                 }
             }));
@@ -137,7 +137,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         if E::NODE_TYPE == NodeType::Prover && prover.pool.is_some() {
             let prover = prover.clone();
             let (router, handler) = oneshot::channel();
-            task::spawn(async move {
+            E::resources().register_task(task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 loop {
@@ -150,7 +150,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                         prover.send_pool_register().await;
                     }
                 }
-            });
+            }));
 
             // Wait until the operator handler is ready.
             let _ = handler.await;
@@ -323,7 +323,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                 // Initialize the prover process.
                 let prover = prover.clone();
                 let (router, handler) = oneshot::channel();
-                E::tasks().append(task::spawn(async move {
+                E::resources().register_task(task::spawn(async move {
                     // Notify the outer function that the task is ready.
                     let _ = router.send(());
                     loop {
@@ -339,7 +339,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             let ledger_router = prover.ledger_router.clone();
                             let prover_router = prover.prover_router.clone();
 
-                            E::tasks().append(task::spawn(async move {
+                            task::spawn(async move {
                                 // Mine the next block.
                                 let result = task::spawn_blocking(move || {
                                     E::thread_pool().install(move || {
@@ -374,7 +374,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                     }
                                     Ok(Err(error)) | Err(error) => trace!("{}", error),
                                 }
-                            }));
+                            });
                         }
                         // Proceed to sleep for a preset amount of time.
                         tokio::time::sleep(MINER_HEARTBEAT_IN_SECONDS).await;

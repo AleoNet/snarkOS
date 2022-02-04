@@ -445,7 +445,7 @@ impl MinerStats {
 
         // Initialize the ledger storage.
         let ledger_storage_path = node.ledger_storage_path(ip);
-        let ledger = snarkos_storage::LedgerState::<Testnet2>::open_reader::<RocksDB, _>(ledger_storage_path).unwrap();
+        let (ledger, ledger_resource) = snarkos_storage::LedgerState::<Testnet2>::open_reader::<RocksDB, _>(ledger_storage_path).unwrap();
 
         // Initialize the prover storage.
         let prover_storage_path = node.prover_storage_path(ip);
@@ -472,6 +472,8 @@ impl MinerStats {
                 }
             }
         }
+
+        tokio::spawn(ledger_resource.abort());
 
         return Ok(format!(
             "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",

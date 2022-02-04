@@ -31,6 +31,10 @@ harness = false
 [dependencies.snarkvm]
 version = "0.8.0"
 
+[dependencies.snarkos-utils]
+path = "../utils"
+version = "2.0.2"
+
 [dependencies.anyhow]
 version = "1"
 
@@ -67,6 +71,10 @@ version = "1"
 
 [dependencies.time]
 version = "0.3.7"
+
+[dependencies.tokio]
+version = "1"
+features = [ "sync" ]
 
 [dependencies.tracing]
 version = "0.1"
