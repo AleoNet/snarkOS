@@ -131,7 +131,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
             // Initialize the handler for the operator.
             let operator_clone = operator.clone();
             let (router, handler) = oneshot::channel();
-            E::tasks().append(task::spawn(async move {
+            E::resources().register_task(task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 // Asynchronously wait for a operator request.
@@ -148,7 +148,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                 // Initialize an update loop for the block template.
                 let operator = operator.clone();
                 let (router, handler) = oneshot::channel();
-                E::tasks().append(task::spawn(async move {
+                E::resources().register_task(task::spawn(async move {
                     // Notify the outer function that the task is ready.
                     let _ = router.send(());
                     // TODO (julesdesmit): Add logic to the loop to retarget share difficulty.

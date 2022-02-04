@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = [ "metrics", "storage", "testing" ]
+members = [ "metrics", "storage", "testing", "utils" ]
 
 [features]
 default = [ "rpc" ]
@@ -38,6 +38,10 @@ tui = "0.17.0"
 
   [dependencies.snarkos-storage]
   path = "./storage"
+  version = "2.0.2"
+
+  [dependencies.snarkos-utils]
+  path = "./utils"
   version = "2.0.2"
 
   [dependencies.snarkvm]

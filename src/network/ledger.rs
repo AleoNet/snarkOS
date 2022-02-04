@@ -112,11 +112,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
         let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
 
+        let canon = Arc::new(LedgerState::open_writer::<S, P>(path)?);
+        let (canon_reader, reader_resource) = LedgerState::open_reader::<S, P>(path)?;
+        E::resources().register(reader_resource);
+
         // Initialize the ledger.
         let ledger = Arc::new(Self {
             ledger_router,
-            canon: Arc::new(LedgerState::open_writer::<S, P>(path)?),
-            canon_reader: LedgerState::open_reader::<S, P>(path)?,
+            canon,
+            canon_reader,
             canon_lock: Arc::new(Mutex::new(())),
             unconfirmed_blocks: Default::default(),
             peers_state: Default::default(),
@@ -131,12 +135,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         {
             let ledger = ledger.clone();
             let (router, handler) = oneshot::channel();
-            E::tasks().append(task::spawn(async move {
+            E::resources().register_task(task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 // Asynchronously wait for a ledger request.
                 while let Some(request) = ledger_handler.recv().await {
-                    // Hold the ledger write lock briefly, to update the state of the ledger.
+                    // Update the state of the ledger.
                     // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
                     // will end up being processed out of order.
                     ledger.update(request).await;

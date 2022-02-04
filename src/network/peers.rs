@@ -134,17 +134,17 @@ impl<N: Network, E: Environment> Peers<N, E> {
         {
             let peers = peers.clone();
             let (router, handler) = oneshot::channel();
-            E::tasks().append(task::spawn(async move {
+            E::resources().register_task(task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 // Asynchronously wait for a peers request.
                 while let Some(request) = peers_handler.recv().await {
                     let peers = peers.clone();
                     // Asynchronously process a peers request.
-                    E::tasks().append(task::spawn(async move {
-                        // Hold the peers write lock briefly, to update the state of the peers.
+                    task::spawn(async move {
+                        // Update the state of the peers.
                         peers.update(request).await;
-                    }));
+                    });
                 }
             }));
             // Wait until the peers router task is ready.
@@ -409,9 +409,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             warn!("Failed to transmit the request: '{}'", error);
                         }
                         // Do not wait for the result of each connection.
-                        E::tasks().append(task::spawn(async move {
+                        task::spawn(async move {
                             let _ = handler.await;
-                        }));
+                        });
                     }
                 }
             }

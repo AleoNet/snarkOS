@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::helpers::{NodeType, Status, Tasks};
+use crate::helpers::{NodeType, Status};
+use snarkos_utils::Resources;
 use snarkvm::dpc::Network;
 
 use once_cell::sync::OnceCell;
@@ -87,19 +88,19 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
         static NODES: OnceCell<HashSet<SocketAddr>> = OnceCell::new();
         NODES.get_or_init(|| Self::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect())
     }
-    
-    /// Returns the tasks handler for the node.
-    fn tasks() -> &'static Tasks<tokio::task::JoinHandle<()>> {
-        static TASKS: OnceCell<Tasks<tokio::task::JoinHandle<()>>> = OnceCell::new();
-        TASKS.get_or_init(Tasks::new)
+
+    /// Returns the resource handler for the node.
+    fn resources() -> &'static Resources {
+        static RESOURCES: OnceCell<Resources> = OnceCell::new();
+        RESOURCES.get_or_init(Resources::default)
     }
-    
+
     /// Returns the status of the node.
     fn status() -> &'static Status {
         static STATUS: OnceCell<Status> = OnceCell::new();
         STATUS.get_or_init(Status::new)
     }
-    
+
     /// Returns the terminator bit for the prover.
     fn terminator() -> &'static Arc<AtomicBool> {
         static TERMINATOR: OnceCell<Arc<AtomicBool>> = OnceCell::new();

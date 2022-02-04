@@ -18,6 +18,7 @@ use crate::{
     helpers::BlockLocators,
     storage::{DataMap, Map, MapId, Storage},
 };
+use snarkos_utils::Resource;
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -35,9 +36,9 @@ use std::{
         Arc,
     },
     thread,
-    thread::JoinHandle,
 };
 use time::OffsetDateTime;
+use tokio::sync::oneshot::{self, error::TryRecvError};
 
 /// The maximum number of linear block locators.
 pub const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 64;
@@ -87,7 +88,7 @@ pub struct LedgerState<N: Network> {
     /// The blocks of the ledger in storage.
     blocks: BlockState<N>,
     /// The indicator bit and tracker for a ledger in read-only mode.
-    read_only: (bool, Arc<AtomicU32>, RwLock<Option<Arc<JoinHandle<()>>>>),
+    read_only: (bool, Arc<AtomicU32>),
     /// Used to ensure the database operations aren't interrupted by a shutdown.
     map_lock: Arc<RwLock<()>>,
 }
@@ -122,7 +123,7 @@ impl<N: Network> LedgerState<N> {
             latest_block_locators: Default::default(),
             ledger_roots: storage.open_map(MapId::LedgerRoots)?,
             blocks: BlockState::open(storage)?,
-            read_only: (is_read_only, Arc::new(AtomicU32::new(0)), RwLock::new(None)),
+            read_only: (is_read_only, Default::default()),
             map_lock: Default::default(),
         };
 
@@ -249,7 +250,7 @@ impl<N: Network> LedgerState<N> {
     /// A writable instance of `LedgerState` possesses full functionality, whereas
     /// a read-only instance of `LedgerState` may only call immutable methods.
     ///
-    pub fn open_reader<S: Storage, P: AsRef<Path>>(path: P) -> Result<Arc<Self>> {
+    pub fn open_reader<S: Storage, P: AsRef<Path>>(path: P) -> Result<(Arc<Self>, Resource)> {
         // Open storage.
         let context = N::NETWORK_ID;
         let is_read_only = true;
@@ -263,7 +264,7 @@ impl<N: Network> LedgerState<N> {
             latest_block_locators: Default::default(),
             ledger_roots: storage.open_map(MapId::LedgerRoots)?,
             blocks: BlockState::open(storage)?,
-            read_only: (is_read_only, Arc::new(AtomicU32::new(0)), RwLock::new(None)),
+            read_only: (is_read_only, Default::default()),
             map_lock: Default::default(),
         });
 
@@ -300,10 +301,10 @@ impl<N: Network> LedgerState<N> {
         // Update the ledger tree state.
         ledger.regenerate_ledger_tree()?;
         // As the ledger is in read-only mode, proceed to start a process to keep the reader in sync.
-        *ledger.read_only.2.write() = Some(Arc::new(ledger.initialize_reader_heartbeat(latest_block_height)?));
+        let resource = ledger.initialize_reader_heartbeat(latest_block_height)?;
 
         trace!("[Read-Only] Ledger successfully loaded at block {}", ledger.latest_block_height());
-        Ok(ledger)
+        Ok((ledger, resource))
     }
 
     /// Returns `true` if the ledger is in read-only mode.
@@ -1043,18 +1044,26 @@ impl<N: Network> LedgerState<N> {
     }
 
     /// Initializes a heartbeat to keep the ledger reader in sync, with the given starting block height.
-    fn initialize_reader_heartbeat(self: &Arc<Self>, starting_block_height: u32) -> Result<JoinHandle<()>> {
+    fn initialize_reader_heartbeat(self: &Arc<Self>, starting_block_height: u32) -> Result<Resource> {
         // If the storage is *not* in read-only mode, this method cannot be called.
         if !self.is_read_only() {
             return Err(anyhow!("Ledger must be read-only to initialize a reader heartbeat"));
         }
 
+        let (abort_sender, mut abort_receiver) = oneshot::channel();
+
         let ledger = self.clone();
-        Ok(thread::spawn(move || {
+        let thread_handle = thread::spawn(move || {
             let last_seen_block_height = ledger.read_only.1.clone();
             ledger.read_only.1.store(starting_block_height, Ordering::SeqCst);
 
             loop {
+                // Check if the thread shouldn't be aborted.
+                match abort_receiver.try_recv() {
+                    Ok(_) | Err(TryRecvError::Closed) => return,
+                    _ => (),
+                };
+
                 // Refresh the ledger storage state.
                 if ledger.ledger_roots.refresh() {
                     // After catching up the reader, determine the latest block height.
@@ -1085,7 +1094,9 @@ impl<N: Network> LedgerState<N> {
                 }
                 thread::sleep(std::time::Duration::from_secs(6));
             }
-        }))
+        });
+
+        Ok(Resource::Thread(thread_handle, abort_sender))
     }
 
     /// Attempts to automatically resolve inconsistent ledger state.

@@ -112,7 +112,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             let prover_router = prover.router();
 
             let (router, handler) = oneshot::channel();
-            E::tasks().append(task::spawn(async move {
+            E::resources().register_task(task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 loop {
@@ -243,7 +243,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         trace!("Ledger has shut down, proceeding to flush tasks...");
 
         // Flush the tasks.
-        E::tasks().flush();
+        E::resources().abort();
         trace!("Node has shut down.");
     }
 
@@ -262,7 +262,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) {
         // Initialize the listener process.
         let (router, handler) = oneshot::channel();
-        E::tasks().append(task::spawn(async move {
+        E::resources().register_task(task::spawn(async move {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             info!("Listening for peers at {}", local_ip);
@@ -312,7 +312,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
-        E::tasks().append(task::spawn(async move {
+        E::resources().register_task(task::spawn(async move {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             loop {
@@ -368,7 +368,7 @@ impl<N: Network, E: Environment> Server<N, E> {
 
             debug!("JSON-RPC server listening on {}", rpc_server_addr);
 
-            E::tasks().append(rpc_server_handle);
+            E::resources().register_task(rpc_server_handle);
         }
     }
 
@@ -379,7 +379,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     async fn initialize_notification(ledger: LedgerReader<N>, prover: Arc<Prover<N, E>>, address: Option<Address<N>>) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
-        E::tasks().append(task::spawn(async move {
+        E::resources().register_task(task::spawn(async move {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             loop {
