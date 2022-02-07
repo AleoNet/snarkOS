@@ -41,26 +41,29 @@ async fn measure_node_overhead() {
 }
 
 #[tokio::test]
-#[ignore = "TODO: indicates a potential leak (13420B - around 1.3kB/connection); investigate further"]
+#[ignore = "TODO@ljedrz: no obvious leaks anymore; investigate larger conn counts and a Ping workaround"]
 async fn inbound_connect_and_disconnect_doesnt_leak() {
     // Start a test node.
     let test_node = TestNode::default().await;
 
     // Start a snarkOS node.
     let client_node = ClientNode::default().await;
+    let client_addr = client_node.local_addr();
 
     // Register initial memory use.
     let pre_connection_mem = PEAK_ALLOC.current_usage();
 
     // Perform a connect and disconnect several times.
     let mut first_conn_mem = None;
-    for i in 0..10 {
+    for i in 0..5 {
         // Connect the test node to the snarkOS node (inbound for snarkOS).
-        test_node.node().connect(client_node.local_addr()).await.unwrap();
+        test_node.node().connect(client_addr).await.unwrap();
 
         // Disconnect the test node from the snarkOS node.
-        assert!(test_node.node().disconnect(client_node.local_addr()).await);
+        assert!(test_node.node().disconnect(client_addr).await);
         wait_until!(1, client_node.connected_peers().await.is_empty());
+
+        // Clear the peer-related collections to not accumulate expected connection artifacts.
         client_node.reset_known_peers().await;
 
         if i == 0 {
@@ -73,6 +76,8 @@ async fn inbound_connect_and_disconnect_doesnt_leak() {
         }
     }
 
+    // Sleeping here for a time a few seconds more than `PING_SLEEP_IN_SECS` results in a pass, as expected.
+
     // Measure memory use after the repeated connections.
     let final_mem = PEAK_ALLOC.current_usage();
 
@@ -82,7 +87,7 @@ async fn inbound_connect_and_disconnect_doesnt_leak() {
 }
 
 #[tokio::test]
-#[ignore = "TODO: indicates a potential leak (12424B - around 1.2kB/connection); investigate further"]
+#[ignore = "TODO@ljedrz: no obvious leaks anymore; investigate larger conn counts and a Ping workaround"]
 async fn outbound_connect_and_disconnect_doesnt_leak() {
     // Start a snarkOS node.
     let client_node = ClientNode::default().await;
@@ -96,7 +101,7 @@ async fn outbound_connect_and_disconnect_doesnt_leak() {
 
     // Perform a connect and disconnect several times.
     let mut first_conn_mem = None;
-    for i in 0..10 {
+    for i in 0..5 {
         // Connect the snarkOS node to the test node (outbound for snarkOS).
         client_node.connect(test_node_addr).await.unwrap();
 
@@ -105,6 +110,8 @@ async fn outbound_connect_and_disconnect_doesnt_leak() {
         let client_node_addr = test_node.node().connected_addrs()[0];
         assert!(test_node.node().disconnect(client_node_addr).await);
         wait_until!(1, client_node.connected_peers().await.is_empty());
+
+        // Clear the peer-related collections to not accumulate expected connection artifacts.
         client_node.reset_known_peers().await;
 
         if i == 0 {
@@ -116,6 +123,8 @@ async fn outbound_connect_and_disconnect_doesnt_leak() {
             );
         }
     }
+
+    // Sleeping here for a time a few seconds more than `PING_SLEEP_IN_SECS` results in a pass, as expected.
 
     // Measure memory use after the repeated connections.
     let final_mem = PEAK_ALLOC.current_usage();
