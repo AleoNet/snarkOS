@@ -266,10 +266,10 @@ jobs:
             echo "Pushed $DOCKER_REPO:${CIRCLE_BRANCH}-latest"
 
 
-  test_gpu:
+  gpu_test:
     machine:
       image: ubuntu-2004-cuda-11.4:202110-01
-    resource_class: gpu.nvidia.medium
+      resource_class: gpu.nvidia.medium
     steps:
       - checkout
       - run:
@@ -322,4 +322,4 @@ workflows:
             - build-and-publish-docker-amd
   build-test-gpu:
     jobs:
-      - test_gpu
+      - gpu_test
