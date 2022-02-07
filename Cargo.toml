@@ -32,7 +32,7 @@ snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e0462bf" }
 bytes = "1.0.0"
 futures = { version = "0.3.19", features = ["thread-pool"] }
 
-crossterm = "0.22"
+crossterm = "0.23"
 tui = "0.17.0"
 
 [dependencies.snarkos-metrics]
