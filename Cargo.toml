@@ -30,7 +30,7 @@ snarkvm = { git = "https://github.com/AleoHQ/snarkVM.git", rev = "e0462bf" }
 #snarkvm = { path = "../snarkVM" }
 
 bytes = "1.0.0"
-futures = { version = "0.3.19", features = ["thread-pool"] }
+futures = { version = "0.3.21", features = ["thread-pool"] }
 
 crossterm = "0.22"
 tui = "0.17.0"
