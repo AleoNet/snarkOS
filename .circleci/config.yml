@@ -70,6 +70,28 @@ jobs:
       - clear_environment:
           cache_key: snarkos-stable-cache
 
+  tests_gpu:
+    docker:
+      - image: ubuntu-2004-cuda-11.4:202110-01
+    resource_class: gpu.nvidia.medium
+    parallelism: 10
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-stable-cache
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: |
+            cargo test -- --features cuda --list --format terse | sed 's/: test//' > test_names.txt
+            TEST_NAMES=$(circleci tests split test_names.txt)
+            for i in $(echo $TEST_NAMES | sed "s/ / /g")
+            do
+                RUST_MIN_STACK=8388608 cargo test --workspace $i 
+            done
+      - clear_environment:
+          cache_key: snarkos-stable-cache
+
   storage:
     docker:
       - image: cimg/rust:1.57.0
@@ -269,6 +291,7 @@ workflows:
   main-workflow:
     jobs:
       - tests
+      - tests_gpu
       - storage
       - testing
       # - codecov:
