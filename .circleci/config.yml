@@ -70,28 +70,6 @@ jobs:
       - clear_environment:
           cache_key: snarkos-stable-cache
 
-  tests_gpu:
-    docker:
-      - image: ubuntu-2004-cuda-11.4:202110-01
-    resource_class: gpu.nvidia.medium
-    parallelism: 10
-    steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-stable-cache
-      - run:
-          name: Build and run tests
-          no_output_timeout: 35m
-          command: |
-            cargo test -- --features cuda --list --format terse | sed 's/: test//' > test_names.txt
-            TEST_NAMES=$(circleci tests split test_names.txt)
-            for i in $(echo $TEST_NAMES | sed "s/ / /g")
-            do
-                RUST_MIN_STACK=8388608 cargo test --workspace $i 
-            done
-      - clear_environment:
-          cache_key: snarkos-stable-cache
-
   storage:
     docker:
       - image: cimg/rust:1.57.0
@@ -287,11 +265,43 @@ jobs:
             docker manifest push $DOCKER_REPO:${CIRCLE_BRANCH}-latest
             echo "Pushed $DOCKER_REPO:${CIRCLE_BRANCH}-latest"
 
+
+  test_gpu:
+    build:
+    machine:
+      resource_class: gpu.nvidia.medium
+      image: ubuntu-2004-cuda-11.4:202110-01
+    steps:
+      - checkout
+      - run:
+        name: Prepare environment and install dependencies
+        command: |
+          export SCCACHE_CACHE_SIZE=200M
+          export WORK_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
+          export SCCACHE_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
+          mkdir -p "$CIRCLE_WORKING_DIRECTORY/.bin"
+          wget https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+          tar -C "$CIRCLE_WORKING_DIRECTORY/.bin" -xvf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
+          mv $CIRCLE_WORKING_DIRECTORY/.bin/sccache-0.2.13-x86_64-unknown-linux-musl/sccache $CIRCLE_WORKING_DIRECTORY/.bin/sccache
+          export PATH="$PATH:$CIRCLE_WORKING_DIRECTORY/.bin"
+          export RUSTC_WRAPPER="sccache"
+          rm -rf "$CIRCLE_WORKING_DIRECTORY/.cargo/registry"
+          sudo apt-get update && sudo apt-get install -y clang llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev
+      - run:
+          name: Build and run tests
+          no_output_timeout: 35m
+          command: |
+            cargo test -- --features cuda --list --format terse | sed 's/: test//' > test_names.txt
+            TEST_NAMES=$(circleci tests split test_names.txt)
+            for i in $(echo $TEST_NAMES | sed "s/ / /g")
+            do
+                RUST_MIN_STACK=8388608 cargo test --workspace $i 
+            done
+
 workflows:
   main-workflow:
     jobs:
       - tests
-      - tests_gpu
       - storage
       - testing
       # - codecov:
@@ -303,7 +313,7 @@ workflows:
     when:
       or:
         - equal: [ testnet2, << pipeline.git.branch >> ]
-        - equal: [ docker-builds, << pipeline.git.branch >> ]
+        - equal: [ docker_builds, << pipeline.git.branch >> ]
     jobs:
       - build-and-publish-docker-arm
       - build-and-publish-docker-amd
@@ -311,3 +321,6 @@ workflows:
           requires:
             - build-and-publish-docker-arm
             - build-and-publish-docker-amd
+  build-test-gpu:
+    jobs:
+      - test_gpu
