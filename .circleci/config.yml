@@ -285,10 +285,12 @@ jobs:
             export PATH="$PATH:$CIRCLE_WORKING_DIRECTORY/.bin"
             export RUSTC_WRAPPER="sccache"
             rm -rf "$CIRCLE_WORKING_DIRECTORY/.cargo/registry"
-            sudo apt-get update && sudo apt-get install -y clang llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev
+            sudo apt-get update && sudo apt-get install -y build-essential curl clang gcc llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev
+            curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
       - run:
           name: Build and run tests
           command: |
+            source $HOME/.cargo/env
             cargo test --  --list --format terse | sed 's/: test//' > test_names.txt
             TEST_NAMES=$(circleci tests split test_names.txt)
             for i in $(echo $TEST_NAMES | sed "s/ / /g")
