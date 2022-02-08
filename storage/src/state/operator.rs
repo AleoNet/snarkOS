@@ -125,9 +125,7 @@ impl<N: Network> SharesState<N> {
     fn get_shares_for_prover(&self, ledger: &Arc<LedgerState<N>>, prover: &Address<N>) -> u64 {
         self.shares
             .iter()
-            .filter_map(|((_, coinbase_record), shares)| {
-                shares.get(prover).copied()
-            })
+            .filter_map(|((_, coinbase_record), shares)| shares.get(prover).copied())
             .sum()
     }
 
