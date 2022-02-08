@@ -55,7 +55,7 @@ version = "0.8"
 version = "1"
 
 [dependencies.rocksdb]
-version = "0.17"
+version = "0.18"
 optional = true
 default-features = false  # See PR #1566 (https://github.com/AleoHQ/snarkOS/pull/1566)
 features = ["snappy"]     #
