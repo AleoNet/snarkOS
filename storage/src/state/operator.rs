@@ -129,10 +129,7 @@ impl<N: Network> SharesState<N> {
                 if !shares.contains_key(prover) {
                     None
                 } else {
-                    match ledger.contains_commitment(&coinbase_record.commitment()) {
-                        Ok(true) => shares.get(prover).copied(),
-                        Ok(false) | Err(_) => None,
-                    }
+                    shares.get(prover).copied()
                 }
             })
             .sum()
