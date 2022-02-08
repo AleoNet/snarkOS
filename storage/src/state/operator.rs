@@ -126,11 +126,7 @@ impl<N: Network> SharesState<N> {
         self.shares
             .iter()
             .filter_map(|((_, coinbase_record), shares)| {
-                if !shares.contains_key(prover) {
-                    None
-                } else {
-                    shares.get(prover).copied()
-                }
+                shares.get(prover).copied()
             })
             .sum()
     }
