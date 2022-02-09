@@ -245,6 +245,9 @@ impl Handshake for TestNode {
             trace!(parent: self.node().span(), "received a challenge request from {}", peer_ip);
 
             (peer_listening_ip, peer_nonce)
+        } else if let Ok(Message::Disconnect(reason)) = peer_request {
+            warn!(parent: self.node().span(), "{} disconnected: {:?}", peer_ip, reason);
+            return Err(io::ErrorKind::NotConnected.into());
         } else {
             error!(parent: self.node().span(), "invalid challenge request from {}", peer_ip);
             return Err(io::ErrorKind::InvalidData.into());
@@ -283,6 +286,9 @@ impl Handshake for TestNode {
                 error!(parent: self.node().span(), "invalid challenge response from {}", peer_ip);
                 Err(io::ErrorKind::InvalidData.into())
             }
+        } else if let Ok(Message::Disconnect(reason)) = peer_response {
+            warn!(parent: self.node().span(), "{} disconnected: {:?}", peer_ip, reason);
+            return Err(io::ErrorKind::NotConnected.into());
         } else {
             error!(parent: self.node().span(), "invalid challenge response from {}", peer_ip);
             Err(io::ErrorKind::InvalidData.into())
@@ -322,7 +328,9 @@ impl Reading for TestNode {
         match message {
             ClientMessage::BlockRequest(_start_block_height, _end_block_height) => {}
             ClientMessage::BlockResponse(_block) => {}
-            ClientMessage::Disconnect => {}
+            ClientMessage::Disconnect(reason) => {
+                debug!("Peer {} disconnected for the following reason: {:?}", source, reason);
+            }
             ClientMessage::PeerRequest => self.process_peer_request(source).await?,
             ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
             ClientMessage::Ping(version, _fork_depth, _peer_type, _peer_state, _block_hash, block_header) => {

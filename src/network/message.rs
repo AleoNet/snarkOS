@@ -23,7 +23,7 @@ use snarkvm::{dpc::posw::PoSWProof, prelude::*};
 
 use ::bytes::{Buf, BufMut, Bytes, BytesMut};
 use anyhow::{anyhow, Result};
-use serde::{de::DeserializeOwned, Serialize};
+use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use std::{
     io::{Cursor, Seek, Write},
     marker::PhantomData,
@@ -82,6 +82,35 @@ impl<T: 'static + Serialize + DeserializeOwned + Send> Data<T> {
     }
 }
 
+/// The reason behind the node disconnecting from a peer.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub enum DisconnectReason {
+    /// The fork length limit was exceeded.
+    ExceededForkRange,
+    /// The peer's client uses an invalid fork depth.
+    InvalidForkDepth,
+    /// The node is a sync node and the peer is ahead.
+    INeedToSyncFirst,
+    /// No reason given.
+    NoReasonGiven,
+    /// The peer's client is outdated, judging by its version.
+    OutdatedClientVersion,
+    /// Dropping a dead connection.
+    PeerHasDisconnected,
+    /// The node is shutting down.
+    ShuttingDown,
+    /// The sync node has served its purpose.
+    SyncComplete,
+    /// The peer has caused too many failures.
+    TooManyFailures,
+    /// The node has too many connections already.
+    TooManyPeers,
+    /// The peer is a sync node that's behind our node, and it needs to sync itself first.
+    YouNeedToSyncFirst,
+    /// The peer's listening port is closed.
+    YourPortIsClosed(u16),
+}
+
 #[derive(Clone, Debug)]
 pub enum Message<N: Network, E: Environment> {
     /// BlockRequest := (start_block_height, end_block_height (inclusive))
@@ -93,7 +122,7 @@ pub enum Message<N: Network, E: Environment> {
     /// ChallengeResponse := (block_header)
     ChallengeResponse(Data<BlockHeader<N>>),
     /// Disconnect := ()
-    Disconnect,
+    Disconnect(DisconnectReason),
     /// PeerRequest := ()
     PeerRequest,
     /// PeerResponse := (\[peer_ip\])
@@ -126,7 +155,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::BlockResponse(..) => "BlockResponse",
             Self::ChallengeRequest(..) => "ChallengeRequest",
             Self::ChallengeResponse(..) => "ChallengeResponse",
-            Self::Disconnect => "Disconnect",
+            Self::Disconnect(..) => "Disconnect",
             Self::PeerRequest => "PeerRequest",
             Self::PeerResponse(..) => "PeerResponse",
             Self::Ping(..) => "Ping",
@@ -148,7 +177,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::BlockResponse(..) => 1,
             Self::ChallengeRequest(..) => 2,
             Self::ChallengeResponse(..) => 3,
-            Self::Disconnect => 4,
+            Self::Disconnect(..) => 4,
             Self::PeerRequest => 5,
             Self::PeerResponse(..) => 6,
             Self::Ping(..) => 7,
@@ -178,7 +207,7 @@ impl<N: Network, E: Environment> Message<N, E> {
                 )?)
             }
             Self::ChallengeResponse(block_header) => Ok(block_header.serialize_blocking_into(writer)?),
-            Self::Disconnect => Ok(()),
+            Self::Disconnect(reason) => Ok(bincode::serialize_into(writer, reason)?),
             Self::PeerRequest => Ok(()),
             Self::PeerResponse(peer_ips) => Ok(bincode::serialize_into(writer, peer_ips)?),
             Self::Ping(version, fork_depth, node_type, status, block_hash, block_header) => {
@@ -253,9 +282,12 @@ impl<N: Network, E: Environment> Message<N, E> {
             4 => {
                 let data = read_to_end(&mut *reader)?;
 
-                match data.is_empty() {
-                    true => Self::Disconnect,
-                    false => return Err(anyhow!("Invalid 'Disconnect' message: {:?}", data)),
+                if data.is_empty() {
+                    Self::Disconnect(DisconnectReason::NoReasonGiven)
+                } else if let Ok(reason) = bincode::deserialize(&data) {
+                    Self::Disconnect(reason)
+                } else {
+                    return Err(anyhow!("Invalid 'Disconnect' message: {:?}", data));
                 }
             }
             5 => {

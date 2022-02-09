@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Data, Environment, LedgerReader, LedgerRouter, Message, OperatorRouter, OutboundRouter, Peer, ProverRouter};
+use crate::{Data, DisconnectReason, Environment, LedgerReader, LedgerRouter, Message, OperatorRouter, OutboundRouter, Peer, ProverRouter};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;
@@ -330,7 +330,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     // Proceed to send disconnect requests to these peers.
                     for peer_ip in peer_ips_to_disconnect {
                         info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
-                        self.send(peer_ip, Message::Disconnect).await;
+                        self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers)).await;
                         // Add an entry for this `Peer` in the restricted peers.
                         self.restricted_peers.write().await.insert(peer_ip, Instant::now());
                     }
@@ -351,7 +351,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         .choose_multiple(&mut OsRng::default(), num_excess_sync_nodes)
                     {
                         info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
-                        self.send(peer_ip, Message::Disconnect).await;
+                        self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers)).await;
                         // Add an entry for this `Peer` in the restricted peers.
                         self.restricted_peers.write().await.insert(peer_ip, Instant::now());
                     }
