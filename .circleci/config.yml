@@ -51,7 +51,7 @@ jobs:
   tests:
     docker:
       - image: cimg/rust:1.57.0
-    resource_class: 2xlarge
+    resource_class: xlarge
     parallelism: 10
     steps:
       - checkout
@@ -65,7 +65,7 @@ jobs:
             TEST_NAMES=$(circleci tests split test_names.txt)
             for i in $(echo $TEST_NAMES | sed "s/ / /g")
             do
-                RUST_MIN_STACK=8388608 cargo test --workspace $i 
+                RUST_MIN_STACK=8388608 cargo test --workspace $i
             done
       - clear_environment:
           cache_key: snarkos-stable-cache
@@ -73,7 +73,7 @@ jobs:
   storage:
     docker:
       - image: cimg/rust:1.57.0
-    resource_class: 2xlarge
+    resource_class: xlarge
     parallelism: 5
     steps:
       - checkout
@@ -88,7 +88,7 @@ jobs:
             TEST_NAMES=$(circleci tests split test_names.txt)
             for i in $(echo $TEST_NAMES | sed "s/ / /g")
             do
-                RUST_MIN_STACK=8388608 cargo test --workspace $i 
+                RUST_MIN_STACK=8388608 cargo test --workspace $i
             done
       - clear_environment:
           cache_key: snarkos-storage-cache
@@ -96,7 +96,7 @@ jobs:
   testing:
     docker:
       - image: cimg/rust:1.57.0
-    resource_class: 2xlarge
+    resource_class: xlarge
     parallelism: 5
     steps:
       - checkout
@@ -111,7 +111,7 @@ jobs:
             TEST_NAMES=$(circleci tests split test_names.txt)
             for i in $(echo $TEST_NAMES | sed "s/ / /g")
             do
-                RUST_MIN_STACK=8388608 cargo test --workspace $i 
+                RUST_MIN_STACK=8388608 cargo test --workspace $i
             done
       - clear_environment:
           cache_key: snarkos-testing-cache
@@ -120,7 +120,7 @@ jobs:
   #   machine:
   #     image: ubuntu-1604:202004-01
   #     docker_layer_caching: true
-  #   resource_class: 2xlarge
+  #   resource_class: xlarge
   #   steps:
   #     - attach_workspace:
   #         at: /home/circleci/project/
@@ -135,7 +135,7 @@ jobs:
   fmt:
     docker:
       - image: cimg/rust:1.57.0
-    resource_class: 2xlarge
+    resource_class: xlarge
     steps:
       - checkout
       - install_rust_nightly
@@ -151,7 +151,7 @@ jobs:
   clippy:
     docker:
       - image: cimg/rust:1.57.0
-    resource_class: 2xlarge
+    resource_class: xlarge
     steps:
       - checkout
       - install_rust_nightly
