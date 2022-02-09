@@ -241,6 +241,26 @@ impl<N: Network, E: Environment> Operator<N, E> {
         match request {
             OperatorRequest::PoolRegister(peer_ip, address) => {
                 if let Some(block_template) = self.block_template.read().await.clone() {
+                    // Ensure that we're connected to the prover.
+                    // TODO(julesdesmit): this is a hack to ensure connections, and we should do
+                    // this more efficiently, ideally speaking.
+                    let (router, handler) = oneshot::channel();
+                    if let Err(error) = self
+                        .peers_router
+                        .send(PeersRequest::Connect(
+                            peer_ip,
+                            self.ledger_reader.clone(),
+                            self.ledger_router.clone(),
+                            self.operator_router.clone(),
+                            self.prover_router.clone(),
+                            router,
+                        ))
+                        .await
+                    {
+                        trace!("[Connect] {}", error);
+                    }
+                    let _ = handler.await;
+
                     // Ensure this prover exists in the list first, and retrieve their share difficulty.
                     let share_difficulty = self
                         .provers
