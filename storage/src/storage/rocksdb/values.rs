@@ -18,16 +18,14 @@ use super::*;
 
 /// An iterator over the values of a prefix.
 pub struct Values<'a, V> {
-    db_iter: rocksdb::DBRawIterator<'a>,
-    prefix: Vec<u8>,
+    db_iter: rocksdb::DBIterator<'a>,
     _phantom: PhantomData<V>,
 }
 
 impl<'a, V: DeserializeOwned> Values<'a, V> {
-    pub(crate) fn new(db_iter: rocksdb::DBRawIterator<'a>, prefix: Vec<u8>) -> Self {
+    pub(crate) fn new(db_iter: rocksdb::DBIterator<'a>) -> Self {
         Self {
             db_iter,
-            prefix,
             _phantom: PhantomData,
         }
     }
@@ -37,20 +35,9 @@ impl<'a, V: DeserializeOwned> Iterator for Values<'a, V> {
     type Item = V;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.db_iter.valid() {
-            let value = self
-                .db_iter
-                .key()
-                .and_then(|k| if k.starts_with(&self.prefix) { Some(k) } else { None })
-                .and_then(|_| match self.db_iter.value().map(|v| bincode::deserialize(v).ok()) {
-                    Some(value) => value,
-                    None => None,
-                });
+        let (_, value) = self.db_iter.next()?;
+        let value = bincode::deserialize(&value).ok()?;
 
-            self.db_iter.next();
-            value
-        } else {
-            None
-        }
+        Some(value)
     }
 }
