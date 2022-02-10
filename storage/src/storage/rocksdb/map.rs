@@ -16,6 +16,8 @@
 
 use super::*;
 
+pub const PREFIX_LEN: usize = 4; // N::NETWORK_ID (u16) + MapId (u16)
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u16)]
 pub enum MapId {
@@ -125,30 +127,21 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
     /// Returns an iterator visiting each key-value pair in the map.
     ///
     fn iter(&'a self) -> Self::Iterator {
-        let mut db_iter = self.rocksdb.raw_iterator();
-        db_iter.seek(&self.context);
-
-        Iter::new(db_iter, self.context.clone())
+        Iter::new(self.rocksdb.prefix_iterator(&self.context))
     }
 
     ///
     /// Returns an iterator over each key in the map.
     ///
     fn keys(&'a self) -> Self::Keys {
-        let mut db_iter = self.rocksdb.raw_iterator();
-        db_iter.seek(&self.context);
-
-        Keys::new(db_iter, self.context.clone())
+        Keys::new(self.rocksdb.prefix_iterator(&self.context))
     }
 
     ///
     /// Returns an iterator over each value in the map.
     ///
     fn values(&'a self) -> Self::Values {
-        let mut db_iter = self.rocksdb.raw_iterator();
-        db_iter.seek(&self.context);
-
-        Values::new(db_iter, self.context.clone())
+        Values::new(self.rocksdb.prefix_iterator(&self.context))
     }
 
     ///

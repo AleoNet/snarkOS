@@ -18,16 +18,14 @@ use super::*;
 
 /// An iterator over all key-value pairs in a data map.
 pub struct Iter<'a, K, V> {
-    db_iter: rocksdb::DBRawIterator<'a>,
-    prefix: Vec<u8>,
+    db_iter: rocksdb::DBIterator<'a>,
     _phantom: PhantomData<(K, V)>,
 }
 
 impl<'a, K: DeserializeOwned, V: DeserializeOwned> Iter<'a, K, V> {
-    pub(super) fn new(db_iter: rocksdb::DBRawIterator<'a>, prefix: Vec<u8>) -> Self {
+    pub(super) fn new(db_iter: rocksdb::DBIterator<'a>) -> Self {
         Self {
             db_iter,
-            prefix,
             _phantom: PhantomData,
         }
     }
@@ -37,25 +35,10 @@ impl<'a, K: DeserializeOwned, V: DeserializeOwned> Iterator for Iter<'a, K, V> {
     type Item = (K, V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.db_iter.valid() {
-            let key = match self
-                .db_iter
-                .key()
-                .and_then(|k| if k.starts_with(&self.prefix) { Some(k) } else { None })
-                .map(|k| bincode::deserialize(&k[self.prefix.len()..]).ok())
-            {
-                Some(key) => key,
-                None => None,
-            };
-            let value = match self.db_iter.value().map(|v| bincode::deserialize(v).ok()) {
-                Some(value) => value,
-                None => None,
-            };
+        let (key, value) = self.db_iter.next()?;
+        let key = bincode::deserialize(&key[PREFIX_LEN..]).ok()?;
+        let value = bincode::deserialize(&value).ok()?;
 
-            self.db_iter.next();
-            key.and_then(|k| value.map(|v| (k, v)))
-        } else {
-            None
-        }
+        Some((key, value))
     }
 }
