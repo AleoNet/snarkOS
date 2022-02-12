@@ -35,7 +35,7 @@ use crate::{
 };
 use snarkvm::dpc::prelude::*;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use futures::SinkExt;
 use std::{
     collections::HashMap,
@@ -261,22 +261,18 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 #[cfg(not(feature = "test"))]
                                 {
                                     // Ensure the claimed listener port is open.
-                                    let stream =
-                                        match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip))
-                                            .await
-                                        {
-                                            Ok(stream) => stream,
-                                            Err(error) => return Err(anyhow!("Unable to reach '{}': '{:?}'", peer_ip, error)),
-                                        };
+                                    let _ = match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip))
+                                        .await
+                                    {
+                                        Ok(stream) => stream,
+                                        Err(error) => {
+                                            // Send the disconnect message.
+                                            let message = Message::Disconnect(DisconnectReason::YourPortIsClosed(listener_port));
+                                            outbound_socket.send(message).await?;
 
-                                    // Send the disconnect message.
-                                    let message = Message::Disconnect(DisconnectReason::YourPortIsClosed(listener_port));
-                                    outbound_socket.send(message).await?;
-
-                                    // Error if the stream is not open.
-                                    if let Err(error) = stream {
-                                        return Err(anyhow!("Unable to reach '{}': '{}'", peer_ip, error));
-                                    }
+                                            return Err(anyhow!("Unable to reach '{}': '{:?}'", peer_ip, error));
+                                        },
+                                    };
                                 }
                             }
                             // Send the challenge response.
@@ -289,6 +285,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             status.update(peer_status);
 
                             (peer_nonce, node_type, status)
+                        }
+                        Message::Disconnect(reason) => {
+                            bail!("Peer {} disconnected for the following reason: {:?}", peer_ip, reason);
                         }
                         message => {
                             return Err(anyhow!(
@@ -318,6 +317,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             true => Ok((peer_ip, peer_nonce, node_type, status)),
                             false => Err(anyhow!("Challenge response from {} failed, received '{}'", peer_ip, block_header)),
                         }
+                    }
+                    Message::Disconnect(reason) => {
+                        bail!("Peer {} disconnected for the following reason: {:?}", peer_ip, reason);
                     }
                     message => Err(anyhow!(
                         "Expected challenge response, received '{}' from {}",
