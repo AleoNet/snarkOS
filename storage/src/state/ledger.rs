@@ -101,7 +101,7 @@ impl<N: Network> LedgerState<N> {
     /// a read-only instance of `LedgerState` may only call immutable methods.
     ///
     pub fn open_writer<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_writer_with_increment::<S, P>(path, 2_000)
+        Self::open_writer_with_increment::<S, P>(path, 10_000)
     }
 
     /// This function is hidden, as it's intended to be used directly in tests only.
