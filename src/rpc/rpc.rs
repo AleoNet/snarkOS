@@ -468,8 +468,8 @@ mod tests {
     /// Initializes a new instance of the ledger state.
     fn new_ledger_state<N: Network, S: Storage, P: AsRef<Path>>(path: Option<P>) -> LedgerState<N> {
         match path {
-            Some(path) => LedgerState::<N>::open_writer_with_increment::<S, _>(path, 1).expect("Failed to initialize ledger"),
-            None => LedgerState::<N>::open_writer_with_increment::<S, _>(temp_dir(), 1).expect("Failed to initialize ledger"),
+            Some(path) => LedgerState::<N>::open_writer::<S, _>(path).expect("Failed to initialize ledger"),
+            None => LedgerState::<N>::open_writer::<S, _>(temp_dir()).expect("Failed to initialize ledger"),
         }
     }
 
