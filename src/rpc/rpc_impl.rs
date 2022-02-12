@@ -18,103 +18,20 @@
 //!
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
-use crate::{
-    network::Operator,
-    rpc::{rpc::*, rpc_trait::RpcFunctions},
-    Environment,
-    LedgerReader,
-    Peers,
-    ProverRequest,
-    ProverRouter,
-};
+use crate::{rpc::*, Environment, ProverRequest};
 use snarkos_storage::Metadata;
 use snarkvm::{
-    dpc::{Address, AleoAmount, Block, BlockHeader, Blocks, MemoryPool, Network, Transaction, Transactions, Transition},
-    utilities::FromBytes,
+    dpc::{Address, AleoAmount, Block, BlockHeader, Blocks, Network, Record, Transaction, Transactions, Transition},
+    utilities::{FromBytes, ToBytes},
 };
 
-use jsonrpc_core::Value;
-use snarkvm::{dpc::Record, utilities::ToBytes};
-use std::{cmp::max, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
+use serde_json::Value;
 use time::OffsetDateTime;
-use tokio::sync::RwLock;
 
-#[derive(Debug, Error)]
-pub enum RpcError {
-    #[error("{}", _0)]
-    AnyhowError(#[from] anyhow::Error),
-    #[error("{}: {}", _0, _1)]
-    Crate(&'static str, String),
-    #[error("{}", _0)]
-    FromHexError(#[from] hex::FromHexError),
-    #[error("{}", _0)]
-    Message(String),
-    #[error("{}", _0)]
-    ParseIntError(#[from] std::num::ParseIntError),
-    #[error("{}", _0)]
-    SerdeJson(#[from] serde_json::Error),
-    #[error("{}", _0)]
-    StdIOError(#[from] std::io::Error),
-}
-
-impl From<RpcError> for std::io::Error {
-    fn from(error: RpcError) -> Self {
-        std::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", error))
-    }
-}
-
-#[doc(hidden)]
-pub struct RpcInner<N: Network, E: Environment> {
-    address: Option<Address<N>>,
-    peers: Arc<Peers<N, E>>,
-    ledger: LedgerReader<N>,
-    operator: Arc<Operator<N, E>>,
-    prover_router: ProverRouter<N>,
-    memory_pool: Arc<RwLock<MemoryPool<N>>>,
-    /// RPC credentials for accessing guarded endpoints
-    #[allow(unused)]
-    pub(crate) credentials: RpcCredentials,
-    launched: Instant,
-}
-
-/// Implements RPC HTTP endpoint functions for a node.
-#[derive(Clone)]
-pub struct RpcImpl<N: Network, E: Environment>(Arc<RpcInner<N, E>>);
-
-impl<N: Network, E: Environment> Deref for RpcImpl<N, E> {
-    type Target = RpcInner<N, E>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<N: Network, E: Environment> RpcImpl<N, E> {
-    /// Creates a new struct for calling public and private RPC endpoints.
-    pub fn new(
-        credentials: RpcCredentials,
-        address: Option<Address<N>>,
-        peers: Arc<Peers<N, E>>,
-        ledger: LedgerReader<N>,
-        operator: Arc<Operator<N, E>>,
-        prover_router: ProverRouter<N>,
-        memory_pool: Arc<RwLock<MemoryPool<N>>>,
-    ) -> Self {
-        Self(Arc::new(RpcInner {
-            address,
-            peers,
-            ledger,
-            operator,
-            prover_router,
-            memory_pool,
-            credentials,
-            launched: Instant::now(),
-        }))
-    }
-}
+use std::{cmp::max, net::SocketAddr};
 
 #[async_trait::async_trait]
-impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
+impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
     /// Returns the latest block from the canonical chain.
     async fn latest_block(&self) -> Result<Block<N>, RpcError> {
         Ok(self.ledger.latest_block())
@@ -162,8 +79,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     }
 
     /// Returns the block height for the given the block hash.
-    async fn get_block_height(&self, block_hash: serde_json::Value) -> Result<u32, RpcError> {
-        let block_hash: N::BlockHash = serde_json::from_value(block_hash)?;
+    async fn get_block_height(&self, block_hash: N::BlockHash) -> Result<u32, RpcError> {
         Ok(self.ledger.get_block_height(&block_hash)?)
     }
 
@@ -265,14 +181,12 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     }
 
     /// Returns the ciphertext given the commitment.
-    async fn get_ciphertext(&self, commitment: serde_json::Value) -> Result<N::RecordCiphertext, RpcError> {
-        let commitment: N::Commitment = serde_json::from_value(commitment)?;
+    async fn get_ciphertext(&self, commitment: N::Commitment) -> Result<N::RecordCiphertext, RpcError> {
         Ok(self.ledger.get_ciphertext(&commitment)?)
     }
 
     /// Returns the ledger proof for a given record commitment.
-    async fn get_ledger_proof(&self, record_commitment: serde_json::Value) -> Result<String, RpcError> {
-        let record_commitment: N::Commitment = serde_json::from_value(record_commitment)?;
+    async fn get_ledger_proof(&self, record_commitment: N::Commitment) -> Result<String, RpcError> {
         let ledger_proof = self.ledger.get_ledger_inclusion_proof(record_commitment)?;
         Ok(hex::encode(ledger_proof.to_bytes_le().expect("Failed to serialize ledger proof")))
     }
@@ -283,8 +197,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     }
 
     /// Returns a transaction with metadata and decrypted records given the transaction ID.
-    async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<Value, RpcError> {
-        let transaction_id: N::TransactionID = serde_json::from_value(transaction_id)?;
+    async fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Value, RpcError> {
         let transaction: Transaction<N> = self.ledger.get_transaction(&transaction_id)?;
         let metadata: Metadata<N> = self.ledger.get_transaction_metadata(&transaction_id)?;
         let decrypted_records: Vec<Record<N>> = transaction.to_records().collect();
@@ -292,8 +205,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     }
 
     /// Returns a transition given the transition ID.
-    async fn get_transition(&self, transition_id: serde_json::Value) -> Result<Transition<N>, RpcError> {
-        let transition_id: N::TransitionID = serde_json::from_value(transition_id)?;
+    async fn get_transition(&self, transition_id: N::TransitionID) -> Result<Transition<N>, RpcError> {
         Ok(self.ledger.get_transition(&transition_id)?)
     }
 
@@ -344,8 +256,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcImpl<N, E> {
     }
 
     /// Returns the amount of shares submitted by a given prover.
-    async fn get_shares_for_prover(&self, prover: Value) -> Result<u64, RpcError> {
-        let prover: Address<N> = serde_json::from_value(prover)?;
+    async fn get_shares_for_prover(&self, prover: Address<N>) -> Result<u64, RpcError> {
         Ok(self.operator.get_shares_for_prover(&prover))
     }
 

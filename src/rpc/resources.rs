@@ -14,29 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#![forbid(unsafe_code)]
-#![allow(clippy::module_inception)]
-#![allow(clippy::suspicious_else_formatting)]
-#![allow(clippy::type_complexity)]
+// The details on resource-limiting can be found at https://github.com/paritytech/jsonrpsee/blob/master/core/src/server/resource_limiting.rs
 
-#[macro_use]
-extern crate thiserror;
-#[macro_use]
-extern crate tracing;
+// note: jsonrpsee expects string literals as resource names; we'll be distinguishing
+// them by the const name, so in order for the actual lookups to be faster, we can make
+// the underlying strings short, as long as they are unique.
 
-pub(crate) mod display;
-pub(crate) use display::*;
-
-pub mod environment;
-pub use environment::*;
-
-pub mod helpers;
-
-pub mod network;
-pub use network::*;
-
-pub mod node;
-pub use node::*;
-
-#[cfg(feature = "rpc")]
-pub(crate) mod rpc;
+/// The resource label corresponding to the number of all active RPC calls.
+pub(crate) const ALL_CONCURRENT_REQUESTS: &str = "0";
+/// The maximum number of RPC requests that can be handled at once at any given time.
+pub(crate) const ALL_CONCURRENT_REQUESTS_LIMIT: u16 = 10;

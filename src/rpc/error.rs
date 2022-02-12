@@ -14,29 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#![forbid(unsafe_code)]
-#![allow(clippy::module_inception)]
-#![allow(clippy::suspicious_else_formatting)]
-#![allow(clippy::type_complexity)]
+#[derive(Debug, Error)]
+pub enum RpcError {
+    #[error("{}", _0)]
+    AnyhowError(#[from] anyhow::Error),
+    #[error("{}: {}", _0, _1)]
+    Crate(&'static str, String),
+    #[error("{}", _0)]
+    FromHexError(#[from] hex::FromHexError),
+    #[error("{}", _0)]
+    Message(String),
+    #[error("{}", _0)]
+    ParseIntError(#[from] std::num::ParseIntError),
+    #[error("{}", _0)]
+    SerdeJson(#[from] serde_json::Error),
+    #[error("{}", _0)]
+    StdIOError(#[from] std::io::Error),
+}
 
-#[macro_use]
-extern crate thiserror;
-#[macro_use]
-extern crate tracing;
-
-pub(crate) mod display;
-pub(crate) use display::*;
-
-pub mod environment;
-pub use environment::*;
-
-pub mod helpers;
-
-pub mod network;
-pub use network::*;
-
-pub mod node;
-pub use node::*;
-
-#[cfg(feature = "rpc")]
-pub(crate) mod rpc;
+impl From<RpcError> for std::io::Error {
+    fn from(error: RpcError) -> Self {
+        std::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", error))
+    }
+}
