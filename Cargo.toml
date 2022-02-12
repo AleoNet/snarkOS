@@ -129,7 +129,7 @@ tui = "0.17.0"
 ]
 
   [dependencies.tokio-util]
-  version = "=0.6"
+  version = "0.7"
   features = [ "codec" ]
 
   [dependencies.tokio-stream]
