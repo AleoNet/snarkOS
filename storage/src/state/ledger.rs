@@ -101,14 +101,14 @@ impl<N: Network> LedgerState<N> {
     /// a read-only instance of `LedgerState` may only call immutable methods.
     ///
     pub fn open_writer<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_writer_inner::<S, P>(path, 2_000)
+        Self::open_writer_with_increment::<S, P>(path, 2_000)
     }
 
     /// This function is hidden, as it's intended to be used directly in tests only.
     /// The `validation_increment` parameter determines the number of blocks to be
     /// handled during the incremental validation process.
     #[doc(hidden)]
-    pub fn open_writer_inner<S: Storage, P: AsRef<Path>>(path: P, validation_increment: u32) -> Result<Self> {
+    pub fn open_writer_with_increment<S: Storage, P: AsRef<Path>>(path: P, validation_increment: u32) -> Result<Self> {
         // Open storage.
         let context = N::NETWORK_ID;
         let is_read_only = false;

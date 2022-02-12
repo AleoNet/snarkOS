@@ -28,7 +28,7 @@ const NUM_BLOCKS: usize = 1_000;
 fn lookups(c: &mut Criterion) {
     // Prepare the test ledger.
     let temp_dir = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
-    let ledger = LedgerState::open_writer_inner::<RocksDB, _>(temp_dir, 1).expect("Failed to initialize ledger");
+    let ledger = LedgerState::open_writer_with_increment::<RocksDB, _>(temp_dir, 1).expect("Failed to initialize ledger");
 
     // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
     // note: the `blocks_100` and `blocks_1000` files were generated on a testnet2 storage using `LedgerState::dump_blocks`.

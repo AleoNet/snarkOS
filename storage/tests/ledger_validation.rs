@@ -37,7 +37,7 @@ fn test_ledger_validation() {
     // Prepare a test ledger and an iterator of blocks to insert.
     let temp_dir = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
     {
-        let ledger = LedgerState::open_writer_inner::<RocksDB, _>(&temp_dir, 1).expect("Failed to initialize ledger");
+        let ledger = LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir, 1).expect("Failed to initialize ledger");
         for block in &blocks {
             ledger.add_next_block(block).expect("Failed to add a test block");
         }
@@ -50,6 +50,6 @@ fn test_ledger_validation() {
         let increment: u32 = rng.gen_range(1..=NUM_BLOCKS as u32);
         println!("Validating with an increment = {}", increment);
         let _ledger: LedgerState<Testnet2> =
-            LedgerState::open_writer_inner::<RocksDB, &Path>(&temp_dir, increment).expect("Failed to initialize ledger");
+            LedgerState::open_writer_with_increment::<RocksDB, &Path>(&temp_dir, increment).expect("Failed to initialize ledger");
     }
 }
