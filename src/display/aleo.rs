@@ -50,7 +50,7 @@ pub fn notification_message<N: Network>(miner: Option<Address<N>>) -> String {
 
  ==================================================================================================
 
-     The incentivized testnet will be announced on Discord. Visit https://discord.gg/5v2ynrw2ds
+     The incentivized testnet will be announced on Discord. Visit https://www.aleo.org/discord
      for the official launch announcement on November 30, 2021, from the Aleo team.
 
      Minimum requirements:
@@ -67,7 +67,7 @@ pub fn notification_message<N: Network>(miner: Option<Address<N>>) -> String {
          3. Ensure your Aleo node is running the `run-client.sh` or `run-miner.sh` script,
             in order to automatically stay up to date on the incentivized testnet.
          4. File technical issues on Github at https://github.com/AleoHQ/snarkOS/issues/new/choose
-         5. Ask questions on Discord at https://discord.gg/5v2ynrw2ds
+         5. Ask questions on Discord at https://www.aleo.org/discord
          6. Please be respectful to all members of the Aleo community.
 
      To claim rewards (after February 15, 2022):
