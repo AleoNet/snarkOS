@@ -1,6 +1,6 @@
 [package]
 name = "snarkos"
-version = "2.0.0"
+version = "2.0.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
@@ -32,12 +32,12 @@ tui = "0.17.0"
 
   [dependencies.snarkos-metrics]
   path = "./metrics"
-  version = "2.0.0"
+  version = "2.0.1"
   optional = true
 
   [dependencies.snarkos-storage]
   path = "./storage"
-  version = "2.0.0"
+  version = "2.0.1"
 
   [dependencies.snarkvm]
   version = "0.8.0"
