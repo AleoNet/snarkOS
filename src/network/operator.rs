@@ -221,9 +221,9 @@ impl<N: Network, E: Environment> Operator<N, E> {
         self.state.get_shares_for_block(block_height, coinbase_record)
     }
 
-    /// Returns the shares for a specific prover, given a ledger and the prover address.
+    /// Returns the shares for a specific prover, given the prover address.
     pub fn get_shares_for_prover(&self, prover: &Address<N>) -> u64 {
-        self.state.get_shares_for_prover(&self.ledger_reader, prover)
+        self.state.get_shares_for_prover(prover)
     }
 
     ///
