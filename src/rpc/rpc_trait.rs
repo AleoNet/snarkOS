@@ -16,8 +16,8 @@
 
 //! Definition of the public and private RPC endpoints.
 
-use crate::rpc::rpc_impl::RpcError;
-use snarkvm::dpc::{Block, BlockHeader, Network, Transaction, Transactions, Transition};
+use crate::rpc::RpcError;
+use snarkvm::dpc::{Address, Block, BlockHeader, Network, Transaction, Transactions, Transition};
 
 use std::net::SocketAddr;
 
@@ -52,7 +52,7 @@ pub trait RpcFunctions<N: Network> {
     async fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getblockheight.md")]
-    async fn get_block_height(&self, block_hash: serde_json::Value) -> Result<u32, RpcError>;
+    async fn get_block_height(&self, block_hash: N::BlockHash) -> Result<u32, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getblockhash.md")]
     async fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash, RpcError>;
@@ -70,19 +70,19 @@ pub trait RpcFunctions<N: Network> {
     async fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getciphertext.md")]
-    async fn get_ciphertext(&self, commitment: serde_json::Value) -> Result<N::RecordCiphertext, RpcError>;
+    async fn get_ciphertext(&self, commitment: N::Commitment) -> Result<N::RecordCiphertext, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getledgerproof.md")]
-    async fn get_ledger_proof(&self, record_commitment: serde_json::Value) -> Result<String, RpcError>;
+    async fn get_ledger_proof(&self, record_commitment: N::Commitment) -> Result<String, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getmemorypool.md")]
     async fn get_memory_pool(&self) -> Result<Vec<Transaction<N>>, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/gettransaction.md")]
-    async fn get_transaction(&self, transaction_id: serde_json::Value) -> Result<serde_json::Value, RpcError>;
+    async fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<serde_json::Value, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/gettransition.md")]
-    async fn get_transition(&self, transition_id: serde_json::Value) -> Result<Transition<N>, RpcError>;
+    async fn get_transition(&self, transition_id: N::TransitionID) -> Result<Transition<N>, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getconnectedpeers.md")]
     async fn get_connected_peers(&self) -> Result<Vec<SocketAddr>, RpcError>;
@@ -94,7 +94,7 @@ pub trait RpcFunctions<N: Network> {
     async fn send_transaction(&self, transaction_bytes: String) -> Result<N::TransactionID, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getsharesforprover.md")]
-    async fn get_shares_for_prover(&self, prover: serde_json::Value) -> Result<u64, RpcError>;
+    async fn get_shares_for_prover(&self, prover: Address<N>) -> Result<u64, RpcError>;
 
     #[doc = include_str!("./documentation/public_endpoints/getshares.md")]
     async fn get_shares(&self) -> u64;

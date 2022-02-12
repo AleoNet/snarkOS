@@ -17,6 +17,7 @@
 use crate::{
     helpers::{block_requests::*, BlockRequest, CircularMap, NodeType, State},
     Data,
+    DisconnectReason,
     Environment,
     LedgerReader,
     Message,
@@ -58,8 +59,8 @@ type LedgerHandler<N> = mpsc::Receiver<LedgerRequest<N>>;
 pub enum LedgerRequest<N: Network> {
     /// BlockResponse := (peer_ip, block, prover_router)
     BlockResponse(SocketAddr, Block<N>, ProverRouter<N>),
-    /// Disconnect := (peer_ip, message)
-    Disconnect(SocketAddr, String),
+    /// Disconnect := (peer_ip, reason)
+    Disconnect(SocketAddr, DisconnectReason),
     /// Failure := (peer_ip, failure)
     Failure(SocketAddr, String),
     /// Heartbeat := (prover_router)
@@ -176,7 +177,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Disconnect all connected peers.
         let connected_peers = self.peers_state.read().await.keys().copied().collect::<Vec<_>>();
         for peer_ip in connected_peers {
-            self.disconnect(peer_ip, "shutting down").await;
+            self.disconnect(peer_ip, DisconnectReason::ShuttingDown).await;
         }
         trace!("[ShuttingDown] Disconnect message has been sent to all connected peers");
 
@@ -214,8 +215,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     }
                 }
             }
-            LedgerRequest::Disconnect(peer_ip, message) => {
-                self.disconnect(peer_ip, &message).await;
+            LedgerRequest::Disconnect(peer_ip, reason) => {
+                self.disconnect(peer_ip, reason).await;
             }
             LedgerRequest::Failure(peer_ip, failure) => {
                 self.add_failure(peer_ip, failure).await;
@@ -274,8 +275,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Disconnects the given peer from the ledger.
     ///
-    async fn disconnect(&self, peer_ip: SocketAddr, message: &str) {
-        info!("Disconnecting from {} ({})", peer_ip, message);
+    async fn disconnect(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
+        info!("Disconnecting from {} ({:?})", peer_ip, reason);
         // Remove all entries of the peer from the ledger.
         self.remove_peer(&peer_ip).await;
         // Update the status of the ledger.
@@ -283,7 +284,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Send a `Disconnect` message to the peer.
         if let Err(error) = self
             .peers_router
-            .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect))
+            .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect(reason)))
             .await
         {
             warn!("[Disconnect] {}", error);
@@ -297,8 +298,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Disconnects and restricts the given peer from the ledger.
     ///
-    async fn disconnect_and_restrict(&self, peer_ip: SocketAddr, message: &str) {
-        info!("Disconnecting and restricting {} ({})", peer_ip, message);
+    async fn disconnect_and_restrict(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
+        info!("Disconnecting and restricting {} ({:?})", peer_ip, reason);
         // Remove all entries of the peer from the ledger.
         self.remove_peer(&peer_ip).await;
         // Update the status of the ledger.
@@ -306,7 +307,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Send a `Disconnect` message to the peer.
         if let Err(error) = self
             .peers_router
-            .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect))
+            .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect(reason)))
             .await
         {
             warn!("[Disconnect] {}", error);
@@ -355,7 +356,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // Proceed to disconnect and restrict these peers.
             for peer_ip in peer_ips_to_disconnect {
-                self.disconnect_and_restrict(peer_ip, "peer has synced").await;
+                self.disconnect_and_restrict(peer_ip, DisconnectReason::SyncComplete).await;
             }
         }
     }
@@ -765,7 +766,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Abort from the block request update.
                 BlockRequestHandler::Abort(_) => return,
                 // Disconnect from the peer if it is misbehaving and proceed to abort.
-                BlockRequestHandler::AbortAndDisconnect(_, ref reason) => {
+                BlockRequestHandler::AbortAndDisconnect(_, reason) => {
                     drop(_block_requests_lock);
                     self.disconnect(peer_ip, reason).await;
                     return;
@@ -934,7 +935,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             .collect::<Vec<_>>();
 
         for peer_ip in peers_to_disconnect {
-            self.disconnect(peer_ip, "exceeded failure limit").await;
+            self.disconnect(peer_ip, DisconnectReason::TooManyFailures).await;
         }
     }
 }

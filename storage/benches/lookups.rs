@@ -63,6 +63,9 @@ fn lookups(c: &mut Criterion) {
         ledger.add_next_block(block).expect("Failed to add a test block");
         block_hashes.push(block.hash());
         ledger_roots.push(ledger.latest_ledger_root());
+        tx_ids.extend(block.transactions().transaction_ids());
+        tx_commitments.extend(block.commitments());
+        tx_serial_numbers.extend(block.serial_numbers());
     }
     assert_eq!(block_hashes.len(), NUM_BLOCKS);
 

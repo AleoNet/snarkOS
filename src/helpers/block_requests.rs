@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{network::ledger::PeersState, Environment};
+use crate::{network::ledger::PeersState, DisconnectReason, Environment};
 use snarkos_storage::{BlockLocators, LedgerState};
 use snarkvm::dpc::prelude::*;
 
@@ -149,7 +149,7 @@ pub(crate) struct BlockRequestHandlerProceed {
 #[derive(Debug, PartialEq, Eq)]
 pub(crate) enum BlockRequestHandler {
     Abort(Case),
-    AbortAndDisconnect(Case, String),
+    AbortAndDisconnect(Case, DisconnectReason),
     Proceed(Case, BlockRequestHandlerProceed),
 }
 
@@ -211,7 +211,7 @@ pub(crate) fn handle_block_requests<N: Network, E: Environment>(
                 // If this peer is outside of the fork range of this ledger, proceed to disconnect from the peer.
                 if latest_block_height.saturating_sub(first_deviating_locator) >= N::ALEO_MAXIMUM_FORK_DEPTH {
                     debug!("Peer {} exceeded the permitted fork range, disconnecting", maximal_peer);
-                    return BlockRequestHandler::AbortAndDisconnect(Case::TwoCBA, "exceeded fork range".into());
+                    return BlockRequestHandler::AbortAndDisconnect(Case::TwoCBA, DisconnectReason::ExceededForkRange);
                 }
                 // Case 2(c)(b)(b) - You don't know if your real common ancestor is within `ALEO_MAXIMUM_FORK_DEPTH`.
                 // Revert to the common ancestor anyways.
@@ -517,7 +517,7 @@ mod tests {
             // Validate the output.
             assert_eq!(
                 result,
-                BlockRequestHandler::AbortAndDisconnect(Case::TwoCBA, "exceeded fork range".into())
+                BlockRequestHandler::AbortAndDisconnect(Case::TwoCBA, DisconnectReason::ExceededForkRange)
             );
         }
     }

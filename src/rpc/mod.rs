@@ -14,9 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub(crate) mod rpc;
-pub(crate) use rpc::*;
+pub(crate) mod context;
+pub(crate) use context::*;
+
+pub(crate) mod error;
+pub(crate) use error::*;
+
+pub(crate) mod resources;
+pub(crate) use resources::*;
 
 pub(crate) mod rpc_impl;
 
 pub(crate) mod rpc_trait;
+pub(crate) use rpc_trait::*;
+
+#[cfg(test)]
+mod tests;
