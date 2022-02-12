@@ -68,7 +68,7 @@ jobs:
     docker:
       - image: cimg/rust:1.57.0
     resource_class: xlarge
-    parallelism: 10
+    parallelism: 20
     steps:
       - checkout
       - setup_environment:
@@ -82,7 +82,7 @@ jobs:
     docker:
       - image: cimg/rust:1.57.0
     resource_class: xlarge
-    parallelism: 5
+    parallelism: 10
     steps:
       - checkout
       - setup_environment:
@@ -96,7 +96,7 @@ jobs:
     docker:
       - image: cimg/rust:1.57.0
     resource_class: xlarge
-    parallelism: 5
+    parallelism: 10
     steps:
       - checkout
       - setup_environment:
