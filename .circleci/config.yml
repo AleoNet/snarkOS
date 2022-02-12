@@ -49,6 +49,7 @@ commands:
         type: string
     steps:
       - run:
+          no_output_timeout: 30m
           command: |
             cd << parameters.workspace_member >>
             cargo test -- --list --format terse | sed 's/: test//' > test_names.txt
