@@ -42,9 +42,7 @@ use std::{
     net::SocketAddr,
     time::{Duration, Instant, SystemTime},
 };
-#[cfg(not(feature = "test"))]
-use tokio::time::timeout;
-use tokio::{net::TcpStream, sync::mpsc, task};
+use tokio::{net::TcpStream, sync::mpsc, task, time::timeout};
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
@@ -256,22 +254,15 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             // Update the peer IP to the listener port.
                             peer_ip.set_port(listener_port);
 
-                            // This check needs to be excluded from network integration tests.
-                            #[cfg(not(feature = "test"))]
+                            // Ensure the claimed listener port is open.
+                            if let Err(error) =
+                                timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await
                             {
-                                // Ensure the claimed listener port is open.
-                                let _ = match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip))
-                                    .await
-                                {
-                                    Ok(stream) => stream,
-                                    Err(error) => {
-                                        // Send the disconnect message.
-                                        let message = Message::Disconnect(DisconnectReason::YourPortIsClosed(listener_port));
-                                        outbound_socket.send(message).await?;
+                                // Send the disconnect message.
+                                let message = Message::Disconnect(DisconnectReason::YourPortIsClosed(listener_port));
+                                outbound_socket.send(message).await?;
 
-                                        return Err(anyhow!("Unable to reach '{}': '{:?}'", peer_ip, error));
-                                    }
-                                };
+                                bail!("Unable to reach '{}': '{:?}'", peer_ip, error);
                             }
                         }
                         // Send the challenge response.
