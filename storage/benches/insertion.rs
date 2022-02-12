@@ -24,7 +24,7 @@ use std::{fs, time::Duration};
 const NUM_BLOCKS: usize = 1_000;
 
 fn insertion(c: &mut Criterion) {
-    // Read the test blocks.
+    // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
     // note: the `blocks_100` and `blocks_1000` files were generated on a testnet2 storage using `LedgerState::dump_blocks`.
     let mut test_blocks = fs::read(format!("benches/blocks_{}", NUM_BLOCKS)).expect(&format!("Missing the test blocks file"));
     let blocks: Vec<Block<Testnet2>> = bincode::deserialize(&mut test_blocks).expect("Failed to deserialize a block dump");
@@ -32,7 +32,7 @@ fn insertion(c: &mut Criterion) {
 
     // Prepare a test ledger and an iterator of blocks to insert.
     let temp_dir = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
-    let ledger = LedgerState::open_writer::<RocksDB, _>(temp_dir).expect("Failed to initialize ledger");
+    let ledger = LedgerState::open_writer_with_increment::<RocksDB, _>(temp_dir, 1).expect("Failed to initialize ledger");
     let mut block_iter = blocks.iter();
 
     c.bench_function("add_block", |b| {
