@@ -203,7 +203,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             let message = Message::Disconnect(DisconnectReason::OutdatedClientVersion);
                             outbound_socket.send(message).await?;
 
-                            return Err(anyhow!("Dropping {} on version {} (outdated)", peer_ip, version));
+                            bail!("Dropping {} on version {} (outdated)", peer_ip, version);
                         }
                         // Ensure the maximum fork depth is correct.
                         if fork_depth != N::ALEO_MAXIMUM_FORK_DEPTH {
@@ -211,11 +211,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             let message = Message::Disconnect(DisconnectReason::InvalidForkDepth);
                             outbound_socket.send(message).await?;
 
-                            return Err(anyhow!(
-                                "Dropping {} for an incorrect maximum fork depth of {}",
-                                peer_ip,
-                                fork_depth
-                            ));
+                            bail!("Dropping {} for an incorrect maximum fork depth of {}", peer_ip, fork_depth);
                         }
                         // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
                         if E::NODE_TYPE != NodeType::Sync
@@ -227,7 +223,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             let message = Message::Disconnect(DisconnectReason::YouNeedToSyncFirst);
                             outbound_socket.send(message).await?;
 
-                            return Err(anyhow!("Dropping {} as this node is ahead", peer_ip));
+                            bail!("Dropping {} as this node is ahead", peer_ip);
                         }
                         // If this node is a sync node, the peer is not a sync node and is syncing, and the peer is ahead, proceed to disconnect.
                         if E::NODE_TYPE == NodeType::Sync
@@ -239,15 +235,15 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             let message = Message::Disconnect(DisconnectReason::INeedToSyncFirst);
                             outbound_socket.send(message).await?;
 
-                            return Err(anyhow!("Dropping {} as this node is ahead", peer_ip));
+                            bail!("Dropping {} as this node is ahead", peer_ip);
                         }
                         // Ensure the peer is not this node.
                         if local_nonce == peer_nonce {
-                            return Err(anyhow!("Attempted to connect to self (nonce = {})", peer_nonce));
+                            bail!("Attempted to connect to self (nonce = {})", peer_nonce);
                         }
                         // Ensure the peer is not already connected to this node.
                         if connected_nonces.contains(&peer_nonce) {
-                            return Err(anyhow!("Already connected to a peer with nonce {}", peer_nonce));
+                            bail!("Already connected to a peer with nonce {}", peer_nonce);
                         }
                         // Verify the listener port.
                         if peer_ip.port() != listener_port {
@@ -280,18 +276,14 @@ impl<N: Network, E: Environment> Peer<N, E> {
                         bail!("Peer {} disconnected for the following reason: {:?}", peer_ip, reason);
                     }
                     message => {
-                        return Err(anyhow!(
-                            "Expected challenge request, received '{}' from {}",
-                            message.name(),
-                            peer_ip
-                        ));
+                        bail!("Expected challenge request, received '{}' from {}", message.name(), peer_ip);
                     }
                 }
             }
             // An error occurred.
-            Some(Err(error)) => return Err(anyhow!("Failed to get challenge request from {}: {:?}", peer_ip, error)),
+            Some(Err(error)) => bail!("Failed to get challenge request from {}: {:?}", peer_ip, error),
             // Did not receive anything.
-            None => return Err(anyhow!("Dropped prior to challenge request of {}", peer_ip)),
+            None => bail!("Dropped prior to challenge request of {}", peer_ip),
         };
 
         // Wait for the challenge response to come in.
