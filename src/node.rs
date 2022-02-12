@@ -219,7 +219,8 @@ pub fn initialize_logger(verbosity: u8, log_sender: Option<mpsc::Sender<Vec<u8>>
         .add_directive("hyper::proto::h1::conn=off".parse().unwrap())
         .add_directive("hyper::proto::h1::decode=off".parse().unwrap())
         .add_directive("hyper::proto::h1::io=off".parse().unwrap())
-        .add_directive("hyper::proto::h1::role=off".parse().unwrap());
+        .add_directive("hyper::proto::h1::role=off".parse().unwrap())
+        .add_directive("jsonrpsee=off".parse().unwrap());
 
     // Initialize tracing.
     let _ = tracing_subscriber::fmt()

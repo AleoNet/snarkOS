@@ -28,9 +28,9 @@ const NUM_BLOCKS: usize = 1_000;
 fn lookups(c: &mut Criterion) {
     // Prepare the test ledger.
     let temp_dir = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
-    let ledger = LedgerState::open_writer::<RocksDB, _>(temp_dir).expect("Failed to initialize ledger");
+    let ledger = LedgerState::open_writer_with_increment::<RocksDB, _>(temp_dir, 1).expect("Failed to initialize ledger");
 
-    // Read the test blocks.
+    // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
     // note: the `blocks_100` and `blocks_1000` files were generated on a testnet2 storage using `LedgerState::dump_blocks`.
     let test_blocks = fs::read(format!("benches/blocks_{}", NUM_BLOCKS)).unwrap_or_else(|_| panic!("Missing the test blocks file"));
     let blocks: Vec<Block<Testnet2>> = bincode::deserialize(&test_blocks).expect("Failed to deserialize a block dump");
@@ -63,6 +63,9 @@ fn lookups(c: &mut Criterion) {
         ledger.add_next_block(block).expect("Failed to add a test block");
         block_hashes.push(block.hash());
         ledger_roots.push(ledger.latest_ledger_root());
+        tx_ids.extend(block.transactions().transaction_ids());
+        tx_commitments.extend(block.commitments());
+        tx_serial_numbers.extend(block.serial_numbers());
     }
     assert_eq!(block_hashes.len(), NUM_BLOCKS);
 

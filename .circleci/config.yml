@@ -26,6 +26,7 @@ commands:
       - restore_cache:
           keys:
             - << parameters.cache_key >>
+
   clear_environment:
     description: "Clear environment"
     parameters:
@@ -40,79 +41,69 @@ commands:
           paths:
             - .cache/sccache
             - .cargo
-  install_rust_nightly:
-    description: "Install Rust nightly toolchain"
-    steps:
-      - run:
-          command: |
-            rustup toolchain install nightly-x86_64-unknown-linux-gnu
 
-jobs:
-  tests:
-    docker:
-      - image: cimg/rust:1.57.0
-    resource_class: xlarge
-    parallelism: 10
+  run_parallel:
+    description: "Build and run tests (in parallel)"
+    parameters:
+      workspace_member:
+        type: string
     steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-stable-cache
       - run:
-          name: Build and run tests
-          no_output_timeout: 35m
+          no_output_timeout: 30m
           command: |
+            cd << parameters.workspace_member >>
             cargo test -- --list --format terse | sed 's/: test//' > test_names.txt
             TEST_NAMES=$(circleci tests split test_names.txt)
             for i in $(echo $TEST_NAMES | sed "s/ / /g")
             do
                 RUST_MIN_STACK=8388608 cargo test --workspace $i
             done
+
+  install_rust_nightly:
+    description: "Install Rust nightly toolchain"
+    steps:
+      - run: rustup toolchain install nightly-x86_64-unknown-linux-gnu
+
+jobs:
+  tests:
+    docker:
+      - image: cimg/rust:1.58.1
+    resource_class: xlarge
+    parallelism: 20
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-stable-cache
+      - run_parallel:
+          workspace_member: .
       - clear_environment:
           cache_key: snarkos-stable-cache
 
   storage:
     docker:
-      - image: cimg/rust:1.57.0
+      - image: cimg/rust:1.58.1
     resource_class: xlarge
-    parallelism: 5
+    parallelism: 10
     steps:
       - checkout
       - setup_environment:
           cache_key: snarkos-storage-cache
-      - run:
-          name: Build and run tests
-          no_output_timeout: 35m
-          command: |
-            cd storage
-            cargo test -- --list --format terse | sed 's/: test//' > test_names.txt
-            TEST_NAMES=$(circleci tests split test_names.txt)
-            for i in $(echo $TEST_NAMES | sed "s/ / /g")
-            do
-                RUST_MIN_STACK=8388608 cargo test --workspace $i
-            done
+      - run_parallel:
+          workspace_member: storage
       - clear_environment:
           cache_key: snarkos-storage-cache
 
   testing:
     docker:
-      - image: cimg/rust:1.57.0
+      - image: cimg/rust:1.58.1
     resource_class: xlarge
     parallelism: 5
     steps:
       - checkout
       - setup_environment:
           cache_key: snarkos-testing-cache
-      - run:
-          name: Build and run tests
-          no_output_timeout: 35m
-          command: |
-            cd testing
-            cargo test -- --list --format terse | sed 's/: test//' > test_names.txt
-            TEST_NAMES=$(circleci tests split test_names.txt)
-            for i in $(echo $TEST_NAMES | sed "s/ / /g")
-            do
-                RUST_MIN_STACK=8388608 cargo test --workspace $i
-            done
+      - run_parallel:
+          workspace_member: testing
       - clear_environment:
           cache_key: snarkos-testing-cache
 
@@ -134,7 +125,7 @@ jobs:
 
   fmt:
     docker:
-      - image: cimg/rust:1.57.0
+      - image: cimg/rust:1.58.1
     resource_class: xlarge
     steps:
       - checkout
@@ -150,7 +141,7 @@ jobs:
 
   clippy:
     docker:
-      - image: cimg/rust:1.57.0
+      - image: cimg/rust:1.58.1
     resource_class: xlarge
     steps:
       - checkout

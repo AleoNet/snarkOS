@@ -14,10 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    state::LedgerState,
-    storage::{DataMap, Map, MapId, Storage},
-};
+use crate::storage::{DataMap, Map, MapId, Storage};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -25,7 +22,6 @@ use std::{
     collections::{HashMap, HashSet},
     iter::FromIterator,
     path::Path,
-    sync::Arc,
 };
 
 #[derive(Debug)]
@@ -67,9 +63,9 @@ impl<N: Network> OperatorState<N> {
         self.shares.get_shares_for_block(block_height, coinbase_record)
     }
 
-    /// Returns the shares for a specific prover, given a ledger and the prover address.
-    pub fn get_shares_for_prover(&self, ledger: &Arc<LedgerState<N>>, prover: &Address<N>) -> u64 {
-        self.shares.get_shares_for_prover(ledger, prover)
+    /// Returns the shares for a specific prover, given the prover address.
+    pub fn get_shares_for_prover(&self, prover: &Address<N>) -> u64 {
+        self.shares.get_shares_for_prover(prover)
     }
 
     /// Increments the share count by one for a given block height, coinbase record and prover address.
@@ -121,21 +117,9 @@ impl<N: Network> SharesState<N> {
         }
     }
 
-    /// Returns the shares for a specific prover, given a ledger and the prover address.
-    fn get_shares_for_prover(&self, ledger: &Arc<LedgerState<N>>, prover: &Address<N>) -> u64 {
-        self.shares
-            .iter()
-            .filter_map(|((_, coinbase_record), shares)| {
-                if !shares.contains_key(prover) {
-                    None
-                } else {
-                    match ledger.contains_commitment(&coinbase_record.commitment()) {
-                        Ok(true) => shares.get(prover).copied(),
-                        Ok(false) | Err(_) => None,
-                    }
-                }
-            })
-            .sum()
+    /// Returns the shares for a specific prover, given the prover address.
+    fn get_shares_for_prover(&self, prover: &Address<N>) -> u64 {
+        self.shares.iter().filter_map(|((_, _), shares)| shares.get(prover).copied()).sum()
     }
 
     /// Increments the share count by one for a given block height, coinbase record, and prover address.
