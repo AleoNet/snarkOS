@@ -442,7 +442,7 @@ mod tests {
         LedgerState,
     };
     use snarkvm::{
-        dpc::{testnet2::Testnet2, AccountScheme, AleoAmount, Transaction, Transactions, Transition},
+        dpc::{testnet2::Testnet2, AleoAmount, Transaction, Transactions, Transition},
         prelude::{Account, Block, BlockHeader},
         utilities::ToBytes,
     };
