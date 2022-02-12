@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-metrics"
-version = "2.0.0"
+version = "2.0.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Storage for a decentralized operating system"
 homepage = "https://aleo.org"
