@@ -638,6 +638,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "crossterm"
+version = "0.23.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77b75a27dc8d220f1f8521ea69cd55a34d720a200ebb3a624d9aa19193d3b432"
+dependencies = [
+ "bitflags",
+ "crossterm_winapi",
+ "libc",
+ "mio",
+ "parking_lot 0.12.0",
+ "signal-hook",
+ "signal-hook-mio",
+ "winapi",
+]
+
+[[package]]
 name = "crossterm_winapi"
 version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1089,7 +1105,7 @@ dependencies = [
  "indexmap",
  "slab",
  "tokio",
- "tokio-util",
+ "tokio-util 0.6.9",
  "tracing",
 ]
 
@@ -1308,9 +1324,9 @@ dependencies = [
 
 [[package]]
 name = "jsonrpsee"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "05fd8cd6c6b1bbd06881d2cf88f1fc83cc36c98f2219090f839115fb4a956cb9"
+checksum = "f0d0b8cc1959f8c05256ace093b2317482da9127f1d9227564f47e7e6bf9bda8"
 dependencies = [
  "jsonrpsee-core",
  "jsonrpsee-http-client",
@@ -1320,9 +1336,9 @@ dependencies = [
 
 [[package]]
 name = "jsonrpsee-core"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f220b5a238dc7992b90f1144fbf6eaa585872c9376afe6fe6863ffead6191bf3"
+checksum = "22abc3274b265dcefe2e26c4beecf9fda4fffa48cf94930443a6c73678f020d5"
 dependencies = [
  "anyhow",
  "arrayvec",
@@ -1333,7 +1349,7 @@ dependencies = [
  "futures-util",
  "hyper",
  "jsonrpsee-types",
- "parking_lot 0.11.2",
+ "parking_lot 0.12.0",
  "rand",
  "rustc-hash",
  "serde",
@@ -1346,9 +1362,9 @@ dependencies = [
 
 [[package]]
 name = "jsonrpsee-http-client"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9dce69e96aa236cc2e3a20467420b31cbc8464703aa95bc33a163d25b0f56023"
+checksum = "d31b837273d09dd80051eefa57d337769dff6c3266108c43a3544ac7ffed9d68"
 dependencies = [
  "async-trait",
  "hyper",
@@ -1365,9 +1381,9 @@ dependencies = [
 
 [[package]]
 name = "jsonrpsee-http-server"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c65c6447c4303d095d6d4abc04439d670057e451473be9f49ce00a12d0096139"
+checksum = "8dd99cccd549e3c3bb9dc6a490d7e5cf507f4d2b0177abd16f9c63b3ee1c2d67"
 dependencies = [
  "futures-channel",
  "futures-util",
@@ -1385,9 +1401,9 @@ dependencies = [
 
 [[package]]
 name = "jsonrpsee-types"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1b3f601bbbe45cd63f5407b6f7d7950e08a7d4f82aa699ff41a4a5e9e54df58"
+checksum = "9f4c45d2e2aa1db4c7d7d7dbaabc10a5b5258d99cd9d42fbfd5260b76f80c324"
 dependencies = [
  "anyhow",
  "beef",
@@ -1427,14 +1443,16 @@ dependencies = [
 
 [[package]]
 name = "librocksdb-sys"
-version = "6.20.3"
+version = "0.6.1+6.28.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c309a9d2470844aceb9a4a098cf5286154d20596868b75a6b36357d2bb9ca25d"
+checksum = "81bc587013734dadb7cf23468e531aa120788b87243648be42e2d3a072186291"
 dependencies = [
  "bindgen",
+ "bzip2-sys",
  "cc",
  "glob",
  "libc",
+ "libz-sys",
 ]
 
 [[package]]
@@ -1831,9 +1849,9 @@ checksum = "0744126afe1a6dd7f394cb50a716dbe086cb06e255e53d8d0185d82828358fb5"
 
 [[package]]
 name = "pea2pea"
-version = "0.32.0"
+version = "0.33.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0eb17c23b076b5df92f28b2477d740497efd79f8c6caa0670d5d34917316289f"
+checksum = "348fe4a211a16afef08c2c2004e903c72fa5684b8faa9934559e8058c178bd11"
 dependencies = [
  "async-trait",
  "once_cell",
@@ -2205,9 +2223,9 @@ dependencies = [
 
 [[package]]
 name = "rocksdb"
-version = "0.17.0"
+version = "0.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a62eca5cacf2c8261128631bed9f045598d40bfbe4b29f5163f0f802f8f44a7"
+checksum = "620f4129485ff1a7128d184bc687470c21c7951b64779ebc9cfdad3dcd920290"
 dependencies = [
  "libc",
  "librocksdb-sys",
@@ -2448,9 +2466,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.78"
+version = "1.0.79"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d23c1ba4cf0efd44be32017709280b32d1cea5c3f1275c3b6d9e8bc54f758085"
+checksum = "8e8d9fa5c3b304765ce1fd9c4c8a3de2c8db365a5b91be52f186efc675681d95"
 dependencies = [
  "itoa 1.0.1",
  "ryu",
@@ -2580,7 +2598,7 @@ dependencies = [
  "cfg-if 1.0.0",
  "circular-queue",
  "colored",
- "crossterm",
+ "crossterm 0.23.0",
  "futures",
  "hex",
  "jsonrpsee",
@@ -2603,7 +2621,7 @@ dependencies = [
  "time 0.3.7",
  "tokio",
  "tokio-stream",
- "tokio-util",
+ "tokio-util 0.7.0",
  "tracing",
  "tracing-subscriber",
  "tui",
@@ -3191,6 +3209,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "tokio-util"
+version = "0.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "64910e1b9c1901aaf5375561e35b9c057d95ff41a44ede043a03e09279eabaf1"
+dependencies = [
+ "bytes",
+ "futures-core",
+ "futures-sink",
+ "log",
+ "pin-project-lite",
+ "tokio",
+]
+
+[[package]]
 name = "toml"
 version = "0.5.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3282,7 +3314,7 @@ checksum = "23ed0a32c88b039b73f1b6c5acbd0554bfa5b6be94467375fd947c4de3a02271"
 dependencies = [
  "bitflags",
  "cassowary",
- "crossterm",
+ "crossterm 0.22.1",
  "unicode-segmentation",
  "unicode-width",
 ]
