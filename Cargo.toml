@@ -1,6 +1,6 @@
 [package]
 name = "snarkos"
-version = "2.0.1"
+version = "2.0.2"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
@@ -22,9 +22,9 @@ members = [ "metrics", "storage", "testing" ]
 [features]
 default = [ "rpc" ]
 cuda = [ "snarkvm/cuda" ]
-prometheus = ["snarkos-metrics"]
+prometheus = [ "snarkos-metrics" ]
 rpc = [ "jsonrpsee" ]
-test = []
+test = [ ]
 
 [dependencies]
 bytes = "1.0.0"
@@ -33,12 +33,12 @@ tui = "0.17.0"
 
   [dependencies.snarkos-metrics]
   path = "./metrics"
-  version = "2.0.1"
+  version = "2.0.2"
   optional = true
 
   [dependencies.snarkos-storage]
   path = "./storage"
-  version = "2.0.1"
+  version = "2.0.2"
 
   [dependencies.snarkvm]
   version = "0.8.0"

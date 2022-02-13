@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-testing"
-version = "2.0.1"
+version = "2.0.2"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
@@ -23,7 +23,7 @@ features = [ "test" ]
 
 [dependencies.snarkos-storage]
 path = "../storage"
-version = "2.0.1"
+version = "2.0.2"
 
 [dependencies.snarkvm]
 version = "0.8.0"
