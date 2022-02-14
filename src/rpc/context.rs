@@ -21,7 +21,7 @@ use snarkvm::dpc::{Address, MemoryPool, Network};
 
 use futures::TryFutureExt;
 use jsonrpsee::{
-    core::Error as JsonrpseeError,
+    core::{middleware::Middleware, Error as JsonrpseeError},
     http_server::{AccessControlBuilder, HttpServerBuilder, RpcModule},
 };
 use serde::{Deserialize, Serialize};
@@ -96,6 +96,27 @@ pub struct Meta {
     pub auth: Option<String>,
 }
 
+/// An implementation of jsonrpsee's Middleware.
+#[derive(Clone)]
+struct RpcMiddleware;
+
+impl Middleware for RpcMiddleware {
+    type Instant = Instant;
+
+    fn on_request(&self) -> Instant {
+        Instant::now()
+    }
+
+    fn on_call(&self, name: &str) {
+        debug!("Received a '{}' RPC request", name);
+    }
+
+    fn on_result(&self, name: &str, success: bool, started_at: Instant) {
+        let result = if success { "succeeded" } else { "failed" };
+        trace!("Call to '{}' {} in {:?}", name, result, started_at.elapsed());
+    }
+}
+
 /// Starts a local RPC HTTP server at `rpc_port` in a dedicated `tokio` task.
 /// RPC failures do not affect the rest of the node.
 pub async fn initialize_rpc_server<N: Network, E: Environment>(
@@ -111,6 +132,7 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
         .register_resource(ALL_CONCURRENT_REQUESTS, ALL_CONCURRENT_REQUESTS_LIMIT, 1)
         .expect("Invalid JSON-RPC server resource")
         .max_request_body_size(10 * 1024 * 1024) // Explicitly select the body size limit (jsonrpsee's default, 10MiB) for greater visibility.
+        .set_middleware(RpcMiddleware)
         .build(rpc_server_addr).expect("Failed to create the RPC server");
 
     let server_addr = server.local_addr().expect("Can't obtain RPC server's local address");
