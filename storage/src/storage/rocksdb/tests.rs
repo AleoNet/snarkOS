@@ -218,7 +218,7 @@ fn test_export_import() {
         let map = storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
 
         for i in 0..100 {
-            map.insert(&i, &i.to_string()).expect("Failed to insert");
+            map.insert(&i, &i.to_string(), None).expect("Failed to insert");
         }
 
         storage.export(&file).expect("Failed to export storage");
