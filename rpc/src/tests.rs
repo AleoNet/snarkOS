@@ -262,7 +262,7 @@ async fn test_get_blocks() {
     let ledger_state = LedgerState::open_writer::<RocksDB, _>(directory.clone()).expect("Failed to initialize ledger");
 
     // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
-    // note: the `blocks_100` file was generated on a testnet2 storage using `LedgerState::dump_blocks`.
+    // note: the `blocks_1` file was generated on a testnet2 storage using `LedgerState::dump_blocks`.
     let mut test_block_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     test_block_path.push("..");
     test_block_path.push("storage");
@@ -329,7 +329,7 @@ async fn test_get_block_hashes() {
     let ledger_state = LedgerState::open_writer::<RocksDB, _>(directory.clone()).expect("Failed to initialize ledger");
 
     // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
-    // note: the `blocks_100` file was generated on a testnet2 storage using `LedgerState::dump_blocks`.
+    // note: the `blocks_1` file was generated on a testnet2 storage using `LedgerState::dump_blocks`.
     let mut test_block_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     test_block_path.push("..");
     test_block_path.push("storage");

@@ -71,6 +71,11 @@ impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> DataMap<K
             None => Ok(None),
         }
     }
+
+    #[cfg(any(test, feature = "test"))]
+    pub fn storage(&self) -> &RocksDB {
+        &self.storage
+    }
 }
 
 impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> fmt::Debug for DataMap<K, V> {

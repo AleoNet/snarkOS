@@ -15,37 +15,49 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_environment::CurrentNetwork;
-use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
-use snarkvm::prelude::Block;
+use snarkos_storage::{
+    storage::{rocksdb::RocksDB, Storage},
+    LedgerState,
+};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use std::{fs, time::Duration};
+use std::time::Duration;
 
-const NUM_BLOCKS: usize = 1_000;
+// This value should be no greater than the number of blocks available in the loaded dump.
+const NUM_BLOCKS: u32 = 1_000;
 
 fn insertion(c: &mut Criterion) {
-    // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
-    // note: the `blocks_100` and `blocks_1000` files were generated on a testnet2 storage using `LedgerState::dump_blocks`.
-    let mut test_blocks = fs::read(format!("benches/blocks_{}", NUM_BLOCKS)).expect(&format!("Missing the test blocks file"));
-    let blocks: Vec<Block<CurrentNetwork>> = bincode::deserialize(&mut test_blocks).expect("Failed to deserialize a block dump");
-    assert_eq!(blocks.len(), NUM_BLOCKS - 1);
+    let temp_dir1 = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
+    // Create an empty ledger.
+    let ledger1: LedgerState<CurrentNetwork> =
+        LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir1, 1).expect("Failed to initialize ledger");
+    // Import a dump of a ledger containing 1k blocks.
+    ledger1
+        .storage()
+        .import("benches/storage_1k_blocks")
+        .expect("Couldn't import the test ledger");
+    // Reopen the ledger so that it applies the storage changes to its in-memory components.
+    drop(ledger1);
+    let ledger1: LedgerState<CurrentNetwork> =
+        LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir1, NUM_BLOCKS).expect("Failed to initialize ledger");
 
-    // Prepare a test ledger and an iterator of blocks to insert.
-    let temp_dir = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
-    let ledger = LedgerState::open_writer_with_increment::<RocksDB, _>(temp_dir, 1).expect("Failed to initialize ledger");
-    let mut block_iter = blocks.iter();
+    // Prepare a second test ledger that will be importing blocks belonging to the first one.
+    let temp_dir2 = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
+    let ledger2 = LedgerState::open_writer_with_increment::<RocksDB, _>(temp_dir2, 1).expect("Failed to initialize ledger");
 
+    let mut i = 1;
     c.bench_function("add_block", |b| {
         b.iter(|| {
-            let next_block = if let Some(block) = block_iter.next() {
+            let next_block = if let Ok(block) = ledger1.get_block(i) {
                 block
             } else {
-                let _ = ledger.revert_to_block_height(0);
-                block_iter = blocks.iter();
-                block_iter.next().unwrap()
+                let _ = ledger2.revert_to_block_height(0);
+                i = 1;
+                ledger1.get_block(i).expect("Couldn't find an expected test block")
             };
-            ledger.add_next_block(next_block).expect("Failed to add a test block");
+            ledger2.add_next_block(&next_block).expect("Failed to add a test block");
+            i += 1;
         })
     });
 }

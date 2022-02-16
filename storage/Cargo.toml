@@ -88,6 +88,11 @@ version = "0.3"
 [dev-dependencies.tempfile]
 version = "3.2"
 
+[dev-dependencies.snarkos-storage]
+path = "."
+features = [ "test" ]
+
 [features]
 default = [ "rocks" ]
 rocks = [ "bincode", "rocksdb" ]
+test = [ ]
