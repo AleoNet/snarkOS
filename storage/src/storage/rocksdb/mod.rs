@@ -65,6 +65,7 @@ impl Storage for RocksDB {
 
         // Customize database options.
         let mut options = rocksdb::Options::default();
+        options.set_compression_type(rocksdb::DBCompressionType::Lz4);
 
         // Register the prefix length.
         let prefix_extractor = rocksdb::SliceTransform::create_fixed_prefix(PREFIX_LEN);
