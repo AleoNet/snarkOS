@@ -209,7 +209,7 @@ pub(crate) fn handle_block_requests<N: Network, E: Environment>(
             else if let Some(first_deviating_locator) = first_deviating_locator {
                 // Case 2(c)(b)(a) - Check if the real common ancestor is NOT within `ALEO_MAXIMUM_FORK_DEPTH`.
                 // If this peer is outside of the fork range of this ledger, proceed to disconnect from the peer.
-                if latest_block_height.saturating_sub(first_deviating_locator) >= N::ALEO_MAXIMUM_FORK_DEPTH {
+                if latest_block_height.saturating_sub(first_deviating_locator) > N::ALEO_MAXIMUM_FORK_DEPTH {
                     debug!("Peer {} exceeded the permitted fork range, disconnecting", maximal_peer);
                     return BlockRequestHandler::AbortAndDisconnect(Case::TwoCBA, DisconnectReason::ExceededForkRange);
                 }
