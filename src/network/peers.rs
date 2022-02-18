@@ -192,7 +192,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
     ///
     /// TODO (howardwu): Make this operation more efficient.
-    /// Returns the number of connected sync nodes.
+    /// Returns the set of connected sync nodes.
     ///
     pub async fn connected_sync_nodes(&self) -> HashSet<SocketAddr> {
         let connected_peers: HashSet<SocketAddr> = self.connected_peers.read().await.keys().into_iter().copied().collect();
