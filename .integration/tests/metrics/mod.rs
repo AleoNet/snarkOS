@@ -24,13 +24,13 @@ use pea2pea::Pea2Pea;
 #[tokio::test]
 async fn metrics_initialization() {
     // Start a test node.
-    let test_node = TestNode::default().await;
+    let _test_node = TestNode::default().await;
 
     // Initialise the metrics, we need to call this manually in tests.
     let snapshotter = metrics::initialize();
 
     // Start a snarkOS node.
-    let client_node = ClientNode::default().await;
+    let _client_node = ClientNode::default().await;
 
     // Verify the metrics have been properly initialised, expect the block height to be set.
     assert_eq!(
