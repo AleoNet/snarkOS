@@ -31,7 +31,7 @@ use snarkos_environment::{
 use snarkos_storage::{storage::Storage, BlockLocators, LedgerState, MAXIMUM_LINEAR_BLOCK_LOCATORS};
 use snarkvm::dpc::prelude::*;
 
-#[cfg(feature = "prometheus")]
+#[cfg(any(feature = "test", feature = "prometheus"))]
 use snarkos_metrics as metrics;
 
 use anyhow::Result;
@@ -521,7 +521,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                             self.canon.latest_block_hash()
                         );
 
-                        #[cfg(feature = "prometheus")]
+                        #[cfg(any(feature = "test", feature = "prometheus"))]
                         metrics::gauge!(metrics::blocks::HEIGHT, latest_block_height as f64);
 
                         // Update the timestamp of the last block increment.
@@ -574,7 +574,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 let latest_block_height = self.canon.latest_block_height();
                 info!("Ledger successfully reverted to block {}", latest_block_height);
 
-                #[cfg(feature = "prometheus")]
+                #[cfg(any(feature = "test", feature = "prometheus"))]
                 metrics::gauge!(metrics::blocks::HEIGHT, latest_block_height as f64);
 
                 // Update the last block update timestamp.

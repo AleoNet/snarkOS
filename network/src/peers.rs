@@ -18,7 +18,7 @@ use crate::{Data, DisconnectReason, LedgerReader, LedgerRouter, Message, Operato
 use snarkos_environment::Environment;
 use snarkvm::dpc::prelude::*;
 
-#[cfg(feature = "prometheus")]
+#[cfg(any(feature = "test", feature = "prometheus"))]
 use snarkos_metrics as metrics;
 
 use anyhow::Result;
@@ -516,7 +516,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Remove an entry for this `Peer` in the candidate peers, if it exists.
                 self.candidate_peers.write().await.remove(&peer_ip);
 
-                #[cfg(feature = "prometheus")]
+                #[cfg(any(feature = "test", feature = "prometheus"))]
                 {
                     let number_of_connected_peers = self.number_of_connected_peers().await;
                     let number_of_candidate_peers = self.number_of_candidate_peers().await;
@@ -530,7 +530,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Add an entry for this `Peer` in the candidate peers.
                 self.candidate_peers.write().await.insert(peer_ip);
 
-                #[cfg(feature = "prometheus")]
+                #[cfg(any(feature = "test", feature = "prometheus"))]
                 {
                     let number_of_connected_peers = self.number_of_connected_peers().await;
                     let number_of_candidate_peers = self.number_of_candidate_peers().await;
@@ -544,7 +544,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Add an entry for this `Peer` in the restricted peers.
                 self.restricted_peers.write().await.insert(peer_ip, Instant::now());
 
-                #[cfg(feature = "prometheus")]
+                #[cfg(any(feature = "test", feature = "prometheus"))]
                 {
                     let number_of_connected_peers = self.number_of_connected_peers().await;
                     let number_of_restricted_peers = self.number_of_restricted_peers().await;
@@ -560,7 +560,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::ReceivePeerResponse(peer_ips) => {
                 self.add_candidate_peers(peer_ips.iter()).await;
 
-                #[cfg(feature = "prometheus")]
+                #[cfg(any(feature = "test", feature = "prometheus"))]
                 {
                     let number_of_candidate_peers = self.number_of_candidate_peers().await;
                     metrics::gauge!(metrics::peers::CANDIDATE, number_of_candidate_peers as f64);
@@ -601,7 +601,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     trace!("Outbound channel failed: {}", error);
                     self.connected_peers.write().await.remove(&peer);
 
-                    #[cfg(feature = "prometheus")]
+                    #[cfg(any(feature = "test", feature = "prometheus"))]
                     {
                         let number_of_connected_peers = self.number_of_connected_peers().await;
                         metrics::gauge!(metrics::peers::CONNECTED, number_of_connected_peers as f64);
