@@ -31,9 +31,9 @@ required-features = ["console"]
 default = [ "console", "rpc" ]
 console = [ "crossterm", "tui" ]
 cuda = [ "snarkvm/cuda" ]
-prometheus = [ "snarkos-metrics" ]
+prometheus = [ "snarkos-metrics/prometheus" ]
 rpc = [ "snarkos-rpc" ]
-test = [ ]
+test = [ "snarkos-metrics/test" ]
 
 [dependencies.aleo-std]
 version = "0.1.6"

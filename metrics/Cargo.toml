@@ -16,11 +16,21 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2018"
 
+
+[features]
+prometheus = [ "metrics-exporter-prometheus" ]
+test = []
+
 [dependencies.metrics]
 version = "0.18"
 
+[dependencies.metrics-util]
+version = "0.11"
+
 [dependencies.metrics-exporter-prometheus]
 version = "0.8"
+optional = true
 
 [dependencies.tokio]
 version = "1"
+features = [ "rt" ]
