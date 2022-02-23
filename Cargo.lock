@@ -2599,7 +2599,6 @@ dependencies = [
  "async-trait",
  "bincode",
  "bytes",
- "cfg-if 1.0.0",
  "circular-queue",
  "colored",
  "crossterm 0.23.0",

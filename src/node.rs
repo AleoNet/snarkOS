@@ -28,7 +28,7 @@ use colored::*;
 use crossterm::tty::IsTty;
 use std::{io, net::SocketAddr, path::PathBuf, str::FromStr};
 use structopt::StructOpt;
-use tokio::{signal, sync::mpsc, task};
+use tokio::sync::mpsc;
 use tracing_subscriber::EnvFilter;
 
 #[derive(StructOpt, Debug)]
@@ -125,40 +125,34 @@ impl Node {
 
     /// Returns the storage path of the ledger.
     pub(crate) fn ledger_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "test")] {
-                // Tests may use any available ports, and removes the storage artifacts afterwards,
-                // so that there is no need to adhere to a specific number assignment logic.
-                PathBuf::from(format!("/tmp/snarkos-test-ledger-{}", _local_ip.port()))
-            } else {
-                aleo_std::aleo_ledger_dir(self.network, self.dev)
-            }
+        if cfg!(feature = "test") {
+            // Tests may use any available ports, and removes the storage artifacts afterwards,
+            // so that there is no need to adhere to a specific number assignment logic.
+            PathBuf::from(format!("/tmp/snarkos-test-ledger-{}", _local_ip.port()))
+        } else {
+            aleo_std::aleo_ledger_dir(self.network, self.dev)
         }
     }
 
     /// Returns the storage path of the operator.
     pub(crate) fn operator_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "test")] {
-                // Tests may use any available ports, and removes the storage artifacts afterwards,
-                // so that there is no need to adhere to a specific number assignment logic.
-                PathBuf::from(format!("/tmp/snarkos-test-operator-{}", _local_ip.port()))
-            } else {
-                aleo_std::aleo_operator_dir(self.network, self.dev)
-            }
+        if cfg!(feature = "test") {
+            // Tests may use any available ports, and removes the storage artifacts afterwards,
+            // so that there is no need to adhere to a specific number assignment logic.
+            PathBuf::from(format!("/tmp/snarkos-test-operator-{}", _local_ip.port()))
+        } else {
+            aleo_std::aleo_operator_dir(self.network, self.dev)
         }
     }
 
     /// Returns the storage path of the prover.
     pub(crate) fn prover_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
-        cfg_if::cfg_if! {
-            if #[cfg(feature = "test")] {
-                // Tests may use any available ports, and removes the storage artifacts afterwards,
-                // so that there is no need to adhere to a specific number assignment logic.
-                PathBuf::from(format!("/tmp/snarkos-test-prover-{}", _local_ip.port()))
-            } else {
-                aleo_std::aleo_prover_dir(self.network, self.dev)
-            }
+        if cfg!(feature = "test") {
+            // Tests may use any available ports, and removes the storage artifacts afterwards,
+            // so that there is no need to adhere to a specific number assignment logic.
+            PathBuf::from(format!("/tmp/snarkos-test-prover-{}", _local_ip.port()))
+        } else {
+            aleo_std::aleo_prover_dir(self.network, self.dev)
         }
     }
 
@@ -182,8 +176,7 @@ impl Node {
 
         // Initialize signal handling; it also maintains ownership of the Server
         // in order for it to not go out of scope.
-        let server_clone = server.clone();
-        handle_signals(server_clone);
+        handle_signals(server.clone());
 
         // Initialize the display, if enabled.
         if self.display {
@@ -254,13 +247,13 @@ impl Command {
     }
 }
 
-enum LogWriter {
+pub enum LogWriter {
     Stdout(io::Stdout),
     Sender(mpsc::Sender<Vec<u8>>),
 }
 
 impl LogWriter {
-    fn new(log_sender: &Option<mpsc::Sender<Vec<u8>>>) -> Self {
+    pub fn new(log_sender: &Option<mpsc::Sender<Vec<u8>>>) -> Self {
         if let Some(sender) = log_sender {
             Self::Sender(sender.clone())
         } else {
@@ -484,12 +477,12 @@ impl MinerStats {
     }
 }
 
-// This function is responsible for handling OS signals in order for the node to be able to intercept them
-// and perform a clean shutdown.
-// note: only Ctrl-C is currently supported, but it should work on both Unix-family systems and Windows.
-fn handle_signals<N: Network, E: Environment>(server: Server<N, E>) {
-    task::spawn(async move {
-        match signal::ctrl_c().await {
+// This function is responsible for handling OS signals in order
+// for the node to be able to intercept them and perform a clean shutdown.
+// Note: Only Ctrl-C is supported; it should work on both Unix-family systems and Windows.
+pub fn handle_signals<N: Network, E: Environment>(server: Server<N, E>) {
+    tokio::task::spawn(async move {
+        match tokio::signal::ctrl_c().await {
             Ok(()) => {
                 server.shut_down().await;
                 std::process::exit(0);

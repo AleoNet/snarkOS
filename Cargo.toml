@@ -59,9 +59,6 @@ tui = "0.17.0"
   [dependencies.bincode]
   version = "1.0"
 
-  [dependencies.cfg-if]
-  version = "1.0"
-
   [dependencies.circular-queue]
   version = "0.2"
 

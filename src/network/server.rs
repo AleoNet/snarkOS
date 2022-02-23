@@ -197,6 +197,11 @@ impl<N: Network, E: Environment> Server<N, E> {
         self.peers.clone()
     }
 
+    /// Returns the ledger of this node.
+    pub fn ledger(&self) -> Arc<Ledger<N, E>> {
+        self.ledger.clone()
+    }
+
     ///
     /// Sends a connection request to the given IP address.
     ///

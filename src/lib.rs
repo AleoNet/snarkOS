@@ -40,3 +40,6 @@ pub use node::*;
 
 #[cfg(feature = "rpc")]
 pub(crate) mod rpc;
+
+pub use snarkos_storage::*;
+pub use snarkvm::dpc::{testnet2::Testnet2, Network};
