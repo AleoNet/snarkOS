@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::helpers::{NodeType, Status};
-use snarkos_utils::Resources;
+use snarkos_utilities::Resources;
 use snarkvm::dpc::Network;
 
 use once_cell::sync::OnceCell;

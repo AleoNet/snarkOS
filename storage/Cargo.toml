@@ -31,8 +31,8 @@ harness = false
 [dependencies.snarkvm]
 version = "0.8.0"
 
-[dependencies.snarkos-utils]
-path = "../utils"
+[dependencies.snarkos-utilities]
+path = "../utilities"
 version = "2.0.2"
 
 [dependencies.anyhow]
