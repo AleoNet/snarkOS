@@ -1,0 +1,66 @@
+version: "3.5"
+
+services:
+
+  client:
+    container_name: snarkos-client
+    image: aleohq/kawemera:latest
+    volumes:
+      - snarkos-client-vol:/aleo/data
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: ["bash", "-c", "/aleo/bin/snarkos --verbosity 3 --node --trial --connect 172.22.0.13:4132"]
+    ports:
+      - 13032:13032
+      - 14132:14132
+    deploy:
+      resources:
+        limits:
+          cpus: 0.50
+          memory: 512M
+        reservations:
+          memory: 96M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    networks:
+      aleo_devnet:
+        ipv4_address: 172.22.0.12
+
+  miner:
+    container_name: snarkos-miner
+    image: aleohq/kawemera:latest
+    volumes:
+      - snarkos-miner-vol:/aleo/data
+    build:
+      context: .
+      dockerfile: ./Dockerfile
+    command: ["bash", "-c", "/aleo/bin/snarkos --verbosity 3 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah --trial --connect 172.22.0.12:4132"]
+    ports:
+      - 13033:13033
+      - 14133:14133
+    deploy:
+      resources:
+        limits:
+          cpus: 3.00
+          memory: 7168M
+        reservations:
+          memory: 4096M
+      restart_policy:
+        condition: on-failure
+        max_attempts: 3
+    networks:
+      aleo_devnet:
+        ipv4_address: 172.22.0.13
+
+networks:
+  aleo_devnet:
+    ipam:
+      driver: default
+      config:
+        - subnet: "172.22.0.0/24"
+
+volumes:
+  snarkos-miner-vol:
+  snarkos-client-vol:
