@@ -16,9 +16,16 @@
 
 use super::*;
 
+pub const PREFIX_LEN: usize = 4; // N::NETWORK_ID (u16) + MapId (u16)
+
+use anyhow::bail;
+use rand::{thread_rng, Rng};
+use std::fmt;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[repr(u16)]
 pub enum MapId {
-    BlockHeaders,
+    BlockHeaders = 0,
     BlockHeights,
     BlockTransactions,
     Commitments,
@@ -32,30 +39,10 @@ pub enum MapId {
     Test,
 }
 
-impl MapId {
-    pub fn as_bytes(&self) -> &'static [u8] {
-        match self {
-            Self::BlockHeaders => b"block_headers",
-            Self::BlockHeights => b"block_heights",
-            Self::BlockTransactions => b"block_transactions",
-            Self::Commitments => b"commitments",
-            Self::LedgerRoots => b"ledger_roots",
-            Self::Records => b"records",
-            Self::SerialNumbers => b"serial_numbers",
-            Self::Transactions => b"transactions",
-            Self::Transitions => b"transitions",
-            Self::Shares => b"shares",
-            #[cfg(test)]
-            Self::Test => b"hello world",
-        }
-    }
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct DataMap<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
-    pub(super) rocksdb: Arc<rocksdb::DB>,
+    pub(super) storage: RocksDB,
     pub(super) context: Vec<u8>,
-    pub(super) is_read_only: bool,
     pub(super) _phantom: PhantomData<(K, V)>,
 }
 
@@ -68,10 +55,16 @@ impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> DataMap<K
         let mut key_buf = self.context.clone();
         key_buf.reserve(bincode::serialized_size(&key)? as usize);
         bincode::serialize_into(&mut key_buf, &key)?;
-        match self.rocksdb.get(&key_buf)? {
+        match self.storage.rocksdb.get(&key_buf)? {
             Some(data) => Ok(Some(data)),
             None => Ok(None),
         }
+    }
+}
+
+impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> fmt::Debug for DataMap<K, V> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DataMap").field("context", &self.context).finish()
     }
 }
 
@@ -107,9 +100,11 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
     }
 
     ///
-    /// Inserts the given key-value pair into the map.
+    /// Inserts the given key-value pair into the map. Can be paired with a numeric
+    /// batch id, which defers the operation until `execute_batch` is called using
+    /// the same id.
     ///
-    fn insert<Q>(&self, key: &Q, value: &V) -> Result<()>
+    fn insert<Q>(&self, key: &Q, value: &V, batch: Option<usize>) -> Result<()>
     where
         K: Borrow<Q>,
         Q: Serialize + ?Sized,
@@ -119,14 +114,21 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         bincode::serialize_into(&mut key_buf, &key)?;
         let value_buf = bincode::serialize(value)?;
 
-        self.rocksdb.put(&key_buf, &value_buf)?;
+        if let Some(batch_id) = batch {
+            self.storage.batches.lock().entry(batch_id).or_default().put(&key_buf, &value_buf);
+        } else {
+            self.storage.rocksdb.put(&key_buf, &value_buf)?;
+        }
+
         Ok(())
     }
 
     ///
-    /// Removes the key-value pair for the given key from the map.
+    /// Removes the key-value pair for the given key from the map. Can be paired with a
+    /// numeric batch id, which defers the operation until `execute_batch` is called using
+    /// the same id.
     ///
-    fn remove<Q>(&self, key: &Q) -> Result<()>
+    fn remove<Q>(&self, key: &Q, batch: Option<usize>) -> Result<()>
     where
         K: Borrow<Q>,
         Q: Serialize + ?Sized,
@@ -135,7 +137,12 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         key_buf.reserve(bincode::serialized_size(&key)? as usize);
         bincode::serialize_into(&mut key_buf, &key)?;
 
-        self.rocksdb.delete(&key_buf)?;
+        if let Some(batch_id) = batch {
+            self.storage.batches.lock().entry(batch_id).or_default().delete(&key_buf);
+        } else {
+            self.storage.rocksdb.delete(&key_buf)?;
+        }
+
         Ok(())
     }
 
@@ -143,30 +150,21 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
     /// Returns an iterator visiting each key-value pair in the map.
     ///
     fn iter(&'a self) -> Self::Iterator {
-        let mut db_iter = self.rocksdb.raw_iterator();
-        db_iter.seek(&self.context);
-
-        Iter::new(db_iter, self.context.clone())
+        Iter::new(self.storage.rocksdb.prefix_iterator(&self.context))
     }
 
     ///
     /// Returns an iterator over each key in the map.
     ///
     fn keys(&'a self) -> Self::Keys {
-        let mut db_iter = self.rocksdb.raw_iterator();
-        db_iter.seek(&self.context);
-
-        Keys::new(db_iter, self.context.clone())
+        Keys::new(self.storage.rocksdb.prefix_iterator(&self.context))
     }
 
     ///
     /// Returns an iterator over each value in the map.
     ///
     fn values(&'a self) -> Self::Values {
-        let mut db_iter = self.rocksdb.raw_iterator();
-        db_iter.seek(&self.context);
-
-        Values::new(db_iter, self.context.clone())
+        Values::new(self.storage.rocksdb.prefix_iterator(&self.context))
     }
 
     ///
@@ -176,13 +174,50 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
     ///
     fn refresh(&self) -> bool {
         // If the storage is in read-only mode, catch it up to its writable storage.
-        if self.is_read_only {
-            let original_sequence_number = self.rocksdb.latest_sequence_number();
-            if self.rocksdb.try_catch_up_with_primary().is_ok() {
-                let new_sequence_number = self.rocksdb.latest_sequence_number();
+        if self.storage.is_read_only {
+            let original_sequence_number = self.storage.rocksdb.latest_sequence_number();
+            if self.storage.rocksdb.try_catch_up_with_primary().is_ok() {
+                let new_sequence_number = self.storage.rocksdb.latest_sequence_number();
                 return new_sequence_number > original_sequence_number;
             }
         }
         false
+    }
+
+    ///
+    /// Prepares an atomic batch of writes and returns its numeric id which can later be used to include
+    /// operations within it. `execute_batch` has to be called in order for any of the writes to actually
+    /// take place.
+    ///
+    fn prepare_batch(&self) -> usize {
+        let mut id = thread_rng().gen();
+
+        while self.storage.batches.lock().contains_key(&id) {
+            id = thread_rng().gen();
+        }
+
+        id
+    }
+
+    ///
+    /// Atomically executes a write batch with the given id.
+    ///
+    fn execute_batch(&self, batch: usize) -> Result<()> {
+        if let Some(batch) = self.storage.batches.lock().remove(&batch) {
+            Ok(self.storage.rocksdb.write(batch)?)
+        } else {
+            bail!("There is no pending storage batch with id = {}", batch);
+        }
+    }
+
+    ///
+    /// Discards a write batch with the given id.
+    ///
+    fn discard_batch(&self, batch: usize) -> Result<()> {
+        if self.storage.batches.lock().remove(&batch).is_none() {
+            bail!("Attempted to discard a non-existent storage batch (id = {})", batch)
+        } else {
+            Ok(())
+        }
     }
 }

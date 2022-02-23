@@ -17,10 +17,10 @@
 use super::{DataMap, MapId};
 
 use anyhow::Result;
-use serde::{de::DeserializeOwned, Deserializer, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use std::{borrow::Borrow, path::Path};
 
-pub trait Storage: Serialize {
+pub trait Storage {
     ///
     /// Opens storage at the given `path` and `context`.
     ///
@@ -34,14 +34,14 @@ pub trait Storage: Serialize {
     fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(&self, map_id: MapId) -> Result<DataMap<K, V>>;
 
     ///
-    /// Imports the given serialized bytes to reconstruct storage.
+    /// Imports a file with the given path to reconstruct storage.
     ///
-    fn import<'de, D: Deserializer<'de>>(&self, deserializer: D) -> Result<(), D::Error>;
+    fn import<P: AsRef<Path>>(&self, path: P) -> Result<()>;
 
     ///
-    /// Exports the current state of storage into serialized bytes.
+    /// Exports the current state of storage to a single file at the specified location.
     ///
-    fn export(&self) -> Result<serde_json::Value>;
+    fn export<P: AsRef<Path>>(&self, path: P) -> Result<()>;
 }
 
 pub trait Map<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
@@ -66,17 +66,21 @@ pub trait Map<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwn
         Q: Serialize + ?Sized;
 
     ///
-    /// Inserts the given key-value pair into the map.
+    /// Inserts the given key-value pair into the map. Can be paired with a numeric
+    /// batch id, which defers the operation until `execute_batch` is called using
+    /// the same id.
     ///
-    fn insert<Q>(&self, key: &Q, value: &V) -> Result<()>
+    fn insert<Q>(&self, key: &Q, value: &V, batch: Option<usize>) -> Result<()>
     where
         K: Borrow<Q>,
         Q: Serialize + ?Sized;
 
     ///
-    /// Removes the key-value pair for the given key from the map.
+    /// Removes the key-value pair for the given key from the map. Can be paired with a
+    /// numeric batch id, which defers the operation until `execute_batch` is called using
+    /// the same id.
     ///
-    fn remove<Q>(&self, key: &Q) -> Result<()>
+    fn remove<Q>(&self, key: &Q, batch: Option<usize>) -> Result<()>
     where
         K: Borrow<Q>,
         Q: Serialize + ?Sized;
@@ -104,4 +108,21 @@ pub trait Map<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwn
         // Currently, this method is implemented for RocksDB to catch up a reader (secondary) database.
         true
     }
+
+    ///
+    /// Prepares an atomic batch of writes and returns its numeric id which can later be used to include
+    /// operations within it. `execute_batch` has to be called in order for any of the writes to actually
+    /// take place.
+    ///
+    fn prepare_batch(&self) -> usize;
+
+    ///
+    /// Atomically executes a write batch with the given id.
+    ///
+    fn execute_batch(&self, batch: usize) -> Result<()>;
+
+    ///
+    /// Discards a write batch with the given id.
+    ///
+    fn discard_batch(&self, batch: usize) -> Result<()>;
 }

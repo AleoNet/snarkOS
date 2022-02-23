@@ -14,30 +14,5 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use super::*;
-
-/// An iterator over the values of a prefix.
-pub struct Values<'a, V> {
-    db_iter: rocksdb::DBIterator<'a>,
-    _phantom: PhantomData<V>,
-}
-
-impl<'a, V: DeserializeOwned> Values<'a, V> {
-    pub(crate) fn new(db_iter: rocksdb::DBIterator<'a>) -> Self {
-        Self {
-            db_iter,
-            _phantom: PhantomData,
-        }
-    }
-}
-
-impl<'a, V: DeserializeOwned> Iterator for Values<'a, V> {
-    type Item = V;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let (_, value) = self.db_iter.next()?;
-        let value = bincode::deserialize(&value).ok()?;
-
-        Some(value)
-    }
-}
+pub mod resources;
+pub use resources::{Resource, Resources};

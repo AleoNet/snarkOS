@@ -18,6 +18,7 @@ use crate::{
     helpers::BlockLocators,
     storage::{DataMap, Map, MapId, Storage},
 };
+use snarkos_utils::Resource;
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -30,14 +31,11 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashSet},
     path::Path,
-    sync::{
-        atomic::{AtomicBool, AtomicU32, Ordering},
-        Arc,
-    },
+    sync::{atomic::AtomicBool, Arc},
     thread,
-    thread::JoinHandle,
 };
 use time::OffsetDateTime;
+use tokio::sync::oneshot::{self, error::TryRecvError};
 
 /// The maximum number of linear block locators.
 pub const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 64;
@@ -87,9 +85,7 @@ pub struct LedgerState<N: Network> {
     /// The blocks of the ledger in storage.
     blocks: BlockState<N>,
     /// The indicator bit and tracker for a ledger in read-only mode.
-    read_only: (bool, Arc<AtomicU32>, RwLock<Option<Arc<JoinHandle<()>>>>),
-    /// Used to ensure the database operations aren't interrupted by a shutdown.
-    map_lock: Arc<RwLock<()>>,
+    read_only: (bool, RwLock<Block<N>>),
 }
 
 impl<N: Network> LedgerState<N> {
@@ -122,15 +118,14 @@ impl<N: Network> LedgerState<N> {
             latest_block_locators: Default::default(),
             ledger_roots: storage.open_map(MapId::LedgerRoots)?,
             blocks: BlockState::open(storage)?,
-            read_only: (is_read_only, Arc::new(AtomicU32::new(0)), RwLock::new(None)),
-            map_lock: Default::default(),
+            read_only: (is_read_only, RwLock::new(N::genesis_block().clone())),
         };
 
         // Determine the latest block height.
         let mut latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
             (Some(latest_block_height_0), Some(latest_block_height_1)) => match latest_block_height_0 == latest_block_height_1 {
                 true => latest_block_height_0,
-                false => match ledger.try_fixing_inconsistent_state() {
+                false => match ledger.try_fixing_inconsistent_state(None) {
                     Ok(current_block_height) => current_block_height,
                     Err(error) => return Err(error),
                 },
@@ -142,14 +137,17 @@ impl<N: Network> LedgerState<N> {
         // If this is new storage, initialize it with the genesis block.
         if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
             let genesis = N::genesis_block();
-            ledger.ledger_roots.insert(&genesis.previous_ledger_root(), &genesis.height())?;
 
-            // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
-            let _map_lock = ledger.map_lock.read();
+            // Perform all the associated storage operations as an atomic batch.
+            let batch = ledger.ledger_roots.prepare_batch();
 
-            ledger.blocks.add_block(genesis)?;
+            ledger
+                .ledger_roots
+                .insert(&genesis.previous_ledger_root(), &genesis.height(), Some(batch))?;
+            ledger.blocks.add_block(genesis, Some(batch))?;
 
-            // The map lock goes out of scope on its own.
+            // Execute the pending storage batch.
+            ledger.ledger_roots.execute_batch(batch)?;
         }
 
         // Check that all canonical block headers exist in storage.
@@ -249,7 +247,7 @@ impl<N: Network> LedgerState<N> {
     /// A writable instance of `LedgerState` possesses full functionality, whereas
     /// a read-only instance of `LedgerState` may only call immutable methods.
     ///
-    pub fn open_reader<S: Storage, P: AsRef<Path>>(path: P) -> Result<Arc<Self>> {
+    pub fn open_reader<S: Storage, P: AsRef<Path>>(path: P) -> Result<(Arc<Self>, Resource)> {
         // Open storage.
         let context = N::NETWORK_ID;
         let is_read_only = true;
@@ -263,8 +261,7 @@ impl<N: Network> LedgerState<N> {
             latest_block_locators: Default::default(),
             ledger_roots: storage.open_map(MapId::LedgerRoots)?,
             blocks: BlockState::open(storage)?,
-            read_only: (is_read_only, Arc::new(AtomicU32::new(0)), RwLock::new(None)),
-            map_lock: Default::default(),
+            read_only: (is_read_only, RwLock::new(N::genesis_block().clone())),
         });
 
         // Determine the latest block height.
@@ -285,25 +282,29 @@ impl<N: Network> LedgerState<N> {
         if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
             let genesis = N::genesis_block();
 
-            // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
-            let _map_lock = ledger.map_lock.read();
+            // Perform all the associated storage operations as an atomic batch.
+            let batch = ledger.ledger_roots.prepare_batch();
 
-            ledger.ledger_roots.insert(&genesis.previous_ledger_root(), &genesis.height())?;
-            ledger.blocks.add_block(genesis)?;
+            ledger
+                .ledger_roots
+                .insert(&genesis.previous_ledger_root(), &genesis.height(), Some(batch))?;
+            ledger.blocks.add_block(genesis, Some(batch))?;
 
-            // The map lock goes out of scope on its own.
+            // Execute the pending storage batch.
+            ledger.ledger_roots.execute_batch(batch)?;
         }
 
         // Update the latest ledger state.
-        *ledger.latest_block.write() = ledger.get_block(latest_block_height)?;
+        let latest_block = ledger.get_block(latest_block_height)?;
+        *ledger.latest_block.write() = latest_block.clone();
         ledger.regenerate_latest_ledger_state()?;
         // Update the ledger tree state.
         ledger.regenerate_ledger_tree()?;
         // As the ledger is in read-only mode, proceed to start a process to keep the reader in sync.
-        *ledger.read_only.2.write() = Some(Arc::new(ledger.initialize_reader_heartbeat(latest_block_height)?));
+        let resource = ledger.initialize_reader_heartbeat(latest_block)?;
 
         trace!("[Read-Only] Ledger successfully loaded at block {}", ledger.latest_block_height());
-        Ok(ledger)
+        Ok((ledger, resource))
     }
 
     /// Returns `true` if the ledger is in read-only mode.
@@ -836,19 +837,23 @@ impl<N: Network> LedgerState<N> {
             }
         }
 
-        // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
-        let _map_lock = self.map_lock.read();
+        // Perform all the associated storage operations as an atomic batch.
+        let batch = self.ledger_roots.prepare_batch();
 
-        self.blocks.add_block(block)?;
+        self.blocks.add_block(block, Some(batch))?;
+        self.ledger_roots
+            .insert(&block.previous_ledger_root(), &block.height(), Some(batch))?;
+
+        // Execute the pending storage batch.
+        self.ledger_roots.execute_batch(batch)?;
+
+        // Update the in-memory objects.
         self.ledger_tree.write().add(&block.hash())?;
-        self.ledger_roots.insert(&block.previous_ledger_root(), &block.height())?;
         self.latest_block_hashes_and_headers
             .write()
             .push((block.hash(), block.header().clone()));
         *self.latest_block_locators.write() = self.get_block_locators(block.height())?;
         *self.latest_block.write() = block.clone();
-
-        // The map lock goes out of scope on its own.
 
         Ok(())
     }
@@ -878,8 +883,8 @@ impl<N: Network> LedgerState<N> {
             .map(|block| (block.height(), block.clone()))
             .collect();
 
-        // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
-        let _map_lock = self.map_lock.read();
+        // Perform all the associated storage operations as an atomic batch.
+        let batch = self.ledger_roots.prepare_batch();
 
         // Process the block removals.
         let mut current_block_height = latest_block_height;
@@ -888,21 +893,27 @@ impl<N: Network> LedgerState<N> {
             match current_block {
                 Some(block) => {
                     // Update the internal storage state of the ledger.
-                    self.blocks.remove_block(current_block_height)?;
-                    self.ledger_roots.remove(&block.previous_ledger_root())?;
+                    self.blocks.remove_block(current_block_height, Some(batch))?;
+                    self.ledger_roots.remove(&block.previous_ledger_root(), Some(batch))?;
                     // Decrement the current block height, and update the current block.
                     current_block_height = current_block_height.saturating_sub(1);
                     current_block = blocks.get(&current_block_height);
                 }
-                None => match self.try_fixing_inconsistent_state() {
+                None => match self.try_fixing_inconsistent_state(Some(batch)) {
                     Ok(block_height) => {
                         current_block_height = block_height;
                         break;
                     }
-                    Err(error) => return Err(error),
+                    Err(error) => {
+                        self.ledger_roots.discard_batch(batch)?;
+                        return Err(error);
+                    }
                 },
             }
         }
+
+        // Execute the pending storage batch.
+        self.ledger_roots.execute_batch(batch)?;
 
         // Update the latest block.
         *self.latest_block.write() = self.get_block(current_block_height)?;
@@ -910,8 +921,6 @@ impl<N: Network> LedgerState<N> {
         self.regenerate_latest_ledger_state()?;
         // Regenerate the ledger tree.
         self.regenerate_ledger_tree()?;
-
-        // The map lock goes out of scope on its own.
 
         // Return the removed blocks, in increasing order (i.e. 1, 2, 3...).
         Ok(blocks.values().skip(1).cloned().collect())
@@ -1020,17 +1029,13 @@ impl<N: Network> LedgerState<N> {
         Ok(())
     }
 
-    // TODO (raychu86): Make this more efficient.
-    /// Updates the ledger tree.
+    /// Regenerates the ledger tree.
     fn regenerate_ledger_tree(&self) -> Result<()> {
         // Acquire the ledger tree write lock.
         let mut ledger_tree = self.ledger_tree.write();
 
         // Retrieve all of the block hashes.
-        let mut block_hashes = Vec::with_capacity(self.latest_block_height() as usize);
-        for height in 0..=self.latest_block_height() {
-            block_hashes.push(self.get_block_hash(height)?);
-        }
+        let block_hashes = self.get_block_hashes(0, self.latest_block_height())?;
 
         // Add the block hashes to create the new ledger tree.
         let mut new_ledger_tree = LedgerTree::<N>::new()?;
@@ -1042,58 +1047,119 @@ impl<N: Network> LedgerState<N> {
         Ok(())
     }
 
+    /// Updates the ledger tree.
+    fn update_ledger_tree(&self, outdated_block_height: u32, new_block_height: u32) -> Result<()> {
+        // Acquire the ledger tree write lock.
+        let mut ledger_tree = self.ledger_tree.write();
+
+        let mut new_ledger_tree = ledger_tree.clone();
+
+        // Retrieve all the new block hashes.
+        let block_hashes = self.get_block_hashes(outdated_block_height + 1, new_block_height)?;
+
+        // Add the block hashes to create the new ledger tree.
+        new_ledger_tree.add_all(&block_hashes)?;
+
+        // Update the current ledger tree with the current state.
+        *ledger_tree = new_ledger_tree;
+
+        Ok(())
+    }
+
     /// Initializes a heartbeat to keep the ledger reader in sync, with the given starting block height.
-    fn initialize_reader_heartbeat(self: &Arc<Self>, starting_block_height: u32) -> Result<JoinHandle<()>> {
+    fn initialize_reader_heartbeat(self: &Arc<Self>, starting_block: Block<N>) -> Result<Resource> {
         // If the storage is *not* in read-only mode, this method cannot be called.
         if !self.is_read_only() {
             return Err(anyhow!("Ledger must be read-only to initialize a reader heartbeat"));
         }
+        *self.read_only.1.write() = starting_block;
+
+        let (abort_sender, mut abort_receiver) = oneshot::channel();
 
         let ledger = self.clone();
-        Ok(thread::spawn(move || {
-            let last_seen_block_height = ledger.read_only.1.clone();
-            ledger.read_only.1.store(starting_block_height, Ordering::SeqCst);
-
+        let thread_handle = thread::spawn(move || {
             loop {
+                // Check if the thread shouldn't be aborted.
+                match abort_receiver.try_recv() {
+                    Ok(_) | Err(TryRecvError::Closed) => return,
+                    _ => (),
+                };
+
                 // Refresh the ledger storage state.
                 if ledger.ledger_roots.refresh() {
                     // After catching up the reader, determine the latest block height.
                     if let Some(latest_block_height) = ledger.blocks.block_heights.keys().max() {
-                        let current_block_height = last_seen_block_height.load(Ordering::SeqCst);
+                        let current_block = ledger.read_only.1.read().clone();
+
+                        let current_block_height = current_block.height();
+                        let current_block_hash = current_block.hash();
                         trace!(
                             "[Read-Only] Updating ledger state from block {} to {}",
                             current_block_height,
                             latest_block_height
                         );
 
-                        // Update the latest block.
-                        match ledger.get_block(latest_block_height) {
-                            Ok(block) => *ledger.latest_block.write() = block,
+                        // Update the last seen block.
+                        let latest_block = ledger.get_block(latest_block_height);
+                        match &latest_block {
+                            Ok(ref block) => *ledger.latest_block.write() = block.clone(),
                             Err(error) => warn!("[Read-Only] {}", error),
                         };
-                        // Regenerate the ledger tree.
-                        if let Err(error) = ledger.regenerate_ledger_tree() {
-                            warn!("[Read-Only] {}", error);
-                        };
+
+                        // A flag indicating whether a fast ledger tree update is feasible.
+                        let mut quick_update = false;
+
+                        // Only consider an update if the latest height is actually greater than the current height.
+                        if latest_block_height > current_block_height {
+                            // If the last known top block hash still exists at the expected height, there was no rollback
+                            // beyond it, which means we only need to update the ledger tree with the new hashes.
+                            if let Ok(found_block_hash) = ledger.get_block_hash(current_block_height) {
+                                if found_block_hash == current_block_hash {
+                                    // Update the ledger tree.
+                                    if let Err(error) = ledger.update_ledger_tree(current_block_height, latest_block_height) {
+                                        warn!("[Read-Only] {}", error);
+                                    } else {
+                                        quick_update = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        // If a quick ledger tree update was infeasible, regenerate it in its entirety.
+                        if !quick_update {
+                            // Regenerate the entire ledger tree.
+                            if let Err(error) = ledger.regenerate_ledger_tree() {
+                                warn!("[Read-Only] {}", error);
+                            };
+                        }
+
                         // Regenerate the latest ledger state.
                         if let Err(error) = ledger.regenerate_latest_ledger_state() {
                             warn!("[Read-Only] {}", error);
                         };
-                        // Update the last seen block height.
-                        last_seen_block_height.store(latest_block_height, Ordering::SeqCst);
+
+                        // Update the last known block in the reader.
+                        if let Ok(block) = latest_block {
+                            *ledger.read_only.1.write() = block;
+                        }
                     }
                 }
                 thread::sleep(std::time::Duration::from_secs(6));
             }
-        }))
+        });
+
+        Ok(Resource::Thread(thread_handle, abort_sender))
     }
 
     /// Attempts to automatically resolve inconsistent ledger state.
-    fn try_fixing_inconsistent_state(&self) -> Result<u32> {
+    fn try_fixing_inconsistent_state(&self, batch: Option<usize>) -> Result<u32> {
         // If the storage is in read-only mode, this method cannot be called.
         if self.is_read_only() {
             return Err(anyhow!("Ledger must be writable to fix inconsistent state"));
         }
+
+        // Remember whether this operation is within an existing batch.
+        let is_part_of_a_batch = batch.is_some();
 
         // Determine the latest block height.
         match (self.ledger_roots.values().max(), self.blocks.block_heights.keys().max()) {
@@ -1105,6 +1171,13 @@ impl<N: Network> LedgerState<N> {
                         debug!("Attempting to automatically resolve inconsistent ledger state");
                         // Set the starting block height as the height of the ledger roots block height.
                         let mut current_block_height = latest_block_height_0;
+
+                        // Perform all the associated storage operations as an atomic batch if it's not part of a batch yet.
+                        let batch = if let Some(id) = batch {
+                            id
+                        } else {
+                            self.ledger_roots.prepare_batch()
+                        };
 
                         // Decrement down to the block height stored in the block heights map.
                         while current_block_height > latest_block_height_1 {
@@ -1121,15 +1194,25 @@ impl<N: Network> LedgerState<N> {
 
                             // Update the internal state of the ledger roots, if a candidate was found.
                             if let Some(previous_ledger_root) = candidate_ledger_root {
-                                self.ledger_roots.remove(&previous_ledger_root)?;
+                                self.ledger_roots.remove(&previous_ledger_root, Some(batch))?;
                                 current_block_height = current_block_height.saturating_sub(1);
                             } else {
+                                // Discard the in-progress batch if it's a standalone operation.
+                                if !is_part_of_a_batch {
+                                    self.ledger_roots.discard_batch(batch)?;
+                                }
+
                                 return Err(anyhow!(
                                     "Loaded a ledger with inconsistent state ({} != {}) (failed to automatically resolve)",
                                     current_block_height,
                                     latest_block_height_1
                                 ));
                             }
+                        }
+
+                        // Execute the pending storage batch if it's a standalone operation.
+                        if !is_part_of_a_batch {
+                            self.ledger_roots.execute_batch(batch)?;
                         }
 
                         // If this is reached, the inconsistency was automatically resolved,
@@ -1152,8 +1235,8 @@ impl<N: Network> LedgerState<N> {
 
     /// Attempts to revert from the latest block height to the given revert block height.
     fn clear_incompatible_blocks(&self, latest_block_height: u32, revert_block_height: u32) -> Result<u32> {
-        // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
-        let _map_lock = self.map_lock.read();
+        // Perform all the associated storage operations as an atomic batch.
+        let batch = self.ledger_roots.prepare_batch();
 
         // Process the block removals.
         let mut current_block_height = latest_block_height;
@@ -1182,14 +1265,14 @@ impl<N: Network> LedgerState<N> {
             };
 
             // Remove the block height.
-            self.blocks.block_heights.remove(&current_block_height)?;
+            self.blocks.block_heights.remove(&current_block_height, Some(batch))?;
             // Remove the block header.
-            self.blocks.block_headers.remove(&block_hash)?;
+            self.blocks.block_headers.remove(&block_hash, Some(batch))?;
             // Remove the block transactions.
-            self.blocks.block_transactions.remove(&block_hash)?;
+            self.blocks.block_transactions.remove(&block_hash, Some(batch))?;
             // Remove the transactions.
             for transaction_ids in transaction_ids.iter() {
-                self.blocks.transactions.remove_transaction(transaction_ids)?;
+                self.blocks.transactions.remove_transaction(transaction_ids, Some(batch))?;
             }
 
             // Remove the ledger root corresponding to the current block height.
@@ -1199,7 +1282,7 @@ impl<N: Network> LedgerState<N> {
                 .filter(|(_, block_height)| current_block_height == *block_height)
                 .collect::<Vec<_>>();
             for (ledger_root, _) in remove_ledger_root {
-                self.ledger_roots.remove(&ledger_root)?;
+                self.ledger_roots.remove(&ledger_root, Some(batch))?;
             }
 
             // Decrement the current block height, and update the current block.
@@ -1207,15 +1290,11 @@ impl<N: Network> LedgerState<N> {
 
             trace!("Ledger successfully reverted to block {}", current_block_height);
         }
-        Ok(current_block_height)
-    }
 
-    /// Gracefully shuts down the ledger state.
-    // FIXME: currently only obtains the lock that is used to ensure that map operations
-    // can't be interrupted by a shutdown; the real solution is to use batch writes in
-    // rocksdb.
-    pub fn shut_down(&self) -> Arc<RwLock<()>> {
-        self.map_lock.clone()
+        // Execute the pending storage batch.
+        self.ledger_roots.execute_batch(batch)?;
+
+        Ok(current_block_height)
     }
 
     ///
@@ -1333,7 +1412,7 @@ impl<N: Network> BlockState<N> {
         }
 
         (start_block_height..=end_block_height)
-            .into_iter()
+            .into_par_iter()
             .map(|height| self.get_block_hash(height))
             .collect()
     }
@@ -1437,7 +1516,7 @@ impl<N: Network> BlockState<N> {
     }
 
     /// Adds the given block to storage.
-    fn add_block(&self, block: &Block<N>) -> Result<()> {
+    fn add_block(&self, block: &Block<N>, batch: Option<usize>) -> Result<()> {
         // Ensure the block does not exist.
         let block_height = block.height();
         if self.block_heights.contains_key(&block_height)? {
@@ -1449,15 +1528,15 @@ impl<N: Network> BlockState<N> {
             let transaction_ids = transactions.transaction_ids().collect::<Vec<_>>();
 
             // Insert the block height.
-            self.block_heights.insert(&block_height, &block_hash)?;
+            self.block_heights.insert(&block_height, &block_hash, batch)?;
             // Insert the block header.
-            self.block_headers.insert(&block_hash, block_header)?;
+            self.block_headers.insert(&block_hash, block_header, batch)?;
             // Insert the block transactions.
-            self.block_transactions.insert(&block_hash, &transaction_ids)?;
+            self.block_transactions.insert(&block_hash, &transaction_ids, batch)?;
             // Insert the transactions.
             for (index, transaction) in transactions.iter().enumerate() {
                 let metadata = Metadata::<N>::new(block_height, block_hash, block.timestamp(), index as u16);
-                self.transactions.add_transaction(transaction, metadata)?;
+                self.transactions.add_transaction(transaction, metadata, batch)?;
             }
 
             Ok(())
@@ -1465,7 +1544,7 @@ impl<N: Network> BlockState<N> {
     }
 
     /// Removes the given block height from storage.
-    fn remove_block(&self, block_height: u32) -> Result<()> {
+    fn remove_block(&self, block_height: u32, batch: Option<usize>) -> Result<()> {
         // Ensure the block height is not the genesis block.
         if block_height == 0 {
             Err(anyhow!("Block {} cannot be removed from storage", block_height))
@@ -1493,14 +1572,14 @@ impl<N: Network> BlockState<N> {
             let block_height = block_header.height();
 
             // Remove the block height.
-            self.block_heights.remove(&block_height)?;
+            self.block_heights.remove(&block_height, batch)?;
             // Remove the block header.
-            self.block_headers.remove(&block_hash)?;
+            self.block_headers.remove(&block_hash, batch)?;
             // Remove the block transactions.
-            self.block_transactions.remove(&block_hash)?;
+            self.block_transactions.remove(&block_hash, batch)?;
             // Remove the transactions.
             for transaction_ids in transaction_ids.iter() {
-                self.transactions.remove_transaction(transaction_ids)?;
+                self.transactions.remove_transaction(transaction_ids, batch)?;
             }
 
             Ok(())
@@ -1605,7 +1684,7 @@ impl<N: Network> TransactionState<N> {
     }
 
     /// Adds the given transaction to storage.
-    fn add_transaction(&self, transaction: &Transaction<N>, metadata: Metadata<N>) -> Result<()> {
+    fn add_transaction(&self, transaction: &Transaction<N>, metadata: Metadata<N>, batch: Option<usize>) -> Result<()> {
         // Ensure the transaction does not exist.
         let transaction_id = transaction.transaction_id();
         if self.transactions.contains_key(&transaction_id)? {
@@ -1617,22 +1696,22 @@ impl<N: Network> TransactionState<N> {
 
             // Insert the transaction ID.
             self.transactions
-                .insert(&transaction_id, &(ledger_root, transition_ids, metadata))?;
+                .insert(&transaction_id, &(ledger_root, transition_ids, metadata), batch)?;
 
             for (i, transition) in transitions.iter().enumerate() {
                 let transition_id = transition.transition_id();
 
                 // Insert the transition.
                 self.transitions
-                    .insert(&transition_id, &(transaction_id, i as u8, transition.clone()))?;
+                    .insert(&transition_id, &(transaction_id, i as u8, transition.clone()), batch)?;
 
                 // Insert the serial numbers.
                 for serial_number in transition.serial_numbers() {
-                    self.serial_numbers.insert(serial_number, &transition_id)?;
+                    self.serial_numbers.insert(serial_number, &transition_id, batch)?;
                 }
                 // Insert the commitments.
                 for commitment in transition.commitments() {
-                    self.commitments.insert(commitment, &transition_id)?;
+                    self.commitments.insert(commitment, &transition_id, batch)?;
                 }
             }
             Ok(())
@@ -1640,7 +1719,7 @@ impl<N: Network> TransactionState<N> {
     }
 
     /// Removes the given transaction ID from storage.
-    fn remove_transaction(&self, transaction_id: &N::TransactionID) -> Result<()> {
+    fn remove_transaction(&self, transaction_id: &N::TransactionID, batch: Option<usize>) -> Result<()> {
         // Retrieve the transition IDs from the transaction.
         let transition_ids = match self.transactions.get(transaction_id)? {
             Some((_, transition_ids, _)) => transition_ids,
@@ -1648,7 +1727,7 @@ impl<N: Network> TransactionState<N> {
         };
 
         // Remove the transaction entry.
-        self.transactions.remove(transaction_id)?;
+        self.transactions.remove(transaction_id, batch)?;
 
         for (_, transition_id) in transition_ids.iter().enumerate() {
             // Retrieve the transition from the transition ID.
@@ -1658,15 +1737,15 @@ impl<N: Network> TransactionState<N> {
             };
 
             // Remove the transition.
-            self.transitions.remove(transition_id)?;
+            self.transitions.remove(transition_id, batch)?;
 
             // Remove the serial numbers.
             for serial_number in transition.serial_numbers() {
-                self.serial_numbers.remove(serial_number)?;
+                self.serial_numbers.remove(serial_number, batch)?;
             }
             // Remove the commitments.
             for commitment in transition.commitments() {
-                self.commitments.remove(commitment)?;
+                self.commitments.remove(commitment, batch)?;
             }
         }
         Ok(())

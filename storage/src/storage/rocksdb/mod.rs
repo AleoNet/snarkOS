@@ -32,14 +32,18 @@ mod tests;
 use crate::storage::{Map, Storage};
 
 use anyhow::Result;
-use serde::{
-    de::{self, DeserializeOwned},
-    ser::SerializeSeq,
-    Deserializer,
-    Serialize,
-    Serializer,
+use parking_lot::Mutex;
+use serde::{de::DeserializeOwned, Serialize};
+use std::{
+    borrow::Borrow,
+    collections::HashMap,
+    convert::TryInto,
+    fs::File,
+    io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
+    marker::PhantomData,
+    path::Path,
+    sync::Arc,
 };
-use std::{borrow::Borrow, fmt, marker::PhantomData, path::Path, sync::Arc};
 
 ///
 /// An instance of a RocksDB database.
@@ -48,6 +52,7 @@ use std::{borrow::Borrow, fmt, marker::PhantomData, path::Path, sync::Arc};
 pub struct RocksDB {
     rocksdb: Arc<rocksdb::DB>,
     context: Vec<u8>,
+    batches: Arc<Mutex<HashMap<usize, rocksdb::WriteBatch>>>,
     is_read_only: bool,
 }
 
@@ -56,12 +61,15 @@ impl Storage for RocksDB {
     /// Opens storage at the given `path` and `context`.
     ///
     fn open<P: AsRef<Path>>(path: P, context: u16, is_read_only: bool) -> Result<Self> {
-        let context = context.to_le_bytes();
-        let mut context_bytes = bincode::serialize(&(context.len() as u32)).unwrap();
-        context_bytes.extend_from_slice(&context);
+        let context = context.to_le_bytes().to_vec();
 
         // Customize database options.
         let mut options = rocksdb::Options::default();
+        options.set_compression_type(rocksdb::DBCompressionType::Lz4);
+
+        // Register the prefix length.
+        let prefix_extractor = rocksdb::SliceTransform::create_fixed_prefix(PREFIX_LEN);
+        options.set_prefix_extractor(prefix_extractor);
 
         let primary = path.as_ref().to_path_buf();
         let rocksdb = match is_read_only {
@@ -81,7 +89,8 @@ impl Storage for RocksDB {
 
         Ok(RocksDB {
             rocksdb,
-            context: context_bytes,
+            context,
+            batches: Default::default(),
             is_read_only,
         })
     }
@@ -91,70 +100,75 @@ impl Storage for RocksDB {
     ///
     fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(&self, map_id: MapId) -> Result<DataMap<K, V>> {
         // Convert the new context into bytes.
-        let new_context = map_id.as_bytes();
+        let new_context = (map_id as u16).to_le_bytes();
 
         // Combine contexts to create a new scope.
         let mut context_bytes = self.context.clone();
-        bincode::serialize_into(&mut context_bytes, &(new_context.len() as u32))?;
-        context_bytes.extend_from_slice(new_context);
+        context_bytes.extend_from_slice(&new_context);
 
         Ok(DataMap {
-            rocksdb: self.rocksdb.clone(),
+            storage: self.clone(),
             context: context_bytes,
-            is_read_only: self.is_read_only,
             _phantom: PhantomData,
         })
     }
 
     ///
-    /// Imports the given serialized bytes to reconstruct storage.
+    /// Imports a file with the given path to reconstruct storage.
     ///
-    fn import<'de, D: Deserializer<'de>>(&self, deserializer: D) -> Result<(), D::Error> {
-        struct RocksDBVisitor {
-            rocksdb: RocksDB,
-        }
+    fn import<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let file = File::open(path)?;
+        let mut reader = BufReader::new(file);
 
-        impl<'de> de::Visitor<'de> for RocksDBVisitor {
-            type Value = ();
+        let len = reader.seek(SeekFrom::End(0))?;
+        reader.rewind()?;
 
-            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-                write!(formatter, "a rocksdb seq")
+        let mut buf = vec![0u8; 16 * 1024];
+
+        while reader.stream_position()? < len {
+            reader.read_exact(&mut buf[..4])?;
+            let key_len = u32::from_le_bytes(buf[..4].try_into().unwrap()) as usize;
+
+            if key_len + 4 > buf.len() {
+                buf.resize(key_len + 4, 0);
             }
 
-            fn visit_seq<A: de::SeqAccess<'de>>(self, mut map: A) -> std::result::Result<(), A::Error> {
-                while let Some((key, value)) = map.next_element::<(Vec<_>, Vec<_>)>()? {
-                    self.rocksdb.rocksdb.put(&key, &value).map_err(serde::de::Error::custom)?;
-                }
+            reader.read_exact(&mut buf[..key_len + 4])?;
+            let value_len = u32::from_le_bytes(buf[key_len..][..4].try_into().unwrap()) as usize;
 
-                Ok(())
+            if key_len + value_len > buf.len() {
+                buf.resize(key_len + value_len, 0);
             }
-        }
 
-        deserializer.deserialize_seq(RocksDBVisitor { rocksdb: self.clone() })?;
+            reader.read_exact(&mut buf[key_len..][..value_len])?;
+
+            self.rocksdb.put(&buf[..key_len], &buf[key_len..][..value_len])?;
+        }
 
         Ok(())
     }
 
     ///
-    /// Exports the current state of storage into serialized bytes.
+    /// Exports the current state of storage to a single file at the specified location.
     ///
-    fn export(&self) -> Result<serde_json::Value> {
-        Ok(serde_json::to_value(&self)?)
-    }
-}
+    fn export<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        let file = File::create(path)?;
+        let mut writer = BufWriter::new(file);
 
-impl Serialize for RocksDB {
-    fn serialize<S: Serializer>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error> {
         let mut iterator = self.rocksdb.raw_iterator();
         iterator.seek_to_first();
 
-        let mut map = serializer.serialize_seq(None)?;
         while iterator.valid() {
             if let (Some(key), Some(value)) = (iterator.key(), iterator.value()) {
-                map.serialize_element(&(key, value))?;
+                writer.write_all(&(key.len() as u32).to_le_bytes())?;
+                writer.write_all(key)?;
+
+                writer.write_all(&(value.len() as u32).to_le_bytes())?;
+                writer.write_all(value)?;
             }
             iterator.next();
         }
-        map.end()
+
+        Ok(())
     }
 }

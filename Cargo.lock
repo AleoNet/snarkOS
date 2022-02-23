@@ -2614,6 +2614,7 @@ dependencies = [
  "serde_json",
  "snarkos-metrics",
  "snarkos-storage",
+ "snarkos-utils",
  "snarkvm",
  "structopt",
  "tempfile",
@@ -2652,9 +2653,11 @@ dependencies = [
  "rocksdb",
  "serde",
  "serde_json",
+ "snarkos-utils",
  "snarkvm",
  "tempfile",
  "time 0.3.7",
+ "tokio",
  "tracing",
 ]
 
@@ -2675,6 +2678,14 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "snarkos-utils"
+version = "2.0.2"
+dependencies = [
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

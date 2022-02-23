@@ -84,7 +84,6 @@ pub struct Ledger<N: Network, E: Environment> {
     /// The canonical chain of blocks.
     canon: Arc<LedgerState<N>>,
     /// The canonical chain of blocks in read-only mode.
-    #[allow(unused)]
     canon_reader: Arc<LedgerState<N>>,
     /// A lock to ensure methods that need to be mutually-exclusive are enforced.
     /// In this context, `add_block`, and `revert_to_block_height` must be mutually-exclusive.
@@ -112,11 +111,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
         let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
 
+        let canon = Arc::new(LedgerState::open_writer::<S, P>(path)?);
+        let (canon_reader, reader_resource) = LedgerState::open_reader::<S, P>(path)?;
+        E::resources().register(reader_resource);
+
         // Initialize the ledger.
         let ledger = Arc::new(Self {
             ledger_router,
-            canon: Arc::new(LedgerState::open_writer::<S, P>(path)?),
-            canon_reader: LedgerState::open_reader::<S, P>(path)?,
+            canon,
+            canon_reader,
             canon_lock: Arc::new(Mutex::new(())),
             unconfirmed_blocks: Default::default(),
             peers_state: Default::default(),
@@ -131,12 +134,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         {
             let ledger = ledger.clone();
             let (router, handler) = oneshot::channel();
-            E::tasks().append(task::spawn(async move {
+            E::resources().register_task(task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 // Asynchronously wait for a ledger request.
                 while let Some(request) = ledger_handler.recv().await {
-                    // Hold the ledger write lock briefly, to update the state of the ledger.
+                    // Update the state of the ledger.
                     // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
                     // will end up being processed out of order.
                     ledger.update(request).await;
@@ -151,11 +154,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
     /// Returns an instance of the ledger reader.
     pub fn reader(&self) -> LedgerReader<N> {
-        // TODO (howardwu): Switch this from `canon` to `canon_reader`.
-        //  RocksDB at v6.22 has a rollback error with its sequence numbers.
-        //  Currently, v6.25 has this issue patched, however rust-rocksdb has not released it.
-        self.canon.clone()
-        // self.canon_reader.clone()
+        self.canon_reader.clone()
     }
 
     /// Returns an instance of the ledger router.
@@ -163,7 +162,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.ledger_router.clone()
     }
 
-    pub(super) async fn shut_down(&self) -> (Arc<Mutex<()>>, Arc<Mutex<()>>, Arc<parking_lot::RwLock<()>>) {
+    pub(super) async fn shut_down(&self) {
         debug!("Ledger is shutting down...");
 
         // Set the terminator bit to `true` to ensure it stops mining.
@@ -180,14 +179,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             self.disconnect(peer_ip, DisconnectReason::ShuttingDown).await;
         }
         trace!("[ShuttingDown] Disconnect message has been sent to all connected peers");
-
-        // Return the lock for the canon chain and block requests.
-        let canon_lock = self.canon_lock.clone();
-        let block_requests_lock = self.block_requests_lock.clone();
-        let storage_map_lock = self.canon.shut_down();
-        trace!("[ShuttingDown] Block requests lock has been cloned");
-
-        (canon_lock, block_requests_lock, storage_map_lock)
     }
 
     ///
