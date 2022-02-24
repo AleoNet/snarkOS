@@ -36,10 +36,11 @@ pub use server::*;
 pub mod updater;
 pub use updater::*;
 
-pub use snarkos_environment::*;
-pub use snarkos_storage::*;
+pub use snarkos_environment as environment;
+pub use snarkos_network as network;
+pub use snarkos_storage as storage;
 
 #[cfg(feature = "rpc")]
-pub use snarkos_rpc::*;
+pub use snarkos_rpc as rpc;
 
 pub use snarkvm::dpc::{testnet2::Testnet2, Address, Network};
