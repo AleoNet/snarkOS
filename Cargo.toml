@@ -19,6 +19,21 @@ edition = "2018"
 [workspace]
 members = [ ".integration", "environment", "metrics", "network", "rpc", "storage" ]
 
+[lib]
+path = "snarkos/lib.rs"
+
+[[bin]]
+name = "snarkos"
+path = "snarkos/main.rs"
+required-features = ["console"]
+
+[features]
+default = [ "console", "rpc" ]
+console = [ "crossterm", "tui" ]
+cuda = [ "snarkvm/cuda" ]
+prometheus = [ "snarkos-metrics" ]
+rpc = [ "snarkos-rpc" ]
+
 [dependencies.aleo-std]
 version = "0.1.6"
 
@@ -97,13 +112,6 @@ optional = true
 
 [dev-dependencies.rusty-hook]
 version = "0.11"
-
-[features]
-default = [ "console", "rpc" ]
-console = [ "crossterm", "tui" ]
-cuda = [ "snarkvm/cuda" ]
-prometheus = [ "snarkos-metrics" ]
-rpc = [ "snarkos-rpc" ]
 
 [profile.release]
 opt-level = 3
