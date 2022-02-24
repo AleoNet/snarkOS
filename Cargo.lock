@@ -2599,8 +2599,6 @@ dependencies = [
  "colored",
  "crossterm 0.23.0",
  "num_cpus",
- "once_cell",
- "parking_lot 0.12.0",
  "rand",
  "rayon",
  "rusty-hook",

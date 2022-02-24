@@ -16,7 +16,7 @@
     * [2.2 Installation](#22-installation)
 * [3a. Run an Aleo Client Node](#3a-run-an-aleo-client-node)
 * [3b. Run an Aleo Mining Node](#3a-run-an-aleo-mining-node)
-* [4. Testnet2 FAQs](#4-testnet2-faqs)
+* [4. FAQs](#4-faqs)
 * [5. Command Line Interface](#5-configuration-file)
 * [6. Development Guide](#6-development-guide)
 * [7. License](#7-license)
@@ -57,7 +57,7 @@ cd snarkOS
 
 **[For Ubuntu users]** A helper script to install dependencies is available. From the snarkOS directory, run:
 ```
-./testnet2_ubuntu.sh
+./build_ubuntu.sh
 ```
 
 ## 3a. Run an Aleo Client Node
@@ -112,7 +112,7 @@ This report can also be queried after the mining node has already ran,
 by running `cargo run --release -- miner stats aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
 in the snarkOS directory, or `snarkos miner stats aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`.
 
-## 4. Testnet2 FAQs
+## 4. FAQs
 
 ### 1. My node is unable to compile.
 
