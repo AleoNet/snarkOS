@@ -14,7 +14,29 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use std::{
+    collections::HashMap,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc,
+    },
+};
 use tokio::sync::{mpsc, oneshot};
+
+pub type ResourceId = usize;
+
+/// The types of messages that the resource manager can handle.
+pub enum ResourceRequest {
+    /// A request to register the given resource under the given id.
+    Register(Resource, ResourceId),
+    /// A request to deregister the resource with the given id.
+    Deregister(ResourceId),
+    /// A request to deregister all the resources.
+    Shutdown,
+    /// A request to print a resource use summary in the logs.
+    #[cfg(test)]
+    LogSummary,
+}
 
 /// Provides the means to shut down a background resource.
 pub type AbortSignal = oneshot::Sender<()>;
@@ -48,13 +70,15 @@ impl Resource {
 /// A collection of handles to resources bound to active processes.
 #[derive(Debug)]
 pub struct Resources {
-    sender: mpsc::UnboundedSender<Option<Resource>>,
+    sender: mpsc::UnboundedSender<ResourceRequest>,
+    index: Arc<AtomicUsize>,
 }
 
 impl Clone for Resources {
     fn clone(&self) -> Self {
         Self {
             sender: self.sender.clone(),
+            index: self.index.clone(),
         }
     }
 }
@@ -71,40 +95,155 @@ impl Resources {
         let (sender, mut receiver) = mpsc::unbounded_channel();
 
         tokio::spawn(async move {
-            let mut resources: Vec<Resource> = vec![];
-            while let Some(resource) = receiver.recv().await {
-                match resource {
-                    Some(resource) => resources.push(resource),
-                    None => break,
+            let mut resources: HashMap<ResourceId, Resource> = Default::default();
+            while let Some(request) = receiver.recv().await {
+                match request {
+                    ResourceRequest::Register(resource, id) => {
+                        if resources.insert(id, resource).is_some() {
+                            error!("A resource with the id {} already exists!", id);
+                        } else {
+                            trace!("Registered a resource under the id {}", id);
+                        }
+                    }
+                    ResourceRequest::Deregister(id) => {
+                        if let Some(resource) = resources.remove(&id) {
+                            trace!("Aborting resource with the id {}", id);
+                            resource.abort().await;
+                        } else {
+                            error!("Resource with the id {} was not found", id);
+                        }
+                    }
+                    ResourceRequest::Shutdown => break,
+                    #[cfg(test)]
+                    ResourceRequest::LogSummary => {
+                        let (mut num_tasks, mut num_threads) = (0, 0);
+                        for resource in resources.values() {
+                            match resource {
+                                Resource::Task(..) => num_tasks += 1,
+                                Resource::Thread(..) => num_threads += 1,
+                            }
+                        }
+                        debug!("[Resources] dedicated threads: {}, dedicated tasks: {}", num_threads, num_tasks);
+                    }
                 }
             }
-            for resource in resources {
+            for resource in resources.into_values() {
                 resource.abort().await;
             }
         });
 
-        Self { sender }
+        Self {
+            sender,
+            index: Default::default(),
+        }
     }
 
-    /// Register the given resource with the resource handler.
-    pub fn register(&self, resource: Resource) {
-        let _ = self.sender.send(Some(resource));
+    /// Obtains an id that can be used to register a resource.
+    pub fn procure_id(&self) -> ResourceId {
+        self.index.fetch_add(1, Ordering::SeqCst)
     }
 
-    /// Register the given task with the resource handler.
-    pub fn register_task(&self, handle: tokio::task::JoinHandle<()>) {
+    /// Register the given resource with the resource handler and optionally
+    /// with an associated resource id which - if provided - must be obtained
+    /// earlier via `Resources::procure_id`.
+    pub fn register(&self, resource: Resource, id: Option<ResourceId>) {
+        // Assign an id to the given resource if not provided.
+        let id = if let Some(id) = id { id } else { self.procure_id() };
+
+        // Prepare a resource request.
+        let request = ResourceRequest::Register(resource, id);
+
+        // This channel will not be closed before the final shutdown.
+        let _ = self.sender.send(request);
+    }
+
+    /// Register the given task with the resource handler and optionally
+    /// with an associated resource id.
+    pub fn register_task(&self, handle: tokio::task::JoinHandle<()>, id: Option<ResourceId>) {
         let task = Resource::Task(handle);
-        self.register(task);
+        self.register(task, id);
     }
 
-    /// Register the given thread with the resource handler.
-    pub fn register_thread(&self, handle: std::thread::JoinHandle<()>, abort_sender: AbortSignal) {
+    /// Register the given thread with the resource handler and optionally
+    /// with an associated resource id.
+    pub fn register_thread(&self, handle: std::thread::JoinHandle<()>, abort_sender: AbortSignal, id: Option<ResourceId>) {
         let thread = Resource::Thread(handle, abort_sender);
-        self.register(thread);
+        self.register(thread, id);
+    }
+
+    // Deregisters and frees a resource with the given id.
+    pub fn deregister(&self, id: ResourceId) {
+        let request = ResourceRequest::Deregister(id);
+
+        // This channel will not be closed before the final shutdown.
+        let _ = self.sender.send(request);
     }
 
     /// Terminate all processes related to registered resources, freeing them in the process.
-    pub fn abort(&self) {
-        self.sender.send(None).ok();
+    pub fn shut_down(&self) {
+        // This channel will not be closed before the final shutdown.
+        let _ = self.sender.send(ResourceRequest::Shutdown);
+    }
+
+    #[cfg(test)]
+    fn log_summary(&self) {
+        // This channel will not be closed before the final shutdown.
+        let _ = self.sender.send(ResourceRequest::LogSummary);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::{thread, time::Duration};
+    use tokio::{sync::oneshot, time};
+
+    struct DropChecker(usize);
+
+    impl Drop for DropChecker {
+        fn drop(&mut self) {
+            warn!("Dropping {}", self.0);
+        }
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    #[ignore = "This test is for inspection purposes only."]
+    async fn resource_management() {
+        tracing_subscriber::fmt::init();
+
+        let resources = Resources::default();
+        resources.log_summary();
+
+        let task_id = resources.procure_id();
+        let task = tokio::task::spawn(async move {
+            let _drop_checker = DropChecker(task_id);
+            loop {
+                time::sleep(Duration::from_millis(10)).await;
+            }
+        });
+        resources.register_task(task, Some(task_id));
+
+        resources.log_summary();
+
+        let thread_id = resources.procure_id();
+        let (tx, mut rx) = oneshot::channel();
+        let thread = thread::spawn(move || {
+            let _drop_checker = DropChecker(thread_id);
+            loop {
+                if rx.try_recv().is_ok() {
+                    break;
+                }
+                thread::sleep(Duration::from_millis(10));
+            }
+        });
+        resources.register_thread(thread, tx, Some(thread_id));
+
+        resources.log_summary();
+        resources.deregister(task_id);
+        resources.log_summary();
+        resources.deregister(thread_id);
+        resources.log_summary();
+
+        time::sleep(Duration::from_millis(100)).await;
     }
 }

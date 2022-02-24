@@ -244,7 +244,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         self.ledger.shut_down().await;
 
         // Flush the tasks.
-        E::resources().abort();
+        E::resources().shut_down();
         trace!("Node has shut down.");
     }
 

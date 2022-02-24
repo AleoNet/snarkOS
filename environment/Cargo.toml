@@ -37,3 +37,10 @@ features = ["sync", "rt"]
 
 [dependencies.tracing]
 version = "0.1"
+
+[dev-dependencies.tracing-subscriber]
+version = "0.3"
+
+[dev-dependencies.tokio]
+version = "1"
+features = ["macros", "rt-multi-thread", "time"]
