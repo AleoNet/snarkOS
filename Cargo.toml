@@ -19,83 +19,87 @@ edition = "2018"
 [workspace]
 members = [ ".integration", "environment", "metrics", "network", "rpc", "storage" ]
 
-[dependencies]
-crossterm = "0.23"
-tui = "0.17.0"
+[dependencies.aleo-std]
+version = "0.1.6"
 
-  [dependencies.aleo-std]
-  version = "0.1.6"
+[dependencies.anyhow]
+version = "1"
 
-  [dependencies.anyhow]
-  version = "1"
+[dependencies.colored]
+version = "2.0"
 
-  [dependencies.colored]
-  version = "2.0"
+[dependencies.crossterm]
+version = "0.23"
+optional = true
 
-  [dependencies.num_cpus]
-  version = "1"
+[dependencies.num_cpus]
+version = "1"
 
-  [dependencies.once_cell]
-  version = "1"
+[dependencies.once_cell]
+version = "1"
 
-  [dependencies.parking_lot]
-  version = "0.12"
+[dependencies.parking_lot]
+version = "0.12"
 
-  [dependencies.rand]
-  version = "0.8"
+[dependencies.rand]
+version = "0.8"
 
-  [dependencies.rayon]
-  version = "1"
+[dependencies.rayon]
+version = "1"
 
-  [dependencies.self_update]
-  version = "0.28"
-  features = [
-    "archive-zip",
-    "compression-zip-bzip2",
-    "compression-zip-deflate",
-    "compression-flate2"
-  ]
+[dependencies.self_update]
+version = "0.28"
+features = [
+  "archive-zip",
+  "compression-zip-bzip2",
+  "compression-zip-deflate",
+  "compression-flate2"
+]
 
-  [dependencies.snarkos-environment]
-  path = "./environment"
-  version = "2.0.2"
+[dependencies.snarkos-environment]
+path = "./environment"
+version = "2.0.2"
 
-  [dependencies.snarkos-metrics]
-  path = "./metrics"
-  version = "2.0.2"
-  optional = true
+[dependencies.snarkos-metrics]
+path = "./metrics"
+version = "2.0.2"
+optional = true
 
-  [dependencies.snarkos-network]
-  path = "./network"
-  version = "2.0.2"
+[dependencies.snarkos-network]
+path = "./network"
+version = "2.0.2"
 
-  [dependencies.snarkos-rpc]
-  path = "./rpc"
-  version = "2.0.2"
-  optional = true
+[dependencies.snarkos-rpc]
+path = "./rpc"
+version = "2.0.2"
+optional = true
 
-  [dependencies.snarkos-storage]
-  path = "./storage"
-  version = "2.0.2"
+[dependencies.snarkos-storage]
+path = "./storage"
+version = "2.0.2"
 
-  [dependencies.snarkvm]
-  version = "0.8.0"
+[dependencies.snarkvm]
+version = "0.8.0"
 
-  [dependencies.structopt]
-  version = "0.3"
+[dependencies.structopt]
+version = "0.3"
 
-  [dependencies.thiserror]
-  version = "1.0"
+[dependencies.thiserror]
+version = "1.0"
 
-  [dependencies.tokio]
-  version = "1"
+[dependencies.tokio]
+version = "1"
 
-  [dependencies.tracing]
-  version = "0.1"
+[dependencies.tracing]
+version = "0.1"
 
-  [dependencies.tracing-subscriber]
-  version = "0.3"
-  features = [ "env-filter", "parking_lot" ]
+[dependencies.tracing-subscriber]
+version = "0.3"
+features = [ "env-filter", "parking_lot" ]
+
+[dependencies.tui]
+version = "0.17"
+optional = true
 
 [dev-dependencies.jsonrpsee]
 version = "0.9"
@@ -105,7 +109,8 @@ features = [ "http-client" ]
 version = "0.11"
 
 [features]
-default = [ "rpc" ]
+default = [ "console", "rpc" ]
+console = [ "crossterm", "tui" ]
 cuda = [ "snarkvm/cuda" ]
 prometheus = [ "snarkos-metrics" ]
 rpc = [ "snarkos-rpc" ]

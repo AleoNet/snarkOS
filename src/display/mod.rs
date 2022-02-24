@@ -17,8 +17,8 @@
 pub(crate) mod aleo;
 pub(crate) use aleo::*;
 
-pub(crate) mod display;
-pub(crate) use display::*;
+pub(crate) mod console;
+pub(crate) use console::*;
 
 pub(super) mod logs;
 
