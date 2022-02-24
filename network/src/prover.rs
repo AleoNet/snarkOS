@@ -34,7 +34,7 @@ use tokio::{
 };
 
 /// Shorthand for the parent half of the `Prover` message channel.
-pub(crate) type ProverRouter<N> = mpsc::Sender<ProverRequest<N>>;
+pub type ProverRouter<N> = mpsc::Sender<ProverRequest<N>>;
 #[allow(unused)]
 /// Shorthand for the child half of the `Prover` message channel.
 type ProverHandler<N> = mpsc::Receiver<ProverRequest<N>>;
@@ -157,7 +157,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
     }
 
     /// Returns an instance of the memory pool.
-    pub(crate) fn memory_pool(&self) -> Arc<RwLock<MemoryPool<N>>> {
+    pub fn memory_pool(&self) -> Arc<RwLock<MemoryPool<N>>> {
         self.memory_pool.clone()
     }
 

@@ -14,13 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    ledger::Ledger,
-    network::{Operator, Prover},
-    rpc::*,
-    Peers,
-};
+use crate::{initialize_rpc_server, rpc_trait::RpcFunctions, RpcContext};
 use snarkos_environment::{Client, Environment};
+use snarkos_network::{ledger::Ledger, Operator, Peers, Prover};
 use snarkos_storage::{
     storage::{rocksdb::RocksDB, Storage},
     LedgerState,

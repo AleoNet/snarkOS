@@ -17,9 +17,9 @@
 use crate::{
     display::{logs::Logs, overview::Overview},
     initialize_logger,
-    network::Server,
-    Environment,
+    Server,
 };
+use snarkos_environment::Environment;
 use snarkvm::dpc::Network;
 
 use anyhow::Result;

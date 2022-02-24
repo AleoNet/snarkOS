@@ -35,7 +35,7 @@ use tokio::{
 };
 
 /// Shorthand for the parent half of the `Operator` message channel.
-pub(crate) type OperatorRouter<N> = mpsc::Sender<OperatorRequest<N>>;
+pub type OperatorRouter<N> = mpsc::Sender<OperatorRequest<N>>;
 #[allow(unused)]
 /// Shorthand for the child half of the `Operator` message channel.
 type OperatorHandler<N> = mpsc::Receiver<OperatorRequest<N>>;

@@ -18,14 +18,13 @@ use crate::{
     helpers::{block_requests::*, BlockRequest, CircularMap},
     Data,
     DisconnectReason,
-    Environment,
-    LedgerReader,
     Message,
     PeersRequest,
     PeersRouter,
     ProverRequest,
     ProverRouter,
 };
+use snarkos_environment::Environment;
 use snarkos_storage::{storage::Storage, BlockLocators, LedgerState, MAXIMUM_LINEAR_BLOCK_LOCATORS};
 use snarkos_utilities::{NodeType, State};
 use snarkvm::dpc::prelude::*;
@@ -47,8 +46,10 @@ use tokio::{
 /// The maximum number of unconfirmed blocks that can be held by the ledger.
 const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 250;
 
+pub type LedgerReader<N> = std::sync::Arc<snarkos_storage::LedgerState<N>>;
+
 /// Shorthand for the parent half of the `Ledger` message channel.
-pub(crate) type LedgerRouter<N> = mpsc::Sender<LedgerRequest<N>>;
+pub type LedgerRouter<N> = mpsc::Sender<LedgerRequest<N>>;
 #[allow(unused)]
 /// Shorthand for the child half of the `Ledger` message channel.
 type LedgerHandler<N> = mpsc::Receiver<LedgerRequest<N>>;
@@ -163,7 +164,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.ledger_router.clone()
     }
 
-    pub(super) async fn shut_down(&self) {
+    pub async fn shut_down(&self) {
         debug!("Ledger is shutting down...");
 
         // Set the terminator bit to `true` to ensure it stops mining.

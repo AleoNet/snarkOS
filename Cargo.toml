@@ -17,17 +17,9 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = [ ".integration", "environment", "metrics", "storage", "utilities" ]
-
-[features]
-default = [ "rpc" ]
-cuda = [ "snarkvm/cuda" ]
-prometheus = [ "snarkos-metrics" ]
-rpc = [ "jsonrpsee" ]
-test = [ ]
+members = [ ".integration", "environment", "metrics", "network", "rpc", "storage", "utilities" ]
 
 [dependencies]
-bytes = "1.0.0"
 crossterm = "0.23"
 tui = "0.17.0"
 
@@ -37,6 +29,15 @@ tui = "0.17.0"
 
   [dependencies.snarkos-metrics]
   path = "./metrics"
+  version = "2.0.2"
+  optional = true
+
+  [dependencies.snarkos-network]
+  path = "./network"
+  version = "2.0.2"
+
+  [dependencies.snarkos-rpc]
+  path = "./rpc"
   version = "2.0.2"
   optional = true
 
@@ -57,29 +58,8 @@ tui = "0.17.0"
   [dependencies.anyhow]
   version = "1"
 
-  [dependencies.async-trait]
-  version = "0.1"
-
-  [dependencies.bincode]
-  version = "1.0"
-
-  [dependencies.circular-queue]
-  version = "0.2"
-
   [dependencies.colored]
   version = "2.0"
-
-  [dependencies.futures]
-  version = "0.3.21"
-  features = [ "thread-pool" ]
-
-  [dependencies.hex]
-  version = "0.4"
-
-  [dependencies.jsonrpsee]
-  version = "0.9"
-  optional = true
-  features = [ "http-server" ]
 
   [dependencies.num_cpus]
   version = "1"
@@ -99,18 +79,11 @@ tui = "0.17.0"
   [dependencies.self_update]
   version = "0.28"
   features = [
-  "archive-zip",
-  "compression-zip-bzip2",
-  "compression-zip-deflate",
-  "compression-flate2"
-]
-
-  [dependencies.serde]
-  version = "1"
-
-  [dependencies.serde_json]
-  version = "1"
-  features = [ "arbitrary_precision" ]
+    "archive-zip",
+    "compression-zip-bzip2",
+    "compression-zip-deflate",
+    "compression-flate2"
+  ]
 
   [dependencies.structopt]
   version = "0.3"
@@ -118,27 +91,8 @@ tui = "0.17.0"
   [dependencies.thiserror]
   version = "1.0"
 
-  [dependencies.time]
-  version = "0.3.7"
-
   [dependencies.tokio]
   version = "1"
-  features = [
-  "io-util",
-  "macros",
-  "net",
-  "rt-multi-thread",
-  "signal",
-  "sync",
-  "time"
-]
-
-  [dependencies.tokio-util]
-  version = "0.7"
-  features = [ "codec" ]
-
-  [dependencies.tokio-stream]
-  version = "=0.1"
 
   [dependencies.tracing]
   version = "0.1"
@@ -151,14 +105,14 @@ tui = "0.17.0"
 version = "0.9"
 features = [ "http-client" ]
 
-[dev-dependencies.rand_chacha]
-version = "0.3"
-
 [dev-dependencies.rusty-hook]
 version = "0.11"
 
-[dev-dependencies.tempfile]
-version = "3.2"
+[features]
+default = [ "rpc" ]
+cuda = [ "snarkvm/cuda" ]
+prometheus = [ "snarkos-metrics" ]
+rpc = [ "snarkos-rpc" ]
 
 [profile.release]
 opt-level = 3

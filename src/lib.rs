@@ -27,19 +27,20 @@ extern crate tracing;
 pub(crate) mod display;
 pub(crate) use display::*;
 
-pub mod helpers;
-
-pub mod network;
-pub use network::*;
-
 pub mod node;
 pub use node::*;
 
-#[cfg(feature = "rpc")]
-pub(crate) mod rpc;
+pub mod server;
+pub use server::*;
+
+pub mod updater;
+pub use updater::*;
 
 pub use snarkos_environment::*;
 pub use snarkos_storage::*;
 pub use snarkos_utilities::*;
+
+#[cfg(feature = "rpc")]
+pub use snarkos_rpc::*;
 
 pub use snarkvm::dpc::{testnet2::Testnet2, Address, Network};

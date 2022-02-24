@@ -34,7 +34,7 @@ use tokio::{
 };
 
 /// Shorthand for the parent half of the `Peers` message channel.
-pub(crate) type PeersRouter<N, E> = mpsc::Sender<PeersRequest<N, E>>;
+pub type PeersRouter<N, E> = mpsc::Sender<PeersRequest<N, E>>;
 #[allow(unused)]
 /// Shorthand for the child half of the `Peers` message channel.
 type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
@@ -109,7 +109,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Initializes a new instance of `Peers`.
     ///
-    pub(crate) async fn new(local_ip: SocketAddr, local_nonce: Option<u64>) -> Arc<Self> {
+    pub async fn new(local_ip: SocketAddr, local_nonce: Option<u64>) -> Arc<Self> {
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
         let (peers_router, mut peers_handler) = mpsc::channel(1024);
 

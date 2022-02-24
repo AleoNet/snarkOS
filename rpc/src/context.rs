@@ -16,8 +16,9 @@
 
 //! Logic for instantiating the RPC server.
 
-use crate::{network::Operator, rpc::*, LedgerReader, Peers, ProverRouter};
+use crate::RpcFunctions;
 use snarkos_environment::Environment;
+use snarkos_network::{LedgerReader, Operator, Peers, ProverRouter};
 use snarkvm::dpc::{Address, MemoryPool, Network};
 
 use futures::TryFutureExt;
@@ -28,6 +29,15 @@ use jsonrpsee::{
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
 use tokio::sync::{oneshot, RwLock};
+
+// The details on resource-limiting can be found at https://github.com/paritytech/jsonrpsee/blob/master/core/src/server/resource_limiting.rs
+// note: jsonrpsee expects string literals as resource names; we'll be distinguishing
+// them by the const name, so in order for the actual lookups to be faster, we can make
+// the underlying strings short, as long as they are unique.
+/// The resource label corresponding to the number of all active RPC calls.
+const ALL_CONCURRENT_REQUESTS: &str = "0";
+/// The maximum number of RPC requests that can be handled at once at any given time.
+const ALL_CONCURRENT_REQUESTS_LIMIT: u16 = 10;
 
 #[doc(hidden)]
 pub struct RpcInner<N: Network, E: Environment> {

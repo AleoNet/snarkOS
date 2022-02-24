@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-integration"
+name = "snarkos-rpc"
 version = "2.0.2"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "A decentralized operating system"
+description = "RPC server for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
@@ -22,21 +22,23 @@ version = "1"
 [dependencies.async-trait]
 version = "0.1"
 
-[dependencies.bincode]
+[dependencies.futures]
+version = "0.3.21"
+features = [ "thread-pool" ]
+
+[dependencies.hex]
+version = "0.4"
+
+[dependencies.jsonrpsee]
+version = "0.9"
+features = [ "http-server" ]
+
+[dependencies.serde]
 version = "1"
 
-[dependencies.pea2pea]
-version = "0.33"
-
-[dependencies.peak_alloc]
-version = "0.1"
-
-[dependencies.rand]
-version = "0.8"
-
-[dependencies.snarkos]
-path = ".."
-version = "2.0.2"
+[dependencies.serde_json]
+version = "1"
+features = [ "arbitrary_precision" ]
 
 [dependencies.snarkos-environment]
 path = "../environment"
@@ -45,7 +47,6 @@ version = "2.0.2"
 [dependencies.snarkos-network]
 path = "../network"
 version = "2.0.2"
-features = [ "test" ]
 
 [dependencies.snarkos-storage]
 path = "../storage"
@@ -58,16 +59,26 @@ version = "2.0.2"
 [dependencies.snarkvm]
 version = "0.8.0"
 
-[dependencies.structopt]
-version = "0.3"
+[dependencies.thiserror]
+version = "1.0"
+
+[dependencies.time]
+version = "0.3.7"
 
 [dependencies.tokio]
 version = "1"
-features = [ "macros", "rt-multi-thread", "time" ]
 
 [dependencies.tracing]
 version = "0.1"
 
-[dependencies.tracing-subscriber]
+[dev-dependencies.bincode]
+version = "1.0"
+
+[dev-dependencies.rand]
+version = "0.8"
+
+[dev-dependencies.rand_chacha]
 version = "0.3"
-features = [ "env-filter", "parking_lot" ]
+
+[dev-dependencies.tempfile]
+version = "3.2"

@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos::{Data, Message};
 use snarkos_environment::{Client, Environment};
+use snarkos_network::{Data, Message};
 use snarkos_storage::BlockLocators;
 use snarkos_utilities::{NodeType, State, Status};
 use snarkvm::{dpc::testnet2::Testnet2, traits::Network};

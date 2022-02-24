@@ -14,12 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use tokio::{
-    sync::{mpsc, oneshot},
-    task,
-};
-
-use std::thread;
+use tokio::sync::{mpsc, oneshot};
 
 /// Provides the means to shut down a background resource.
 pub type AbortSignal = oneshot::Sender<()>;
@@ -27,9 +22,9 @@ pub type AbortSignal = oneshot::Sender<()>;
 /// A background task or thread.
 pub enum Resource {
     /// An asynchronous task.
-    Task(task::JoinHandle<()>),
+    Task(tokio::task::JoinHandle<()>),
     /// An OS-native thread.
-    Thread(thread::JoinHandle<()>, AbortSignal),
+    Thread(std::thread::JoinHandle<()>, AbortSignal),
 }
 
 impl Resource {
@@ -41,7 +36,7 @@ impl Resource {
             }
             Self::Thread(handle, sender) => {
                 let _ = sender.send(());
-                let _ = task::spawn_blocking(move || {
+                let _ = tokio::task::spawn_blocking(move || {
                     let _ = handle.join().map_err(|e| error!("Can't join a thread: {:?}", e));
                 })
                 .await;
@@ -97,13 +92,13 @@ impl Resources {
     }
 
     /// Register the given task with the resource handler.
-    pub fn register_task(&self, handle: task::JoinHandle<()>) {
+    pub fn register_task(&self, handle: tokio::task::JoinHandle<()>) {
         let task = Resource::Task(handle);
         self.register(task);
     }
 
     /// Register the given thread with the resource handler.
-    pub fn register_thread(&self, handle: thread::JoinHandle<()>, abort_sender: AbortSignal) {
+    pub fn register_thread(&self, handle: std::thread::JoinHandle<()>, abort_sender: AbortSignal) {
         let thread = Resource::Thread(handle, abort_sender);
         self.register(thread);
     }

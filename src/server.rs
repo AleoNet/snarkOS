@@ -14,29 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    display::notification_message,
-    ledger::{Ledger, LedgerRequest, LedgerRouter},
+use crate::{display::notification_message, Node};
+use snarkos_environment::Environment;
+use snarkos_network::{
+    ledger::{Ledger, LedgerReader, LedgerRequest, LedgerRouter},
     operator::{Operator, OperatorRouter},
     peers::{Peers, PeersRequest, PeersRouter},
     prover::{Prover, ProverRouter},
-    Node,
 };
-use snarkos_environment::Environment;
-use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
+use snarkos_storage::storage::rocksdb::RocksDB;
 use snarkos_utilities::{NodeType, State};
 use snarkvm::prelude::*;
 
 #[cfg(feature = "rpc")]
-use crate::rpc::{context::RpcContext, initialize_rpc_server};
+use snarkos_rpc::{initialize_rpc_server, RpcContext};
 #[cfg(feature = "rpc")]
 use tokio::sync::RwLock;
 
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, sync::oneshot, task};
-
-pub type LedgerReader<N> = Arc<LedgerState<N>>;
 
 ///
 /// A set of operations to initialize the node server for a specific network.

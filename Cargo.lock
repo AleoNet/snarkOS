@@ -2596,37 +2596,26 @@ version = "2.0.2"
 dependencies = [
  "aleo-std",
  "anyhow",
- "async-trait",
- "bincode",
- "bytes",
- "circular-queue",
  "colored",
  "crossterm 0.23.0",
- "futures",
- "hex",
  "jsonrpsee",
  "num_cpus",
  "once_cell",
  "parking_lot 0.12.0",
  "rand",
- "rand_chacha",
  "rayon",
  "rusty-hook",
  "self_update",
- "serde",
- "serde_json",
  "snarkos-environment",
  "snarkos-metrics",
+ "snarkos-network",
+ "snarkos-rpc",
  "snarkos-storage",
  "snarkos-utilities",
  "snarkvm",
  "structopt",
- "tempfile",
  "thiserror",
- "time 0.3.7",
  "tokio",
- "tokio-stream",
- "tokio-util 0.7.0",
  "tracing",
  "tracing-subscriber",
  "tui",
@@ -2644,12 +2633,82 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-integration"
+version = "2.0.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "pea2pea",
+ "peak_alloc",
+ "rand",
+ "snarkos",
+ "snarkos-environment",
+ "snarkos-network",
+ "snarkos-storage",
+ "snarkos-utilities",
+ "snarkvm",
+ "structopt",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "snarkos-metrics"
 version = "2.0.2"
 dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
  "tokio",
+]
+
+[[package]]
+name = "snarkos-network"
+version = "2.0.2"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "bytes",
+ "circular-queue",
+ "futures",
+ "rand",
+ "serde",
+ "snarkos-environment",
+ "snarkos-storage",
+ "snarkos-utilities",
+ "snarkvm",
+ "time 0.3.7",
+ "tokio",
+ "tokio-stream",
+ "tokio-util 0.7.0",
+ "tracing",
+]
+
+[[package]]
+name = "snarkos-rpc"
+version = "2.0.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "futures",
+ "hex",
+ "jsonrpsee",
+ "rand",
+ "rand_chacha",
+ "serde",
+ "serde_json",
+ "snarkos-environment",
+ "snarkos-network",
+ "snarkos-storage",
+ "snarkos-utilities",
+ "snarkvm",
+ "tempfile",
+ "thiserror",
+ "time 0.3.7",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2674,27 +2733,6 @@ dependencies = [
  "time 0.3.7",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "snarkos-testing"
-version = "2.0.2"
-dependencies = [
- "anyhow",
- "async-trait",
- "bincode",
- "pea2pea",
- "peak_alloc",
- "rand",
- "snarkos",
- "snarkos-environment",
- "snarkos-storage",
- "snarkos-utilities",
- "snarkvm",
- "structopt",
- "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

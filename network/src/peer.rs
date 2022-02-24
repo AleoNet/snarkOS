@@ -15,23 +15,21 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    network::{
-        ConnectionResult,
-        DisconnectReason,
-        LedgerReader,
-        LedgerRequest,
-        LedgerRouter,
-        Message,
-        OperatorRequest,
-        OperatorRouter,
-        PeersRequest,
-        PeersRouter,
-        ProverRequest,
-        ProverRouter,
-    },
+    ConnectionResult,
     Data,
-    Environment,
+    DisconnectReason,
+    LedgerReader,
+    LedgerRequest,
+    LedgerRouter,
+    Message,
+    OperatorRequest,
+    OperatorRouter,
+    PeersRequest,
+    PeersRouter,
+    ProverRequest,
+    ProverRouter,
 };
+use snarkos_environment::Environment;
 use snarkos_utilities::{NodeType, State, Status};
 use snarkvm::dpc::prelude::*;
 

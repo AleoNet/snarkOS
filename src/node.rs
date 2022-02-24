@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{helpers::Updater, network::Server, Display};
+use crate::{Display, Server, Updater};
 use snarkos_environment::{Client, ClientTrial, Environment, Miner, MinerTrial, Operator, OperatorTrial, Prover, ProverTrial, SyncNode};
 use snarkos_storage::storage::rocksdb::RocksDB;
 use snarkos_utilities::NodeType;

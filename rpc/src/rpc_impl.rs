@@ -18,8 +18,9 @@
 //!
 //! See [RpcFunctions](../trait.RpcFunctions.html) for documentation of public endpoints.
 
-use crate::{rpc::*, ProverRequest};
+use crate::{RpcContext, RpcError, RpcFunctions};
 use snarkos_environment::Environment;
+use snarkos_network::ProverRequest;
 use snarkos_storage::Metadata;
 use snarkvm::{
     dpc::{Address, AleoAmount, Block, BlockHeader, Blocks, Network, Record, Transaction, Transactions, Transition},

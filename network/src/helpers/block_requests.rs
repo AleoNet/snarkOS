@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{network::ledger::PeersState, DisconnectReason, Environment};
+use crate::{ledger::PeersState, DisconnectReason};
+use snarkos_environment::Environment;
 use snarkos_storage::{BlockLocators, LedgerState};
 use snarkvm::dpc::prelude::*;
 
@@ -243,7 +244,7 @@ pub(crate) fn handle_block_requests<N: Network, E: Environment>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Client;
+    use snarkos_environment::Client;
     use snarkvm::dpc::testnet2::Testnet2;
 
     use rand::{thread_rng, Rng};

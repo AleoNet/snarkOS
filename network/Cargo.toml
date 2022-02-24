@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-integration"
+name = "snarkos-network"
 version = "2.0.2"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "A decentralized operating system"
+description = "Node server for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
@@ -19,33 +19,28 @@ edition = "2018"
 [dependencies.anyhow]
 version = "1"
 
-[dependencies.async-trait]
-version = "0.1"
-
 [dependencies.bincode]
-version = "1"
+version = "1.0"
 
-[dependencies.pea2pea]
-version = "0.33"
+[dependencies.bytes]
+version = "1.0.0"
 
-[dependencies.peak_alloc]
-version = "0.1"
+[dependencies.circular-queue]
+version = "0.2"
+
+[dependencies.futures]
+version = "0.3.21"
+features = [ "thread-pool" ]
 
 [dependencies.rand]
 version = "0.8"
 
-[dependencies.snarkos]
-path = ".."
-version = "2.0.2"
+[dependencies.serde]
+version = "1"
 
 [dependencies.snarkos-environment]
 path = "../environment"
 version = "2.0.2"
-
-[dependencies.snarkos-network]
-path = "../network"
-version = "2.0.2"
-features = [ "test" ]
 
 [dependencies.snarkos-storage]
 path = "../storage"
@@ -58,16 +53,31 @@ version = "2.0.2"
 [dependencies.snarkvm]
 version = "0.8.0"
 
-[dependencies.structopt]
-version = "0.3"
+[dependencies.time]
+version = "0.3.7"
 
 [dependencies.tokio]
 version = "1"
-features = [ "macros", "rt-multi-thread", "time" ]
+features = [
+  "io-util",
+  "macros",
+  "net",
+  "rt-multi-thread",
+  "signal",
+  "sync",
+  "time"
+]
+
+[dependencies.tokio-util]
+version = "0.7"
+features = [ "codec" ]
+
+[dependencies.tokio-stream]
+version = "=0.1"
 
 [dependencies.tracing]
 version = "0.1"
 
-[dependencies.tracing-subscriber]
-version = "0.3"
-features = [ "env-filter", "parking_lot" ]
+[features]
+default = [ ]
+test = [ ]
