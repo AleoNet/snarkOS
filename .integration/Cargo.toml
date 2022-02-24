@@ -51,10 +51,6 @@ features = [ "test" ]
 path = "../storage"
 version = "2.0.2"
 
-[dependencies.snarkos-utilities]
-path = "../utilities"
-version = "2.0.2"
-
 [dependencies.snarkvm]
 version = "0.8.0"
 

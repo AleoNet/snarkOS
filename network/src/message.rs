@@ -14,9 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_environment::Environment;
+use snarkos_environment::{
+    helpers::{NodeType, State},
+    Environment,
+};
 use snarkos_storage::BlockLocators;
-use snarkos_utilities::{NodeType, State};
 use snarkvm::{dpc::posw::PoSWProof, prelude::*};
 
 use ::bytes::{Buf, BufMut, Bytes, BytesMut};

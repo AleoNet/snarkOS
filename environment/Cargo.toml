@@ -25,9 +25,15 @@ version = "1"
 [dependencies.rayon]
 version = "1"
 
-[dependencies.snarkos-utilities]
-path = "../utilities"
-version = "2.0.2"
+[dependencies.serde]
+version = "1"
 
 [dependencies.snarkvm]
 version = "0.8.0"
+
+[dependencies.tokio]
+version = "1"
+features = ["sync", "rt"]
+
+[dependencies.tracing]
+version = "0.1"

@@ -16,7 +16,12 @@
 
 #![forbid(unsafe_code)]
 
-use snarkos_utilities::{NodeType, Resources, Status};
+#[macro_use]
+extern crate tracing;
+
+pub mod helpers;
+
+use crate::helpers::{NodeType, Resources, Status};
 use snarkvm::dpc::Network;
 
 use once_cell::sync::OnceCell;

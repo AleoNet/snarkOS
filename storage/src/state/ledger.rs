@@ -18,7 +18,7 @@ use crate::{
     helpers::BlockLocators,
     storage::{DataMap, Map, MapId, Storage},
 };
-use snarkos_utilities::Resource;
+use snarkos_environment::helpers::Resource;
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};

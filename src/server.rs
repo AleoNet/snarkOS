@@ -15,7 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{display::notification_message, Node};
-use snarkos_environment::Environment;
+use snarkos_environment::{
+    helpers::{NodeType, State},
+    Environment,
+};
 use snarkos_network::{
     ledger::{Ledger, LedgerReader, LedgerRequest, LedgerRouter},
     operator::{Operator, OperatorRouter},
@@ -23,7 +26,6 @@ use snarkos_network::{
     prover::{Prover, ProverRouter},
 };
 use snarkos_storage::storage::rocksdb::RocksDB;
-use snarkos_utilities::{NodeType, State};
 use snarkvm::prelude::*;
 
 #[cfg(feature = "rpc")]

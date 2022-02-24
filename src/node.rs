@@ -15,9 +15,20 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Display, Server, Updater};
-use snarkos_environment::{Client, ClientTrial, Environment, Miner, MinerTrial, Operator, OperatorTrial, Prover, ProverTrial, SyncNode};
+use snarkos_environment::{
+    helpers::NodeType,
+    Client,
+    ClientTrial,
+    Environment,
+    Miner,
+    MinerTrial,
+    Operator,
+    OperatorTrial,
+    Prover,
+    ProverTrial,
+    SyncNode,
+};
 use snarkos_storage::storage::rocksdb::RocksDB;
-use snarkos_utilities::NodeType;
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use anyhow::{anyhow, Result};

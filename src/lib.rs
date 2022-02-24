@@ -38,7 +38,6 @@ pub use updater::*;
 
 pub use snarkos_environment::*;
 pub use snarkos_storage::*;
-pub use snarkos_utilities::*;
 
 #[cfg(feature = "rpc")]
 pub use snarkos_rpc::*;

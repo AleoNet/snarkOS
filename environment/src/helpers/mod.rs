@@ -14,16 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#![forbid(unsafe_code)]
-
-#[macro_use]
-extern crate tracing;
+mod node_type;
+pub use node_type::NodeType;
 
 mod resources;
 pub use resources::{Resource, Resources};
-
-mod node_type;
-pub use node_type::NodeType;
 
 mod status;
 pub use status::{State, Status};

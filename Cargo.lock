@@ -2611,7 +2611,6 @@ dependencies = [
  "snarkos-network",
  "snarkos-rpc",
  "snarkos-storage",
- "snarkos-utilities",
  "snarkvm",
  "structopt",
  "thiserror",
@@ -2628,8 +2627,10 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "rayon",
- "snarkos-utilities",
+ "serde",
  "snarkvm",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2646,7 +2647,6 @@ dependencies = [
  "snarkos-environment",
  "snarkos-network",
  "snarkos-storage",
- "snarkos-utilities",
  "snarkvm",
  "structopt",
  "tokio",
@@ -2676,7 +2676,6 @@ dependencies = [
  "serde",
  "snarkos-environment",
  "snarkos-storage",
- "snarkos-utilities",
  "snarkvm",
  "time 0.3.7",
  "tokio",
@@ -2702,7 +2701,6 @@ dependencies = [
  "snarkos-environment",
  "snarkos-network",
  "snarkos-storage",
- "snarkos-utilities",
  "snarkvm",
  "tempfile",
  "thiserror",
@@ -2727,19 +2725,10 @@ dependencies = [
  "rocksdb",
  "serde",
  "serde_json",
- "snarkos-utilities",
+ "snarkos-environment",
  "snarkvm",
  "tempfile",
  "time 0.3.7",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "snarkos-utilities"
-version = "2.0.2"
-dependencies = [
- "serde",
  "tokio",
  "tracing",
 ]

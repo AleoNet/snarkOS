@@ -24,9 +24,11 @@ use crate::{
     ProverRequest,
     ProverRouter,
 };
-use snarkos_environment::Environment;
+use snarkos_environment::{
+    helpers::{NodeType, State},
+    Environment,
+};
 use snarkos_storage::{storage::Storage, BlockLocators, LedgerState, MAXIMUM_LINEAR_BLOCK_LOCATORS};
-use snarkos_utilities::{NodeType, State};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;

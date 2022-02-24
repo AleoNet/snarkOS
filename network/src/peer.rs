@@ -29,8 +29,10 @@ use crate::{
     ProverRequest,
     ProverRouter,
 };
-use snarkos_environment::Environment;
-use snarkos_utilities::{NodeType, State, Status};
+use snarkos_environment::{
+    helpers::{NodeType, State, Status},
+    Environment,
+};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, bail, Result};

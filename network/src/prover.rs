@@ -15,9 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Data, LedgerReader, LedgerRequest, LedgerRouter, Message, PeersRequest, PeersRouter};
-use snarkos_environment::Environment;
+use snarkos_environment::{
+    helpers::{NodeType, State},
+    Environment,
+};
 use snarkos_storage::{storage::Storage, ProverState};
-use snarkos_utilities::{NodeType, State};
 use snarkvm::dpc::{posw::PoSWProof, prelude::*};
 
 use anyhow::{anyhow, Result};

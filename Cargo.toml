@@ -17,40 +17,11 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = [ ".integration", "environment", "metrics", "network", "rpc", "storage", "utilities" ]
+members = [ ".integration", "environment", "metrics", "network", "rpc", "storage" ]
 
 [dependencies]
 crossterm = "0.23"
 tui = "0.17.0"
-
-  [dependencies.snarkos-environment]
-  path = "./environment"
-  version = "2.0.2"
-
-  [dependencies.snarkos-metrics]
-  path = "./metrics"
-  version = "2.0.2"
-  optional = true
-
-  [dependencies.snarkos-network]
-  path = "./network"
-  version = "2.0.2"
-
-  [dependencies.snarkos-rpc]
-  path = "./rpc"
-  version = "2.0.2"
-  optional = true
-
-  [dependencies.snarkos-storage]
-  path = "./storage"
-  version = "2.0.2"
-
-  [dependencies.snarkos-utilities]
-  path = "utilities"
-  version = "2.0.2"
-
-  [dependencies.snarkvm]
-  version = "0.8.0"
 
   [dependencies.aleo-std]
   version = "0.1.6"
@@ -84,6 +55,31 @@ tui = "0.17.0"
     "compression-zip-deflate",
     "compression-flate2"
   ]
+
+  [dependencies.snarkos-environment]
+  path = "./environment"
+  version = "2.0.2"
+
+  [dependencies.snarkos-metrics]
+  path = "./metrics"
+  version = "2.0.2"
+  optional = true
+
+  [dependencies.snarkos-network]
+  path = "./network"
+  version = "2.0.2"
+
+  [dependencies.snarkos-rpc]
+  path = "./rpc"
+  version = "2.0.2"
+  optional = true
+
+  [dependencies.snarkos-storage]
+  path = "./storage"
+  version = "2.0.2"
+
+  [dependencies.snarkvm]
+  version = "0.8.0"
 
   [dependencies.structopt]
   version = "0.3"
