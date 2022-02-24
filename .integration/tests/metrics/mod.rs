@@ -16,8 +16,8 @@
 
 use crate::wait_until;
 
+use snarkos_integration::{ClientNode, TestNode};
 use snarkos_metrics as metrics;
-use snarkos_testing::{ClientNode, TestNode};
 
 use pea2pea::Pea2Pea;
 

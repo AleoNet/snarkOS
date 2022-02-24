@@ -431,7 +431,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     fn initialize_metrics(ledger: LedgerReader<N>) {
         #[cfg(not(feature = "test"))]
         if let Some(handler) = snarkos_metrics::initialize() {
-            E::tasks().append(handler);
+            E::resources().register_task(handler);
         }
 
         // Set the block height as it could already be non-zero.
