@@ -16,18 +16,6 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2018"
 
-[dependencies.snarkos]
-path = ".."
-version = "2.0.0"
-features = [ "test" ]
-
-[dependencies.snarkos-storage]
-path = "../storage"
-version = "2.0.2"
-
-[dependencies.snarkvm]
-version = "0.8.0"
-
 [dependencies.anyhow]
 version = "1"
 
@@ -45,6 +33,26 @@ version = "0.1"
 
 [dependencies.rand]
 version = "0.8"
+
+[dependencies.snarkos]
+path = ".."
+version = "2.0.2"
+features = [ "test" ]
+
+[dependencies.snarkos-environment]
+path = "../environment"
+version = "2.0.2"
+
+[dependencies.snarkos-storage]
+path = "../storage"
+version = "2.0.2"
+
+[dependencies.snarkos-utilities]
+path = "../utilities"
+version = "2.0.2"
+
+[dependencies.snarkvm]
+version = "0.8.0"
 
 [dependencies.structopt]
 version = "0.3"

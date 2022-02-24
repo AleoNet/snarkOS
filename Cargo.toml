@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = [ "metrics", "storage", "testing", "utilities"]
+members = [ "environment", "metrics", "storage", "testing", "utilities"]
 
 [features]
 default = [ "rpc" ]
@@ -30,6 +30,10 @@ test = [ ]
 bytes = "1.0.0"
 crossterm = "0.23"
 tui = "0.17.0"
+
+  [dependencies.snarkos-environment]
+  path = "./environment"
+  version = "2.0.2"
 
   [dependencies.snarkos-metrics]
   path = "./metrics"

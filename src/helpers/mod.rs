@@ -23,11 +23,5 @@ pub use block_requests::*;
 pub mod circular_map;
 pub use circular_map::*;
 
-pub mod node_type;
-pub use node_type::*;
-
-pub mod status;
-pub use status::*;
-
 pub mod updater;
 pub use updater::*;

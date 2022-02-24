@@ -16,15 +16,15 @@
 
 use crate::{
     display::notification_message,
-    environment::Environment,
-    helpers::{NodeType, State},
     ledger::{Ledger, LedgerRequest, LedgerRouter},
     operator::{Operator, OperatorRouter},
     peers::{Peers, PeersRequest, PeersRouter},
     prover::{Prover, ProverRouter},
     Node,
 };
+use snarkos_environment::Environment;
 use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
+use snarkos_utilities::{NodeType, State};
 use snarkvm::prelude::*;
 
 #[cfg(feature = "rpc")]

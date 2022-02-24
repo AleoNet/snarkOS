@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{NodeType, State, Status},
     network::{
         ConnectionResult,
         DisconnectReason,
@@ -33,6 +32,7 @@ use crate::{
     Data,
     Environment,
 };
+use snarkos_utilities::{NodeType, State, Status};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, bail, Result};

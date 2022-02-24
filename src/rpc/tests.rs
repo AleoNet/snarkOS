@@ -15,18 +15,17 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    environment::Client,
-    helpers::State,
     ledger::Ledger,
     network::{Operator, Prover},
     rpc::*,
-    Environment,
     Peers,
 };
+use snarkos_environment::{Client, Environment};
 use snarkos_storage::{
     storage::{rocksdb::RocksDB, Storage},
     LedgerState,
 };
+use snarkos_utilities::State;
 use snarkvm::{
     dpc::{testnet2::Testnet2, Address, AleoAmount, Network, Transaction, Transactions, Transition},
     prelude::{Account, Block, BlockHeader},

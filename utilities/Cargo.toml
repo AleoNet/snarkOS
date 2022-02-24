@@ -16,6 +16,9 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2018"
 
+[dependencies.serde]
+version = "1"
+
 [dependencies.tokio]
 version = "1"
 features = ["sync", "rt"]

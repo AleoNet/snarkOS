@@ -18,7 +18,6 @@ use tokio::{
     sync::{mpsc, oneshot},
     task,
 };
-use tracing::*;
 
 use std::thread;
 

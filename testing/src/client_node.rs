@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos::{Client, Server};
+use snarkos::Server;
+use snarkos_environment::Client;
 use snarkvm::dpc::testnet2::Testnet2;
 
 use std::{fs, net::SocketAddr};

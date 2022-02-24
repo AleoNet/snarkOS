@@ -14,8 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::helpers::{NodeType, Status};
-use snarkos_utilities::Resources;
+#![forbid(unsafe_code)]
+
+use snarkos_utilities::{NodeType, Resources, Status};
 use snarkvm::dpc::Network;
 
 use once_cell::sync::OnceCell;

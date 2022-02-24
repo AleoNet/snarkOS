@@ -2615,6 +2615,7 @@ dependencies = [
  "self_update",
  "serde",
  "serde_json",
+ "snarkos-environment",
  "snarkos-metrics",
  "snarkos-storage",
  "snarkos-utilities",
@@ -2629,6 +2630,17 @@ dependencies = [
  "tracing",
  "tracing-subscriber",
  "tui",
+]
+
+[[package]]
+name = "snarkos-environment"
+version = "2.0.2"
+dependencies = [
+ "num_cpus",
+ "once_cell",
+ "rayon",
+ "snarkos-utilities",
+ "snarkvm",
 ]
 
 [[package]]
@@ -2675,7 +2687,9 @@ dependencies = [
  "peak_alloc",
  "rand",
  "snarkos",
+ "snarkos-environment",
  "snarkos-storage",
+ "snarkos-utilities",
  "snarkvm",
  "structopt",
  "tokio",
@@ -2687,6 +2701,7 @@ dependencies = [
 name = "snarkos-utilities"
 version = "2.0.2"
 dependencies = [
+ "serde",
  "tokio",
  "tracing",
 ]

@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{block_requests::*, BlockRequest, CircularMap, NodeType, State},
+    helpers::{block_requests::*, BlockRequest, CircularMap},
     Data,
     DisconnectReason,
     Environment,
@@ -27,6 +27,7 @@ use crate::{
     ProverRouter,
 };
 use snarkos_storage::{storage::Storage, BlockLocators, LedgerState, MAXIMUM_LINEAR_BLOCK_LOCATORS};
+use snarkos_utilities::{NodeType, State};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::Result;

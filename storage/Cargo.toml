@@ -28,12 +28,12 @@ harness = false
 name = "opening"
 harness = false
 
-[dependencies.snarkvm]
-version = "0.8.0"
-
 [dependencies.snarkos-utilities]
 path = "../utilities"
 version = "2.0.2"
+
+[dependencies.snarkvm]
+version = "0.8.0"
 
 [dependencies.anyhow]
 version = "1"

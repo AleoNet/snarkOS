@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#![forbid(unsafe_code)]
+
 pub mod client_node;
 pub use client_node::*;
 
