@@ -37,6 +37,7 @@ version = "0.8"
 [dependencies.snarkos]
 path = ".."
 version = "2.0.2"
+features = [ "test" ]
 
 [dependencies.snarkos-environment]
 path = "../environment"

@@ -33,6 +33,7 @@ console = [ "crossterm", "tui" ]
 cuda = [ "snarkvm/cuda" ]
 prometheus = [ "snarkos-metrics" ]
 rpc = [ "snarkos-rpc" ]
+test = [ ]
 
 [dependencies.aleo-std]
 version = "0.1.6"
