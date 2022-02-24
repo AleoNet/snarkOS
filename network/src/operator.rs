@@ -121,14 +121,17 @@ impl<N: Network, E: Environment> Operator<N, E> {
             // Initialize the handler for the operator.
             let operator_clone = operator.clone();
             let (router, handler) = oneshot::channel();
-            E::resources().register_task(task::spawn(async move {
+            let task = task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 // Asynchronously wait for a operator request.
                 while let Some(request) = operator_handler.recv().await {
                     operator_clone.update(request).await;
                 }
-            }));
+            });
+            // Register the task; no need to provide an id, as it will run indefinitely.
+            E::resources().register_task(task, None);
+
             // Wait until the operator handler is ready.
             let _ = handler.await;
         }
@@ -138,7 +141,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                 // Initialize an update loop for the block template.
                 let operator = operator.clone();
                 let (router, handler) = oneshot::channel();
-                E::resources().register_task(task::spawn(async move {
+                let task = task::spawn(async move {
                     // Notify the outer function that the task is ready.
                     let _ = router.send(());
                     // TODO (julesdesmit): Add logic to the loop to retarget share difficulty.
@@ -185,7 +188,10 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         // Proceed to sleep for a preset amount of time.
                         tokio::time::sleep(HEARTBEAT_IN_SECONDS).await;
                     }
-                }));
+                });
+                // Register the task; no need to provide an id, as it will run indefinitely.
+                E::resources().register_task(task, None);
+
                 // Wait until the operator handler is ready.
                 let _ = handler.await;
             } else {

@@ -494,7 +494,7 @@ impl MinerStats {
 // for the node to be able to intercept them and perform a clean shutdown.
 // Note: Only Ctrl-C is supported; it should work on both Unix-family systems and Windows.
 pub fn handle_signals<N: Network, E: Environment>(server: Server<N, E>) {
-    tokio::task::spawn(async move {
+    let task = tokio::task::spawn(async move {
         match tokio::signal::ctrl_c().await {
             Ok(()) => {
                 server.shut_down().await;
@@ -503,4 +503,6 @@ pub fn handle_signals<N: Network, E: Environment>(server: Server<N, E>) {
             Err(error) => error!("tokio::signal::ctrl_c encountered an error: {}", error),
         }
     });
+    // Register the task; no need to provide an id, as it will run indefinitely.
+    E::resources().register_task(task, None);
 }

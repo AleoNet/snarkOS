@@ -115,7 +115,7 @@ impl<N: Network, E: Environment> Server<N, E> {
             let prover_router = prover.router();
 
             let (router, handler) = oneshot::channel();
-            E::resources().register_task(task::spawn(async move {
+            let task = task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 loop {
@@ -141,7 +141,10 @@ impl<N: Network, E: Environment> Server<N, E> {
                     // Sleep for `30` seconds.
                     tokio::time::sleep(std::time::Duration::from_secs(30)).await;
                 }
-            }));
+            });
+            // Register the task; no need to provide an id, as it will run indefinitely.
+            E::resources().register_task(task, None);
+
             // Wait until the prover handler is ready.
             let _ = handler.await;
         }
@@ -263,7 +266,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) {
         // Initialize the listener process.
         let (router, handler) = oneshot::channel();
-        E::resources().register_task(task::spawn(async move {
+        let task = task::spawn(async move {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             info!("Listening for peers at {}", local_ip);
@@ -295,7 +298,10 @@ impl<N: Network, E: Environment> Server<N, E> {
                     tokio::time::sleep(Duration::from_secs(5)).await;
                 }
             }
-        }));
+        });
+        // Register the task; no need to provide an id, as it will run indefinitely.
+        E::resources().register_task(task, None);
+
         // Wait until the listener task is ready.
         let _ = handler.await;
     }
@@ -313,7 +319,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
-        E::resources().register_task(task::spawn(async move {
+        let task = task::spawn(async move {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             loop {
@@ -334,7 +340,10 @@ impl<N: Network, E: Environment> Server<N, E> {
                 // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
                 tokio::time::sleep(Duration::from_secs(E::HEARTBEAT_IN_SECS)).await;
             }
-        }));
+        });
+        // Register the task; no need to provide an id, as it will run indefinitely.
+        E::resources().register_task(task, None);
+
         // Wait until the heartbeat task is ready.
         let _ = handler.await;
     }
@@ -369,7 +378,8 @@ impl<N: Network, E: Environment> Server<N, E> {
 
             debug!("JSON-RPC server listening on {}", rpc_server_addr);
 
-            E::resources().register_task(rpc_server_handle);
+            // Register the task; no need to provide an id, as it will run indefinitely.
+            E::resources().register_task(rpc_server_handle, None);
         }
     }
 
@@ -380,7 +390,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     async fn initialize_notification(ledger: LedgerReader<N>, prover: Arc<Prover<N, E>>, address: Option<Address<N>>) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
-        E::resources().register_task(task::spawn(async move {
+        let task = task::spawn(async move {
             // Notify the outer function that the task is ready.
             let _ = router.send(());
             loop {
@@ -422,7 +432,10 @@ impl<N: Network, E: Environment> Server<N, E> {
                 // Sleep for `120` seconds.
                 tokio::time::sleep(Duration::from_secs(120)).await;
             }
-        }));
+        });
+        // Register the task; no need to provide an id, as it will run indefinitely.
+        E::resources().register_task(task, None);
+
         // Wait until the heartbeat task is ready.
         let _ = handler.await;
     }
