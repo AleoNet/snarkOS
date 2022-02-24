@@ -17,147 +17,102 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = [ "metrics", "storage", "testing", "utils" ]
+members = [ ".integration", "environment", "metrics", "network", "rpc", "storage" ]
+
+[lib]
+path = "snarkos/lib.rs"
+
+[[bin]]
+name = "snarkos"
+path = "snarkos/main.rs"
+required-features = ["console"]
 
 [features]
-default = [ "rpc" ]
+default = [ "console", "rpc" ]
+console = [ "crossterm", "tui" ]
 cuda = [ "snarkvm/cuda" ]
 prometheus = [ "snarkos-metrics" ]
-rpc = [ "jsonrpsee" ]
+rpc = [ "snarkos-rpc" ]
 test = [ ]
 
-[dependencies]
-bytes = "1.0.0"
-crossterm = "0.23"
-tui = "0.17.0"
+[dependencies.aleo-std]
+version = "0.1.6"
 
-  [dependencies.snarkos-metrics]
-  path = "./metrics"
-  version = "2.0.2"
-  optional = true
+[dependencies.anyhow]
+version = "1"
 
-  [dependencies.snarkos-storage]
-  path = "./storage"
-  version = "2.0.2"
+[dependencies.colored]
+version = "2.0"
 
-  [dependencies.snarkos-utils]
-  path = "./utils"
-  version = "2.0.2"
+[dependencies.crossterm]
+version = "0.23"
+optional = true
 
-  [dependencies.snarkvm]
-  version = "0.8.0"
+[dependencies.num_cpus]
+version = "1"
 
-  [dependencies.aleo-std]
-  version = "0.1.6"
+[dependencies.rand]
+version = "0.8"
 
-  [dependencies.anyhow]
-  version = "1"
+[dependencies.rayon]
+version = "1"
 
-  [dependencies.async-trait]
-  version = "0.1"
-
-  [dependencies.bincode]
-  version = "1.0"
-
-  [dependencies.cfg-if]
-  version = "1.0"
-
-  [dependencies.circular-queue]
-  version = "0.2"
-
-  [dependencies.colored]
-  version = "2.0"
-
-  [dependencies.futures]
-  version = "0.3.21"
-  features = [ "thread-pool" ]
-
-  [dependencies.hex]
-  version = "0.4"
-
-  [dependencies.jsonrpsee]
-  version = "0.9"
-  optional = true
-  features = [ "http-server" ]
-
-  [dependencies.num_cpus]
-  version = "1"
-
-  [dependencies.once_cell]
-  version = "1"
-
-  [dependencies.parking_lot]
-  version = "0.12"
-
-  [dependencies.rand]
-  version = "0.8"
-
-  [dependencies.rayon]
-  version = "1"
-
-  [dependencies.self_update]
-  version = "0.28"
-  features = [
+[dependencies.self_update]
+version = "0.28"
+features = [
   "archive-zip",
   "compression-zip-bzip2",
   "compression-zip-deflate",
   "compression-flate2"
 ]
 
-  [dependencies.serde]
-  version = "1"
+[dependencies.snarkos-environment]
+path = "./environment"
+version = "2.0.2"
 
-  [dependencies.serde_json]
-  version = "1"
-  features = [ "arbitrary_precision" ]
+[dependencies.snarkos-metrics]
+path = "./metrics"
+version = "2.0.2"
+optional = true
 
-  [dependencies.structopt]
-  version = "0.3"
+[dependencies.snarkos-network]
+path = "./network"
+version = "2.0.2"
 
-  [dependencies.thiserror]
-  version = "1.0"
+[dependencies.snarkos-rpc]
+path = "./rpc"
+version = "2.0.2"
+optional = true
 
-  [dependencies.time]
-  version = "0.3.7"
+[dependencies.snarkos-storage]
+path = "./storage"
+version = "2.0.2"
 
-  [dependencies.tokio]
-  version = "1"
-  features = [
-  "io-util",
-  "macros",
-  "net",
-  "rt-multi-thread",
-  "signal",
-  "sync",
-  "time"
-]
+[dependencies.snarkvm]
+version = "0.8.0"
 
-  [dependencies.tokio-util]
-  version = "0.7"
-  features = [ "codec" ]
-
-  [dependencies.tokio-stream]
-  version = "=0.1"
-
-  [dependencies.tracing]
-  version = "0.1"
-
-  [dependencies.tracing-subscriber]
-  version = "0.3"
-  features = [ "env-filter", "parking_lot" ]
-
-[dev-dependencies.jsonrpsee]
-version = "0.9"
-features = [ "http-client" ]
-
-[dev-dependencies.rand_chacha]
+[dependencies.structopt]
 version = "0.3"
+
+[dependencies.thiserror]
+version = "1.0"
+
+[dependencies.tokio]
+version = "1"
+
+[dependencies.tracing]
+version = "0.1"
+
+[dependencies.tracing-subscriber]
+version = "0.3"
+features = [ "env-filter", "parking_lot" ]
+
+[dependencies.tui]
+version = "0.17"
+optional = true
 
 [dev-dependencies.rusty-hook]
 version = "0.11"
-
-[dev-dependencies.tempfile]
-version = "3.2"
 
 [profile.release]
 opt-level = 3

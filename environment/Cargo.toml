@@ -1,0 +1,39 @@
+[package]
+name = "snarkos-environment"
+version = "2.0.2"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "Environment for a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "GPL-3.0"
+edition = "2018"
+
+[dependencies.num_cpus]
+version = "1"
+
+[dependencies.once_cell]
+version = "1"
+
+[dependencies.rayon]
+version = "1"
+
+[dependencies.serde]
+version = "1"
+
+[dependencies.snarkvm]
+version = "0.8.0"
+
+[dependencies.tokio]
+version = "1"
+features = ["sync", "rt"]
+
+[dependencies.tracing]
+version = "0.1"

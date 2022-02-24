@@ -2596,40 +2596,59 @@ version = "2.0.2"
 dependencies = [
  "aleo-std",
  "anyhow",
- "async-trait",
- "bincode",
- "bytes",
- "cfg-if 1.0.0",
- "circular-queue",
  "colored",
  "crossterm 0.23.0",
- "futures",
- "hex",
- "jsonrpsee",
  "num_cpus",
- "once_cell",
- "parking_lot 0.12.0",
  "rand",
- "rand_chacha",
  "rayon",
  "rusty-hook",
  "self_update",
- "serde",
- "serde_json",
+ "snarkos-environment",
  "snarkos-metrics",
+ "snarkos-network",
+ "snarkos-rpc",
  "snarkos-storage",
- "snarkos-utils",
  "snarkvm",
  "structopt",
- "tempfile",
  "thiserror",
- "time 0.3.7",
  "tokio",
- "tokio-stream",
- "tokio-util 0.7.0",
  "tracing",
  "tracing-subscriber",
  "tui",
+]
+
+[[package]]
+name = "snarkos-environment"
+version = "2.0.2"
+dependencies = [
+ "num_cpus",
+ "once_cell",
+ "rayon",
+ "serde",
+ "snarkvm",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
+name = "snarkos-integration"
+version = "2.0.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "pea2pea",
+ "peak_alloc",
+ "rand",
+ "snarkos",
+ "snarkos-environment",
+ "snarkos-network",
+ "snarkos-storage",
+ "snarkvm",
+ "structopt",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2639,6 +2658,52 @@ dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
  "tokio",
+]
+
+[[package]]
+name = "snarkos-network"
+version = "2.0.2"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "bytes",
+ "circular-queue",
+ "futures",
+ "rand",
+ "serde",
+ "snarkos-environment",
+ "snarkos-storage",
+ "snarkvm",
+ "time 0.3.7",
+ "tokio",
+ "tokio-stream",
+ "tokio-util 0.7.0",
+ "tracing",
+]
+
+[[package]]
+name = "snarkos-rpc"
+version = "2.0.2"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "bincode",
+ "futures",
+ "hex",
+ "jsonrpsee",
+ "rand",
+ "rand_chacha",
+ "serde",
+ "serde_json",
+ "snarkos-environment",
+ "snarkos-network",
+ "snarkos-storage",
+ "snarkvm",
+ "tempfile",
+ "thiserror",
+ "time 0.3.7",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -2657,37 +2722,10 @@ dependencies = [
  "rocksdb",
  "serde",
  "serde_json",
- "snarkos-utils",
+ "snarkos-environment",
  "snarkvm",
  "tempfile",
  "time 0.3.7",
- "tokio",
- "tracing",
-]
-
-[[package]]
-name = "snarkos-testing"
-version = "2.0.2"
-dependencies = [
- "anyhow",
- "async-trait",
- "bincode",
- "pea2pea",
- "peak_alloc",
- "rand",
- "snarkos",
- "snarkos-storage",
- "snarkvm",
- "structopt",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
-name = "snarkos-utils"
-version = "2.0.2"
-dependencies = [
  "tokio",
  "tracing",
 ]

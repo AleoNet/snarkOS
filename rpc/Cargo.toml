@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-storage"
+name = "snarkos-rpc"
 version = "2.0.2"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "Storage for a decentralized operating system"
+description = "RPC server for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
@@ -16,78 +16,69 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2018"
 
-[[bench]]
-name = "lookups"
-harness = false
-
-[[bench]]
-name = "insertion"
-harness = false
-
-[[bench]]
-name = "opening"
-harness = false
-
 [dependencies.anyhow]
 version = "1"
 
-[dependencies.bincode]
-version = "1.0"
-optional = true
+[dependencies.async-trait]
+version = "0.1"
 
-[dependencies.circular-queue]
-version = "0.2"
+[dependencies.futures]
+version = "0.3.21"
+features = [ "thread-pool" ]
 
-[dependencies.itertools]
-version = "0.10"
+[dependencies.hex]
+version = "0.4"
 
-[dependencies.parking_lot]
-version = "0.12"
-
-[dependencies.rand]
-version = "0.8"
-
-[dependencies.rayon]
-version = "1"
-
-[dependencies.rocksdb]
-version = "0.18"
-optional = true
-default-features = false
-features = [ "lz4" ]
+[dependencies.jsonrpsee]
+version = "0.9"
+features = [ "http-server" ]
 
 [dependencies.serde]
 version = "1"
 
 [dependencies.serde_json]
 version = "1"
+features = [ "arbitrary_precision" ]
 
 [dependencies.snarkos-environment]
 path = "../environment"
 version = "2.0.2"
 
+[dependencies.snarkos-network]
+path = "../network"
+version = "2.0.2"
+
+[dependencies.snarkos-storage]
+path = "../storage"
+version = "2.0.2"
+
 [dependencies.snarkvm]
 version = "0.8.0"
+
+[dependencies.thiserror]
+version = "1.0"
 
 [dependencies.time]
 version = "0.3.7"
 
 [dependencies.tokio]
 version = "1"
-features = [ "sync" ]
 
 [dependencies.tracing]
 version = "0.1"
 
-[dev-dependencies.criterion]
-version = "0.3"
+[dev-dependencies.bincode]
+version = "1.0"
 
-[dev-dependencies.rand_xorshift]
+[dev-dependencies.jsonrpsee]
+version = "0.9"
+features = [ "http-client" ]
+
+[dev-dependencies.rand]
+version = "0.8"
+
+[dev-dependencies.rand_chacha]
 version = "0.3"
 
 [dev-dependencies.tempfile]
 version = "3.2"
-
-[features]
-default = [ "rocks" ]
-rocks = [ "bincode", "rocksdb" ]
