@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{common::display_bytes, wait_until};
-use snarkos_testing::{ClientNode, TestNode};
+use snarkos_integration::{ClientNode, TestNode};
 
 use pea2pea::Pea2Pea;
 use peak_alloc::PeakAlloc;

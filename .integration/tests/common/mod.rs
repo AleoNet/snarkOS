@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_testing::test_node::{ClientNonce, ClientState, TestNode};
+use snarkos_integration::test_node::{ClientNonce, ClientState, TestNode};
 
 use pea2pea::{protocols::*, Config};
 use std::net::{IpAddr, Ipv4Addr};

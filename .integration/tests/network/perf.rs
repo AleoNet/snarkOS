@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_testing::ClientNode;
+use snarkos_integration::ClientNode;
 
 use std::time::Instant;
 

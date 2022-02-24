@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::common::start_logger;
-use snarkos_testing::TestNode;
+use snarkos_integration::TestNode;
 
 use pea2pea::{
     protocols::{Handshake, Reading, Writing},
