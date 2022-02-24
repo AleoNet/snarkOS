@@ -70,6 +70,10 @@ version = "0.1"
 [dev-dependencies.bincode]
 version = "1.0"
 
+[dev-dependencies.jsonrpsee]
+version = "0.9"
+features = [ "http-client" ]
+
 [dev-dependencies.rand]
 version = "0.8"
 

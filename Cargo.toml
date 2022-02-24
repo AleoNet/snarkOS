@@ -101,10 +101,6 @@ features = [ "env-filter", "parking_lot" ]
 version = "0.17"
 optional = true
 
-[dev-dependencies.jsonrpsee]
-version = "0.9"
-features = [ "http-client" ]
-
 [dev-dependencies.rusty-hook]
 version = "0.11"
 
