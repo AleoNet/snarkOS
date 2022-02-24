@@ -316,7 +316,7 @@ jobs:
 workflows:
   main-workflow:
     jobs:
-      - integration
+#      - integration
       - environment
       - metrics
       - network
