@@ -42,4 +42,4 @@ pub use node::*;
 pub(crate) mod rpc;
 
 pub use snarkos_storage::*;
-pub use snarkvm::dpc::{testnet2::Testnet2, Network};
+pub use snarkvm::dpc::{testnet2::Testnet2, Address, Network};
