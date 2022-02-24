@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2018"
 
 [workspace]
-members = [ "environment", "metrics", "storage", "testing", "utilities"]
+members = [ ".integration", "environment", "metrics", "storage", "utilities" ]
 
 [features]
 default = [ "rpc" ]

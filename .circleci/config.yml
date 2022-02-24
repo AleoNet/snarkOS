@@ -1,7 +1,7 @@
 version: 2.1
 commands:
   setup_environment:
-    description: "Setup testing environment"
+    description: "Setup integration testing environment"
     parameters:
       cache_key:
         type: string
@@ -93,7 +93,7 @@ jobs:
       - clear_environment:
           cache_key: snarkos-storage-cache
 
-  testing:
+  integration:
     docker:
       - image: cimg/rust:1.58.1
     resource_class: xlarge
@@ -101,11 +101,11 @@ jobs:
     steps:
       - checkout
       - setup_environment:
-          cache_key: snarkos-testing-cache
+          cache_key: snarkos-integration-cache
       - run_parallel:
-          workspace_member: testing
+          workspace_member: .integration
       - clear_environment:
-          cache_key: snarkos-testing-cache
+          cache_key: snarkos-integration-cache
 
   # codecov:
   #   machine:
@@ -259,9 +259,9 @@ jobs:
 workflows:
   main-workflow:
     jobs:
+      - integration
       - tests
       - storage
-      - testing
       # - codecov:
       #     requires:
       #       - rust-stable
