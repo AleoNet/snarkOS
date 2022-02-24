@@ -65,7 +65,78 @@ commands:
       - run: rustup toolchain install nightly-x86_64-unknown-linux-gnu
 
 jobs:
-  tests:
+
+  integration:
+    docker:
+      - image: cimg/rust:1.58.1
+    resource_class: xlarge
+    parallelism: 5
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-integration-cache
+      - run_parallel:
+          workspace_member: .integration
+      - clear_environment:
+          cache_key: snarkos-integration-cache
+
+  environment:
+    docker:
+      - image: cimg/rust:1.58.1
+    resource_class: xlarge
+    parallelism: 1
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-environment-cache
+      - run_parallel:
+          workspace_member: environment
+      - clear_environment:
+          cache_key: snarkos-environment-cache
+
+  metrics:
+    docker:
+      - image: cimg/rust:1.58.1
+    resource_class: xlarge
+    parallelism: 1
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-metrics-cache
+      - run_parallel:
+          workspace_member: metrics
+      - clear_environment:
+          cache_key: snarkos-metrics-cache
+
+  network:
+    docker:
+      - image: cimg/rust:1.58.1
+    resource_class: xlarge
+    parallelism: 20
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-network-cache
+      - run_parallel:
+          workspace_member: network
+      - clear_environment:
+          cache_key: snarkos-network-cache
+
+  rpc:
+    docker:
+      - image: cimg/rust:1.58.1
+    resource_class: xlarge
+    parallelism: 20
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: snarkos-rpc-cache
+      - run_parallel:
+          workspace_member: rpc
+      - clear_environment:
+          cache_key: snarkos-rpc-cache
+
+  snarkos:
     docker:
       - image: cimg/rust:1.58.1
     resource_class: xlarge
@@ -92,20 +163,6 @@ jobs:
           workspace_member: storage
       - clear_environment:
           cache_key: snarkos-storage-cache
-
-  integration:
-    docker:
-      - image: cimg/rust:1.58.1
-    resource_class: xlarge
-    parallelism: 5
-    steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-integration-cache
-      - run_parallel:
-          workspace_member: .integration
-      - clear_environment:
-          cache_key: snarkos-integration-cache
 
   # codecov:
   #   machine:
@@ -165,13 +222,13 @@ jobs:
       - checkout
       - run: mkdir -p my_workspace
       - run:
-          name: "Build snarkos Docker Image ARM V8"
+          name: "Build snarkOS Docker Image ARM V8"
           no_output_timeout: 2h
           command: |
             VERSION=$(git rev-parse --short HEAD)
             docker build -f Dockerfile -t $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64 .
       - run:
-          name: "Push snarkos Docker Image ARM V8"
+          name: "Push snarkOS Docker Image ARM V8"
           command: |
             VERSION=$(git rev-parse --short HEAD)
             echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
@@ -197,13 +254,13 @@ jobs:
       - checkout
       - run: mkdir -p my_workspace
       - run:
-          name: "Build snarkos Docker Image AMD"
+          name: "Build snarkOS Docker Image AMD"
           no_output_timeout: 2h
           command: |
             VERSION=$(git rev-parse --short HEAD)
             docker build -f Dockerfile -t $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64 .
       - run:
-          name: "Push snarkos Docker Image AMD"
+          name: "Push snarkOS Docker Image AMD"
           command: |
             VERSION=$(git rev-parse --short HEAD)
             echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
@@ -229,20 +286,20 @@ jobs:
       - attach_workspace:
           at: my_workspace
       - run:
-          name: "Pull ARM docker image"
+          name: "Pull ARM Docker image"
           command: |
             ARM_TAG=$(cat my_workspace/docker_tag_arm)
             echo $ARM_TAG
             echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
             docker pull $DOCKER_REPO:$ARM_TAG
       - run:
-          name: "Pull AMD docker image"
+          name: "Pull AMD Docker image"
           command: |
             AMD_TAG=$(cat my_workspace/docker_tag_amd)
             echo $AMD_TAG
             docker pull $DOCKER_REPO:$AMD_TAG
       - run:
-          name: "Create and push docker multi arch manifest"
+          name: "Create and push Docker multi arch manifest"
           command: |
             ARM_TAG=$(cat my_workspace/docker_tag_arm)
             AMD_TAG=$(cat my_workspace/docker_tag_amd)
@@ -260,7 +317,11 @@ workflows:
   main-workflow:
     jobs:
       - integration
-      - tests
+      - environment
+      - metrics
+      - network
+      - rpc
+      - snarkos
       - storage
       # - codecov:
       #     requires:
@@ -270,7 +331,7 @@ workflows:
   build-snarkos-docker-images:
     when:
       or:
-        - equal: [ testnet2, << pipeline.git.branch >> ]
+        - equal: [ testnet3, << pipeline.git.branch >> ]
         - equal: [ docker-builds, << pipeline.git.branch >> ]
     jobs:
       - build-and-publish-docker-arm
