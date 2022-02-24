@@ -263,7 +263,14 @@ async fn test_get_blocks() {
 
     // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
     // note: the `blocks_100` file was generated on a testnet2 storage using `LedgerState::dump_blocks`.
-    let test_blocks = fs::read("storage/benches/blocks_1").unwrap_or_else(|_| panic!("Missing the test blocks file"));
+    let mut test_block_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    test_block_path.push("..");
+    test_block_path.push("storage");
+    test_block_path.push("benches");
+    test_block_path.push("blocks_1");
+
+    let test_blocks = fs::read(test_block_path).unwrap_or_else(|_| panic!("Missing the test blocks file"));
+
     let blocks: Vec<Block<Testnet2>> = bincode::deserialize(&test_blocks).expect("Failed to deserialize a block dump");
 
     // Load a test block into the ledger.
@@ -323,7 +330,14 @@ async fn test_get_block_hashes() {
 
     // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
     // note: the `blocks_100` file was generated on a testnet2 storage using `LedgerState::dump_blocks`.
-    let test_blocks = fs::read("storage/benches/blocks_1").unwrap_or_else(|_| panic!("Missing the test blocks file"));
+    let mut test_block_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+    test_block_path.push("..");
+    test_block_path.push("storage");
+    test_block_path.push("benches");
+    test_block_path.push("blocks_1");
+
+    let test_blocks = fs::read(test_block_path).unwrap_or_else(|_| panic!("Missing the test blocks file"));
+
     let blocks: Vec<Block<Testnet2>> = bincode::deserialize(&test_blocks).expect("Failed to deserialize a block dump");
 
     // Load a test block into the ledger.

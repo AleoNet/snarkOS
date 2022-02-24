@@ -1,7 +1,7 @@
 version: 2.1
 commands:
   setup_environment:
-    description: "Setup integration testing environment"
+    description: "Setup testing environment"
     parameters:
       cache_key:
         type: string
