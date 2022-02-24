@@ -46,12 +46,12 @@ pub fn notification_message<N: Network>(miner: Option<Address<N>>) -> String {
 
  ==================================================================================================
 
-                         Welcome to Aleo Testnet2 - Incentivization Period
+                         Welcome to Aleo Testnet3 - Incentivization Period
 
  ==================================================================================================
 
      The incentivized testnet will be announced on Discord. Visit https://www.aleo.org/discord
-     for the official launch announcement on November 30, 2021, from the Aleo team.
+     for the official launch announcement on Month Date, Year, from the Aleo team.
 
      Minimum requirements:
 
@@ -60,7 +60,7 @@ pub fn notification_message<N: Network>(miner: Option<Address<N>>) -> String {
          - Storage: 128GB of disk space
          - Network: 50 Mbps of upload and download bandwidth
 
-     To get started (after November 30, 2021):
+     To get started (after Month Date, Year):
 
          1. Generate one Aleo account, and save the account private key and view key.
          2. Ensure ports 4132/tcp and 3032/tcp are open on your router and OS firewall.
@@ -70,14 +70,14 @@ pub fn notification_message<N: Network>(miner: Option<Address<N>>) -> String {
          5. Ask questions on Discord at https://www.aleo.org/discord
          6. Please be respectful to all members of the Aleo community.
 
-     To claim rewards (after February 15, 2022):
+     To claim rewards (after Month Date, Year):
 
-         1. Participants will be required to KYC at the end of incentivized testnet2.
+         1. Participants will be required to KYC at the end of incentivized testnet3.
          2. Participants must demonstrate ownership of their Aleo miner address.
          3. [For United States & Canada] Participants must be accredited investors.
          4. The Aleo team reserves the right to maintain discretion in rewarding participants.
 
-     Thank you for participating in incentivized testnet2 and for supporting privacy!
+     Thank you for participating in incentivized testnet3 and for supporting privacy!
 
  ==================================================================================================
 "#
