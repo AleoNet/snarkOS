@@ -513,7 +513,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Attempt to add the unconfirmed block as the next block in the canonical chain.
                 false => match self.canon.add_next_block(&unconfirmed_block) {
                     Ok(()) => {
-                        // Allocation necessary if prometheus is enabled.
                         let latest_block_height = self.canon.latest_block_height();
                         info!(
                             "Ledger successfully advanced to block {} ({})",
@@ -570,7 +569,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         match self.canon.revert_to_block_height(block_height) {
             Ok(removed_blocks) => {
-                // Allocation necessary if prometheus is enabled.
                 let latest_block_height = self.canon.latest_block_height();
                 info!("Ledger successfully reverted to block {}", latest_block_height);
 

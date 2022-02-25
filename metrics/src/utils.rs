@@ -17,19 +17,34 @@
 use metrics::Key;
 use metrics_util::{CompositeKey, DebugValue, MetricKind, Snapshotter};
 
+pub struct TestMetrics(Snapshotter);
+
+impl TestMetrics {
+    pub fn new() -> Self {
+        Self(crate::initialize())
+    }
+
+    pub fn get_val_for(&self, metric: &'static str) -> MetricVal {
+        let key = CompositeKey::new(MetricKind::Gauge, Key::from_name(metric));
+
+        match &self.0.snapshot().into_hashmap().get(&key).unwrap().2 {
+            DebugValue::Gauge(val) => MetricVal::Gauge(val.into_inner()),
+            DebugValue::Counter(val) => MetricVal::Counter(*val),
+            DebugValue::Histogram(vals) => MetricVal::Histogram(vals.iter().map(|val| val.into_inner()).collect()),
+        }
+    }
+}
+
+impl Drop for TestMetrics {
+    fn drop(&mut self) {
+        // Clear the recorder to avoid the global state bleeding into other tests.
+        metrics::clear_recorder();
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub enum MetricVal {
     Counter(u64),
     Gauge(f64),
     Histogram(Vec<f64>),
-}
-
-pub fn get_metric(snapshotter: &Snapshotter, metric: &'static str) -> MetricVal {
-    let key = CompositeKey::new(MetricKind::Gauge, Key::from_name(metric));
-
-    match &snapshotter.snapshot().into_hashmap().get(&key).unwrap().2 {
-        DebugValue::Gauge(val) => MetricVal::Gauge(val.into_inner()),
-        DebugValue::Counter(val) => MetricVal::Counter(*val),
-        DebugValue::Histogram(vals) => MetricVal::Histogram(vals.iter().map(|val| val.into_inner()).collect()),
-    }
 }

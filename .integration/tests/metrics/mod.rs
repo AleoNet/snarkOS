@@ -23,35 +23,14 @@ use pea2pea::Pea2Pea;
 
 #[tokio::test]
 async fn metrics_initialization() {
-    // Start a test node.
-    let _test_node = TestNode::default().await;
-
     // Initialise the metrics, we need to call this manually in tests.
-    let snapshotter = metrics::initialize();
-
-    // Start a snarkOS node.
-    let _client_node = ClientNode::default().await;
+    let metrics = metrics::TestMetrics::new();
 
     // Verify the metrics have been properly initialised, expect the block height to be set.
-    assert_eq!(
-        metrics::get_metric(&snapshotter, metrics::blocks::HEIGHT),
-        metrics::MetricVal::Gauge(0.0)
-    );
-    assert_eq!(
-        metrics::get_metric(&snapshotter, metrics::peers::CONNECTED),
-        metrics::MetricVal::Gauge(0.0)
-    );
-    assert_eq!(
-        metrics::get_metric(&snapshotter, metrics::peers::CANDIDATE),
-        metrics::MetricVal::Gauge(0.0)
-    );
-    assert_eq!(
-        metrics::get_metric(&snapshotter, metrics::peers::RESTRICTED),
-        metrics::MetricVal::Gauge(0.0)
-    );
-
-    // Clear the recorder to avoid the global state bleeding into other tests.
-    metrics::clear_recorder();
+    assert_eq!(metrics.get_val_for(metrics::blocks::HEIGHT), metrics::MetricVal::Gauge(0.0));
+    assert_eq!(metrics.get_val_for(metrics::peers::CONNECTED), metrics::MetricVal::Gauge(0.0));
+    assert_eq!(metrics.get_val_for(metrics::peers::CANDIDATE), metrics::MetricVal::Gauge(0.0));
+    assert_eq!(metrics.get_val_for(metrics::peers::RESTRICTED), metrics::MetricVal::Gauge(0.0));
 }
 
 #[tokio::test]
@@ -60,7 +39,7 @@ async fn connect_disconnect() {
     let test_node = TestNode::default().await;
 
     // Initialise the metrics, we need to call this manually in tests.
-    let snapshotter = metrics::initialize();
+    let metrics = metrics::TestMetrics::new();
 
     // Start a snarkOS node.
     let client_node = ClientNode::default().await;
@@ -73,18 +52,9 @@ async fn connect_disconnect() {
         wait_until!(1, client_node.connected_peers().await.len() == 1);
 
         // Check the metrics.
-        assert_eq!(
-            metrics::get_metric(&snapshotter, metrics::peers::CONNECTED),
-            metrics::MetricVal::Gauge(1.0)
-        );
-        assert_eq!(
-            metrics::get_metric(&snapshotter, metrics::peers::CANDIDATE),
-            metrics::MetricVal::Gauge(0.0)
-        );
-        assert_eq!(
-            metrics::get_metric(&snapshotter, metrics::peers::RESTRICTED),
-            metrics::MetricVal::Gauge(0.0)
-        );
+        assert_eq!(metrics.get_val_for(metrics::peers::CONNECTED), metrics::MetricVal::Gauge(1.0));
+        assert_eq!(metrics.get_val_for(metrics::peers::CANDIDATE), metrics::MetricVal::Gauge(0.0));
+        assert_eq!(metrics.get_val_for(metrics::peers::RESTRICTED), metrics::MetricVal::Gauge(0.0));
 
         // Shut down the node, force a disconnect.
         test_node.node().disconnect(client_node.local_addr()).await;
@@ -92,20 +62,8 @@ async fn connect_disconnect() {
         wait_until!(1, client_node.connected_peers().await.len() == 0);
 
         // Check the metrics.
-        assert_eq!(
-            metrics::get_metric(&snapshotter, metrics::peers::CONNECTED),
-            metrics::MetricVal::Gauge(0.0)
-        );
-        assert_eq!(
-            metrics::get_metric(&snapshotter, metrics::peers::CANDIDATE),
-            metrics::MetricVal::Gauge(1.0)
-        );
-        assert_eq!(
-            metrics::get_metric(&snapshotter, metrics::peers::RESTRICTED),
-            metrics::MetricVal::Gauge(0.0)
-        );
+        assert_eq!(metrics.get_val_for(metrics::peers::CONNECTED), metrics::MetricVal::Gauge(0.0));
+        assert_eq!(metrics.get_val_for(metrics::peers::CANDIDATE), metrics::MetricVal::Gauge(1.0));
+        assert_eq!(metrics.get_val_for(metrics::peers::RESTRICTED), metrics::MetricVal::Gauge(0.0));
     }
-
-    // Clear the recorder to avoid the global state bleeding into other tests.
-    metrics::clear_recorder();
 }
