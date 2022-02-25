@@ -42,6 +42,11 @@ version = "1"
 path = "../environment"
 version = "2.0.2"
 
+[dependencies.snarkos-metrics]
+path = "../metrics"
+version = "2.0.2"
+optional = true
+
 [dependencies.snarkos-storage]
 path = "../storage"
 version = "2.0.2"
@@ -76,4 +81,5 @@ version = "0.1"
 
 [features]
 default = [ ]
-test = [ ]
+prometheus = [ "snarkos-metrics/prometheus" ]
+test = [ "snarkos-metrics/test" ]

@@ -843,6 +843,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "endian-type"
+version = "0.1.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c34f04666d835ff5d62e058c3995147c06f42fe86ff053337632bca83e42702d"
+
+[[package]]
 name = "envmnt"
 version = "0.8.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1570,14 +1576,18 @@ version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0296c9cffd3d72c61d8fcd25efc381fd589f7b155a81f2fa5670010430f60c57"
 dependencies = [
+ "aho-corasick",
  "atomic-shim",
  "crossbeam-epoch",
  "crossbeam-utils",
  "hashbrown",
+ "indexmap",
  "metrics",
  "num_cpus",
+ "ordered-float",
  "parking_lot 0.11.2",
  "quanta",
+ "radix_trie",
  "sketches-ddsketch",
 ]
 
@@ -1661,6 +1671,15 @@ name = "nias"
 version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ab250442c86f1850815b5d268639dff018c0627022bc1940eb2d642ca1ce12f0"
+
+[[package]]
+name = "nibble_vec"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "77a5d83df9f36fe23f0c3648c6bbb8b0298bb5f1939c8f2704431371f4b84d43"
+dependencies = [
+ "smallvec",
+]
 
 [[package]]
 name = "nom"
@@ -1805,6 +1824,15 @@ dependencies = [
  "libc",
  "pkg-config",
  "vcpkg",
+]
+
+[[package]]
+name = "ordered-float"
+version = "2.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7940cf2ca942593318d07fcf2596cdca60a85c9e7fab408a5e21a4f9dcd40d87"
+dependencies = [
+ "num-traits",
 ]
 
 [[package]]
@@ -2045,6 +2073,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "864d3e96a899863136fc6e99f3d7cae289dafe43bf2c5ac19b70df7210c0a145"
 dependencies = [
  "proc-macro2 1.0.36",
+]
+
+[[package]]
+name = "radix_trie"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c069c179fcdc6a2fe24d8d18305cf085fdbd4f922c041943e203685d6a1c58fd"
+dependencies = [
+ "endian-type",
+ "nibble_vec",
 ]
 
 [[package]]
@@ -2642,6 +2680,7 @@ dependencies = [
  "rand",
  "snarkos",
  "snarkos-environment",
+ "snarkos-metrics",
  "snarkos-network",
  "snarkos-storage",
  "snarkvm",
@@ -2657,6 +2696,7 @@ version = "2.0.2"
 dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
+ "metrics-util",
  "tokio",
 ]
 
@@ -2672,6 +2712,7 @@ dependencies = [
  "rand",
  "serde",
  "snarkos-environment",
+ "snarkos-metrics",
  "snarkos-storage",
  "snarkvm",
  "time 0.3.7",

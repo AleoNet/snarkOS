@@ -30,6 +30,10 @@ use snarkvm::prelude::*;
 
 #[cfg(feature = "rpc")]
 use snarkos_rpc::{initialize_rpc_server, RpcContext};
+
+#[cfg(any(feature = "test", feature = "prometheus"))]
+use snarkos_metrics as metrics;
+
 #[cfg(feature = "rpc")]
 use tokio::sync::RwLock;
 
@@ -174,8 +178,8 @@ impl<N: Network, E: Environment> Server<N, E> {
         Self::initialize_notification(ledger.reader(), prover.clone(), address).await;
 
         // Initialise the metrics exporter.
-        #[cfg(feature = "prometheus")]
-        Self::initialize_metrics();
+        #[cfg(any(feature = "test", feature = "prometheus"))]
+        Self::initialize_metrics(ledger.reader());
 
         Ok(Self {
             local_ip,
@@ -423,8 +427,14 @@ impl<N: Network, E: Environment> Server<N, E> {
         let _ = handler.await;
     }
 
-    #[cfg(feature = "prometheus")]
-    fn initialize_metrics() {
-        E::tasks().append(snarkos_metrics::initialize().expect("couldn't initialise the metrics"));
+    #[cfg(any(feature = "test", feature = "prometheus"))]
+    fn initialize_metrics(ledger: LedgerReader<N>) {
+        #[cfg(not(feature = "test"))]
+        if let Some(handler) = snarkos_metrics::initialize() {
+            E::resources().register_task(handler);
+        }
+
+        // Set the block height as it could already be non-zero.
+        metrics::gauge!(metrics::blocks::HEIGHT, ledger.latest_block_height() as f64);
     }
 }

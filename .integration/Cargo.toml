@@ -43,6 +43,10 @@ features = [ "test" ]
 path = "../environment"
 version = "2.0.2"
 
+[dependencies.snarkos-metrics]
+path = "../metrics"
+features = [ "test" ]
+
 [dependencies.snarkos-network]
 path = "../network"
 version = "2.0.2"

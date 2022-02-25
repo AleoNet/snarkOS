@@ -14,6 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod common;
-mod metrics;
-mod network;
+pub const GAUGE_NAMES: [&str; 4] = [blocks::HEIGHT, peers::CONNECTED, peers::CANDIDATE, peers::RESTRICTED];
+
+pub mod blocks {
+    pub const HEIGHT: &str = "snarkos_blocks_height_total";
+}
+
+pub mod peers {
+    pub const CONNECTED: &str = "snarkos_peers_connected_total";
+    pub const CANDIDATE: &str = "snarkos_peers_candidate_total";
+    pub const RESTRICTED: &str = "snarkos_peers_restricted_total";
+}

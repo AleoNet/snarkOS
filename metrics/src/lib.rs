@@ -14,12 +14,30 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+// The `test` and `prometheus` features are mutually exclusive, fail compilation if this occurs.
+#[cfg(all(feature = "test", feature = "prometheus"))]
+compile_error!("feature \"test\" and feature \"prometheus\" cannot be enabled at the same time");
+
+mod names;
+
+#[cfg(feature = "test")]
+mod utils;
+
 // Re-export the metrics macros.
 pub use metrics::*;
+pub use names::*;
 
-use metrics_exporter_prometheus::PrometheusBuilder;
+// Re-export test utilities.
+#[cfg(feature = "test")]
+pub use utils::*;
 
+#[cfg(feature = "test")]
+use metrics_util::{DebuggingRecorder, Snapshotter};
+
+#[cfg(feature = "prometheus")]
 pub fn initialize() -> Option<tokio::task::JoinHandle<()>> {
+    use metrics_exporter_prometheus::PrometheusBuilder;
+
     let (recorder, exporter) = PrometheusBuilder::new().build().expect("can't build the prometheus exporter");
 
     metrics::set_boxed_recorder(Box::new(recorder)).expect("can't set the prometheus exporter");
@@ -28,5 +46,26 @@ pub fn initialize() -> Option<tokio::task::JoinHandle<()>> {
         exporter.await.expect("can't await the prometheus exporter");
     });
 
+    register_metrics();
+
     Some(metrics_exporter_task)
+}
+
+#[cfg(feature = "test")]
+pub fn initialize() -> Snapshotter {
+    // Let the errors through in case the recorder has already been set as is likely when running
+    // multiple metrics tests.
+    let recorder = DebuggingRecorder::new();
+    let snapshotter = recorder.snapshotter();
+    let _ = recorder.install();
+
+    register_metrics();
+
+    snapshotter
+}
+
+fn register_metrics() {
+    for name in GAUGE_NAMES {
+        register_gauge!(name);
+    }
 }
