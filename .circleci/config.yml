@@ -56,7 +56,7 @@ commands:
             TEST_NAMES=$(circleci tests split test_names.txt)
             for i in $(echo $TEST_NAMES | sed "s/ / /g")
             do
-                RUST_MIN_STACK=8388608 cargo test --workspace $i
+                RUST_MIN_STACK=8388608 cargo test $i
             done
 
   install_rust_nightly:
@@ -68,7 +68,7 @@ jobs:
 
   integration:
     docker:
-      - image: cimg/rust:1.58.1
+      - image: cimg/rust:1.59
     resource_class: xlarge
     parallelism: 5
     steps:
@@ -82,7 +82,7 @@ jobs:
 
   environment:
     docker:
-      - image: cimg/rust:1.58.1
+      - image: cimg/rust:1.59
     resource_class: xlarge
     parallelism: 1
     steps:
@@ -96,7 +96,7 @@ jobs:
 
   metrics:
     docker:
-      - image: cimg/rust:1.58.1
+      - image: cimg/rust:1.59
     resource_class: xlarge
     parallelism: 1
     steps:
@@ -110,7 +110,7 @@ jobs:
 
   network:
     docker:
-      - image: cimg/rust:1.58.1
+      - image: cimg/rust:1.59
     resource_class: xlarge
     parallelism: 20
     steps:
@@ -124,7 +124,7 @@ jobs:
 
   rpc:
     docker:
-      - image: cimg/rust:1.58.1
+      - image: cimg/rust:1.59
     resource_class: xlarge
     parallelism: 20
     steps:
@@ -138,7 +138,7 @@ jobs:
 
   snarkos:
     docker:
-      - image: cimg/rust:1.58.1
+      - image: cimg/rust:1.59
     resource_class: xlarge
     parallelism: 20
     steps:
@@ -152,7 +152,7 @@ jobs:
 
   storage:
     docker:
-      - image: cimg/rust:1.58.1
+      - image: cimg/rust:1.59
     resource_class: xlarge
     parallelism: 10
     steps:
@@ -182,7 +182,7 @@ jobs:
 
   fmt:
     docker:
-      - image: cimg/rust:1.58.1
+      - image: cimg/rust:1.59
     resource_class: xlarge
     steps:
       - checkout
@@ -198,7 +198,7 @@ jobs:
 
   clippy:
     docker:
-      - image: cimg/rust:1.58.1
+      - image: cimg/rust:1.59
     resource_class: xlarge
     steps:
       - checkout
