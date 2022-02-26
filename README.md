@@ -43,7 +43,7 @@ Please note to run an Aleo mining node that is **competitive**, the machine will
 
 ### 2.2 Installation
 
-Before beginning, please ensure your machine has `Rust v1.56+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
+Before beginning, please ensure your machine has `Rust v1.59+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 
 Start by cloning the snarkOS Github repository:
 ```
@@ -116,7 +116,7 @@ in the snarkOS directory, or `snarkos miner stats aleo1xxxxxxxxxxxxxxxxxxxxxxxxx
 
 ### 1. My node is unable to compile.
 
-- Ensure your machine has `Rust v1.56+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
+- Ensure your machine has `Rust v1.59+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 - If large errors appear during compilation, try running `cargo clean`.
 - Ensure snarkOS is started using `./run-client.sh` or `./run-miner.sh`.
 
