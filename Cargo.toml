@@ -36,7 +36,7 @@ rpc = [ "snarkos-rpc" ]
 test = [ "snarkos-metrics/test", "snarkos-network/test" ]
 
 [dependencies.aleo-std]
-version = "0.1.6"
+version = "0.1.12"
 
 [dependencies.anyhow]
 version = "1"
