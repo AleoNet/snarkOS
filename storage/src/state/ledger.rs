@@ -231,11 +231,6 @@ impl<N: Network> LedgerState<N> {
         ledger.regenerate_ledger_tree()?;
         assert_eq!(ledger.ledger_tree.read().root(), latest_ledger_root);
 
-        // let value = storage.export()?;
-        // println!("{}", value);
-        // let storage_2 = S::open(".ledger_2", context)?;
-        // storage_2.import(value)?;
-
         info!("Ledger successfully loaded at block {}", ledger.latest_block_height());
         Ok(ledger)
     }

@@ -41,11 +41,6 @@ impl<N: Network> ProverState<N> {
             coinbase: CoinbaseState::open(storage)?,
         };
 
-        // let value = storage.export()?;
-        // println!("{}", value);
-        // let storage_2 = S::open(".ledger_2", context)?;
-        // storage_2.import(value)?;
-
         info!("Prover successfully initialized");
         Ok(prover)
     }
