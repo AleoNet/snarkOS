@@ -1274,8 +1274,8 @@ impl<N: Network> LedgerState<N> {
             let remove_ledger_root = self
                 .ledger_roots
                 .iter()
-                .filter(|(_, block_height)| current_block_height == *block_height)
-                .collect::<Vec<_>>();
+                .filter(|(_, block_height)| current_block_height == *block_height);
+
             for (ledger_root, _) in remove_ledger_root {
                 self.ledger_roots.remove(&ledger_root, Some(batch))?;
             }
