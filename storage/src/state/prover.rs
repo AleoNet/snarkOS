@@ -28,12 +28,11 @@ pub struct ProverState<N: Network> {
 
 impl<N: Network> ProverState<N> {
     ///
-    /// Opens a new writable instance of `ProverState` from the given storage path.
+    /// Opens a new instance of `ProverState` from the given storage path.
     ///
-    pub fn open_writer<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
+    pub fn open<S: Storage, P: AsRef<Path>>(path: P, is_read_only: bool) -> Result<Self> {
         // Open storage.
         let context = N::NETWORK_ID;
-        let is_read_only = false;
         let storage = S::open(path, context, is_read_only)?;
 
         // Initialize the prover.

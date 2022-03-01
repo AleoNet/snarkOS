@@ -95,7 +95,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         let (prover_router, mut prover_handler) = mpsc::channel(1024);
         // Initialize the prover.
         let prover = Arc::new(Self {
-            state: Arc::new(ProverState::open_writer::<S, P>(path)?),
+            state: Arc::new(ProverState::open::<S, P>(path, false)?),
             address,
             pool: pool_ip,
             prover_router,
