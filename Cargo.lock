@@ -30,11 +30,12 @@ dependencies = [
 
 [[package]]
 name = "aleo-std"
-version = "0.1.8"
+version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a4618148b254f38b9283c9e00a4938187f8f3f20aa2dafc59cf7377b27cb764b"
+checksum = "cedebcd5cef12e2739faee8e07ccde1c4a0c7d23371f4007799c49ba2a7eb278"
 dependencies = [
  "aleo-std-cpu",
+ "aleo-std-profiler",
  "aleo-std-storage",
  "aleo-std-time",
  "aleo-std-timed",
@@ -46,6 +47,12 @@ name = "aleo-std-cpu"
 version = "0.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d1dcc739555d14733cbe4756f144b81d64f01843df359189b4d71bd5e521e2ee"
+
+[[package]]
+name = "aleo-std-profiler"
+version = "0.1.12"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "360a97d2f318af317382164debf2acb0aef276117ad06616f2768909aff01afe"
 
 [[package]]
 name = "aleo-std-storage"
