@@ -47,15 +47,26 @@ pub struct DataMap<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOw
 }
 
 impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> DataMap<K, V> {
+    #[inline]
+    fn create_prefixed_key<Q>(&self, key: &Q) -> Result<Vec<u8>>
+    where
+        K: Borrow<Q>,
+        Q: Serialize + ?Sized,
+    {
+        let mut raw_key = self.context.clone();
+        raw_key.reserve(bincode::serialized_size(&key)? as usize);
+        bincode::serialize_into(&mut raw_key, &key)?;
+
+        Ok(raw_key)
+    }
+
     fn get_raw<'a, Q>(&'a self, key: &Q) -> Result<Option<rocksdb::DBPinnableSlice<'a>>>
     where
         K: Borrow<Q>,
         Q: Serialize + ?Sized,
     {
-        let mut key_buf = self.context.clone();
-        key_buf.reserve(bincode::serialized_size(&key)? as usize);
-        bincode::serialize_into(&mut key_buf, &key)?;
-        match self.storage.rocksdb.get_pinned(&key_buf)? {
+        let raw_key = self.create_prefixed_key(key)?;
+        match self.storage.rocksdb.get_pinned(&raw_key)? {
             Some(data) => Ok(Some(data)),
             None => Ok(None),
         }
@@ -109,15 +120,13 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         K: Borrow<Q>,
         Q: Serialize + ?Sized,
     {
-        let mut key_buf = self.context.clone();
-        key_buf.reserve(bincode::serialized_size(&key)? as usize);
-        bincode::serialize_into(&mut key_buf, &key)?;
-        let value_buf = bincode::serialize(value)?;
+        let raw_key = self.create_prefixed_key(key)?;
+        let raw_value = bincode::serialize(value)?;
 
         if let Some(batch_id) = batch {
-            self.storage.batches.lock().entry(batch_id).or_default().put(&key_buf, &value_buf);
+            self.storage.batches.lock().entry(batch_id).or_default().put(&raw_key, &raw_value);
         } else {
-            self.storage.rocksdb.put(&key_buf, &value_buf)?;
+            self.storage.rocksdb.put(&raw_key, &raw_value)?;
         }
 
         Ok(())
@@ -133,14 +142,12 @@ impl<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> Map<'
         K: Borrow<Q>,
         Q: Serialize + ?Sized,
     {
-        let mut key_buf = self.context.clone();
-        key_buf.reserve(bincode::serialized_size(&key)? as usize);
-        bincode::serialize_into(&mut key_buf, &key)?;
+        let raw_key = self.create_prefixed_key(key)?;
 
         if let Some(batch_id) = batch {
-            self.storage.batches.lock().entry(batch_id).or_default().delete(&key_buf);
+            self.storage.batches.lock().entry(batch_id).or_default().delete(&raw_key);
         } else {
-            self.storage.rocksdb.delete(&key_buf)?;
+            self.storage.rocksdb.delete(&raw_key)?;
         }
 
         Ok(())
