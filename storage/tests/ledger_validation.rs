@@ -14,8 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use snarkos_environment::CurrentNetwork;
 use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
-use snarkvm::{dpc::testnet2::Testnet2, prelude::Block};
+use snarkvm::prelude::Block;
 
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
@@ -31,7 +32,7 @@ fn test_ledger_validation() {
     // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
     // note: the `blocks_100` and `blocks_1000` files were generated on a testnet2 storage using `LedgerState::dump_blocks`.
     let mut test_blocks = fs::read(format!("benches/blocks_{}", NUM_BLOCKS)).expect(&format!("Missing the test blocks file"));
-    let blocks: Vec<Block<Testnet2>> = bincode::deserialize(&mut test_blocks).expect("Failed to deserialize a block dump");
+    let blocks: Vec<Block<CurrentNetwork>> = bincode::deserialize(&mut test_blocks).expect("Failed to deserialize a block dump");
     assert_eq!(blocks.len(), NUM_BLOCKS - 1);
 
     // Prepare a test ledger and an iterator of blocks to insert.
@@ -49,7 +50,7 @@ fn test_ledger_validation() {
     for _ in 0..NUM_CHECKS {
         let increment: u32 = rng.gen_range(1..=NUM_BLOCKS as u32);
         println!("Validating with an increment = {}", increment);
-        let _ledger: LedgerState<Testnet2> =
+        let _ledger: LedgerState<CurrentNetwork> =
             LedgerState::open_writer_with_increment::<RocksDB, &Path>(&temp_dir, increment).expect("Failed to initialize ledger");
     }
 }

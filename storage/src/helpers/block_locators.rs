@@ -212,15 +212,16 @@ impl<N: Network> Deref for BlockLocators<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::dpc::testnet2::Testnet2;
+    use snarkos_environment::CurrentNetwork;
 
     #[test]
     fn test_block_locators_serde_json() {
-        let expected_block_height = Testnet2::genesis_block().height();
-        let expected_block_hash = Testnet2::genesis_block().hash();
-        let expected_block_header = Testnet2::genesis_block().header().clone();
+        let expected_block_height = CurrentNetwork::genesis_block().height();
+        let expected_block_hash = CurrentNetwork::genesis_block().hash();
+        let expected_block_header = CurrentNetwork::genesis_block().header().clone();
         let expected_block_locators =
-            BlockLocators::<Testnet2>::from([(expected_block_height, (expected_block_hash, Some(expected_block_header)))].into()).unwrap();
+            BlockLocators::<CurrentNetwork>::from([(expected_block_height, (expected_block_hash, Some(expected_block_header)))].into())
+                .unwrap();
 
         // Serialize
         let expected_string = expected_block_locators.to_string();
@@ -235,11 +236,12 @@ mod tests {
 
     #[test]
     fn test_block_locators_bincode() {
-        let expected_block_height = Testnet2::genesis_block().height();
-        let expected_block_hash = Testnet2::genesis_block().hash();
-        let expected_block_header = Testnet2::genesis_block().header().clone();
+        let expected_block_height = CurrentNetwork::genesis_block().height();
+        let expected_block_hash = CurrentNetwork::genesis_block().hash();
+        let expected_block_header = CurrentNetwork::genesis_block().header().clone();
         let expected_block_locators =
-            BlockLocators::<Testnet2>::from([(expected_block_height, (expected_block_hash, Some(expected_block_header)))].into()).unwrap();
+            BlockLocators::<CurrentNetwork>::from([(expected_block_height, (expected_block_hash, Some(expected_block_header)))].into())
+                .unwrap();
 
         // Serialize
         let expected_bytes = expected_block_locators.to_bytes_le().unwrap();

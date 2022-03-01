@@ -43,7 +43,8 @@ pub use snarkos_storage as storage;
 #[cfg(feature = "rpc")]
 pub use snarkos_rpc as rpc;
 
-pub use snarkvm::dpc::{testnet2::Testnet2, Address, Network};
+pub use environment::CurrentNetwork;
+pub use snarkvm::dpc::{Address, Network};
 
 pub mod prelude {
     pub use crate::{environment::*, network::*, storage::*};
@@ -51,5 +52,6 @@ pub mod prelude {
     #[cfg(feature = "rpc")]
     pub use crate::rpc::*;
 
-    pub use snarkvm::dpc::{testnet2::Testnet2, Address, Network};
+    pub use snarkos_environment::CurrentNetwork;
+    pub use snarkvm::dpc::{Address, Network};
 }

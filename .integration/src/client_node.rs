@@ -15,15 +15,14 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos::Server;
-use snarkos_environment::Client;
-use snarkvm::dpc::testnet2::Testnet2;
+use snarkos_environment::{Client, CurrentNetwork};
 
 use std::{fs, net::SocketAddr};
 use structopt::StructOpt;
 
 /// A facade for a snarkOS client node.
 pub struct ClientNode {
-    pub server: Server<Testnet2, Client<Testnet2>>,
+    pub server: Server<CurrentNetwork, Client<CurrentNetwork>>,
 }
 
 impl ClientNode {
@@ -59,7 +58,9 @@ impl ClientNode {
         let permanent_args = &["snarkos", "--norpc"];
         let combined_args = permanent_args.iter().chain(extra_args.iter());
         let config = snarkos::Node::from_iter(combined_args);
-        let server = Server::<Testnet2, Client<Testnet2>>::initialize(&config, None, None).await.unwrap();
+        let server = Server::<CurrentNetwork, Client<CurrentNetwork>>::initialize(&config, None, None)
+            .await
+            .unwrap();
 
         ClientNode { server }
     }
