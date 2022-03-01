@@ -18,7 +18,8 @@ use crate::{
     storage::{rocksdb::RocksDB, Storage},
     LedgerState,
 };
-use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
+use snarkos_environment::CurrentNetwork;
+use snarkvm::dpc::prelude::*;
 
 use rand::{thread_rng, Rng};
 use std::sync::atomic::AtomicBool;
@@ -35,13 +36,13 @@ fn create_new_ledger<N: Network, S: Storage>() -> LedgerState<N> {
 #[test]
 fn test_genesis() {
     // Initialize a new ledger.
-    let ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<CurrentNetwork, RocksDB>();
 
     // Retrieve the genesis block.
-    let genesis = Testnet2::genesis_block();
+    let genesis = CurrentNetwork::genesis_block();
 
     // Initialize a new ledger tree.
-    let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
+    let mut ledger_tree = LedgerTree::<CurrentNetwork>::new().expect("Failed to initialize ledger tree");
     ledger_tree.add(&genesis.hash()).expect("Failed to add to ledger tree");
 
     // Ensure the ledger is at the genesis block.
@@ -61,17 +62,17 @@ fn test_add_next_block() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<CurrentNetwork, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
-    let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
+    let mut ledger_tree = LedgerTree::<CurrentNetwork>::new().expect("Failed to initialize ledger tree");
     ledger_tree
-        .add(&Testnet2::genesis_block().hash())
+        .add(&CurrentNetwork::genesis_block().hash())
         .expect("Failed to add to ledger tree");
 
     // Initialize a new account.
-    let account = Account::<Testnet2>::new(&mut thread_rng());
+    let account = Account::<CurrentNetwork>::new(&mut thread_rng());
     let address = account.address();
 
     // Mine the next block.
@@ -91,7 +92,7 @@ fn test_add_next_block() {
     assert_eq!(ledger_tree.root(), ledger.latest_ledger_root());
 
     // Retrieve the genesis block.
-    let genesis = Testnet2::genesis_block();
+    let genesis = CurrentNetwork::genesis_block();
 
     // Ensure the block locators are correct.
     let block_locators = ledger.latest_block_locators();
@@ -109,17 +110,17 @@ fn test_remove_last_block() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<CurrentNetwork, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
-    let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
+    let mut ledger_tree = LedgerTree::<CurrentNetwork>::new().expect("Failed to initialize ledger tree");
     ledger_tree
-        .add(&Testnet2::genesis_block().hash())
+        .add(&CurrentNetwork::genesis_block().hash())
         .expect("Failed to add to ledger tree");
 
     // Initialize a new account.
-    let account = Account::<Testnet2>::new(&mut thread_rng());
+    let account = Account::<CurrentNetwork>::new(&mut thread_rng());
     let address = account.address();
 
     // Mine the next block.
@@ -136,7 +137,7 @@ fn test_remove_last_block() {
     assert_eq!(vec![block], blocks);
 
     // Retrieve the genesis block.
-    let genesis = Testnet2::genesis_block();
+    let genesis = CurrentNetwork::genesis_block();
 
     // Ensure the ledger is back at the genesis block.
     assert_eq!(0, ledger.latest_block_height());
@@ -155,17 +156,17 @@ fn test_remove_last_2_blocks() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<CurrentNetwork, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
-    let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
+    let mut ledger_tree = LedgerTree::<CurrentNetwork>::new().expect("Failed to initialize ledger tree");
     ledger_tree
-        .add(&Testnet2::genesis_block().hash())
+        .add(&CurrentNetwork::genesis_block().hash())
         .expect("Failed to add to ledger tree");
 
     // Initialize a new account.
-    let account = Account::<Testnet2>::new(&mut thread_rng());
+    let account = Account::<CurrentNetwork>::new(&mut thread_rng());
     let address = account.address();
 
     // Mine the next block.
@@ -189,7 +190,7 @@ fn test_remove_last_2_blocks() {
     assert_eq!(vec![block_1, block_2], blocks);
 
     // Retrieve the genesis block.
-    let genesis = Testnet2::genesis_block();
+    let genesis = CurrentNetwork::genesis_block();
 
     // Ensure the ledger is back at the genesis block.
     assert_eq!(0, ledger.latest_block_height());
@@ -208,17 +209,17 @@ fn test_get_block_locators() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<CurrentNetwork, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new ledger tree.
-    let mut ledger_tree = LedgerTree::<Testnet2>::new().expect("Failed to initialize ledger tree");
+    let mut ledger_tree = LedgerTree::<CurrentNetwork>::new().expect("Failed to initialize ledger tree");
     ledger_tree
-        .add(&Testnet2::genesis_block().hash())
+        .add(&CurrentNetwork::genesis_block().hash())
         .expect("Failed to add to ledger tree");
 
     // Initialize a new account.
-    let account = Account::<Testnet2>::new(&mut thread_rng());
+    let account = Account::<CurrentNetwork>::new(&mut thread_rng());
     let address = account.address();
 
     // Mine the next block.
@@ -279,11 +280,11 @@ fn test_transaction_fees() {
     let terminator = AtomicBool::new(false);
 
     // Initialize a new ledger.
-    let ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<CurrentNetwork, RocksDB>();
     assert_eq!(0, ledger.latest_block_height());
 
     // Initialize a new account.
-    let account = Account::<Testnet2>::new(&mut thread_rng());
+    let account = Account::<CurrentNetwork>::new(&mut thread_rng());
     let private_key = account.private_key();
     let view_key = account.view_key();
     let address = account.address();
@@ -305,7 +306,7 @@ fn test_transaction_fees() {
     let ledger_proof = ledger.get_ledger_inclusion_proof(coinbase_record[0].commitment()).unwrap();
 
     // Initialize a recipient account.
-    let recipient_account = Account::<Testnet2>::new(rng);
+    let recipient_account = Account::<CurrentNetwork>::new(rng);
     let recipient_view_key = recipient_account.view_key();
     let recipient = recipient_account.address();
 
@@ -336,7 +337,7 @@ fn test_transaction_fees() {
     ledger.add_next_block(&block_2).expect("Failed to add next block to ledger");
     assert_eq!(2, ledger.latest_block_height());
 
-    let expected_block_reward = Block::<Testnet2>::block_reward(2).add(fee);
+    let expected_block_reward = Block::<CurrentNetwork>::block_reward(2).add(fee);
     let output_record = &block_2.transactions()[0]
         .to_decrypted_records(&recipient_view_key.into())
         .collect::<Vec<_>>()[0];

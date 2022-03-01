@@ -34,6 +34,9 @@ use std::{
     sync::{atomic::AtomicBool, Arc},
 };
 
+/// A type alias for the current version of the network.
+pub type CurrentNetwork = snarkvm::dpc::testnet2::Testnet2;
+
 #[rustfmt::skip]
 pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     type Network: Network;

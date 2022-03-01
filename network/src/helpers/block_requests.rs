@@ -244,8 +244,7 @@ pub(crate) fn handle_block_requests<N: Network, E: Environment>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_environment::Client;
-    use snarkvm::dpc::testnet2::Testnet2;
+    use snarkos_environment::{Client, CurrentNetwork};
 
     use rand::{thread_rng, Rng};
 
@@ -273,7 +272,7 @@ mod tests {
             let maximum_common_ancestor = peer_maximum_block_height;
 
             // Determine if block requests or forking is required.
-            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+            let result = handle_block_requests::<CurrentNetwork, Client<CurrentNetwork>>(
                 latest_block_height,
                 latest_cumulative_weight,
                 peer_ip,
@@ -311,7 +310,7 @@ mod tests {
             let maximum_common_ancestor = peer_maximum_block_height;
 
             // Determine if block requests or forking is required.
-            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+            let result = handle_block_requests::<CurrentNetwork, Client<CurrentNetwork>>(
                 latest_block_height,
                 latest_cumulative_weight,
                 peer_ip,
@@ -350,7 +349,7 @@ mod tests {
             let peer_first_deviating_locator = Some(maximum_common_ancestor + 1);
 
             // Determine if block requests or forking is required.
-            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+            let result = handle_block_requests::<CurrentNetwork, Client<CurrentNetwork>>(
                 latest_block_height,
                 latest_cumulative_weight,
                 peer_ip,
@@ -389,7 +388,7 @@ mod tests {
             let peer_first_deviating_locator = Some(maximum_common_ancestor + 1);
 
             // Determine if block requests or forking is required.
-            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+            let result = handle_block_requests::<CurrentNetwork, Client<CurrentNetwork>>(
                 latest_block_height,
                 latest_cumulative_weight,
                 peer_ip,
@@ -402,7 +401,7 @@ mod tests {
 
             let expected_number_of_block_requests = std::cmp::min(
                 peer_maximum_block_height - latest_block_height,
-                Client::<Testnet2>::MAXIMUM_BLOCK_REQUEST,
+                Client::<CurrentNetwork>::MAXIMUM_BLOCK_REQUEST,
             );
             let expected_start_block_height = latest_block_height + 1;
             let expected_end_block_height = expected_start_block_height + expected_number_of_block_requests - 1;
@@ -429,7 +428,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             // Declare internal state.
             let latest_block_height: u32 =
-                rng.gen_range(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 1..(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 1) * 2);
+                rng.gen_range(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH + 1..(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH + 1) * 2);
             let latest_cumulative_weight: u128 = latest_block_height as u128;
 
             // Declare peer state.
@@ -442,11 +441,11 @@ mod tests {
 
             // Declare locator state.
             let maximum_common_ancestor =
-                rng.gen_range(latest_block_height.saturating_sub(Testnet2::ALEO_MAXIMUM_FORK_DEPTH)..latest_block_height);
+                rng.gen_range(latest_block_height.saturating_sub(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH)..latest_block_height);
             let peer_first_deviating_locator = Some(rng.gen_range(maximum_common_ancestor + 1..latest_block_height));
 
             // Determine if block requests or forking is required.
-            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+            let result = handle_block_requests::<CurrentNetwork, Client<CurrentNetwork>>(
                 latest_block_height,
                 latest_cumulative_weight,
                 peer_ip,
@@ -459,7 +458,7 @@ mod tests {
 
             let expected_number_of_block_requests = std::cmp::min(
                 peer_maximum_block_height - maximum_common_ancestor,
-                Client::<Testnet2>::MAXIMUM_BLOCK_REQUEST,
+                Client::<CurrentNetwork>::MAXIMUM_BLOCK_REQUEST,
             );
             let expected_start_block_height = maximum_common_ancestor + 1;
             let expected_end_block_height = expected_start_block_height + expected_number_of_block_requests - 1;
@@ -487,7 +486,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             // Declare internal state.
             let latest_block_height: u32 =
-                rng.gen_range(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 2..(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 2) * 2);
+                rng.gen_range(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH + 2..(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH + 2) * 2);
             let latest_cumulative_weight: u128 = latest_block_height as u128;
 
             // Declare peer state.
@@ -499,12 +498,13 @@ mod tests {
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
 
             // Declare locator state.
-            let maximum_common_ancestor = rng.gen_range(0..latest_block_height.saturating_sub(Testnet2::ALEO_MAXIMUM_FORK_DEPTH) / 2);
-            let peer_first_deviating_locator =
-                Some(rng.gen_range(maximum_common_ancestor + 1..latest_block_height.saturating_sub(Testnet2::ALEO_MAXIMUM_FORK_DEPTH)));
+            let maximum_common_ancestor = rng.gen_range(0..latest_block_height.saturating_sub(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH) / 2);
+            let peer_first_deviating_locator = Some(
+                rng.gen_range(maximum_common_ancestor + 1..latest_block_height.saturating_sub(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH)),
+            );
 
             // Determine if block requests or forking is required.
-            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+            let result = handle_block_requests::<CurrentNetwork, Client<CurrentNetwork>>(
                 latest_block_height,
                 latest_cumulative_weight,
                 peer_ip,
@@ -534,7 +534,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             // Declare internal state.
             let latest_block_height: u32 =
-                rng.gen_range(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 1..(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 1) * 2);
+                rng.gen_range(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH + 1..(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH + 1) * 2);
             let latest_cumulative_weight: u128 = latest_block_height as u128;
 
             // Declare peer state.
@@ -546,12 +546,12 @@ mod tests {
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
 
             // Declare locator state.
-            let maximum_common_ancestor = rng.gen_range(0..latest_block_height.saturating_sub(Testnet2::ALEO_MAXIMUM_FORK_DEPTH));
+            let maximum_common_ancestor = rng.gen_range(0..latest_block_height.saturating_sub(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH));
             let peer_first_deviating_locator =
-                Some(rng.gen_range(latest_block_height.saturating_sub(Testnet2::ALEO_MAXIMUM_FORK_DEPTH)..latest_block_height));
+                Some(rng.gen_range(latest_block_height.saturating_sub(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH)..latest_block_height));
 
             // Determine if block requests or forking is required.
-            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+            let result = handle_block_requests::<CurrentNetwork, Client<CurrentNetwork>>(
                 latest_block_height,
                 latest_cumulative_weight,
                 peer_ip,
@@ -564,7 +564,7 @@ mod tests {
 
             let expected_number_of_block_requests = std::cmp::min(
                 peer_maximum_block_height - maximum_common_ancestor,
-                Client::<Testnet2>::MAXIMUM_BLOCK_REQUEST,
+                Client::<CurrentNetwork>::MAXIMUM_BLOCK_REQUEST,
             );
             let expected_start_block_height = maximum_common_ancestor + 1;
             let expected_end_block_height = expected_start_block_height + expected_number_of_block_requests - 1;
@@ -592,7 +592,7 @@ mod tests {
         for _ in 0..ITERATIONS {
             // Declare internal state.
             let latest_block_height: u32 =
-                rng.gen_range(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 1..(Testnet2::ALEO_MAXIMUM_FORK_DEPTH + 1) * 2);
+                rng.gen_range(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH + 1..(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH + 1) * 2);
             let latest_cumulative_weight: u128 = latest_block_height as u128;
 
             // Declare peer state.
@@ -604,11 +604,11 @@ mod tests {
             let peer_maximum_cumulative_weight: u128 = peer_maximum_block_height as u128;
 
             // Declare locator state.
-            let maximum_common_ancestor = rng.gen_range(0..latest_block_height.saturating_sub(Testnet2::ALEO_MAXIMUM_FORK_DEPTH));
+            let maximum_common_ancestor = rng.gen_range(0..latest_block_height.saturating_sub(CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH));
             let peer_first_deviating_locator = None;
 
             // Determine if block requests or forking is required.
-            let result = handle_block_requests::<Testnet2, Client<Testnet2>>(
+            let result = handle_block_requests::<CurrentNetwork, Client<CurrentNetwork>>(
                 latest_block_height,
                 latest_cumulative_weight,
                 peer_ip,

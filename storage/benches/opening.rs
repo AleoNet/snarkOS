@@ -14,8 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use snarkos_environment::CurrentNetwork;
 use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
-use snarkvm::{dpc::testnet2::Testnet2, prelude::Block};
+use snarkvm::prelude::Block;
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
@@ -27,7 +28,7 @@ fn opening(c: &mut Criterion) {
     // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
     // note: the `blocks_100` and `blocks_1000` files were generated on a testnet2 storage using `LedgerState::dump_blocks`.
     let mut test_blocks = fs::read(format!("benches/blocks_{}", NUM_BLOCKS)).expect(&format!("Missing the test blocks file"));
-    let blocks: Vec<Block<Testnet2>> = bincode::deserialize(&mut test_blocks).expect("Failed to deserialize a block dump");
+    let blocks: Vec<Block<CurrentNetwork>> = bincode::deserialize(&mut test_blocks).expect("Failed to deserialize a block dump");
     assert_eq!(blocks.len(), NUM_BLOCKS - 1);
 
     // Prepare a test ledger and insert all the test blocks.
@@ -41,7 +42,7 @@ fn opening(c: &mut Criterion) {
 
     c.bench_function("Ledger::open_writer", |b| {
         b.iter(|| {
-            let _ledger: LedgerState<Testnet2> =
+            let _ledger: LedgerState<CurrentNetwork> =
                 LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir, NUM_BLOCKS as u32).expect("Failed to initialize ledger");
         })
     });

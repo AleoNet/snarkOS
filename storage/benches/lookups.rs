@@ -14,8 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use snarkos_environment::CurrentNetwork;
 use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
-use snarkvm::{dpc::testnet2::Testnet2, prelude::Block, traits::Network};
+use snarkvm::{prelude::Block, traits::Network};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 use rand::{prelude::SliceRandom, thread_rng, Rng, SeedableRng};
@@ -33,28 +34,28 @@ fn lookups(c: &mut Criterion) {
     // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
     // note: the `blocks_100` and `blocks_1000` files were generated on a testnet2 storage using `LedgerState::dump_blocks`.
     let test_blocks = fs::read(format!("benches/blocks_{}", NUM_BLOCKS)).unwrap_or_else(|_| panic!("Missing the test blocks file"));
-    let blocks: Vec<Block<Testnet2>> = bincode::deserialize(&test_blocks).expect("Failed to deserialize a block dump");
+    let blocks: Vec<Block<CurrentNetwork>> = bincode::deserialize(&test_blocks).expect("Failed to deserialize a block dump");
     assert_eq!(blocks.len(), NUM_BLOCKS - 1);
 
     // Prepare the collections for block component ids.
 
     let mut block_hashes = Vec::with_capacity(NUM_BLOCKS);
-    block_hashes.push(Testnet2::genesis_block().hash());
+    block_hashes.push(CurrentNetwork::genesis_block().hash());
 
     let mut ledger_roots = Vec::with_capacity(NUM_BLOCKS);
 
     let mut tx_ids = Vec::with_capacity(NUM_BLOCKS);
-    for tx_id in Testnet2::genesis_block().transactions().transaction_ids() {
+    for tx_id in CurrentNetwork::genesis_block().transactions().transaction_ids() {
         tx_ids.push(tx_id);
     }
 
     let mut tx_commitments = Vec::with_capacity(NUM_BLOCKS);
-    for tx_commitment in Testnet2::genesis_block().transactions().commitments() {
+    for tx_commitment in CurrentNetwork::genesis_block().transactions().commitments() {
         tx_commitments.push(tx_commitment);
     }
 
     let mut tx_serial_numbers = Vec::with_capacity(NUM_BLOCKS);
-    for tx_serial_number in Testnet2::genesis_block().transactions().serial_numbers() {
+    for tx_serial_number in CurrentNetwork::genesis_block().transactions().serial_numbers() {
         tx_serial_numbers.push(tx_serial_number);
     }
 
