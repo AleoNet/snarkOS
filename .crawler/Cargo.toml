@@ -18,6 +18,9 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dependencies.parking_lot]
+version = "0.12"
+
 [dependencies.time]
 version = "0.3"
 features = ["local-offset"]

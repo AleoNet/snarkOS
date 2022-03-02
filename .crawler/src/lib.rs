@@ -15,3 +15,4 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod connection;
+pub mod known_network;
