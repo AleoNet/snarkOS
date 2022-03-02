@@ -2771,6 +2771,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snarkos-environment",
+ "snarkos-storage",
  "snarkvm",
  "tempfile",
  "time 0.3.7",
