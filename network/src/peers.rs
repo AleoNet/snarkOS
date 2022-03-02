@@ -354,6 +354,35 @@ impl<N: Network, E: Environment> Peers<N, E> {
         }
     }
 
+    async fn can_connect(&self, peer_ip: SocketAddr) -> bool {
+        if peer_ip == self.local_ip
+            || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
+        {
+            debug!("Dropping connection request to {} (attempted to self-connect)", peer_ip);
+            return false;
+        }
+
+        // Ensure the node does not surpass the maximum number of peer connections.
+        if self.number_of_connected_peers().await >= E::MAXIMUM_NUMBER_OF_PEERS {
+            debug!("Dropping connection request to {} (maximum peers reached)", peer_ip);
+            return false;
+        }
+
+        // Ensure the peer is a new connection.
+        if self.is_connected_to(peer_ip).await {
+            debug!("Dropping connection request to {} (already connected)", peer_ip);
+            return false;
+        }
+
+        // Ensure the peer is not restricted.
+        if self.is_restricted(peer_ip).await {
+            debug!("Dropping connection request to {} (restricted)", peer_ip);
+            return false;
+        }
+
+        true
+    }
+
     async fn connect(
         &self,
         peer_ip: SocketAddr,
@@ -363,72 +392,58 @@ impl<N: Network, E: Environment> Peers<N, E> {
         prover_router: ProverRouter<N>,
         connection_result: ConnectionResult,
     ) {
-        // Ensure the peer IP is not this node.
-        if peer_ip == self.local_ip
-            || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
-        {
-            debug!("Skipping connection request to {} (attempted to self-connect)", peer_ip);
+        if !self.can_connect(peer_ip).await {
+            return;
         }
-        // Ensure the node does not surpass the maximum number of peer connections.
-        else if self.number_of_connected_peers().await >= E::MAXIMUM_NUMBER_OF_PEERS {
-            debug!("Skipping connection request to {} (maximum peers reached)", peer_ip);
+
+        // Lock seen_outbound_connections for further processing.
+        let mut seen_outbound_connections = self.seen_outbound_connections.write().await;
+
+        // Ensure the node respects the connection frequency limit.
+        let last_seen = seen_outbound_connections.entry(peer_ip).or_insert(SystemTime::UNIX_EPOCH);
+        let elapsed = last_seen.elapsed().unwrap_or(Duration::MAX).as_secs();
+
+        if elapsed < E::RADIO_SILENCE_IN_SECS {
+            trace!("Skipping connection request to {} (tried {} secs ago)", peer_ip, elapsed);
+            return;
         }
-        // Ensure the peer is a new connection.
-        else if self.is_connected_to(peer_ip).await {
-            debug!("Skipping connection request to {} (already connected)", peer_ip);
-        }
-        // Ensure the peer is not restricted.
-        else if self.is_restricted(peer_ip).await {
-            debug!("Skipping connection request to {} (restricted)", peer_ip);
-        }
+
         // Attempt to open a TCP stream.
-        else {
-            // Lock seen_outbound_connections for further processing.
-            let mut seen_outbound_connections = self.seen_outbound_connections.write().await;
+        debug!("Connecting to {}...", peer_ip);
+        // Update the last seen timestamp for this peer.
+        seen_outbound_connections.insert(peer_ip, SystemTime::now());
 
-            // Ensure the node respects the connection frequency limit.
-            let last_seen = seen_outbound_connections.entry(peer_ip).or_insert(SystemTime::UNIX_EPOCH);
-            let elapsed = last_seen.elapsed().unwrap_or(Duration::MAX).as_secs();
-            if elapsed < E::RADIO_SILENCE_IN_SECS {
-                trace!("Skipping connection request to {} (tried {} secs ago)", peer_ip, elapsed);
-            } else {
-                debug!("Connecting to {}...", peer_ip);
-                // Update the last seen timestamp for this peer.
-                seen_outbound_connections.insert(peer_ip, SystemTime::now());
+        // Release the lock over seen_outbound_connections.
+        drop(seen_outbound_connections);
 
-                // Release the lock over seen_outbound_connections.
-                drop(seen_outbound_connections);
-
-                // Initialize the peer handler.
-                match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await {
-                    Ok(stream) => match stream {
-                        Ok(stream) => {
-                            Peer::handler(
-                                stream,
-                                self.local_ip,
-                                self.local_nonce,
-                                &self.peers_router,
-                                ledger_reader,
-                                ledger_router,
-                                prover_router,
-                                operator_router,
-                                self.connected_nonces().await,
-                                Some(connection_result),
-                            )
-                            .await
-                        }
-                        Err(error) => {
-                            trace!("Failed to connect to '{}': '{:?}'", peer_ip, error);
-                            self.candidate_peers.write().await.remove(&peer_ip);
-                        }
-                    },
-                    Err(error) => {
-                        error!("Unable to reach '{}': '{:?}'", peer_ip, error);
-                        self.candidate_peers.write().await.remove(&peer_ip);
-                    }
-                };
+        // Initialize the peer handler.
+        match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await {
+            Ok(stream) => match stream {
+                Ok(stream) => {
+                    Peer::handler(
+                        stream,
+                        self.local_ip,
+                        self.local_nonce,
+                        &self.peers_router,
+                        ledger_reader,
+                        ledger_router,
+                        prover_router,
+                        operator_router,
+                        self.connected_nonces().await,
+                        Some(connection_result),
+                    )
+                    .await
+                }
+                Err(error) => {
+                    trace!("Failed to connect to '{}': '{:?}'", peer_ip, error);
+                    self.candidate_peers.write().await.remove(&peer_ip);
+                }
+            },
+            Err(error) => {
+                error!("Unable to reach '{}': '{:?}'", peer_ip, error);
+                self.candidate_peers.write().await.remove(&peer_ip);
             }
-        }
+        };
     }
 
     async fn heartbeat(
@@ -599,81 +614,65 @@ impl<N: Network, E: Environment> Peers<N, E> {
         operator_router: OperatorRouter<N>,
         prover_router: ProverRouter<N>,
     ) {
-        // Ensure the peer IP is not this node.
-        if peer_ip == self.local_ip
-            || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
-        {
-            debug!("Skipping connection request to {} (attempted to self-connect)", peer_ip);
+        if !self.can_connect(peer_ip).await {
+            return;
         }
-        // Ensure the node does not surpass the maximum number of peer connections.
-        else if self.number_of_connected_peers().await >= E::MAXIMUM_NUMBER_OF_PEERS {
-            debug!("Dropping connection request from {} (maximum peers reached)", peer_ip);
-        }
-        // Ensure the node is not already connected to this peer.
-        else if self.is_connected_to(peer_ip).await {
-            debug!("Dropping connection request from {} (already connected)", peer_ip);
-        }
-        // Ensure the peer is not restricted.
-        else if self.is_restricted(peer_ip).await {
-            debug!("Dropping connection request from {} (restricted)", peer_ip);
-        }
+
         // Spawn a handler to be run asynchronously.
-        else {
-            // Sanitize the port from the peer, if it is a remote IP address.
-            let (peer_lookup, peer_port) = match peer_ip.ip().is_loopback() {
-                // Loopback case - Do not sanitize, merely pass through.
-                true => (peer_ip, peer_ip.port()),
-                // Remote case - Sanitize, storing u16::MAX for the peer IP address to dedup the peer next time.
-                false => (SocketAddr::new(peer_ip.ip(), u16::MAX), peer_ip.port()),
-            };
+        // Sanitize the port from the peer, if it is a remote IP address.
+        let (peer_lookup, peer_port) = match peer_ip.ip().is_loopback() {
+            // Loopback case - Do not sanitize, merely pass through.
+            true => (peer_ip, peer_ip.port()),
+            // Remote case - Sanitize, storing u16::MAX for the peer IP address to dedup the peer next time.
+            false => (SocketAddr::new(peer_ip.ip(), u16::MAX), peer_ip.port()),
+        };
 
-            // Lock seen_inbound_connections for further processing.
-            let mut seen_inbound_connections = self.seen_inbound_connections.write().await;
+        // Lock seen_inbound_connections for further processing.
+        let mut seen_inbound_connections = self.seen_inbound_connections.write().await;
 
-            // Fetch the inbound tracker entry for this peer.
-            let ((initial_port, num_attempts), last_seen) = seen_inbound_connections
-                .entry(peer_lookup)
-                .or_insert(((peer_port, 0), SystemTime::UNIX_EPOCH));
-            let elapsed = last_seen.elapsed().unwrap_or(Duration::MAX).as_secs();
+        // Fetch the inbound tracker entry for this peer.
+        let ((initial_port, num_attempts), last_seen) = seen_inbound_connections
+            .entry(peer_lookup)
+            .or_insert(((peer_port, 0), SystemTime::UNIX_EPOCH));
+        let elapsed = last_seen.elapsed().unwrap_or(Duration::MAX).as_secs();
 
-            // Reset the inbound tracker entry for this peer, if the predefined elapsed time has passed.
-            if elapsed > E::RADIO_SILENCE_IN_SECS {
-                // Reset the initial port for this peer.
-                *initial_port = peer_port;
-                // Reset the number of attempts for this peer.
-                *num_attempts = 0;
-                // Reset the last seen timestamp for this peer.
-                *last_seen = SystemTime::now();
-            }
+        // Reset the inbound tracker entry for this peer, if the predefined elapsed time has passed.
+        if elapsed > E::RADIO_SILENCE_IN_SECS {
+            // Reset the initial port for this peer.
+            *initial_port = peer_port;
+            // Reset the number of attempts for this peer.
+            *num_attempts = 0;
+            // Reset the last seen timestamp for this peer.
+            *last_seen = SystemTime::now();
+        }
 
-            // Ensure the connecting peer has not surpassed the connection attempt limit.
-            if *initial_port < peer_port && *num_attempts > E::MAXIMUM_CONNECTION_FAILURES {
-                trace!("Dropping connection request from {} (tried {} secs ago)", peer_ip, elapsed);
-                // Add an entry for this `Peer` in the restricted peers.
-                self.restricted_peers.write().await.insert(peer_ip, Instant::now());
-            } else {
-                debug!("Received a connection request from {}", peer_ip);
-                // Update the number of attempts for this peer.
-                *num_attempts += 1;
+        // Ensure the connecting peer has not surpassed the connection attempt limit.
+        if *initial_port < peer_port && *num_attempts > E::MAXIMUM_CONNECTION_FAILURES {
+            trace!("Dropping connection request from {} (tried {} secs ago)", peer_ip, elapsed);
+            // Add an entry for this `Peer` in the restricted peers.
+            self.restricted_peers.write().await.insert(peer_ip, Instant::now());
+        } else {
+            debug!("Received a connection request from {}", peer_ip);
+            // Update the number of attempts for this peer.
+            *num_attempts += 1;
 
-                // Release the lock over seen_inbound_connections.
-                drop(seen_inbound_connections);
+            // Release the lock over seen_inbound_connections.
+            drop(seen_inbound_connections);
 
-                // Initialize the peer handler.
-                Peer::handler(
-                    stream,
-                    self.local_ip,
-                    self.local_nonce,
-                    &self.peers_router,
-                    ledger_reader,
-                    ledger_router,
-                    prover_router,
-                    operator_router,
-                    self.connected_nonces().await,
-                    None,
-                )
-                .await;
-            }
+            // Initialize the peer handler.
+            Peer::handler(
+                stream,
+                self.local_ip,
+                self.local_nonce,
+                &self.peers_router,
+                ledger_reader,
+                ledger_router,
+                prover_router,
+                operator_router,
+                self.connected_nonces().await,
+                None,
+            )
+            .await;
         }
     }
 
