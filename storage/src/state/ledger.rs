@@ -231,11 +231,6 @@ impl<N: Network> LedgerState<N> {
         ledger.regenerate_ledger_tree()?;
         assert_eq!(ledger.ledger_tree.read().root(), latest_ledger_root);
 
-        // let value = storage.export()?;
-        // println!("{}", value);
-        // let storage_2 = S::open(".ledger_2", context)?;
-        // storage_2.import(value)?;
-
         info!("Ledger successfully loaded at block {}", ledger.latest_block_height());
         Ok(ledger)
     }
@@ -1279,8 +1274,8 @@ impl<N: Network> LedgerState<N> {
             let remove_ledger_root = self
                 .ledger_roots
                 .iter()
-                .filter(|(_, block_height)| current_block_height == *block_height)
-                .collect::<Vec<_>>();
+                .filter(|(_, block_height)| current_block_height == *block_height);
+
             for (ledger_root, _) in remove_ledger_root {
                 self.ledger_roots.remove(&ledger_root, Some(batch))?;
             }

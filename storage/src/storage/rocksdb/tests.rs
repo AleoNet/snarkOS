@@ -230,6 +230,6 @@ fn test_export_import() {
     let map = storage.open_map::<u32, String>(MapId::Test).expect("Failed to open data map");
 
     for i in 0..100 {
-        assert_eq!(map.get(&i).expect("Failed to insert"), Some(i.to_string()));
+        assert_eq!(map.get(&i).expect("Failed to get"), Some(i.to_string()));
     }
 }
