@@ -173,6 +173,43 @@ impl Resources {
         self.register(task, id);
     }
 
+    /// Register a task and instrument it with the given `name`; useful metrics on it will be logged every `interval`.
+    #[cfg(feature = "task-metrics")]
+    pub fn register_instrumented_task(
+        &self,
+        id: Option<ResourceId>,
+        name: String,
+        interval: std::time::Duration,
+        handle: tokio::task::JoinHandle<()>,
+    ) {
+        let task_monitor = tokio_metrics::TaskMonitor::new();
+
+        let tm = task_monitor.clone();
+        self.register_task(
+            None,
+            tokio::spawn(async move {
+                loop {
+                    tokio::time::sleep(interval).await;
+                    let metrics = tm.cumulative(); // Note: the list of metrics below is not exhaustive.
+                    debug!(
+                        "['{}' task metrics] mean poll duration: {:?}; mean idle duration: {:?}; slow poll ratio: {:?}",
+                        name,
+                        metrics.mean_poll_duration(),
+                        metrics.mean_idle_duration(),
+                        metrics.slow_poll_ratio(),
+                    );
+                }
+            }),
+        );
+
+        self.register_task(
+            id,
+            tokio::spawn(async move {
+                let _ = task_monitor.instrument(handle).await;
+            }),
+        );
+    }
+
     /// Register the given thread with the resource handler and optionally
     /// with an associated resource id.
     pub fn register_thread(&self, id: Option<ResourceId>, handle: std::thread::JoinHandle<()>, abort_sender: AbortSignal) {
