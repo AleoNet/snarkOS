@@ -127,7 +127,7 @@ async fn new_rpc_server<N: Network, E: Environment, S: Storage>(existing_rpc_con
     // Initialize the RPC server.
     let (rpc_server_addr, rpc_server_handle) = initialize_rpc_server("127.0.0.1:0".parse().unwrap(), rpc_context).await;
 
-    E::resources().register_task(rpc_server_handle, None);
+    E::resources().register_task(None, rpc_server_handle);
 
     rpc_server_addr
 }

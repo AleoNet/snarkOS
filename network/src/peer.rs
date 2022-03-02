@@ -335,7 +335,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
         // Procure a resource id to register the task with, as it might be terminated at any point in time.
         let peer_resource_id = E::resources().procure_id();
-        let task = task::spawn(async move {
+        E::resources().register_task(Some(peer_resource_id), task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
             let mut peer = match Peer::new(stream, local_ip, local_nonce, &peers_router, &ledger_reader, &connected_nonces).await {
                 Ok(peer) => {
@@ -608,12 +608,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[Pong] {}", error);
                                     }
 
-                                    // Procure a resource id to register the task with, as it might be terminated at any point in time.
                                     // Spawn an asynchronous task for the `Ping` request.
                                     let peers_router = peers_router.clone();
                                     let ledger_reader = ledger_reader.clone();
+                                    // Procure a resource id to register the task with, as it might be terminated at any point in time.
                                     let ping_resource_id = E::resources().procure_id();
-                                    let task = task::spawn(async move {
+                                    E::resources().register_task(Some(ping_resource_id), task::spawn(async move {
                                         // Sleep for the preset time before sending a `Ping` request.
                                         tokio::time::sleep(Duration::from_secs(E::PING_SLEEP_IN_SECS)).await;
 
@@ -628,8 +628,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         }
 
                                         E::resources().deregister(ping_resource_id);
-                                    });
-                                    E::resources().register_task(task, Some(ping_resource_id));
+                                    }));
                                 }
                                 Message::UnconfirmedBlock(block_height, block_hash, block) => {
                                     // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
@@ -775,8 +774,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
             }
 
             E::resources().deregister(peer_resource_id);
-        });
-
-        E::resources().register_task(task, Some(peer_resource_id));
+        }));
     }
 }

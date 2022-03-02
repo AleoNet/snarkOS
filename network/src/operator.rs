@@ -121,16 +121,17 @@ impl<N: Network, E: Environment> Operator<N, E> {
             // Initialize the handler for the operator.
             let operator_clone = operator.clone();
             let (router, handler) = oneshot::channel();
-            let task = task::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                // Asynchronously wait for a operator request.
-                while let Some(request) = operator_handler.recv().await {
-                    operator_clone.update(request).await;
-                }
-            });
-            // Register the task; no need to provide an id, as it will run indefinitely.
-            E::resources().register_task(task, None);
+            E::resources().register_task(
+                None, // No need to provide an id, as the task will run indefinitely.
+                task::spawn(async move {
+                    // Notify the outer function that the task is ready.
+                    let _ = router.send(());
+                    // Asynchronously wait for a operator request.
+                    while let Some(request) = operator_handler.recv().await {
+                        operator_clone.update(request).await;
+                    }
+                }),
+            );
 
             // Wait until the operator handler is ready.
             let _ = handler.await;
@@ -141,56 +142,57 @@ impl<N: Network, E: Environment> Operator<N, E> {
                 // Initialize an update loop for the block template.
                 let operator = operator.clone();
                 let (router, handler) = oneshot::channel();
-                let task = task::spawn(async move {
-                    // Notify the outer function that the task is ready.
-                    let _ = router.send(());
-                    // TODO (julesdesmit): Add logic to the loop to retarget share difficulty.
-                    loop {
-                        // Determine if the current block template is stale.
-                        let is_block_template_stale = match &*operator.block_template.read().await {
-                            Some(template) => operator.ledger_reader.latest_block_height().saturating_add(1) != template.block_height(),
-                            None => true,
-                        };
-
-                        // Update the block template if it is stale.
-                        if is_block_template_stale {
-                            // Construct a new block template.
-                            let transactions = operator.memory_pool.read().await.transactions();
-                            let ledger_reader = operator.ledger_reader.clone();
-                            let result = task::spawn_blocking(move || {
-                                E::thread_pool().install(move || {
-                                    match ledger_reader.get_block_template(
-                                        recipient,
-                                        E::COINBASE_IS_PUBLIC,
-                                        &transactions,
-                                        &mut thread_rng(),
-                                    ) {
-                                        Ok(block_template) => Ok(block_template),
-                                        Err(error) => Err(format!("Failed to produce a new block template: {}", error)),
-                                    }
-                                })
-                            })
-                            .await;
-
-                            // Update the block template.
-                            match result {
-                                Ok(Ok(block_template)) => {
-                                    // Acquire the write lock to update the block template.
-                                    *operator.block_template.write().await = Some(block_template);
-                                    // Clear the set of known nonces.
-                                    operator.known_nonces.write().await.clear();
-                                }
-                                Ok(Err(error_message)) => error!("{}", error_message),
-                                Err(error) => error!("{}", error),
+                E::resources().register_task(
+                    None, // No need to provide an id, as the task will run indefinitely.
+                    task::spawn(async move {
+                        // Notify the outer function that the task is ready.
+                        let _ = router.send(());
+                        // TODO (julesdesmit): Add logic to the loop to retarget share difficulty.
+                        loop {
+                            // Determine if the current block template is stale.
+                            let is_block_template_stale = match &*operator.block_template.read().await {
+                                Some(template) => operator.ledger_reader.latest_block_height().saturating_add(1) != template.block_height(),
+                                None => true,
                             };
-                        }
 
-                        // Proceed to sleep for a preset amount of time.
-                        tokio::time::sleep(HEARTBEAT_IN_SECONDS).await;
-                    }
-                });
-                // Register the task; no need to provide an id, as it will run indefinitely.
-                E::resources().register_task(task, None);
+                            // Update the block template if it is stale.
+                            if is_block_template_stale {
+                                // Construct a new block template.
+                                let transactions = operator.memory_pool.read().await.transactions();
+                                let ledger_reader = operator.ledger_reader.clone();
+                                let result = task::spawn_blocking(move || {
+                                    E::thread_pool().install(move || {
+                                        match ledger_reader.get_block_template(
+                                            recipient,
+                                            E::COINBASE_IS_PUBLIC,
+                                            &transactions,
+                                            &mut thread_rng(),
+                                        ) {
+                                            Ok(block_template) => Ok(block_template),
+                                            Err(error) => Err(format!("Failed to produce a new block template: {}", error)),
+                                        }
+                                    })
+                                })
+                                .await;
+
+                                // Update the block template.
+                                match result {
+                                    Ok(Ok(block_template)) => {
+                                        // Acquire the write lock to update the block template.
+                                        *operator.block_template.write().await = Some(block_template);
+                                        // Clear the set of known nonces.
+                                        operator.known_nonces.write().await.clear();
+                                    }
+                                    Ok(Err(error_message)) => error!("{}", error_message),
+                                    Err(error) => error!("{}", error),
+                                };
+                            }
+
+                            // Proceed to sleep for a preset amount of time.
+                            tokio::time::sleep(HEARTBEAT_IN_SECONDS).await;
+                        }
+                    }),
+                );
 
                 // Wait until the operator handler is ready.
                 let _ = handler.await;

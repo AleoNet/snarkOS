@@ -159,14 +159,14 @@ impl Resources {
 
     /// Register the given task with the resource handler and optionally
     /// with an associated resource id.
-    pub fn register_task(&self, handle: tokio::task::JoinHandle<()>, id: Option<ResourceId>) {
+    pub fn register_task(&self, id: Option<ResourceId>, handle: tokio::task::JoinHandle<()>) {
         let task = Resource::Task(handle);
         self.register(task, id);
     }
 
     /// Register the given thread with the resource handler and optionally
     /// with an associated resource id.
-    pub fn register_thread(&self, handle: std::thread::JoinHandle<()>, abort_sender: AbortSignal, id: Option<ResourceId>) {
+    pub fn register_thread(&self, id: Option<ResourceId>, handle: std::thread::JoinHandle<()>, abort_sender: AbortSignal) {
         let thread = Resource::Thread(handle, abort_sender);
         self.register(thread, id);
     }
@@ -221,7 +221,7 @@ mod tests {
                 time::sleep(Duration::from_millis(10)).await;
             }
         });
-        resources.register_task(task, Some(task_id));
+        resources.register_task(Some(task_id), task);
 
         resources.log_summary();
 
@@ -236,7 +236,7 @@ mod tests {
                 thread::sleep(Duration::from_millis(10));
             }
         });
-        resources.register_thread(thread, tx, Some(thread_id));
+        resources.register_thread(Some(thread_id), thread, tx);
 
         resources.log_summary();
         resources.deregister(task_id);

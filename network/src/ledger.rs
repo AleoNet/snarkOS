@@ -142,19 +142,20 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         {
             let ledger = ledger.clone();
             let (router, handler) = oneshot::channel();
-            let task = task::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                // Asynchronously wait for a ledger request.
-                while let Some(request) = ledger_handler.recv().await {
-                    // Update the state of the ledger.
-                    // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
-                    // will end up being processed out of order.
-                    ledger.update(request).await;
-                }
-            });
-            // Register the task; no need to provide an id, as it will run indefinitely.
-            E::resources().register_task(task, None);
+            E::resources().register_task(
+                None, // No need to provide an id, as the task will run indefinitely.
+                task::spawn(async move {
+                    // Notify the outer function that the task is ready.
+                    let _ = router.send(());
+                    // Asynchronously wait for a ledger request.
+                    while let Some(request) = ledger_handler.recv().await {
+                        // Update the state of the ledger.
+                        // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
+                        // will end up being processed out of order.
+                        ledger.update(request).await;
+                    }
+                }),
+            );
 
             // Wait until the ledger handler is ready.
             let _ = handler.await;
