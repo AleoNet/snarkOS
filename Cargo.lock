@@ -2693,6 +2693,7 @@ dependencies = [
  "snarkvm",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
