@@ -54,7 +54,6 @@ impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> DataMap<K
         Q: Serialize + ?Sized,
     {
         let mut raw_key = self.context.clone();
-        raw_key.reserve(bincode::serialized_size(&key)? as usize);
         bincode::serialize_into(&mut raw_key, &key)?;
 
         Ok(raw_key)
