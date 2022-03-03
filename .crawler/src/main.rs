@@ -14,19 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_crawler::known_network::KnownNetwork;
+use snarkos_crawler::{constants::*, known_network::KnownNetwork};
 use snarkos_environment::{Client, CurrentNetwork, Environment};
 use snarkos_network::Data;
 use snarkos_storage::BlockLocators;
-use snarkos_synthetic_node::{
-    enable_tracing,
-    ClientMessage,
-    ClientState,
-    SynthNode,
-    MAXIMUM_FORK_DEPTH,
-    MESSAGE_LENGTH_PREFIX_SIZE,
-    MESSAGE_VERSION,
-};
+use snarkos_synthetic_node::{enable_tracing, ClientMessage, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
 use snarkvm::traits::Network;
 
 use pea2pea::{
@@ -35,14 +27,7 @@ use pea2pea::{
     Node as Pea2PeaNode,
     Pea2Pea,
 };
-use std::{
-    convert::TryInto,
-    io,
-    net::{IpAddr, Ipv4Addr, SocketAddr},
-    ops::Deref,
-    sync::Arc,
-    time::Duration,
-};
+use std::{convert::TryInto, io, net::SocketAddr, ops::Deref, sync::Arc, time::Duration};
 use structopt::StructOpt;
 use tokio::task;
 use tracing::*;
@@ -76,14 +61,6 @@ struct Opts {
     #[structopt(parse(try_from_str), default_value = "0.0.0.0:4132", long = "node")]
     pub node: SocketAddr,
 }
-
-// Consts & aliases.
-const PING_INTERVAL_SECS: u64 = 5;
-const PEER_INTERVAL_SECS: u64 = 3;
-const DESIRED_CONNECTIONS: usize = <Client<CurrentNetwork>>::MINIMUM_NUMBER_OF_PEERS * 3;
-const SYNC_NODES: &'static [&'static str] = <Client<CurrentNetwork>>::SYNC_NODES;
-
-pub const MAXIMUM_NUMBER_OF_PEERS: usize = 10000;
 
 #[derive(Clone)]
 struct Crawler {
