@@ -956,17 +956,8 @@ impl<N: Network> LedgerState<N> {
 
         // Compute the transactions inclusion proof.
         let transactions_inclusion_proof = {
-            // TODO (howardwu): Optimize this operation.
-            let index = transactions
-                .transaction_ids()
-                .enumerate()
-                .filter_map(|(index, id)| match id == transaction_id {
-                    true => Some(index),
-                    false => None,
-                })
-                .collect::<Vec<_>>();
-            assert_eq!(1, index.len()); // TODO (howardwu): Clean this up with a proper error handler.
-            transactions.to_transactions_inclusion_proof(index[0], transaction_id)?
+            let index = transactions.transaction_ids().position(|id| id == transaction_id).unwrap();
+            transactions.to_transactions_inclusion_proof(index, transaction_id)?
         };
 
         // Compute the block header inclusion proof.
