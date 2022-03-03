@@ -618,7 +618,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
             return;
         }
 
-        // Spawn a handler to be run asynchronously.
         // Sanitize the port from the peer, if it is a remote IP address.
         let (peer_lookup, peer_port) = match peer_ip.ip().is_loopback() {
             // Loopback case - Do not sanitize, merely pass through.
