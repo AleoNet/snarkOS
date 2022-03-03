@@ -56,6 +56,8 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     const BEACON_NODES: &'static [&'static str] = &[];
     /// The list of sync nodes to bootstrap the node server with.
     const SYNC_NODES: &'static [&'static str] = &["127.0.0.1:4135"];
+    /// The list of nodes to attempt to maintain connections with.
+    const TRUSTED_NODES: &'static [&'static str] = &[];
 
     /// The duration in seconds to sleep in between heartbeat executions.
     const HEARTBEAT_IN_SECS: u64 = 9;
@@ -96,6 +98,12 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     fn sync_nodes() -> &'static HashSet<SocketAddr> {
         static NODES: OnceCell<HashSet<SocketAddr>> = OnceCell::new();
         NODES.get_or_init(|| Self::SYNC_NODES.iter().map(|ip| ip.parse().unwrap()).collect())
+    }
+
+    /// Returns the list of trusted nodes.
+    fn trusted_nodes() -> &'static HashSet<SocketAddr> {
+        static NODES: OnceCell<HashSet<SocketAddr>> = OnceCell::new();
+        NODES.get_or_init(|| Self::TRUSTED_NODES.iter().map(|ip| ip.parse().unwrap()).collect())
     }
 
     /// Returns the resource handler for the node.

@@ -333,7 +333,11 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         .read()
                         .await
                         .iter()
-                        .filter(|(peer_ip, _)| !E::sync_nodes().contains(peer_ip) && !E::beacon_nodes().contains(peer_ip))
+                        .filter(|(peer_ip, _)| {
+                            !E::sync_nodes().contains(peer_ip)
+                                && !E::beacon_nodes().contains(peer_ip)
+                                && !E::trusted_nodes().contains(peer_ip)
+                        })
                         .take(num_excess_peers)
                         .map(|(&peer_ip, _)| peer_ip)
                         .collect::<Vec<SocketAddr>>();
@@ -365,6 +369,33 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers)).await;
                         // Add an entry for this `Peer` in the restricted peers.
                         self.restricted_peers.write().await.insert(peer_ip, Instant::now());
+                    }
+                }
+
+                // Ensure that the trusted nodes are connected.
+                if !E::trusted_nodes().is_empty() {
+                    let connected_peers = self.connected_peers().await.into_iter().collect::<HashSet<_>>();
+                    let trusted_nodes = E::trusted_nodes();
+                    let disconnected_trusted_nodes = trusted_nodes.difference(&connected_peers).copied();
+                    for peer_ip in disconnected_trusted_nodes {
+                        // Initialize the connection process.
+                        let (router, handler) = oneshot::channel();
+                        let request = PeersRequest::Connect(
+                            peer_ip,
+                            ledger_reader.clone(),
+                            ledger_router.clone(),
+                            operator_router.clone(),
+                            prover_router.clone(),
+                            router,
+                        );
+                        if let Err(error) = self.peers_router.send(request).await {
+                            warn!("Failed to transmit the request: '{}'", error);
+                        }
+
+                        // Do not wait for the result of each connection.
+                        E::resources().register_task(task::spawn(async move {
+                            let _ = handler.await;
+                        }));
                     }
                 }
 
