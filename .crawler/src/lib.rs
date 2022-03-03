@@ -16,4 +16,5 @@
 
 mod connection;
 pub mod constants;
+pub mod crawler;
 pub mod known_network;
