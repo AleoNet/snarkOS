@@ -16,9 +16,10 @@
 
 use snarkos_environment::{Client, CurrentNetwork, Environment};
 
-pub const PING_INTERVAL_SECS: u64 = 5;
-pub const PEER_INTERVAL_SECS: u64 = 3;
 pub const DESIRED_CONNECTIONS: usize = <Client<CurrentNetwork>>::MINIMUM_NUMBER_OF_PEERS * 3;
-pub const SYNC_NODES: &'static [&'static str] = <Client<CurrentNetwork>>::SYNC_NODES;
+pub const LOG_INTERVAL_SECS: u64 = 10;
 pub const MAXIMUM_NUMBER_OF_PEERS: usize = 10000;
 pub const MESSAGE_VERSION: u32 = <Client<CurrentNetwork>>::MESSAGE_VERSION;
+pub const PING_INTERVAL_SECS: u64 = 5;
+pub const PEER_INTERVAL_SECS: u64 = 3;
+pub const SYNC_NODES: &'static [&'static str] = <Client<CurrentNetwork>>::SYNC_NODES;

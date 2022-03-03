@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{constants::*, known_network::KnownNetwork};
-use snarkos_environment::{Client, CurrentNetwork, Environment};
+use snarkos_environment::CurrentNetwork;
 use snarkos_network::Data;
 use snarkos_storage::BlockLocators;
 use snarkos_synthetic_node::{ClientMessage, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
@@ -115,12 +115,32 @@ impl Crawler {
         let node = self.clone();
         task::spawn(async move {
             loop {
-                let num_connections = node.node().num_connected() + node.node().num_connecting();
-                if num_connections < DESIRED_CONNECTIONS && node.node().num_connected() != 0 {
-                    info!(parent: node.node().span(), "I'd like to have {} more peers; asking peers for their peers", DESIRED_CONNECTIONS - num_connections);
-                    node.send_broadcast(ClientMessage::PeerRequest).unwrap();
+                // Disconnect from peers we have just crawled.
+                for addr in node.known_network.addrs_to_disconnect() {
+                    node.node().disconnect(addr).await;
                 }
+
+                // Connect to peers we haven't crawled in a while.
+                for addr in node.known_network.addrs_to_connect() {
+                    if !node.node().is_connected(addr) {
+                        let _ = node.node().connect(addr).await;
+                    }
+                }
+
+                info!(parent: node.node().span(), "Crawling the netowrk for more peers; asking peers for their peers");
+                node.send_broadcast(ClientMessage::PeerRequest).unwrap();
                 tokio::time::sleep(Duration::from_secs(PEER_INTERVAL_SECS)).await;
+            }
+        });
+    }
+
+    fn log_known_network(&self) {
+        let node = self.clone();
+        tokio::spawn(async move {
+            loop {
+                info!(parent: node.node().span(), "Known addresses: {}", node.known_network.nodes().len());
+                info!(parent: node.node().span(), "Known connections: {}", node.known_network.connections().len());
+                tokio::time::sleep(Duration::from_secs(LOG_INTERVAL_SECS)).await;
             }
         });
     }
@@ -129,6 +149,7 @@ impl Crawler {
     pub fn run_periodic_tasks(&self) {
         self.send_pings();
         self.update_peers();
+        self.log_known_network();
     }
 }
 
@@ -190,14 +211,7 @@ impl Reading for Crawler {
 // Helper methods.
 impl Crawler {
     async fn process_peer_request(&self, source: SocketAddr) -> io::Result<()> {
-        let peers = self
-            .state
-            .peers
-            .lock()
-            .await
-            .iter()
-            .map(|peer| peer.listening_addr)
-            .collect::<Vec<_>>();
+        let peers = vec![];
         let msg = ClientMessage::PeerResponse(peers);
         info!(parent: self.node().span(), "sending a PeerResponse to {}", source);
 
@@ -206,18 +220,23 @@ impl Crawler {
         Ok(())
     }
 
-    async fn process_peer_response(&self, source: SocketAddr, peer_ips: Vec<SocketAddr>) -> io::Result<()> {
-        let num_connections = self.node().num_connected() + self.node().num_connecting();
+    async fn process_peer_response(&self, source: SocketAddr, mut peer_ips: Vec<SocketAddr>) -> io::Result<()> {
         let node = self.clone();
         task::spawn(async move {
-            for peer_ip in peer_ips
-                .into_iter()
-                .filter(|addr| node.node().listening_addr().unwrap() != *addr)
-                .take(DESIRED_CONNECTIONS.saturating_sub(num_connections))
-            {
+            peer_ips.retain(|addr| node.node().listening_addr().unwrap() != *addr);
+
+            // Insert the address into the known network and update the crawl state.
+            node.known_network.update_connections(source, peer_ips.clone());
+            node.known_network.received_peers(source);
+
+            for peer_ip in peer_ips {
                 if !node.node().is_connected(peer_ip) && !node.state.peers.lock().await.iter().any(|peer| peer.listening_addr == peer_ip) {
                     info!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, peer_ip);
-                    let _ = node.node().connect(peer_ip).await;
+
+                    // Only connect if this address is unknown.
+                    if !node.known_network.nodes().contains_key(&peer_ip) {
+                        let _ = node.node().connect(peer_ip).await;
+                    }
                 }
             }
         });
@@ -227,12 +246,16 @@ impl Crawler {
 
     async fn process_ping(&self, source: SocketAddr, version: u32, block_height: u32) -> io::Result<()> {
         // Ensure the message protocol version is not outdated.
-        if version < <Client<CurrentNetwork>>::MESSAGE_VERSION {
+        if version < MESSAGE_VERSION {
             warn!(parent: self.node().span(), "dropping {} due to outdated version ({})", source, version);
             return Err(io::ErrorKind::InvalidData.into());
         }
 
         debug!(parent: self.node().span(), "peer {} is at height {}", source, block_height);
+
+        // Update the known network nodes and update the crawl state.
+        self.known_network.update_height(source, block_height);
+        self.known_network.received_height(source);
 
         let genesis = CurrentNetwork::genesis_block();
         let msg = ClientMessage::Pong(
