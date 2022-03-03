@@ -18,9 +18,48 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[dependencies.async-trait]
+version = "0.1"
+
 [dependencies.parking_lot]
 version = "0.12"
+
+[dependencies.pea2pea]
+version = "0.33"
+
+[dependencies.snarkos-environment]
+path = "../environment"
+version = "2.0.2"
+
+[dependencies.snarkos-metrics]
+path = "../metrics"
+features = [ "test" ]
+
+[dependencies.snarkos-network]
+path = "../network"
+version = "2.0.2"
+features = [ "test" ]
+
+[dependencies.snarkos-storage]
+path = "../storage"
+version = "2.0.2"
+
+[dependencies.snarkos-synthetic-node]
+path = "../.synthetic_node"
+version = "2.0.2"
+
+[dependencies.snarkvm]
+version = "0.8.0"
+
+[dependencies.structopt]
+version = "0.3"
 
 [dependencies.time]
 version = "0.3"
 features = ["local-offset"]
+
+[dependencies.tokio]
+version = "1"
+
+[dependencies.tracing]
+version = "0.1"
