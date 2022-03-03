@@ -38,14 +38,14 @@ use tokio::{
 use tracing::*;
 
 // Consts & aliases.
-const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
-const CHALLENGE_HEIGHT: u32 = 0;
-const MESSAGE_VERSION: u32 = <Client<CurrentNetwork>>::MESSAGE_VERSION;
-const MAXIMUM_FORK_DEPTH: u32 = CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH;
+pub const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
+pub const CHALLENGE_HEIGHT: u32 = 0;
+pub const MESSAGE_VERSION: u32 = <Client<CurrentNetwork>>::MESSAGE_VERSION;
+pub const MAXIMUM_FORK_DEPTH: u32 = CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH;
 
 pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<CurrentNetwork>>::MAXIMUM_NUMBER_OF_PEERS;
 
-type ClientMessage = Message<CurrentNetwork, Client<CurrentNetwork>>;
+pub type ClientMessage = Message<CurrentNetwork, Client<CurrentNetwork>>;
 pub type ClientNonce = u64;
 
 /// The test node; it consists of a `Node` that handles networking and `State`
@@ -53,13 +53,13 @@ pub type ClientNonce = u64;
 #[derive(Clone)]
 pub struct SynthNode {
     node: Pea2PeaNode,
-    state: ClientState,
+    pub state: ClientState,
 }
 
 /// Represents a connected snarkOS client peer.
 pub struct ClientPeer {
     connected_addr: SocketAddr,
-    listening_addr: SocketAddr,
+    pub listening_addr: SocketAddr,
     nonce: ClientNonce,
 }
 
@@ -96,11 +96,11 @@ impl SynthNode {
         Self { node, state }
     }
 
-    fn node_type(&self) -> NodeType {
+    pub fn node_type(&self) -> NodeType {
         NodeType::Client
     }
 
-    fn state(&self) -> State {
+    pub fn state(&self) -> State {
         self.state.status.get()
     }
 }
