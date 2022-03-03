@@ -18,4 +18,34 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[dependencies]
+[dependencies.async-trait]
+version = "0.1"
+
+[dependencies.pea2pea]
+version = "0.33.0"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.snarkos-environment]
+path = "../environment"
+version = "2.0.2"
+
+[dependencies.snarkos-network]
+path = "../network"
+version = "2.0.2"
+
+[dependencies.snarkvm]
+version = "0.8.0"
+
+[dependencies.tokio]
+version = "1"
+
+[dependencies.tracing]
+version = "0.1"
+
+[dependencies.tracing-subscriber]
+version = "0.3"
+features = [ "env-filter" ]
+
+
