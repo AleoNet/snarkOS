@@ -126,7 +126,7 @@ impl Crawler {
                 }
 
                 // Connect to peers we haven't crawled in a while.
-                for addr in node.known_network.addrs_to_connect() {
+                for addr in node.known_network.addrs_to_connect().into_iter().take(MAXIMUM_NUMBER_OF_PEERS / 10) {
                     if !node.node().is_connected(addr)
                         && !node
                             .state
