@@ -151,7 +151,7 @@ impl KnownNetwork {
                 if let Some(last_crawled) = meta.last_crawled {
                     (OffsetDateTime::now_utc() - last_crawled).whole_minutes() > CRAWL_INTERVAL_MINS
                 } else {
-                    false
+                    true
                 }
             })
             .map(|(&addr, _)| addr)
