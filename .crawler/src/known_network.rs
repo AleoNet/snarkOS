@@ -36,7 +36,7 @@ pub struct NodeMeta {
     last_crawled: Option<OffsetDateTime>,
 
     // Useful for keeping track of crawl round state.
-    received_peers: bool,
+    received_peer_sets: u8,
 }
 
 impl NodeMeta {
@@ -45,12 +45,12 @@ impl NodeMeta {
             listening_addr,
             last_height: None,
             last_crawled: None,
-            received_peers: false,
+            received_peer_sets: 0,
         }
     }
 
     fn reset_crawl_state(&mut self) {
-        self.received_peers = false;
+        self.received_peer_sets = 0;
 
         self.last_crawled = Some(OffsetDateTime::now_utc());
     }
@@ -133,7 +133,7 @@ impl KnownNetwork {
 
     pub fn received_peers(&self, source: SocketAddr) {
         if let Some(meta) = self.nodes.write().get_mut(&source) {
-            meta.received_peers = true;
+            meta.received_peer_sets += 1;
         }
     }
 
@@ -161,7 +161,7 @@ impl KnownNetwork {
             let mut nodes_g = self.nodes.write();
             for (addr, meta) in nodes_g.iter_mut() {
                 // Disconnect from peers we have received a height and peers for.
-                if meta.last_height.is_some() && meta.received_peers {
+                if meta.last_height.is_some() && meta.received_peer_sets >= 3 {
                     meta.reset_crawl_state();
                     addrs.insert(*addr);
                 }

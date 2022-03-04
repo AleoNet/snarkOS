@@ -165,7 +165,7 @@ impl Crawler {
     /// Starts the usual periodic activities of a crawler node.
     pub fn run_periodic_tasks(&self) {
         self.log_known_network();
-        self.send_pings();
+        //self.send_pings();
         self.update_peers();
     }
 }
