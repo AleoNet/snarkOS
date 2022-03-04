@@ -27,12 +27,14 @@ use pea2pea::{
     Node as Pea2PeaNode,
     Pea2Pea,
 };
+use rand::seq::IteratorRandom;
 use std::{convert::TryInto, io, net::SocketAddr, ops::Deref, sync::Arc, time::Duration};
 use structopt::StructOpt;
 use tokio::task;
 use tracing::*;
 
 // CLI
+// TODO: investigate using clap instead.
 #[derive(Debug, StructOpt)]
 pub struct Opts {
     /// Specify the IP address and port for the node server.
@@ -102,7 +104,7 @@ impl Crawler {
 
             loop {
                 if node.node().num_connected() != 0 {
-                    info!(parent: node.node().span(), "sending out Pings");
+                    debug!(parent: node.node().span(), "Sending out Pings");
                     node.send_broadcast(ping_msg.clone()).unwrap();
                 }
                 tokio::time::sleep(Duration::from_secs(PING_INTERVAL_SECS)).await;
@@ -122,12 +124,10 @@ impl Crawler {
 
                 // Connect to peers we haven't crawled in a while.
                 for addr in node.known_network.addrs_to_connect() {
-                    if !node.node().is_connected(addr) {
-                        let _ = node.node().connect(addr).await;
-                    }
+                    let _ = node.node().connect(addr).await;
                 }
 
-                info!(parent: node.node().span(), "Crawling the netowrk for more peers; asking peers for their peers");
+                debug!(parent: node.node().span(), "Crawling the netowrk for more peers; asking peers for their peers");
                 node.send_broadcast(ClientMessage::PeerRequest).unwrap();
                 tokio::time::sleep(Duration::from_secs(PEER_INTERVAL_SECS)).await;
             }
@@ -160,18 +160,18 @@ impl Reading for Crawler {
 
     fn read_message<R: io::Read>(&self, source: SocketAddr, reader: &mut R) -> io::Result<Option<Self::Message>> {
         // FIXME: use the maximum message size allowed by the protocol or (better) use streaming deserialization.
-        let mut buf = [0u8; 8 * 1024];
+        let mut buf = [0u8; 64 * 1024];
 
         reader.read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE])?;
         let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
 
-        if reader.read_exact(&mut buf[..len]).is_err() {
+        if len > buf.len() || reader.read_exact(&mut buf[..len]).is_err() {
             return Ok(None);
         }
 
         match ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len])) {
             Ok(msg) => {
-                info!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
+                debug!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
                 Ok(Some(msg))
             }
             Err(e) => {
@@ -211,9 +211,14 @@ impl Reading for Crawler {
 // Helper methods.
 impl Crawler {
     async fn process_peer_request(&self, source: SocketAddr) -> io::Result<()> {
-        let peers = vec![];
+        let peers = self
+            .known_network
+            .nodes()
+            .into_iter()
+            .map(|(addr, _)| addr)
+            .choose_multiple(&mut rand::thread_rng(), 10);
         let msg = ClientMessage::PeerResponse(peers);
-        info!(parent: self.node().span(), "sending a PeerResponse to {}", source);
+        debug!(parent: self.node().span(), "sending a PeerResponse to {}", source);
 
         self.send_direct_message(source, msg)?;
 
@@ -231,7 +236,7 @@ impl Crawler {
 
             for peer_ip in peer_ips {
                 if !node.node().is_connected(peer_ip) && !node.state.peers.lock().await.iter().any(|peer| peer.listening_addr == peer_ip) {
-                    info!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, peer_ip);
+                    debug!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, peer_ip);
 
                     // Only connect if this address is unknown.
                     if !node.known_network.nodes().contains_key(&peer_ip) {
@@ -265,7 +270,7 @@ impl Crawler {
             ),
         );
 
-        info!(parent: self.node().span(), "sending a Pong to {}", source);
+        debug!(parent: self.node().span(), "sending a Pong to {}", source);
 
         self.send_direct_message(source, msg)?;
 

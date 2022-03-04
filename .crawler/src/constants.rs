@@ -14,12 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_environment::{Client, CurrentNetwork, Environment};
+use snarkos_environment::{Client, ClientTrial, CurrentNetwork, Environment};
 
-pub const DESIRED_CONNECTIONS: usize = <Client<CurrentNetwork>>::MINIMUM_NUMBER_OF_PEERS * 3;
+// The interval for revisiting connections.
+pub const CRAWL_INTERVAL_MINS: i64 = 10;
 pub const LOG_INTERVAL_SECS: u64 = 10;
-pub const MAXIMUM_NUMBER_OF_PEERS: usize = 10000;
+pub const MAXIMUM_NUMBER_OF_PEERS: usize = 1000;
 pub const MESSAGE_VERSION: u32 = <Client<CurrentNetwork>>::MESSAGE_VERSION;
 pub const PING_INTERVAL_SECS: u64 = 5;
 pub const PEER_INTERVAL_SECS: u64 = 3;
-pub const SYNC_NODES: &'static [&'static str] = <Client<CurrentNetwork>>::SYNC_NODES;
+pub const SYNC_NODES: &'static [&'static str] = <ClientTrial<CurrentNetwork>>::SYNC_NODES;
+// Purges connections that haven't been seen within this time (in hours).
+pub const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;

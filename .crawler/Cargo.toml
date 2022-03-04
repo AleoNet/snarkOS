@@ -27,6 +27,9 @@ version = "0.12"
 [dependencies.pea2pea]
 version = "0.33"
 
+[dependencies.rand]
+version = "0.8"
+
 [dependencies.snarkos-environment]
 path = "../environment"
 version = "2.0.2"

@@ -21,17 +21,16 @@ use std::{
 };
 use time::OffsetDateTime;
 
-use crate::connection::{nodes_from_connections, Connection};
-
-// Purges connections that haven't been seen within this time (in hours).
-const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
-
-// The interval for revisiting connections.
-const CRAWL_INTERVAL_MINS: i64 = 10;
+use crate::{
+    connection::{nodes_from_connections, Connection},
+    constants::{CRAWL_INTERVAL_MINS, STALE_CONNECTION_CUTOFF_TIME_HRS},
+};
 
 /// Node information collected while crawling.
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct NodeMeta {
+    #[allow(dead_code)]
+    addr: SocketAddr,
     last_height: u32,
     // Set on disconnect.
     last_crawled: Option<OffsetDateTime>,
@@ -42,11 +41,13 @@ pub struct NodeMeta {
 }
 
 impl NodeMeta {
-    fn new(last_height: u32, last_crawled: Option<OffsetDateTime>) -> Self {
+    fn new(addr: SocketAddr, last_height: u32, last_crawled: Option<OffsetDateTime>) -> Self {
         Self {
+            addr,
             last_height,
             last_crawled,
-            ..Default::default()
+            received_peers: Default::default(),
+            received_height: Default::default(),
         }
     }
 
@@ -124,7 +125,7 @@ impl KnownNetwork {
         if let Some(meta) = nodes_g.get_mut(&source) {
             meta.last_height = height
         } else {
-            let meta = NodeMeta::new(height, None);
+            let meta = NodeMeta::new(source, height, None);
             nodes_g.insert(source, meta);
         }
     }
