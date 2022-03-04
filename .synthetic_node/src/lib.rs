@@ -30,7 +30,7 @@ use pea2pea::{
     Pea2Pea,
 };
 use rand::{thread_rng, Rng};
-use std::{convert::TryInto, io, net::SocketAddr, sync::Arc};
+use std::{collections::HashSet, convert::TryInto, io, net::SocketAddr, sync::Arc};
 use tokio::{
     io::{AsyncReadExt, AsyncWriteExt},
     sync::Mutex,
@@ -261,9 +261,15 @@ impl Writing for SynthNode {
 impl Disconnect for SynthNode {
     async fn handle_disconnect(&self, disconnecting_addr: SocketAddr) {
         let mut locked_peers = self.state.peers.lock().await;
-        let initial_len = locked_peers.len();
         locked_peers.retain(|peer| peer.connected_addr != disconnecting_addr);
-        assert_eq!(locked_peers.len(), initial_len - 1)
+        assert_eq!(
+            locked_peers.len(),
+            locked_peers
+                .iter()
+                .map(|peer| (peer.listening_addr, peer.connected_addr))
+                .collect::<HashSet<_>>()
+                .len()
+        );
     }
 }
 
