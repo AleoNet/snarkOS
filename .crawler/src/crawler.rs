@@ -46,7 +46,7 @@ pub struct Opts {
 #[derive(Clone)]
 pub struct Crawler {
     synth_node: SynthNode,
-    known_network: Arc<KnownNetwork>,
+    pub known_network: Arc<KnownNetwork>,
 }
 
 impl Pea2Pea for Crawler {
@@ -104,11 +104,11 @@ impl Crawler {
             );
 
             loop {
+                tokio::time::sleep(Duration::from_secs(PING_INTERVAL_SECS)).await;
                 if node.node().num_connected() != 0 {
                     debug!(parent: node.node().span(), "sending out Pings");
                     node.send_broadcast(ping_msg.clone()).unwrap();
                 }
-                tokio::time::sleep(Duration::from_secs(PING_INTERVAL_SECS)).await;
             }
         });
     }
@@ -127,10 +127,20 @@ impl Crawler {
 
                 // Connect to peers we haven't crawled in a while.
                 for addr in node.known_network.addrs_to_connect() {
-                    let node_clone = node.clone();
-                    task::spawn(async move {
-                        let _ = node_clone.node().connect(addr).await;
-                    });
+                    if !node.node().is_connected(addr)
+                        && !node
+                            .state
+                            .peers
+                            .lock()
+                            .await
+                            .iter()
+                            .any(|peer| peer.listening_addr == addr || peer.connected_addr == addr)
+                    {
+                        let node_clone = node.clone();
+                        task::spawn(async move {
+                            let _ = node_clone.node().connect(addr).await;
+                        });
+                    }
                 }
 
                 debug!(parent: node.node().span(), "crawling the netowrk for more peers; asking peers for their peers");
@@ -154,9 +164,9 @@ impl Crawler {
 
     /// Starts the usual periodic activities of a crawler node.
     pub fn run_periodic_tasks(&self) {
+        self.log_known_network();
         self.send_pings();
         self.update_peers();
-        self.log_known_network();
     }
 }
 

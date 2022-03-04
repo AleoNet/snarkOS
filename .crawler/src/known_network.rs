@@ -40,12 +40,12 @@ pub struct NodeMeta {
 }
 
 impl NodeMeta {
-    fn new(listening_addr: SocketAddr, last_height: Option<u32>, last_crawled: Option<OffsetDateTime>) -> Self {
+    fn new(listening_addr: SocketAddr) -> Self {
         Self {
             listening_addr,
-            last_height,
-            last_crawled,
-            received_peers: Default::default(),
+            last_height: None,
+            last_crawled: None,
+            received_peers: false,
         }
     }
 
@@ -66,6 +66,10 @@ pub struct KnownNetwork {
 }
 
 impl KnownNetwork {
+    pub fn add_node(&self, addr: SocketAddr) {
+        self.nodes.write().insert(addr, NodeMeta::new(addr));
+    }
+
     // More convenient for testing.
     pub fn update_connections(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
         // Rules:
@@ -112,11 +116,7 @@ impl KnownNetwork {
 
             // Remove the nodes that no longer correspond to connections.
             let nodes_from_connections = nodes_from_connections(&self.connections());
-            nodes_g.extend(
-                nodes_from_connections
-                    .into_iter()
-                    .map(|addr| (addr, NodeMeta::new(addr, None, None))),
-            );
+            nodes_g.extend(nodes_from_connections.into_iter().map(|addr| (addr, NodeMeta::new(addr))));
         }
     }
 

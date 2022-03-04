@@ -19,7 +19,6 @@ use snarkos_crawler::{
     crawler::{Crawler, Opts},
 };
 
-use pea2pea::Pea2Pea;
 use structopt::StructOpt;
 
 #[tokio::main]
@@ -34,8 +33,8 @@ async fn main() {
     snarkos_synthetic_node::enable_tracing();
 
     for addr in SYNC_NODES {
-        // Ignore connection failures for now.
-        let _ = crawler.node().connect(addr.parse().unwrap()).await;
+        let addr = addr.parse().unwrap();
+        crawler.known_network.add_node(addr);
     }
 
     crawler.run_periodic_tasks();
