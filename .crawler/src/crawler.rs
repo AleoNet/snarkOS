@@ -125,7 +125,12 @@ impl Crawler {
 
                 // Connect to peers we haven't crawled in a while.
                 for addr in node.known_network.addrs_to_connect() {
-                    let _ = node.node().connect(addr).await;
+                    let node_clone = node.clone();
+                    task::spawn(async move {
+                        if node_clone.node().connect(addr).await.is_ok() {
+                            let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
+                        }
+                    });
                 }
 
                 debug!(parent: node.node().span(), "crawling the netowrk for more peers; asking peers for their peers");
@@ -251,7 +256,12 @@ impl Crawler {
 
                     // Only connect if this address is unknown.
                     if !node.known_network.nodes().contains_key(&peer_ip) {
-                        let _ = node.node().connect(peer_ip).await;
+                        let node_clone = node.clone();
+                        task::spawn(async move {
+                            if node_clone.node().connect(peer_ip).await.is_ok() {
+                                let _ = node_clone.send_direct_message(peer_ip, ClientMessage::PeerRequest);
+                            }
+                        });
                     }
                 }
             }
