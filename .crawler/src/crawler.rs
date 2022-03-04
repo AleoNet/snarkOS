@@ -169,6 +169,9 @@ impl Reading for Crawler {
             return Ok(None);
         }
 
+        // TODO: only partially deserialize the client messages at first; we need to first read the
+        // message id, and immediately reject message types we're not interested in, especially
+        // blocks, txs, pongs and anything else that has deferred deserialization in the true node.
         match ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len])) {
             Ok(msg) => {
                 debug!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
@@ -191,7 +194,8 @@ impl Reading for Crawler {
             ClientMessage::PeerRequest => self.process_peer_request(source).await?,
             ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
             ClientMessage::Ping(version, _fork_depth, _peer_type, _peer_state, _block_hash, block_header) => {
-                // Deserialise the block header.
+                // TODO: we should probably manually deserialize the header, as we only need the
+                // height, and we need to be able to quickly handle any number of such messages
                 let block_header = block_header.deserialize().await.unwrap();
                 self.process_ping(source, version, block_header.height()).await?
             }
@@ -251,6 +255,8 @@ impl Crawler {
 
     async fn process_ping(&self, source: SocketAddr, version: u32, block_height: u32) -> io::Result<()> {
         // Ensure the message protocol version is not outdated.
+        // TODO: we should probably maintain a detailed list of non-compliant peers so we can
+        // report their numbers and reasons for non-compliance with the protocol.
         if version < MESSAGE_VERSION {
             warn!(parent: self.node().span(), "dropping {} due to outdated version ({})", source, version);
             return Err(io::ErrorKind::InvalidData.into());
@@ -265,6 +271,8 @@ impl Crawler {
         let genesis = CurrentNetwork::genesis_block();
         let msg = ClientMessage::Pong(
             None,
+            // TODO: we'll be sending this out very often, so we might as well create this
+            // object just once and copy it over whenever needed.
             Data::Object(
                 BlockLocators::<CurrentNetwork>::from(vec![(genesis.height(), (genesis.hash(), None))].into_iter().collect()).unwrap(),
             ),
