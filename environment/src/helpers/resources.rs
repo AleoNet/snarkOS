@@ -214,14 +214,27 @@ mod tests {
         let resources = Resources::default();
         resources.log_summary();
 
-        let task_id = resources.procure_id();
-        let task = tokio::task::spawn(async move {
-            let _drop_checker = DropChecker(task_id);
+        let task_id0 = resources.procure_id();
+        let task0 = tokio::task::spawn(async move {
+            let _drop_checker = DropChecker(task_id0);
             loop {
                 time::sleep(Duration::from_millis(10)).await;
             }
         });
-        resources.register_task(Some(task_id), task);
+        resources.register_task(Some(task_id0), task0);
+
+        resources.log_summary();
+
+        let resources_clone = resources.clone();
+        let task_id1 = resources.procure_id();
+        let task1 = tokio::task::spawn(async move {
+            let _drop_checker = DropChecker(task_id1);
+
+            time::sleep(Duration::from_millis(1)).await;
+
+            resources_clone.deregister(task_id1);
+        });
+        resources.register_task(Some(task_id1), task1);
 
         resources.log_summary();
 
@@ -238,12 +251,16 @@ mod tests {
         });
         resources.register_thread(Some(thread_id), thread, tx);
 
+        thread::sleep(Duration::from_millis(10));
+
         resources.log_summary();
-        resources.deregister(task_id);
+        resources.deregister(task_id0);
         resources.log_summary();
         resources.deregister(thread_id);
         resources.log_summary();
 
         time::sleep(Duration::from_millis(100)).await;
+
+        resources.log_summary();
     }
 }
