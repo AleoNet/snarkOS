@@ -31,29 +31,26 @@ use crate::{
 pub struct NodeMeta {
     #[allow(dead_code)]
     listening_addr: SocketAddr,
-    last_height: u32,
+    last_height: Option<u32>,
     // Set on disconnect.
     last_crawled: Option<OffsetDateTime>,
 
     // Useful for keeping track of crawl round state.
     received_peers: bool,
-    received_height: bool,
 }
 
 impl NodeMeta {
-    fn new(listening_addr: SocketAddr, last_height: u32, last_crawled: Option<OffsetDateTime>) -> Self {
+    fn new(listening_addr: SocketAddr, last_height: Option<u32>, last_crawled: Option<OffsetDateTime>) -> Self {
         Self {
             listening_addr,
             last_height,
             last_crawled,
             received_peers: Default::default(),
-            received_height: Default::default(),
         }
     }
 
     fn reset_crawl_state(&mut self) {
         self.received_peers = false;
-        self.received_height = false;
 
         self.last_crawled = Some(OffsetDateTime::now_utc());
     }
@@ -115,30 +112,24 @@ impl KnownNetwork {
 
             // Remove the nodes that no longer correspond to connections.
             let nodes_from_connections = nodes_from_connections(&self.connections());
-            nodes_g.extend(nodes_from_connections.into_iter().map(|addr| (addr, NodeMeta::new(addr, 0, None))));
+            nodes_g.extend(
+                nodes_from_connections
+                    .into_iter()
+                    .map(|addr| (addr, NodeMeta::new(addr, None, None))),
+            );
         }
     }
 
     /// Update the height stored for this particular node.
     pub fn update_height(&self, source: SocketAddr, height: u32) {
-        let mut nodes_g = self.nodes.write();
-        if let Some(meta) = nodes_g.get_mut(&source) {
-            meta.last_height = height
-        } else {
-            let meta = NodeMeta::new(source, height, None);
-            nodes_g.insert(source, meta);
+        if let Some(meta) = self.nodes.write().get_mut(&source) {
+            meta.last_height = Some(height);
         }
     }
 
     pub fn received_peers(&self, source: SocketAddr) {
         if let Some(meta) = self.nodes.write().get_mut(&source) {
             meta.received_peers = true;
-        }
-    }
-
-    pub fn received_height(&self, source: SocketAddr) {
-        if let Some(meta) = self.nodes.write().get_mut(&source) {
-            meta.received_height = true;
         }
     }
 
@@ -166,7 +157,7 @@ impl KnownNetwork {
             let mut nodes_g = self.nodes.write();
             for (addr, meta) in nodes_g.iter_mut() {
                 // Disconnect from peers we have received a height and peers for.
-                if meta.received_height && meta.received_peers {
+                if meta.last_height.is_some() && meta.received_peers {
                     meta.reset_crawl_state();
                     addrs.insert(*addr);
                 }

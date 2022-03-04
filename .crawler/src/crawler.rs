@@ -296,7 +296,6 @@ impl Crawler {
         // Update the known network nodes and update the crawl state.
         if let Some(listening_addr) = self.get_peer_listening_addr(source).await {
             self.known_network.update_height(listening_addr, block_height);
-            self.known_network.received_height(listening_addr);
         }
 
         let genesis = CurrentNetwork::genesis_block();
