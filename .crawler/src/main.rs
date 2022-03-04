@@ -18,7 +18,6 @@ use snarkos_crawler::{
     constants::SYNC_NODES,
     crawler::{Crawler, Opts},
 };
-use snarkos_synthetic_node::enable_tracing;
 
 use pea2pea::Pea2Pea;
 use structopt::StructOpt;
@@ -32,7 +31,7 @@ async fn main() {
     let crawler = Crawler::new(opts).await;
 
     // Enable tracing for the crawler.
-    enable_tracing();
+    // snarkos_synthetic_node::enable_tracing();
 
     for addr in SYNC_NODES {
         // Ignore connection failures for now.
