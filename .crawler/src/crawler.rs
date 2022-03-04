@@ -70,6 +70,7 @@ impl Crawler {
             listener_ip: Some(opts.node.ip()),
             desired_listening_port: Some(opts.node.port()),
             max_connections: MAXIMUM_NUMBER_OF_PEERS as u16,
+            max_handshake_time_ms: 5_000,
             ..Default::default()
         };
 
