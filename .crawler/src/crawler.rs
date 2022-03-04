@@ -129,9 +129,7 @@ impl Crawler {
                 for addr in node.known_network.addrs_to_connect() {
                     let node_clone = node.clone();
                     task::spawn(async move {
-                        if node_clone.node().connect(addr).await.is_ok() {
-                            let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
-                        }
+                        let _ = node_clone.node().connect(addr).await;
                     });
                 }
 
@@ -270,9 +268,7 @@ impl Crawler {
                     if !node.known_network.nodes().contains_key(&peer_ip) {
                         let node_clone = node.clone();
                         task::spawn(async move {
-                            if node_clone.node().connect(peer_ip).await.is_ok() {
-                                let _ = node_clone.send_direct_message(peer_ip, ClientMessage::PeerRequest);
-                            }
+                            let _ = node_clone.node().connect(peer_ip).await;
                         });
                     }
                 }
