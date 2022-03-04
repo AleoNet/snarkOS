@@ -36,6 +36,7 @@ use tokio::{
     sync::Mutex,
 };
 use tracing::*;
+use tracing_subscriber::filter::LevelFilter;
 
 // Consts & aliases.
 pub const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
@@ -250,5 +251,15 @@ impl Disconnect for SynthNode {
 pub fn enable_tracing() {
     use tracing_subscriber::{fmt, EnvFilter};
 
-    fmt().with_test_writer().with_env_filter(EnvFilter::from_default_env()).init();
+    let env_filter = match EnvFilter::try_from_default_env() {
+        Ok(filter) => filter
+            .add_directive("mio=off".parse().unwrap())
+            .add_directive("pea2pea::protocols::handshake=off".parse().unwrap()),
+        _ => EnvFilter::default()
+            .add_directive(LevelFilter::INFO.into())
+            .add_directive("mio=off".parse().unwrap())
+            .add_directive("pea2pea::protocols::handshake=off".parse().unwrap()),
+    };
+
+    fmt().with_test_writer().with_env_filter(env_filter).init();
 }

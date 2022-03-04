@@ -31,7 +31,7 @@ async fn main() {
     let crawler = Crawler::new(opts).await;
 
     // Enable tracing for the crawler.
-    // snarkos_synthetic_node::enable_tracing();
+    snarkos_synthetic_node::enable_tracing();
 
     for addr in SYNC_NODES {
         // Ignore connection failures for now.

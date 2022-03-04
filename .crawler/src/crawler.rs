@@ -105,7 +105,7 @@ impl Crawler {
 
             loop {
                 if node.node().num_connected() != 0 {
-                    debug!(parent: node.node().span(), "Sending out Pings");
+                    debug!(parent: node.node().span(), "sending out Pings");
                     node.send_broadcast(ping_msg.clone()).unwrap();
                 }
                 tokio::time::sleep(Duration::from_secs(PING_INTERVAL_SECS)).await;
@@ -128,7 +128,7 @@ impl Crawler {
                     let _ = node.node().connect(addr).await;
                 }
 
-                debug!(parent: node.node().span(), "Crawling the netowrk for more peers; asking peers for their peers");
+                debug!(parent: node.node().span(), "crawling the netowrk for more peers; asking peers for their peers");
                 node.send_broadcast(ClientMessage::PeerRequest).unwrap();
                 tokio::time::sleep(Duration::from_secs(PEER_INTERVAL_SECS)).await;
             }
@@ -139,8 +139,9 @@ impl Crawler {
         let node = self.clone();
         tokio::spawn(async move {
             loop {
-                info!(parent: node.node().span(), "Known addresses: {}", node.known_network.nodes().len());
-                info!(parent: node.node().span(), "Known connections: {}", node.known_network.connections().len());
+                info!(parent: node.node().span(), "current peers: {}", node.node().num_connected());
+                info!(parent: node.node().span(), "known addresses: {}", node.known_network.nodes().len());
+                info!(parent: node.node().span(), "known connections: {}", node.known_network.connections().len());
                 tokio::time::sleep(Duration::from_secs(LOG_INTERVAL_SECS)).await;
             }
         });
@@ -184,7 +185,7 @@ impl Reading for Crawler {
                 Ok(Some(msg))
             }
             Err(e) => {
-                error!("a message from {} failed to deserialize: {}", source, e);
+                error!(parent: self.node().span(), "a message from {} failed to deserialize: {}", source, e);
                 Err(io::ErrorKind::InvalidData.into())
             }
         }
@@ -195,7 +196,7 @@ impl Reading for Crawler {
             ClientMessage::BlockRequest(_start_block_height, _end_block_height) => {}
             ClientMessage::BlockResponse(_block) => {}
             ClientMessage::Disconnect(reason) => {
-                debug!("Peer {} disconnected for the following reason: {:?}", source, reason);
+                debug!(parent: self.node().span(), "peer {} disconnected for the following reason: {:?}", source, reason);
             }
             ClientMessage::PeerRequest => self.process_peer_request(source).await?,
             ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
