@@ -120,7 +120,9 @@ impl Crawler {
             loop {
                 // Disconnect from peers we have just crawled.
                 for addr in node.known_network.addrs_to_disconnect() {
-                    node.node().disconnect(addr).await;
+                    if let Some(addr) = node.get_peer_connected_addr(addr).await {
+                        node.node().disconnect(addr).await;
+                    }
                 }
 
                 // Connect to peers we haven't crawled in a while.
@@ -247,11 +249,21 @@ impl Crawler {
             peer_ips.retain(|addr| node.node().listening_addr().unwrap() != *addr);
 
             // Insert the address into the known network and update the crawl state.
-            node.known_network.update_connections(source, peer_ips.clone());
-            node.known_network.received_peers(source);
+            if let Some(listening_addr) = node.get_peer_listening_addr(source).await {
+                node.known_network.update_connections(listening_addr, peer_ips.clone());
+                node.known_network.received_peers(listening_addr);
+            }
 
             for peer_ip in peer_ips {
-                if !node.node().is_connected(peer_ip) && !node.state.peers.lock().await.iter().any(|peer| peer.listening_addr == peer_ip) {
+                if !node.node().is_connected(peer_ip)
+                    && !node
+                        .state
+                        .peers
+                        .lock()
+                        .await
+                        .iter()
+                        .any(|peer| peer.listening_addr == peer_ip || peer.connected_addr == peer_ip)
+                {
                     debug!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, peer_ip);
 
                     // Only connect if this address is unknown.
@@ -282,8 +294,10 @@ impl Crawler {
         debug!(parent: self.node().span(), "peer {} is at height {}", source, block_height);
 
         // Update the known network nodes and update the crawl state.
-        self.known_network.update_height(source, block_height);
-        self.known_network.received_height(source);
+        if let Some(listening_addr) = self.get_peer_listening_addr(source).await {
+            self.known_network.update_height(listening_addr, block_height);
+            self.known_network.received_height(listening_addr);
+        }
 
         let genesis = CurrentNetwork::genesis_block();
         let msg = ClientMessage::Pong(

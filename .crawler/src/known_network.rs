@@ -30,7 +30,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub struct NodeMeta {
     #[allow(dead_code)]
-    addr: SocketAddr,
+    listening_addr: SocketAddr,
     last_height: u32,
     // Set on disconnect.
     last_crawled: Option<OffsetDateTime>,
@@ -41,9 +41,9 @@ pub struct NodeMeta {
 }
 
 impl NodeMeta {
-    fn new(addr: SocketAddr, last_height: u32, last_crawled: Option<OffsetDateTime>) -> Self {
+    fn new(listening_addr: SocketAddr, last_height: u32, last_crawled: Option<OffsetDateTime>) -> Self {
         Self {
-            addr,
+            listening_addr,
             last_height,
             last_crawled,
             received_peers: Default::default(),
@@ -115,7 +115,7 @@ impl KnownNetwork {
 
             // Remove the nodes that no longer correspond to connections.
             let nodes_from_connections = nodes_from_connections(&self.connections());
-            nodes_g.retain(|addr, _| nodes_from_connections.contains(addr));
+            nodes_g.extend(nodes_from_connections.into_iter().map(|addr| (addr, NodeMeta::new(addr, 0, None))));
         }
     }
 

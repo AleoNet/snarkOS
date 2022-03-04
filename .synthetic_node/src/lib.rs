@@ -59,7 +59,7 @@ pub struct SynthNode {
 
 /// Represents a connected snarkOS client peer.
 pub struct ClientPeer {
-    connected_addr: SocketAddr,
+    pub connected_addr: SocketAddr,
     pub listening_addr: SocketAddr,
     nonce: ClientNonce,
 }
@@ -103,6 +103,26 @@ impl SynthNode {
 
     pub fn state(&self) -> State {
         self.state.status.get()
+    }
+
+    pub async fn get_peer_connected_addr(&self, addr: SocketAddr) -> Option<SocketAddr> {
+        self.state
+            .peers
+            .lock()
+            .await
+            .iter()
+            .find(|peer| peer.listening_addr == addr || peer.connected_addr == addr)
+            .map(|peer| peer.connected_addr)
+    }
+
+    pub async fn get_peer_listening_addr(&self, addr: SocketAddr) -> Option<SocketAddr> {
+        self.state
+            .peers
+            .lock()
+            .await
+            .iter()
+            .find(|peer| peer.connected_addr == addr || peer.listening_addr == addr)
+            .map(|peer| peer.listening_addr)
     }
 }
 
