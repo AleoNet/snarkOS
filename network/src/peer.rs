@@ -355,6 +355,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             warn!("Failed to report a failed connection");
                         }
                     }
+                    E::resources().deregister(peer_resource_id);
+
                     return;
                 }
             };

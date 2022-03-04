@@ -33,7 +33,7 @@ version = "0.8.0"
 
 [dependencies.tokio]
 version = "1"
-features = ["sync", "rt"]
+features = ["sync", "rt", "time"]
 
 [dependencies.tracing]
 version = "0.1"

@@ -20,8 +20,12 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc,
     },
+    time::Duration,
 };
-use tokio::sync::{mpsc, oneshot};
+use tokio::{
+    sync::{mpsc, oneshot},
+    time::sleep,
+};
 
 pub type ResourceId = usize;
 
@@ -107,8 +111,13 @@ impl Resources {
                     }
                     ResourceRequest::Deregister(id) => {
                         if let Some(resource) = resources.remove(&id) {
-                            trace!("Aborting resource with the id {}", id);
-                            resource.abort().await;
+                            // Spawn a short-lived task that will allow some time for the
+                            // to-be-aborted task to free its resources.
+                            tokio::spawn(async move {
+                                sleep(Duration::from_secs(1)).await;
+                                trace!("Aborting resource with the id {}", id);
+                                resource.abort().await;
+                            });
                         } else {
                             error!("Resource with the id {} was not found", id);
                         }
@@ -195,8 +204,8 @@ impl Resources {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::{thread, time::Duration};
-    use tokio::{sync::oneshot, time};
+    use std::thread;
+    use tokio::sync::oneshot;
 
     struct DropChecker(usize);
 
@@ -218,7 +227,7 @@ mod tests {
         let task0 = tokio::task::spawn(async move {
             let _drop_checker = DropChecker(task_id0);
             loop {
-                time::sleep(Duration::from_millis(10)).await;
+                sleep(Duration::from_millis(10)).await;
             }
         });
         resources.register_task(Some(task_id0), task0);
@@ -230,7 +239,7 @@ mod tests {
         let task1 = tokio::task::spawn(async move {
             let _drop_checker = DropChecker(task_id1);
 
-            time::sleep(Duration::from_millis(1)).await;
+            sleep(Duration::from_millis(1)).await;
 
             resources_clone.deregister(task_id1);
         });
@@ -259,7 +268,7 @@ mod tests {
         resources.deregister(thread_id);
         resources.log_summary();
 
-        time::sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(100)).await;
 
         resources.log_summary();
     }

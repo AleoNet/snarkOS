@@ -484,6 +484,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             Some(resource_id),
                             task::spawn(async move {
                                 let _ = handler.await;
+
+                                E::resources().deregister(resource_id);
                             }),
                         );
                     }
