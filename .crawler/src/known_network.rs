@@ -116,7 +116,11 @@ impl KnownNetwork {
 
             // Remove the nodes that no longer correspond to connections.
             let nodes_from_connections = nodes_from_connections(&self.connections());
-            nodes_g.extend(nodes_from_connections.into_iter().map(|addr| (addr, NodeMeta::new(addr))));
+            for addr in nodes_from_connections {
+                if !nodes_g.contains_key(&addr) {
+                    nodes_g.insert(addr, NodeMeta::new(addr));
+                }
+            }
         }
     }
 
