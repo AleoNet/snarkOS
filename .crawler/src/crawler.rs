@@ -166,7 +166,12 @@ impl Reading for Crawler {
         reader.read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE])?;
         let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
 
-        if len > buf.len() || reader.read_exact(&mut buf[..len]).is_err() {
+        if len > buf.len() {
+            error!(parent: self.node().span(), "a message from {} is too large ({}B)", source, len);
+            return Err(io::ErrorKind::InvalidData.into());
+        }
+
+        if reader.read_exact(&mut buf[..len]).is_err() {
             return Ok(None);
         }
 
