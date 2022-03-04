@@ -2663,6 +2663,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-crawler"
+version = "2.0.2"
+dependencies = [
+ "async-trait",
+ "parking_lot 0.12.0",
+ "pea2pea",
+ "rand",
+ "snarkos-environment",
+ "snarkos-metrics",
+ "snarkos-network",
+ "snarkos-storage",
+ "snarkos-synthetic-node",
+ "snarkvm",
+ "structopt",
+ "time 0.3.7",
+ "tokio",
+ "tracing",
+]
+
+[[package]]
 name = "snarkos-environment"
 version = "2.0.2"
 dependencies = [
@@ -2684,12 +2704,12 @@ dependencies = [
  "bincode",
  "pea2pea",
  "peak_alloc",
- "rand",
  "snarkos",
  "snarkos-environment",
  "snarkos-metrics",
  "snarkos-network",
  "snarkos-storage",
+ "snarkos-synthetic-node",
  "snarkvm",
  "structopt",
  "tokio",
@@ -2776,6 +2796,21 @@ dependencies = [
  "time 0.3.7",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "snarkos-synthetic-node"
+version = "2.0.2"
+dependencies = [
+ "async-trait",
+ "pea2pea",
+ "rand",
+ "snarkos-environment",
+ "snarkos-network",
+ "snarkvm",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
