@@ -54,6 +54,14 @@ impl NodeMeta {
 
         self.last_crawled = Some(OffsetDateTime::now_utc());
     }
+
+    fn needs_refreshing(&self) -> bool {
+        if let Some(last_crawled) = self.last_crawled {
+            (OffsetDateTime::now_utc() - last_crawled).whole_minutes() > CRAWL_INTERVAL_MINS
+        } else {
+            true
+        }
+    }
 }
 
 /// Keeps track of crawled peers and their connections.
@@ -137,18 +145,21 @@ impl KnownNetwork {
         }
     }
 
+    /// Checks if the given address should be (re)connected to.
+    pub fn should_be_connected_to(&self, addr: SocketAddr) -> bool {
+        if let Some(meta) = self.nodes.read().get(&addr) {
+            meta.needs_refreshing()
+        } else {
+            true
+        }
+    }
+
     pub fn addrs_to_connect(&self) -> HashSet<SocketAddr> {
         // Snapshot is safe to use as disconnected peers won't have their state updated at the
         // moment.
         self.nodes()
             .iter()
-            .filter(|(_, meta)| {
-                if let Some(last_crawled) = meta.last_crawled {
-                    (OffsetDateTime::now_utc() - last_crawled).whole_minutes() > CRAWL_INTERVAL_MINS
-                } else {
-                    true
-                }
-            })
+            .filter(|(_, meta)| meta.needs_refreshing())
             .map(|(&addr, _)| addr)
             .collect()
     }

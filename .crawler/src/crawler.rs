@@ -67,6 +67,7 @@ impl Crawler {
     /// Creates a crawler node with the most basic network protocols enabled.
     pub async fn new(opts: Opts) -> Self {
         let config = Config {
+            name: Some("snarkOS crawler".into()),
             listener_ip: Some(opts.node.ip()),
             desired_listening_port: Some(opts.node.port()),
             max_connections: MAXIMUM_NUMBER_OF_PEERS as u16,
@@ -90,14 +91,26 @@ impl Crawler {
     }
 
     pub async fn is_connected(&self, addr: SocketAddr) -> bool {
-        !self.node().is_connected(addr)
-            && !self
-                .state
-                .peers
-                .lock()
-                .await
-                .iter()
-                .any(|peer| peer.listening_addr == addr || peer.connected_addr == addr)
+        // Handshakes can take a while.
+        if self.node().is_connecting(addr) {
+            return true;
+        }
+
+        let connected_addrs = self.node().connected_addrs();
+
+        self.state
+            .peers
+            .lock()
+            .await
+            .iter()
+            .filter_map(|peer| {
+                if peer.listening_addr == addr || peer.connected_addr == addr {
+                    Some(addr)
+                } else {
+                    None
+                }
+            })
+            .any(|addr| connected_addrs.contains(&addr))
     }
 
     /// Spawns a task dedicated to peer maintenance.
@@ -117,12 +130,14 @@ impl Crawler {
                     if !node.is_connected(addr).await {
                         let node_clone = node.clone();
                         task::spawn(async move {
-                            let _ = node_clone.node().connect(addr).await;
+                            if node_clone.node().connect(addr).await.is_ok() {
+                                let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
+                            }
                         });
                     }
                 }
 
-                debug!(parent: node.node().span(), "crawling the netowrk for more peers; asking peers for their peers");
+                debug!(parent: node.node().span(), "crawling the network for more peers; asking peers for their peers");
                 node.send_broadcast(ClientMessage::PeerRequest).unwrap();
                 tokio::time::sleep(Duration::from_secs(PEER_INTERVAL_SECS)).await;
             }
@@ -244,11 +259,13 @@ impl Crawler {
                 if !node.is_connected(addr).await {
                     debug!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, addr);
 
-                    // Only connect if this address is unknown.
-                    if !node.known_network.nodes().contains_key(&addr) {
+                    // Only connect if this address needs to be crawled.
+                    if node.known_network.should_be_connected_to(addr) {
                         let node_clone = node.clone();
                         task::spawn(async move {
-                            let _ = node_clone.node().connect(addr).await;
+                            if node_clone.node().connect(addr).await.is_ok() {
+                                let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
+                            }
                         });
                     }
                 }
