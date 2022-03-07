@@ -141,6 +141,8 @@ impl Crawler {
                         task::spawn(async move {
                             if node_clone.node().connect(addr).await.is_ok() {
                                 let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
+                            } else {
+                                node_clone.known_network.update_timestamp(addr);
                             }
                         });
                     }
@@ -286,6 +288,8 @@ impl Crawler {
                         task::spawn(async move {
                             if node_clone.node().connect(addr).await.is_ok() {
                                 let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
+                            } else {
+                                node_clone.known_network.update_timestamp(addr);
                             }
                         });
                     }

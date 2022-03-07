@@ -51,7 +51,6 @@ impl NodeMeta {
 
     fn reset_crawl_state(&mut self) {
         self.received_peer_sets = 0;
-
         self.last_crawled = Some(OffsetDateTime::now_utc());
     }
 
@@ -142,6 +141,13 @@ impl KnownNetwork {
     pub fn received_peers(&self, source: SocketAddr) {
         if let Some(meta) = self.nodes.write().get_mut(&source) {
             meta.received_peer_sets += 1;
+        }
+    }
+
+    /// Update the timestamp for this particular node.
+    pub fn update_timestamp(&self, source: SocketAddr) {
+        if let Some(meta) = self.nodes.write().get_mut(&source) {
+            meta.last_crawled = Some(OffsetDateTime::now_utc());
         }
     }
 
