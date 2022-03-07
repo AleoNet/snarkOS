@@ -35,6 +35,10 @@ version = "0.8.0"
 version = "1"
 features = ["sync", "rt", "time"]
 
+[dependencies.tokio-metrics]
+version = "0.1"
+optional = true
+
 [dependencies.tracing]
 version = "0.1"
 
@@ -44,3 +48,6 @@ version = "0.3"
 [dev-dependencies.tokio]
 version = "1"
 features = ["macros", "rt-multi-thread", "time"]
+
+[features]
+task-metrics = [ "tokio-metrics" ]
