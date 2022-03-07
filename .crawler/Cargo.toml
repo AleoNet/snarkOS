@@ -1,5 +1,5 @@
 [package]
-name = "snarkos-integration"
+name = "snarkos-crawler"
 version = "2.0.2"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
@@ -16,25 +16,19 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
-[dependencies.anyhow]
-version = "1"
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies.async-trait]
 version = "0.1"
 
-[dependencies.bincode]
-version = "1"
+[dependencies.parking_lot]
+version = "0.12"
 
 [dependencies.pea2pea]
 version = "0.33"
 
-[dependencies.peak_alloc]
-version = "0.1"
-
-[dependencies.snarkos]
-path = ".."
-version = "2.0.2"
-features = [ "test" ]
+[dependencies.rand]
+version = "0.8"
 
 [dependencies.snarkos-environment]
 path = "../environment"
@@ -63,13 +57,12 @@ version = "0.8.0"
 [dependencies.structopt]
 version = "0.3"
 
+[dependencies.time]
+version = "0.3"
+features = ["local-offset"]
+
 [dependencies.tokio]
 version = "1"
-features = [ "macros", "rt-multi-thread", "time" ]
 
 [dependencies.tracing]
 version = "0.1"
-
-[dependencies.tracing-subscriber]
-version = "0.3"
-features = [ "env-filter", "parking_lot" ]

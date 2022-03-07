@@ -14,91 +14,51 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_environment::{
-    helpers::{NodeType, State, Status},
-    Client,
-    CurrentNetwork,
-    Environment,
-};
-use snarkos_network::{Data, Message};
+use snarkos_environment::{Client, CurrentNetwork, Environment};
+use snarkos_network::Data;
 use snarkos_storage::BlockLocators;
+use snarkos_synthetic_node::{ClientMessage, ClientState, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
 use snarkvm::traits::Network;
 
 use pea2pea::{
     protocols::{Disconnect, Handshake, Reading, Writing},
     Config,
-    Connection,
     Node as Pea2PeaNode,
     Pea2Pea,
 };
-use rand::{thread_rng, Rng};
 use std::{
     convert::TryInto,
     io,
     net::{IpAddr, Ipv4Addr, SocketAddr},
-    sync::Arc,
+    ops::Deref,
     time::Duration,
 };
-use tokio::{
-    io::{AsyncReadExt, AsyncWriteExt},
-    sync::Mutex,
-    task,
-};
+use tokio::task;
 use tracing::*;
 
 // Consts & aliases.
-const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
-const CHALLENGE_HEIGHT: u32 = 0;
 const PING_INTERVAL_SECS: u64 = 5;
 const PEER_INTERVAL_SECS: u64 = 3;
 const DESIRED_CONNECTIONS: usize = <Client<CurrentNetwork>>::MINIMUM_NUMBER_OF_PEERS * 3;
-const MESSAGE_VERSION: u32 = <Client<CurrentNetwork>>::MESSAGE_VERSION;
-const MAXIMUM_FORK_DEPTH: u32 = CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH;
 
 pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<CurrentNetwork>>::MAXIMUM_NUMBER_OF_PEERS;
-
-type ClientMessage = Message<CurrentNetwork, Client<CurrentNetwork>>;
-pub type ClientNonce = u64;
 
 /// The test node; it consists of a `Node` that handles networking and `State`
 /// that can be extended freely based on test requirements.
 #[derive(Clone)]
-pub struct TestNode {
-    node: Pea2PeaNode,
-    state: ClientState,
-}
-
-/// Represents a connected snarkOS client peer.
-pub struct ClientPeer {
-    connected_addr: SocketAddr,
-    listening_addr: SocketAddr,
-    nonce: ClientNonce,
-}
-
-/// snarkOS client state required for test purposes.
-#[derive(Clone)]
-pub struct ClientState {
-    pub local_nonce: ClientNonce,
-    /// The list of known peers; `Pea2Pea` includes its own internal peer handling,
-    /// but snarkOS nodes must discover the listening address and unique nonce of each peer;
-    /// this collection facilitates the snarkOS peering experience to align with snarkOS logic.
-    pub peers: Arc<Mutex<Vec<ClientPeer>>>,
-    pub status: Status,
-}
-
-impl Default for ClientState {
-    fn default() -> Self {
-        Self {
-            local_nonce: thread_rng().gen(),
-            peers: Default::default(),
-            status: Status::new(),
-        }
-    }
-}
+pub struct TestNode(SynthNode);
 
 impl Pea2Pea for TestNode {
     fn node(&self) -> &Pea2PeaNode {
-        &self.node
+        &self.0.node()
+    }
+}
+
+impl Deref for TestNode {
+    type Target = SynthNode;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
 }
 
@@ -113,7 +73,7 @@ impl TestNode {
 
         let pea2pea_node = Pea2PeaNode::new(Some(config)).await.unwrap();
         let client_state = Default::default();
-        let node = Self::new(pea2pea_node, client_state);
+        let node = TestNode(SynthNode::new(pea2pea_node, client_state));
         node.enable_disconnect().await;
         node.enable_handshake().await;
         node.enable_reading().await;
@@ -123,15 +83,7 @@ impl TestNode {
 
     /// Creates a test node using the given `Pea2Pea` node.
     pub fn new(node: Pea2PeaNode, state: ClientState) -> Self {
-        Self { node, state }
-    }
-
-    fn node_type(&self) -> NodeType {
-        NodeType::Client
-    }
-
-    fn state(&self) -> State {
-        self.state.status.get()
+        Self(SynthNode::new(node, state))
     }
 
     /// Spawns a task dedicated to broadcasting Ping messages.
@@ -180,122 +132,6 @@ impl TestNode {
     }
 }
 
-/// Automated handshake handling for the test nodes.
-#[async_trait::async_trait]
-impl Handshake for TestNode {
-    async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
-        // Guard against double (two-sided) connections.
-        let mut locked_peers = self.state.peers.lock().await;
-
-        let own_ip = self.node().listening_addr()?;
-        let peer_ip = connection.addr;
-
-        let genesis_block_header = CurrentNetwork::genesis_block().header();
-
-        // Send a challenge request to the peer.
-        let own_request = ClientMessage::ChallengeRequest(
-            MESSAGE_VERSION,
-            MAXIMUM_FORK_DEPTH,
-            NodeType::Client,
-            State::Ready,
-            own_ip.port(),
-            self.state.local_nonce,
-            0,
-        );
-        trace!(parent: self.node().span(), "sending a challenge request to {}", peer_ip);
-        let mut msg = Vec::new();
-        own_request.serialize_into(&mut msg).unwrap();
-        let len = u32::to_le_bytes(msg.len() as u32);
-        connection.writer().write_all(&len).await?;
-        connection.writer().write_all(&msg).await?;
-
-        let mut buf = [0u8; 1024];
-
-        // Read the challenge request from the peer.
-        connection.reader().read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE]).await?;
-        let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
-        connection.reader().read_exact(&mut buf[..len]).await?;
-        let peer_request = ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len]));
-
-        // Register peer's nonce.
-        let (peer_listening_addr, peer_nonce) = if let Ok(Message::ChallengeRequest(
-            peer_version,
-            _peer_fork_depth,
-            _peer_node_type,
-            _peer_status,
-            peer_listening_port,
-            peer_nonce,
-            _cumulative_weight,
-        )) = peer_request
-        {
-            if peer_version < MESSAGE_VERSION {
-                warn!(parent: self.node().span(), "dropping {} due to outdated version ({})", peer_ip, peer_version);
-                return Err(io::ErrorKind::InvalidData.into());
-            }
-
-            let peer_listening_ip = SocketAddr::from((peer_ip.ip(), peer_listening_port));
-
-            if locked_peers
-                .iter()
-                .any(|peer| peer.nonce == peer_nonce || peer.listening_addr == peer_listening_ip)
-            {
-                return Err(io::ErrorKind::AlreadyExists.into());
-            }
-
-            trace!(parent: self.node().span(), "received a challenge request from {}", peer_ip);
-
-            (peer_listening_ip, peer_nonce)
-        } else if let Ok(Message::Disconnect(reason)) = peer_request {
-            warn!(parent: self.node().span(), "{} disconnected: {:?}", peer_ip, reason);
-            return Err(io::ErrorKind::NotConnected.into());
-        } else {
-            error!(parent: self.node().span(), "invalid challenge request from {}", peer_ip);
-            return Err(io::ErrorKind::InvalidData.into());
-        };
-
-        // Respond with own challenge request.
-        let own_response = ClientMessage::ChallengeResponse(Data::Object(genesis_block_header.clone()));
-        trace!(parent: self.node().span(), "sending a challenge response to {}", peer_ip);
-        let mut msg = Vec::new();
-        own_response.serialize_into(&mut msg).unwrap();
-        let len = u32::to_le_bytes(msg.len() as u32);
-        connection.writer().write_all(&len).await?;
-        connection.writer().write_all(&msg).await?;
-
-        // Wait for the challenge response to come in.
-        connection.reader().read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE]).await?;
-        let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
-        connection.reader().read_exact(&mut buf[..len]).await?;
-        let peer_response = ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len]));
-
-        if let Ok(Message::ChallengeResponse(block_header)) = peer_response {
-            let block_header = block_header.deserialize().await.unwrap();
-
-            trace!(parent: self.node().span(), "received a challenge response from {}", peer_ip);
-            if block_header.height() == CHALLENGE_HEIGHT && &block_header == genesis_block_header && block_header.is_valid() {
-                // Register the newly connected snarkOS peer.
-                locked_peers.push(ClientPeer {
-                    connected_addr: peer_ip,
-                    listening_addr: peer_listening_addr,
-                    nonce: peer_nonce,
-                });
-                debug!(parent: self.node().span(), "connected to {} (listening addr: {})", peer_ip, peer_listening_addr);
-
-                Ok(connection)
-            } else {
-                error!(parent: self.node().span(), "invalid challenge response from {}", peer_ip);
-                Err(io::ErrorKind::InvalidData.into())
-            }
-        } else if let Ok(Message::Disconnect(reason)) = peer_response {
-            warn!(parent: self.node().span(), "{} disconnected: {:?}", peer_ip, reason);
-            return Err(io::ErrorKind::NotConnected.into());
-        } else {
-            error!(parent: self.node().span(), "invalid challenge response from {}", peer_ip);
-            Err(io::ErrorKind::InvalidData.into())
-        }
-    }
-}
-
 /// Inbound message processing logic for the test nodes.
 #[async_trait::async_trait]
 impl Reading for TestNode {
@@ -341,35 +177,13 @@ impl Reading for TestNode {
             ClientMessage::Pong(_is_fork, _block_locators) => {}
             ClientMessage::UnconfirmedBlock(_block_height, _block_hash, _block) => {}
             ClientMessage::UnconfirmedTransaction(_transaction) => {}
+            ClientMessage::PoolRegister(_address) => {}
+            ClientMessage::PoolRequest(_share_difficulty, _block_template) => {}
+            ClientMessage::PoolResponse(_address, _nonce, _proof) => {}
             _ => return Err(io::ErrorKind::InvalidData.into()), // Peer is not following the protocol.
         }
 
         Ok(())
-    }
-}
-
-/// Outbound message processing logic for the test nodes.
-impl Writing for TestNode {
-    type Message = ClientMessage;
-
-    fn write_message<W: io::Write>(&self, _target: SocketAddr, payload: &Self::Message, writer: &mut W) -> io::Result<()> {
-        let mut msg = Vec::new();
-        payload.serialize_into(&mut msg).unwrap();
-        let len = u32::to_le_bytes(msg.len() as u32);
-
-        writer.write_all(&len)?;
-        writer.write_all(&msg)
-    }
-}
-
-/// Disconnect logic for the test nodes.
-#[async_trait::async_trait]
-impl Disconnect for TestNode {
-    async fn handle_disconnect(&self, disconnecting_addr: SocketAddr) {
-        let mut locked_peers = self.state.peers.lock().await;
-        let initial_len = locked_peers.len();
-        locked_peers.retain(|peer| peer.connected_addr != disconnecting_addr);
-        assert_eq!(locked_peers.len(), initial_len - 1)
     }
 }
 

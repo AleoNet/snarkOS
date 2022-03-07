@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2021"
 
 [workspace]
-members = [ ".integration", "environment", "metrics", "network", "rpc", "storage" ]
+members = [ ".crawler", ".integration", ".synthetic_node", "environment", "metrics", "network", "rpc", "storage" ]
 
 [lib]
 path = "snarkos/lib.rs"
