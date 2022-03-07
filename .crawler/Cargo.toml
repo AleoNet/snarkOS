@@ -32,6 +32,7 @@ version = "0.34"
 
 [dependencies.rand]
 version = "0.8"
+features = [ "small_rng" ]
 
 [dependencies.snarkos-environment]
 path = "../environment"

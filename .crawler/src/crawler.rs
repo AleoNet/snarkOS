@@ -27,7 +27,7 @@ use pea2pea::{
     Node as Pea2PeaNode,
     Pea2Pea,
 };
-use rand::seq::IteratorRandom;
+use rand::{rngs::SmallRng, seq::IteratorRandom, SeedableRng};
 use std::{convert::TryInto, io, net::SocketAddr, ops::Deref, sync::Arc, time::Duration};
 use structopt::StructOpt;
 use tokio::task;
@@ -90,6 +90,10 @@ impl Crawler {
         node
     }
 
+    fn rng(&self) -> SmallRng {
+        SmallRng::from_entropy()
+    }
+
     pub async fn is_connected(&self, addr: SocketAddr) -> bool {
         // Handshakes can take a while.
         if self.node().is_connecting(addr) {
@@ -126,7 +130,12 @@ impl Crawler {
                 }
 
                 // Connect to peers we haven't crawled in a while.
-                for addr in node.known_network.addrs_to_connect().into_iter().take(MAXIMUM_NUMBER_OF_PEERS / 10) {
+                for addr in node
+                    .known_network
+                    .addrs_to_connect()
+                    .into_iter()
+                    .choose_multiple(&mut node.rng(), 25)
+                {
                     if !node.is_connected(addr).await {
                         let node_clone = node.clone();
                         task::spawn(async move {
@@ -247,7 +256,7 @@ impl Crawler {
             .nodes()
             .into_iter()
             .map(|(addr, _)| addr)
-            .choose_multiple(&mut rand::thread_rng(), 10);
+            .choose_multiple(&mut self.rng(), 10);
         let msg = ClientMessage::PeerResponse(peers);
         debug!(parent: self.node().span(), "sending a PeerResponse to {}", source);
 
