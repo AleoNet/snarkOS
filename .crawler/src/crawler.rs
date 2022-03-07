@@ -134,7 +134,7 @@ impl Crawler {
                     .known_network
                     .addrs_to_connect()
                     .into_iter()
-                    .choose_multiple(&mut node.rng(), 25)
+                    .choose_multiple(&mut node.rng(), NUM_CONCURRENT_CONNECTION_ATTEMPTS as usize)
                 {
                     if !node.is_connected(addr).await {
                         let node_clone = node.clone();
