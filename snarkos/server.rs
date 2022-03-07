@@ -115,33 +115,37 @@ impl<N: Network, E: Environment> Server<N, E> {
             let prover_router = prover.router();
 
             let (router, handler) = oneshot::channel();
-            E::resources().register_task(task::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                loop {
-                    // Initialize the connection process.
-                    let (router, handler) = oneshot::channel();
-                    // Route a `Connect` request to the pool.
-                    if let Err(error) = peers_router
-                        .send(PeersRequest::Connect(
-                            pool_ip,
-                            ledger_reader.clone(),
-                            ledger_router.clone(),
-                            operator_router.clone(),
-                            prover_router.clone(),
-                            router,
-                        ))
-                        .await
-                    {
-                        trace!("[Connect] {}", error);
-                    }
-                    // Wait until the connection task is initialized.
-                    let _ = handler.await;
+            E::resources().register_task(
+                None, // No need to provide an id, as the task will run indefinitely.
+                task::spawn(async move {
+                    // Notify the outer function that the task is ready.
+                    let _ = router.send(());
+                    loop {
+                        // Initialize the connection process.
+                        let (router, handler) = oneshot::channel();
+                        // Route a `Connect` request to the pool.
+                        if let Err(error) = peers_router
+                            .send(PeersRequest::Connect(
+                                pool_ip,
+                                ledger_reader.clone(),
+                                ledger_router.clone(),
+                                operator_router.clone(),
+                                prover_router.clone(),
+                                router,
+                            ))
+                            .await
+                        {
+                            trace!("[Connect] {}", error);
+                        }
+                        // Wait until the connection task is initialized.
+                        let _ = handler.await;
 
-                    // Sleep for `30` seconds.
-                    tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-                }
-            }));
+                        // Sleep for `30` seconds.
+                        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                    }
+                }),
+            );
+
             // Wait until the prover handler is ready.
             let _ = handler.await;
         }
@@ -244,7 +248,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         self.ledger.shut_down().await;
 
         // Flush the tasks.
-        E::resources().abort();
+        E::resources().shut_down();
         trace!("Node has shut down.");
     }
 
@@ -263,39 +267,43 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) {
         // Initialize the listener process.
         let (router, handler) = oneshot::channel();
-        E::resources().register_task(task::spawn(async move {
-            // Notify the outer function that the task is ready.
-            let _ = router.send(());
-            info!("Listening for peers at {}", local_ip);
-            loop {
-                // Don't accept connections if the node is breaching the configured peer limit.
-                if peers.number_of_connected_peers().await < E::MAXIMUM_NUMBER_OF_PEERS {
-                    // Asynchronously wait for an inbound TcpStream.
-                    match listener.accept().await {
-                        // Process the inbound connection request.
-                        Ok((stream, peer_ip)) => {
-                            let request = PeersRequest::PeerConnecting(
-                                stream,
-                                peer_ip,
-                                ledger_reader.clone(),
-                                ledger_router.clone(),
-                                operator_router.clone(),
-                                prover_router.clone(),
-                            );
-                            if let Err(error) = peers.router().send(request).await {
-                                error!("Failed to send request to peers: {}", error)
+        E::resources().register_task(
+            None, // No need to provide an id, as the task will run indefinitely.
+            task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                info!("Listening for peers at {}", local_ip);
+                loop {
+                    // Don't accept connections if the node is breaching the configured peer limit.
+                    if peers.number_of_connected_peers().await < E::MAXIMUM_NUMBER_OF_PEERS {
+                        // Asynchronously wait for an inbound TcpStream.
+                        match listener.accept().await {
+                            // Process the inbound connection request.
+                            Ok((stream, peer_ip)) => {
+                                let request = PeersRequest::PeerConnecting(
+                                    stream,
+                                    peer_ip,
+                                    ledger_reader.clone(),
+                                    ledger_router.clone(),
+                                    operator_router.clone(),
+                                    prover_router.clone(),
+                                );
+                                if let Err(error) = peers.router().send(request).await {
+                                    error!("Failed to send request to peers: {}", error)
+                                }
                             }
+                            Err(error) => error!("Failed to accept a connection: {}", error),
                         }
-                        Err(error) => error!("Failed to accept a connection: {}", error),
+                        // Add a small delay to prevent overloading the network from handshakes.
+                        tokio::time::sleep(Duration::from_millis(150)).await;
+                    } else {
+                        // Add a sleep delay as the node has reached peer capacity.
+                        tokio::time::sleep(Duration::from_secs(5)).await;
                     }
-                    // Add a small delay to prevent overloading the network from handshakes.
-                    tokio::time::sleep(Duration::from_millis(150)).await;
-                } else {
-                    // Add a sleep delay as the node has reached peer capacity.
-                    tokio::time::sleep(Duration::from_secs(5)).await;
                 }
-            }
-        }));
+            }),
+        );
+
         // Wait until the listener task is ready.
         let _ = handler.await;
     }
@@ -313,28 +321,32 @@ impl<N: Network, E: Environment> Server<N, E> {
     ) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
-        E::resources().register_task(task::spawn(async move {
-            // Notify the outer function that the task is ready.
-            let _ = router.send(());
-            loop {
-                // Transmit a heartbeat request to the ledger.
-                if let Err(error) = ledger_router.send(LedgerRequest::Heartbeat(prover_router.clone())).await {
-                    error!("Failed to send heartbeat to ledger: {}", error)
+        E::resources().register_task(
+            None, // No need to provide an id, as the task will run indefinitely.
+            task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                loop {
+                    // Transmit a heartbeat request to the ledger.
+                    if let Err(error) = ledger_router.send(LedgerRequest::Heartbeat(prover_router.clone())).await {
+                        error!("Failed to send heartbeat to ledger: {}", error)
+                    }
+                    // Transmit a heartbeat request to the peers.
+                    let request = PeersRequest::Heartbeat(
+                        ledger_reader.clone(),
+                        ledger_router.clone(),
+                        operator_router.clone(),
+                        prover_router.clone(),
+                    );
+                    if let Err(error) = peers_router.send(request).await {
+                        error!("Failed to send heartbeat to peers: {}", error)
+                    }
+                    // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
+                    tokio::time::sleep(Duration::from_secs(E::HEARTBEAT_IN_SECS)).await;
                 }
-                // Transmit a heartbeat request to the peers.
-                let request = PeersRequest::Heartbeat(
-                    ledger_reader.clone(),
-                    ledger_router.clone(),
-                    operator_router.clone(),
-                    prover_router.clone(),
-                );
-                if let Err(error) = peers_router.send(request).await {
-                    error!("Failed to send heartbeat to peers: {}", error)
-                }
-                // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
-                tokio::time::sleep(Duration::from_secs(E::HEARTBEAT_IN_SECS)).await;
-            }
-        }));
+            }),
+        );
+
         // Wait until the heartbeat task is ready.
         let _ = handler.await;
     }
@@ -369,7 +381,8 @@ impl<N: Network, E: Environment> Server<N, E> {
 
             debug!("JSON-RPC server listening on {}", rpc_server_addr);
 
-            E::resources().register_task(rpc_server_handle);
+            // Register the task; no need to provide an id, as it will run indefinitely.
+            E::resources().register_task(None, rpc_server_handle);
         }
     }
 
@@ -380,49 +393,53 @@ impl<N: Network, E: Environment> Server<N, E> {
     async fn initialize_notification(ledger: LedgerReader<N>, prover: Arc<Prover<N, E>>, address: Option<Address<N>>) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
-        E::resources().register_task(task::spawn(async move {
-            // Notify the outer function that the task is ready.
-            let _ = router.send(());
-            loop {
-                info!("{}", notification_message(address));
+        E::resources().register_task(
+            None, // No need to provide an id, as the task will run indefinitely.
+            task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                loop {
+                    info!("{}", notification_message(address));
 
-                if E::NODE_TYPE == NodeType::Miner {
-                    if let Some(miner_address) = address {
-                        // Retrieve the latest block height.
-                        let latest_block_height = ledger.latest_block_height();
+                    if E::NODE_TYPE == NodeType::Miner {
+                        if let Some(miner_address) = address {
+                            // Retrieve the latest block height.
+                            let latest_block_height = ledger.latest_block_height();
 
-                        // Prepare a list of confirmed and pending coinbase records.
-                        let mut confirmed = vec![];
-                        let mut pending = vec![];
+                            // Prepare a list of confirmed and pending coinbase records.
+                            let mut confirmed = vec![];
+                            let mut pending = vec![];
 
-                        // Iterate through the coinbase records from storage.
-                        for (block_height, record) in prover.to_coinbase_records() {
-                            // Filter the coinbase records by determining if they exist on the canonical chain.
-                            if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
-                                // Ensure the record owner matches.
-                                if record.owner() == miner_address {
-                                    // Add the block to the appropriate list.
-                                    match block_height + 2048 < latest_block_height {
-                                        true => confirmed.push((block_height, record)),
-                                        false => pending.push((block_height, record)),
+                            // Iterate through the coinbase records from storage.
+                            for (block_height, record) in prover.to_coinbase_records() {
+                                // Filter the coinbase records by determining if they exist on the canonical chain.
+                                if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
+                                    // Ensure the record owner matches.
+                                    if record.owner() == miner_address {
+                                        // Add the block to the appropriate list.
+                                        match block_height + 2048 < latest_block_height {
+                                            true => confirmed.push((block_height, record)),
+                                            false => pending.push((block_height, record)),
+                                        }
                                     }
                                 }
                             }
+
+                            info!(
+                                "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
+                                confirmed.len(),
+                                pending.len(),
+                                miner_address
+                            );
                         }
-
-                        info!(
-                            "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
-                            confirmed.len(),
-                            pending.len(),
-                            miner_address
-                        );
                     }
-                }
 
-                // Sleep for `120` seconds.
-                tokio::time::sleep(Duration::from_secs(120)).await;
-            }
-        }));
+                    // Sleep for `120` seconds.
+                    tokio::time::sleep(Duration::from_secs(120)).await;
+                }
+            }),
+        );
+
         // Wait until the heartbeat task is ready.
         let _ = handler.await;
     }

@@ -120,7 +120,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         let canon = Arc::new(LedgerState::open_writer::<S, P>(path)?);
         let (canon_reader, reader_resource) = LedgerState::open_reader::<S, P>(path)?;
-        E::resources().register(reader_resource);
+        // Register the thread; no need to provide an id, as it will run indefinitely.
+        E::resources().register(reader_resource, None);
 
         // Initialize the ledger.
         let ledger = Arc::new(Self {
@@ -141,17 +142,21 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         {
             let ledger = ledger.clone();
             let (router, handler) = oneshot::channel();
-            E::resources().register_task(task::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                // Asynchronously wait for a ledger request.
-                while let Some(request) = ledger_handler.recv().await {
-                    // Update the state of the ledger.
-                    // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
-                    // will end up being processed out of order.
-                    ledger.update(request).await;
-                }
-            }));
+            E::resources().register_task(
+                None, // No need to provide an id, as the task will run indefinitely.
+                task::spawn(async move {
+                    // Notify the outer function that the task is ready.
+                    let _ = router.send(());
+                    // Asynchronously wait for a ledger request.
+                    while let Some(request) = ledger_handler.recv().await {
+                        // Update the state of the ledger.
+                        // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
+                        // will end up being processed out of order.
+                        ledger.update(request).await;
+                    }
+                }),
+            );
+
             // Wait until the ledger handler is ready.
             let _ = handler.await;
         }

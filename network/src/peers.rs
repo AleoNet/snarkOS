@@ -138,19 +138,30 @@ impl<N: Network, E: Environment> Peers<N, E> {
         {
             let peers = peers.clone();
             let (router, handler) = oneshot::channel();
-            E::resources().register_task(task::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                // Asynchronously wait for a peers request.
-                while let Some(request) = peers_handler.recv().await {
-                    let peers = peers.clone();
-                    // Asynchronously process a peers request.
-                    task::spawn(async move {
-                        // Update the state of the peers.
-                        peers.update(request).await;
-                    });
-                }
-            }));
+            E::resources().register_task(
+                None, // No need to provide an id, as the task will run indefinitely.
+                task::spawn(async move {
+                    // Notify the outer function that the task is ready.
+                    let _ = router.send(());
+                    // Asynchronously wait for a peers request.
+                    while let Some(request) = peers_handler.recv().await {
+                        let peers = peers.clone();
+                        // Procure a resource id to register the task with, as it might be terminated at any point in time.
+                        let resource_id = E::resources().procure_id();
+                        // Asynchronously process a peers request.
+                        E::resources().register_task(
+                            Some(resource_id),
+                            task::spawn(async move {
+                                // Update the state of the peers.
+                                peers.update(request).await;
+
+                                E::resources().deregister(resource_id);
+                            }),
+                        );
+                    }
+                }),
+            );
+
             // Wait until the peers router task is ready.
             let _ = handler.await;
         }
@@ -402,9 +413,16 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         }
 
                         // Do not wait for the result of each connection.
-                        E::resources().register_task(task::spawn(async move {
-                            let _ = handler.await;
-                        }));
+                        // Procure a resource id to register the task with, as it might be terminated at any point in time.
+                        let resource_id = E::resources().procure_id();
+                        E::resources().register_task(
+                            Some(resource_id),
+                            task::spawn(async move {
+                                let _ = handler.await;
+
+                                E::resources().deregister(resource_id);
+                            }),
+                        );
                     }
                 }
 
@@ -460,9 +478,16 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             warn!("Failed to transmit the request: '{}'", error);
                         }
                         // Do not wait for the result of each connection.
-                        task::spawn(async move {
-                            let _ = handler.await;
-                        });
+                        // Procure a resource id to register the task with, as it might be terminated at any point in time.
+                        let resource_id = E::resources().procure_id();
+                        E::resources().register_task(
+                            Some(resource_id),
+                            task::spawn(async move {
+                                let _ = handler.await;
+
+                                E::resources().deregister(resource_id);
+                            }),
+                        );
                     }
                 }
             }
