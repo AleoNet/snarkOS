@@ -455,7 +455,7 @@ impl MinerStats {
 
         // Initialize the prover storage.
         let prover_storage_path = node.prover_storage_path(ip);
-        let prover = snarkos_storage::ProverState::<CurrentNetwork>::open_writer::<RocksDB, _>(prover_storage_path).unwrap();
+        let prover = snarkos_storage::ProverState::<CurrentNetwork>::open::<RocksDB, _>(prover_storage_path, true).unwrap();
 
         // Retrieve the latest block height.
         let latest_block_height = ledger.latest_block_height();
