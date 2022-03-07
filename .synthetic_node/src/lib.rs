@@ -136,6 +136,13 @@ impl Handshake for SynthNode {
         let own_ip = self.node().listening_addr()?;
         let peer_ip = connection.addr;
 
+        if locked_peers
+            .iter()
+            .any(|peer| peer.listening_addr == peer_ip || peer.connected_addr == peer_ip)
+        {
+            return Err(io::ErrorKind::AlreadyExists.into());
+        }
+
         let genesis_block_header = CurrentNetwork::genesis_block().header();
 
         // Send a challenge request to the peer.
