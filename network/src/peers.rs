@@ -453,156 +453,154 @@ impl<N: Network, E: Environment> Peers<N, E> {
         operator_router: OperatorRouter<N>,
         prover_router: ProverRouter<N>,
     ) {
-         // Obtain the number of connected peers.
-         let number_of_connected_peers = self.number_of_connected_peers().await;
-         // Ensure the number of connected peers is below the maximum threshold.
-         if number_of_connected_peers > E::MAXIMUM_NUMBER_OF_PEERS {
-             debug!("Exceeded maximum number of connected peers");
+        // Obtain the number of connected peers.
+        let number_of_connected_peers = self.number_of_connected_peers().await;
+        // Ensure the number of connected peers is below the maximum threshold.
+        if number_of_connected_peers > E::MAXIMUM_NUMBER_OF_PEERS {
+            debug!("Exceeded maximum number of connected peers");
 
-             // Determine the peers to disconnect from.
-             let num_excess_peers = number_of_connected_peers.saturating_sub(E::MAXIMUM_NUMBER_OF_PEERS);
-             let peer_ips_to_disconnect = self
-                 .connected_peers
-                 .read()
-                 .await
-                 .iter()
-                 .filter(|(peer_ip, _)| {
-                     !E::sync_nodes().contains(peer_ip)
-                         && !E::beacon_nodes().contains(peer_ip)
-                         && !E::trusted_nodes().contains(peer_ip)
-                 })
-                 .take(num_excess_peers)
-                 .map(|(&peer_ip, _)| peer_ip)
-                 .collect::<Vec<SocketAddr>>();
+            // Determine the peers to disconnect from.
+            let num_excess_peers = number_of_connected_peers.saturating_sub(E::MAXIMUM_NUMBER_OF_PEERS);
+            let peer_ips_to_disconnect = self
+                .connected_peers
+                .read()
+                .await
+                .iter()
+                .filter(|(peer_ip, _)| {
+                    !E::sync_nodes().contains(peer_ip) && !E::beacon_nodes().contains(peer_ip) && !E::trusted_nodes().contains(peer_ip)
+                })
+                .take(num_excess_peers)
+                .map(|(&peer_ip, _)| peer_ip)
+                .collect::<Vec<SocketAddr>>();
 
-             // Proceed to send disconnect requests to these peers.
-             for peer_ip in peer_ips_to_disconnect {
-                 info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
-                 self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers)).await;
-                 // Add an entry for this `Peer` in the restricted peers.
-                 self.restricted_peers.write().await.insert(peer_ip, Instant::now());
-             }
-         }
+            // Proceed to send disconnect requests to these peers.
+            for peer_ip in peer_ips_to_disconnect {
+                info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
+                self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers)).await;
+                // Add an entry for this `Peer` in the restricted peers.
+                self.restricted_peers.write().await.insert(peer_ip, Instant::now());
+            }
+        }
 
-         // TODO (howardwu): This logic can be optimized and unified with the context around it.
-         // Determine if the node is connected to more sync nodes than expected.
-         let connected_sync_nodes = self.connected_sync_nodes().await;
-         let number_of_connected_sync_nodes = connected_sync_nodes.len();
-         let num_excess_sync_nodes = number_of_connected_sync_nodes.saturating_sub(1);
-         if num_excess_sync_nodes > 0 {
-             debug!("Exceeded maximum number of sync nodes");
+        // TODO (howardwu): This logic can be optimized and unified with the context around it.
+        // Determine if the node is connected to more sync nodes than expected.
+        let connected_sync_nodes = self.connected_sync_nodes().await;
+        let number_of_connected_sync_nodes = connected_sync_nodes.len();
+        let num_excess_sync_nodes = number_of_connected_sync_nodes.saturating_sub(1);
+        if num_excess_sync_nodes > 0 {
+            debug!("Exceeded maximum number of sync nodes");
 
-             // Proceed to send disconnect requests to these peers.
-             for peer_ip in connected_sync_nodes
-                 .iter()
-                 .copied()
-                 .choose_multiple(&mut OsRng::default(), num_excess_sync_nodes)
-             {
-                 info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
-                 self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers)).await;
-                 // Add an entry for this `Peer` in the restricted peers.
-                 self.restricted_peers.write().await.insert(peer_ip, Instant::now());
-             }
-         }
+            // Proceed to send disconnect requests to these peers.
+            for peer_ip in connected_sync_nodes
+                .iter()
+                .copied()
+                .choose_multiple(&mut OsRng::default(), num_excess_sync_nodes)
+            {
+                info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
+                self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers)).await;
+                // Add an entry for this `Peer` in the restricted peers.
+                self.restricted_peers.write().await.insert(peer_ip, Instant::now());
+            }
+        }
 
-         // Ensure that the trusted nodes are connected.
-         if !E::trusted_nodes().is_empty() {
-             let connected_peers = self.connected_peers().await.into_iter().collect::<HashSet<_>>();
-             let trusted_nodes = E::trusted_nodes();
-             let disconnected_trusted_nodes = trusted_nodes.difference(&connected_peers).copied();
-             for peer_ip in disconnected_trusted_nodes {
-                 // Initialize the connection process.
-                 let (router, handler) = oneshot::channel();
-                 let request = PeersRequest::Connect(
-                     peer_ip,
-                     ledger_reader.clone(),
-                     ledger_router.clone(),
-                     operator_router.clone(),
-                     prover_router.clone(),
-                     router,
-                 );
-                 if let Err(error) = self.peers_router.send(request).await {
-                     warn!("Failed to transmit the request: '{}'", error);
-                 }
+        // Ensure that the trusted nodes are connected.
+        if !E::trusted_nodes().is_empty() {
+            let connected_peers = self.connected_peers().await.into_iter().collect::<HashSet<_>>();
+            let trusted_nodes = E::trusted_nodes();
+            let disconnected_trusted_nodes = trusted_nodes.difference(&connected_peers).copied();
+            for peer_ip in disconnected_trusted_nodes {
+                // Initialize the connection process.
+                let (router, handler) = oneshot::channel();
+                let request = PeersRequest::Connect(
+                    peer_ip,
+                    ledger_reader.clone(),
+                    ledger_router.clone(),
+                    operator_router.clone(),
+                    prover_router.clone(),
+                    router,
+                );
+                if let Err(error) = self.peers_router.send(request).await {
+                    warn!("Failed to transmit the request: '{}'", error);
+                }
 
-                 // Do not wait for the result of each connection.
-                 // Procure a resource id to register the task with, as it might be terminated at any point in time.
-                 let resource_id = E::resources().procure_id();
-                 E::resources().register_task(
-                     Some(resource_id),
-                     task::spawn(async move {
-                         let _ = handler.await;
+                // Do not wait for the result of each connection.
+                // Procure a resource id to register the task with, as it might be terminated at any point in time.
+                let resource_id = E::resources().procure_id();
+                E::resources().register_task(
+                    Some(resource_id),
+                    task::spawn(async move {
+                        let _ = handler.await;
 
-                         E::resources().deregister(resource_id);
-                     }),
-                 );
-             }
-         }
+                        E::resources().deregister(resource_id);
+                    }),
+                );
+            }
+        }
 
-         // Skip if the number of connected peers is above the minimum threshold.
-         match number_of_connected_peers < E::MINIMUM_NUMBER_OF_PEERS {
-             true => {
-                 trace!("Sending request for more peer connections");
-                 // Request more peers if the number of connected peers is below the threshold.
-                 for peer_ip in self.connected_peers().await.iter().choose_multiple(&mut OsRng::default(), 3) {
-                     self.send(*peer_ip, Message::PeerRequest).await;
-                 }
-             }
-             false => return,
-         };
+        // Skip if the number of connected peers is above the minimum threshold.
+        match number_of_connected_peers < E::MINIMUM_NUMBER_OF_PEERS {
+            true => {
+                trace!("Sending request for more peer connections");
+                // Request more peers if the number of connected peers is below the threshold.
+                for peer_ip in self.connected_peers().await.iter().choose_multiple(&mut OsRng::default(), 3) {
+                    self.send(*peer_ip, Message::PeerRequest).await;
+                }
+            }
+            false => return,
+        };
 
-         // Add the sync nodes to the list of candidate peers.
-         if number_of_connected_sync_nodes == 0 {
-             self.add_candidate_peers(E::sync_nodes().iter()).await;
-         }
+        // Add the sync nodes to the list of candidate peers.
+        if number_of_connected_sync_nodes == 0 {
+            self.add_candidate_peers(E::sync_nodes().iter()).await;
+        }
 
-         // Add the beacon nodes to the list of candidate peers.
-         self.add_candidate_peers(E::beacon_nodes().iter()).await;
+        // Add the beacon nodes to the list of candidate peers.
+        self.add_candidate_peers(E::beacon_nodes().iter()).await;
 
-         // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
-         // Select the peers randomly from the list of candidate peers.
-         let midpoint_number_of_peers = E::MINIMUM_NUMBER_OF_PEERS.saturating_add(E::MAXIMUM_NUMBER_OF_PEERS) / 2;
-         for peer_ip in self
-             .candidate_peers()
-             .await
-             .iter()
-             .copied()
-             .choose_multiple(&mut OsRng::default(), midpoint_number_of_peers)
-         {
-             // Ensure this node is not connected to more than the permitted number of sync nodes.
-             if E::sync_nodes().contains(&peer_ip) && number_of_connected_sync_nodes >= 1 {
-                 continue;
-             }
+        // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
+        // Select the peers randomly from the list of candidate peers.
+        let midpoint_number_of_peers = E::MINIMUM_NUMBER_OF_PEERS.saturating_add(E::MAXIMUM_NUMBER_OF_PEERS) / 2;
+        for peer_ip in self
+            .candidate_peers()
+            .await
+            .iter()
+            .copied()
+            .choose_multiple(&mut OsRng::default(), midpoint_number_of_peers)
+        {
+            // Ensure this node is not connected to more than the permitted number of sync nodes.
+            if E::sync_nodes().contains(&peer_ip) && number_of_connected_sync_nodes >= 1 {
+                continue;
+            }
 
-             if !self.is_connected_to(peer_ip).await {
-                 trace!("Attempting connection to {}...", peer_ip);
+            if !self.is_connected_to(peer_ip).await {
+                trace!("Attempting connection to {}...", peer_ip);
 
-                 // Initialize the connection process.
-                 let (router, handler) = oneshot::channel();
-                 let request = PeersRequest::Connect(
-                     peer_ip,
-                     ledger_reader.clone(),
-                     ledger_router.clone(),
-                     operator_router.clone(),
-                     prover_router.clone(),
-                     router,
-                 );
-                 if let Err(error) = self.peers_router.send(request).await {
-                     warn!("Failed to transmit the request: '{}'", error);
-                 }
-                 // Do not wait for the result of each connection.
-                 // Procure a resource id to register the task with, as it might be terminated at any point in time.
-                 let resource_id = E::resources().procure_id();
-                 E::resources().register_task(
-                     Some(resource_id),
-                     task::spawn(async move {
-                         let _ = handler.await;
+                // Initialize the connection process.
+                let (router, handler) = oneshot::channel();
+                let request = PeersRequest::Connect(
+                    peer_ip,
+                    ledger_reader.clone(),
+                    ledger_router.clone(),
+                    operator_router.clone(),
+                    prover_router.clone(),
+                    router,
+                );
+                if let Err(error) = self.peers_router.send(request).await {
+                    warn!("Failed to transmit the request: '{}'", error);
+                }
+                // Do not wait for the result of each connection.
+                // Procure a resource id to register the task with, as it might be terminated at any point in time.
+                let resource_id = E::resources().procure_id();
+                E::resources().register_task(
+                    Some(resource_id),
+                    task::spawn(async move {
+                        let _ = handler.await;
 
-                         E::resources().deregister(resource_id);
-                     }),
-                 );
-             }
-         }
+                        E::resources().deregister(resource_id);
+                    }),
+                );
+            }
+        }
     }
 
     async fn peer_connecting(
