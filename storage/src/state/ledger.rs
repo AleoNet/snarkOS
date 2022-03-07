@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#[cfg(any(test, feature = "test"))]
+use crate::storage::rocksdb::RocksDB;
 use crate::{
     helpers::BlockLocators,
     storage::{DataMap, Map, MapId, Storage},
@@ -1305,6 +1307,11 @@ impl<N: Network> LedgerState<N> {
         bincode::serialize_into(&mut file, &blocks)?;
 
         Ok(())
+    }
+
+    #[cfg(any(test, feature = "test"))]
+    pub fn storage(&self) -> &RocksDB {
+        self.ledger_roots.storage()
     }
 }
 

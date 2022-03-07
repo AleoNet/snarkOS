@@ -15,33 +15,30 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_environment::CurrentNetwork;
-use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
-use snarkvm::prelude::Block;
+use snarkos_storage::{
+    storage::{rocksdb::RocksDB, Storage},
+    LedgerState,
+};
 
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_xorshift::XorShiftRng;
 
-use std::{fs, path::Path};
+use std::path::Path;
 
 const NUM_BLOCKS: usize = 1_000;
-const NUM_CHECKS: usize = 100;
+const NUM_CHECKS: usize = 10;
 
 #[test]
-#[ignore = "takes a while to run (most of which is deserialization)"]
 fn test_ledger_validation() {
-    // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
-    // note: the `blocks_100` and `blocks_1000` files were generated on a testnet2 storage using `LedgerState::dump_blocks`.
-    let mut test_blocks = fs::read(format!("benches/blocks_{}", NUM_BLOCKS)).expect(&format!("Missing the test blocks file"));
-    let blocks: Vec<Block<CurrentNetwork>> = bincode::deserialize(&mut test_blocks).expect("Failed to deserialize a block dump");
-    assert_eq!(blocks.len(), NUM_BLOCKS - 1);
-
     // Prepare a test ledger and an iterator of blocks to insert.
     let temp_dir = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
     {
-        let ledger = LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir, 1).expect("Failed to initialize ledger");
-        for block in &blocks {
-            ledger.add_next_block(block).expect("Failed to add a test block");
-        }
+        let ledger: LedgerState<CurrentNetwork> =
+            LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir, 1).expect("Failed to initialize ledger");
+        ledger
+            .storage()
+            .import("benches/storage_1k_blocks")
+            .expect("Couldn't import the test ledger");
     }
 
     let seed: u64 = thread_rng().gen();

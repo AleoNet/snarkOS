@@ -15,35 +15,35 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_environment::CurrentNetwork;
-use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
-use snarkvm::prelude::Block;
+use snarkos_storage::{
+    storage::{rocksdb::RocksDB, Storage},
+    LedgerState,
+};
 
 use criterion::{criterion_group, criterion_main, Criterion};
 
-use std::{fs, time::Duration};
+use std::time::Duration;
 
-const NUM_BLOCKS: usize = 1_000;
+// This value should be no greater than the number of blocks available in the loaded dump.
+const NUM_BLOCKS: u32 = 1_000;
 
 fn opening(c: &mut Criterion) {
-    // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
-    // note: the `blocks_100` and `blocks_1000` files were generated on a testnet2 storage using `LedgerState::dump_blocks`.
-    let mut test_blocks = fs::read(format!("benches/blocks_{}", NUM_BLOCKS)).expect(&format!("Missing the test blocks file"));
-    let blocks: Vec<Block<CurrentNetwork>> = bincode::deserialize(&mut test_blocks).expect("Failed to deserialize a block dump");
-    assert_eq!(blocks.len(), NUM_BLOCKS - 1);
-
-    // Prepare a test ledger and insert all the test blocks.
     let temp_dir = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
-    {
-        let ledger = LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir, 1).expect("Failed to initialize ledger");
-        for block in &blocks {
-            ledger.add_next_block(block).expect("Failed to add a test block");
-        }
-    }
+    // Create an empty ledger.
+    let ledger: LedgerState<CurrentNetwork> =
+        LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir, 1).expect("Failed to initialize ledger");
+    // Import a dump of a ledger containing 1k blocks.
+    ledger
+        .storage()
+        .import("benches/storage_1k_blocks")
+        .expect("Couldn't import the test ledger");
+    // Drop the ledger, as we will be benchmarking re-opening it.
+    drop(ledger);
 
     c.bench_function("Ledger::open_writer", |b| {
         b.iter(|| {
             let _ledger: LedgerState<CurrentNetwork> =
-                LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir, NUM_BLOCKS as u32).expect("Failed to initialize ledger");
+                LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir, NUM_BLOCKS).expect("Failed to initialize ledger");
         })
     });
 }
