@@ -16,6 +16,14 @@
 
 use snarkos_environment::{Client, ClientTrial, CurrentNetwork, Environment};
 
+pub const ACCEPTED_MESSAGE_IDS: &'static [u16] = &[
+    2, // ChallengeRequest
+    3, // ChallengeResponse
+    4, // Disconnect
+    5, // PeerRequest
+    6, // PeerResponse
+    7, // Ping
+];
 // The interval for revisiting connections.
 pub const CRAWL_INTERVAL_MINS: i64 = 3;
 pub const LOG_INTERVAL_SECS: u64 = 12;

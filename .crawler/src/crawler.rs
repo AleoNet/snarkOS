@@ -163,10 +163,15 @@ impl Crawler {
     }
 }
 
+pub enum InboundMessage {
+    Handled(ClientMessage),
+    Unhandled,
+}
+
 /// Inbound message processing logic for the crawler nodes.
 #[async_trait::async_trait]
 impl Reading for Crawler {
-    type Message = ClientMessage;
+    type Message = InboundMessage;
 
     fn read_message<R: io::Read>(&self, source: SocketAddr, reader: &mut R) -> io::Result<Option<Self::Message>> {
         // FIXME: use the maximum message size allowed by the protocol or (better) use streaming deserialization.
@@ -184,13 +189,17 @@ impl Reading for Crawler {
             return Ok(None);
         }
 
-        // TODO: only partially deserialize the client messages at first; we need to first read the
-        // message id, and immediately reject message types we're not interested in, especially
-        // blocks, txs, pongs and anything else that has deferred deserialization in the true node.
+        // Read the message ID to filter out undesirable messages.
+        let message_id: u16 = bincode::deserialize(&buf[..2]).map_err(|_| io::ErrorKind::InvalidData)?;
+
+        if !ACCEPTED_MESSAGE_IDS.contains(&message_id) {
+            return Ok(Some(InboundMessage::Unhandled));
+        }
+
         match ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len])) {
             Ok(msg) => {
                 debug!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
-                Ok(Some(msg))
+                Ok(Some(InboundMessage::Handled(msg)))
             }
             Err(e) => {
                 error!(parent: self.node().span(), "a message from {} failed to deserialize: {}", source, e);
@@ -200,30 +209,33 @@ impl Reading for Crawler {
     }
 
     async fn process_message(&self, source: SocketAddr, message: Self::Message) -> io::Result<()> {
-        match message {
-            ClientMessage::BlockRequest(_start_block_height, _end_block_height) => {}
-            ClientMessage::BlockResponse(_block) => {}
-            ClientMessage::Disconnect(reason) => {
-                debug!(parent: self.node().span(), "peer {} disconnected for the following reason: {:?}", source, reason);
+        if let InboundMessage::Handled(message) = message {
+            match message {
+                ClientMessage::Disconnect(reason) => {
+                    debug!(parent: self.node().span(), "peer {} disconnected for the following reason: {:?}", source, reason);
+                    Ok(())
+                }
+                ClientMessage::PeerRequest => {
+                    self.process_peer_request(source).await?;
+                    Ok(())
+                }
+                ClientMessage::PeerResponse(peer_ips) => {
+                    self.process_peer_response(source, peer_ips).await?;
+                    Ok(())
+                }
+                ClientMessage::Ping(version, _fork_depth, _peer_type, _peer_state, _block_hash, block_header) => {
+                    // TODO: we should probably manually deserialize the header, as we only need the
+                    // height, and we need to be able to quickly handle any number of such messages
+                    let block_header = block_header.deserialize().await.map_err(|_| io::ErrorKind::InvalidData)?;
+                    self.process_ping(source, version, block_header.height()).await
+                }
+                _ => {
+                    unreachable!();
+                }
             }
-            ClientMessage::PeerRequest => self.process_peer_request(source).await?,
-            ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
-            ClientMessage::Ping(version, _fork_depth, _peer_type, _peer_state, _block_hash, block_header) => {
-                // TODO: we should probably manually deserialize the header, as we only need the
-                // height, and we need to be able to quickly handle any number of such messages
-                let block_header = block_header.deserialize().await.unwrap();
-                self.process_ping(source, version, block_header.height()).await?
-            }
-            ClientMessage::Pong(_is_fork, _block_locators) => {}
-            ClientMessage::UnconfirmedBlock(_block_height, _block_hash, _block) => {}
-            ClientMessage::UnconfirmedTransaction(_transaction) => {}
-            ClientMessage::PoolRegister(_address) => {}
-            ClientMessage::PoolRequest(_share_difficulty, _block_template) => {}
-            ClientMessage::PoolResponse(_address, _nonce, _proof) => {}
-            _ => return Err(io::ErrorKind::InvalidData.into()), // Peer is not following the protocol.
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 }
 
