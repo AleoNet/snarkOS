@@ -23,7 +23,7 @@ use time::OffsetDateTime;
 
 use crate::{
     connection::{nodes_from_connections, Connection},
-    constants::{CRAWL_INTERVAL_MINS, STALE_CONNECTION_CUTOFF_TIME_HRS},
+    constants::*,
 };
 
 /// Node information collected while crawling.
@@ -172,7 +172,7 @@ impl KnownNetwork {
             let mut nodes_g = self.nodes.write();
             for (addr, meta) in nodes_g.iter_mut() {
                 // Disconnect from peers we have received a height and peers for.
-                if meta.last_height.is_some() && meta.received_peer_sets >= 3 {
+                if meta.last_height.is_some() && meta.received_peer_sets >= DESIRED_PEER_SET_COUNT {
                     meta.reset_crawl_state();
                     addrs.insert(*addr);
                 }

@@ -33,3 +33,4 @@ pub const PEER_INTERVAL_SECS: u64 = 10;
 pub const SYNC_NODES: &'static [&'static str] = <ClientTrial<CurrentNetwork>>::SYNC_NODES;
 // Purges connections that haven't been seen within this time (in hours).
 pub const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
+pub const DESIRED_PEER_SET_COUNT: u8 = 3;
