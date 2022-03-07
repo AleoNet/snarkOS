@@ -89,6 +89,17 @@ impl Crawler {
         node
     }
 
+    pub async fn is_connected(&self, addr: SocketAddr) -> bool {
+        !self.node().is_connected(addr)
+            && !self
+                .state
+                .peers
+                .lock()
+                .await
+                .iter()
+                .any(|peer| peer.listening_addr == addr || peer.connected_addr == addr)
+    }
+
     /// Spawns a task dedicated to peer maintenance.
     pub fn update_peers(&self) {
         let node = self.clone();
@@ -103,15 +114,7 @@ impl Crawler {
 
                 // Connect to peers we haven't crawled in a while.
                 for addr in node.known_network.addrs_to_connect().into_iter().take(MAXIMUM_NUMBER_OF_PEERS / 10) {
-                    if !node.node().is_connected(addr)
-                        && !node
-                            .state
-                            .peers
-                            .lock()
-                            .await
-                            .iter()
-                            .any(|peer| peer.listening_addr == addr || peer.connected_addr == addr)
-                    {
+                    if !node.is_connected(addr).await {
                         let node_clone = node.clone();
                         task::spawn(async move {
                             let _ = node_clone.node().connect(addr).await;
@@ -226,34 +229,26 @@ impl Crawler {
         Ok(())
     }
 
-    async fn process_peer_response(&self, source: SocketAddr, mut peer_ips: Vec<SocketAddr>) -> io::Result<()> {
+    async fn process_peer_response(&self, source: SocketAddr, mut peer_addrs: Vec<SocketAddr>) -> io::Result<()> {
         let node = self.clone();
         task::spawn(async move {
-            peer_ips.retain(|addr| node.node().listening_addr().unwrap() != *addr);
+            peer_addrs.retain(|addr| node.node().listening_addr().unwrap() != *addr);
 
             // Insert the address into the known network and update the crawl state.
             if let Some(listening_addr) = node.get_peer_listening_addr(source).await {
-                node.known_network.update_connections(listening_addr, peer_ips.clone());
+                node.known_network.update_connections(listening_addr, peer_addrs.clone());
                 node.known_network.received_peers(listening_addr);
             }
 
-            for peer_ip in peer_ips {
-                if !node.node().is_connected(peer_ip)
-                    && !node
-                        .state
-                        .peers
-                        .lock()
-                        .await
-                        .iter()
-                        .any(|peer| peer.listening_addr == peer_ip || peer.connected_addr == peer_ip)
-                {
-                    debug!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, peer_ip);
+            for addr in peer_addrs {
+                if !node.is_connected(addr).await {
+                    debug!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, addr);
 
                     // Only connect if this address is unknown.
-                    if !node.known_network.nodes().contains_key(&peer_ip) {
+                    if !node.known_network.nodes().contains_key(&addr) {
                         let node_clone = node.clone();
                         task::spawn(async move {
-                            let _ = node_clone.node().connect(peer_ip).await;
+                            let _ = node_clone.node().connect(addr).await;
                         });
                     }
                 }
