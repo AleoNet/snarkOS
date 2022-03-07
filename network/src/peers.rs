@@ -195,21 +195,30 @@ impl<N: Network, E: Environment> Peers<N, E> {
     }
 
     ///
-    /// TODO (howardwu): Make this operation more efficient.
     /// Returns the set of connected sync nodes.
     ///
     pub async fn connected_sync_nodes(&self) -> HashSet<SocketAddr> {
-        let connected_peers: HashSet<SocketAddr> = self.connected_peers.read().await.keys().into_iter().copied().collect();
-        connected_peers.intersection(E::sync_nodes()).copied().collect()
+        let sync_nodes = E::sync_nodes();
+        self.connected_peers
+            .read()
+            .await
+            .keys()
+            .filter(|addr| sync_nodes.contains(addr))
+            .copied()
+            .collect()
     }
 
     ///
-    /// TODO (howardwu): Make this operation more efficient.
     /// Returns the number of connected sync nodes.
     ///
     pub async fn number_of_connected_sync_nodes(&self) -> usize {
-        let connected_peers: HashSet<SocketAddr> = self.connected_peers.read().await.keys().into_iter().copied().collect();
-        connected_peers.intersection(E::sync_nodes()).count()
+        let sync_nodes = E::sync_nodes();
+        self.connected_peers
+            .read()
+            .await
+            .keys()
+            .filter(|addr| sync_nodes.contains(addr))
+            .count()
     }
 
     ///
