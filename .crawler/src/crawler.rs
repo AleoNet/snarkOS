@@ -18,7 +18,7 @@ use crate::{constants::*, known_network::KnownNetwork};
 use snarkos_environment::CurrentNetwork;
 use snarkos_network::Data;
 use snarkos_storage::BlockLocators;
-use snarkos_synthetic_node::{ClientMessage, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
+use snarkos_synthetic_node::{ClientMessage, SynthNode, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
 use snarkvm::traits::Network;
 
 use pea2pea::{
@@ -89,30 +89,6 @@ impl Crawler {
         node
     }
 
-    /// Spawns a task dedicated to broadcasting Ping messages.
-    pub fn send_pings(&self) {
-        let node = self.clone();
-        task::spawn(async move {
-            let genesis = CurrentNetwork::genesis_block();
-            let ping_msg = ClientMessage::Ping(
-                MESSAGE_VERSION,
-                MAXIMUM_FORK_DEPTH,
-                node.node_type(),
-                node.state(),
-                genesis.hash(),
-                Data::Object(genesis.header().clone()),
-            );
-
-            loop {
-                tokio::time::sleep(Duration::from_secs(PING_INTERVAL_SECS)).await;
-                if node.node().num_connected() != 0 {
-                    debug!(parent: node.node().span(), "sending out Pings");
-                    node.send_broadcast(ping_msg.clone()).unwrap();
-                }
-            }
-        });
-    }
-
     /// Spawns a task dedicated to peer maintenance.
     pub fn update_peers(&self) {
         let node = self.clone();
@@ -165,7 +141,6 @@ impl Crawler {
     /// Starts the usual periodic activities of a crawler node.
     pub fn run_periodic_tasks(&self) {
         self.log_known_network();
-        //self.send_pings();
         self.update_peers();
     }
 }
