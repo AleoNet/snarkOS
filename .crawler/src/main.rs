@@ -32,11 +32,13 @@ async fn main() {
     // Enable tracing for the crawler.
     snarkos_synthetic_node::enable_tracing();
 
+    // Register the addresses of the sync nodes.
     for addr in SYNC_NODES {
         let addr = addr.parse().unwrap();
         crawler.known_network.add_node(addr);
     }
 
+    // Start crawling.
     crawler.run_periodic_tasks();
 
     std::future::pending::<()>().await;

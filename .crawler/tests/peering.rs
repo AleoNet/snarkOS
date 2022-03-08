@@ -42,6 +42,9 @@ async fn basics() {
         node.node().connect(*prev_node_addr).await.unwrap();
     }
 
+    // A small delay to make sure all connections are ready.
+    tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+
     // Double-check the topology.
     for (i, node) in test_nodes.iter().enumerate() {
         if i == 0 || i == NUM_NODES - 1 {

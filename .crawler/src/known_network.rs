@@ -15,8 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use parking_lot::RwLock;
+use snarkos_environment::helpers::{NodeType, State};
 use std::{
     collections::{HashMap, HashSet},
+    fmt,
     net::SocketAddr,
 };
 use time::OffsetDateTime;
@@ -26,37 +28,90 @@ use crate::{
     constants::*,
 };
 
+/// The current state of a crawled node.
+#[derive(Debug, Clone)]
+pub struct NodeState {
+    node_type: NodeType,
+    version: u32,
+    height: u32,
+    state: State,
+}
+
+/// A summary of the state of the known nodes.
+#[derive(Clone)]
+#[allow(dead_code)]
+pub struct NetworkSummary {
+    // The number of all known nodes.
+    num_known_nodes: usize,
+    // The number of all known connections.
+    num_known_connections: usize,
+    // The number of nodes that haven't provided their state yet.
+    nodes_pending_state: usize,
+    // The types of nodes and their respective counts.
+    types: HashMap<NodeType, usize>,
+    // The versions of nodes and their respective counts.
+    versions: HashMap<u32, usize>,
+    // The node states of nodes and their respective counts.
+    states: HashMap<State, usize>,
+    // The heights of nodes and their respective counts.
+    heights: HashMap<u32, usize>,
+}
+
+impl fmt::Debug for NetworkSummary {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Network summary")
+            .field("number of known nodes", &self.num_known_nodes)
+            .field("number of known connections", &self.num_known_connections)
+            .field("nodes pending state", &self.nodes_pending_state)
+            .field("types", &self.types)
+            .field("versions", &self.versions)
+            .field("states", &self.states)
+            .finish()
+    }
+}
+
 /// Node information collected while crawling.
 #[derive(Debug, Clone)]
 pub struct NodeMeta {
     #[allow(dead_code)]
     listening_addr: SocketAddr,
-    last_height: Option<u32>,
-    // Set on disconnect.
-    last_crawled: Option<OffsetDateTime>,
-
-    // Useful for keeping track of crawl round state.
+    // The details of the node's state.
+    pub state: Option<NodeState>,
+    // The last connection success/failure timestamp.
+    timestamp: Option<OffsetDateTime>,
+    // The number of lists of peers received from the node.
     received_peer_sets: u8,
+    // The number of subsequent connection failures.
+    connection_failures: u8,
 }
 
 impl NodeMeta {
     fn new(listening_addr: SocketAddr) -> Self {
         Self {
             listening_addr,
-            last_height: None,
-            last_crawled: None,
+            state: None,
+            timestamp: None,
             received_peer_sets: 0,
+            connection_failures: 0,
         }
     }
 
     fn reset_crawl_state(&mut self) {
         self.received_peer_sets = 0;
-        self.last_crawled = Some(OffsetDateTime::now_utc());
+        self.connection_failures = 0;
+        self.timestamp = Some(OffsetDateTime::now_utc());
     }
 
     fn needs_refreshing(&self) -> bool {
-        if let Some(last_crawled) = self.last_crawled {
-            (OffsetDateTime::now_utc() - last_crawled).whole_minutes() > CRAWL_INTERVAL_MINS
+        if let Some(timestamp) = self.timestamp {
+            let crawl_interval = if self.state.is_some() {
+                CRAWL_INTERVAL_MINS
+            } else {
+                // Delay further connection attempts to nodes that are hard to connect to.
+                self.connection_failures as i64
+            };
+
+            (OffsetDateTime::now_utc() - timestamp).whole_minutes() > crawl_interval
         } else {
             true
         }
@@ -78,7 +133,7 @@ impl KnownNetwork {
     }
 
     // More convenient for testing.
-    pub fn update_connections(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
+    fn update_connections(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
         // Rules:
         //  - if a connecton exists already, do nothing.
         //  - if a connection is new, add it.
@@ -132,22 +187,39 @@ impl KnownNetwork {
     }
 
     /// Update the height stored for this particular node.
-    pub fn update_height(&self, source: SocketAddr, height: u32) {
-        if let Some(meta) = self.nodes.write().get_mut(&source) {
-            meta.last_height = Some(height);
-        }
+    pub fn received_ping(&self, source: SocketAddr, node_type: NodeType, version: u32, state: State, height: u32) {
+        let mut nodes = self.nodes.write();
+        let mut meta = nodes.entry(source).or_insert_with(|| NodeMeta::new(source));
+
+        meta.state = Some(NodeState {
+            node_type,
+            version,
+            height,
+            state,
+        });
+        meta.timestamp = Some(OffsetDateTime::now_utc());
     }
 
-    pub fn received_peers(&self, source: SocketAddr) {
-        if let Some(meta) = self.nodes.write().get_mut(&source) {
-            meta.received_peer_sets += 1;
-        }
+    pub fn received_peers(&self, source: SocketAddr, addrs: Vec<SocketAddr>) {
+        self.update_connections(source, addrs);
+
+        let mut nodes = self.nodes.write();
+        let mut meta = nodes.entry(source).or_insert_with(|| NodeMeta::new(source));
+
+        meta.received_peer_sets += 1;
+        meta.timestamp = Some(OffsetDateTime::now_utc());
     }
 
     /// Update the timestamp for this particular node.
-    pub fn update_timestamp(&self, source: SocketAddr) {
+    pub fn update_timestamp(&self, source: SocketAddr, connection_succeeded: bool) {
         if let Some(meta) = self.nodes.write().get_mut(&source) {
-            meta.last_crawled = Some(OffsetDateTime::now_utc());
+            meta.timestamp = Some(OffsetDateTime::now_utc());
+            if connection_succeeded {
+                // Reset the conn failure count when the connection succeeds.
+                meta.connection_failures = 0;
+            } else {
+                meta.connection_failures += 1;
+            }
         }
     }
 
@@ -170,18 +242,18 @@ impl KnownNetwork {
             .collect()
     }
 
-    pub fn addrs_to_disconnect(&self) -> HashSet<SocketAddr> {
-        let mut addrs = HashSet::new();
+    pub fn addrs_to_disconnect(&self) -> Vec<SocketAddr> {
+        let mut peers = self.nodes.write();
 
-        // Scope the write lock.
-        {
-            let mut nodes_g = self.nodes.write();
-            for (addr, meta) in nodes_g.iter_mut() {
-                // Disconnect from peers we have received a height and peers for.
-                if meta.last_height.is_some() && meta.received_peer_sets >= DESIRED_PEER_SET_COUNT {
-                    meta.reset_crawl_state();
-                    addrs.insert(*addr);
-                }
+        // Forget nodes that can't be connected to in case they are offline.
+        peers.retain(|_, meta| meta.connection_failures <= MAX_CONNECTION_FAILURE_COUNT);
+
+        let mut addrs = Vec::new();
+        for (addr, meta) in peers.iter_mut() {
+            // Disconnect from peers we have received the state and sufficient peers from.
+            if meta.state.is_some() && meta.received_peer_sets >= DESIRED_PEER_SET_COUNT {
+                meta.reset_crawl_state();
+                addrs.push(*addr);
             }
         }
 
@@ -206,6 +278,40 @@ impl KnownNetwork {
     /// Returns a snapshot of all the nodes.
     pub fn nodes(&self) -> HashMap<SocketAddr, NodeMeta> {
         self.nodes.read().clone()
+    }
+
+    /// Returns a state summary for the known nodes.
+    pub fn get_node_summary(&self) -> NetworkSummary {
+        let nodes = self.nodes();
+
+        let mut versions = HashMap::with_capacity(nodes.len());
+        let mut states = HashMap::with_capacity(nodes.len());
+        let mut types = HashMap::with_capacity(nodes.len());
+        let mut heights = HashMap::with_capacity(nodes.len());
+        let mut nodes_pending_state: usize = 0;
+
+        for meta in nodes.values() {
+            if let Some(ref state) = meta.state {
+                versions.entry(state.version).and_modify(|count| *count += 1).or_insert(1);
+                states.entry(state.state).and_modify(|count| *count += 1).or_insert(1);
+                types.entry(state.node_type).and_modify(|count| *count += 1).or_insert(1);
+                heights.entry(state.height).and_modify(|count| *count += 1).or_insert(1);
+            } else {
+                nodes_pending_state += 1;
+            }
+        }
+
+        let num_known_connections = self.connections().len();
+
+        NetworkSummary {
+            num_known_nodes: nodes.len(),
+            num_known_connections,
+            nodes_pending_state,
+            versions,
+            heights,
+            states,
+            types,
+        }
     }
 }
 
