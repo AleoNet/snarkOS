@@ -22,7 +22,7 @@ edition = "2021"
 version = "0.1"
 
 [dependencies.pea2pea]
-version = "0.33.0"
+version = "0.34.0"
 
 [dependencies.rand]
 version = "0.8"
