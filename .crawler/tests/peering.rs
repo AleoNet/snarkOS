@@ -14,11 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::time::{Duration, Instant};
-
 use pea2pea::Pea2Pea;
 use snarkos_crawler::crawler::{Crawler, Opts};
-use snarkos_integration::TestNode;
+use snarkos_integration::{wait_until, TestNode};
 
 const NUM_NODES: usize = 10;
 
@@ -65,12 +63,5 @@ async fn basics() {
     // Initialize the crawler.
     crawler.run_periodic_tasks();
 
-    let now = Instant::now();
-    loop {
-        if crawler.node().num_connected() == NUM_NODES {
-            break;
-        }
-        tokio::time::sleep(Duration::from_millis(1)).await;
-        assert!(now.elapsed() <= Duration::from_secs(5), "timed out!");
-    }
+    wait_until!(5, crawler.node().num_connected() == NUM_NODES);
 }

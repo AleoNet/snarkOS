@@ -14,9 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::wait_until;
-
-use snarkos_integration::{ClientNode, TestNode};
+use snarkos_integration::{wait_until, ClientNode, TestNode};
 use snarkos_metrics as metrics;
 
 use pea2pea::Pea2Pea;

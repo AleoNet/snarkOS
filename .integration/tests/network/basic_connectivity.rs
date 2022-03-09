@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{common::spawn_test_node_with_nonce, wait_until};
-use snarkos_integration::{ClientNode, TestNode, MAXIMUM_NUMBER_OF_PEERS};
+use crate::common::spawn_test_node_with_nonce;
+use snarkos_integration::{wait_until, ClientNode, TestNode, MAXIMUM_NUMBER_OF_PEERS};
 
 use pea2pea::Pea2Pea;
 use std::sync::{
