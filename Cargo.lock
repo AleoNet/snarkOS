@@ -2667,10 +2667,12 @@ name = "snarkos-crawler"
 version = "2.0.2"
 dependencies = [
  "async-trait",
+ "bincode",
  "parking_lot 0.12.0",
  "pea2pea",
  "rand",
  "snarkos-environment",
+ "snarkos-integration",
  "snarkos-metrics",
  "snarkos-network",
  "snarkos-storage",
@@ -2680,6 +2682,7 @@ dependencies = [
  "time 0.3.7",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]

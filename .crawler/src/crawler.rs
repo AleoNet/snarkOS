@@ -18,7 +18,7 @@ use crate::{constants::*, known_network::KnownNetwork};
 use snarkos_environment::CurrentNetwork;
 use snarkos_network::Data;
 use snarkos_storage::BlockLocators;
-use snarkos_synthetic_node::{ClientMessage, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
+use snarkos_synthetic_node::{ClientMessage, SynthNode, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
 use snarkvm::traits::Network;
 
 use pea2pea::{
@@ -27,7 +27,7 @@ use pea2pea::{
     Node as Pea2PeaNode,
     Pea2Pea,
 };
-use rand::seq::IteratorRandom;
+use rand::{rngs::SmallRng, seq::IteratorRandom, SeedableRng};
 use std::{convert::TryInto, io, net::SocketAddr, ops::Deref, sync::Arc, time::Duration};
 use structopt::StructOpt;
 use tokio::task;
@@ -67,6 +67,7 @@ impl Crawler {
     /// Creates a crawler node with the most basic network protocols enabled.
     pub async fn new(opts: Opts) -> Self {
         let config = Config {
+            name: Some("snarkOS crawler".into()),
             listener_ip: Some(opts.node.ip()),
             desired_listening_port: Some(opts.node.port()),
             max_connections: MAXIMUM_NUMBER_OF_PEERS as u16,
@@ -89,28 +90,31 @@ impl Crawler {
         node
     }
 
-    /// Spawns a task dedicated to broadcasting Ping messages.
-    pub fn send_pings(&self) {
-        let node = self.clone();
-        task::spawn(async move {
-            let genesis = CurrentNetwork::genesis_block();
-            let ping_msg = ClientMessage::Ping(
-                MESSAGE_VERSION,
-                MAXIMUM_FORK_DEPTH,
-                node.node_type(),
-                node.state(),
-                genesis.hash(),
-                Data::Object(genesis.header().clone()),
-            );
+    fn rng(&self) -> SmallRng {
+        SmallRng::from_entropy()
+    }
 
-            loop {
-                tokio::time::sleep(Duration::from_secs(PING_INTERVAL_SECS)).await;
-                if node.node().num_connected() != 0 {
-                    debug!(parent: node.node().span(), "sending out Pings");
-                    node.send_broadcast(ping_msg.clone()).unwrap();
+    pub async fn is_connected(&self, addr: SocketAddr) -> bool {
+        // Handshakes can take a while.
+        if self.node().is_connecting(addr) {
+            return true;
+        }
+
+        let connected_addrs = self.node().connected_addrs();
+
+        self.state
+            .peers
+            .lock()
+            .await
+            .iter()
+            .filter_map(|peer| {
+                if peer.listening_addr == addr || peer.connected_addr == addr {
+                    Some(addr)
+                } else {
+                    None
                 }
-            }
-        });
+            })
+            .any(|addr| connected_addrs.contains(&addr))
     }
 
     /// Spawns a task dedicated to peer maintenance.
@@ -126,24 +130,25 @@ impl Crawler {
                 }
 
                 // Connect to peers we haven't crawled in a while.
-                for addr in node.known_network.addrs_to_connect().into_iter().take(MAXIMUM_NUMBER_OF_PEERS / 10) {
-                    if !node.node().is_connected(addr)
-                        && !node
-                            .state
-                            .peers
-                            .lock()
-                            .await
-                            .iter()
-                            .any(|peer| peer.listening_addr == addr || peer.connected_addr == addr)
-                    {
+                for addr in node
+                    .known_network
+                    .addrs_to_connect()
+                    .into_iter()
+                    .choose_multiple(&mut node.rng(), NUM_CONCURRENT_CONNECTION_ATTEMPTS as usize)
+                {
+                    if !node.is_connected(addr).await {
                         let node_clone = node.clone();
                         task::spawn(async move {
-                            let _ = node_clone.node().connect(addr).await;
+                            if node_clone.node().connect(addr).await.is_ok() {
+                                let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
+                            } else {
+                                node_clone.known_network.update_timestamp(addr);
+                            }
                         });
                     }
                 }
 
-                debug!(parent: node.node().span(), "crawling the netowrk for more peers; asking peers for their peers");
+                debug!(parent: node.node().span(), "crawling the network for more peers; asking peers for their peers");
                 node.send_broadcast(ClientMessage::PeerRequest).unwrap();
                 tokio::time::sleep(Duration::from_secs(PEER_INTERVAL_SECS)).await;
             }
@@ -165,15 +170,19 @@ impl Crawler {
     /// Starts the usual periodic activities of a crawler node.
     pub fn run_periodic_tasks(&self) {
         self.log_known_network();
-        //self.send_pings();
         self.update_peers();
     }
+}
+
+pub enum InboundMessage {
+    Handled(ClientMessage),
+    Unhandled,
 }
 
 /// Inbound message processing logic for the crawler nodes.
 #[async_trait::async_trait]
 impl Reading for Crawler {
-    type Message = ClientMessage;
+    type Message = InboundMessage;
 
     fn read_message<R: io::Read>(&self, source: SocketAddr, reader: &mut R) -> io::Result<Option<Self::Message>> {
         // FIXME: use the maximum message size allowed by the protocol or (better) use streaming deserialization.
@@ -191,13 +200,17 @@ impl Reading for Crawler {
             return Ok(None);
         }
 
-        // TODO: only partially deserialize the client messages at first; we need to first read the
-        // message id, and immediately reject message types we're not interested in, especially
-        // blocks, txs, pongs and anything else that has deferred deserialization in the true node.
+        // Read the message ID to filter out undesirable messages.
+        let message_id: u16 = bincode::deserialize(&buf[..2]).map_err(|_| io::ErrorKind::InvalidData)?;
+
+        if !ACCEPTED_MESSAGE_IDS.contains(&message_id) {
+            return Ok(Some(InboundMessage::Unhandled));
+        }
+
         match ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len])) {
             Ok(msg) => {
                 debug!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
-                Ok(Some(msg))
+                Ok(Some(InboundMessage::Handled(msg)))
             }
             Err(e) => {
                 error!(parent: self.node().span(), "a message from {} failed to deserialize: {}", source, e);
@@ -207,30 +220,33 @@ impl Reading for Crawler {
     }
 
     async fn process_message(&self, source: SocketAddr, message: Self::Message) -> io::Result<()> {
-        match message {
-            ClientMessage::BlockRequest(_start_block_height, _end_block_height) => {}
-            ClientMessage::BlockResponse(_block) => {}
-            ClientMessage::Disconnect(reason) => {
-                debug!(parent: self.node().span(), "peer {} disconnected for the following reason: {:?}", source, reason);
+        if let InboundMessage::Handled(message) = message {
+            match message {
+                ClientMessage::Disconnect(reason) => {
+                    debug!(parent: self.node().span(), "peer {} disconnected for the following reason: {:?}", source, reason);
+                    Ok(())
+                }
+                ClientMessage::PeerRequest => {
+                    self.process_peer_request(source).await?;
+                    Ok(())
+                }
+                ClientMessage::PeerResponse(peer_ips) => {
+                    self.process_peer_response(source, peer_ips).await?;
+                    Ok(())
+                }
+                ClientMessage::Ping(version, _fork_depth, _peer_type, _peer_state, _block_hash, block_header) => {
+                    // TODO: we should probably manually deserialize the header, as we only need the
+                    // height, and we need to be able to quickly handle any number of such messages
+                    let block_header = block_header.deserialize().await.map_err(|_| io::ErrorKind::InvalidData)?;
+                    self.process_ping(source, version, block_header.height()).await
+                }
+                _ => {
+                    unreachable!();
+                }
             }
-            ClientMessage::PeerRequest => self.process_peer_request(source).await?,
-            ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
-            ClientMessage::Ping(version, _fork_depth, _peer_type, _peer_state, _block_hash, block_header) => {
-                // TODO: we should probably manually deserialize the header, as we only need the
-                // height, and we need to be able to quickly handle any number of such messages
-                let block_header = block_header.deserialize().await.unwrap();
-                self.process_ping(source, version, block_header.height()).await?
-            }
-            ClientMessage::Pong(_is_fork, _block_locators) => {}
-            ClientMessage::UnconfirmedBlock(_block_height, _block_hash, _block) => {}
-            ClientMessage::UnconfirmedTransaction(_transaction) => {}
-            ClientMessage::PoolRegister(_address) => {}
-            ClientMessage::PoolRequest(_share_difficulty, _block_template) => {}
-            ClientMessage::PoolResponse(_address, _nonce, _proof) => {}
-            _ => return Err(io::ErrorKind::InvalidData.into()), // Peer is not following the protocol.
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 }
 
@@ -242,7 +258,7 @@ impl Crawler {
             .nodes()
             .into_iter()
             .map(|(addr, _)| addr)
-            .choose_multiple(&mut rand::thread_rng(), 10);
+            .choose_multiple(&mut self.rng(), 10);
         let msg = ClientMessage::PeerResponse(peers);
         debug!(parent: self.node().span(), "sending a PeerResponse to {}", source);
 
@@ -251,34 +267,30 @@ impl Crawler {
         Ok(())
     }
 
-    async fn process_peer_response(&self, source: SocketAddr, mut peer_ips: Vec<SocketAddr>) -> io::Result<()> {
+    async fn process_peer_response(&self, source: SocketAddr, mut peer_addrs: Vec<SocketAddr>) -> io::Result<()> {
         let node = self.clone();
         task::spawn(async move {
-            peer_ips.retain(|addr| node.node().listening_addr().unwrap() != *addr);
+            peer_addrs.retain(|addr| node.node().listening_addr().unwrap() != *addr);
 
             // Insert the address into the known network and update the crawl state.
             if let Some(listening_addr) = node.get_peer_listening_addr(source).await {
-                node.known_network.update_connections(listening_addr, peer_ips.clone());
+                node.known_network.update_connections(listening_addr, peer_addrs.clone());
                 node.known_network.received_peers(listening_addr);
             }
 
-            for peer_ip in peer_ips {
-                if !node.node().is_connected(peer_ip)
-                    && !node
-                        .state
-                        .peers
-                        .lock()
-                        .await
-                        .iter()
-                        .any(|peer| peer.listening_addr == peer_ip || peer.connected_addr == peer_ip)
-                {
-                    debug!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, peer_ip);
+            for addr in peer_addrs {
+                if !node.is_connected(addr).await {
+                    debug!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, addr);
 
-                    // Only connect if this address is unknown.
-                    if !node.known_network.nodes().contains_key(&peer_ip) {
+                    // Only connect if this address needs to be crawled.
+                    if node.known_network.should_be_connected_to(addr) {
                         let node_clone = node.clone();
                         task::spawn(async move {
-                            let _ = node_clone.node().connect(peer_ip).await;
+                            if node_clone.node().connect(addr).await.is_ok() {
+                                let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
+                            } else {
+                                node_clone.known_network.update_timestamp(addr);
+                            }
                         });
                     }
                 }

@@ -16,13 +16,22 @@
 
 use snarkos_environment::{Client, ClientTrial, CurrentNetwork, Environment};
 
+pub const ACCEPTED_MESSAGE_IDS: &'static [u16] = &[
+    2, // ChallengeRequest
+    3, // ChallengeResponse
+    4, // Disconnect
+    5, // PeerRequest
+    6, // PeerResponse
+    7, // Ping
+];
 // The interval for revisiting connections.
 pub const CRAWL_INTERVAL_MINS: i64 = 3;
 pub const LOG_INTERVAL_SECS: u64 = 12;
 pub const MAXIMUM_NUMBER_OF_PEERS: usize = 1000;
 pub const MESSAGE_VERSION: u32 = <Client<CurrentNetwork>>::MESSAGE_VERSION;
-pub const PING_INTERVAL_SECS: u64 = 5;
 pub const PEER_INTERVAL_SECS: u64 = 10;
 pub const SYNC_NODES: &'static [&'static str] = <ClientTrial<CurrentNetwork>>::SYNC_NODES;
 // Purges connections that haven't been seen within this time (in hours).
 pub const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
+pub const DESIRED_PEER_SET_COUNT: u8 = 3;
+pub const NUM_CONCURRENT_CONNECTION_ATTEMPTS: u8 = 20;

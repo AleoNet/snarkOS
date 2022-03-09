@@ -23,7 +23,7 @@ use time::OffsetDateTime;
 
 use crate::{
     connection::{nodes_from_connections, Connection},
-    constants::{CRAWL_INTERVAL_MINS, STALE_CONNECTION_CUTOFF_TIME_HRS},
+    constants::*,
 };
 
 /// Node information collected while crawling.
@@ -51,8 +51,15 @@ impl NodeMeta {
 
     fn reset_crawl_state(&mut self) {
         self.received_peer_sets = 0;
-
         self.last_crawled = Some(OffsetDateTime::now_utc());
+    }
+
+    fn needs_refreshing(&self) -> bool {
+        if let Some(last_crawled) = self.last_crawled {
+            (OffsetDateTime::now_utc() - last_crawled).whole_minutes() > CRAWL_INTERVAL_MINS
+        } else {
+            true
+        }
     }
 }
 
@@ -137,18 +144,28 @@ impl KnownNetwork {
         }
     }
 
+    /// Update the timestamp for this particular node.
+    pub fn update_timestamp(&self, source: SocketAddr) {
+        if let Some(meta) = self.nodes.write().get_mut(&source) {
+            meta.last_crawled = Some(OffsetDateTime::now_utc());
+        }
+    }
+
+    /// Checks if the given address should be (re)connected to.
+    pub fn should_be_connected_to(&self, addr: SocketAddr) -> bool {
+        if let Some(meta) = self.nodes.read().get(&addr) {
+            meta.needs_refreshing()
+        } else {
+            true
+        }
+    }
+
     pub fn addrs_to_connect(&self) -> HashSet<SocketAddr> {
         // Snapshot is safe to use as disconnected peers won't have their state updated at the
         // moment.
         self.nodes()
             .iter()
-            .filter(|(_, meta)| {
-                if let Some(last_crawled) = meta.last_crawled {
-                    (OffsetDateTime::now_utc() - last_crawled).whole_minutes() > CRAWL_INTERVAL_MINS
-                } else {
-                    true
-                }
-            })
+            .filter(|(_, meta)| meta.needs_refreshing())
             .map(|(&addr, _)| addr)
             .collect()
     }
@@ -161,7 +178,7 @@ impl KnownNetwork {
             let mut nodes_g = self.nodes.write();
             for (addr, meta) in nodes_g.iter_mut() {
                 // Disconnect from peers we have received a height and peers for.
-                if meta.last_height.is_some() && meta.received_peer_sets >= 3 {
+                if meta.last_height.is_some() && meta.received_peer_sets >= DESIRED_PEER_SET_COUNT {
                     meta.reset_crawl_state();
                     addrs.insert(*addr);
                 }

@@ -32,7 +32,7 @@ pub struct Connection {
     pub source: SocketAddr,
     /// The other side of the connection.
     pub target: SocketAddr,
-    /// The last time this peer was seen by the crawler (used determine which connections are
+    /// The last time this peer was seen by the crawler (used to determine which connections are
     /// likely stale).
     pub last_seen: OffsetDateTime,
 }
