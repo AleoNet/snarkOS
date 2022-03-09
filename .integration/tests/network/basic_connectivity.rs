@@ -48,7 +48,7 @@ async fn test_nodes_can_connect_to_each_other() {
     test_node1.node().connect(test_node0_addr).await.unwrap();
 
     // Ensure that both nodes have an active connection now.
-    assert!(test_node0.node().num_connected() == 1 && test_node1.node().num_connected() == 1);
+    wait_until!(1, test_node0.node().num_connected() == 1 && test_node1.node().num_connected() == 1);
 }
 
 #[tokio::test]
@@ -81,7 +81,7 @@ async fn handshake_as_responder_works() {
     test_node.node().connect(client_node.local_addr()).await.unwrap();
 
     // Double-check with the snarkOS node.
-    assert!(client_node.connected_peers().await.len() == 1)
+    wait_until!(1, client_node.connected_peers().await.len() == 1);
 }
 
 #[tokio::test]

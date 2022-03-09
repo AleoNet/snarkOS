@@ -17,7 +17,7 @@
 use serde::{Deserialize, Serialize};
 use std::fmt;
 
-#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[repr(u8)]
 pub enum NodeType {
     /// A client node is a full node, capable of sending and receiving blocks.

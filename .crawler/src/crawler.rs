@@ -15,10 +15,13 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{constants::*, known_network::KnownNetwork};
-use snarkos_environment::CurrentNetwork;
+use snarkos_environment::{
+    helpers::{NodeType, State},
+    CurrentNetwork,
+};
 use snarkos_network::Data;
 use snarkos_storage::BlockLocators;
-use snarkos_synthetic_node::{ClientMessage, SynthNode, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
+use snarkos_synthetic_node::{ClientMessage, SynthNode, MESSAGE_LENGTH_PREFIX_SIZE};
 use snarkvm::traits::Network;
 
 use pea2pea::{
@@ -28,7 +31,14 @@ use pea2pea::{
     Pea2Pea,
 };
 use rand::{rngs::SmallRng, seq::IteratorRandom, SeedableRng};
-use std::{convert::TryInto, io, net::SocketAddr, ops::Deref, sync::Arc, time::Duration};
+use std::{
+    convert::TryInto,
+    io::{self, Read},
+    net::SocketAddr,
+    ops::Deref,
+    sync::Arc,
+    time::Duration,
+};
 use structopt::StructOpt;
 use tokio::task;
 use tracing::*;
@@ -43,6 +53,7 @@ pub struct Opts {
     pub node: SocketAddr,
 }
 
+/// Represents the crawler together with network metrics it has collected.
 #[derive(Clone)]
 pub struct Crawler {
     synth_node: SynthNode,
@@ -64,14 +75,15 @@ impl Deref for Crawler {
 }
 
 impl Crawler {
-    /// Creates a crawler node with the most basic network protocols enabled.
+    /// Creates the crawler with the given configuration.
     pub async fn new(opts: Opts) -> Self {
         let config = Config {
             name: Some("snarkOS crawler".into()),
             listener_ip: Some(opts.node.ip()),
             desired_listening_port: Some(opts.node.port()),
             max_connections: MAXIMUM_NUMBER_OF_PEERS as u16,
-            max_handshake_time_ms: 5_000,
+            max_handshake_time_ms: MAX_HANDSHAKE_TIME_MS,
+            read_buffer_size: READ_BUFFER_SIZE,
             ..Default::default()
         };
 
@@ -90,31 +102,22 @@ impl Crawler {
         node
     }
 
+    /// Returns the randomness used by the crawler.
     fn rng(&self) -> SmallRng {
+        // TODO: should be good enough, but double-check if it's not too slow
         SmallRng::from_entropy()
     }
 
-    pub async fn is_connected(&self, addr: SocketAddr) -> bool {
-        // Handshakes can take a while.
-        if self.node().is_connecting(addr) {
+    /// Checks whether the crawler is already connected or connecting to the given address.
+    pub fn is_connected(&self, addr: SocketAddr) -> bool {
+        // Handshakes can take a while, so check connecting addresses too.
+        // note: these take care of connected addresses
+        if self.node().is_connecting(addr) || self.node().is_connected(addr) {
             return true;
         }
 
-        let connected_addrs = self.node().connected_addrs();
-
-        self.state
-            .peers
-            .lock()
-            .await
-            .iter()
-            .filter_map(|peer| {
-                if peer.listening_addr == addr || peer.connected_addr == addr {
-                    Some(addr)
-                } else {
-                    None
-                }
-            })
-            .any(|addr| connected_addrs.contains(&addr))
+        // note: this takes care of listening addresses
+        self.state.peers.read().contains_key(&addr)
     }
 
     /// Spawns a task dedicated to peer maintenance.
@@ -122,27 +125,34 @@ impl Crawler {
         let node = self.clone();
         task::spawn(async move {
             loop {
-                // Disconnect from peers we have just crawled.
-                for addr in node.known_network.addrs_to_disconnect() {
-                    if let Some(addr) = node.get_peer_connected_addr(addr).await {
-                        node.node().disconnect(addr).await;
+                // Disconnect from peers that we've collected sufficient information on or that have become stale.
+                let addrs_to_disconnect = node.known_network.addrs_to_disconnect();
+                for addr in &addrs_to_disconnect {
+                    if let Some(addr) = node.get_peer_connected_addr(*addr) {
+                        let node_clone = node.clone();
+                        task::spawn(async move {
+                            node_clone.node().disconnect(addr).await;
+                        });
                     }
                 }
 
                 // Connect to peers we haven't crawled in a while.
-                for addr in node
-                    .known_network
-                    .addrs_to_connect()
+                let addrs_to_connect = node.known_network.addrs_to_connect();
+                for addr in addrs_to_connect
                     .into_iter()
+                    // FIXME: Figure out how to get rid of this overlap.
+                    .filter(|addr| !addrs_to_disconnect.contains(addr))
                     .choose_multiple(&mut node.rng(), NUM_CONCURRENT_CONNECTION_ATTEMPTS as usize)
                 {
-                    if !node.is_connected(addr).await {
+                    if !node.is_connected(addr) {
                         let node_clone = node.clone();
                         task::spawn(async move {
                             if node_clone.node().connect(addr).await.is_ok() {
+                                // Immediately ask for the new peer's peers.
                                 let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
+                                node_clone.known_network.update_timestamp(addr, true);
                             } else {
-                                node_clone.known_network.update_timestamp(addr);
+                                node_clone.known_network.update_timestamp(addr, false);
                             }
                         });
                     }
@@ -150,18 +160,18 @@ impl Crawler {
 
                 debug!(parent: node.node().span(), "crawling the network for more peers; asking peers for their peers");
                 node.send_broadcast(ClientMessage::PeerRequest).unwrap();
-                tokio::time::sleep(Duration::from_secs(PEER_INTERVAL_SECS)).await;
+                tokio::time::sleep(Duration::from_secs(PEER_UPDATE_INTERVAL_SECS)).await;
             }
         });
     }
 
+    /// Spawns a task printing the desired crawling information in the logs.
     fn log_known_network(&self) {
         let node = self.clone();
         tokio::spawn(async move {
             loop {
-                info!(parent: node.node().span(), "current peers: {}", node.node().num_connected());
-                info!(parent: node.node().span(), "known addresses: {}", node.known_network.nodes().len());
-                info!(parent: node.node().span(), "known connections: {}", node.known_network.connections().len());
+                info!(parent: node.node().span(), "connected peers: {}", node.node().num_connected());
+                info!(parent: node.node().span(), "\n{:#?}", node.known_network.get_node_summary());
                 tokio::time::sleep(Duration::from_secs(LOG_INTERVAL_SECS)).await;
             }
         });
@@ -174,9 +184,10 @@ impl Crawler {
     }
 }
 
+/// A wrapper type for inbound messages, allowing the crawler to immediately reject undesired ones.
 pub enum InboundMessage {
     Handled(ClientMessage),
-    Unhandled,
+    Unhandled(u16),
 }
 
 /// Inbound message processing logic for the crawler nodes.
@@ -184,29 +195,52 @@ pub enum InboundMessage {
 impl Reading for Crawler {
     type Message = InboundMessage;
 
+    // This implementation is slightly low-level in order to discard unwanted messages without a performance penalty.
     fn read_message<R: io::Read>(&self, source: SocketAddr, reader: &mut R) -> io::Result<Option<Self::Message>> {
-        // FIXME: use the maximum message size allowed by the protocol or (better) use streaming deserialization.
-        let mut buf = [0u8; 64 * 1024];
+        // The read buffer should be just enough to read the longest expected message.
+        let mut buf = [0u8; READ_BUFFER_SIZE];
 
-        reader.read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE])?;
-        let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
+        // Read the length of the inbound message.
+        let read_len = reader.read(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE])?;
 
-        if len > buf.len() {
-            error!(parent: self.node().span(), "a message from {} is too large ({}B)", source, len);
-            return Err(io::ErrorKind::InvalidData.into());
+        // This is unlikely, but mark the message as incomplete if too few bytes are available.
+        if read_len < 2 {
+            return Ok(None);
         }
 
-        if reader.read_exact(&mut buf[..len]).is_err() {
+        // Read the message's length.
+        let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
+
+        // Only read the message ID first.
+        let read_len = reader.read(&mut buf[..2])?;
+
+        // This is unlikely, but mark the message as incomplete if too few bytes are available.
+        if read_len < 2 {
             return Ok(None);
         }
 
         // Read the message ID to filter out undesirable messages.
         let message_id: u16 = bincode::deserialize(&buf[..2]).map_err(|_| io::ErrorKind::InvalidData)?;
 
-        if !ACCEPTED_MESSAGE_IDS.contains(&message_id) {
-            return Ok(Some(InboundMessage::Unhandled));
+        // Discard unwanted messages and those longer than the buffer's capacity.
+        if !ACCEPTED_MESSAGE_IDS.contains(&message_id) || len > buf.len() {
+            // Advance the reader to discard the unwanted bytes.
+            let read_len = io::copy(&mut reader.take(len as u64 - 2), &mut io::sink())?;
+            if read_len != len as u64 - 2 {
+                return Ok(None);
+            }
+            return Ok(Some(InboundMessage::Unhandled(message_id)));
         }
 
+        // Read the remaining number of bytes indicated by the length prefix.
+        let read_len = reader.read(&mut buf[2..][..len - 2])?;
+
+        // This one is likely: mark the message as incomplete if it's lacking bytes.
+        if read_len != len - 2 {
+            return Ok(None);
+        }
+
+        // Only deserialize the desired messages.
         match ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len])) {
             Ok(msg) => {
                 debug!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
@@ -227,59 +261,64 @@ impl Reading for Crawler {
                     Ok(())
                 }
                 ClientMessage::PeerRequest => {
-                    self.process_peer_request(source).await?;
+                    self.process_peer_request(source)?;
                     Ok(())
                 }
                 ClientMessage::PeerResponse(peer_ips) => {
-                    self.process_peer_response(source, peer_ips).await?;
+                    self.process_peer_response(source, peer_ips)?;
                     Ok(())
                 }
-                ClientMessage::Ping(version, _fork_depth, _peer_type, _peer_state, _block_hash, block_header) => {
+                ClientMessage::Ping(version, _fork_depth, node_type, state, _block_hash, block_header) => {
                     // TODO: we should probably manually deserialize the header, as we only need the
                     // height, and we need to be able to quickly handle any number of such messages
                     let block_header = block_header.deserialize().await.map_err(|_| io::ErrorKind::InvalidData)?;
-                    self.process_ping(source, version, block_header.height()).await
+                    self.process_ping(source, node_type, version, state, block_header.height())
                 }
                 _ => {
                     unreachable!();
                 }
             }
-        } else {
+        } else if let InboundMessage::Unhandled(id) = message {
+            if ACCEPTED_MESSAGE_IDS.contains(&id) {
+                warn!(parent: self.node().span(), "rejected an unexpected message (ID: {}); double-check the buffer size", id);
+            }
+
             Ok(())
+        } else {
+            unreachable!();
         }
     }
 }
 
 // Helper methods.
 impl Crawler {
-    async fn process_peer_request(&self, source: SocketAddr) -> io::Result<()> {
+    fn process_peer_request(&self, source: SocketAddr) -> io::Result<()> {
         let peers = self
             .known_network
             .nodes()
             .into_iter()
+            .filter(|(_, meta)| meta.state.is_some())
             .map(|(addr, _)| addr)
-            .choose_multiple(&mut self.rng(), 10);
-        let msg = ClientMessage::PeerResponse(peers);
-        debug!(parent: self.node().span(), "sending a PeerResponse to {}", source);
+            .choose_multiple(&mut self.rng(), SHARED_PEER_COUNT);
 
-        self.send_direct_message(source, msg)?;
+        debug!(parent: self.node().span(), "sending a PeerResponse to {}", source);
+        self.send_direct_message(source, ClientMessage::PeerResponse(peers))?;
 
         Ok(())
     }
 
-    async fn process_peer_response(&self, source: SocketAddr, mut peer_addrs: Vec<SocketAddr>) -> io::Result<()> {
+    fn process_peer_response(&self, source: SocketAddr, mut peer_addrs: Vec<SocketAddr>) -> io::Result<()> {
         let node = self.clone();
         task::spawn(async move {
             peer_addrs.retain(|addr| node.node().listening_addr().unwrap() != *addr);
 
             // Insert the address into the known network and update the crawl state.
-            if let Some(listening_addr) = node.get_peer_listening_addr(source).await {
-                node.known_network.update_connections(listening_addr, peer_addrs.clone());
-                node.known_network.received_peers(listening_addr);
+            if let Some(listening_addr) = node.get_peer_listening_addr(source) {
+                node.known_network.received_peers(listening_addr, peer_addrs.clone());
             }
 
             for addr in peer_addrs {
-                if !node.is_connected(addr).await {
+                if !node.is_connected(addr) {
                     debug!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, addr);
 
                     // Only connect if this address needs to be crawled.
@@ -287,9 +326,12 @@ impl Crawler {
                         let node_clone = node.clone();
                         task::spawn(async move {
                             if node_clone.node().connect(addr).await.is_ok() {
+                                node_clone.known_network.update_timestamp(addr, true);
+
+                                // Immediately ask for the new peer's peers.
                                 let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
                             } else {
-                                node_clone.known_network.update_timestamp(addr);
+                                node_clone.known_network.update_timestamp(addr, false);
                             }
                         });
                     }
@@ -300,20 +342,15 @@ impl Crawler {
         Ok(())
     }
 
-    async fn process_ping(&self, source: SocketAddr, version: u32, block_height: u32) -> io::Result<()> {
-        // Ensure the message protocol version is not outdated.
-        // TODO: we should probably maintain a detailed list of non-compliant peers so we can
-        // report their numbers and reasons for non-compliance with the protocol.
-        if version < MESSAGE_VERSION {
-            warn!(parent: self.node().span(), "dropping {} due to outdated version ({})", source, version);
-            return Err(io::ErrorKind::InvalidData.into());
-        }
+    fn process_ping(&self, source: SocketAddr, node_type: NodeType, version: u32, state: State, block_height: u32) -> io::Result<()> {
+        // Don't reject non-compliant peers in order to have the fullest image of the network.
 
         debug!(parent: self.node().span(), "peer {} is at height {}", source, block_height);
 
         // Update the known network nodes and update the crawl state.
-        if let Some(listening_addr) = self.get_peer_listening_addr(source).await {
-            self.known_network.update_height(listening_addr, block_height);
+        if let Some(listening_addr) = self.get_peer_listening_addr(source) {
+            self.known_network
+                .received_ping(listening_addr, node_type, version, state, block_height);
         }
 
         let genesis = CurrentNetwork::genesis_block();
@@ -327,7 +364,6 @@ impl Crawler {
         );
 
         debug!(parent: self.node().span(), "sending a Pong to {}", source);
-
         self.send_direct_message(source, msg)?;
 
         Ok(())

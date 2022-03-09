@@ -2809,6 +2809,7 @@ name = "snarkos-synthetic-node"
 version = "2.0.2"
 dependencies = [
  "async-trait",
+ "parking_lot 0.12.0",
  "pea2pea",
  "rand",
  "snarkos-environment",

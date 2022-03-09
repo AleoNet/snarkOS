@@ -23,7 +23,7 @@ use std::{
     },
 };
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[repr(u8)]
 pub enum State {
     /// The ledger is ready to handle requests.

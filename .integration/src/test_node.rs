@@ -14,7 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_environment::{Client, CurrentNetwork, Environment};
+use snarkos_environment::{
+    helpers::{NodeType, State},
+    Client,
+    CurrentNetwork,
+    Environment,
+};
 use snarkos_network::Data;
 use snarkos_storage::BlockLocators;
 use snarkos_synthetic_node::{ClientMessage, ClientState, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
@@ -94,8 +99,8 @@ impl TestNode {
             let ping_msg = ClientMessage::Ping(
                 MESSAGE_VERSION,
                 MAXIMUM_FORK_DEPTH,
-                node.node_type(),
-                node.state(),
+                NodeType::Client,
+                State::Ready,
                 genesis.hash(),
                 Data::Object(genesis.header().clone()),
             );
@@ -168,7 +173,7 @@ impl Reading for TestNode {
                 debug!("Peer {} disconnected for the following reason: {:?}", source, reason);
             }
             ClientMessage::PeerRequest => self.process_peer_request(source).await?,
-            ClientMessage::PeerResponse(peer_ips) => self.process_peer_response(source, peer_ips).await?,
+            ClientMessage::PeerResponse(peer_addrs) => self.process_peer_response(source, peer_addrs).await?,
             ClientMessage::Ping(version, _fork_depth, _peer_type, _peer_state, _block_hash, block_header) => {
                 // Deserialise the block header.
                 let block_header = block_header.deserialize().await.unwrap();
@@ -190,14 +195,7 @@ impl Reading for TestNode {
 // Helper methods.
 impl TestNode {
     async fn process_peer_request(&self, source: SocketAddr) -> io::Result<()> {
-        let peers = self
-            .state
-            .peers
-            .lock()
-            .await
-            .iter()
-            .map(|peer| peer.listening_addr)
-            .collect::<Vec<_>>();
+        let peers = self.state.peers.read().keys().copied().collect::<Vec<_>>();
         let msg = ClientMessage::PeerResponse(peers);
         info!(parent: self.node().span(), "sending a PeerResponse to {}", source);
 
@@ -206,18 +204,18 @@ impl TestNode {
         Ok(())
     }
 
-    async fn process_peer_response(&self, source: SocketAddr, peer_ips: Vec<SocketAddr>) -> io::Result<()> {
+    async fn process_peer_response(&self, source: SocketAddr, peer_addrs: Vec<SocketAddr>) -> io::Result<()> {
         let num_connections = self.node().num_connected() + self.node().num_connecting();
         let node = self.clone();
         task::spawn(async move {
-            for peer_ip in peer_ips
+            for peer_addr in peer_addrs
                 .into_iter()
                 .filter(|addr| node.node().listening_addr().unwrap() != *addr)
                 .take(DESIRED_CONNECTIONS.saturating_sub(num_connections))
             {
-                if !node.node().is_connected(peer_ip) && !node.state.peers.lock().await.iter().any(|peer| peer.listening_addr == peer_ip) {
-                    info!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, peer_ip);
-                    let _ = node.node().connect(peer_ip).await;
+                if !node.node().is_connected(peer_addr) && !node.state.peers.read().contains_key(&peer_addr) {
+                    info!(parent: node.node().span(), "trying to connect to {}'s peer {}", source, peer_addr);
+                    let _ = node.node().connect(peer_addr).await;
                 }
             }
         });
