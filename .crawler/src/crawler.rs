@@ -125,6 +125,9 @@ impl Crawler {
         let node = self.clone();
         task::spawn(async move {
             loop {
+                debug!(parent: node.node().span(), "crawling the network for more peers; asking peers for their peers");
+                node.send_broadcast(ClientMessage::PeerRequest).unwrap();
+
                 // Disconnect from peers that we've collected sufficient information on or that have become stale.
                 let addrs_to_disconnect = node.known_network.addrs_to_disconnect();
                 for addr in &addrs_to_disconnect {
@@ -158,8 +161,6 @@ impl Crawler {
                     }
                 }
 
-                debug!(parent: node.node().span(), "crawling the network for more peers; asking peers for their peers");
-                node.send_broadcast(ClientMessage::PeerRequest).unwrap();
                 tokio::time::sleep(Duration::from_secs(PEER_UPDATE_INTERVAL_SECS)).await;
             }
         });
