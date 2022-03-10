@@ -190,6 +190,8 @@ impl KnownNetwork {
 
     /// Update the height stored for this particular node.
     pub fn received_ping(&self, source: SocketAddr, node_type: NodeType, version: u32, state: State, height: u32) {
+        let timestamp = OffsetDateTime::now_utc();
+
         let mut nodes = self.nodes.write();
         let mut meta = nodes.entry(source).or_insert_with(|| NodeMeta::new(source));
 
@@ -199,29 +201,34 @@ impl KnownNetwork {
             height,
             state,
         });
-        meta.timestamp = Some(OffsetDateTime::now_utc());
+        meta.timestamp = Some(timestamp);
     }
 
     pub fn received_peers(&self, source: SocketAddr, addrs: Vec<SocketAddr>) {
+        let timestamp = OffsetDateTime::now_utc();
+
         self.update_connections(source, addrs);
 
         let mut nodes = self.nodes.write();
         let mut meta = nodes.entry(source).or_insert_with(|| NodeMeta::new(source));
 
         meta.received_peer_sets += 1;
-        meta.timestamp = Some(OffsetDateTime::now_utc());
+        meta.timestamp = Some(timestamp);
     }
 
     /// Update the timestamp for this particular node.
     pub fn update_timestamp(&self, source: SocketAddr, connection_succeeded: bool) {
-        if let Some(meta) = self.nodes.write().get_mut(&source) {
-            meta.timestamp = Some(OffsetDateTime::now_utc());
-            if connection_succeeded {
-                // Reset the conn failure count when the connection succeeds.
-                meta.connection_failures = 0;
-            } else {
-                meta.connection_failures += 1;
-            }
+        let timestamp = OffsetDateTime::now_utc();
+
+        let mut nodes = self.nodes.write();
+        let mut meta = nodes.entry(source).or_insert_with(|| NodeMeta::new(source));
+
+        meta.timestamp = Some(timestamp);
+        if connection_succeeded {
+            // Reset the conn failure count when the connection succeeds.
+            meta.connection_failures = 0;
+        } else {
+            meta.connection_failures += 1;
         }
     }
 
