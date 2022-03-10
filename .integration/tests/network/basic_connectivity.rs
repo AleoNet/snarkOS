@@ -18,11 +18,14 @@ use crate::common::spawn_test_node_with_nonce;
 use snarkos_integration::{wait_until, ClientNode, TestNode, MAXIMUM_NUMBER_OF_PEERS};
 
 use pea2pea::Pea2Pea;
-use std::sync::{
-    atomic::{AtomicU8, Ordering::*},
-    Arc,
+use std::{
+    sync::{
+        atomic::{AtomicU8, Ordering::*},
+        Arc,
+    },
+    time::Duration,
 };
-use tokio::task;
+use tokio::{task, time};
 
 #[tokio::test]
 async fn client_nodes_can_connect_to_each_other() {
@@ -159,6 +162,9 @@ async fn connection_limits_are_obeyed() {
     for test_node in &test_nodes {
         test_node.node().connect(client_node.local_addr()).await.unwrap();
     }
+
+    // A short sleep to ensure all the connections are ready.
+    time::sleep(Duration::from_millis(10)).await;
 
     // Create one additional test node.
     let extra_test_node = TestNode::default().await;
