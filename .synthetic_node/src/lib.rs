@@ -102,11 +102,15 @@ impl SynthNode {
 
     /// Returns the peer's connected address when provided with the listening address.
     pub fn get_peer_connected_addr(&self, addr: SocketAddr) -> Option<SocketAddr> {
+        debug_assert!(self.node().connected_addrs().contains(&addr));
+
         self.state.peers.read().get(&addr).map(|peer| peer.connected_addr)
     }
 
     /// Returns the peer's listening address when provided with the connected address.
     pub fn get_peer_listening_addr(&self, addr: SocketAddr) -> Option<SocketAddr> {
+        debug_assert!(self.state.peers.read().contains_key(&addr));
+
         self.state.address_map.read().get(&addr).copied()
     }
 }
@@ -258,6 +262,8 @@ impl Writing for SynthNode {
 #[async_trait::async_trait]
 impl Disconnect for SynthNode {
     async fn handle_disconnect(&self, disconnecting_addr: SocketAddr) {
+        debug_assert_eq!(self.state.address_map.read().len(), self.state.peers.read().len());
+
         if let Some(listening_addr) = self.state.address_map.write().remove(&disconnecting_addr) {
             self.state.peers.write().remove(&listening_addr);
         }

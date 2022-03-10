@@ -28,11 +28,11 @@ use time::OffsetDateTime;
 /// (since connections are directionless). The timestamp is also not included in the comparison.
 #[derive(Debug, Eq, Copy, Clone)]
 pub struct Connection {
-    /// One side of the connection.
+    /// The listening address of one side of the connection.
     pub source: SocketAddr,
-    /// The other side of the connection.
+    /// The listening address of the other side of the connection.
     pub target: SocketAddr,
-    /// The last time this peer was seen by the crawler (used to determine which connections are
+    /// The last time this connection was seen by the crawler (used to determine which connections are
     /// likely stale).
     pub last_seen: OffsetDateTime,
 }

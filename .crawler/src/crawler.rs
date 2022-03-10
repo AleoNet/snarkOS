@@ -40,6 +40,7 @@ use std::{
     time::Duration,
 };
 use structopt::StructOpt;
+use time::OffsetDateTime;
 use tokio::task;
 use tracing::*;
 
@@ -125,6 +126,9 @@ impl Crawler {
         let node = self.clone();
         task::spawn(async move {
             loop {
+                debug!(parent: node.node().span(), "crawling the network for more peers; asking peers for their peers");
+                node.send_broadcast(ClientMessage::PeerRequest).unwrap();
+
                 // Disconnect from peers that we've collected sufficient information on or that have become stale.
                 let addrs_to_disconnect = node.known_network.addrs_to_disconnect();
                 for addr in &addrs_to_disconnect {
@@ -147,19 +151,18 @@ impl Crawler {
                     if !node.is_connected(addr) {
                         let node_clone = node.clone();
                         task::spawn(async move {
+                            let connection_init_timestamp = OffsetDateTime::now_utc();
                             if node_clone.node().connect(addr).await.is_ok() {
                                 // Immediately ask for the new peer's peers.
                                 let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
-                                node_clone.known_network.update_timestamp(addr, true);
+                                node_clone.known_network.connected_to_node(addr, connection_init_timestamp, true);
                             } else {
-                                node_clone.known_network.update_timestamp(addr, false);
+                                node_clone.known_network.connected_to_node(addr, connection_init_timestamp, false);
                             }
                         });
                     }
                 }
 
-                debug!(parent: node.node().span(), "crawling the network for more peers; asking peers for their peers");
-                node.send_broadcast(ClientMessage::PeerRequest).unwrap();
                 tokio::time::sleep(Duration::from_secs(PEER_UPDATE_INTERVAL_SECS)).await;
             }
         });
@@ -325,13 +328,14 @@ impl Crawler {
                     if node.known_network.should_be_connected_to(addr) {
                         let node_clone = node.clone();
                         task::spawn(async move {
+                            let connection_init_timestamp = OffsetDateTime::now_utc();
                             if node_clone.node().connect(addr).await.is_ok() {
-                                node_clone.known_network.update_timestamp(addr, true);
+                                node_clone.known_network.connected_to_node(addr, connection_init_timestamp, true);
 
                                 // Immediately ask for the new peer's peers.
                                 let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
                             } else {
-                                node_clone.known_network.update_timestamp(addr, false);
+                                node_clone.known_network.connected_to_node(addr, connection_init_timestamp, false);
                             }
                         });
                     }

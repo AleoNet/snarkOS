@@ -21,7 +21,7 @@ use std::{
     fmt,
     net::SocketAddr,
 };
-use time::OffsetDateTime;
+use time::{Duration, OffsetDateTime};
 
 use crate::{
     connection::{nodes_from_connections, Connection},
@@ -55,6 +55,8 @@ pub struct NetworkSummary {
     states: HashMap<State, usize>,
     // The heights of nodes and their respective counts.
     heights: HashMap<u32, usize>,
+    // The average handshake time in the network.
+    avg_handshake_time_ms: Option<i64>,
 }
 
 impl fmt::Debug for NetworkSummary {
@@ -66,42 +68,36 @@ impl fmt::Debug for NetworkSummary {
             .field("types", &self.types)
             .field("versions", &self.versions)
             .field("states", &self.states)
+            .field("average handshake time (in ms)", &self.avg_handshake_time_ms)
             .finish()
     }
 }
 
 /// Node information collected while crawling.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct NodeMeta {
-    #[allow(dead_code)]
-    listening_addr: SocketAddr,
     // The details of the node's state.
     pub state: Option<NodeState>,
-    // The last connection success/failure timestamp.
+    // The last interaction timestamp.
     timestamp: Option<OffsetDateTime>,
     // The number of lists of peers received from the node.
     received_peer_sets: u8,
     // The number of subsequent connection failures.
     connection_failures: u8,
+    // The time it took to connect to the node.
+    handshake_time: Option<Duration>,
 }
 
 impl NodeMeta {
-    fn new(listening_addr: SocketAddr) -> Self {
-        Self {
-            listening_addr,
-            state: None,
-            timestamp: None,
-            received_peer_sets: 0,
-            connection_failures: 0,
-        }
-    }
-
+    // Resets the node's values which determine whether the crawler should stay connected to it.
+    // note: it should be called when a node is disconnected from after it's been crawled successfully
     fn reset_crawl_state(&mut self) {
         self.received_peer_sets = 0;
         self.connection_failures = 0;
         self.timestamp = Some(OffsetDateTime::now_utc());
     }
 
+    // Returns `true` if the node should be connected to again.
     fn needs_refreshing(&self) -> bool {
         if let Some(timestamp) = self.timestamp {
             let crawl_interval = if self.state.is_some() {
@@ -113,26 +109,29 @@ impl NodeMeta {
 
             (OffsetDateTime::now_utc() - timestamp).whole_minutes() > crawl_interval
         } else {
+            // If there is no timestamp yet, this is the very first connection attempt.
             true
         }
     }
 }
 
 /// Keeps track of crawled peers and their connections.
+// note: all the associated addresses are listening addresses.
 #[derive(Debug, Default)]
 pub struct KnownNetwork {
-    // The nodes and their information.
+    // The information on known nodes; the keys of the map are their related listening addresses.
     nodes: RwLock<HashMap<SocketAddr, NodeMeta>>,
-    // The connections map.
+    // The map of known connections between nodes.
     connections: RwLock<HashSet<Connection>>,
 }
 
 impl KnownNetwork {
-    pub fn add_node(&self, addr: SocketAddr) {
-        self.nodes.write().insert(addr, NodeMeta::new(addr));
+    /// Adds a node with the given address.
+    pub fn add_node(&self, listening_addr: SocketAddr) {
+        self.nodes.write().insert(listening_addr, NodeMeta::default());
     }
 
-    // More convenient for testing.
+    // Updates the list of connections and registers new nodes based on them.
     fn update_connections(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
         // Rules:
         //  - if a connecton exists already, do nothing.
@@ -163,33 +162,39 @@ impl KnownNetwork {
         {
             let mut connections_g = self.connections.write();
 
-            // Remove stale connections.
-            connections_g.retain(|connection| !connections_to_remove.contains(connection));
+            // Remove stale connections, if there are any.
+            for addr in connections_to_remove {
+                connections_g.remove(&addr);
+            }
 
-            // Insert new connections, we use replace so the last seen timestamp is overwritten.
+            // Insert new connections, we use `replace` so the last seen timestamp is overwritten.
             for new_connection in new_connections.into_iter() {
                 connections_g.replace(new_connection);
             }
         }
 
+        // Obtain node addresses based on the list of known connections.
+        let node_addrs_from_conns = nodes_from_connections(&self.connections());
+
         // Scope the write lock.
         {
             let mut nodes_g = self.nodes.write();
 
-            // Remove the nodes that no longer correspond to connections.
-            let nodes_from_connections = nodes_from_connections(&self.connections());
-            for addr in nodes_from_connections {
+            // Create new node objects based on connection addresses.
+            for addr in node_addrs_from_conns {
                 if !nodes_g.contains_key(&addr) {
-                    nodes_g.insert(addr, NodeMeta::new(addr));
+                    nodes_g.insert(addr, NodeMeta::default());
                 }
             }
         }
     }
 
-    /// Update the height stored for this particular node.
+    /// Updates the details of a node based on a Ping message received from it.
     pub fn received_ping(&self, source: SocketAddr, node_type: NodeType, version: u32, state: State, height: u32) {
+        let timestamp = OffsetDateTime::now_utc();
+
         let mut nodes = self.nodes.write();
-        let mut meta = nodes.entry(source).or_insert_with(|| NodeMeta::new(source));
+        let mut meta = nodes.entry(source).or_default();
 
         meta.state = Some(NodeState {
             node_type,
@@ -197,29 +202,37 @@ impl KnownNetwork {
             height,
             state,
         });
-        meta.timestamp = Some(OffsetDateTime::now_utc());
+        meta.timestamp = Some(timestamp);
     }
 
+    /// Updates the known connections based on a received list of a node's peers.
     pub fn received_peers(&self, source: SocketAddr, addrs: Vec<SocketAddr>) {
+        let timestamp = OffsetDateTime::now_utc();
+
         self.update_connections(source, addrs);
 
         let mut nodes = self.nodes.write();
-        let mut meta = nodes.entry(source).or_insert_with(|| NodeMeta::new(source));
+        let mut meta = nodes.entry(source).or_default();
 
         meta.received_peer_sets += 1;
-        meta.timestamp = Some(OffsetDateTime::now_utc());
+        meta.timestamp = Some(timestamp);
     }
 
-    /// Update the timestamp for this particular node.
-    pub fn update_timestamp(&self, source: SocketAddr, connection_succeeded: bool) {
-        if let Some(meta) = self.nodes.write().get_mut(&source) {
-            meta.timestamp = Some(OffsetDateTime::now_utc());
-            if connection_succeeded {
-                // Reset the conn failure count when the connection succeeds.
-                meta.connection_failures = 0;
-            } else {
-                meta.connection_failures += 1;
-            }
+    /// Updates a node's details applicable as soon as a connection succeeds or fails.
+    pub fn connected_to_node(&self, source: SocketAddr, connection_init_timestamp: OffsetDateTime, connection_succeeded: bool) {
+        let mut nodes = self.nodes.write();
+        let mut meta = nodes.entry(source).or_default();
+
+        // Update the node interaction timestamp.
+        meta.timestamp = Some(connection_init_timestamp);
+
+        if connection_succeeded {
+            // Reset the conn failure count when the connection succeeds.
+            meta.connection_failures = 0;
+            // Register the time it took to perform the handshake.
+            meta.handshake_time = Some(OffsetDateTime::now_utc() - connection_init_timestamp);
+        } else {
+            meta.connection_failures += 1;
         }
     }
 
@@ -232,6 +245,7 @@ impl KnownNetwork {
         }
     }
 
+    /// Returns a list of addresses the crawler should connect to.
     pub fn addrs_to_connect(&self) -> HashSet<SocketAddr> {
         // Snapshot is safe to use as disconnected peers won't have their state updated at the
         // moment.
@@ -242,6 +256,7 @@ impl KnownNetwork {
             .collect()
     }
 
+    /// Returns a list of addresses the crawler should disconnect from.
     pub fn addrs_to_disconnect(&self) -> Vec<SocketAddr> {
         let mut peers = self.nodes.write();
 
@@ -288,6 +303,8 @@ impl KnownNetwork {
         let mut states = HashMap::with_capacity(nodes.len());
         let mut types = HashMap::with_capacity(nodes.len());
         let mut heights = HashMap::with_capacity(nodes.len());
+
+        let mut handshake_times = Vec::with_capacity(nodes.len());
         let mut nodes_pending_state: usize = 0;
 
         for meta in nodes.values() {
@@ -299,9 +316,18 @@ impl KnownNetwork {
             } else {
                 nodes_pending_state += 1;
             }
+            if let Some(time) = meta.handshake_time {
+                handshake_times.push(time);
+            }
         }
 
         let num_known_connections = self.connections().len();
+        let avg_handshake_time_ms = if !handshake_times.is_empty() {
+            let avg = handshake_times.iter().sum::<Duration>().whole_milliseconds() as i64 / handshake_times.len() as i64;
+            Some(avg)
+        } else {
+            None
+        };
 
         NetworkSummary {
             num_known_nodes: nodes.len(),
@@ -311,6 +337,7 @@ impl KnownNetwork {
             heights,
             states,
             types,
+            avg_handshake_time_ms,
         }
     }
 }
@@ -318,8 +345,6 @@ impl KnownNetwork {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    use time::Duration;
 
     #[test]
     fn connections_update() {
