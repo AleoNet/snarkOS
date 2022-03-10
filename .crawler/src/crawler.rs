@@ -40,6 +40,7 @@ use std::{
     time::Duration,
 };
 use structopt::StructOpt;
+use time::OffsetDateTime;
 use tokio::task;
 use tracing::*;
 
@@ -150,12 +151,13 @@ impl Crawler {
                     if !node.is_connected(addr) {
                         let node_clone = node.clone();
                         task::spawn(async move {
+                            let connection_init_timestamp = OffsetDateTime::now_utc();
                             if node_clone.node().connect(addr).await.is_ok() {
                                 // Immediately ask for the new peer's peers.
                                 let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
-                                node_clone.known_network.update_timestamp(addr, true);
+                                node_clone.known_network.connected_to_node(addr, connection_init_timestamp, true);
                             } else {
-                                node_clone.known_network.update_timestamp(addr, false);
+                                node_clone.known_network.connected_to_node(addr, connection_init_timestamp, false);
                             }
                         });
                     }
@@ -326,13 +328,14 @@ impl Crawler {
                     if node.known_network.should_be_connected_to(addr) {
                         let node_clone = node.clone();
                         task::spawn(async move {
+                            let connection_init_timestamp = OffsetDateTime::now_utc();
                             if node_clone.node().connect(addr).await.is_ok() {
-                                node_clone.known_network.update_timestamp(addr, true);
+                                node_clone.known_network.connected_to_node(addr, connection_init_timestamp, true);
 
                                 // Immediately ask for the new peer's peers.
                                 let _ = node_clone.send_direct_message(addr, ClientMessage::PeerRequest);
                             } else {
-                                node_clone.known_network.update_timestamp(addr, false);
+                                node_clone.known_network.connected_to_node(addr, connection_init_timestamp, false);
                             }
                         });
                     }

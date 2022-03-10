@@ -21,7 +21,7 @@ use std::{
     fmt,
     net::SocketAddr,
 };
-use time::OffsetDateTime;
+use time::{Duration, OffsetDateTime};
 
 use crate::{
     connection::{nodes_from_connections, Connection},
@@ -55,6 +55,8 @@ pub struct NetworkSummary {
     states: HashMap<State, usize>,
     // The heights of nodes and their respective counts.
     heights: HashMap<u32, usize>,
+    // The average handshake time in the network.
+    avg_handshake_time_ms: Option<i64>,
 }
 
 impl fmt::Debug for NetworkSummary {
@@ -66,6 +68,7 @@ impl fmt::Debug for NetworkSummary {
             .field("types", &self.types)
             .field("versions", &self.versions)
             .field("states", &self.states)
+            .field("average handshake time (in ms)", &self.avg_handshake_time_ms)
             .finish()
     }
 }
@@ -83,6 +86,8 @@ pub struct NodeMeta {
     received_peer_sets: u8,
     // The number of subsequent connection failures.
     connection_failures: u8,
+    // The time it took to connect to the node.
+    handshake_time: Option<Duration>,
 }
 
 impl NodeMeta {
@@ -94,6 +99,7 @@ impl NodeMeta {
             timestamp: None,
             received_peer_sets: 0,
             connection_failures: 0,
+            handshake_time: None,
         }
     }
 
@@ -224,17 +230,19 @@ impl KnownNetwork {
         meta.timestamp = Some(timestamp);
     }
 
-    /// Update the timestamp for this particular node.
-    pub fn update_timestamp(&self, source: SocketAddr, connection_succeeded: bool) {
-        let timestamp = OffsetDateTime::now_utc();
-
+    /// Updates a node's details applicable as soon as a connection succeeds or fails.
+    pub fn connected_to_node(&self, source: SocketAddr, connection_init_timestamp: OffsetDateTime, connection_succeeded: bool) {
         let mut nodes = self.nodes.write();
         let mut meta = nodes.entry(source).or_insert_with(|| NodeMeta::new(source));
 
-        meta.timestamp = Some(timestamp);
+        // Update the node interaction timestamp.
+        meta.timestamp = Some(connection_init_timestamp);
+
         if connection_succeeded {
             // Reset the conn failure count when the connection succeeds.
             meta.connection_failures = 0;
+            // Register the time it took to perform the handshake.
+            meta.handshake_time = Some(OffsetDateTime::now_utc() - connection_init_timestamp);
         } else {
             meta.connection_failures += 1;
         }
@@ -307,6 +315,8 @@ impl KnownNetwork {
         let mut states = HashMap::with_capacity(nodes.len());
         let mut types = HashMap::with_capacity(nodes.len());
         let mut heights = HashMap::with_capacity(nodes.len());
+
+        let mut handshake_times = Vec::with_capacity(nodes.len());
         let mut nodes_pending_state: usize = 0;
 
         for meta in nodes.values() {
@@ -318,9 +328,18 @@ impl KnownNetwork {
             } else {
                 nodes_pending_state += 1;
             }
+            if let Some(time) = meta.handshake_time {
+                handshake_times.push(time);
+            }
         }
 
         let num_known_connections = self.connections().len();
+        let avg_handshake_time_ms = if !handshake_times.is_empty() {
+            let avg = handshake_times.iter().sum::<Duration>().whole_milliseconds() as i64 / handshake_times.len() as i64;
+            Some(avg)
+        } else {
+            None
+        };
 
         NetworkSummary {
             num_known_nodes: nodes.len(),
@@ -330,6 +349,7 @@ impl KnownNetwork {
             heights,
             states,
             types,
+            avg_handshake_time_ms,
         }
     }
 }
@@ -337,8 +357,6 @@ impl KnownNetwork {
 #[cfg(test)]
 mod test {
     use super::*;
-
-    use time::Duration;
 
     #[test]
     fn connections_update() {
