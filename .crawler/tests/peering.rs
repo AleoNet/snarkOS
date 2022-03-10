@@ -67,4 +67,13 @@ async fn basics() {
     crawler.run_periodic_tasks();
 
     wait_until!(5, crawler.node().num_connected() == NUM_NODES);
+
+    assert_eq!(crawler.known_network.nodes().len(), NUM_NODES);
+    assert_eq!(crawler.known_network.connections().len(), NUM_NODES - 1);
+
+    for test_node in test_nodes {
+        test_node.node().shut_down().await;
+    }
+
+    wait_until!(1, crawler.node().num_connected() == 0);
 }
