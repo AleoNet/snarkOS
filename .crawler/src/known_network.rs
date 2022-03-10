@@ -163,8 +163,10 @@ impl KnownNetwork {
         {
             let mut connections_g = self.connections.write();
 
-            // Remove stale connections.
-            connections_g.retain(|connection| !connections_to_remove.contains(connection));
+            // Remove stale connections, if there are any.
+            if !connections_to_remove.is_empty() {
+                connections_g.retain(|connection| !connections_to_remove.contains(connection));
+            }
 
             // Insert new connections, we use replace so the last seen timestamp is overwritten.
             for new_connection in new_connections.into_iter() {
