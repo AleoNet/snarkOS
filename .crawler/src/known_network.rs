@@ -77,7 +77,7 @@ pub struct NodeMeta {
     listening_addr: SocketAddr,
     // The details of the node's state.
     pub state: Option<NodeState>,
-    // The last connection success/failure timestamp.
+    // The last interaction timestamp.
     timestamp: Option<OffsetDateTime>,
     // The number of lists of peers received from the node.
     received_peer_sets: u8,
@@ -86,6 +86,7 @@ pub struct NodeMeta {
 }
 
 impl NodeMeta {
+    // Creates a new `NodeMeta` object.
     fn new(listening_addr: SocketAddr) -> Self {
         Self {
             listening_addr,
@@ -96,12 +97,15 @@ impl NodeMeta {
         }
     }
 
+    // Resets the node's values which determine whether the crawler should stay connected to it.
+    // note: it should be called when a node is disconnected from after it's been crawled successfully
     fn reset_crawl_state(&mut self) {
         self.received_peer_sets = 0;
         self.connection_failures = 0;
         self.timestamp = Some(OffsetDateTime::now_utc());
     }
 
+    // Returns `true` if the node should be connected to again.
     fn needs_refreshing(&self) -> bool {
         if let Some(timestamp) = self.timestamp {
             let crawl_interval = if self.state.is_some() {
@@ -113,26 +117,29 @@ impl NodeMeta {
 
             (OffsetDateTime::now_utc() - timestamp).whole_minutes() > crawl_interval
         } else {
+            // If there is no timestamp yet, this is the very first connection attempt.
             true
         }
     }
 }
 
 /// Keeps track of crawled peers and their connections.
+// note: all the associated addresses are listening addresses.
 #[derive(Debug, Default)]
 pub struct KnownNetwork {
-    // The nodes and their information.
+    // The information on known nodes; the keys of the map are their related listening addresses.
     nodes: RwLock<HashMap<SocketAddr, NodeMeta>>,
-    // The connections map.
+    // The map of known connections between nodes.
     connections: RwLock<HashSet<Connection>>,
 }
 
 impl KnownNetwork {
-    pub fn add_node(&self, addr: SocketAddr) {
-        self.nodes.write().insert(addr, NodeMeta::new(addr));
+    /// Adds a node with the given address.
+    pub fn add_node(&self, listening_addr: SocketAddr) {
+        self.nodes.write().insert(listening_addr, NodeMeta::new(listening_addr));
     }
 
-    // More convenient for testing.
+    // Updates the list of connections and registers new nodes based on them.
     fn update_connections(&self, source: SocketAddr, peers: Vec<SocketAddr>) {
         // Rules:
         //  - if a connecton exists already, do nothing.
@@ -188,7 +195,7 @@ impl KnownNetwork {
         }
     }
 
-    /// Update the height stored for this particular node.
+    /// Updates the details of a node based on a Ping message received from it.
     pub fn received_ping(&self, source: SocketAddr, node_type: NodeType, version: u32, state: State, height: u32) {
         let timestamp = OffsetDateTime::now_utc();
 
@@ -204,6 +211,7 @@ impl KnownNetwork {
         meta.timestamp = Some(timestamp);
     }
 
+    /// Updates the known connections based on a received list of a node's peers.
     pub fn received_peers(&self, source: SocketAddr, addrs: Vec<SocketAddr>) {
         let timestamp = OffsetDateTime::now_utc();
 
@@ -241,6 +249,7 @@ impl KnownNetwork {
         }
     }
 
+    /// Returns a list of addresses the crawler should connect to.
     pub fn addrs_to_connect(&self) -> HashSet<SocketAddr> {
         // Snapshot is safe to use as disconnected peers won't have their state updated at the
         // moment.
@@ -251,6 +260,7 @@ impl KnownNetwork {
             .collect()
     }
 
+    /// Returns a list of addresses the crawler should disconnect from.
     pub fn addrs_to_disconnect(&self) -> Vec<SocketAddr> {
         let mut peers = self.nodes.write();
 
