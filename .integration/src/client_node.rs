@@ -14,11 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use clap::Parser;
 use snarkos::Server;
 use snarkos_environment::{Client, CurrentNetwork};
 
 use std::{fs, net::SocketAddr};
-use structopt::StructOpt;
 
 /// A facade for a snarkOS client node.
 pub struct ClientNode {
@@ -57,7 +57,7 @@ impl ClientNode {
     pub async fn with_args(extra_args: &[&str]) -> Self {
         let permanent_args = &["snarkos", "--norpc"];
         let combined_args = permanent_args.iter().chain(extra_args.iter());
-        let config = snarkos::Node::from_iter(combined_args);
+        let config = snarkos::Node::parse_from(combined_args);
         let server = Server::<CurrentNetwork, Client<CurrentNetwork>>::initialize(&config, None, None)
             .await
             .unwrap();

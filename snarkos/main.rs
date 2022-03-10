@@ -17,7 +17,7 @@
 use snarkos::{initialize_logger, Node};
 
 use anyhow::Result;
-use structopt::StructOpt;
+use clap::Parser;
 use tokio::runtime;
 
 fn main() -> Result<()> {
@@ -26,7 +26,7 @@ fn main() -> Result<()> {
     }
 
     // Parse the provided arguments.
-    let node = Node::from_args();
+    let node = Node::parse();
 
     // Start logging, if enabled.
     if !node.display {

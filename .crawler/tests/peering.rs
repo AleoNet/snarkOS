@@ -14,10 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use clap::Parser;
 use pea2pea::Pea2Pea;
-use snarkos_crawler::crawler::{Crawler, Opts};
+use snarkos_crawler::crawler::Crawler;
 use snarkos_integration::{wait_until, TestNode};
-use structopt::StructOpt;
 
 const NUM_NODES: usize = 10;
 
@@ -56,7 +56,7 @@ async fn basics() {
     }
 
     // Start the crawler.
-    let opts = Opts::from_iter(&["snarkos_crawler_test", "--node", "127.0.0.1:0"]);
+    let opts = Parser::parse_from(&["snarkos_crawler_test", "--addr", "127.0.0.1:0"]);
     let crawler = Crawler::new(opts, None).await;
 
     // "Seed" the crawler with the address of the first node.

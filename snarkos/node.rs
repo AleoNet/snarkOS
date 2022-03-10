@@ -33,64 +33,64 @@ use snarkos_storage::storage::rocksdb::RocksDB;
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
+use clap::Parser;
 use colored::*;
 use crossterm::tty::IsTty;
 use std::{io, net::SocketAddr, path::PathBuf, str::FromStr};
-use structopt::StructOpt;
 use tokio::sync::mpsc;
 use tracing_subscriber::EnvFilter;
 
-#[derive(StructOpt, Debug)]
-#[structopt(name = "snarkos", author = "The Aleo Team <hello@aleo.org>", setting = structopt::clap::AppSettings::ColoredHelp)]
+#[derive(Debug, Parser)]
+#[clap(name = "snarkos", author = "The Aleo Team <hello@aleo.org>")]
 pub struct Node {
     /// Specify the IP address and port of a peer to connect to.
-    #[structopt(long = "connect")]
+    #[clap(long = "connect")]
     pub connect: Option<String>,
     /// Specify this as a mining node, with the given miner address.
-    #[structopt(long = "miner")]
+    #[clap(long = "miner")]
     pub miner: Option<String>,
     /// Specify this as an operating node, with the given operator address.
-    #[structopt(long = "operator")]
+    #[clap(long = "operator")]
     pub operator: Option<String>,
     /// Specify this as a prover node, with the given prover address.
-    #[structopt(long = "prover")]
+    #[clap(long = "prover")]
     pub prover: Option<String>,
     /// Specify the pool that a prover node is contributing to.
-    #[structopt(long = "pool")]
+    #[clap(long = "pool")]
     pub pool: Option<SocketAddr>,
     /// Specify the network of this node.
-    #[structopt(default_value = "2", long = "network")]
+    #[clap(default_value = "2", long = "network")]
     pub network: u16,
     /// Specify the IP address and port for the node server.
-    #[structopt(parse(try_from_str), default_value = "0.0.0.0:4132", long = "node")]
+    #[clap(parse(try_from_str), default_value = "0.0.0.0:4132", long = "node")]
     pub node: SocketAddr,
     /// Specify the IP address and port for the RPC server.
-    #[structopt(parse(try_from_str), default_value = "0.0.0.0:3032", long = "rpc")]
+    #[clap(parse(try_from_str), default_value = "0.0.0.0:3032", long = "rpc")]
     pub rpc: SocketAddr,
     /// Specify the username for the RPC server.
-    #[structopt(default_value = "root", long = "username")]
+    #[clap(default_value = "root", long = "username")]
     pub rpc_username: String,
     /// Specify the password for the RPC server.
-    #[structopt(default_value = "pass", long = "password")]
+    #[clap(default_value = "pass", long = "password")]
     pub rpc_password: String,
     /// Specify the verbosity of the node [options: 0, 1, 2, 3]
-    #[structopt(default_value = "2", long = "verbosity")]
+    #[clap(default_value = "2", long = "verbosity")]
     pub verbosity: u8,
     /// Enables development mode, specify a unique ID for the local node.
-    #[structopt(long)]
+    #[clap(long)]
     pub dev: Option<u16>,
     /// If the flag is set, the node will render a read-only display.
-    #[structopt(long)]
+    #[clap(long)]
     pub display: bool,
     /// If the flag is set, the node will not initialize the RPC server.
-    #[structopt(long)]
+    #[clap(long)]
     pub norpc: bool,
-    #[structopt(hidden = true, long)]
+    #[clap(hide = true, long)]
     pub trial: bool,
-    #[structopt(hidden = true, long)]
+    #[clap(hide = true, long)]
     pub sync: bool,
     /// Specify an optional subcommand.
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     commands: Option<Command>,
 }
 
@@ -236,15 +236,15 @@ pub fn initialize_logger(verbosity: u8, log_sender: Option<mpsc::Sender<Vec<u8>>
         .try_init();
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Debug, Parser)]
 pub enum Command {
-    #[structopt(name = "clean", about = "Removes the ledger files from storage")]
+    #[clap(name = "clean", about = "Removes the ledger files from storage")]
     Clean(Clean),
-    #[structopt(name = "update", about = "Updates snarkOS to the latest version")]
+    #[clap(name = "update", about = "Updates snarkOS to the latest version")]
     Update(Update),
-    #[structopt(name = "experimental", about = "Experimental features")]
+    #[clap(name = "experimental", about = "Experimental features")]
     Experimental(Experimental),
-    #[structopt(name = "miner", about = "Miner commands and settings")]
+    #[clap(name = "miner", about = "Miner commands and settings")]
     Miner(MinerSubcommand),
 }
 
@@ -291,13 +291,13 @@ impl io::Write for LogWriter {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Debug, Parser)]
 pub struct Clean {
     /// Specify the network of the ledger to remove from storage.
-    #[structopt(default_value = "2", long = "network")]
+    #[clap(default_value = "2", long = "network")]
     pub network: u16,
     /// Enables development mode, specify the unique ID of the local node to clean.
-    #[structopt(long)]
+    #[clap(long)]
     pub dev: Option<u16>,
 }
 
@@ -328,16 +328,16 @@ impl Clean {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Debug, Parser)]
 pub struct Update {
     /// Lists all available versions of snarkOS
-    #[structopt(short = "l", long)]
+    #[clap(short = 'l', long)]
     list: bool,
     /// Suppress outputs to terminal
-    #[structopt(short = "q", long)]
+    #[clap(short = 'q', long)]
     quiet: bool,
     /// Update to specified version
-    #[structopt(short = "v", long)]
+    #[clap(short = 'v', long)]
     version: Option<String>,
 }
 
@@ -371,9 +371,9 @@ impl Update {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Debug, Parser)]
 pub struct Experimental {
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     commands: ExperimentalCommands,
 }
 
@@ -385,13 +385,13 @@ impl Experimental {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Debug, Parser)]
 pub enum ExperimentalCommands {
-    #[structopt(name = "new_account", about = "Generate a new Aleo account.")]
+    #[clap(name = "new_account", about = "Generate a new Aleo account.")]
     NewAccount(NewAccount),
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Debug, Parser)]
 pub struct NewAccount {}
 
 impl NewAccount {
@@ -412,9 +412,9 @@ impl NewAccount {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Debug, Parser)]
 pub struct MinerSubcommand {
-    #[structopt(subcommand)]
+    #[clap(subcommand)]
     commands: MinerCommands,
 }
 
@@ -426,15 +426,15 @@ impl MinerSubcommand {
     }
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Debug, Parser)]
 pub enum MinerCommands {
-    #[structopt(name = "stats", about = "Prints statistics for the miner.")]
+    #[clap(name = "stats", about = "Prints statistics for the miner.")]
     Stats(MinerStats),
 }
 
-#[derive(StructOpt, Debug)]
+#[derive(Debug, Parser)]
 pub struct MinerStats {
-    #[structopt()]
+    #[clap()]
     address: String,
 }
 
@@ -444,7 +444,7 @@ impl MinerStats {
         let miner = Address::<CurrentNetwork>::from_str(&self.address)?;
 
         // Initialize the node.
-        let node = Node::from_iter(&["snarkos", "--norpc", "--verbosity", "0"]);
+        let node = Node::parse_from(&["snarkos", "--norpc", "--verbosity", "0"]);
 
         let ip = "0.0.0.0:1000".parse().unwrap();
 
