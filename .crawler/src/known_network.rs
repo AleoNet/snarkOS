@@ -74,10 +74,8 @@ impl fmt::Debug for NetworkSummary {
 }
 
 /// Node information collected while crawling.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct NodeMeta {
-    #[allow(dead_code)]
-    listening_addr: SocketAddr,
     // The details of the node's state.
     pub state: Option<NodeState>,
     // The last interaction timestamp.
@@ -91,18 +89,6 @@ pub struct NodeMeta {
 }
 
 impl NodeMeta {
-    // Creates a new `NodeMeta` object.
-    fn new(listening_addr: SocketAddr) -> Self {
-        Self {
-            listening_addr,
-            state: None,
-            timestamp: None,
-            received_peer_sets: 0,
-            connection_failures: 0,
-            handshake_time: None,
-        }
-    }
-
     // Resets the node's values which determine whether the crawler should stay connected to it.
     // note: it should be called when a node is disconnected from after it's been crawled successfully
     fn reset_crawl_state(&mut self) {
@@ -142,7 +128,7 @@ pub struct KnownNetwork {
 impl KnownNetwork {
     /// Adds a node with the given address.
     pub fn add_node(&self, listening_addr: SocketAddr) {
-        self.nodes.write().insert(listening_addr, NodeMeta::new(listening_addr));
+        self.nodes.write().insert(listening_addr, NodeMeta::default());
     }
 
     // Updates the list of connections and registers new nodes based on them.
@@ -177,25 +163,27 @@ impl KnownNetwork {
             let mut connections_g = self.connections.write();
 
             // Remove stale connections, if there are any.
-            if !connections_to_remove.is_empty() {
-                connections_g.retain(|connection| !connections_to_remove.contains(connection));
+            for addr in connections_to_remove {
+                connections_g.remove(&addr);
             }
 
-            // Insert new connections, we use replace so the last seen timestamp is overwritten.
+            // Insert new connections, we use `replace` so the last seen timestamp is overwritten.
             for new_connection in new_connections.into_iter() {
                 connections_g.replace(new_connection);
             }
         }
 
+        // Obtain node addresses based on the list of known connections.
+        let node_addrs_from_conns = nodes_from_connections(&self.connections());
+
         // Scope the write lock.
         {
             let mut nodes_g = self.nodes.write();
 
-            // Remove the nodes that no longer correspond to connections.
-            let nodes_from_connections = nodes_from_connections(&self.connections());
-            for addr in nodes_from_connections {
+            // Create new node objects based on connection addresses.
+            for addr in node_addrs_from_conns {
                 if !nodes_g.contains_key(&addr) {
-                    nodes_g.insert(addr, NodeMeta::new(addr));
+                    nodes_g.insert(addr, NodeMeta::default());
                 }
             }
         }
@@ -206,7 +194,7 @@ impl KnownNetwork {
         let timestamp = OffsetDateTime::now_utc();
 
         let mut nodes = self.nodes.write();
-        let mut meta = nodes.entry(source).or_insert_with(|| NodeMeta::new(source));
+        let mut meta = nodes.entry(source).or_default();
 
         meta.state = Some(NodeState {
             node_type,
@@ -224,7 +212,7 @@ impl KnownNetwork {
         self.update_connections(source, addrs);
 
         let mut nodes = self.nodes.write();
-        let mut meta = nodes.entry(source).or_insert_with(|| NodeMeta::new(source));
+        let mut meta = nodes.entry(source).or_default();
 
         meta.received_peer_sets += 1;
         meta.timestamp = Some(timestamp);
@@ -233,7 +221,7 @@ impl KnownNetwork {
     /// Updates a node's details applicable as soon as a connection succeeds or fails.
     pub fn connected_to_node(&self, source: SocketAddr, connection_init_timestamp: OffsetDateTime, connection_succeeded: bool) {
         let mut nodes = self.nodes.write();
-        let mut meta = nodes.entry(source).or_insert_with(|| NodeMeta::new(source));
+        let mut meta = nodes.entry(source).or_default();
 
         // Update the node interaction timestamp.
         meta.timestamp = Some(connection_init_timestamp);
