@@ -22,7 +22,7 @@ use snarkvm::prelude::*;
 use std::{net::SocketAddr, sync::Arc};
 
 /// The network state of the node.
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct NetworkState<N: Network, E: Environment> {
     /// The local address of the node.
     pub local_ip: SocketAddr,

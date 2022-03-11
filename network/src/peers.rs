@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{LedgerReader, LedgerRouter, OperatorRouter, OutboundRouter, Peer, ProverRouter};
+use crate::{LedgerReader, LedgerRouter, NetworkState, OperatorRouter, OutboundRouter, Peer, ProverRouter};
 use snarkos_environment::{
     network::{Data, DisconnectReason, Message},
     Environment,
@@ -25,6 +25,7 @@ use snarkvm::dpc::prelude::*;
 use snarkos_metrics as metrics;
 
 use anyhow::Result;
+use once_cell::sync::OnceCell;
 use rand::{prelude::IteratorRandom, rngs::OsRng, thread_rng, Rng};
 use std::{
     collections::{HashMap, HashSet},
@@ -92,7 +93,9 @@ pub enum PeersRequest<N: Network, E: Environment> {
 ///
 /// A list of peers connected to the node server.
 ///
+#[derive(Debug)]
 pub struct Peers<N: Network, E: Environment> {
+    network_state: OnceCell<NetworkState<N, E>>,
     /// The peers router of the node.
     peers_router: PeersRouter<N, E>,
     /// The local address of this node.
@@ -127,6 +130,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
         // Initialize the peers.
         let peers = Arc::new(Self {
+            network_state: OnceCell::new(),
             peers_router,
             local_ip,
             local_nonce,
@@ -170,6 +174,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
         }
 
         peers
+    }
+
+    pub fn set_network_state(&self, network_state: NetworkState<N, E>) {
+        self.network_state.set(network_state).expect("network state can only be set once");
     }
 
     /// Returns an instance of the peers router.

@@ -177,15 +177,18 @@ impl<N: Network, E: Environment> Server<N, E> {
         #[cfg(any(feature = "test", feature = "prometheus"))]
         Self::initialize_metrics(ledger.reader());
 
-        Ok(Self {
-            network_state: NetworkState {
-                local_ip,
-                peers,
-                ledger,
-                operator,
-                prover,
-            },
-        })
+        let network_state = NetworkState {
+            local_ip,
+            peers,
+            ledger,
+            operator,
+            prover,
+        };
+
+        // Set the network state reference on the peers.
+        network_state.peers.set_network_state(network_state.clone());
+
+        Ok(Self { network_state })
     }
 
     /// Returns the IP address of this node.
