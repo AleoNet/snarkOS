@@ -28,7 +28,7 @@ version = "0.18"
 version = "0.11"
 
 [dependencies.metrics-exporter-prometheus]
-version = "0.8"
+version = "0.9"
 optional = true
 
 [dependencies.tokio]
