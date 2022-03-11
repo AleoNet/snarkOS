@@ -324,6 +324,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             Ok(stream) => match stream {
                                 Ok(stream) => {
                                     Peer::handler(
+                                        self.network_state.get().expect("network state must be set").clone(),
                                         stream,
                                         self.local_ip,
                                         self.local_nonce,
@@ -571,6 +572,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                         // Initialize the peer handler.
                         Peer::handler(
+                            self.network_state.get().expect("network state must be set").clone(),
                             stream,
                             self.local_ip,
                             self.local_nonce,

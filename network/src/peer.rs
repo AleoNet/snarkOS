@@ -33,6 +33,7 @@ use snarkos_environment::{
 };
 use snarkvm::dpc::prelude::*;
 
+use crate::state::NetworkState;
 use anyhow::{anyhow, bail, Result};
 use futures::SinkExt;
 use std::{
@@ -53,6 +54,7 @@ type OutboundHandler<N, E> = mpsc::Receiver<Message<N, E>>;
 /// The state for each connected client.
 ///
 pub(crate) struct Peer<N: Network, E: Environment> {
+    network_state: NetworkState<N, E>,
     /// The IP address of the peer, with the port set to the listener port.
     listener_ip: SocketAddr,
     /// The message version of the peer.
@@ -83,6 +85,7 @@ pub(crate) struct Peer<N: Network, E: Environment> {
 impl<N: Network, E: Environment> Peer<N, E> {
     /// Create a new instance of `Peer`.
     async fn new(
+        network_state: NetworkState<N, E>,
         stream: TcpStream,
         local_ip: SocketAddr,
         local_nonce: u64,
@@ -124,6 +127,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             .await?;
 
         Ok(Peer {
+            network_state,
             listener_ip: peer_ip,
             version: 0,
             node_type,
@@ -318,6 +322,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
     /// A handler to process an individual peer.
     #[allow(clippy::too_many_arguments)]
     pub(super) async fn handler(
+        network_state: NetworkState<N, E>,
         stream: TcpStream,
         local_ip: SocketAddr,
         local_nonce: u64,
@@ -335,7 +340,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let peer_resource_id = E::resources().procure_id();
         E::resources().register_task(Some(peer_resource_id), task::spawn(async move {
             // Register our peer with state which internally sets up some channels.
-            let mut peer = match Peer::new(stream, local_ip, local_nonce, &peers_router, &ledger_reader, &connected_nonces).await {
+            let mut peer = match Peer::new(network_state, stream, local_ip, local_nonce, &peers_router, &ledger_reader, &connected_nonces).await {
                 Ok(peer) => {
                     // If the optional connection result router is given, report a successful connection result.
                     if let Some(router) = connection_result {
