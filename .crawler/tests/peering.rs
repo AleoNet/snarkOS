@@ -17,6 +17,7 @@
 use pea2pea::Pea2Pea;
 use snarkos_crawler::crawler::{Crawler, Opts};
 use snarkos_integration::{wait_until, TestNode};
+use structopt::StructOpt;
 
 const NUM_NODES: usize = 10;
 
@@ -55,10 +56,8 @@ async fn basics() {
     }
 
     // Start the crawler.
-    let opts = Opts {
-        node: "127.0.0.1:0".parse().unwrap(),
-    };
-    let crawler = Crawler::new(opts).await;
+    let opts = Opts::from_iter(&["snarkos_crawler_test", "--node", "127.0.0.1:0"]);
+    let crawler = Crawler::new(opts, None).await;
 
     // "Seed" the crawler with the address of the first node.
     crawler.known_network.add_node(test_node_addrs[0]);
