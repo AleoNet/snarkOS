@@ -16,11 +16,13 @@
 
 use crate::{
     helpers::{block_requests::*, BlockRequest, CircularMap},
+    state::NetworkState,
     PeersRequest,
     PeersRouter,
     ProverRequest,
     ProverRouter,
 };
+
 use snarkos_environment::{
     helpers::{block_locators::*, NodeType, State},
     network::{Data, DisconnectReason, Message},
@@ -33,6 +35,7 @@ use snarkvm::dpc::prelude::*;
 use snarkos_metrics as metrics;
 
 use anyhow::Result;
+use once_cell::sync::OnceCell;
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -84,6 +87,7 @@ pub type PeersState<N> = HashMap<SocketAddr, Option<(NodeType, State, Option<boo
 #[derive(Debug)]
 #[allow(clippy::type_complexity)]
 pub struct Ledger<N: Network, E: Environment> {
+    network_state: OnceCell<NetworkState<N, E>>,
     /// The ledger router of the node.
     ledger_router: LedgerRouter<N>,
     /// The canonical chain of blocks.
@@ -123,6 +127,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
         // Initialize the ledger.
         let ledger = Arc::new(Self {
+            network_state: OnceCell::new(),
             ledger_router,
             canon,
             canon_reader,
@@ -160,6 +165,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
 
         Ok(ledger)
+    }
+
+    pub fn set_network_state(&self, network_state: NetworkState<N, E>) {
+        self.network_state.set(network_state).expect("network state can only be set once");
     }
 
     /// Returns an instance of the ledger reader.
