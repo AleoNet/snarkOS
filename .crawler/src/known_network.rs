@@ -31,10 +31,10 @@ use crate::{
 /// The current state of a crawled node.
 #[derive(Debug, Clone)]
 pub struct NodeState {
-    node_type: NodeType,
-    version: u32,
-    height: u32,
-    state: State,
+    pub node_type: NodeType,
+    pub version: u32,
+    pub height: u32,
+    pub state: State,
 }
 
 /// A summary of the state of the known nodes.
@@ -79,13 +79,13 @@ pub struct NodeMeta {
     // The details of the node's state.
     pub state: Option<NodeState>,
     // The last interaction timestamp.
-    timestamp: Option<OffsetDateTime>,
+    pub timestamp: Option<OffsetDateTime>,
     // The number of lists of peers received from the node.
     received_peer_sets: u8,
     // The number of subsequent connection failures.
     connection_failures: u8,
     // The time it took to connect to the node.
-    handshake_time: Option<Duration>,
+    pub handshake_time: Option<Duration>,
 }
 
 impl NodeMeta {
@@ -293,6 +293,16 @@ impl KnownNetwork {
     /// Returns a snapshot of all the nodes.
     pub fn nodes(&self) -> HashMap<SocketAddr, NodeMeta> {
         self.nodes.read().clone()
+    }
+
+    /// Returns the number of all the known connections.
+    pub fn num_connections(&self) -> usize {
+        self.connections.read().len()
+    }
+
+    /// Returns the number of all the known nodes.
+    pub fn num_nodes(&self) -> usize {
+        self.nodes.read().len()
     }
 
     /// Returns a state summary for the known nodes.

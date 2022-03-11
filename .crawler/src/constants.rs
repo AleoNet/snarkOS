@@ -26,6 +26,8 @@ pub const ACCEPTED_MESSAGE_IDS: &'static [u16] = &[
 ];
 /// The interval for revisiting successfully crawled nodes.
 pub const CRAWL_INTERVAL_MINS: i64 = 10;
+/// The amount of time (in seconds) between database writes containing crawling information.
+pub const DB_WRITE_INTERVAL_SECS: u8 = 10;
 /// The amount of time (in seconds) between crawling logs.
 pub const LOG_INTERVAL_SECS: u64 = 10;
 /// The maximum number of peers the crawler can have at a time.

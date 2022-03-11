@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#[cfg(feature = "postgres")]
+use snarkos_crawler::storage::initialize_storage;
 use snarkos_crawler::{
     constants::SYNC_NODES,
     crawler::{Crawler, Opts},
@@ -23,14 +25,20 @@ use structopt::StructOpt;
 
 #[tokio::main]
 async fn main() {
+    // Enable tracing.
+    snarkos_synthetic_node::enable_tracing();
+
     // Read configuration options.
     let opts = Opts::from_args();
 
-    // Configure and start crawler.
-    let crawler = Crawler::new(opts).await;
+    // Initialize the storage, if enabled.
+    #[cfg(feature = "postgres")]
+    let storage = Some(initialize_storage(&opts).await.expect("couldn't initialize storage"));
+    #[cfg(not(feature = "postgres"))]
+    let storage = None;
 
-    // Enable tracing for the crawler.
-    snarkos_synthetic_node::enable_tracing();
+    // Configure and start crawler.
+    let crawler = Crawler::new(opts, storage).await;
 
     // Register the addresses of the sync nodes.
     for addr in SYNC_NODES {

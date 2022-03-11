@@ -31,6 +31,8 @@ use pea2pea::{
     Pea2Pea,
 };
 use rand::{rngs::SmallRng, seq::IteratorRandom, SeedableRng};
+#[cfg(feature = "postgres-tls")]
+use std::path::PathBuf;
 use std::{
     convert::TryInto,
     io::{self, Read},
@@ -41,8 +43,13 @@ use std::{
 };
 use structopt::StructOpt;
 use time::OffsetDateTime;
-use tokio::task;
+use tokio::{sync::Mutex, task};
+#[cfg(feature = "postgres")]
+use tokio_postgres::Client as StorageClient;
 use tracing::*;
+
+#[cfg(not(feature = "postgres"))]
+pub struct StorageClient;
 
 // CLI
 // TODO: investigate using clap instead.
@@ -52,6 +59,34 @@ pub struct Opts {
     /// Naming and defaults kept consistent with snarkOS.
     #[structopt(parse(try_from_str), default_value = "0.0.0.0:4132", long = "node")]
     pub node: SocketAddr,
+    /// The path to a certificate file to be used for a TLS connection with the postgres instance.
+    #[cfg(feature = "postgres-tls")]
+    #[structopt(long = "postgres-cert-path")]
+    pub postgres_cert_path: PathBuf,
+    /// The hostname of the postgres instance (defaults to "localhost").
+    #[cfg(feature = "postgres")]
+    #[structopt(long = "postgres-host", default_value = "localhost")]
+    pub postgres_host: String,
+    /// The port of the postgres instance (defaults to 5432).
+    #[cfg(feature = "postgres")]
+    #[structopt(long = "postgres-port", default_value = "5432")]
+    pub postgres_port: u16,
+    /// The user of the postgres instance (defaults to "postgres").
+    #[cfg(feature = "postgres")]
+    #[structopt(long = "postgres-user", default_value = "postgres")]
+    pub postgres_user: String,
+    /// The password for the postgres instance (defaults to nothing).
+    #[cfg(feature = "postgres")]
+    #[structopt(long = "postgres-pass", default_value = "")]
+    pub postgres_pass: String,
+    /// The hostname of the postgres instance (defaults to "postgres").
+    #[cfg(feature = "postgres")]
+    #[structopt(long = "postgres-dbname", default_value = "postgres")]
+    pub postgres_dbname: String,
+    /// If set to `true`, re-creates the crawler's database tables.
+    #[cfg(feature = "postgres")]
+    #[structopt(long = "postgres-clean")]
+    pub postgres_clean: bool,
 }
 
 /// Represents the crawler together with network metrics it has collected.
@@ -59,6 +94,7 @@ pub struct Opts {
 pub struct Crawler {
     synth_node: SynthNode,
     pub known_network: Arc<KnownNetwork>,
+    pub storage: Option<Arc<Mutex<StorageClient>>>,
 }
 
 impl Pea2Pea for Crawler {
@@ -77,7 +113,7 @@ impl Deref for Crawler {
 
 impl Crawler {
     /// Creates the crawler with the given configuration.
-    pub async fn new(opts: Opts) -> Self {
+    pub async fn new(opts: Opts, storage: Option<StorageClient>) -> Self {
         let config = Config {
             name: Some("snarkOS crawler".into()),
             listener_ip: Some(opts.node.ip()),
@@ -93,6 +129,7 @@ impl Crawler {
         let node = Self {
             synth_node: SynthNode::new(pea2pea_node, client_state),
             known_network: Arc::new(KnownNetwork::default()),
+            storage: storage.map(|s| Arc::new(Mutex::new(s))),
         };
 
         node.enable_disconnect().await;
@@ -168,7 +205,22 @@ impl Crawler {
         });
     }
 
+    /// Spawns a task periodically storing crawling information in a database.
+    #[cfg(feature = "postgres")]
+    fn store_known_network(&self) {
+        let node = self.clone();
+        tokio::spawn(async move {
+            loop {
+                if let Err(e) = node.write_crawling_data().await {
+                    error!(parent: node.node().span(), "storage write error: {}", e);
+                }
+                tokio::time::sleep(Duration::from_secs(DB_WRITE_INTERVAL_SECS.into())).await;
+            }
+        });
+    }
+
     /// Spawns a task printing the desired crawling information in the logs.
+    #[cfg(not(feature = "postgres"))]
     fn log_known_network(&self) {
         let node = self.clone();
         tokio::spawn(async move {
@@ -182,6 +234,9 @@ impl Crawler {
 
     /// Starts the usual periodic activities of a crawler node.
     pub fn run_periodic_tasks(&self) {
+        #[cfg(feature = "postgres")]
+        self.store_known_network();
+        #[cfg(not(feature = "postgres"))]
         self.log_known_network();
         self.update_peers();
     }
