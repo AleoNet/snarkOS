@@ -14,30 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#![forbid(unsafe_code)]
-#![allow(clippy::module_inception)]
-#![allow(clippy::suspicious_else_formatting)]
-#![allow(clippy::type_complexity)]
+use crate::{ledger::Ledger, operator::Operator, peers::Peers, prover::Prover};
 
-#[macro_use]
-extern crate tracing;
+use snarkos_environment::Environment;
+use snarkvm::prelude::*;
 
-pub mod helpers;
+use std::{net::SocketAddr, sync::Arc};
 
-pub mod ledger;
-pub use ledger::*;
-
-pub mod state;
-pub use state::*;
-
-pub mod operator;
-pub use operator::*;
-
-pub(crate) mod peer;
-pub(crate) use peer::*;
-
-pub mod peers;
-pub use peers::*;
-
-pub mod prover;
-pub use prover::*;
+/// The network state of the node.
+#[derive(Clone)]
+pub struct NetworkState<N: Network, E: Environment> {
+    /// The local address of the node.
+    pub local_ip: SocketAddr,
+    /// The list of peers for the node.
+    pub peers: Arc<Peers<N, E>>,
+    /// The ledger of the node.
+    pub ledger: Arc<Ledger<N, E>>,
+    /// The operator of the node.
+    pub operator: Arc<Operator<N, E>>,
+    /// The prover of the node.
+    pub prover: Arc<Prover<N, E>>,
+}

@@ -24,6 +24,7 @@ use snarkos_network::{
     operator::{Operator, OperatorRouter},
     peers::{Peers, PeersRequest, PeersRouter},
     prover::{Prover, ProverRouter},
+    state::NetworkState,
 };
 use snarkos_storage::storage::rocksdb::RocksDB;
 use snarkvm::prelude::*;
@@ -46,16 +47,7 @@ use tokio::{net::TcpListener, sync::oneshot, task};
 ///
 #[derive(Clone)]
 pub struct Server<N: Network, E: Environment> {
-    /// The local address of the node.
-    local_ip: SocketAddr,
-    /// The list of peers for the node.
-    peers: Arc<Peers<N, E>>,
-    /// The ledger of the node.
-    ledger: Arc<Ledger<N, E>>,
-    /// The operator of the node.
-    operator: Arc<Operator<N, E>>,
-    /// The prover of the node.
-    prover: Arc<Prover<N, E>>,
+    network_state: NetworkState<N, E>,
 }
 
 impl<N: Network, E: Environment> Server<N, E> {
@@ -186,27 +178,29 @@ impl<N: Network, E: Environment> Server<N, E> {
         Self::initialize_metrics(ledger.reader());
 
         Ok(Self {
-            local_ip,
-            peers,
-            ledger,
-            operator,
-            prover,
+            network_state: NetworkState {
+                local_ip,
+                peers,
+                ledger,
+                operator,
+                prover,
+            },
         })
     }
 
     /// Returns the IP address of this node.
     pub fn local_ip(&self) -> SocketAddr {
-        self.local_ip
+        self.network_state.local_ip
     }
 
     /// Returns the peer manager of this node.
     pub fn peers(&self) -> Arc<Peers<N, E>> {
-        self.peers.clone()
+        self.network_state.peers.clone()
     }
 
     /// Returns the ledger of this node.
     pub fn ledger(&self) -> Arc<Ledger<N, E>> {
-        self.ledger.clone()
+        self.network_state.ledger.clone()
     }
 
     ///
@@ -218,14 +212,15 @@ impl<N: Network, E: Environment> Server<N, E> {
         let (router, handler) = oneshot::channel();
 
         // Route a `Connect` request to the peer manager.
-        self.peers
+        self.network_state
+            .peers
             .router()
             .send(PeersRequest::Connect(
                 peer_ip,
-                self.ledger.reader(),
-                self.ledger.router(),
-                self.operator.router(),
-                self.prover.router(),
+                self.network_state.ledger.reader(),
+                self.network_state.ledger.router(),
+                self.network_state.operator.router(),
+                self.network_state.prover.router(),
                 router,
             ))
             .await?;
@@ -245,7 +240,7 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Shut down the ledger.
         trace!("Proceeding to shut down the ledger...");
-        self.ledger.shut_down().await;
+        self.network_state.ledger.shut_down().await;
 
         // Flush the tasks.
         E::resources().shut_down();
