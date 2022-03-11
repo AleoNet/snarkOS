@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{LedgerReader, LedgerRequest, LedgerRouter, PeersRequest, PeersRouter};
+use crate::{LedgerReader, LedgerRequest, LedgerRouter, NetworkState, PeersRequest, PeersRouter};
 use snarkos_environment::{
     helpers::{NodeType, State},
     network::{Data, Message},
@@ -24,6 +24,7 @@ use snarkos_storage::{storage::Storage, ProverState};
 use snarkvm::dpc::{posw::PoSWProof, prelude::*};
 
 use anyhow::{anyhow, Result};
+use once_cell::sync::OnceCell;
 use rand::thread_rng;
 use std::{
     net::SocketAddr,
@@ -63,6 +64,7 @@ pub enum ProverRequest<N: Network> {
 ///
 #[derive(Debug)]
 pub struct Prover<N: Network, E: Environment> {
+    network_state: OnceCell<NetworkState<N, E>>,
     /// The state storage of the prover.
     state: Arc<ProverState<N>>,
     /// The Aleo address of the prover.
@@ -96,6 +98,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         let (prover_router, mut prover_handler) = mpsc::channel(1024);
         // Initialize the prover.
         let prover = Arc::new(Self {
+            network_state: OnceCell::new(),
             state: Arc::new(ProverState::open::<S, P>(path, false)?),
             address,
             pool: pool_ip,
@@ -159,6 +162,10 @@ impl<N: Network, E: Environment> Prover<N, E> {
         }
 
         Ok(prover)
+    }
+
+    pub fn set_network_state(&self, network_state: NetworkState<N, E>) {
+        self.network_state.set(network_state).expect("network state can only be set once");
     }
 
     /// Returns an instance of the prover router.

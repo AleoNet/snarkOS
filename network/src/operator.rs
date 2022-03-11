@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{LedgerReader, LedgerRequest, LedgerRouter, PeersRequest, PeersRouter, ProverRouter};
+use crate::{LedgerReader, LedgerRequest, LedgerRouter, NetworkState, PeersRequest, PeersRouter, ProverRouter};
 use snarkos_environment::{
     helpers::NodeType,
     network::{Data, Message},
@@ -24,6 +24,7 @@ use snarkos_storage::{storage::Storage, OperatorState};
 use snarkvm::dpc::{prelude::*, PoSWProof};
 
 use anyhow::Result;
+use once_cell::sync::OnceCell;
 use rand::thread_rng;
 use std::{
     collections::{HashMap, HashSet},
@@ -64,6 +65,7 @@ const HEARTBEAT_IN_SECONDS: Duration = Duration::from_secs(1);
 ///
 #[derive(Debug)]
 pub struct Operator<N: Network, E: Environment> {
+    network_state: OnceCell<NetworkState<N, E>>,
     /// The address of the operator.
     address: Option<Address<N>>,
     /// The local address of this node.
@@ -107,6 +109,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
         let (operator_router, mut operator_handler) = mpsc::channel(1024);
         // Initialize the operator.
         let operator = Arc::new(Self {
+            network_state: OnceCell::new(),
             address,
             local_ip,
             state: Arc::new(OperatorState::open_writer::<S, P>(path)?),
@@ -206,6 +209,10 @@ impl<N: Network, E: Environment> Operator<N, E> {
         }
 
         Ok(operator)
+    }
+
+    pub fn set_network_state(&self, network_state: NetworkState<N, E>) {
+        self.network_state.set(network_state).expect("network state can only be set once");
     }
 
     /// Returns an instance of the operator router.

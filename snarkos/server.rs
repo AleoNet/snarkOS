@@ -185,9 +185,11 @@ impl<N: Network, E: Environment> Server<N, E> {
             prover,
         };
 
-        // Set the network state reference on the peers.
+        // Set the network state reference on the various services.
         network_state.peers.set_network_state(network_state.clone());
         network_state.ledger.set_network_state(network_state.clone());
+        network_state.operator.set_network_state(network_state.clone());
+        network_state.prover.set_network_state(network_state.clone());
 
         Ok(Self { network_state })
     }
