@@ -154,8 +154,25 @@ impl<N: Network, E: Environment> Server<N, E> {
         )
         .await;
 
+        let network_state = NetworkState {
+            local_ip,
+            peers: peers.clone(),
+            ledger: ledger.clone(),
+            operator: operator.clone(),
+            prover: prover.clone(),
+        };
+
         // Initialize a new instance of the heartbeat.
-        Self::initialize_heartbeat(peers.router(), ledger.reader(), ledger.router(), operator.router(), prover.router()).await;
+        Self::initialize_heartbeat(
+            // Maybe this can be passed in differently.
+            network_state.clone(),
+            peers.router(),
+            ledger.reader(),
+            ledger.router(),
+            operator.router(),
+            prover.router(),
+        )
+        .await;
 
         #[cfg(feature = "rpc")]
         // Initialize a new instance of the RPC server.
@@ -176,14 +193,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialise the metrics exporter.
         #[cfg(any(feature = "test", feature = "prometheus"))]
         Self::initialize_metrics(ledger.reader());
-
-        let network_state = NetworkState {
-            local_ip,
-            peers,
-            ledger,
-            operator,
-            prover,
-        };
 
         // Set the network state reference on the various services.
         network_state.peers.set_network_state(network_state.clone());
@@ -314,6 +323,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     async fn initialize_heartbeat(
+        network_state: NetworkState<N, E>,
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
         ledger_router: LedgerRouter<N>,
@@ -329,9 +339,8 @@ impl<N: Network, E: Environment> Server<N, E> {
                 let _ = router.send(());
                 loop {
                     // Transmit a heartbeat request to the ledger.
-                    if let Err(error) = ledger_router.send(LedgerRequest::Heartbeat(prover_router.clone())).await {
-                        error!("Failed to send heartbeat to ledger: {}", error)
-                    }
+                    network_state.ledger.update(LedgerRequest::Heartbeat(prover_router.clone())).await;
+
                     // Transmit a heartbeat request to the peers.
                     let request = PeersRequest::Heartbeat(
                         ledger_reader.clone(),

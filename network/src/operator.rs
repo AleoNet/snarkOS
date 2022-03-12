@@ -335,9 +335,13 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         if let Ok(block) = Block::from(previous_block_hash, block_header, transactions) {
                             info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
                             let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
-                            if let Err(error) = self.ledger_router.send(request).await {
-                                warn!("Failed to broadcast mined block - {}", error);
-                            }
+
+                            self.network_state
+                                .get()
+                                .expect("network state must be set")
+                                .ledger
+                                .update(request)
+                                .await;
                         }
                     }
                 } else {

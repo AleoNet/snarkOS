@@ -142,27 +142,27 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         });
 
         // Initialize the handler for the ledger.
-        {
-            let ledger = ledger.clone();
-            let (router, handler) = oneshot::channel();
-            E::resources().register_task(
-                None, // No need to provide an id, as the task will run indefinitely.
-                task::spawn(async move {
-                    // Notify the outer function that the task is ready.
-                    let _ = router.send(());
-                    // Asynchronously wait for a ledger request.
-                    while let Some(request) = ledger_handler.recv().await {
-                        // Update the state of the ledger.
-                        // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
-                        // will end up being processed out of order.
-                        ledger.update(request).await;
-                    }
-                }),
-            );
+        // {
+        //     let ledger = ledger.clone();
+        //     let (router, handler) = oneshot::channel();
+        //     E::resources().register_task(
+        //         None, // No need to provide an id, as the task will run indefinitely.
+        //         task::spawn(async move {
+        //             // Notify the outer function that the task is ready.
+        //             let _ = router.send(());
+        //             // Asynchronously wait for a ledger request.
+        //             while let Some(request) = ledger_handler.recv().await {
+        //                 // Update the state of the ledger.
+        //                 // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
+        //                 // will end up being processed out of order.
+        //                 ledger.update(request).await;
+        //             }
+        //         }),
+        //     );
 
-            // Wait until the ledger handler is ready.
-            let _ = handler.await;
-        }
+        //     // Wait until the ledger handler is ready.
+        //     let _ = handler.await;
+        // }
 
         Ok(ledger)
     }
@@ -204,7 +204,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(&self, request: LedgerRequest<N>) {
+    pub async fn update(&self, request: LedgerRequest<N>) {
         match request {
             LedgerRequest::BlockResponse(peer_ip, block, prover_router) => {
                 // Remove the block request from the ledger.

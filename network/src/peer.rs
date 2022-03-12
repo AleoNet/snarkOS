@@ -471,9 +471,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     if number_of_blocks > E::MAXIMUM_BLOCK_REQUEST {
                                         // Route a `Failure` to the ledger.
                                         let failure = format!("Attempted to request {} blocks", number_of_blocks);
-                                        if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, failure)).await {
-                                            warn!("[Failure] {}", error);
-                                        }
+
+                                        peer.network_state.ledger.update(LedgerRequest::Failure(peer_ip, failure)).await;
+
                                         continue;
                                     }
                                     // Retrieve the requested blocks.
@@ -481,9 +481,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         Ok(blocks) => blocks,
                                         Err(error) => {
                                             // Route a `Failure` to the ledger.
-                                            if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
-                                                warn!("[Failure] {}", error);
-                                            }
+
+                                            peer.network_state.ledger.update(LedgerRequest::Failure(peer_ip, format!("{}", error))).await;
+
                                             continue;
                                         }
                                     };
@@ -511,13 +511,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                             }
 
                                             // Route the `BlockResponse` to the ledger.
-                                            if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block, prover_router.clone())).await {
-                                                warn!("[BlockResponse] {}", error);
-                                            }
+                                            peer.network_state.ledger.update(LedgerRequest::BlockResponse(peer_ip, block, prover_router.clone())).await;
                                         },
                                         // Route the `Failure` to the ledger.
-                                        Err(error) => if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
-                                            warn!("[Failure] {}", error);
+                                        Err(error) => {
+                                            peer.network_state.ledger.update(LedgerRequest::Failure(peer_ip, format!("{}", error))).await;
                                         }
                                     }
                                 }
@@ -609,9 +607,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     };
 
                                     // Route the request to the ledger.
-                                    if let Err(error) = ledger_router.send(request).await {
-                                        warn!("[Pong] {}", error);
-                                    }
+                                    peer.network_state.ledger.update(request).await;
 
                                     // Spawn an asynchronous task for the `Ping` request.
                                     let peers_router = peers_router.clone();
@@ -683,9 +679,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         };
 
                                         // Route the request to the ledger.
-                                        if let Err(error) = ledger_router.send(request).await {
-                                            warn!("[UnconfirmedBlock] {}", error);
-                                        }
+                                        peer.network_state.ledger.update(request).await;
                                     }
                                 }
                                 Message::UnconfirmedTransaction(transaction) => {

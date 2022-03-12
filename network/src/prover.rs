@@ -330,13 +330,14 @@ impl<N: Network, E: Environment> Prover<N, E> {
         if E::NODE_TYPE == NodeType::Miner && prover.pool.is_none() {
             if let Some(recipient) = prover.address {
                 // Initialize the prover process.
-                let prover = prover.clone();
+                //           let prover_clone = prover.clone();
                 let (router, handler) = oneshot::channel();
                 E::resources().register_task(
                     None, // No need to provide an id, as the task will run indefinitely.
                     task::spawn(async move {
                         // Notify the outer function that the task is ready.
                         let _ = router.send(());
+
                         loop {
                             // If `terminator` is `false` and the status is not `Peering` or `Mining` already, mine the next block.
                             if !E::terminator().load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
@@ -352,6 +353,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
                                 // Procure a resource id to register the task with, as it might be terminated at any point in time.
                                 let mining_task_id = E::resources().procure_id();
+                                let prover_clone = prover.clone();
                                 E::resources().register_task(
                                     Some(mining_task_id),
                                     task::spawn(async move {
@@ -383,9 +385,14 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
                                                 // Broadcast the next block.
                                                 let request = LedgerRequest::UnconfirmedBlock(local_ip, block, prover_router.clone());
-                                                if let Err(error) = ledger_router.send(request).await {
-                                                    warn!("Failed to broadcast mined block - {}", error);
-                                                }
+
+                                                prover_clone
+                                                    .network_state
+                                                    .get()
+                                                    .expect("network state must be set")
+                                                    .ledger
+                                                    .update(request)
+                                                    .await;
                                             }
                                             Ok(Err(error)) | Err(error) => trace!("{}", error),
                                         }
