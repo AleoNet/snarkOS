@@ -448,7 +448,8 @@ impl<N: Network, E: Environment> Server<N, E> {
     fn initialize_metrics(ledger: LedgerReader<N>) {
         #[cfg(not(feature = "test"))]
         if let Some(handler) = snarkos_metrics::initialize() {
-            E::resources().register_task(handler);
+            // No need to provide an id, as the task will run indefinitely.
+            E::resources().register_task(None, handler);
         }
 
         // Set the block height as it could already be non-zero.
