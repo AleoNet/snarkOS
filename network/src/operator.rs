@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{LedgerReader, LedgerRequest, LedgerRouter, NetworkState, PeersRequest, PeersRouter, ProverRouter};
+use crate::{state::NetworkState, LedgerReader, LedgerRequest, PeersRequest, PeersRouter, ProverRouter};
 use snarkos_environment::{
     helpers::NodeType,
     network::{Data, Message},
@@ -86,8 +86,6 @@ pub struct Operator<N: Network, E: Environment> {
     peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
     ledger_reader: LedgerReader<N>,
-    /// The ledger router of the node.
-    ledger_router: LedgerRouter<N>,
     /// The prover router of the node.
     prover_router: ProverRouter<N>,
 }
@@ -102,7 +100,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
         memory_pool: Arc<RwLock<MemoryPool<N>>>,
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
-        ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `Operator` struct.
@@ -120,7 +117,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
             memory_pool,
             peers_router,
             ledger_reader,
-            ledger_router,
             prover_router,
         });
 

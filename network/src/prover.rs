@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{LedgerReader, LedgerRequest, LedgerRouter, NetworkState, PeersRequest, PeersRouter};
+use crate::{state::NetworkState, LedgerReader, LedgerRequest, PeersRequest, PeersRouter};
 use snarkos_environment::{
     helpers::{NodeType, State},
     network::{Data, Message},
@@ -79,8 +79,6 @@ pub struct Prover<N: Network, E: Environment> {
     peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
     ledger_reader: LedgerReader<N>,
-    /// The ledger router of the node.
-    ledger_router: LedgerRouter<N>,
 }
 
 impl<N: Network, E: Environment> Prover<N, E> {
@@ -92,7 +90,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
         pool_ip: Option<SocketAddr>,
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
-        ledger_router: LedgerRouter<N>,
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `Prover` struct.
         let (prover_router, mut prover_handler) = mpsc::channel(1024);
@@ -106,7 +103,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
             memory_pool: Arc::new(RwLock::new(MemoryPool::new())),
             peers_router,
             ledger_reader,
-            ledger_router,
         });
 
         // Initialize the handler for the prover.
@@ -348,7 +344,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                 let state = prover.state.clone();
                                 let canon = prover.ledger_reader.clone(); // This is *safe* as the ledger only reads.
                                 let unconfirmed_transactions = prover.memory_pool.read().await.transactions();
-                                let ledger_router = prover.ledger_router.clone();
                                 let prover_router = prover.prover_router.clone();
 
                                 // Procure a resource id to register the task with, as it might be terminated at any point in time.

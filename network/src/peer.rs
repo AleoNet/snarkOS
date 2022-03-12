@@ -18,7 +18,6 @@ use crate::{
     ConnectionResult,
     LedgerReader,
     LedgerRequest,
-    LedgerRouter,
     OperatorRequest,
     OperatorRouter,
     PeersRequest,
@@ -328,7 +327,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
         local_nonce: u64,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
-        ledger_router: LedgerRouter<N>,
         prover_router: ProverRouter<N>,
         operator_router: OperatorRouter<N>,
         connected_nonces: Vec<u64>,
@@ -765,12 +763,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
             // When this is reached, it means the peer has disconnected.
             // Route a `Disconnect` to the ledger.
-            if let Err(error) = ledger_router
-                .send(LedgerRequest::Disconnect(peer_ip, DisconnectReason::PeerHasDisconnected))
-                .await
-            {
-                warn!("[Peer::Disconnect] {}", error);
-            }
+            peer.network_state.ledger.update(LedgerRequest::Disconnect(peer_ip, DisconnectReason::PeerHasDisconnected)).await;
 
             E::resources().deregister(peer_resource_id);
         }));

@@ -20,7 +20,7 @@ use snarkos_environment::{
     Environment,
 };
 use snarkos_network::{
-    ledger::{Ledger, LedgerReader, LedgerRequest, LedgerRouter},
+    ledger::{Ledger, LedgerReader, LedgerRequest},
     operator::{Operator, OperatorRouter},
     peers::{Peers, PeersRequest, PeersRouter},
     prover::{Prover, ProverRouter},
@@ -74,16 +74,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance for managing the ledger.
         let ledger = Ledger::<N, E>::open::<RocksDB, _>(&ledger_storage_path, peers.router()).await?;
         // Initialize a new instance for managing the prover.
-        let prover = Prover::open::<RocksDB, _>(
-            &prover_storage_path,
-            address,
-            local_ip,
-            pool_ip,
-            peers.router(),
-            ledger.reader(),
-            ledger.router(),
-        )
-        .await?;
+        let prover = Prover::open::<RocksDB, _>(&prover_storage_path, address, local_ip, pool_ip, peers.router(), ledger.reader()).await?;
         // Initialize a new instance for managing the operator.
         let operator = Operator::open::<RocksDB, _>(
             &operator_storage_path,
@@ -92,7 +83,6 @@ impl<N: Network, E: Environment> Server<N, E> {
             prover.memory_pool(),
             peers.router(),
             ledger.reader(),
-            ledger.router(),
             prover.router(),
         )
         .await?;
@@ -102,7 +92,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         if let Some(pool_ip) = pool_ip {
             let peers_router = peers.router();
             let ledger_reader = ledger.reader();
-            let ledger_router = ledger.router();
             let operator_router = operator.router();
             let prover_router = prover.router();
 
@@ -120,7 +109,6 @@ impl<N: Network, E: Environment> Server<N, E> {
                             .send(PeersRequest::Connect(
                                 pool_ip,
                                 ledger_reader.clone(),
-                                ledger_router.clone(),
                                 operator_router.clone(),
                                 prover_router.clone(),
                                 router,
@@ -148,7 +136,6 @@ impl<N: Network, E: Environment> Server<N, E> {
             listener,
             peers.clone(),
             ledger.reader(),
-            ledger.router(),
             operator.router(),
             prover.router(),
         )
@@ -168,7 +155,6 @@ impl<N: Network, E: Environment> Server<N, E> {
             network_state.clone(),
             peers.router(),
             ledger.reader(),
-            ledger.router(),
             operator.router(),
             prover.router(),
         )
@@ -233,7 +219,6 @@ impl<N: Network, E: Environment> Server<N, E> {
             .send(PeersRequest::Connect(
                 peer_ip,
                 self.network_state.ledger.reader(),
-                self.network_state.ledger.router(),
                 self.network_state.operator.router(),
                 self.network_state.prover.router(),
                 router,
@@ -271,7 +256,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         listener: TcpListener,
         peers: Arc<Peers<N, E>>,
         ledger_reader: LedgerReader<N>,
-        ledger_router: LedgerRouter<N>,
         operator_router: OperatorRouter<N>,
         prover_router: ProverRouter<N>,
     ) {
@@ -294,7 +278,6 @@ impl<N: Network, E: Environment> Server<N, E> {
                                     stream,
                                     peer_ip,
                                     ledger_reader.clone(),
-                                    ledger_router.clone(),
                                     operator_router.clone(),
                                     prover_router.clone(),
                                 );
@@ -326,7 +309,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         network_state: NetworkState<N, E>,
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
-        ledger_router: LedgerRouter<N>,
         operator_router: OperatorRouter<N>,
         prover_router: ProverRouter<N>,
     ) {
@@ -342,12 +324,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                     network_state.ledger.update(LedgerRequest::Heartbeat(prover_router.clone())).await;
 
                     // Transmit a heartbeat request to the peers.
-                    let request = PeersRequest::Heartbeat(
-                        ledger_reader.clone(),
-                        ledger_router.clone(),
-                        operator_router.clone(),
-                        prover_router.clone(),
-                    );
+                    let request = PeersRequest::Heartbeat(ledger_reader.clone(), operator_router.clone(), prover_router.clone());
                     if let Err(error) = peers_router.send(request).await {
                         error!("Failed to send heartbeat to peers: {}", error)
                     }

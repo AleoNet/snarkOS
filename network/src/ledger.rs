@@ -44,21 +44,12 @@ use std::{
     time::{Duration, Instant},
 };
 use time::OffsetDateTime;
-use tokio::{
-    sync::{mpsc, oneshot, Mutex, RwLock},
-    task,
-};
+use tokio::sync::{Mutex, RwLock};
 
 /// The maximum number of unconfirmed blocks that can be held by the ledger.
 const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 250;
 
 pub type LedgerReader<N> = std::sync::Arc<snarkos_storage::LedgerState<N>>;
-
-/// Shorthand for the parent half of the `Ledger` message channel.
-pub type LedgerRouter<N> = mpsc::Sender<LedgerRequest<N>>;
-#[allow(unused)]
-/// Shorthand for the child half of the `Ledger` message channel.
-type LedgerHandler<N> = mpsc::Receiver<LedgerRequest<N>>;
 
 ///
 /// An enum of requests that the `Ledger` struct processes.
@@ -88,8 +79,6 @@ pub type PeersState<N> = HashMap<SocketAddr, Option<(NodeType, State, Option<boo
 #[allow(clippy::type_complexity)]
 pub struct Ledger<N: Network, E: Environment> {
     network_state: OnceCell<NetworkState<N, E>>,
-    /// The ledger router of the node.
-    ledger_router: LedgerRouter<N>,
     /// The canonical chain of blocks.
     canon: Arc<LedgerState<N>>,
     /// The canonical chain of blocks in read-only mode.
@@ -117,9 +106,6 @@ pub struct Ledger<N: Network, E: Environment> {
 impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger.
     pub async fn open<S: Storage, P: AsRef<Path> + Copy>(path: P, peers_router: PeersRouter<N, E>) -> Result<Arc<Self>> {
-        // Initialize an mpsc channel for sending requests to the `Ledger` struct.
-        let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
-
         let canon = Arc::new(LedgerState::open_writer::<S, P>(path)?);
         let (canon_reader, reader_resource) = LedgerState::open_reader::<S, P>(path)?;
         // Register the thread; no need to provide an id, as it will run indefinitely.
@@ -128,7 +114,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Initialize the ledger.
         let ledger = Arc::new(Self {
             network_state: OnceCell::new(),
-            ledger_router,
             canon,
             canon_reader,
             canon_lock: Arc::new(Mutex::new(())),
@@ -141,29 +126,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             peers_router,
         });
 
-        // Initialize the handler for the ledger.
-        // {
-        //     let ledger = ledger.clone();
-        //     let (router, handler) = oneshot::channel();
-        //     E::resources().register_task(
-        //         None, // No need to provide an id, as the task will run indefinitely.
-        //         task::spawn(async move {
-        //             // Notify the outer function that the task is ready.
-        //             let _ = router.send(());
-        //             // Asynchronously wait for a ledger request.
-        //             while let Some(request) = ledger_handler.recv().await {
-        //                 // Update the state of the ledger.
-        //                 // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
-        //                 // will end up being processed out of order.
-        //                 ledger.update(request).await;
-        //             }
-        //         }),
-        //     );
-
-        //     // Wait until the ledger handler is ready.
-        //     let _ = handler.await;
-        // }
-
         Ok(ledger)
     }
 
@@ -174,11 +136,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Returns an instance of the ledger reader.
     pub fn reader(&self) -> LedgerReader<N> {
         self.canon_reader.clone()
-    }
-
-    /// Returns an instance of the ledger router.
-    pub fn router(&self) -> LedgerRouter<N> {
-        self.ledger_router.clone()
     }
 
     pub async fn shut_down(&self) {
