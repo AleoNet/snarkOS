@@ -18,7 +18,6 @@ use parking_lot::RwLock;
 use snarkos_environment::helpers::{NodeType, State};
 use std::{
     collections::{HashMap, HashSet},
-    fmt,
     net::SocketAddr,
 };
 use time::{Duration, OffsetDateTime};
@@ -35,42 +34,6 @@ pub struct NodeState {
     pub version: u32,
     pub height: u32,
     pub state: State,
-}
-
-/// A summary of the state of the known nodes.
-#[derive(Clone)]
-#[allow(dead_code)]
-pub struct NetworkSummary {
-    // The number of all known nodes.
-    num_known_nodes: usize,
-    // The number of all known connections.
-    num_known_connections: usize,
-    // The number of nodes that haven't provided their state yet.
-    nodes_pending_state: usize,
-    // The types of nodes and their respective counts.
-    types: HashMap<NodeType, usize>,
-    // The versions of nodes and their respective counts.
-    versions: HashMap<u32, usize>,
-    // The node states of nodes and their respective counts.
-    states: HashMap<State, usize>,
-    // The heights of nodes and their respective counts.
-    heights: HashMap<u32, usize>,
-    // The average handshake time in the network.
-    avg_handshake_time_ms: Option<i64>,
-}
-
-impl fmt::Debug for NetworkSummary {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Network summary")
-            .field("number of known nodes", &self.num_known_nodes)
-            .field("number of known connections", &self.num_known_connections)
-            .field("nodes pending state", &self.nodes_pending_state)
-            .field("types", &self.types)
-            .field("versions", &self.versions)
-            .field("states", &self.states)
-            .field("average handshake time (in ms)", &self.avg_handshake_time_ms)
-            .finish()
-    }
 }
 
 /// Node information collected while crawling.
@@ -147,13 +110,13 @@ impl KnownNetwork {
         // source), otherwise it's a connection which doesn't include the source and shouldn't be
         // removed. We also keep connections seen within the last few hours as peerlists are capped
         // in size and omitted connections don't necessarily mean they don't exist anymore.
-        let connections_to_remove: HashSet<Connection> = self
+        let now = OffsetDateTime::now_utc();
+        let connections_to_remove: Vec<Connection> = self
             .connections
             .read()
             .difference(&new_connections)
             .filter(|conn| {
-                (conn.source == source || conn.target == source)
-                    && (OffsetDateTime::now_utc() - conn.last_seen).whole_hours() > STALE_CONNECTION_CUTOFF_TIME_HRS
+                (conn.source == source || conn.target == source) && (now - conn.last_seen).whole_hours() > STALE_CONNECTION_CUTOFF_TIME_HRS
             })
             .copied()
             .collect();
@@ -303,52 +266,6 @@ impl KnownNetwork {
     /// Returns the number of all the known nodes.
     pub fn num_nodes(&self) -> usize {
         self.nodes.read().len()
-    }
-
-    /// Returns a state summary for the known nodes.
-    pub fn get_node_summary(&self) -> NetworkSummary {
-        let nodes = self.nodes();
-
-        let mut versions = HashMap::with_capacity(nodes.len());
-        let mut states = HashMap::with_capacity(nodes.len());
-        let mut types = HashMap::with_capacity(nodes.len());
-        let mut heights = HashMap::with_capacity(nodes.len());
-
-        let mut handshake_times = Vec::with_capacity(nodes.len());
-        let mut nodes_pending_state: usize = 0;
-
-        for meta in nodes.values() {
-            if let Some(ref state) = meta.state {
-                versions.entry(state.version).and_modify(|count| *count += 1).or_insert(1);
-                states.entry(state.state).and_modify(|count| *count += 1).or_insert(1);
-                types.entry(state.node_type).and_modify(|count| *count += 1).or_insert(1);
-                heights.entry(state.height).and_modify(|count| *count += 1).or_insert(1);
-            } else {
-                nodes_pending_state += 1;
-            }
-            if let Some(time) = meta.handshake_time {
-                handshake_times.push(time);
-            }
-        }
-
-        let num_known_connections = self.connections().len();
-        let avg_handshake_time_ms = if !handshake_times.is_empty() {
-            let avg = handshake_times.iter().sum::<Duration>().whole_milliseconds() as i64 / handshake_times.len() as i64;
-            Some(avg)
-        } else {
-            None
-        };
-
-        NetworkSummary {
-            num_known_nodes: nodes.len(),
-            num_known_connections,
-            nodes_pending_state,
-            versions,
-            heights,
-            states,
-            types,
-            avg_handshake_time_ms,
-        }
     }
 }
 

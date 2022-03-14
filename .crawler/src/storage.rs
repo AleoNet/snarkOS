@@ -27,7 +27,10 @@ use tokio_postgres::NoTls;
 use tokio_postgres::{types::Type, Client, Error};
 use tracing::*;
 
-use crate::crawler::{Crawler, Opts};
+use crate::{
+    crawler::{Crawler, Opts},
+    metrics::NetworkMetrics,
+};
 
 /// Connects to a PostgreSQL database and creates the needed tables if they don't exist yet.
 pub async fn initialize_storage(opts: &Opts) -> Result<Client, anyhow::Error> {
@@ -70,20 +73,26 @@ pub async fn initialize_storage(opts: &Opts) -> Result<Client, anyhow::Error> {
         .batch_execute(
             "
         CREATE TABLE IF NOT EXISTS nodes (
-            ip              INET NOT NULL,
-            port            INTEGER NOT NULL,
-            timestamp       TIMESTAMP WITH TIME ZONE,
-            type            SMALLINT,
-            version         INTEGER,
-            state           SMALLINT,
-            height          INTEGER,
-            handshake_ms    INTEGER
+            ip                  INET NOT NULL,
+            port                INTEGER NOT NULL,
+            timestamp           TIMESTAMP WITH TIME ZONE,
+            type                SMALLINT,
+            version             INTEGER,
+            state               SMALLINT,
+            height              INTEGER,
+            handshake_ms        INTEGER,
+            connection_count    SMALLINT,
+            prestige_score      REAL,
+            fiedler_value       REAL
         );
 
         CREATE TABLE IF NOT EXISTS network (
-            timestamp      TIMESTAMP WITH TIME ZONE NOT NULL,
-            nodes          INTEGER NOT NULL,
-            connections    INTEGER NOT NULL
+            timestamp        TIMESTAMP WITH TIME ZONE NOT NULL,
+            nodes            INTEGER NOT NULL,
+            connections      INTEGER NOT NULL,
+            density          REAL,
+            fiedler_value    REAL,
+            dcd              REAL
         );
     ",
         )
@@ -95,15 +104,19 @@ pub async fn initialize_storage(opts: &Opts) -> Result<Client, anyhow::Error> {
 }
 
 impl Crawler {
-    pub async fn write_crawling_data(&self) -> Result<(), Error> {
-        if let Some(ref storage) = self.storage {
-            let nodes = self.known_network.nodes();
+    pub async fn write_crawling_data(&self, metrics: Option<NetworkMetrics>) -> Result<(), Error> {
+        let metrics = if let Some(metrics) = metrics {
+            metrics
+        } else {
+            return Ok(());
+        };
 
+        if let Some(ref storage) = self.storage {
             let mut storage = storage.lock().await;
             let transaction = storage.transaction().await?;
 
             let per_node_stmt = transaction
-                .prepare_typed("INSERT INTO nodes VALUES ($1, $2, $3, $4, $5, $6, $7, $8);", &[
+                .prepare_typed("INSERT INTO nodes VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);", &[
                     Type::INET,
                     Type::INT4,
                     Type::TIMESTAMPTZ,
@@ -112,28 +125,37 @@ impl Crawler {
                     Type::INT2,
                     Type::INT8,
                     Type::INT4,
+                    Type::INT4,
+                    Type::FLOAT4,
+                    Type::FLOAT4,
                 ])
                 .await?;
 
-            for (addr, meta) in nodes.into_iter().filter(|(_, meta)| meta.timestamp.is_some()) {
+            for (addr, meta, nc) in metrics.per_node {
                 transaction
                     .execute(&per_node_stmt, &[
                         &addr.ip(),
                         &(addr.port() as i32),
-                        &meta.timestamp.unwrap(),
+                        &meta.timestamp,
                         &meta.state.as_ref().map(|s| s.node_type as i16),
                         &meta.state.as_ref().map(|s| s.version as i32),
                         &meta.state.as_ref().map(|s| s.state as i16),
                         &meta.state.as_ref().map(|s| s.height as i64),
                         &meta.handshake_time.map(|t| t.whole_milliseconds() as i32),
+                        &(nc.degree_centrality as i32),
+                        &(nc.eigenvector_centrality as f32),
+                        &(nc.fiedler_value as f32),
                     ])
                     .await?;
             }
 
             let network_stmt = transaction
-                .prepare_typed("INSERT INTO network VALUES ($1, $2, $3);", &[
+                .prepare_typed("INSERT INTO network VALUES ($1, $2, $3, $4, $5, $6);", &[
                     Type::TIMESTAMPTZ,
                     Type::INT4,
+                    Type::INT4,
+                    Type::FLOAT4,
+                    Type::FLOAT4,
                     Type::INT4,
                 ])
                 .await?;
@@ -141,8 +163,11 @@ impl Crawler {
             transaction
                 .execute(&network_stmt, &[
                     &OffsetDateTime::now_utc(),
-                    &(self.known_network.num_nodes() as i32),
-                    &(self.known_network.num_connections() as i32),
+                    &(metrics.node_count as i32),
+                    &(metrics.connection_count as i32),
+                    &(metrics.density as f32),
+                    &(metrics.algebraic_connectivity as f32),
+                    &(metrics.degree_centrality_delta as i32),
                 ])
                 .await?;
 
