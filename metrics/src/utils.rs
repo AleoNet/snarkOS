@@ -15,7 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use metrics::Key;
-use metrics_util::{CompositeKey, DebugValue, MetricKind, Snapshotter};
+use metrics_util::{
+    debugging::{DebugValue, Snapshotter},
+    CompositeKey,
+    MetricKind,
+};
 
 pub struct TestMetrics(Snapshotter);
 

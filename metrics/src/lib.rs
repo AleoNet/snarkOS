@@ -32,7 +32,7 @@ pub use names::*;
 pub use utils::*;
 
 #[cfg(feature = "test")]
-use metrics_util::{DebuggingRecorder, Snapshotter};
+use metrics_util::debugging::{DebuggingRecorder, Snapshotter};
 
 #[cfg(feature = "prometheus")]
 pub fn initialize() -> Option<tokio::task::JoinHandle<()>> {
