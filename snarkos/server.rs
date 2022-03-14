@@ -35,9 +35,6 @@ use snarkos_rpc::{initialize_rpc_server, RpcContext};
 #[cfg(any(feature = "test", feature = "prometheus"))]
 use snarkos_metrics as metrics;
 
-#[cfg(feature = "rpc")]
-use tokio::sync::RwLock;
-
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{net::TcpListener, sync::oneshot, task};
@@ -88,7 +85,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         .await?;
 
         // TODO (howardwu): This is a hack for the prover.
-        //  Check that the prover is connected to the pool before sending a PoolRegister message.
+        // Check that the prover is connected to the pool before sending a PoolRegister message.
         if let Some(pool_ip) = pool_ip {
             let peers_router = peers.router();
             let ledger_reader = ledger.reader();
@@ -162,16 +159,7 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         #[cfg(feature = "rpc")]
         // Initialize a new instance of the RPC server.
-        Self::initialize_rpc(
-            node,
-            address,
-            peers.clone(),
-            ledger.reader(),
-            operator.clone(),
-            prover.router(),
-            prover.memory_pool(),
-        )
-        .await;
+        Self::initialize_rpc(node, address, network_state.clone()).await;
 
         // Initialize a new instance of the notification.
         Self::initialize_notification(ledger.reader(), prover.clone(), address).await;
@@ -343,27 +331,10 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     #[inline]
     #[cfg(feature = "rpc")]
-    async fn initialize_rpc(
-        node: &Node,
-        address: Option<Address<N>>,
-        peers: Arc<Peers<N, E>>,
-        ledger_reader: LedgerReader<N>,
-        operator: Arc<Operator<N, E>>,
-        prover_router: ProverRouter<N>,
-        memory_pool: Arc<RwLock<MemoryPool<N>>>,
-    ) {
+    async fn initialize_rpc(node: &Node, address: Option<Address<N>>, network_state: NetworkState<N, E>) {
         if !node.norpc {
             // Initialize a new instance of the RPC server.
-            let rpc_context = RpcContext::new(
-                node.rpc_username.clone(),
-                node.rpc_password.clone(),
-                address,
-                peers,
-                ledger_reader,
-                operator,
-                prover_router,
-                memory_pool,
-            );
+            let rpc_context = RpcContext::new(node.rpc_username.clone(), node.rpc_password.clone(), address, network_state);
             let (rpc_server_addr, rpc_server_handle) = initialize_rpc_server::<N, E>(node.rpc, rpc_context).await;
 
             debug!("JSON-RPC server listening on {}", rpc_server_addr);

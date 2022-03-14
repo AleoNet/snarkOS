@@ -35,87 +35,95 @@ use std::{cmp::max, net::SocketAddr};
 impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
     /// Returns the latest block from the canonical chain.
     async fn latest_block(&self) -> Result<Block<N>, RpcError> {
-        Ok(self.ledger.latest_block())
+        Ok(self.network_state.ledger.reader().latest_block())
     }
 
     /// Returns the latest block height from the canonical chain.
     async fn latest_block_height(&self) -> Result<u32, RpcError> {
-        Ok(self.ledger.latest_block_height())
+        Ok(self.network_state.ledger.reader().latest_block_height())
     }
 
     /// Returns the latest cumulative weight from the canonical chain.
     async fn latest_cumulative_weight(&self) -> Result<u128, RpcError> {
-        Ok(self.ledger.latest_cumulative_weight())
+        Ok(self.network_state.ledger.reader().latest_cumulative_weight())
     }
 
     /// Returns the latest block hash from the canonical chain.
     async fn latest_block_hash(&self) -> Result<N::BlockHash, RpcError> {
-        Ok(self.ledger.latest_block_hash())
+        Ok(self.network_state.ledger.reader().latest_block_hash())
     }
 
     /// Returns the latest block header from the canonical chain.
     async fn latest_block_header(&self) -> Result<BlockHeader<N>, RpcError> {
-        Ok(self.ledger.latest_block_header())
+        Ok(self.network_state.ledger.reader().latest_block_header())
     }
 
     /// Returns the latest block transactions from the canonical chain.
     async fn latest_block_transactions(&self) -> Result<Transactions<N>, RpcError> {
-        Ok(self.ledger.latest_block_transactions())
+        Ok(self.network_state.ledger.reader().latest_block_transactions())
     }
 
     /// Returns the latest ledger root from the canonical chain.
     async fn latest_ledger_root(&self) -> Result<N::LedgerRoot, RpcError> {
-        Ok(self.ledger.latest_ledger_root())
+        Ok(self.network_state.ledger.reader().latest_ledger_root())
     }
 
     /// Returns the block given the block height.
     async fn get_block(&self, block_height: u32) -> Result<Block<N>, RpcError> {
-        Ok(self.ledger.get_block(block_height)?)
+        Ok(self.network_state.ledger.reader().get_block(block_height)?)
     }
 
     /// Returns up to `MAXIMUM_BLOCK_REQUEST` blocks from the given `start_block_height` to `end_block_height` (inclusive).
     async fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>, RpcError> {
         let safe_start_height = max(start_block_height, end_block_height.saturating_sub(E::MAXIMUM_BLOCK_REQUEST - 1));
-        Ok(self.ledger.get_blocks(safe_start_height, end_block_height)?)
+        Ok(self.network_state.ledger.reader().get_blocks(safe_start_height, end_block_height)?)
     }
 
     /// Returns the block height for the given the block hash.
     async fn get_block_height(&self, block_hash: N::BlockHash) -> Result<u32, RpcError> {
-        Ok(self.ledger.get_block_height(&block_hash)?)
+        Ok(self.network_state.ledger.reader().get_block_height(&block_hash)?)
     }
 
     /// Returns the block hash for the given block height, if it exists in the canonical chain.
     async fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash, RpcError> {
-        Ok(self.ledger.get_block_hash(block_height)?)
+        Ok(self.network_state.ledger.reader().get_block_hash(block_height)?)
     }
 
     /// Returns up to `MAXIMUM_BLOCK_REQUEST` block hashes from the given `start_block_height` to `end_block_height` (inclusive).
     async fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>, RpcError> {
         let safe_start_height = max(start_block_height, end_block_height.saturating_sub(E::MAXIMUM_BLOCK_REQUEST - 1));
-        Ok(self.ledger.get_block_hashes(safe_start_height, end_block_height)?)
+        Ok(self
+            .network_state
+            .ledger
+            .reader()
+            .get_block_hashes(safe_start_height, end_block_height)?)
     }
 
     /// Returns the block header for the given the block height.
     async fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>, RpcError> {
-        Ok(self.ledger.get_block_header(block_height)?)
+        Ok(self.network_state.ledger.reader().get_block_header(block_height)?)
     }
 
     /// Returns the block template for the next mined block
     async fn get_block_template(&self) -> Result<Value, RpcError> {
         // Fetch the latest state from the ledger.
-        let latest_block = self.ledger.latest_block();
-        let ledger_root = self.ledger.latest_ledger_root();
+        let latest_block = self.network_state.ledger.reader().latest_block();
+        let ledger_root = self.network_state.ledger.reader().latest_ledger_root();
 
         // Prepare the new block.
         let previous_block_hash = latest_block.hash();
-        let block_height = self.ledger.latest_block_height() + 1;
+        let block_height = self.network_state.ledger.reader().latest_block_height() + 1;
         let block_timestamp = OffsetDateTime::now_utc().unix_timestamp();
 
         // Compute the block difficulty target.
         let difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
             Blocks::<N>::compute_difficulty_target(latest_block.header(), block_timestamp, block_height)
         } else if N::NETWORK_ID == 2 {
-            let anchor_block_header = self.ledger.get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
+            let anchor_block_header = self
+                .network_state
+                .ledger
+                .reader()
+                .get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
             Blocks::<N>::compute_difficulty_target(&anchor_block_header, block_timestamp, block_height)
         } else {
             Blocks::<N>::compute_difficulty_target(N::genesis_block().header(), block_timestamp, block_height)
@@ -132,20 +140,22 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
 
         // Get and filter the transactions from the mempool.
         let transactions: Vec<String> = self
-            .memory_pool
+            .network_state
+            .prover
+            .memory_pool()
             .read()
             .await
             .transactions()
             .iter()
             .filter(|transaction| {
                 for serial_number in transaction.serial_numbers() {
-                    if let Ok(true) = self.ledger.contains_serial_number(serial_number) {
+                    if let Ok(true) = self.network_state.ledger.reader().contains_serial_number(serial_number) {
                         return false;
                     }
                 }
 
                 for commitment in transaction.commitments() {
-                    if let Ok(true) = self.ledger.contains_commitment(commitment) {
+                    if let Ok(true) = self.network_state.ledger.reader().contains_commitment(commitment) {
                         return false;
                     }
                 }
@@ -178,54 +188,54 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
 
     /// Returns the transactions from the block of the given block height.
     async fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>, RpcError> {
-        Ok(self.ledger.get_block_transactions(block_height)?)
+        Ok(self.network_state.ledger.reader().get_block_transactions(block_height)?)
     }
 
     /// Returns the ciphertext given the commitment.
     async fn get_ciphertext(&self, commitment: N::Commitment) -> Result<N::RecordCiphertext, RpcError> {
-        Ok(self.ledger.get_ciphertext(&commitment)?)
+        Ok(self.network_state.ledger.reader().get_ciphertext(&commitment)?)
     }
 
     /// Returns the ledger proof for a given record commitment.
     async fn get_ledger_proof(&self, record_commitment: N::Commitment) -> Result<String, RpcError> {
-        let ledger_proof = self.ledger.get_ledger_inclusion_proof(record_commitment)?;
+        let ledger_proof = self.network_state.ledger.reader().get_ledger_inclusion_proof(record_commitment)?;
         Ok(hex::encode(ledger_proof.to_bytes_le().expect("Failed to serialize ledger proof")))
     }
 
     /// Returns transactions in the node's memory pool.
     async fn get_memory_pool(&self) -> Result<Vec<Transaction<N>>, RpcError> {
-        Ok(self.memory_pool.read().await.transactions())
+        Ok(self.network_state.prover.memory_pool().read().await.transactions())
     }
 
     /// Returns a transaction with metadata and decrypted records given the transaction ID.
     async fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Value, RpcError> {
-        let transaction: Transaction<N> = self.ledger.get_transaction(&transaction_id)?;
-        let metadata = self.ledger.get_transaction_metadata(&transaction_id)?;
+        let transaction: Transaction<N> = self.network_state.ledger.reader().get_transaction(&transaction_id)?;
+        let metadata = self.network_state.ledger.reader().get_transaction_metadata(&transaction_id)?;
         let decrypted_records: Vec<Record<N>> = transaction.to_records().collect();
         Ok(serde_json::json!({ "transaction": transaction, "metadata": metadata, "decrypted_records": decrypted_records }))
     }
 
     /// Returns a transition given the transition ID.
     async fn get_transition(&self, transition_id: N::TransitionID) -> Result<Transition<N>, RpcError> {
-        Ok(self.ledger.get_transition(&transition_id)?)
+        Ok(self.network_state.ledger.reader().get_transition(&transition_id)?)
     }
 
     /// Returns the peers currently connected to this node.
     async fn get_connected_peers(&self) -> Result<Vec<SocketAddr>, RpcError> {
-        Ok(self.peers.connected_peers().await)
+        Ok(self.network_state.peers.connected_peers().await)
     }
 
     /// Returns the current state of this node.
     async fn get_node_state(&self) -> Result<Value, RpcError> {
-        let candidate_peers = self.peers.candidate_peers().await;
-        let connected_peers = self.peers.connected_peers().await;
+        let candidate_peers = self.network_state.peers.candidate_peers().await;
+        let connected_peers = self.network_state.peers.connected_peers().await;
         let number_of_candidate_peers = candidate_peers.len();
         let number_of_connected_peers = connected_peers.len();
-        let number_of_connected_sync_nodes = self.peers.number_of_connected_sync_nodes().await;
+        let number_of_connected_sync_nodes = self.network_state.peers.number_of_connected_sync_nodes().await;
 
-        let latest_block_hash = self.ledger.latest_block_hash();
-        let latest_block_height = self.ledger.latest_block_height();
-        let latest_cumulative_weight = self.ledger.latest_cumulative_weight();
+        let latest_block_hash = self.network_state.ledger.reader().latest_block_hash();
+        let latest_block_height = self.network_state.ledger.reader().latest_block_height();
+        let latest_cumulative_weight = self.network_state.ledger.reader().latest_cumulative_weight();
 
         Ok(serde_json::json!({
             "address": self.address,
@@ -250,26 +260,27 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
         let transaction: Transaction<N> = FromBytes::from_bytes_le(&hex::decode(transaction_hex)?)?;
         // Route an `UnconfirmedTransaction` to the prover.
         let request = ProverRequest::UnconfirmedTransaction("0.0.0.0:3032".parse().unwrap(), transaction.clone());
-        if let Err(error) = self.prover_router.send(request).await {
-            warn!("[UnconfirmedTransaction] {}", error);
-        }
+        self.network_state.prover.update(request).await;
+        // if let Err(error) = self.prover_router.send(request).await {
+        //     warn!("[UnconfirmedTransaction] {}", error);
+        // }
         Ok(transaction.transaction_id())
     }
 
     /// Returns the amount of shares submitted by a given prover.
     async fn get_shares_for_prover(&self, prover: Address<N>) -> Result<u64, RpcError> {
-        Ok(self.operator.get_shares_for_prover(&prover))
+        Ok(self.network_state.operator.get_shares_for_prover(&prover))
     }
 
     /// Returns the amount of shares submitted to the operator in total.
     async fn get_shares(&self) -> u64 {
-        let shares = self.operator.to_shares();
+        let shares = self.network_state.operator.to_shares();
         shares.iter().map(|(_, share)| share.values().sum::<u64>()).sum()
     }
 
     /// Returns a list of all provers that have submitted shares to the operator.
     async fn get_provers(&self) -> Value {
-        let provers = self.operator.get_provers();
+        let provers = self.network_state.operator.get_provers();
         serde_json::json!(provers)
     }
 }

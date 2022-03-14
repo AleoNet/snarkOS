@@ -106,25 +106,25 @@ impl<N: Network, E: Environment> Prover<N, E> {
         });
 
         // Initialize the handler for the prover.
-        {
-            let prover = prover.clone();
-            let (router, handler) = oneshot::channel();
-            E::resources().register_task(
-                None, // No need to provide an id, as the task will run indefinitely.
-                task::spawn(async move {
-                    // Notify the outer function that the task is ready.
-                    let _ = router.send(());
-                    // Asynchronously wait for a prover request.
-                    while let Some(request) = prover_handler.recv().await {
-                        // Update the state of the prover.
-                        prover.update(request).await;
-                    }
-                }),
-            );
+        // {
+        //     let prover = prover.clone();
+        //     let (router, handler) = oneshot::channel();
+        //     E::resources().register_task(
+        //         None, // No need to provide an id, as the task will run indefinitely.
+        //         task::spawn(async move {
+        //             // Notify the outer function that the task is ready.
+        //             let _ = router.send(());
+        //             // Asynchronously wait for a prover request.
+        //             while let Some(request) = prover_handler.recv().await {
+        //                 // Update the state of the prover.
+        //                 prover.update(request).await;
+        //             }
+        //         }),
+        //     );
 
-            // Wait until the prover handler is ready.
-            let _ = handler.await;
-        }
+        //     // Wait until the prover handler is ready.
+        //     let _ = handler.await;
+        // }
 
         // Initialize the miner, if the node type is a miner.
         if E::NODE_TYPE == NodeType::Miner && prover.pool.is_none() {
@@ -183,7 +183,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
     /// Performs the given `request` to the prover.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(&self, request: ProverRequest<N>) {
+    pub async fn update(&self, request: ProverRequest<N>) {
         match request {
             ProverRequest::PoolRequest(operator_ip, share_difficulty, block_template) => {
                 // Process the pool request message.

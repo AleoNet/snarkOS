@@ -356,9 +356,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             self.unconfirmed_blocks.write().await.clear();
 
             // Reset the memory pool of its transactions.
-            if let Err(error) = prover_router.send(ProverRequest::MemoryPoolClear(None)).await {
-                error!("[MemoryPoolClear]: {}", error);
-            }
+            self.network_state
+                .get()
+                .expect("network state must be set")
+                .prover
+                .update(ProverRequest::MemoryPoolClear(None))
+                .await;
+            // if let Err(error) = prover_router.send(ProverRequest::MemoryPoolClear(None)).await {
+            //     error!("[MemoryPoolClear]: {}", error);
+            // }
 
             self.block_requests
                 .write()
@@ -500,9 +506,15 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash);
 
                         // On success, filter the memory pool of its transactions, if they exist.
-                        if let Err(error) = prover_router.send(ProverRequest::MemoryPoolClear(Some(unconfirmed_block))).await {
-                            error!("[MemoryPoolClear]: {}", error);
-                        }
+                        self.network_state
+                            .get()
+                            .expect("network state must be set")
+                            .prover
+                            .update(ProverRequest::MemoryPoolClear(Some(unconfirmed_block)))
+                            .await;
+                        //  if let Err(error) = prover_router.send(ProverRequest::MemoryPoolClear(Some(unconfirmed_block))).await {
+                        //      error!("[MemoryPoolClear]: {}", error);
+                        //  }
 
                         return true;
                     }

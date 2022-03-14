@@ -711,10 +711,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                                 trace!("Skipping 'UnconfirmedTransaction {}' from {}", transaction.transaction_id(), peer_ip);
                                             } else {
                                                 // Route the `UnconfirmedTransaction` to the prover.
-                                                if let Err(error) = prover_router.send(ProverRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
-                                                    warn!("[UnconfirmedTransaction] {}", error);
+                                                peer.network_state.prover.update(ProverRequest::UnconfirmedTransaction(peer_ip, transaction)).await;
+                                               //  if let Err(error) = prover_router.send(ProverRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
+                                               //      warn!("[UnconfirmedTransaction] {}", error);
 
-                                                }
+                                               //  }
                                             }
 
                                         }
@@ -732,9 +733,10 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     if E::NODE_TYPE != NodeType::Prover {
                                         trace!("Skipping 'PoolRequest' from {}", peer_ip);
                                     } else if let Ok(block_template) = block_template.deserialize().await {
-                                        if let Err(error) = prover_router.send(ProverRequest::PoolRequest(peer_ip, share_difficulty, block_template)).await {
-                                            warn!("[PoolRequest] {}", error);
-                                        }
+                                    peer.network_state.prover.update(ProverRequest::PoolRequest(peer_ip, share_difficulty, block_template)).await;
+                                       //  if let Err(error) = prover_router.send(ProverRequest::PoolRequest(peer_ip, share_difficulty, block_template)).await {
+                                       //      warn!("[PoolRequest] {}", error);
+                                       //  }
                                     } else {
                                         warn!("[PoolRequest] could not deserialize block template");
                                     }
