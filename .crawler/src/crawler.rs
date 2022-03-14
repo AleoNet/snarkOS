@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{constants::*, known_network::KnownNetwork};
+use crate::{constants::*, known_network::KnownNetwork, metrics::NetworkMetrics};
 use snarkos_environment::{
     helpers::{NodeType, State},
     CurrentNetwork,
@@ -99,7 +99,7 @@ pub struct Crawler {
 
 impl Pea2Pea for Crawler {
     fn node(&self) -> &Pea2PeaNode {
-        &self.synth_node.node()
+        self.synth_node.node()
     }
 }
 
@@ -163,7 +163,7 @@ impl Crawler {
         let node = self.clone();
         task::spawn(async move {
             loop {
-                debug!(parent: node.node().span(), "crawling the network for more peers; asking peers for their peers");
+                info!(parent: node.node().span(), "crawling the network for more peers; asking peers for their peers");
                 node.send_broadcast(ClientMessage::PeerRequest).unwrap();
 
                 // Disconnect from peers that we've collected sufficient information on or that have become stale.
@@ -211,7 +211,12 @@ impl Crawler {
         let node = self.clone();
         tokio::spawn(async move {
             loop {
-                if let Err(e) = node.write_crawling_data().await {
+                let nodes = node.known_network.nodes();
+                let connections = node.known_network.connections();
+                let conns = connections.clone();
+                let metrics = task::spawn_blocking(move || NetworkMetrics::new(conns, nodes)).await.unwrap();
+
+                if let Err(e) = node.write_crawling_data(connections, metrics).await {
                     error!(parent: node.node().span(), "storage write error: {}", e);
                 }
                 tokio::time::sleep(Duration::from_secs(DB_WRITE_INTERVAL_SECS.into())).await;
@@ -225,8 +230,14 @@ impl Crawler {
         let node = self.clone();
         tokio::spawn(async move {
             loop {
-                info!(parent: node.node().span(), "connected peers: {}", node.node().num_connected());
-                info!(parent: node.node().span(), "\n{:#?}", node.known_network.get_node_summary());
+                let connections = node.known_network.connections();
+                let nodes = node.known_network.nodes();
+                let summary = task::spawn_blocking(move || NetworkMetrics::new(connections, nodes).map(|metrics| metrics.summary()))
+                    .await
+                    .unwrap();
+                if let Some(summary) = summary {
+                    info!(parent: node.node().span(), "{}", summary);
+                }
                 tokio::time::sleep(Duration::from_secs(LOG_INTERVAL_SECS)).await;
             }
         });
@@ -244,7 +255,7 @@ impl Crawler {
 
 /// A wrapper type for inbound messages, allowing the crawler to immediately reject undesired ones.
 pub enum InboundMessage {
-    Handled(ClientMessage),
+    Handled(Box<ClientMessage>),
     Unhandled(u16),
 }
 
@@ -302,7 +313,7 @@ impl Reading for Crawler {
         match ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len])) {
             Ok(msg) => {
                 debug!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
-                Ok(Some(InboundMessage::Handled(msg)))
+                Ok(Some(InboundMessage::Handled(Box::new(msg))))
             }
             Err(e) => {
                 error!(parent: self.node().span(), "a message from {} failed to deserialize: {}", source, e);
@@ -313,7 +324,7 @@ impl Reading for Crawler {
 
     async fn process_message(&self, source: SocketAddr, message: Self::Message) -> io::Result<()> {
         if let InboundMessage::Handled(message) = message {
-            match message {
+            match *message {
                 ClientMessage::Disconnect(reason) => {
                     debug!(parent: self.node().span(), "peer {} disconnected for the following reason: {:?}", source, reason);
                     Ok(())

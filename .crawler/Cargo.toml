@@ -31,6 +31,9 @@ version = "0.1"
 [dependencies.bincode]
 version = "1"
 
+[dependencies.nalgebra]
+version = "0.30"
+
 [dependencies.native-tls]
 version = "0.2"
 optional = true

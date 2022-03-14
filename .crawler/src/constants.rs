@@ -18,7 +18,7 @@ use snarkos_environment::{ClientTrial, CurrentNetwork, Environment};
 
 /// The IDs of messages that are accepted by the crawler.
 // note: ChallengeRequest and ChallengeResponse are only expected during the handshake.
-pub const ACCEPTED_MESSAGE_IDS: &'static [u16] = &[
+pub const ACCEPTED_MESSAGE_IDS: &[u16] = &[
     4, // Disconnect
     5, // PeerRequest
     6, // PeerResponse
@@ -35,7 +35,7 @@ pub const MAXIMUM_NUMBER_OF_PEERS: usize = 1000;
 /// The amount of time (in seconds) between peer updates.
 pub const PEER_UPDATE_INTERVAL_SECS: u64 = 10;
 /// The list of sync nodes to begin crawling with.
-pub const SYNC_NODES: &'static [&'static str] = <ClientTrial<CurrentNetwork>>::SYNC_NODES;
+pub const SYNC_NODES: &[&str] = <ClientTrial<CurrentNetwork>>::SYNC_NODES;
 /// Connections that haven't been seen within this time (in hours) are forgotten.
 pub const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
 /// The number of lists of peers that a single peer needs to provide before it's disconnected from.
