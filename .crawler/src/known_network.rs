@@ -145,9 +145,7 @@ impl KnownNetwork {
 
             // Create new node objects based on connection addresses.
             for addr in node_addrs_from_conns {
-                if !nodes_g.contains_key(&addr) {
-                    nodes_g.insert(addr, NodeMeta::default());
-                }
+                nodes_g.entry(addr).or_default();
             }
         }
     }

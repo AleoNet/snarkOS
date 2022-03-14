@@ -99,7 +99,7 @@ pub struct Crawler {
 
 impl Pea2Pea for Crawler {
     fn node(&self) -> &Pea2PeaNode {
-        &self.synth_node.node()
+        self.synth_node.node()
     }
 }
 
@@ -255,7 +255,7 @@ impl Crawler {
 
 /// A wrapper type for inbound messages, allowing the crawler to immediately reject undesired ones.
 pub enum InboundMessage {
-    Handled(ClientMessage),
+    Handled(Box<ClientMessage>),
     Unhandled(u16),
 }
 
@@ -313,7 +313,7 @@ impl Reading for Crawler {
         match ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len])) {
             Ok(msg) => {
                 debug!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
-                Ok(Some(InboundMessage::Handled(msg)))
+                Ok(Some(InboundMessage::Handled(Box::new(msg))))
             }
             Err(e) => {
                 error!(parent: self.node().span(), "a message from {} failed to deserialize: {}", source, e);
@@ -324,7 +324,7 @@ impl Reading for Crawler {
 
     async fn process_message(&self, source: SocketAddr, message: Self::Message) -> io::Result<()> {
         if let InboundMessage::Handled(message) = message {
-            match message {
+            match *message {
                 ClientMessage::Disconnect(reason) => {
                     debug!(parent: self.node().span(), "peer {} disconnected for the following reason: {:?}", source, reason);
                     Ok(())
