@@ -24,6 +24,7 @@ use snarkos_storage::BlockLocators;
 use snarkos_synthetic_node::{ClientMessage, SynthNode, MESSAGE_LENGTH_PREFIX_SIZE};
 use snarkvm::traits::Network;
 
+use clap::Parser;
 use pea2pea::{
     protocols::{Disconnect, Handshake, Reading, Writing},
     Config,
@@ -41,7 +42,6 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use structopt::StructOpt;
 use time::OffsetDateTime;
 use tokio::{sync::Mutex, task};
 #[cfg(feature = "postgres")]
@@ -52,40 +52,38 @@ use tracing::*;
 pub struct StorageClient;
 
 // CLI
-// TODO: investigate using clap instead.
-#[derive(Debug, StructOpt)]
+#[derive(Debug, Parser)]
 pub struct Opts {
     /// Specify the IP address and port for the node server.
-    /// Naming and defaults kept consistent with snarkOS.
-    #[structopt(parse(try_from_str), default_value = "0.0.0.0:4132", long = "node")]
-    pub node: SocketAddr,
+    #[clap(long = "addr", short = 'a', parse(try_from_str), default_value = "0.0.0.0:4132")]
+    pub addr: SocketAddr,
     /// The path to a certificate file to be used for a TLS connection with the postgres instance.
     #[cfg(feature = "postgres-tls")]
-    #[structopt(long = "postgres-cert-path")]
+    #[clap(long = "postgres-cert-path")]
     pub postgres_cert_path: PathBuf,
     /// The hostname of the postgres instance (defaults to "localhost").
     #[cfg(feature = "postgres")]
-    #[structopt(long = "postgres-host", default_value = "localhost")]
+    #[clap(long = "postgres-host", default_value = "localhost")]
     pub postgres_host: String,
     /// The port of the postgres instance (defaults to 5432).
     #[cfg(feature = "postgres")]
-    #[structopt(long = "postgres-port", default_value = "5432")]
+    #[clap(long = "postgres-port", default_value = "5432")]
     pub postgres_port: u16,
     /// The user of the postgres instance (defaults to "postgres").
     #[cfg(feature = "postgres")]
-    #[structopt(long = "postgres-user", default_value = "postgres")]
+    #[clap(long = "postgres-user", default_value = "postgres")]
     pub postgres_user: String,
     /// The password for the postgres instance (defaults to nothing).
     #[cfg(feature = "postgres")]
-    #[structopt(long = "postgres-pass", default_value = "")]
+    #[clap(long = "postgres-pass", default_value = "")]
     pub postgres_pass: String,
     /// The hostname of the postgres instance (defaults to "postgres").
     #[cfg(feature = "postgres")]
-    #[structopt(long = "postgres-dbname", default_value = "postgres")]
+    #[clap(long = "postgres-dbname", default_value = "postgres")]
     pub postgres_dbname: String,
     /// If set to `true`, re-creates the crawler's database tables.
     #[cfg(feature = "postgres")]
-    #[structopt(long = "postgres-clean")]
+    #[clap(long = "postgres-clean")]
     pub postgres_clean: bool,
 }
 
@@ -116,8 +114,8 @@ impl Crawler {
     pub async fn new(opts: Opts, storage: Option<StorageClient>) -> Self {
         let config = Config {
             name: Some("snarkOS crawler".into()),
-            listener_ip: Some(opts.node.ip()),
-            desired_listening_port: Some(opts.node.port()),
+            listener_ip: Some(opts.addr.ip()),
+            desired_listening_port: Some(opts.addr.port()),
             max_connections: MAXIMUM_NUMBER_OF_PEERS as u16,
             max_handshake_time_ms: MAX_HANDSHAKE_TIME_MS,
             read_buffer_size: READ_BUFFER_SIZE,
