@@ -78,8 +78,6 @@ pub struct Operator<N: Network, E: Environment> {
     provers: RwLock<HashMap<Address<N>, (Instant, u64)>>,
     /// A list of the known nonces for the current round.
     known_nonces: RwLock<HashSet<N::PoSWNonce>>,
-    /// The operator router of the node.
-    operator_router: OperatorRouter<N>,
     /// The pool of unconfirmed transactions.
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
     /// The peers router of the node.
@@ -99,8 +97,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
     ) -> Result<Arc<Self>> {
-        // Initialize an mpsc channel for sending requests to the `Operator` struct.
-        let (operator_router, mut operator_handler) = mpsc::channel(1024);
         // Initialize the operator.
         let operator = Arc::new(Self {
             network_state: OnceCell::new(),
@@ -110,31 +106,30 @@ impl<N: Network, E: Environment> Operator<N, E> {
             block_template: RwLock::new(None),
             provers: Default::default(),
             known_nonces: Default::default(),
-            operator_router,
             memory_pool,
             peers_router,
             ledger_reader,
         });
 
-        if E::NODE_TYPE == NodeType::Operator {
-            // Initialize the handler for the operator.
-            let operator_clone = operator.clone();
-            let (router, handler) = oneshot::channel();
-            E::resources().register_task(
-                None, // No need to provide an id, as the task will run indefinitely.
-                task::spawn(async move {
-                    // Notify the outer function that the task is ready.
-                    let _ = router.send(());
-                    // Asynchronously wait for a operator request.
-                    while let Some(request) = operator_handler.recv().await {
-                        operator_clone.update(request).await;
-                    }
-                }),
-            );
+        // if E::NODE_TYPE == NodeType::Operator {
+        //     // Initialize the handler for the operator.
+        //     let operator_clone = operator.clone();
+        //     let (router, handler) = oneshot::channel();
+        //     E::resources().register_task(
+        //         None, // No need to provide an id, as the task will run indefinitely.
+        //         task::spawn(async move {
+        //             // Notify the outer function that the task is ready.
+        //             let _ = router.send(());
+        //             // Asynchronously wait for a operator request.
+        //             while let Some(request) = operator_handler.recv().await {
+        //                 operator_clone.update(request).await;
+        //             }
+        //         }),
+        //     );
 
-            // Wait until the operator handler is ready.
-            let _ = handler.await;
-        }
+        //     // Wait until the operator handler is ready.
+        //     let _ = handler.await;
+        // }
 
         if E::NODE_TYPE == NodeType::Operator {
             if let Some(recipient) = operator.address {
@@ -205,11 +200,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
     pub fn set_network_state(&self, network_state: NetworkState<N, E>) {
         self.network_state.set(network_state).expect("network state can only be set once");
-    }
-
-    /// Returns an instance of the operator router.
-    pub fn router(&self) -> OperatorRouter<N> {
-        self.operator_router.clone()
     }
 
     /// Returns all the shares in storage.

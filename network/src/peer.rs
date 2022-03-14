@@ -19,7 +19,6 @@ use crate::{
     LedgerReader,
     LedgerRequest,
     OperatorRequest,
-    OperatorRouter,
     PeersRequest,
     PeersRouter,
     ProverRequest,
@@ -326,7 +325,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
         local_nonce: u64,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
-        operator_router: OperatorRouter<N>,
         connected_nonces: Vec<u64>,
         connection_result: Option<ConnectionResult>,
     ) {
@@ -719,9 +717,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 Message::PoolRegister(address) => {
                                     if E::NODE_TYPE != NodeType::Operator {
                                         trace!("Skipping 'PoolRegister' from {}", peer_ip);
-                                    } else if let Err(error) = operator_router.send(OperatorRequest::PoolRegister(peer_ip, address)).await {
-                                        warn!("[PoolRegister] {}", error);
                                     }
+
+                                    peer.network_state.operator.update(OperatorRequest::PoolRegister(peer_ip, address)).await;
                                 }
                                 Message::PoolRequest(share_difficulty, block_template) => {
                                     if E::NODE_TYPE != NodeType::Prover {
@@ -736,9 +734,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     if E::NODE_TYPE != NodeType::Operator {
                                         trace!("Skipping 'PoolResponse' from {}", peer_ip);
                                     } else if let Ok(proof) = proof.deserialize().await {
-                                        if let Err(error) = operator_router.send(OperatorRequest::PoolResponse(peer_ip, address, nonce, proof)).await {
-                                            warn!("[PoolResponse] {}", error);
-                                        }
+                                        peer.network_state.operator.update(OperatorRequest::PoolResponse(peer_ip, address, nonce, proof)).await;
                                     } else {
                                         warn!("[PoolResponse] could not deserialize proof");
                                     }

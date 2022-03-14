@@ -21,7 +21,7 @@ use snarkos_environment::{
 };
 use snarkos_network::{
     ledger::{Ledger, LedgerReader, LedgerRequest},
-    operator::{Operator, OperatorRouter},
+    operator::Operator,
     peers::{Peers, PeersRequest, PeersRouter},
     prover::Prover,
     state::NetworkState,
@@ -88,7 +88,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         if let Some(pool_ip) = pool_ip {
             let peers_router = peers.router();
             let ledger_reader = ledger.reader();
-            let operator_router = operator.router();
 
             let (router, handler) = oneshot::channel();
             E::resources().register_task(
@@ -101,12 +100,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                         let (router, handler) = oneshot::channel();
                         // Route a `Connect` request to the pool.
                         if let Err(error) = peers_router
-                            .send(PeersRequest::Connect(
-                                pool_ip,
-                                ledger_reader.clone(),
-                                operator_router.clone(),
-                                router,
-                            ))
+                            .send(PeersRequest::Connect(pool_ip, ledger_reader.clone(), router))
                             .await
                         {
                             trace!("[Connect] {}", error);
@@ -125,7 +119,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         }
 
         // Initialize the connection listener for new peers.
-        Self::initialize_listener(local_ip, listener, peers.clone(), ledger.reader(), operator.router()).await;
+        Self::initialize_listener(local_ip, listener, peers.clone(), ledger.reader()).await;
 
         let network_state = NetworkState {
             local_ip,
@@ -141,7 +135,6 @@ impl<N: Network, E: Environment> Server<N, E> {
             network_state.clone(),
             peers.router(),
             ledger.reader(),
-            operator.router(),
         )
         .await;
 
@@ -192,12 +185,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         self.network_state
             .peers
             .router()
-            .send(PeersRequest::Connect(
-                peer_ip,
-                self.network_state.ledger.reader(),
-                self.network_state.operator.router(),
-                router,
-            ))
+            .send(PeersRequest::Connect(peer_ip, self.network_state.ledger.reader(), router))
             .await?;
 
         // Wait until the connection task is initialized.
@@ -226,13 +214,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize the connection listener for new peers.
     ///
     #[inline]
-    async fn initialize_listener(
-        local_ip: SocketAddr,
-        listener: TcpListener,
-        peers: Arc<Peers<N, E>>,
-        ledger_reader: LedgerReader<N>,
-        operator_router: OperatorRouter<N>,
-    ) {
+    async fn initialize_listener(local_ip: SocketAddr, listener: TcpListener, peers: Arc<Peers<N, E>>, ledger_reader: LedgerReader<N>) {
         // Initialize the listener process.
         let (router, handler) = oneshot::channel();
         E::resources().register_task(
@@ -248,7 +230,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                         match listener.accept().await {
                             // Process the inbound connection request.
                             Ok((stream, peer_ip)) => {
-                                let request = PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader.clone(), operator_router.clone());
+                                let request = PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader.clone());
                                 if let Err(error) = peers.router().send(request).await {
                                     error!("Failed to send request to peers: {}", error)
                                 }
@@ -273,12 +255,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize a new instance of the heartbeat.
     ///
     #[inline]
-    async fn initialize_heartbeat(
-        network_state: NetworkState<N, E>,
-        peers_router: PeersRouter<N, E>,
-        ledger_reader: LedgerReader<N>,
-        operator_router: OperatorRouter<N>,
-    ) {
+    async fn initialize_heartbeat(network_state: NetworkState<N, E>, peers_router: PeersRouter<N, E>, ledger_reader: LedgerReader<N>) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
         E::resources().register_task(
@@ -291,7 +268,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                     network_state.ledger.update(LedgerRequest::Heartbeat).await;
 
                     // Transmit a heartbeat request to the peers.
-                    let request = PeersRequest::Heartbeat(ledger_reader.clone(), operator_router.clone());
+                    let request = PeersRequest::Heartbeat(ledger_reader.clone());
                     if let Err(error) = peers_router.send(request).await {
                         error!("Failed to send heartbeat to peers: {}", error)
                     }
