@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use std::collections::HashSet;
 #[cfg(feature = "postgres-tls")]
 use std::fs;
 
@@ -28,6 +29,7 @@ use tokio_postgres::{types::Type, Client, Error};
 use tracing::*;
 
 use crate::{
+    connection::Connection,
     crawler::{Crawler, Opts},
     metrics::NetworkMetrics,
 };
@@ -64,7 +66,7 @@ pub async fn initialize_storage(opts: &Opts) -> Result<Client, anyhow::Error> {
 
     if opts.postgres_clean {
         client
-            .batch_execute("DROP TABLE IF EXISTS nodes; DROP TABLE IF EXISTS network;")
+            .batch_execute("DROP TABLE IF EXISTS nodes; DROP TABLE IF EXISTS network; DROP TABLE IF EXISTS connections;")
             .await?;
         debug!("Persistent storage was cleaned");
     }
@@ -94,6 +96,14 @@ pub async fn initialize_storage(opts: &Opts) -> Result<Client, anyhow::Error> {
             fiedler_value    REAL,
             dcd              REAL
         );
+
+        CREATE TABLE IF NOT EXISTS connections (
+            timestamp    TIMESTAMP WITH TIME ZONE NOT NULL,
+            ip1          INET NOT NULL,
+            port1        INTEGER NOT NULL,
+            ip2          INET NOT NULL,
+            port2        INTEGER NOT NULL
+        );
     ",
         )
         .await?;
@@ -104,7 +114,7 @@ pub async fn initialize_storage(opts: &Opts) -> Result<Client, anyhow::Error> {
 }
 
 impl Crawler {
-    pub async fn write_crawling_data(&self, metrics: Option<NetworkMetrics>) -> Result<(), Error> {
+    pub async fn write_crawling_data(&self, connections: HashSet<Connection>, metrics: Option<NetworkMetrics>) -> Result<(), Error> {
         let metrics = if let Some(metrics) = metrics {
             metrics
         } else {
@@ -112,6 +122,9 @@ impl Crawler {
         };
 
         if let Some(ref storage) = self.storage {
+            // Procure a timestamp for network and connection details.
+            let timestamp = OffsetDateTime::now_utc();
+
             let mut storage = storage.lock().await;
             let transaction = storage.transaction().await?;
 
@@ -162,7 +175,7 @@ impl Crawler {
 
             transaction
                 .execute(&network_stmt, &[
-                    &OffsetDateTime::now_utc(),
+                    &timestamp,
                     &(metrics.node_count as i32),
                     &(metrics.connection_count as i32),
                     &(metrics.density as f32),
@@ -170,6 +183,28 @@ impl Crawler {
                     &(metrics.degree_centrality_delta as i32),
                 ])
                 .await?;
+
+            let connections_stmt = transaction
+                .prepare_typed("INSERT INTO connections VALUES ($1, $2, $3, $4, $5);", &[
+                    Type::TIMESTAMPTZ,
+                    Type::INET,
+                    Type::INT4,
+                    Type::INET,
+                    Type::INT4,
+                ])
+                .await?;
+
+            for conn in connections {
+                transaction
+                    .execute(&connections_stmt, &[
+                        &timestamp,
+                        &conn.source.ip(),
+                        &(conn.source.port() as i32),
+                        &conn.target.ip(),
+                        &(conn.target.port() as i32),
+                    ])
+                    .await?;
+            }
 
             transaction.commit().await?;
         }

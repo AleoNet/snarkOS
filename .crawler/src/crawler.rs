@@ -211,11 +211,12 @@ impl Crawler {
         let node = self.clone();
         tokio::spawn(async move {
             loop {
-                let connections = node.known_network.connections();
                 let nodes = node.known_network.nodes();
-                let metrics = task::spawn_blocking(move || NetworkMetrics::new(connections, nodes)).await.unwrap();
+                let connections = node.known_network.connections();
+                let conns = connections.clone();
+                let metrics = task::spawn_blocking(move || NetworkMetrics::new(conns, nodes)).await.unwrap();
 
-                if let Err(e) = node.write_crawling_data(metrics).await {
+                if let Err(e) = node.write_crawling_data(connections, metrics).await {
                     error!(parent: node.node().span(), "storage write error: {}", e);
                 }
                 tokio::time::sleep(Duration::from_secs(DB_WRITE_INTERVAL_SECS.into())).await;
