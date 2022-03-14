@@ -34,15 +34,9 @@ use std::{
     time::{Duration, Instant},
 };
 use tokio::{
-    sync::{mpsc, oneshot, RwLock},
+    sync::{oneshot, RwLock},
     task,
 };
-
-/// Shorthand for the parent half of the `Operator` message channel.
-pub type OperatorRouter<N> = mpsc::Sender<OperatorRequest<N>>;
-#[allow(unused)]
-/// Shorthand for the child half of the `Operator` message channel.
-type OperatorHandler<N> = mpsc::Receiver<OperatorRequest<N>>;
 
 ///
 /// An enum of requests that the `Operator` struct processes.
@@ -110,26 +104,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
             peers_router,
             ledger_reader,
         });
-
-        // if E::NODE_TYPE == NodeType::Operator {
-        //     // Initialize the handler for the operator.
-        //     let operator_clone = operator.clone();
-        //     let (router, handler) = oneshot::channel();
-        //     E::resources().register_task(
-        //         None, // No need to provide an id, as the task will run indefinitely.
-        //         task::spawn(async move {
-        //             // Notify the outer function that the task is ready.
-        //             let _ = router.send(());
-        //             // Asynchronously wait for a operator request.
-        //             while let Some(request) = operator_handler.recv().await {
-        //                 operator_clone.update(request).await;
-        //             }
-        //         }),
-        //     );
-
-        //     // Wait until the operator handler is ready.
-        //     let _ = handler.await;
-        // }
 
         if E::NODE_TYPE == NodeType::Operator {
             if let Some(recipient) = operator.address {
