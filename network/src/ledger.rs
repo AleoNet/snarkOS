@@ -20,7 +20,6 @@ use crate::{
     PeersRequest,
     PeersRouter,
     ProverRequest,
-    ProverRouter,
 };
 
 use snarkos_environment::{
@@ -56,18 +55,18 @@ pub type LedgerReader<N> = std::sync::Arc<snarkos_storage::LedgerState<N>>;
 ///
 #[derive(Debug)]
 pub enum LedgerRequest<N: Network> {
-    /// BlockResponse := (peer_ip, block, prover_router)
-    BlockResponse(SocketAddr, Block<N>, ProverRouter<N>),
+    /// BlockResponse := (peer_ip, block)
+    BlockResponse(SocketAddr, Block<N>),
     /// Disconnect := (peer_ip, reason)
     Disconnect(SocketAddr, DisconnectReason),
     /// Failure := (peer_ip, failure)
     Failure(SocketAddr, String),
-    /// Heartbeat := (prover_router)
-    Heartbeat(ProverRouter<N>),
+    /// Heartbeat := ()
+    Heartbeat,
     /// Pong := (peer_ip, node_type, status, is_fork, block_locators)
     Pong(SocketAddr, NodeType, State, Option<bool>, BlockLocators<N>),
-    /// UnconfirmedBlock := (peer_ip, block, prover_router)
-    UnconfirmedBlock(SocketAddr, Block<N>, ProverRouter<N>),
+    /// UnconfirmedBlock := (peer_ip, block)
+    UnconfirmedBlock(SocketAddr, Block<N>),
 }
 
 pub type PeersState<N> = HashMap<SocketAddr, Option<(NodeType, State, Option<bool>, u32, BlockLocators<N>)>>;
@@ -163,11 +162,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     pub async fn update(&self, request: LedgerRequest<N>) {
         match request {
-            LedgerRequest::BlockResponse(peer_ip, block, prover_router) => {
+            LedgerRequest::BlockResponse(peer_ip, block) => {
                 // Remove the block request from the ledger.
                 if self.remove_block_request(peer_ip, block.height()).await {
                     // On success, process the block response.
-                    self.add_block(block, &prover_router).await;
+                    self.add_block(block).await;
                     // Check if syncing with this peer is complete.
                     if self
                         .block_requests
@@ -188,11 +187,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             LedgerRequest::Failure(peer_ip, failure) => {
                 self.add_failure(peer_ip, failure).await;
             }
-            LedgerRequest::Heartbeat(prover_router) => {
+            LedgerRequest::Heartbeat => {
                 // Update for sync nodes.
                 self.update_sync_nodes().await;
                 // Update the ledger.
-                self.update_ledger(&prover_router).await;
+                self.update_ledger().await;
                 // Update the status of the ledger.
                 self.update_status().await;
                 // Remove expired block requests.
@@ -223,11 +222,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // Process the pong.
                 self.update_peer(peer_ip, node_type, status, is_fork, block_locators).await;
             }
-            LedgerRequest::UnconfirmedBlock(peer_ip, block, prover_router) => {
+            LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
                 // Ensure the node is not peering.
                 if !E::status().is_peering() {
                     // Process the unconfirmed block.
-                    self.add_block(block.clone(), &prover_router).await;
+                    self.add_block(block.clone()).await;
                     // Propagate the unconfirmed block to the connected peers.
                     let message = Message::UnconfirmedBlock(block.height(), block.hash(), Data::Object(block));
                     let request = PeersRequest::MessagePropagate(peer_ip, message);
@@ -331,13 +330,13 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Attempt to fast-forward the ledger with unconfirmed blocks.
     ///
-    async fn update_ledger(&self, prover_router: &ProverRouter<N>) {
+    async fn update_ledger(&self) {
         // Check for candidate blocks to fast forward the ledger.
         let mut block_hash = self.canon.latest_block_hash();
         let unconfirmed_blocks_snapshot = self.unconfirmed_blocks.read().await.clone();
         while let Some(unconfirmed_block) = unconfirmed_blocks_snapshot.get(&block_hash) {
             // Attempt to add the unconfirmed block.
-            match self.add_block(unconfirmed_block.clone(), prover_router).await {
+            match self.add_block(unconfirmed_block.clone()).await {
                 // Upon success, update the block hash iterator.
                 true => block_hash = unconfirmed_block.hash(),
                 false => break,
@@ -362,9 +361,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 .prover
                 .update(ProverRequest::MemoryPoolClear(None))
                 .await;
-            // if let Err(error) = prover_router.send(ProverRequest::MemoryPoolClear(None)).await {
-            //     error!("[MemoryPoolClear]: {}", error);
-            // }
 
             self.block_requests
                 .write()
@@ -442,7 +438,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Returns `true` if the given block is successfully added to the *canon* chain.
     ///
-    async fn add_block(&self, unconfirmed_block: Block<N>, prover_router: &ProverRouter<N>) -> bool {
+    async fn add_block(&self, unconfirmed_block: Block<N>) -> bool {
         // Retrieve the unconfirmed block height.
         let unconfirmed_block_height = unconfirmed_block.height();
         // Retrieve the unconfirmed block hash.
@@ -512,9 +508,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                             .prover
                             .update(ProverRequest::MemoryPoolClear(Some(unconfirmed_block)))
                             .await;
-                        //  if let Err(error) = prover_router.send(ProverRequest::MemoryPoolClear(Some(unconfirmed_block))).await {
-                        //      error!("[MemoryPoolClear]: {}", error);
-                        //  }
 
                         return true;
                     }

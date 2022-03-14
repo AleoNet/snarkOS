@@ -33,15 +33,9 @@ use std::{
     time::Duration,
 };
 use tokio::{
-    sync::{mpsc, oneshot, RwLock},
+    sync::{oneshot, RwLock},
     task,
 };
-
-/// Shorthand for the parent half of the `Prover` message channel.
-pub type ProverRouter<N> = mpsc::Sender<ProverRequest<N>>;
-#[allow(unused)]
-/// Shorthand for the child half of the `Prover` message channel.
-type ProverHandler<N> = mpsc::Receiver<ProverRequest<N>>;
 
 /// The miner heartbeat in seconds.
 const MINER_HEARTBEAT_IN_SECONDS: Duration = Duration::from_secs(2);
@@ -71,8 +65,6 @@ pub struct Prover<N: Network, E: Environment> {
     address: Option<Address<N>>,
     /// The IP address of the connected pool.
     pool: Option<SocketAddr>,
-    /// The prover router of the node.
-    prover_router: ProverRouter<N>,
     /// The pool of unconfirmed transactions.
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
     /// The peers router of the node.
@@ -91,40 +83,16 @@ impl<N: Network, E: Environment> Prover<N, E> {
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
     ) -> Result<Arc<Self>> {
-        // Initialize an mpsc channel for sending requests to the `Prover` struct.
-        let (prover_router, mut prover_handler) = mpsc::channel(1024);
         // Initialize the prover.
         let prover = Arc::new(Self {
             network_state: OnceCell::new(),
             state: Arc::new(ProverState::open::<S, P>(path, false)?),
             address,
             pool: pool_ip,
-            prover_router,
             memory_pool: Arc::new(RwLock::new(MemoryPool::new())),
             peers_router,
             ledger_reader,
         });
-
-        // Initialize the handler for the prover.
-        // {
-        //     let prover = prover.clone();
-        //     let (router, handler) = oneshot::channel();
-        //     E::resources().register_task(
-        //         None, // No need to provide an id, as the task will run indefinitely.
-        //         task::spawn(async move {
-        //             // Notify the outer function that the task is ready.
-        //             let _ = router.send(());
-        //             // Asynchronously wait for a prover request.
-        //             while let Some(request) = prover_handler.recv().await {
-        //                 // Update the state of the prover.
-        //                 prover.update(request).await;
-        //             }
-        //         }),
-        //     );
-
-        //     // Wait until the prover handler is ready.
-        //     let _ = handler.await;
-        // }
 
         // Initialize the miner, if the node type is a miner.
         if E::NODE_TYPE == NodeType::Miner && prover.pool.is_none() {
@@ -162,11 +130,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
     pub fn set_network_state(&self, network_state: NetworkState<N, E>) {
         self.network_state.set(network_state).expect("network state can only be set once");
-    }
-
-    /// Returns an instance of the prover router.
-    pub fn router(&self) -> ProverRouter<N> {
-        self.prover_router.clone()
     }
 
     /// Returns an instance of the memory pool.
@@ -344,7 +307,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                 let state = prover.state.clone();
                                 let canon = prover.ledger_reader.clone(); // This is *safe* as the ledger only reads.
                                 let unconfirmed_transactions = prover.memory_pool.read().await.transactions();
-                                let prover_router = prover.prover_router.clone();
 
                                 // Procure a resource id to register the task with, as it might be terminated at any point in time.
                                 let mining_task_id = E::resources().procure_id();
@@ -379,7 +341,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                                 }
 
                                                 // Broadcast the next block.
-                                                let request = LedgerRequest::UnconfirmedBlock(local_ip, block, prover_router.clone());
+                                                let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
 
                                                 prover_clone
                                                     .network_state

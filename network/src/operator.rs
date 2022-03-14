@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{state::NetworkState, LedgerReader, LedgerRequest, PeersRequest, PeersRouter, ProverRouter};
+use crate::{state::NetworkState, LedgerReader, LedgerRequest, PeersRequest, PeersRouter};
 use snarkos_environment::{
     helpers::NodeType,
     network::{Data, Message},
@@ -86,8 +86,6 @@ pub struct Operator<N: Network, E: Environment> {
     peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
     ledger_reader: LedgerReader<N>,
-    /// The prover router of the node.
-    prover_router: ProverRouter<N>,
 }
 
 impl<N: Network, E: Environment> Operator<N, E> {
@@ -100,7 +98,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
         memory_pool: Arc<RwLock<MemoryPool<N>>>,
         peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
-        prover_router: ProverRouter<N>,
     ) -> Result<Arc<Self>> {
         // Initialize an mpsc channel for sending requests to the `Operator` struct.
         let (operator_router, mut operator_handler) = mpsc::channel(1024);
@@ -117,7 +114,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
             memory_pool,
             peers_router,
             ledger_reader,
-            prover_router,
         });
 
         if E::NODE_TYPE == NodeType::Operator {
@@ -330,7 +326,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     ) {
                         if let Ok(block) = Block::from(previous_block_hash, block_header, transactions) {
                             info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
-                            let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
+                            let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block);
 
                             self.network_state
                                 .get()

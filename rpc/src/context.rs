@@ -18,8 +18,8 @@
 
 use crate::RpcFunctions;
 use snarkos_environment::Environment;
-use snarkos_network::{LedgerReader, NetworkState, Operator, Peers, ProverRouter};
-use snarkvm::dpc::{Address, MemoryPool, Network};
+use snarkos_network::NetworkState;
+use snarkvm::dpc::{Address, Network};
 
 use futures::TryFutureExt;
 use jsonrpsee::{
@@ -28,7 +28,7 @@ use jsonrpsee::{
 };
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
-use tokio::sync::{oneshot, RwLock};
+use tokio::sync::oneshot;
 
 // The details on resource-limiting can be found at https://github.com/paritytech/jsonrpsee/blob/master/core/src/server/resource_limiting.rs
 // note: jsonrpsee expects string literals as resource names; we'll be distinguishing

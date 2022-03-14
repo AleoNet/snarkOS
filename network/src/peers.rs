@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{LedgerReader, NetworkState, OperatorRouter, OutboundRouter, Peer, ProverRouter};
+use crate::{LedgerReader, NetworkState, OperatorRouter, OutboundRouter, Peer};
 use snarkos_environment::{
     network::{Data, DisconnectReason, Message},
     Environment,
@@ -54,16 +54,16 @@ pub(crate) type ConnectionResult = oneshot::Sender<Result<()>>;
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, ledger_reader, operator_router, prover_router, connection_result)
-    Connect(SocketAddr, LedgerReader<N>, OperatorRouter<N>, ProverRouter<N>, ConnectionResult),
-    /// Heartbeat := (ledger_reader, operator_router, prover_router)
-    Heartbeat(LedgerReader<N>, OperatorRouter<N>, ProverRouter<N>),
+    /// Connect := (peer_ip, ledger_reader, operator_router, connection_result)
+    Connect(SocketAddr, LedgerReader<N>, OperatorRouter<N>, ConnectionResult),
+    /// Heartbeat := (ledger_reader, operator_router)
+    Heartbeat(LedgerReader<N>, OperatorRouter<N>),
     /// MessagePropagate := (peer_ip, message)
     MessagePropagate(SocketAddr, Message<N, E>),
     /// MessageSend := (peer_ip, message)
     MessageSend(SocketAddr, Message<N, E>),
-    /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router, operator_router, prover_router)
-    PeerConnecting(TcpStream, SocketAddr, LedgerReader<N>, OperatorRouter<N>, ProverRouter<N>),
+    /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router, operator_router)
+    PeerConnecting(TcpStream, SocketAddr, LedgerReader<N>, OperatorRouter<N>),
     /// PeerConnected := (peer_ip, peer_nonce, outbound_router)
     PeerConnected(SocketAddr, u64, OutboundRouter<N, E>),
     /// PeerDisconnected := (peer_ip)
@@ -268,7 +268,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(super) async fn update(&self, request: PeersRequest<N, E>) {
         match request {
-            PeersRequest::Connect(peer_ip, ledger_reader, operator_router, prover_router, connection_result) => {
+            PeersRequest::Connect(peer_ip, ledger_reader, operator_router, connection_result) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -316,7 +316,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                         self.local_nonce,
                                         &self.peers_router,
                                         ledger_reader,
-                                        prover_router,
                                         operator_router,
                                         self.connected_nonces().await,
                                         Some(connection_result),
@@ -336,7 +335,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
             }
-            PeersRequest::Heartbeat(ledger_reader, operator_router, prover_router) => {
+            PeersRequest::Heartbeat(ledger_reader, operator_router) => {
                 // Obtain the number of connected peers.
                 let number_of_connected_peers = self.number_of_connected_peers().await;
                 // Ensure the number of connected peers is below the maximum threshold.
@@ -397,13 +396,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     for peer_ip in disconnected_trusted_nodes {
                         // Initialize the connection process.
                         let (router, handler) = oneshot::channel();
-                        let request = PeersRequest::Connect(
-                            peer_ip,
-                            ledger_reader.clone(),
-                            operator_router.clone(),
-                            prover_router.clone(),
-                            router,
-                        );
+                        let request = PeersRequest::Connect(peer_ip, ledger_reader.clone(), operator_router.clone(), router);
                         if let Err(error) = self.peers_router.send(request).await {
                             warn!("Failed to transmit the request: '{}'", error);
                         }
@@ -462,13 +455,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                         // Initialize the connection process.
                         let (router, handler) = oneshot::channel();
-                        let request = PeersRequest::Connect(
-                            peer_ip,
-                            ledger_reader.clone(),
-                            operator_router.clone(),
-                            prover_router.clone(),
-                            router,
-                        );
+                        let request = PeersRequest::Connect(peer_ip, ledger_reader.clone(), operator_router.clone(), router);
                         if let Err(error) = self.peers_router.send(request).await {
                             warn!("Failed to transmit the request: '{}'", error);
                         }
@@ -492,7 +479,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::MessageSend(sender, message) => {
                 self.send(sender, message).await;
             }
-            PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader, operator_router, prover_router) => {
+            PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader, operator_router) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -561,7 +548,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             self.local_nonce,
                             &self.peers_router,
                             ledger_reader,
-                            prover_router,
                             operator_router,
                             self.connected_nonces().await,
                             None,

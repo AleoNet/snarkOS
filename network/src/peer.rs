@@ -23,7 +23,6 @@ use crate::{
     PeersRequest,
     PeersRouter,
     ProverRequest,
-    ProverRouter,
 };
 use snarkos_environment::{
     helpers::{NodeType, State, Status},
@@ -327,7 +326,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
         local_nonce: u64,
         peers_router: &PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
-        prover_router: ProverRouter<N>,
         operator_router: OperatorRouter<N>,
         connected_nonces: Vec<u64>,
         connection_result: Option<ConnectionResult>,
@@ -509,7 +507,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                             }
 
                                             // Route the `BlockResponse` to the ledger.
-                                            peer.network_state.ledger.update(LedgerRequest::BlockResponse(peer_ip, block, prover_router.clone())).await;
+                                            peer.network_state.ledger.update(LedgerRequest::BlockResponse(peer_ip, block)).await;
                                         },
                                         // Route the `Failure` to the ledger.
                                         Err(error) => {
@@ -668,7 +666,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                             // Ensure the claimed block height and block hash matches in the deserialized block.
                                             Ok(block) => match block_height == block.height() && block_hash == block.hash() {
                                                 // Route the `UnconfirmedBlock` to the ledger.
-                                                true => LedgerRequest::UnconfirmedBlock(peer_ip, block, prover_router.clone()),
+                                                true => LedgerRequest::UnconfirmedBlock(peer_ip, block),
                                                 // Route the `Failure` to the ledger.
                                                 false => LedgerRequest::Failure(peer_ip, "Malformed UnconfirmedBlock message".to_string())
                                             },
@@ -712,10 +710,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                             } else {
                                                 // Route the `UnconfirmedTransaction` to the prover.
                                                 peer.network_state.prover.update(ProverRequest::UnconfirmedTransaction(peer_ip, transaction)).await;
-                                               //  if let Err(error) = prover_router.send(ProverRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
-                                               //      warn!("[UnconfirmedTransaction] {}", error);
-
-                                               //  }
                                             }
 
                                         }
@@ -734,9 +728,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         trace!("Skipping 'PoolRequest' from {}", peer_ip);
                                     } else if let Ok(block_template) = block_template.deserialize().await {
                                     peer.network_state.prover.update(ProverRequest::PoolRequest(peer_ip, share_difficulty, block_template)).await;
-                                       //  if let Err(error) = prover_router.send(ProverRequest::PoolRequest(peer_ip, share_difficulty, block_template)).await {
-                                       //      warn!("[PoolRequest] {}", error);
-                                       //  }
                                     } else {
                                         warn!("[PoolRequest] could not deserialize block template");
                                     }
