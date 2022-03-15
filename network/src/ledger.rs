@@ -25,10 +25,10 @@ use crate::{
     ProverRouter,
 };
 use snarkos_environment::{
-    helpers::{NodeType, State},
+    helpers::{block_locators::*, NodeType, State},
     Environment,
 };
-use snarkos_storage::{storage::Storage, BlockLocators, LedgerState, MAXIMUM_LINEAR_BLOCK_LOCATORS};
+use snarkos_storage::{storage::Storage, LedgerState};
 use snarkvm::dpc::prelude::*;
 
 #[cfg(any(feature = "test", feature = "prometheus"))]

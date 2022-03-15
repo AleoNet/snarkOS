@@ -14,7 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::MAXIMUM_BLOCK_LOCATORS;
+/// The maximum number of linear block locators.
+pub const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 64;
+/// The maximum number of quadratic block locators.
+pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 32;
+/// The total maximum number of block locators.
+pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
+
 use snarkvm::{
     dpc::{BlockHeader, Network},
     utilities::{
@@ -28,7 +34,7 @@ use snarkvm::{
     },
 };
 
-use anyhow::{anyhow, Result};
+use anyhow::{bail, Result};
 use rayon::prelude::*;
 use serde::{de, ser, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use std::{
@@ -60,7 +66,7 @@ impl<N: Network> BlockLocators<N> {
                     MAXIMUM_BLOCK_LOCATORS, num_locators
                 );
                 error!("{}", error);
-                Err(anyhow!("{}", error))
+                bail!("{}", error)
             }
         }
     }
@@ -124,7 +130,7 @@ impl<N: Network> FromBytes for BlockLocators<N> {
             .map(|(height, hash, bytes)| (height, (hash, bytes.map(|bytes| BlockHeader::<N>::read_le(&bytes[..]).unwrap()))))
             .collect::<BTreeMap<_, (_, _)>>();
 
-        Self::from(block_locators).map_err(|error| Error::new(ErrorKind::Other, format!("{}", error)))
+        Self::from(block_locators).map_err(|error| Error::new(ErrorKind::Other, error))
     }
 }
 
@@ -212,7 +218,7 @@ impl<N: Network> Deref for BlockLocators<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_environment::CurrentNetwork;
+    use crate::CurrentNetwork;
 
     #[test]
     fn test_block_locators_serde_json() {

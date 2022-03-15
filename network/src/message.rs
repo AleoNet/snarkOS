@@ -15,10 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_environment::{
-    helpers::{NodeType, State},
+    helpers::{BlockLocators, NodeType, State},
     Environment,
 };
-use snarkos_storage::BlockLocators;
 use snarkvm::{dpc::posw::PoSWProof, prelude::*};
 
 use ::bytes::{Buf, BufMut, Bytes, BytesMut};

@@ -20,18 +20,7 @@
 #[macro_use]
 extern crate tracing;
 
-mod helpers;
-pub use helpers::BlockLocators;
-
 pub(crate) mod state;
-pub use state::{
-    LedgerState,
-    Metadata,
-    OperatorState,
-    ProverState,
-    MAXIMUM_BLOCK_LOCATORS,
-    MAXIMUM_LINEAR_BLOCK_LOCATORS,
-    MAXIMUM_QUADRATIC_BLOCK_LOCATORS,
-};
+pub use state::{LedgerState, Metadata, OperatorState, ProverState};
 
 pub mod storage;

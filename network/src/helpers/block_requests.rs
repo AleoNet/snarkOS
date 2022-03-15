@@ -15,8 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{ledger::PeersState, DisconnectReason};
-use snarkos_environment::Environment;
-use snarkos_storage::{BlockLocators, LedgerState};
+use snarkos_environment::{helpers::BlockLocators, Environment};
+use snarkos_storage::LedgerState;
 use snarkvm::dpc::prelude::*;
 
 use std::net::SocketAddr;

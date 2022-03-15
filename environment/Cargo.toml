@@ -16,6 +16,9 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
+[dependencies.anyhow]
+version = "1"
+
 [dependencies.num_cpus]
 version = "1"
 
@@ -26,6 +29,9 @@ version = "1"
 version = "1"
 
 [dependencies.serde]
+version = "1"
+
+[dependencies.serde_json]
 version = "1"
 
 [dependencies.snarkvm]
@@ -41,6 +47,9 @@ optional = true
 
 [dependencies.tracing]
 version = "0.1"
+
+[dev-dependencies.bincode]
+version = "1"
 
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
