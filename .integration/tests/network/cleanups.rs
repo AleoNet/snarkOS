@@ -45,7 +45,8 @@ async fn measure_node_overhead() {
 }
 
 #[tokio::test]
-#[ignore = "TODO@ljedrz: no obvious leaks anymore; investigate larger conn counts and a Ping workaround"]
+// TODO@ljedrz: investigate larger connection counts
+// latest result: 46.37 KB
 async fn inbound_connect_and_disconnect_doesnt_leak() {
     // Start a test node.
     let test_node = TestNode::default().await;
@@ -80,18 +81,13 @@ async fn inbound_connect_and_disconnect_doesnt_leak() {
         }
     }
 
-    // Sleeping here for a time a few seconds more than `PING_SLEEP_IN_SECS` results in a pass, as expected.
-
-    // Measure memory use after the repeated connections.
-    let final_mem = PEAK_ALLOC.current_usage();
-
     // Check if there is a connection-related leak.
-    let leaked_mem = final_mem.saturating_sub(first_conn_mem.unwrap());
-    assert_eq!(leaked_mem, 0);
+    wait_until!(3, PEAK_ALLOC.current_usage().saturating_sub(first_conn_mem.unwrap()) == 0);
 }
 
 #[tokio::test]
-#[ignore = "TODO@ljedrz: no obvious leaks anymore; investigate larger conn counts and a Ping workaround"]
+// TODO@ljedrz: investigate larger connection counts
+// latest result: 46.01 KB
 async fn outbound_connect_and_disconnect_doesnt_leak() {
     // Start a snarkOS node.
     let client_node = ClientNode::default().await;
@@ -128,14 +124,8 @@ async fn outbound_connect_and_disconnect_doesnt_leak() {
         }
     }
 
-    // Sleeping here for a time a few seconds more than `PING_SLEEP_IN_SECS` results in a pass, as expected.
-
-    // Measure memory use after the repeated connections.
-    let final_mem = PEAK_ALLOC.current_usage();
-
     // Check if there is a connection-related leak.
-    let leaked_mem = final_mem.saturating_sub(first_conn_mem.unwrap());
-    assert_eq!(leaked_mem, 0);
+    wait_until!(3, PEAK_ALLOC.current_usage().saturating_sub(first_conn_mem.unwrap()) == 0);
 }
 
 #[tokio::test]
