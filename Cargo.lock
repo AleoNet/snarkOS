@@ -2904,7 +2904,6 @@ dependencies = [
  "snarkos-integration",
  "snarkos-metrics",
  "snarkos-network",
- "snarkos-storage",
  "snarkos-synthetic-node",
  "snarkvm",
  "time 0.3.7",
@@ -2918,10 +2917,13 @@ dependencies = [
 name = "snarkos-environment"
 version = "2.0.2"
 dependencies = [
+ "anyhow",
+ "bincode",
  "num_cpus",
  "once_cell",
  "rayon",
  "serde",
+ "serde_json",
  "snarkvm",
  "tokio",
  "tokio-metrics",
@@ -2943,7 +2945,6 @@ dependencies = [
  "snarkos-environment",
  "snarkos-metrics",
  "snarkos-network",
- "snarkos-storage",
  "snarkos-synthetic-node",
  "snarkvm",
  "tokio",
@@ -3023,7 +3024,6 @@ dependencies = [
  "rayon",
  "rocksdb",
  "serde",
- "serde_json",
  "snarkos-environment",
  "snarkos-storage",
  "snarkvm",
