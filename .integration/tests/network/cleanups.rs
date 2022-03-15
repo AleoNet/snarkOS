@@ -16,6 +16,7 @@
 
 use crate::common::display_bytes;
 use snarkos_integration::{wait_until, ClientNode, TestNode};
+use snarkvm::dpc::Network;
 
 use pea2pea::Pea2Pea;
 use peak_alloc::PeakAlloc;
@@ -25,8 +26,11 @@ use peak_alloc::PeakAlloc;
 static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
 #[tokio::test]
-#[ignore = "this test is purely informational; latest result: 159.81 MB"]
+#[ignore = "this test is purely informational; latest result: 11.73 MB"]
 async fn measure_node_overhead() {
+    // It takes a lot of memory to set up the snarkVM bits related to the Network, so filter it out.
+    let _genesis_block = snarkos_environment::CurrentNetwork::genesis_block();
+
     // Register initial memory use.
     let initial_mem = PEAK_ALLOC.current_usage();
 
