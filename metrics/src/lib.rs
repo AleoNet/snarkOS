@@ -64,6 +64,7 @@ pub fn initialize() -> Snapshotter {
     snapshotter
 }
 
+#[cfg(feature = "test")]
 fn register_metrics() {
     for name in GAUGE_NAMES {
         register_gauge!(name);
