@@ -74,7 +74,7 @@ async fn inbound_connect_and_disconnect_doesnt_leak() {
             // Measure memory use caused by the 1st connect and disconnect.
             first_conn_mem = Some(PEAK_ALLOC.current_usage());
             println!(
-                "Memory increase after a single outbound connection: {}",
+                "Memory increase after a single inbound connection: {}",
                 display_bytes((first_conn_mem.unwrap() - pre_connection_mem) as f64)
             );
         }
