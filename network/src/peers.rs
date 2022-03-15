@@ -14,8 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Data, DisconnectReason, LedgerReader, LedgerRouter, Message, OperatorRouter, OutboundRouter, Peer, ProverRouter};
-use snarkos_environment::Environment;
+use crate::{LedgerReader, LedgerRouter, OperatorRouter, OutboundRouter, Peer, ProverRouter};
+use snarkos_environment::{
+    network::{Data, DisconnectReason, Message},
+    Environment,
+};
 use snarkvm::dpc::prelude::*;
 
 #[cfg(any(feature = "test", feature = "prometheus"))]

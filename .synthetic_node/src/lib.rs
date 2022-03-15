@@ -16,11 +16,11 @@
 
 use snarkos_environment::{
     helpers::{NodeType, State},
+    network::{Data, DisconnectReason, Message},
     Client,
     CurrentNetwork,
     Environment,
 };
-use snarkos_network::{Data, DisconnectReason, Message};
 use snarkvm::traits::Network;
 
 use parking_lot::RwLock;

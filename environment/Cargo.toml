@@ -19,6 +19,14 @@ edition = "2021"
 [dependencies.anyhow]
 version = "1"
 
+[dependencies.bincode]
+version = "1"
+optional = true
+
+[dependencies.bytes]
+version = "1"
+optional = true
+
 [dependencies.num_cpus]
 version = "1"
 
@@ -45,11 +53,13 @@ features = ["sync", "rt", "time"]
 version = "0.1"
 optional = true
 
+[dependencies.tokio-util]
+version = "0.7"
+features = [ "codec" ]
+optional = true
+
 [dependencies.tracing]
 version = "0.1"
-
-[dev-dependencies.bincode]
-version = "1"
 
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
@@ -59,4 +69,5 @@ version = "1"
 features = ["macros", "rt-multi-thread", "time"]
 
 [features]
+network = [ "bincode", "bytes", "tokio-util" ]
 task-metrics = [ "tokio-metrics" ]

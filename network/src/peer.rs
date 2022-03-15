@@ -16,12 +16,9 @@
 
 use crate::{
     ConnectionResult,
-    Data,
-    DisconnectReason,
     LedgerReader,
     LedgerRequest,
     LedgerRouter,
-    Message,
     OperatorRequest,
     OperatorRouter,
     PeersRequest,
@@ -31,6 +28,7 @@ use crate::{
 };
 use snarkos_environment::{
     helpers::{NodeType, State, Status},
+    network::{Data, DisconnectReason, Message},
     Environment,
 };
 use snarkvm::dpc::prelude::*;

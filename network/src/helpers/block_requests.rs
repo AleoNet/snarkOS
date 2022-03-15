@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{ledger::PeersState, DisconnectReason};
-use snarkos_environment::{helpers::BlockLocators, Environment};
+use crate::ledger::PeersState;
+use snarkos_environment::{helpers::BlockLocators, network::DisconnectReason, Environment};
 use snarkos_storage::LedgerState;
 use snarkvm::dpc::prelude::*;
 

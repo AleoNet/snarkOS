@@ -16,11 +16,11 @@
 
 use snarkos_environment::{
     helpers::{BlockLocators, NodeType, State},
+    network::Data,
     Client,
     CurrentNetwork,
     Environment,
 };
-use snarkos_network::Data;
 use snarkos_synthetic_node::{ClientMessage, ClientState, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
 use snarkvm::traits::Network;
 

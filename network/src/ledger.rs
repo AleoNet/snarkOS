@@ -16,9 +16,6 @@
 
 use crate::{
     helpers::{block_requests::*, BlockRequest, CircularMap},
-    Data,
-    DisconnectReason,
-    Message,
     PeersRequest,
     PeersRouter,
     ProverRequest,
@@ -26,6 +23,7 @@ use crate::{
 };
 use snarkos_environment::{
     helpers::{block_locators::*, NodeType, State},
+    network::{Data, DisconnectReason, Message},
     Environment,
 };
 use snarkos_storage::{storage::Storage, LedgerState};

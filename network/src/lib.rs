@@ -27,9 +27,6 @@ pub mod helpers;
 pub mod ledger;
 pub use ledger::*;
 
-pub mod message;
-pub use message::*;
-
 pub mod operator;
 pub use operator::*;
 

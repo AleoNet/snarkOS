@@ -20,6 +20,8 @@
 extern crate tracing;
 
 pub mod helpers;
+#[cfg(feature = "network")]
+pub mod network;
 
 use crate::helpers::{NodeType, Resources, Status};
 use snarkvm::dpc::Network;

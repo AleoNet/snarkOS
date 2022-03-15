@@ -16,7 +16,9 @@
 
 #![forbid(unsafe_code)]
 
+#[cfg(feature = "test")]
 pub mod client_node;
+#[cfg(feature = "test")]
 pub use client_node::*;
 
 pub mod test_node;
