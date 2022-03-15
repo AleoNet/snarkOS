@@ -21,7 +21,6 @@
 use crate::{RpcContext, RpcError, RpcFunctions};
 use snarkos_environment::Environment;
 use snarkos_network::ProverRequest;
-use snarkos_storage::Metadata;
 use snarkvm::{
     dpc::{Address, AleoAmount, Block, BlockHeader, Blocks, Network, Record, Transaction, Transactions, Transition},
     utilities::{FromBytes, ToBytes},
@@ -201,7 +200,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
     /// Returns a transaction with metadata and decrypted records given the transaction ID.
     async fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Value, RpcError> {
         let transaction: Transaction<N> = self.ledger.get_transaction(&transaction_id)?;
-        let metadata: Metadata<N> = self.ledger.get_transaction_metadata(&transaction_id)?;
+        let metadata = self.ledger.get_transaction_metadata(&transaction_id)?;
         let decrypted_records: Vec<Record<N>> = transaction.to_records().collect();
         Ok(serde_json::json!({ "transaction": transaction, "metadata": metadata, "decrypted_records": decrypted_records }))
     }
