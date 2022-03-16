@@ -196,9 +196,17 @@ impl Node {
             let _display = Display::<N, E>::start(server.clone(), self.verbosity)?;
         };
 
-        // Connect to a peer if one was given as an argument.
-        if let Some(peer_ip) = &self.connect {
-            let _ = server.connect_to(peer_ip.parse().unwrap()).await;
+        // Connect to peer(s) if given as an argument.
+        if let Some(peer_ips) = &self.connect {
+            for peer_ip in peer_ips.split(',') {
+                let addr: SocketAddr = if let Ok(addr) = peer_ip.parse() {
+                    addr
+                } else {
+                    error!("The address supplied to --connect ('{}') is malformed.", peer_ip);
+                    continue;
+                };
+                let _ = server.connect_to(addr).await;
+            }
         }
 
         // Note: Do not move this. The pending await must be here otherwise
