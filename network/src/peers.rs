@@ -64,8 +64,8 @@ pub enum PeersRequest<N: Network, E: Environment> {
     MessageSend(SocketAddr, Message<N, E>),
     /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router)
     PeerConnecting(TcpStream, SocketAddr, LedgerReader<N>),
-    /// PeerConnected := (peer_ip, peer_nonce, outbound_router)
-    PeerConnected(SocketAddr, u64, OutboundRouter<N, E>),
+    /// PeerConnected := (peer_ip, peer_nonce)
+    PeerConnected(SocketAddr, u64),
     /// PeerDisconnected := (peer_ip)
     PeerDisconnected(SocketAddr),
     /// PeerRestricted := (peer_ip)
@@ -88,8 +88,8 @@ pub struct Peers<N: Network, E: Environment> {
     local_ip: SocketAddr,
     /// The local nonce for this node session.
     local_nonce: u64,
-    /// The map connected peer IPs to their nonce and outbound message router.
-    connected_peers: RwLock<HashMap<SocketAddr, (u64, OutboundRouter<N, E>)>>,
+    /// The map connected peer IPs to their nonce.
+    connected_peers: RwLock<HashMap<SocketAddr, u64>>,
     /// The set of candidate peer IPs.
     candidate_peers: RwLock<HashSet<SocketAddr>>,
     /// The set of restricted peer IPs.
@@ -254,12 +254,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Returns the list of nonces for the connected peers.
     ///
     pub(crate) async fn connected_nonces(&self) -> Vec<u64> {
-        self.connected_peers
-            .read()
-            .await
-            .values()
-            .map(|(peer_nonce, _)| *peer_nonce)
-            .collect()
+        self.connected_peers.read().await.values().map(|peer_nonce| *peer_nonce).collect()
     }
 
     ///
@@ -554,9 +549,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
             }
-            PeersRequest::PeerConnected(peer_ip, peer_nonce, outbound) => {
+            PeersRequest::PeerConnected(peer_ip, peer_nonce) => {
                 // Add an entry for this `Peer` in the connected peers.
-                self.connected_peers.write().await.insert(peer_ip, (peer_nonce, outbound));
+                self.connected_peers.write().await.insert(peer_ip, peer_nonce);
                 // Remove an entry for this `Peer` in the candidate peers, if it exists.
                 self.candidate_peers.write().await.remove(&peer_ip);
 
@@ -640,9 +635,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
     async fn send(&self, peer: SocketAddr, message: Message<N, E>) {
         let target_peer = self.connected_peers.read().await.get(&peer).cloned();
         match target_peer {
-            Some((_, outbound)) => {
-                if let Err(error) = outbound.send(message).await {
-                    trace!("Outbound channel failed: {}", error);
+            // TODO: clean this up.
+            Some(_) => {
+                if let Err(error) = peer.send(message).await {
+                    trace!("Message sending failed: {}", error);
                     self.connected_peers.write().await.remove(&peer);
 
                     #[cfg(any(feature = "test", feature = "prometheus"))]
