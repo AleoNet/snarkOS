@@ -22,6 +22,7 @@ use crate::{
     LedgerRequest,
     LedgerRouter,
     Message,
+    MessageCodec,
     OperatorRequest,
     OperatorRouter,
     PeersRequest,
@@ -68,7 +69,7 @@ pub(crate) struct Peer<N: Network, E: Environment> {
     /// The timestamp of the last message received from this peer.
     last_seen: Instant,
     /// The TCP socket that handles sending and receiving data with this peer.
-    outbound_socket: Framed<TcpStream, Message<N, E>>,
+    outbound_socket: Framed<TcpStream, MessageCodec<N, E>>,
     /// The `outbound_handler` half of the MPSC message channel, used to receive messages from peers.
     /// When a message is received on this `OutboundHandler`, it will be written to the socket.
     outbound_handler: OutboundHandler<N, E>,
@@ -93,7 +94,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         connected_nonces: &[u64],
     ) -> Result<Self> {
         // Construct the socket.
-        let mut outbound_socket = Framed::new(stream, Message::<N, E>::PeerRequest);
+        let mut outbound_socket = Framed::new(stream, MessageCodec::default());
 
         // Perform the handshake before proceeding.
         let (peer_ip, peer_nonce, node_type, status) = Peer::handshake(
@@ -155,7 +156,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
     /// Performs the handshake protocol, returning the listener IP and nonce of the peer upon success.
     async fn handshake(
-        outbound_socket: &mut Framed<TcpStream, Message<N, E>>,
+        outbound_socket: &mut Framed<TcpStream, MessageCodec<N, E>>,
         local_ip: SocketAddr,
         local_nonce: u64,
         local_cumulative_weight: u128,

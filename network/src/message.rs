@@ -338,7 +338,17 @@ impl<N: Network, E: Environment> Message<N, E> {
     }
 }
 
-impl<N: Network, E: Environment> Encoder<Message<N, E>> for Message<N, E> {
+/// The codec used to decode and encode network `Message`s.
+// note: it's very similar to `LengthDelimitedCodec`, but omits the `Bytes` allocation it would require.
+pub struct MessageCodec<N: Network, E: Environment>(PhantomData<N>, PhantomData<E>);
+
+impl<N: Network, E: Environment> Default for MessageCodec<N, E> {
+    fn default() -> Self {
+        Self(PhantomData, PhantomData)
+    }
+}
+
+impl<N: Network, E: Environment> Encoder<Message<N, E>> for MessageCodec<N, E> {
     type Error = anyhow::Error;
 
     fn encode(&mut self, message: Message<N, E>, dst: &mut BytesMut) -> Result<(), Self::Error> {
@@ -358,7 +368,7 @@ impl<N: Network, E: Environment> Encoder<Message<N, E>> for Message<N, E> {
     }
 }
 
-impl<N: Network, E: Environment> Decoder for Message<N, E> {
+impl<N: Network, E: Environment> Decoder for MessageCodec<N, E> {
     type Error = std::io::Error;
     type Item = Message<N, E>;
 
