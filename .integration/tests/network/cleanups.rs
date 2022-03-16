@@ -131,19 +131,21 @@ async fn outbound_connect_and_disconnect_doesnt_leak() {
 #[tokio::test]
 #[ignore = "TODO: currently fails"]
 async fn node_shutdown_doesnt_leak() {
+    tracing_subscriber::fmt::init();
+
+    // It takes a lot of memory to set up the snarkVM bits related to the Network, so filter it out.
+    let _genesis_block = snarkos_environment::CurrentNetwork::genesis_block();
+
     // Register initial memory use.
     let initial_mem = PEAK_ALLOC.current_usage();
 
     // Start a snarkOS node.
     let client_node = ClientNode::default().await;
 
-    // Trigger `Server::shut_down` via the `Drop` impl.
+    // Perform a full shutdown and cleanup.
+    client_node.shut_down().await;
     drop(client_node);
 
-    // Measure memory use after the shutdown.
-    let final_mem = PEAK_ALLOC.current_usage();
-
     // Check if there are any leaks.
-    let leaked_mem = final_mem.saturating_sub(initial_mem);
-    assert_eq!(leaked_mem, 0);
+    wait_until!(3, PEAK_ALLOC.current_usage().saturating_sub(initial_mem) == 0);
 }

@@ -136,7 +136,12 @@ impl Resources {
                     }
                 }
             }
-            for resource in resources.into_values() {
+
+            let mut resources = resources.into_iter().collect::<Vec<_>>();
+            resources.sort_unstable_by_key(|(id, _res)| *id);
+
+            for (id, resource) in resources.into_iter().rev() {
+                trace!("Aborting resource with the id {}", id);
                 resource.abort().await;
             }
         });
