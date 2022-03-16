@@ -432,10 +432,12 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Skip if the number of connected peers is above the minimum threshold.
                 match number_of_connected_peers < E::MINIMUM_NUMBER_OF_PEERS {
                     true => {
-                        trace!("Sending request for more peer connections");
-                        // Request more peers if the number of connected peers is below the threshold.
-                        for peer_ip in self.connected_peers().await.iter().choose_multiple(&mut OsRng::default(), 3) {
-                            self.send(*peer_ip, Message::PeerRequest).await;
+                        if number_of_connected_peers > 0 {
+                            trace!("Sending requests for more peer connections");
+                            // Request more peers if the number of connected peers is below the threshold.
+                            for peer_ip in self.connected_peers().await.iter().choose_multiple(&mut OsRng::default(), 3) {
+                                self.send(*peer_ip, Message::PeerRequest).await;
+                            }
                         }
                     }
                     false => return,
