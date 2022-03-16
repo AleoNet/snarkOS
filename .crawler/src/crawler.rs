@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#[cfg(feature = "postgres")]
+use crate::storage::PostgresOpts;
 use crate::{constants::*, known_network::KnownNetwork, metrics::NetworkMetrics};
 use snarkos_environment::{
     helpers::{NodeType, State},
@@ -32,8 +34,6 @@ use pea2pea::{
     Pea2Pea,
 };
 use rand::{rngs::SmallRng, seq::IteratorRandom, SeedableRng};
-#[cfg(feature = "postgres-tls")]
-use std::path::PathBuf;
 use std::{
     convert::TryInto,
     io::{self, Read},
@@ -57,34 +57,9 @@ pub struct Opts {
     /// Specify the IP address and port for the node server.
     #[clap(long = "addr", short = 'a', parse(try_from_str), default_value = "0.0.0.0:4132")]
     pub addr: SocketAddr,
-    /// The path to a certificate file to be used for a TLS connection with the postgres instance.
-    #[cfg(feature = "postgres-tls")]
-    #[clap(long = "postgres-cert-path")]
-    pub postgres_cert_path: PathBuf,
-    /// The hostname of the postgres instance (defaults to "localhost").
     #[cfg(feature = "postgres")]
-    #[clap(long = "postgres-host", default_value = "localhost")]
-    pub postgres_host: String,
-    /// The port of the postgres instance (defaults to 5432).
-    #[cfg(feature = "postgres")]
-    #[clap(long = "postgres-port", default_value = "5432")]
-    pub postgres_port: u16,
-    /// The user of the postgres instance (defaults to "postgres").
-    #[cfg(feature = "postgres")]
-    #[clap(long = "postgres-user", default_value = "postgres")]
-    pub postgres_user: String,
-    /// The password for the postgres instance (defaults to nothing).
-    #[cfg(feature = "postgres")]
-    #[clap(long = "postgres-pass", default_value = "")]
-    pub postgres_pass: String,
-    /// The hostname of the postgres instance (defaults to "postgres").
-    #[cfg(feature = "postgres")]
-    #[clap(long = "postgres-dbname", default_value = "postgres")]
-    pub postgres_dbname: String,
-    /// If set to `true`, re-creates the crawler's database tables.
-    #[cfg(feature = "postgres")]
-    #[clap(long = "postgres-clean")]
-    pub postgres_clean: bool,
+    #[clap(flatten)]
+    pub postgres: PostgresOpts,
 }
 
 /// Represents the crawler together with network metrics it has collected.

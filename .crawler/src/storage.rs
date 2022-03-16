@@ -16,8 +16,9 @@
 
 use std::collections::HashSet;
 #[cfg(feature = "postgres-tls")]
-use std::fs;
+use std::{fs, path::PathBuf};
 
+use clap::Parser;
 #[cfg(feature = "postgres-tls")]
 use native_tls::{Certificate, TlsConnector};
 #[cfg(feature = "postgres-tls")]
@@ -34,18 +35,44 @@ use crate::{
     metrics::NetworkMetrics,
 };
 
+#[derive(Debug, Parser)]
+pub struct PostgresOpts {
+    /// The hostname of the postgres instance (defaults to "localhost").
+    #[clap(long = "postgres-host", default_value = "localhost")]
+    pub host: String,
+    /// The port of the postgres instance (defaults to 5432).
+    #[clap(long = "postgres-port", default_value = "5432")]
+    pub port: u16,
+    /// The user of the postgres instance (defaults to "postgres").
+    #[clap(long = "postgres-user", default_value = "postgres")]
+    pub user: String,
+    /// The password for the postgres instance (defaults to nothing).
+    #[clap(long = "postgres-pass", default_value = "")]
+    pub pass: String,
+    /// The hostname of the postgres instance (defaults to "postgres").
+    #[clap(long = "postgres-dbname", default_value = "postgres")]
+    pub dbname: String,
+    /// If set to `true`, re-creates the crawler's database tables.
+    #[clap(long = "postgres-clean")]
+    pub clean: bool,
+    /// The path to a certificate file to be used for a TLS connection with the postgres instance.
+    #[cfg(feature = "postgres-tls")]
+    #[clap(long = "postgres-cert-path")]
+    pub cert_path: PathBuf,
+}
+
 /// Connects to a PostgreSQL database and creates the needed tables if they don't exist yet.
 pub async fn initialize_storage(opts: &Opts) -> Result<Client, anyhow::Error> {
     // Prepare the connection config.
     let config = format!(
         "host={} port={} user={} password={} dbname={}",
-        opts.postgres_host, opts.postgres_port, opts.postgres_user, opts.postgres_pass, opts.postgres_dbname
+        opts.postgres.host, opts.postgres.port, opts.postgres.user, opts.postgres.pass, opts.postgres.dbname
     );
 
     // Connect to the PostgreSQL database.
     #[cfg(feature = "postgres-tls")]
     let (client, connection) = {
-        let cert = fs::read(&opts.postgres_cert_path)?;
+        let cert = fs::read(&opts.postgres.cert_path)?;
         let cert = Certificate::from_pem(&cert)?;
         let connector = TlsConnector::builder().add_root_certificate(cert).build()?;
         let connector = MakeTlsConnector::new(connector);
@@ -64,7 +91,7 @@ pub async fn initialize_storage(opts: &Opts) -> Result<Client, anyhow::Error> {
         }
     });
 
-    if opts.postgres_clean {
+    if opts.postgres.clean {
         client
             .batch_execute("DROP TABLE IF EXISTS nodes; DROP TABLE IF EXISTS network; DROP TABLE IF EXISTS connections;")
             .await?;
