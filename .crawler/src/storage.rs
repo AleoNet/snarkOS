@@ -93,7 +93,13 @@ pub async fn initialize_storage(opts: &Opts) -> Result<Client, anyhow::Error> {
 
     if opts.postgres.clean {
         client
-            .batch_execute("DROP TABLE IF EXISTS nodes; DROP TABLE IF EXISTS network; DROP TABLE IF EXISTS connections;")
+            .batch_execute(
+                "
+                DROP TABLE IF EXISTS node_states;
+                DROP TABLE IF EXISTS node_centrality;
+                DROP TABLE IF EXISTS network;
+                DROP TABLE IF EXISTS connections;",
+            )
             .await?;
         debug!("Persistent storage was cleaned");
     }
@@ -101,22 +107,27 @@ pub async fn initialize_storage(opts: &Opts) -> Result<Client, anyhow::Error> {
     client
         .batch_execute(
             "
-        CREATE TABLE IF NOT EXISTS nodes (
+        CREATE TABLE IF NOT EXISTS node_states (
+            ip              INET NOT NULL,
+            port            INTEGER NOT NULL,
+            timestamp       TIMESTAMP WITH TIME ZONE,
+            type            SMALLINT,
+            version         INTEGER,
+            state           SMALLINT,
+            height          INTEGER,
+            handshake_ms    INTEGER,
+            UNIQUE          (ip, port, timestamp)
+        );
+        CREATE INDEX IF NOT EXISTS node_states_idx ON node_states (ip, port, timestamp);
+
+        CREATE TABLE IF NOT EXISTS node_centrality (
             ip                  INET NOT NULL,
             port                INTEGER NOT NULL,
-            timestamp           TIMESTAMP WITH TIME ZONE,
-            type                SMALLINT,
-            version             INTEGER,
-            state               SMALLINT,
-            height              INTEGER,
-            handshake_ms        INTEGER,
+            timestamp           TIMESTAMP WITH TIME ZONE NOT NULL,
             connection_count    SMALLINT,
             prestige_score      REAL,
-            fiedler_value       REAL,
-            UNIQUE              (ip, port, timestamp)
+            fiedler_value       REAL
         );
-
-        CREATE INDEX IF NOT EXISTS nodes_idx ON nodes (ip, port, timestamp);
 
         CREATE TABLE IF NOT EXISTS network (
             timestamp        TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -158,11 +169,10 @@ impl Crawler {
             let mut storage = storage.lock().await;
             let transaction = storage.transaction().await?;
 
-            let per_node_stmt = transaction
+            let node_state_stmt = transaction
                 .prepare_typed(
-                    "INSERT INTO nodes VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-                    ON CONFLICT (ip, port, timestamp) DO UPDATE SET (connection_count, prestige_score, fiedler_value)
-                    = (excluded.connection_count, excluded.prestige_score, excluded.fiedler_value);",
+                    "INSERT INTO node_states VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+                    ON CONFLICT (ip, port, timestamp) DO NOTHING;",
                     &[
                         Type::INET,
                         Type::INT4,
@@ -172,16 +182,24 @@ impl Crawler {
                         Type::INT2,
                         Type::INT8,
                         Type::INT4,
-                        Type::INT4,
-                        Type::FLOAT4,
-                        Type::FLOAT4,
                     ],
                 )
                 .await?;
 
+            let node_centrality_stmt = transaction
+                .prepare_typed("INSERT INTO node_centrality VALUES ($1, $2, $3, $4, $5, $6);", &[
+                    Type::INET,
+                    Type::INT4,
+                    Type::TIMESTAMPTZ,
+                    Type::INT4,
+                    Type::FLOAT4,
+                    Type::FLOAT4,
+                ])
+                .await?;
+
             for (addr, meta, nc) in metrics.per_node {
                 transaction
-                    .execute(&per_node_stmt, &[
+                    .execute(&node_state_stmt, &[
                         &addr.ip(),
                         &(addr.port() as i32),
                         &meta.timestamp,
@@ -190,6 +208,14 @@ impl Crawler {
                         &meta.state.as_ref().map(|s| s.state as i16),
                         &meta.state.as_ref().map(|s| s.height as i64),
                         &meta.handshake_time.map(|t| t.whole_milliseconds() as i32),
+                    ])
+                    .await?;
+
+                transaction
+                    .execute(&node_centrality_stmt, &[
+                        &addr.ip(),
+                        &(addr.port() as i32),
+                        &timestamp,
                         &(nc.degree_centrality as i32),
                         &(nc.eigenvector_centrality as f32),
                         &(nc.fiedler_value as f32),
