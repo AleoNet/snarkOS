@@ -112,8 +112,11 @@ pub async fn initialize_storage(opts: &Opts) -> Result<Client, anyhow::Error> {
             handshake_ms        INTEGER,
             connection_count    SMALLINT,
             prestige_score      REAL,
-            fiedler_value       REAL
+            fiedler_value       REAL,
+            UNIQUE              (ip, port, timestamp)
         );
+
+        CREATE INDEX IF NOT EXISTS nodes_idx ON nodes (ip, port, timestamp);
 
         CREATE TABLE IF NOT EXISTS network (
             timestamp        TIMESTAMP WITH TIME ZONE NOT NULL,
@@ -156,19 +159,24 @@ impl Crawler {
             let transaction = storage.transaction().await?;
 
             let per_node_stmt = transaction
-                .prepare_typed("INSERT INTO nodes VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11);", &[
-                    Type::INET,
-                    Type::INT4,
-                    Type::TIMESTAMPTZ,
-                    Type::INT2,
-                    Type::INT4,
-                    Type::INT2,
-                    Type::INT8,
-                    Type::INT4,
-                    Type::INT4,
-                    Type::FLOAT4,
-                    Type::FLOAT4,
-                ])
+                .prepare_typed(
+                    "INSERT INTO nodes VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+                    ON CONFLICT (ip, port, timestamp) DO UPDATE SET (connection_count, prestige_score, fiedler_value)
+                    = (excluded.connection_count, excluded.prestige_score, excluded.fiedler_value);",
+                    &[
+                        Type::INET,
+                        Type::INT4,
+                        Type::TIMESTAMPTZ,
+                        Type::INT2,
+                        Type::INT4,
+                        Type::INT2,
+                        Type::INT8,
+                        Type::INT4,
+                        Type::INT4,
+                        Type::FLOAT4,
+                        Type::FLOAT4,
+                    ],
+                )
                 .await?;
 
             for (addr, meta, nc) in metrics.per_node {
