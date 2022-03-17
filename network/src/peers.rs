@@ -530,6 +530,52 @@ impl<N: Network, E: Environment> Peers<N, E> {
         }
     }
 
+    pub async fn peer_disconnected(&self, peer_ip: SocketAddr) {
+        // Remove an entry for this `Peer` in the connected peers, if it exists.
+        self.connected_peers.write().await.remove(&peer_ip);
+        // Add an entry for this `Peer` in the candidate peers.
+        self.candidate_peers.write().await.insert(peer_ip);
+
+        #[cfg(any(feature = "test", feature = "prometheus"))]
+        {
+            let number_of_connected_peers = self.number_of_connected_peers().await;
+            let number_of_candidate_peers = self.number_of_candidate_peers().await;
+            metrics::gauge!(metrics::peers::CONNECTED, number_of_connected_peers as f64);
+            metrics::gauge!(metrics::peers::CANDIDATE, number_of_candidate_peers as f64);
+        }
+    }
+
+    pub async fn peer_restricted(&self, peer_ip: SocketAddr) {
+        // Remove an entry for this `Peer` in the connected peers, if it exists.
+        self.connected_peers.write().await.remove(&peer_ip);
+        // Add an entry for this `Peer` in the restricted peers.
+        self.restricted_peers.write().await.insert(peer_ip, Instant::now());
+
+        #[cfg(any(feature = "test", feature = "prometheus"))]
+        {
+            let number_of_connected_peers = self.number_of_connected_peers().await;
+            let number_of_restricted_peers = self.number_of_restricted_peers().await;
+            metrics::gauge!(metrics::peers::CONNECTED, number_of_connected_peers as f64);
+            metrics::gauge!(metrics::peers::RESTRICTED, number_of_restricted_peers as f64);
+        }
+    }
+
+    pub async fn send_peer_response(&self, recipient: SocketAddr) {
+        // Send a `PeerResponse` message.
+        let connected_peers = self.connected_peers().await;
+        self.send(recipient, Message::PeerResponse(connected_peers)).await;
+    }
+
+    pub async fn receive_peer_response(&self, peer_ips: Vec<SocketAddr>) {
+        self.add_candidate_peers(peer_ips.iter()).await;
+
+        #[cfg(any(feature = "test", feature = "prometheus"))]
+        {
+            let number_of_candidate_peers = self.number_of_candidate_peers().await;
+            metrics::gauge!(metrics::peers::CANDIDATE, number_of_candidate_peers as f64);
+        }
+    }
+
     ///
     /// Performs the given `request` to the peers.
     /// All requests must go through this `update`, so that a unified view is preserved.
@@ -543,49 +589,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
         //     PeersRequest::MessagePropagate(sender, message) => {}
         //     PeersRequest::MessageSend(sender, message) => {}
         //     PeersRequest::PeerConnecting(stream, peer_ip) => {}
-        //     PeersRequest::PeerConnected(peer_ip, peer_nonce) => {
-        //     }
+        //     PeersRequest::PeerConnected(peer_ip, peer_nonce) => {}
         //     PeersRequest::PeerDisconnected(peer_ip) => {
-        //         // Remove an entry for this `Peer` in the connected peers, if it exists.
-        //         self.connected_peers.write().await.remove(&peer_ip);
-        //         // Add an entry for this `Peer` in the candidate peers.
-        //         self.candidate_peers.write().await.insert(peer_ip);
-
-        //         #[cfg(any(feature = "test", feature = "prometheus"))]
-        //         {
-        //             let number_of_connected_peers = self.number_of_connected_peers().await;
-        //             let number_of_candidate_peers = self.number_of_candidate_peers().await;
-        //             metrics::gauge!(metrics::peers::CONNECTED, number_of_connected_peers as f64);
-        //             metrics::gauge!(metrics::peers::CANDIDATE, number_of_candidate_peers as f64);
-        //         }
         //     }
         //     PeersRequest::PeerRestricted(peer_ip) => {
-        //         // Remove an entry for this `Peer` in the connected peers, if it exists.
-        //         self.connected_peers.write().await.remove(&peer_ip);
-        //         // Add an entry for this `Peer` in the restricted peers.
-        //         self.restricted_peers.write().await.insert(peer_ip, Instant::now());
-
-        //         #[cfg(any(feature = "test", feature = "prometheus"))]
-        //         {
-        //             let number_of_connected_peers = self.number_of_connected_peers().await;
-        //             let number_of_restricted_peers = self.number_of_restricted_peers().await;
-        //             metrics::gauge!(metrics::peers::CONNECTED, number_of_connected_peers as f64);
-        //             metrics::gauge!(metrics::peers::RESTRICTED, number_of_restricted_peers as f64);
-        //         }
         //     }
         //     PeersRequest::SendPeerResponse(recipient) => {
-        //         // Send a `PeerResponse` message.
-        //         let connected_peers = self.connected_peers().await;
-        //         self.send(recipient, Message::PeerResponse(connected_peers)).await;
         //     }
         //     PeersRequest::ReceivePeerResponse(peer_ips) => {
-        //         self.add_candidate_peers(peer_ips.iter()).await;
-
-        //         #[cfg(any(feature = "test", feature = "prometheus"))]
-        //         {
-        //             let number_of_candidate_peers = self.number_of_candidate_peers().await;
-        //             metrics::gauge!(metrics::peers::CANDIDATE, number_of_candidate_peers as f64);
-        //         }
         //     }
         // }
     }
