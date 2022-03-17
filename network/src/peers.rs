@@ -88,6 +88,7 @@ pub struct Peers<N: Network, E: Environment> {
     local_ip: SocketAddr,
     /// The local nonce for this node session.
     local_nonce: u64,
+    peers: RwLock<HashMap<SocketAddr, Peer<N, E>>>,
     /// The map connected peer IPs to their nonce.
     connected_peers: RwLock<HashMap<SocketAddr, u64>>,
     /// The set of candidate peer IPs.
@@ -120,6 +121,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             peers_router,
             local_ip,
             local_nonce,
+            peers: Default::default(),
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
