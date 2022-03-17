@@ -88,7 +88,7 @@ pub struct Peers<N: Network, E: Environment> {
     local_ip: SocketAddr,
     /// The local nonce for this node session.
     local_nonce: u64,
-    peers: RwLock<HashMap<SocketAddr, Peer<N, E>>>,
+    peers: RwLock<HashMap<SocketAddr, Arc<Peer<N, E>>>>,
     /// The map connected peer IPs to their nonce.
     connected_peers: RwLock<HashMap<SocketAddr, u64>>,
     /// The set of candidate peer IPs.
@@ -265,7 +265,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(super) async fn update(&self, request: PeersRequest<N, E>) {
         match request {
-            PeersRequest::Connect(peer_ip, ledger_reader, connection_result) => {
+            PeersRequest::Connect(peer_ip, ledger_reader, conn_result_router) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -306,17 +306,32 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await {
                             Ok(stream) => match stream {
                                 Ok(stream) => {
-                                    Peer::handler(
+                                    let peer = match Peer::new(
                                         self.network_state.get().expect("network state must be set").clone(),
                                         stream,
                                         self.local_ip,
                                         self.local_nonce,
                                         &self.peers_router,
-                                        ledger_reader,
-                                        self.connected_nonces().await,
-                                        Some(connection_result),
+                                        &self.connected_nonces().await,
                                     )
                                     .await
+                                    {
+                                        Ok(peer) => {
+                                            // If the optional connection result router is given, report a successful connection result.
+                                            if conn_result_router.send(Ok(())).is_err() {
+                                                warn!("Failed to report a successful connection");
+                                            }
+
+                                            self.peers.write().await.insert(peer_ip, peer);
+                                        }
+                                        Err(error) => {
+                                            trace!("{}", error);
+                                            // If the optional connection result router is given, report a failed connection result.
+                                            if conn_result_router.send(Err(error)).is_err() {
+                                                warn!("Failed to report a failed connection");
+                                            }
+                                        }
+                                    };
                                 }
                                 Err(error) => {
                                     trace!("Failed to connect to '{}': '{:?}'", peer_ip, error);
@@ -536,18 +551,23 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         // Release the lock over seen_inbound_connections.
                         drop(seen_inbound_connections);
 
-                        // Initialize the peer handler.
-                        Peer::handler(
+                        let peer = match Peer::new(
                             self.network_state.get().expect("network state must be set").clone(),
                             stream,
                             self.local_ip,
                             self.local_nonce,
                             &self.peers_router,
-                            ledger_reader,
-                            self.connected_nonces().await,
-                            None,
+                            &self.connected_nonces().await,
                         )
-                        .await;
+                        .await
+                        {
+                            Ok(peer) => {
+                                self.peers.write().await.insert(peer_ip, peer);
+                            }
+                            Err(error) => {
+                                trace!("{}", error);
+                            }
+                        };
                     }
                 }
             }
@@ -634,14 +654,16 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Sends the given message to specified peer.
     ///
-    async fn send(&self, peer: SocketAddr, message: Message<N, E>) {
-        let target_peer = self.connected_peers.read().await.get(&peer).cloned();
-        match target_peer {
+    async fn send(&self, peer_addr: SocketAddr, message: Message<N, E>) {
+        let target_addr = self.connected_peers.read().await.get(&peer_addr).cloned();
+        let peer = self.peers.read().await.get(&peer_addr).cloned();
+
+        match (target_addr, peer) {
             // TODO: clean this up.
-            Some(_) => {
-                if let Err(error) = peer.send(message).await {
+            (Some(_), Some(peer)) => {
+                if let Err(error) = peer.outbound_sender.send(message).await {
                     trace!("Message sending failed: {}", error);
-                    self.connected_peers.write().await.remove(&peer);
+                    self.connected_peers.write().await.remove(&peer_addr);
 
                     #[cfg(any(feature = "test", feature = "prometheus"))]
                     {
@@ -650,7 +672,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
             }
-            None => warn!("Attempted to send to a non-connected peer {}", peer),
+            _ => warn!("Attempted to send to a non-connected peer {}", peer_addr),
         }
     }
 

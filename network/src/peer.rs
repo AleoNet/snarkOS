@@ -79,7 +79,7 @@ pub(crate) struct Peer<N: Network, E: Environment> {
     /// TODO: make atomic?
     last_seen: RwLock<Instant>,
     /// The TCP socket that handles sending and receiving data with this peer.
-    outbound_sender: mpsc::Sender<Message<N, E>>,
+    pub outbound_sender: mpsc::Sender<Message<N, E>>,
     /// The map of block hashes to their last seen timestamp.
     seen_inbound_blocks: RwLock<HashMap<N::BlockHash, SystemTime>>,
     /// The map of transaction IDs to their last seen timestamp.
@@ -92,7 +92,7 @@ pub(crate) struct Peer<N: Network, E: Environment> {
 
 impl<N: Network, E: Environment> Peer<N, E> {
     /// Create a new instance of `Peer`.
-    async fn new(
+    pub async fn new(
         network_state: NetworkState<N, E>,
         stream: TcpStream,
         local_ip: SocketAddr,
@@ -472,7 +472,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             tokio::spawn(async move {
                 loop {
                     match outbound_receiver.recv().await {
-                        Some(message) => outbound_socket.send(message),
+                        Some(message) => outbound_socket.send(message).await,
                         None => break,
                     };
                 }
