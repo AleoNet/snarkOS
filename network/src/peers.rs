@@ -350,14 +350,14 @@ impl<N: Network, E: Environment> Peers<N, E> {
             for peer_ip in disconnected_trusted_nodes {
                 // Initialize the connection process.
                 let (router, handler) = oneshot::channel();
-                let request = PeersRequest::Connect(peer_ip, router);
                 self.network_state
                     .get()
                     .expect("network state must be set")
                     .peers
-                    .update(request)
+                    .connect(peer_ip, router)
                     .await;
 
+                // TODO: remove routing.
                 // Do not wait for the result of each connection.
                 // Procure a resource id to register the task with, as it might be terminated at any point in time.
                 let resource_id = E::resources().procure_id();
