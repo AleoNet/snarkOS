@@ -256,7 +256,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Returns the list of nonces for the connected peers.
     ///
     pub(crate) async fn connected_nonces(&self) -> Vec<u64> {
-        self.connected_peers.read().await.values().map(|peer_nonce| *peer_nonce).collect()
+        self.connected_peers.read().await.values().copied().collect()
     }
 
     ///

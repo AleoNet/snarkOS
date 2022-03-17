@@ -422,14 +422,13 @@ impl<N: Network, E: Environment> Peer<N, E> {
         E::resources().register_task(
             Some(inbound_resource_id),
             tokio::spawn(async move {
-                loop {
-                    let _ = match outbound_receiver.recv().await {
-                        Some(message) => outbound_socket.send(message).await,
-                        None => break,
-                    };
+                while let Some(message) = outbound_receiver.recv().await {
+                    if let Err(_error) = outbound_socket.send(message).await {
+                        // TODO: handle error.
+                    }
                 }
 
-                // Returning None in the previous match indicates all the senders have been
+                // Returning None from the outbound receiver indicates all the senders have been
                 // dropped, time to clean up the task.
                 E::resources().deregister(inbound_resource_id);
             }),
