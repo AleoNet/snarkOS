@@ -228,7 +228,12 @@ impl NetworkMetrics {
         let avg_degree_centrality = degree_centralities.iter().map(|v| *v as u64).sum::<u64>() / degree_centralities.len() as u64;
 
         let avg_height = if !heights.is_empty() {
-            let avg = heights.keys().map(|h| *h as u64).sum::<u64>() / heights.len() as u64;
+            let (mut sum_heights, mut sum_counts) = (0u64, 0u64);
+            for (height, count) in &heights {
+                sum_heights += *height as u64 * *count as u64;
+                sum_counts += *count as u64;
+            }
+            let avg = sum_heights / sum_counts;
             Some(avg as u32)
         } else {
             None
