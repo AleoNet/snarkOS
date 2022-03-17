@@ -246,7 +246,7 @@ impl Reading for Crawler {
         let read_len = reader.read(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE])?;
 
         // This is unlikely, but mark the message as incomplete if too few bytes are available.
-        if read_len < 2 {
+        if read_len < MESSAGE_LENGTH_PREFIX_SIZE {
             return Ok(None);
         }
 
