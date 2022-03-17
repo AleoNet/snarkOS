@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{LedgerReader, NetworkState, OutboundRouter, Peer};
+use crate::{NetworkState, Peer};
 use snarkos_environment::{
     network::{Data, DisconnectReason, Message},
     Environment,
@@ -54,16 +54,16 @@ pub(crate) type ConnectionResult = oneshot::Sender<Result<()>>;
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, ledger_reader, connection_result)
-    Connect(SocketAddr, LedgerReader<N>, ConnectionResult),
-    /// Heartbeat := (ledger_reader)
-    Heartbeat(LedgerReader<N>),
+    /// Connect := (peer_ip, connection_result)
+    Connect(SocketAddr, ConnectionResult),
+    /// Heartbeat : ()
+    Heartbeat,
     /// MessagePropagate := (peer_ip, message)
     MessagePropagate(SocketAddr, Message<N, E>),
     /// MessageSend := (peer_ip, message)
     MessageSend(SocketAddr, Message<N, E>),
-    /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router)
-    PeerConnecting(TcpStream, SocketAddr, LedgerReader<N>),
+    /// PeerConnecting := (stream, peer_ip)
+    PeerConnecting(TcpStream, SocketAddr),
     /// PeerConnected := (peer_ip, peer_nonce)
     PeerConnected(SocketAddr, u64),
     /// PeerDisconnected := (peer_ip)
@@ -265,7 +265,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(super) async fn update(&self, request: PeersRequest<N, E>) {
         match request {
-            PeersRequest::Connect(peer_ip, ledger_reader, conn_result_router) => {
+            PeersRequest::Connect(peer_ip, conn_result_router) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -306,7 +306,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await {
                             Ok(stream) => match stream {
                                 Ok(stream) => {
-                                    let peer = match Peer::new(
+                                    match Peer::new(
                                         self.network_state.get().expect("network state must be set").clone(),
                                         stream,
                                         self.local_ip,
@@ -346,7 +346,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
             }
-            PeersRequest::Heartbeat(ledger_reader) => {
+            PeersRequest::Heartbeat => {
                 // Obtain the number of connected peers.
                 let number_of_connected_peers = self.number_of_connected_peers().await;
                 // Ensure the number of connected peers is below the maximum threshold.
@@ -407,7 +407,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     for peer_ip in disconnected_trusted_nodes {
                         // Initialize the connection process.
                         let (router, handler) = oneshot::channel();
-                        let request = PeersRequest::Connect(peer_ip, ledger_reader.clone(), router);
+                        let request = PeersRequest::Connect(peer_ip, router);
                         if let Err(error) = self.peers_router.send(request).await {
                             warn!("Failed to transmit the request: '{}'", error);
                         }
@@ -466,7 +466,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                         // Initialize the connection process.
                         let (router, handler) = oneshot::channel();
-                        let request = PeersRequest::Connect(peer_ip, ledger_reader.clone(), router);
+                        let request = PeersRequest::Connect(peer_ip, router);
                         if let Err(error) = self.peers_router.send(request).await {
                             warn!("Failed to transmit the request: '{}'", error);
                         }
@@ -490,7 +490,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::MessageSend(sender, message) => {
                 self.send(sender, message).await;
             }
-            PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader) => {
+            PeersRequest::PeerConnecting(stream, peer_ip) => {
                 // Ensure the peer IP is not this node.
                 if peer_ip == self.local_ip
                     || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -551,7 +551,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         // Release the lock over seen_inbound_connections.
                         drop(seen_inbound_connections);
 
-                        let peer = match Peer::new(
+                        match Peer::new(
                             self.network_state.get().expect("network state must be set").clone(),
                             stream,
                             self.local_ip,

@@ -14,15 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    ConnectionResult,
-    LedgerReader,
-    LedgerRequest,
-    OperatorRequest,
-    PeersRequest,
-    PeersRouter,
-    ProverRequest,
-};
+use crate::{LedgerRequest, OperatorRequest, PeersRequest, PeersRouter, ProverRequest};
 use snarkos_environment::{
     helpers::{NodeType, State, Status},
     network::{Data, DisconnectReason, Message},
@@ -52,11 +44,6 @@ use tokio::{
 };
 use tokio_stream::StreamExt;
 use tokio_util::codec::{FramedRead, FramedWrite};
-
-/// Shorthand for the parent half of the `Peer` outbound message channel.
-pub(crate) type OutboundRouter<N, E> = mpsc::Sender<Message<N, E>>;
-/// Shorthand for the child half of the `Peer` outbound message channel.
-type OutboundHandler<N, E> = mpsc::Receiver<Message<N, E>>;
 
 ///
 /// The state for each connected client.
@@ -429,49 +416,14 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let peer = self;
         let peers_router = peers_router.clone();
 
-        // TODO: call Peer::new where Peer::handler is currently called.
-        // let peer = match Peer::new(
-        //     network_state,
-        //     stream,
-        //     local_ip,
-        //     local_nonce,
-        //     &peers_router,
-        //     &ledger_reader,
-        //     &connected_nonces,
-        // )
-        // .await
-        // {
-        //     Ok(peer) => {
-        //         // If the optional connection result router is given, report a successful connection result.
-        //         if let Some(router) = connection_result {
-        //             if router.send(Ok(())).is_err() {
-        //                 warn!("Failed to report a successful connection");
-        //             }
-        //         }
-        //         peer
-        //     }
-        //     Err(error) => {
-        //         trace!("{}", error);
-        //         // If the optional connection result router is given, report a failed connection result.
-        //         if let Some(router) = connection_result {
-        //             if router.send(Err(error)).is_err() {
-        //                 warn!("Failed to report a failed connection");
-        //             }
-        //         }
-
-        //         return;
-        //     }
-        // };
-
-        // Procure a resource id to register the task with, as it might be terminated at any point in time.
-
-        // Start outbound task.
+        // Start outbound task: procure a resource id to register the task with, as it might be
+        // terminated at any point in time.
         let inbound_resource_id = E::resources().procure_id();
         E::resources().register_task(
             Some(inbound_resource_id),
             tokio::spawn(async move {
                 loop {
-                    match outbound_receiver.recv().await {
+                    let _ = match outbound_receiver.recv().await {
                         Some(message) => outbound_socket.send(message).await,
                         None => break,
                     };
@@ -483,7 +435,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
             }),
         );
 
-        // Start inbound task.
+        // Start inbound task: procure a resource id to register the task with, as it might be
+        // terminated at any point in time.
         let outbound_resource_id = E::resources().procure_id();
         E::resources().register_task(
             Some(outbound_resource_id),
@@ -495,10 +448,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                 let ledger_reader = peer.network_state.ledger.reader();
                 info!("Connected to {}", peer_ip);
 
-                // TODO: start a loop to handle incoming messages from other peers.
-
                 // Process incoming messages until this stream is disconnected.
-
                 loop {
                     match inbound_socket.next().await {
                         // Received a message from the peer.
