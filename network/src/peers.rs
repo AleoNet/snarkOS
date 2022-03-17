@@ -515,6 +515,21 @@ impl<N: Network, E: Environment> Peers<N, E> {
         }
     }
 
+    pub async fn peers_connected(&self, peer_ip: SocketAddr, peer_nonce: u64) {
+        // Add an entry for this `Peer` in the connected peers.
+        self.connected_peers.write().await.insert(peer_ip, peer_nonce);
+        // Remove an entry for this `Peer` in the candidate peers, if it exists.
+        self.candidate_peers.write().await.remove(&peer_ip);
+
+        #[cfg(any(feature = "test", feature = "prometheus"))]
+        {
+            let number_of_connected_peers = self.number_of_connected_peers().await;
+            let number_of_candidate_peers = self.number_of_candidate_peers().await;
+            metrics::gauge!(metrics::peers::CONNECTED, number_of_connected_peers as f64);
+            metrics::gauge!(metrics::peers::CANDIDATE, number_of_candidate_peers as f64);
+        }
+    }
+
     ///
     /// Performs the given `request` to the peers.
     /// All requests must go through this `update`, so that a unified view is preserved.
@@ -529,18 +544,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
         //     PeersRequest::MessageSend(sender, message) => {}
         //     PeersRequest::PeerConnecting(stream, peer_ip) => {}
         //     PeersRequest::PeerConnected(peer_ip, peer_nonce) => {
-        //         // Add an entry for this `Peer` in the connected peers.
-        //         self.connected_peers.write().await.insert(peer_ip, peer_nonce);
-        //         // Remove an entry for this `Peer` in the candidate peers, if it exists.
-        //         self.candidate_peers.write().await.remove(&peer_ip);
-
-        //         #[cfg(any(feature = "test", feature = "prometheus"))]
-        //         {
-        //             let number_of_connected_peers = self.number_of_connected_peers().await;
-        //             let number_of_candidate_peers = self.number_of_candidate_peers().await;
-        //             metrics::gauge!(metrics::peers::CONNECTED, number_of_connected_peers as f64);
-        //             metrics::gauge!(metrics::peers::CANDIDATE, number_of_candidate_peers as f64);
-        //         }
         //     }
         //     PeersRequest::PeerDisconnected(peer_ip) => {
         //         // Remove an entry for this `Peer` in the connected peers, if it exists.
