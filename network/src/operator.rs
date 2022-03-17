@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{state::NetworkState, LedgerReader, LedgerRequest, PeersRequest, PeersRouter};
+use crate::{state::NetworkState, LedgerReader, LedgerRequest, PeersRequest};
 use snarkos_environment::{
     helpers::NodeType,
     network::{Data, Message},
@@ -74,8 +74,6 @@ pub struct Operator<N: Network, E: Environment> {
     known_nonces: RwLock<HashSet<N::PoSWNonce>>,
     /// The pool of unconfirmed transactions.
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
-    /// The peers router of the node.
-    peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
     ledger_reader: LedgerReader<N>,
 }
@@ -88,7 +86,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
         address: Option<Address<N>>,
         local_ip: SocketAddr,
         memory_pool: Arc<RwLock<MemoryPool<N>>>,
-        peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
     ) -> Result<Arc<Self>> {
         // Initialize the operator.
@@ -101,7 +98,6 @@ impl<N: Network, E: Environment> Operator<N, E> {
             provers: Default::default(),
             known_nonces: Default::default(),
             memory_pool,
-            peers_router,
             ledger_reader,
         });
 
@@ -217,9 +213,12 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                     // Route a `PoolRequest` to the peer.
                     let message = Message::PoolRequest(share_difficulty, Data::Object(block_template));
-                    if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
-                        warn!("[PoolRequest] {}", error);
-                    }
+                    self.network_state
+                        .get()
+                        .expect("network state must be set")
+                        .peers
+                        .update(PeersRequest::MessageSend(peer_ip, message))
+                        .await
                 } else {
                     warn!("[PoolRegister] No current block template exists");
                 }

@@ -18,7 +18,6 @@ use crate::{
     helpers::{block_requests::*, BlockRequest, CircularMap},
     state::NetworkState,
     PeersRequest,
-    PeersRouter,
     ProverRequest,
 };
 
@@ -98,13 +97,11 @@ pub struct Ledger<N: Network, E: Environment> {
     last_block_update_timestamp: RwLock<Instant>,
     /// The map of each peer to their failure messages := (failure_message, timestamp).
     failures: RwLock<HashMap<SocketAddr, Vec<(String, i64)>>>,
-    /// The peers router of the node.
-    peers_router: PeersRouter<N, E>,
 }
 
 impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger.
-    pub async fn open<S: Storage, P: AsRef<Path> + Copy>(path: P, peers_router: PeersRouter<N, E>) -> Result<Arc<Self>> {
+    pub async fn open<S: Storage, P: AsRef<Path> + Copy>(path: P) -> Result<Arc<Self>> {
         let canon = Arc::new(LedgerState::open_writer::<S, P>(path)?);
         let (canon_reader, reader_resource) = LedgerState::open_reader::<S, P>(path)?;
         // Register the thread; no need to provide an id, as it will run indefinitely.
@@ -122,7 +119,6 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             block_requests_lock: Arc::new(Mutex::new(())),
             last_block_update_timestamp: RwLock::new(Instant::now()),
             failures: Default::default(),
-            peers_router,
         });
 
         Ok(ledger)
@@ -230,9 +226,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     // Propagate the unconfirmed block to the connected peers.
                     let message = Message::UnconfirmedBlock(block.height(), block.hash(), Data::Object(block));
                     let request = PeersRequest::MessagePropagate(peer_ip, message);
-                    if let Err(error) = self.peers_router.send(request).await {
-                        warn!("[UnconfirmedBlock] {}", error);
-                    }
+                    self.network_state
+                        .get()
+                        .expect("network state should be set")
+                        .peers
+                        .update(request)
+                        .await;
                 }
             }
         }
@@ -248,17 +247,20 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Update the status of the ledger.
         self.update_status().await;
         // Send a `Disconnect` message to the peer.
-        if let Err(error) = self
-            .peers_router
-            .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect(reason)))
-            .await
-        {
-            warn!("[Disconnect] {}", error);
-        }
+        self.network_state
+            .get()
+            .expect("network state should be set")
+            .peers
+            .update(PeersRequest::MessageSend(peer_ip, Message::Disconnect(reason)))
+            .await;
+
         // Route a `PeerDisconnected` to the peers.
-        if let Err(error) = self.peers_router.send(PeersRequest::PeerDisconnected(peer_ip)).await {
-            warn!("[PeerDisconnected] {}", error);
-        }
+        self.network_state
+            .get()
+            .expect("network state should be set")
+            .peers
+            .update(PeersRequest::PeerDisconnected(peer_ip))
+            .await;
     }
 
     ///
@@ -271,17 +273,20 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Update the status of the ledger.
         self.update_status().await;
         // Send a `Disconnect` message to the peer.
-        if let Err(error) = self
-            .peers_router
-            .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect(reason)))
-            .await
-        {
-            warn!("[Disconnect] {}", error);
-        }
+        self.network_state
+            .get()
+            .expect("network state should be set")
+            .peers
+            .update(PeersRequest::MessageSend(peer_ip, Message::Disconnect(reason)))
+            .await;
+
         // Route a `PeerRestricted` to the peers.
-        if let Err(error) = self.peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
-            warn!("[PeerRestricted] {}", error);
-        }
+        self.network_state
+            .get()
+            .expect("netowrk state should be set")
+            .peers
+            .update(PeersRequest::PeerRestricted(peer_ip))
+            .await;
     }
 
     ///
@@ -769,10 +774,12 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Send a `BlockRequest` message to the peer.
             debug!("Requesting blocks {} to {} from {}", start_block_height, end_block_height, peer_ip);
             let request = PeersRequest::MessageSend(peer_ip, Message::BlockRequest(start_block_height, end_block_height));
-            if let Err(error) = self.peers_router.send(request).await {
-                warn!("[BlockRequest] {}", error);
-                return;
-            }
+            self.network_state
+                .get()
+                .expect("network state should be set")
+                .peers
+                .update(request)
+                .await;
 
             // Filter out any pre-existing block requests for the peer.
             let mut missing_block_requests = false;

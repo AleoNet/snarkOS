@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{state::NetworkState, LedgerReader, LedgerRequest, PeersRequest, PeersRouter};
+use crate::{state::NetworkState, LedgerReader, LedgerRequest, PeersRequest};
 use snarkos_environment::{
     helpers::{NodeType, State},
     network::{Data, Message},
@@ -67,8 +67,6 @@ pub struct Prover<N: Network, E: Environment> {
     pool: Option<SocketAddr>,
     /// The pool of unconfirmed transactions.
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
-    /// The peers router of the node.
-    peers_router: PeersRouter<N, E>,
     /// The ledger state of the node.
     ledger_reader: LedgerReader<N>,
 }
@@ -80,7 +78,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
         address: Option<Address<N>>,
         local_ip: SocketAddr,
         pool_ip: Option<SocketAddr>,
-        peers_router: PeersRouter<N, E>,
         ledger_reader: LedgerReader<N>,
     ) -> Result<Arc<Self>> {
         // Initialize the prover.
@@ -90,7 +87,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
             address,
             pool: pool_ip,
             memory_pool: Arc::new(RwLock::new(MemoryPool::new())),
-            peers_router,
             ledger_reader,
         });
 
@@ -175,9 +171,12 @@ impl<N: Network, E: Environment> Prover<N, E> {
                 if let Some(pool_ip) = self.pool {
                     // Proceed to register the prover to receive a block template.
                     let request = PeersRequest::MessageSend(pool_ip, Message::PoolRegister(recipient));
-                    if let Err(error) = self.peers_router.send(request).await {
-                        warn!("[PoolRegister] {}", error);
-                    }
+                    self.network_state
+                        .get()
+                        .expect("network state must be set")
+                        .peers
+                        .update(request)
+                        .await;
                 } else {
                     error!("Missing pool IP address. Please specify a pool IP address in order to run the prover");
                 }
@@ -240,9 +239,12 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
                                     // Send a `PoolResponse` to the operator.
                                     let message = Message::PoolResponse(recipient, nonce, Data::Object(proof));
-                                    if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(operator_ip, message)).await {
-                                        warn!("[PoolResponse] {}", error);
-                                    }
+                                    self.network_state
+                                        .get()
+                                        .expect("network state must be set")
+                                        .peers
+                                        .update(PeersRequest::MessageSend(operator_ip, message))
+                                        .await;
                                 }
                                 Ok(Err(error)) => trace!("{}", error),
                                 Err(error) => trace!("{}", anyhow!("Failed to mine the next block {}", error)),
@@ -272,9 +274,12 @@ impl<N: Network, E: Environment> Prover<N, E> {
                 Ok(()) => {
                     // Upon success, propagate the unconfirmed transaction to the connected peers.
                     let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedTransaction(Data::Object(transaction)));
-                    if let Err(error) = self.peers_router.send(request).await {
-                        warn!("[UnconfirmedTransaction] {}", error);
-                    }
+                    self.network_state
+                        .get()
+                        .expect("network state must be set")
+                        .peers
+                        .update(request)
+                        .await;
                 }
                 Err(error) => error!("{}", error),
             }

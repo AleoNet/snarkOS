@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{LedgerRequest, OperatorRequest, PeersRequest, PeersRouter, ProverRequest};
+use crate::{LedgerRequest, OperatorRequest, PeersRequest, ProverRequest};
 use snarkos_environment::{
     helpers::{NodeType, State, Status},
     network::{Data, DisconnectReason, Message},
@@ -84,7 +84,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
         stream: TcpStream,
         local_ip: SocketAddr,
         local_nonce: u64,
-        peers_router: &PeersRouter<N, E>,
         connected_nonces: &[u64],
     ) -> Result<Arc<Self>> {
         let (read_half, write_half) = stream.into_split();
@@ -137,11 +136,14 @@ impl<N: Network, E: Environment> Peer<N, E> {
         });
 
         // Add an entry for this `Peer` in the connected peers.
-        peers_router.send(PeersRequest::PeerConnected(peer_ip, peer_nonce)).await?;
+        peer.network_state
+            .peers
+            .update(PeersRequest::PeerConnected(peer_ip, peer_nonce))
+            .await;
 
         // TODO: rename or split.
         peer.clone()
-            .start_io_tasks(inbound_socket, outbound_socket, outbound_receiver, peers_router)
+            .start_io_tasks(inbound_socket, outbound_socket, outbound_receiver)
             .await;
 
         Ok(peer)
@@ -411,10 +413,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
         mut inbound_socket: FramedRead<OwnedReadHalf, Message<N, E>>,
         mut outbound_socket: FramedWrite<OwnedWriteHalf, Message<N, E>>,
         mut outbound_receiver: mpsc::Receiver<Message<N, E>>,
-        peers_router: &PeersRouter<N, E>,
     ) {
         let peer = self;
-        let peers_router = peers_router.clone();
 
         // Start outbound task: procure a resource id to register the task with, as it might be
         // terminated at any point in time.
@@ -449,6 +449,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                 // Process incoming messages until this stream is disconnected.
                 loop {
+                    let peer = peer.clone();
+
                     match inbound_socket.next().await {
                         // Received a message from the peer.
                         Some(Ok(message)) => {
@@ -538,15 +540,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 }
                                 Message::PeerRequest => {
                                     // Send a `PeerResponse` message.
-                                    if let Err(error) = peers_router.send(PeersRequest::SendPeerResponse(peer_ip)).await {
-                                        warn!("[PeerRequest] {}", error);
-                                    }
+                                    peer.network_state.peers.update(PeersRequest::SendPeerResponse(peer_ip)).await;
                                 }
                                 Message::PeerResponse(peer_ips) => {
                                     // Adds the given peer IPs to the list of candidate peers.
-                                    if let Err(error) = peers_router.send(PeersRequest::ReceivePeerResponse(peer_ips)).await {
-                                        warn!("[PeerResponse] {}", error);
-                                    }
+                                    peer.network_state.peers.update(PeersRequest::ReceivePeerResponse(peer_ips)).await
                                 }
                                 Message::Ping(version, fork_depth, node_type, status, block_hash, block_header) => {
                                     // Ensure the message protocol version is not outdated.
@@ -637,7 +635,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     peer.network_state.ledger.update(request).await;
 
                                     // Spawn an asynchronous task for the `Ping` request.
-                                    let peers_router = peers_router.clone();
                                     let ledger_reader = peer.network_state.ledger.reader();
                                     // Procure a resource id to register the task with, as it might be terminated at any point in time.
                                     let ping_resource_id = E::resources().procure_id();
@@ -660,9 +657,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                                 latest_block_hash,
                                                 Data::Object(latest_block_header),
                                             );
-                                            if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
-                                                warn!("[Ping] {}", error);
-                                            }
+                                            peer.network_state.peers.update(PeersRequest::MessageSend(peer_ip, message)).await;
 
                                             E::resources().deregister(ping_resource_id);
                                         }),
@@ -680,9 +675,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     if frequency >= 10 {
                                         warn!("Dropping {} for spamming unconfirmed blocks (frequency = {})", peer_ip, frequency);
                                         // Send a `PeerRestricted` message.
-                                        if let Err(error) = peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
-                                            warn!("[PeerRestricted] {}", error);
-                                        }
+                                        peer.network_state.peers.update(PeersRequest::PeerRestricted(peer_ip)).await;
+
                                         break;
                                     }
 
@@ -748,9 +742,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                             peer_ip, frequency
                                         );
                                         // Send a `PeerRestricted` message.
-                                        if let Err(error) = peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
-                                            warn!("[PeerRestricted] {}", error);
-                                        }
+                                        peer.network_state.peers.update(PeersRequest::PeerRestricted(peer_ip)).await;
+
                                         break;
                                     }
 
