@@ -105,7 +105,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
         };
 
         // Initialize the peers.
-        let peers = Arc::new(Self {
+        Arc::new(Self {
             network_state: OnceCell::new(),
             local_ip,
             local_nonce,
@@ -115,9 +115,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             restricted_peers: Default::default(),
             seen_inbound_connections: Default::default(),
             seen_outbound_connections: Default::default(),
-        });
-
-        peers
+        })
     }
 
     pub fn set_network_state(&self, network_state: NetworkState<N, E>) {
