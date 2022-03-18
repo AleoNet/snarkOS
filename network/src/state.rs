@@ -35,3 +35,29 @@ pub struct NetworkState<N: Network, E: Environment> {
     /// The prover of the node.
     pub prover: Arc<Prover<N, E>>,
 }
+
+impl<N: Network, E: Environment> NetworkState<N, E> {
+    pub fn new(
+        local_ip: SocketAddr,
+        peers: Arc<Peers<N, E>>,
+        ledger: Arc<Ledger<N, E>>,
+        operator: Arc<Operator<N, E>>,
+        prover: Arc<Prover<N, E>>,
+    ) -> Self {
+        let network_state = Self {
+            local_ip,
+            peers,
+            ledger,
+            operator,
+            prover,
+        };
+
+        // Set the network state reference on the various services.
+        network_state.peers.set_network_state(network_state.clone());
+        network_state.ledger.set_network_state(network_state.clone());
+        network_state.operator.set_network_state(network_state.clone());
+        network_state.prover.set_network_state(network_state.clone());
+
+        network_state
+    }
+}

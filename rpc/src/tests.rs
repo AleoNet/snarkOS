@@ -73,34 +73,21 @@ async fn new_rpc_context<N: Network, E: Environment, S: Storage, P: AsRef<Path>>
     let peers = Peers::new(node_addr, None).await;
 
     // Initialize a new instance for managing the ledger.
-    let ledger = Ledger::<N, E>::open::<S, _>(&ledger_path, peers.router())
+    let ledger = Ledger::<N, E>::open::<S, _>(&ledger_path)
         .await
         .expect("Failed to initialize ledger");
 
     // Initialize a new instance for managing the prover.
-    let prover = Prover::open::<S, _>(&prover_path, None, node_addr, Some(node_addr), peers.router(), ledger.reader())
+    let prover = Prover::open::<S, _>(&prover_path, None, node_addr, Some(node_addr), ledger.reader())
         .await
         .expect("Failed to initialize prover");
 
     // Initialize a new instance for managing the operator.
-    let operator = Operator::open::<RocksDB, _>(
-        &operator_storage_path,
-        None,
-        node_addr,
-        prover.memory_pool(),
-        peers.router(),
-        ledger.reader(),
-    )
-    .await
-    .expect("Failed to initialize operator");
+    let operator = Operator::open::<RocksDB, _>(&operator_storage_path, None, node_addr, prover.memory_pool(), ledger.reader())
+        .await
+        .expect("Failed to initialize operator");
 
-    let network_state = NetworkState {
-        local_ip: node_addr,
-        peers: peers.clone(),
-        ledger: ledger.clone(),
-        operator: operator.clone(),
-        prover: prover.clone(),
-    };
+    let network_state = NetworkState::new(node_addr, peers.clone(), ledger.clone(), operator.clone(), prover.clone());
 
     RpcContext::new(username, password, None, network_state)
 }

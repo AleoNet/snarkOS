@@ -76,19 +76,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let operator =
             Operator::open::<RocksDB, _>(&operator_storage_path, address, local_ip, prover.memory_pool(), ledger.reader()).await?;
 
-        let network_state = NetworkState {
-            local_ip,
-            peers: peers.clone(),
-            ledger: ledger.clone(),
-            operator: operator.clone(),
-            prover: prover.clone(),
-        };
-
-        // Set the network state reference on the various services.
-        network_state.peers.set_network_state(network_state.clone());
-        network_state.ledger.set_network_state(network_state.clone());
-        network_state.operator.set_network_state(network_state.clone());
-        network_state.prover.set_network_state(network_state.clone());
+        let network_state = NetworkState::new(local_ip, peers.clone(), ledger.clone(), operator.clone(), prover.clone());
 
         // TODO (howardwu): This is a hack for the prover.
         // Check that the prover is connected to the pool before sending a PoolRegister message.
