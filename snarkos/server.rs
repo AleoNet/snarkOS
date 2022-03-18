@@ -84,6 +84,12 @@ impl<N: Network, E: Environment> Server<N, E> {
             prover: prover.clone(),
         };
 
+        // Set the network state reference on the various services.
+        network_state.peers.set_network_state(network_state.clone());
+        network_state.ledger.set_network_state(network_state.clone());
+        network_state.operator.set_network_state(network_state.clone());
+        network_state.prover.set_network_state(network_state.clone());
+
         // TODO (howardwu): This is a hack for the prover.
         // Check that the prover is connected to the pool before sending a PoolRegister message.
         if let Some(pool_ip) = pool_ip {
@@ -134,12 +140,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialise the metrics exporter.
         #[cfg(any(feature = "test", feature = "prometheus"))]
         Self::initialize_metrics(ledger.reader());
-
-        // Set the network state reference on the various services.
-        network_state.peers.set_network_state(network_state.clone());
-        network_state.ledger.set_network_state(network_state.clone());
-        network_state.operator.set_network_state(network_state.clone());
-        network_state.prover.set_network_state(network_state.clone());
 
         Ok(Self { network_state })
     }
