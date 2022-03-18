@@ -41,7 +41,7 @@ pub const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
 /// The number of lists of peers that a single peer needs to provide before it's disconnected from.
 pub const DESIRED_PEER_SET_COUNT: u8 = 3;
 /// The maximum number of connections to attempt to initiate when updating peers.
-pub const NUM_CONCURRENT_CONNECTION_ATTEMPTS: u8 = 20;
+pub const NUM_CONCURRENT_CONNECTION_ATTEMPTS: u8 = 50;
 /// The maximum time (in milliseconds) a handshake can take; doesn't have to match the one in the snarkOS node.
 pub const MAX_HANDSHAKE_TIME_MS: u64 = 10_000;
 /// The size of the per-connection read buffer.

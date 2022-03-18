@@ -20,7 +20,7 @@ use snarkos_environment::{
     CurrentNetwork,
     Environment,
 };
-use snarkos_network::{Data, Message};
+use snarkos_network::{Data, DisconnectReason, Message};
 use snarkvm::traits::Network;
 
 use parking_lot::RwLock;
@@ -262,6 +262,12 @@ impl Writing for SynthNode {
 #[async_trait::async_trait]
 impl Disconnect for SynthNode {
     async fn handle_disconnect(&self, disconnecting_addr: SocketAddr) {
+        // Send a disconnect message before breaking the connection.
+        let disconnect_msg = ClientMessage::Disconnect(DisconnectReason::NoReasonGiven);
+        if let Ok(rx) = self.send_direct_message(disconnecting_addr, disconnect_msg) {
+            let _ = rx.await;
+        }
+
         debug_assert_eq!(self.state.address_map.read().len(), self.state.peers.read().len());
 
         if let Some(listening_addr) = self.state.address_map.write().remove(&disconnecting_addr) {
