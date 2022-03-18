@@ -99,7 +99,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                         // Initialize the connection process.
                         let (router, handler) = oneshot::channel();
                         // Route a `Connect` request to the pool.
-                        peers.update(PeersRequest::Connect(pool_ip, router)).await;
+                        peers.connect(pool_ip, router).await;
 
                         // Wait until the connection task is initialized.
                         let _ = handler.await;
@@ -168,7 +168,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let (router, handler) = oneshot::channel();
 
         // Route a `Connect` request to the peer manager.
-        self.network_state.peers.update(PeersRequest::Connect(peer_ip, router)).await;
+        self.network_state.peers.connect(peer_ip, router).await;
 
         // Wait until the connection task is initialized.
         handler.await.map(|_| ()).map_err(|e| e.into())
@@ -212,8 +212,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                         match listener.accept().await {
                             // Process the inbound connection request.
                             Ok((stream, peer_ip)) => {
-                                let request = PeersRequest::PeerConnecting(stream, peer_ip);
-                                peers.update(request).await;
+                                peers.peer_connecting(stream, peer_ip).await;
                             }
                             Err(error) => error!("Failed to accept a connection: {}", error),
                         }
@@ -248,8 +247,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                     network_state.ledger.update(LedgerRequest::Heartbeat).await;
 
                     // Transmit a heartbeat request to the peers.
-                    let request = PeersRequest::Heartbeat;
-                    network_state.peers.update(request).await;
+                    network_state.peers.heartbeat().await;
 
                     // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
                     tokio::time::sleep(Duration::from_secs(E::HEARTBEAT_IN_SECS)).await;

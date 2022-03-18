@@ -217,7 +217,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         .get()
                         .expect("network state must be set")
                         .peers
-                        .update(PeersRequest::MessageSend(peer_ip, message))
+                        .send(peer_ip, message)
                         .await
                 } else {
                     warn!("[PoolRegister] No current block template exists");

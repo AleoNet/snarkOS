@@ -136,10 +136,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         });
 
         // Add an entry for this `Peer` in the connected peers.
-        peer.network_state
-            .peers
-            .update(PeersRequest::PeerConnected(peer_ip, peer_nonce))
-            .await;
+        peer.network_state.peers.peer_connected(peer_ip, peer_nonce).await;
 
         // TODO: rename or split.
         peer.clone()
@@ -540,11 +537,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 }
                                 Message::PeerRequest => {
                                     // Send a `PeerResponse` message.
-                                    peer.network_state.peers.update(PeersRequest::SendPeerResponse(peer_ip)).await;
+                                    peer.network_state.peers.send_peer_response(peer_ip).await;
                                 }
                                 Message::PeerResponse(peer_ips) => {
                                     // Adds the given peer IPs to the list of candidate peers.
-                                    peer.network_state.peers.update(PeersRequest::ReceivePeerResponse(peer_ips)).await
+                                    peer.network_state.peers.receive_peer_response(peer_ips).await
                                 }
                                 Message::Ping(version, fork_depth, node_type, status, block_hash, block_header) => {
                                     // Ensure the message protocol version is not outdated.
@@ -657,7 +654,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                                 latest_block_hash,
                                                 Data::Object(latest_block_header),
                                             );
-                                            peer.network_state.peers.update(PeersRequest::MessageSend(peer_ip, message)).await;
+                                            peer.network_state.peers.send(peer_ip, message).await;
 
                                             E::resources().deregister(ping_resource_id);
                                         }),
@@ -675,7 +672,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     if frequency >= 10 {
                                         warn!("Dropping {} for spamming unconfirmed blocks (frequency = {})", peer_ip, frequency);
                                         // Send a `PeerRestricted` message.
-                                        peer.network_state.peers.update(PeersRequest::PeerRestricted(peer_ip)).await;
+                                        peer.network_state.peers.peer_restricted(peer_ip).await;
 
                                         break;
                                     }
@@ -742,7 +739,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                             peer_ip, frequency
                                         );
                                         // Send a `PeerRestricted` message.
-                                        peer.network_state.peers.update(PeersRequest::PeerRestricted(peer_ip)).await;
+                                        peer.network_state.peers.peer_restricted(peer_ip).await;
 
                                         break;
                                     }

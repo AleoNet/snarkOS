@@ -170,12 +170,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
             if let Some(recipient) = self.address {
                 if let Some(pool_ip) = self.pool {
                     // Proceed to register the prover to receive a block template.
-                    let request = PeersRequest::MessageSend(pool_ip, Message::PoolRegister(recipient));
                     self.network_state
                         .get()
                         .expect("network state must be set")
                         .peers
-                        .update(request)
+                        .send(pool_ip, Message::PoolRegister(recipient))
                         .await;
                 } else {
                     error!("Missing pool IP address. Please specify a pool IP address in order to run the prover");
@@ -243,7 +242,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                         .get()
                                         .expect("network state must be set")
                                         .peers
-                                        .update(PeersRequest::MessageSend(operator_ip, message))
+                                        .send(operator_ip, message)
                                         .await;
                                 }
                                 Ok(Err(error)) => trace!("{}", error),
@@ -273,12 +272,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
             match self.memory_pool.write().await.add_transaction(&transaction) {
                 Ok(()) => {
                     // Upon success, propagate the unconfirmed transaction to the connected peers.
-                    let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedTransaction(Data::Object(transaction)));
                     self.network_state
                         .get()
                         .expect("network state must be set")
                         .peers
-                        .update(request)
+                        .propagate(peer_ip, Message::UnconfirmedTransaction(Data::Object(transaction)))
                         .await;
                 }
                 Err(error) => error!("{}", error),

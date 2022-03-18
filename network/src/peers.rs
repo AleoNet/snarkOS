@@ -412,12 +412,11 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                 // Initialize the connection process.
                 let (router, handler) = oneshot::channel();
-                let request = PeersRequest::Connect(peer_ip, router);
                 self.network_state
                     .get()
                     .expect("network state must be set")
                     .peers
-                    .update(request)
+                    .connect(peer_ip, router)
                     .await;
                 // Do not wait for the result of each connection.
                 // Procure a resource id to register the task with, as it might be terminated at any point in time.
@@ -515,7 +514,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
         }
     }
 
-    pub async fn peers_connected(&self, peer_ip: SocketAddr, peer_nonce: u64) {
+    pub async fn peer_connected(&self, peer_ip: SocketAddr, peer_nonce: u64) {
         // Add an entry for this `Peer` in the connected peers.
         self.connected_peers.write().await.insert(peer_ip, peer_nonce);
         // Remove an entry for this `Peer` in the candidate peers, if it exists.
@@ -577,31 +576,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
     }
 
     ///
-    /// Performs the given `request` to the peers.
-    /// All requests must go through this `update`, so that a unified view is preserved.
-    ///
-    pub async fn update(&self, request: PeersRequest<N, E>) {
-        // TODO: start task for each new request.
-
-        // match request {
-        //     PeersRequest::Connect(peer_ip, conn_result_router) => {}
-        //     PeersRequest::Heartbeat => {}
-        //     PeersRequest::MessagePropagate(sender, message) => {}
-        //     PeersRequest::MessageSend(sender, message) => {}
-        //     PeersRequest::PeerConnecting(stream, peer_ip) => {}
-        //     PeersRequest::PeerConnected(peer_ip, peer_nonce) => {}
-        //     PeersRequest::PeerDisconnected(peer_ip) => {
-        //     }
-        //     PeersRequest::PeerRestricted(peer_ip) => {
-        //     }
-        //     PeersRequest::SendPeerResponse(recipient) => {
-        //     }
-        //     PeersRequest::ReceivePeerResponse(peer_ips) => {
-        //     }
-        // }
-    }
-
-    ///
     /// Adds the given peer IPs to the set of candidate peers.
     ///
     /// This method skips adding any given peers if the combined size exceeds the threshold,
@@ -625,7 +599,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Sends the given message to specified peer.
     ///
-    async fn send(&self, peer_addr: SocketAddr, message: Message<N, E>) {
+    pub async fn send(&self, peer_addr: SocketAddr, message: Message<N, E>) {
         let target_addr = self.connected_peers.read().await.get(&peer_addr).cloned();
         let peer = self.peers.read().await.get(&peer_addr).cloned();
 
@@ -650,7 +624,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Sends the given message to every connected peer, excluding the sender.
     ///
-    async fn propagate(&self, sender: SocketAddr, mut message: Message<N, E>) {
+    pub async fn propagate(&self, sender: SocketAddr, mut message: Message<N, E>) {
         // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         if let Message::UnconfirmedBlock(_, _, ref mut data) = message {
             let serialized_block = Data::serialize(data.clone()).await.expect("Block serialization is bugged");
