@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{state::NetworkState, LedgerReader, LedgerRequest};
+use crate::{state::NetworkState, LedgerReader};
 use snarkos_environment::{
     helpers::{NodeType, State},
     network::{Data, Message},
@@ -344,14 +344,12 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                                 }
 
                                                 // Broadcast the next block.
-                                                let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
-
                                                 prover_clone
                                                     .network_state
                                                     .get()
                                                     .expect("network state must be set")
                                                     .ledger
-                                                    .update(request)
+                                                    .unconfirmed_block(local_ip, block)
                                                     .await;
                                             }
                                             Ok(Err(error)) | Err(error) => trace!("{}", error),

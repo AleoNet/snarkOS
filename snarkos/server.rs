@@ -20,7 +20,7 @@ use snarkos_environment::{
     Environment,
 };
 use snarkos_network::{
-    ledger::{Ledger, LedgerReader, LedgerRequest},
+    ledger::{Ledger, LedgerReader},
     operator::Operator,
     peers::Peers,
     prover::Prover,
@@ -232,7 +232,7 @@ impl<N: Network, E: Environment> Server<N, E> {
                 let _ = router.send(());
                 loop {
                     // Transmit a heartbeat request to the ledger.
-                    network_state.ledger.update(LedgerRequest::Heartbeat).await;
+                    network_state.ledger.heartbeat().await;
 
                     // Transmit a heartbeat request to the peers.
                     network_state.peers.heartbeat().await;

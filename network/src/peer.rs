@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{LedgerRequest, OperatorRequest, ProverRequest};
+use crate::{OperatorRequest, ProverRequest};
 use snarkos_environment::{
     helpers::{NodeType, State, Status},
     network::{Data, DisconnectReason, Message},
@@ -473,7 +473,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         // Route a `Failure` to the ledger.
                                         let failure = format!("Attempted to request {} blocks", number_of_blocks);
 
-                                        peer.network_state.ledger.update(LedgerRequest::Failure(peer_ip, failure)).await;
+                                        peer.network_state.ledger.add_failure(peer_ip, failure).await;
 
                                         continue;
                                     }
@@ -482,11 +482,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         Ok(blocks) => blocks,
                                         Err(error) => {
                                             // Route a `Failure` to the ledger.
-
-                                            peer.network_state
-                                                .ledger
-                                                .update(LedgerRequest::Failure(peer_ip, format!("{}", error)))
-                                                .await;
+                                            peer.network_state.ledger.add_failure(peer_ip, format!("{}", error)).await;
 
                                             continue;
                                         }
@@ -515,14 +511,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                             }
 
                                             // Route the `BlockResponse` to the ledger.
-                                            peer.network_state.ledger.update(LedgerRequest::BlockResponse(peer_ip, block)).await;
+                                            peer.network_state.ledger.block_response(peer_ip, block).await;
                                         }
                                         // Route the `Failure` to the ledger.
                                         Err(error) => {
-                                            peer.network_state
-                                                .ledger
-                                                .update(LedgerRequest::Failure(peer_ip, format!("{}", error)))
-                                                .await;
+                                            peer.network_state.ledger.add_failure(peer_ip, format!("{}", error)).await;
                                         }
                                     }
                                 }
@@ -615,21 +608,17 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 }
                                 Message::Pong(is_fork, block_locators) => {
                                     // Perform the deferred non-blocking deserialization of block locators.
-                                    let request = match block_locators.deserialize().await {
+                                    match block_locators.deserialize().await {
                                         // Route the `Pong` to the ledger.
-                                        Ok(block_locators) => LedgerRequest::Pong(
-                                            peer_ip,
-                                            *peer.node_type.read().await,
-                                            peer.status.get(),
-                                            is_fork,
-                                            block_locators,
-                                        ),
+                                        Ok(block_locators) => {
+                                            peer.network_state
+                                                .ledger
+                                                .pong(peer_ip, *peer.node_type.read().await, peer.status.get(), is_fork, block_locators)
+                                                .await
+                                        }
                                         // Route the `Failure` to the ledger.
-                                        Err(error) => LedgerRequest::Failure(peer_ip, format!("{}", error)),
-                                    };
-
-                                    // Route the request to the ledger.
-                                    peer.network_state.ledger.update(request).await;
+                                        Err(error) => peer.network_state.ledger.add_failure(peer_ip, format!("{}", error)).await,
+                                    }
 
                                     // Spawn an asynchronous task for the `Ping` request.
                                     let ledger_reader = peer.network_state.ledger.reader();
@@ -708,20 +697,22 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         trace!("Skipping 'UnconfirmedBlock {}' from {}", block_height, peer_ip)
                                     } else {
                                         // Perform the deferred non-blocking deserialization of the block.
-                                        let request = match block.deserialize().await {
+                                        match block.deserialize().await {
                                             // Ensure the claimed block height and block hash matches in the deserialized block.
                                             Ok(block) => match block_height == block.height() && block_hash == block.hash() {
                                                 // Route the `UnconfirmedBlock` to the ledger.
-                                                true => LedgerRequest::UnconfirmedBlock(peer_ip, block),
+                                                true => peer.network_state.ledger.unconfirmed_block(peer_ip, block).await,
                                                 // Route the `Failure` to the ledger.
-                                                false => LedgerRequest::Failure(peer_ip, "Malformed UnconfirmedBlock message".to_string()),
+                                                false => {
+                                                    peer.network_state
+                                                        .ledger
+                                                        .add_failure(peer_ip, "Malformed UnconfirmedBlock message".to_string())
+                                                        .await
+                                                }
                                             },
                                             // Route the `Failure` to the ledger.
-                                            Err(error) => LedgerRequest::Failure(peer_ip, format!("{}", error)),
-                                        };
-
-                                        // Route the request to the ledger.
-                                        peer.network_state.ledger.update(request).await;
+                                            Err(error) => peer.network_state.ledger.add_failure(peer_ip, format!("{}", error)).await,
+                                        }
                                     }
                                 }
                                 Message::UnconfirmedTransaction(tx) => {
@@ -825,7 +816,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                 // Route a `Disconnect` to the ledger.
                 peer.network_state
                     .ledger
-                    .update(LedgerRequest::Disconnect(peer_ip, DisconnectReason::PeerHasDisconnected))
+                    .disconnect(peer_ip, DisconnectReason::PeerHasDisconnected)
                     .await;
 
                 E::resources().deregister(inbound_resource_id);

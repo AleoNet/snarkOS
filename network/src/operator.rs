@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{state::NetworkState, LedgerReader, LedgerRequest};
+use crate::{state::NetworkState, LedgerReader};
 use snarkos_environment::{
     helpers::NodeType,
     network::{Data, Message},
@@ -289,13 +289,12 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     ) {
                         if let Ok(block) = Block::from(previous_block_hash, block_header, transactions) {
                             info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
-                            let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block);
 
                             self.network_state
                                 .get()
                                 .expect("network state must be set")
                                 .ledger
-                                .update(request)
+                                .unconfirmed_block(self.local_ip, block)
                                 .await;
                         }
                     }

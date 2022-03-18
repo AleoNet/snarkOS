@@ -51,21 +51,21 @@ pub type LedgerReader<N> = std::sync::Arc<snarkos_storage::LedgerState<N>>;
 ///
 /// An enum of requests that the `Ledger` struct processes.
 ///
-#[derive(Debug)]
-pub enum LedgerRequest<N: Network> {
-    /// BlockResponse := (peer_ip, block)
-    BlockResponse(SocketAddr, Block<N>),
-    /// Disconnect := (peer_ip, reason)
-    Disconnect(SocketAddr, DisconnectReason),
-    /// Failure := (peer_ip, failure)
-    Failure(SocketAddr, String),
-    /// Heartbeat := ()
-    Heartbeat,
-    /// Pong := (peer_ip, node_type, status, is_fork, block_locators)
-    Pong(SocketAddr, NodeType, State, Option<bool>, BlockLocators<N>),
-    /// UnconfirmedBlock := (peer_ip, block)
-    UnconfirmedBlock(SocketAddr, Block<N>),
-}
+// #[derive(Debug)]
+// enum LedgerRequest<N: Network> {
+//     /// BlockResponse := (peer_ip, block)
+//     BlockResponse(SocketAddr, Block<N>),
+//     /// Disconnect := (peer_ip, reason)
+//     Disconnect(SocketAddr, DisconnectReason),
+//     /// Failure := (peer_ip, failure)
+//     Failure(SocketAddr, String),
+//     /// Heartbeat := ()
+//     Heartbeat,
+//     /// Pong := (peer_ip, node_type, status, is_fork, block_locators)
+//     Pong(SocketAddr, NodeType, State, Option<bool>, BlockLocators<N>),
+//     /// UnconfirmedBlock := (peer_ip, block)
+//     UnconfirmedBlock(SocketAddr, Block<N>),
+// }
 
 pub type PeersState<N> = HashMap<SocketAddr, Option<(NodeType, State, Option<bool>, u32, BlockLocators<N>)>>;
 
@@ -151,94 +151,90 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         trace!("[ShuttingDown] Disconnect message has been sent to all connected peers");
     }
 
-    ///
-    /// Performs the given `request` to the ledger.
-    /// All requests must go through this `update`, so that a unified view is preserved.
-    ///
-    pub async fn update(&self, request: LedgerRequest<N>) {
-        match request {
-            LedgerRequest::BlockResponse(peer_ip, block) => {
-                // Remove the block request from the ledger.
-                if self.remove_block_request(peer_ip, block.height()).await {
-                    // On success, process the block response.
-                    self.add_block(block).await;
-                    // Check if syncing with this peer is complete.
-                    if self
-                        .block_requests
-                        .read()
-                        .await
-                        .get(&peer_ip)
-                        .map(|requests| requests.is_empty())
-                        .unwrap_or(false)
-                    {
-                        trace!("All block requests with {} have been processed", peer_ip);
-                        self.update_block_requests().await;
-                    }
-                }
-            }
-            LedgerRequest::Disconnect(peer_ip, reason) => {
-                self.disconnect(peer_ip, reason).await;
-            }
-            LedgerRequest::Failure(peer_ip, failure) => {
-                self.add_failure(peer_ip, failure).await;
-            }
-            LedgerRequest::Heartbeat => {
-                // Update for sync nodes.
-                self.update_sync_nodes().await;
-                // Update the ledger.
-                self.update_ledger().await;
-                // Update the status of the ledger.
-                self.update_status().await;
-                // Remove expired block requests.
-                self.remove_expired_block_requests().await;
-                // Remove expired failures.
-                self.remove_expired_failures().await;
-                // Disconnect from peers with frequent failures.
-                self.disconnect_from_failing_peers().await;
-                // Update the block requests.
+    pub async fn block_response(&self, peer_ip: SocketAddr, block: Block<N>) {
+        // Remove the block request from the ledger.
+        if self.remove_block_request(peer_ip, block.height()).await {
+            // On success, process the block response.
+            self.add_block(block).await;
+            // Check if syncing with this peer is complete.
+            if self
+                .block_requests
+                .read()
+                .await
+                .get(&peer_ip)
+                .map(|requests| requests.is_empty())
+                .unwrap_or(false)
+            {
+                trace!("All block requests with {} have been processed", peer_ip);
                 self.update_block_requests().await;
+            }
+        }
+    }
 
-                let block_requests = self.number_of_block_requests().await;
-                let connected_peers = self.peers_state.read().await.len();
+    pub async fn heartbeat(&self) {
+        // Update for sync nodes.
+        self.update_sync_nodes().await;
+        // Update the ledger.
+        self.update_ledger().await;
+        // Update the status of the ledger.
+        self.update_status().await;
+        // Remove expired block requests.
+        self.remove_expired_block_requests().await;
+        // Remove expired failures.
+        self.remove_expired_failures().await;
+        // Disconnect from peers with frequent failures.
+        self.disconnect_from_failing_peers().await;
+        // Update the block requests.
+        self.update_block_requests().await;
 
-                debug!(
-                    "Status Report (type = {}, status = {}, block_height = {}, cumulative_weight = {}, block_requests = {}, connected_peers = {})",
-                    E::NODE_TYPE,
-                    E::status(),
-                    self.canon.latest_block_height(),
-                    self.canon.latest_cumulative_weight(),
-                    block_requests,
-                    connected_peers,
-                );
-            }
-            LedgerRequest::Pong(peer_ip, node_type, status, is_fork, block_locators) => {
-                // Ensure the peer has been initialized in the ledger.
-                self.initialize_peer(peer_ip).await;
-                // Process the pong.
-                self.update_peer(peer_ip, node_type, status, is_fork, block_locators).await;
-            }
-            LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
-                // Ensure the node is not peering.
-                if !E::status().is_peering() {
-                    // Process the unconfirmed block.
-                    self.add_block(block.clone()).await;
-                    // Propagate the unconfirmed block to the connected peers.
-                    let message = Message::UnconfirmedBlock(block.height(), block.hash(), Data::Object(block));
-                    self.network_state
-                        .get()
-                        .expect("network state should be set")
-                        .peers
-                        .propagate(peer_ip, message)
-                        .await;
-                }
-            }
+        let block_requests = self.number_of_block_requests().await;
+        let connected_peers = self.peers_state.read().await.len();
+
+        debug!(
+            "Status Report (type = {}, status = {}, block_height = {}, cumulative_weight = {}, block_requests = {}, connected_peers = {})",
+            E::NODE_TYPE,
+            E::status(),
+            self.canon.latest_block_height(),
+            self.canon.latest_cumulative_weight(),
+            block_requests,
+            connected_peers,
+        );
+    }
+
+    pub async fn pong(
+        &self,
+        peer_ip: SocketAddr,
+        node_type: NodeType,
+        status: State,
+        is_fork: Option<bool>,
+        block_locators: BlockLocators<N>,
+    ) {
+        // Ensure the peer has been initialized in the ledger.
+        self.initialize_peer(peer_ip).await;
+        // Process the pong.
+        self.update_peer(peer_ip, node_type, status, is_fork, block_locators).await;
+    }
+
+    pub async fn unconfirmed_block(&self, peer_ip: SocketAddr, block: Block<N>) {
+        // Ensure the node is not peering.
+        if !E::status().is_peering() {
+            // Process the unconfirmed block.
+            self.add_block(block.clone()).await;
+            // Propagate the unconfirmed block to the connected peers.
+            let message = Message::UnconfirmedBlock(block.height(), block.hash(), Data::Object(block));
+            self.network_state
+                .get()
+                .expect("network state should be set")
+                .peers
+                .propagate(peer_ip, message)
+                .await;
         }
     }
 
     ///
     /// Disconnects the given peer from the ledger.
     ///
-    async fn disconnect(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
+    pub async fn disconnect(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
         info!("Disconnecting from {} ({:?})", peer_ip, reason);
         // Remove all entries of the peer from the ledger.
         self.remove_peer(&peer_ip).await;
@@ -886,7 +882,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Adds the given failure message to the specified peer IP.
     ///
-    async fn add_failure(&self, peer_ip: SocketAddr, failure: String) {
+    pub async fn add_failure(&self, peer_ip: SocketAddr, failure: String) {
         trace!("Adding failure for {}: {}", peer_ip, failure);
         match self.failures.write().await.get_mut(&peer_ip) {
             Some(failures) => failures.push((failure, OffsetDateTime::now_utc().unix_timestamp())),
