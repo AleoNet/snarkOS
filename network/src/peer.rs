@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{LedgerRequest, OperatorRequest, PeersRequest, ProverRequest};
+use crate::{LedgerRequest, OperatorRequest, ProverRequest};
 use snarkos_environment::{
     helpers::{NodeType, State, Status},
     network::{Data, DisconnectReason, Message},

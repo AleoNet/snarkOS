@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{state::NetworkState, LedgerReader, LedgerRequest, PeersRequest};
+use crate::{state::NetworkState, LedgerReader, LedgerRequest};
 use snarkos_environment::{
     helpers::{NodeType, State},
     network::{Data, Message},

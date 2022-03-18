@@ -17,7 +17,6 @@
 use crate::{
     helpers::{block_requests::*, BlockRequest, CircularMap},
     state::NetworkState,
-    PeersRequest,
     ProverRequest,
 };
 

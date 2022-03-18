@@ -22,7 +22,7 @@ use snarkos_environment::{
 use snarkos_network::{
     ledger::{Ledger, LedgerReader, LedgerRequest},
     operator::Operator,
-    peers::{Peers, PeersRequest},
+    peers::Peers,
     prover::Prover,
     state::NetworkState,
 };
