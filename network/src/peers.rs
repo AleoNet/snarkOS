@@ -44,33 +44,6 @@ use tokio::{
 pub(crate) type ConnectionResult = oneshot::Sender<Result<()>>;
 
 ///
-/// An enum of requests that the `Peers` struct processes.
-///
-#[derive(Debug)]
-pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, connection_result)
-    Connect(SocketAddr, ConnectionResult),
-    /// Heartbeat : ()
-    Heartbeat,
-    /// MessagePropagate := (peer_ip, message)
-    MessagePropagate(SocketAddr, Message<N, E>),
-    /// MessageSend := (peer_ip, message)
-    MessageSend(SocketAddr, Message<N, E>),
-    /// PeerConnecting := (stream, peer_ip)
-    PeerConnecting(TcpStream, SocketAddr),
-    /// PeerConnected := (peer_ip, peer_nonce)
-    PeerConnected(SocketAddr, u64),
-    /// PeerDisconnected := (peer_ip)
-    PeerDisconnected(SocketAddr),
-    /// PeerRestricted := (peer_ip)
-    PeerRestricted(SocketAddr),
-    /// SendPeerResponse := (peer_ip)
-    SendPeerResponse(SocketAddr),
-    /// ReceivePeerResponse := (\[peer_ip\])
-    ReceivePeerResponse(Vec<SocketAddr>),
-}
-
-///
 /// A list of peers connected to the node server.
 ///
 #[derive(Debug)]
