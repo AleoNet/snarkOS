@@ -128,6 +128,10 @@ impl<N: Network, E: Environment> Prover<N, E> {
         self.network_state.set(network_state).expect("network state can only be set once");
     }
 
+    fn expect_network_state(&self) -> &NetworkState<N, E> {
+        self.network_state.get().expect("network state must be set")
+    }
+
     /// Returns an instance of the memory pool.
     pub fn memory_pool(&self) -> Arc<RwLock<MemoryPool<N>>> {
         self.memory_pool.clone()
@@ -170,9 +174,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
             if let Some(recipient) = self.address {
                 if let Some(pool_ip) = self.pool {
                     // Proceed to register the prover to receive a block template.
-                    self.network_state
-                        .get()
-                        .expect("network state must be set")
+                    self.expect_network_state()
                         .peers
                         .send(pool_ip, Message::PoolRegister(recipient))
                         .await;
@@ -238,12 +240,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
                                     // Send a `PoolResponse` to the operator.
                                     let message = Message::PoolResponse(recipient, nonce, Data::Object(proof));
-                                    self.network_state
-                                        .get()
-                                        .expect("network state must be set")
-                                        .peers
-                                        .send(operator_ip, message)
-                                        .await;
+                                    self.expect_network_state().peers.send(operator_ip, message).await;
                                 }
                                 Ok(Err(error)) => trace!("{}", error),
                                 Err(error) => trace!("{}", anyhow!("Failed to mine the next block {}", error)),
@@ -272,9 +269,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
             match self.memory_pool.write().await.add_transaction(&transaction) {
                 Ok(()) => {
                     // Upon success, propagate the unconfirmed transaction to the connected peers.
-                    self.network_state
-                        .get()
-                        .expect("network state must be set")
+                    self.expect_network_state()
                         .peers
                         .propagate(peer_ip, Message::UnconfirmedTransaction(Data::Object(transaction)))
                         .await;
@@ -344,13 +339,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                                 }
 
                                                 // Broadcast the next block.
-                                                prover_clone
-                                                    .network_state
-                                                    .get()
-                                                    .expect("network state must be set")
-                                                    .ledger
-                                                    .unconfirmed_block(local_ip, block)
-                                                    .await;
+                                                prover_clone.expect_network_state().ledger.unconfirmed_block(local_ip, block).await;
                                             }
                                             Ok(Err(error)) | Err(error) => trace!("{}", error),
                                         }

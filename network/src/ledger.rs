@@ -127,6 +127,10 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.network_state.set(network_state).expect("network state can only be set once");
     }
 
+    fn expect_network_state(&self) -> &NetworkState<N, E> {
+        self.network_state.get().expect("network state must be set")
+    }
+
     /// Returns an instance of the ledger reader.
     pub fn reader(&self) -> LedgerReader<N> {
         self.canon_reader.clone()
@@ -354,9 +358,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             self.unconfirmed_blocks.write().await.clear();
 
             // Reset the memory pool of its transactions.
-            self.network_state
-                .get()
-                .expect("network state must be set")
+            self.expect_network_state()
                 .prover
                 .update(ProverRequest::MemoryPoolClear(None))
                 .await;
@@ -501,9 +503,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                         self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash);
 
                         // On success, filter the memory pool of its transactions, if they exist.
-                        self.network_state
-                            .get()
-                            .expect("network state must be set")
+                        self.expect_network_state()
                             .prover
                             .update(ProverRequest::MemoryPoolClear(Some(unconfirmed_block)))
                             .await;

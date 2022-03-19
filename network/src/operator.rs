@@ -172,6 +172,10 @@ impl<N: Network, E: Environment> Operator<N, E> {
         self.network_state.set(network_state).expect("network state can only be set once");
     }
 
+    fn expect_network_state(&self) -> &NetworkState<N, E> {
+        self.network_state.get().expect("network state must be set")
+    }
+
     /// Returns all the shares in storage.
     pub fn to_shares(&self) -> Vec<((u32, Record<N>), HashMap<Address<N>, u64>)> {
         self.state.to_shares()
@@ -213,12 +217,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                     // Route a `PoolRequest` to the peer.
                     let message = Message::PoolRequest(share_difficulty, Data::Object(block_template));
-                    self.network_state
-                        .get()
-                        .expect("network state must be set")
-                        .peers
-                        .send(peer_ip, message)
-                        .await
+                    self.expect_network_state().peers.send(peer_ip, message).await
                 } else {
                     warn!("[PoolRegister] No current block template exists");
                 }
@@ -290,12 +289,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
                         if let Ok(block) = Block::from(previous_block_hash, block_header, transactions) {
                             info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
 
-                            self.network_state
-                                .get()
-                                .expect("network state must be set")
-                                .ledger
-                                .unconfirmed_block(self.local_ip, block)
-                                .await;
+                            self.expect_network_state().ledger.unconfirmed_block(self.local_ip, block).await;
                         }
                     }
                 } else {

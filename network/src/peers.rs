@@ -53,6 +53,7 @@ pub struct Peers<N: Network, E: Environment> {
     local_ip: SocketAddr,
     /// The local nonce for this node session.
     local_nonce: u64,
+    /// The map of known peer IPs to their corresponding `Peer` instance.
     peers: RwLock<HashMap<SocketAddr, Arc<Peer<N, E>>>>,
     /// The map connected peer IPs to their nonce.
     connected_peers: RwLock<HashMap<SocketAddr, u64>>,
@@ -93,6 +94,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
     pub fn set_network_state(&self, network_state: NetworkState<N, E>) {
         self.network_state.set(network_state).expect("network state can only be set once");
+    }
+
+    fn expect_network_state(&self) -> &NetworkState<N, E> {
+        self.network_state.get().expect("network state must be set")
     }
 
     ///
@@ -223,7 +228,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     Ok(stream) => match stream {
                         Ok(stream) => {
                             match Peer::new(
-                                self.network_state.get().expect("network state must be set").clone(),
+                                self.expect_network_state().clone(),
                                 stream,
                                 self.local_ip,
                                 self.local_nonce,
@@ -321,12 +326,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             for peer_ip in disconnected_trusted_nodes {
                 // Initialize the connection process.
                 let (router, handler) = oneshot::channel();
-                self.network_state
-                    .get()
-                    .expect("network state must be set")
-                    .peers
-                    .connect(peer_ip, router)
-                    .await;
+                self.expect_network_state().peers.connect(peer_ip, router).await;
 
                 // TODO: remove routing.
                 // Do not wait for the result of each connection.
@@ -383,12 +383,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                 // Initialize the connection process.
                 let (router, handler) = oneshot::channel();
-                self.network_state
-                    .get()
-                    .expect("network state must be set")
-                    .peers
-                    .connect(peer_ip, router)
-                    .await;
+                self.expect_network_state().peers.connect(peer_ip, router).await;
+
                 // Do not wait for the result of each connection.
                 // Procure a resource id to register the task with, as it might be terminated at any point in time.
                 let resource_id = E::resources().procure_id();
@@ -466,7 +462,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 drop(seen_inbound_connections);
 
                 match Peer::new(
-                    self.network_state.get().expect("network state must be set").clone(),
+                    self.expect_network_state().clone(),
                     stream,
                     self.local_ip,
                     self.local_nonce,
