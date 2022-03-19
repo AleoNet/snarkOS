@@ -349,14 +349,17 @@ impl<N: Network, E: Environment> Default for MessageCodec<N, E> {
 }
 
 impl<N: Network, E: Environment> Encoder<Message<N, E>> for MessageCodec<N, E> {
-    type Error = anyhow::Error;
+    type Error = io::Error;
 
     fn encode(&mut self, message: Message<N, E>, dst: &mut BytesMut) -> Result<(), Self::Error> {
         // Prepare the room for the length of the payload.
         dst.extend_from_slice(&0u32.to_le_bytes());
 
         // Serialize the payload directly into dst.
-        message.serialize_into(&mut dst.writer())?;
+        message
+            .serialize_into(&mut dst.writer())
+            // This error should never happen, the conversion is for greater compatibility.
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "serialization error"))?;
 
         // Calculate the length of the serialized payload.
         let len_slice = (dst[4..].len() as u32).to_le_bytes();

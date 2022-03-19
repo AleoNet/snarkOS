@@ -21,11 +21,14 @@ edition = "2021"
 [dependencies.async-trait]
 version = "0.1"
 
+[dependencies.futures-util]
+version = "0.3"
+
 [dependencies.parking_lot]
 version = "0.12"
 
 [dependencies.pea2pea]
-version = "0.34"
+version = "0.35"
 
 [dependencies.rand]
 version = "0.8"
@@ -43,6 +46,9 @@ version = "0.8.0"
 
 [dependencies.tokio]
 version = "1"
+
+[dependencies.tokio-util]
+version = "0.7"
 
 [dependencies.tracing]
 version = "0.1"
