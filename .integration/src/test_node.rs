@@ -16,12 +16,12 @@
 
 use snarkos_environment::{
     helpers::{BlockLocators, NodeType, State},
-    network::Data,
+    network::{Data, MessageCodec},
     Client,
     CurrentNetwork,
     Environment,
 };
-use snarkos_synthetic_node::{ClientMessage, ClientState, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
+use snarkos_synthetic_node::{ClientMessage, ClientState, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_VERSION};
 use snarkvm::traits::Network;
 
 use pea2pea::{
@@ -31,7 +31,6 @@ use pea2pea::{
     Pea2Pea,
 };
 use std::{
-    convert::TryInto,
     io,
     net::{IpAddr, Ipv4Addr, SocketAddr},
     ops::Deref,
@@ -139,29 +138,11 @@ impl TestNode {
 /// Inbound message processing logic for the test nodes.
 #[async_trait::async_trait]
 impl Reading for TestNode {
+    type Codec = MessageCodec<CurrentNetwork, Client<CurrentNetwork>>;
     type Message = ClientMessage;
 
-    fn read_message<R: io::Read>(&self, source: SocketAddr, reader: &mut R) -> io::Result<Option<Self::Message>> {
-        // FIXME: use the maximum message size allowed by the protocol or (better) use streaming deserialization.
-        let mut buf = [0u8; 8 * 1024];
-
-        reader.read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE])?;
-        let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
-
-        if reader.read_exact(&mut buf[..len]).is_err() {
-            return Ok(None);
-        }
-
-        match ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len])) {
-            Ok(msg) => {
-                info!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
-                Ok(Some(msg))
-            }
-            Err(e) => {
-                error!("a message from {} failed to deserialize: {}", source, e);
-                Err(io::ErrorKind::InvalidData.into())
-            }
-        }
+    fn codec(&self, _addr: SocketAddr) -> Self::Codec {
+        Default::default()
     }
 
     async fn process_message(&self, source: SocketAddr, message: Self::Message) -> io::Result<()> {
