@@ -20,11 +20,14 @@ use crate::{constants::*, known_network::KnownNetwork, metrics::NetworkMetrics};
 use snarkos_environment::{
     helpers::{BlockLocators, NodeType, State},
     network::Data,
+    Client,
     CurrentNetwork,
+    Environment,
 };
-use snarkos_synthetic_node::{ClientMessage, SynthNode, MESSAGE_LENGTH_PREFIX_SIZE};
+use snarkos_synthetic_node::{ClientMessage, SynthNode};
 use snarkvm::traits::Network;
 
+use bytes::{Buf, BytesMut};
 use clap::Parser;
 use pea2pea::{
     protocols::{Disconnect, Handshake, Reading, Writing},
@@ -33,18 +36,12 @@ use pea2pea::{
     Pea2Pea,
 };
 use rand::{rngs::SmallRng, seq::IteratorRandom, SeedableRng};
-use std::{
-    convert::TryInto,
-    io::{self, Read},
-    net::SocketAddr,
-    ops::Deref,
-    sync::Arc,
-    time::Duration,
-};
+use std::{io, marker::PhantomData, net::SocketAddr, ops::Deref, sync::Arc, time::Duration};
 use time::OffsetDateTime;
 use tokio::{sync::Mutex, task};
 #[cfg(feature = "postgres")]
 use tokio_postgres::Client as StorageClient;
+use tokio_util::codec::{Decoder, LengthDelimitedCodec};
 use tracing::*;
 
 #[cfg(not(feature = "postgres"))]
@@ -92,7 +89,6 @@ impl Crawler {
             desired_listening_port: Some(opts.addr.port()),
             max_connections: MAXIMUM_NUMBER_OF_PEERS as u16,
             max_handshake_time_ms: MAX_HANDSHAKE_TIME_MS,
-            read_buffer_size: READ_BUFFER_SIZE,
             ..Default::default()
         };
 
@@ -231,67 +227,71 @@ pub enum InboundMessage {
     Unhandled(u16),
 }
 
-/// Inbound message processing logic for the crawler nodes.
-#[async_trait::async_trait]
-impl Reading for Crawler {
-    type Message = InboundMessage;
+pub struct CrawlerDecoder<E: Environment> {
+    codec: LengthDelimitedCodec,
+    span: Span,
+    addr: SocketAddr,
+    _phantom: PhantomData<E>,
+}
 
-    // This implementation is slightly low-level in order to discard unwanted messages without a performance penalty.
-    fn read_message<R: io::Read>(&self, source: SocketAddr, reader: &mut R) -> io::Result<Option<Self::Message>> {
-        // The read buffer should be just enough to read the longest expected message.
-        let mut buf = [0u8; READ_BUFFER_SIZE];
+impl<E: Environment> CrawlerDecoder<E> {
+    fn new(addr: SocketAddr, span: Span) -> Self {
+        Self {
+            codec: LengthDelimitedCodec::builder()
+                .max_frame_length(E::MAXIMUM_MESSAGE_SIZE)
+                .little_endian()
+                .new_codec(),
+            span,
+            addr,
+            _phantom: PhantomData,
+        }
+    }
+}
 
-        // Read the length of the inbound message.
-        let read_len = reader.read(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE])?;
+impl<E: Environment> Decoder for CrawlerDecoder<E> {
+    type Error = io::Error;
+    type Item = InboundMessage;
 
-        // This is unlikely, but mark the message as incomplete if too few bytes are available.
-        if read_len < MESSAGE_LENGTH_PREFIX_SIZE {
+    fn decode(&mut self, source: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
+        let bytes = if let Some(bytes) = self.codec.decode(source)? {
+            bytes
+        } else {
             return Ok(None);
+        };
+
+        if bytes.len() < 2 {
+            return Err(io::ErrorKind::InvalidData.into());
         }
 
-        // Read the message's length.
-        let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
+        // Deliberately not advancing the buffer here.
+        let message_id = (&bytes.chunk()[..2]).get_u16_le();
 
-        // Only read the message ID first.
-        let read_len = reader.read(&mut buf[..2])?;
-
-        // This is unlikely, but mark the message as incomplete if too few bytes are available.
-        if read_len < 2 {
-            return Ok(None);
-        }
-
-        // Read the message ID to filter out undesirable messages.
-        let message_id: u16 = bincode::deserialize(&buf[..2]).map_err(|_| io::ErrorKind::InvalidData)?;
-
-        // Discard unwanted messages and those longer than the buffer's capacity.
-        if !ACCEPTED_MESSAGE_IDS.contains(&message_id) || len > buf.len() {
-            // Advance the reader to discard the unwanted bytes.
-            let read_len = io::copy(&mut reader.take(len as u64 - 2), &mut io::sink())?;
-            if read_len != len as u64 - 2 {
-                return Ok(None);
-            }
+        if !ACCEPTED_MESSAGE_IDS.contains(&message_id) {
             return Ok(Some(InboundMessage::Unhandled(message_id)));
         }
 
-        // Read the remaining number of bytes indicated by the length prefix.
-        let read_len = reader.read(&mut buf[2..][..len - 2])?;
-
-        // This one is likely: mark the message as incomplete if it's lacking bytes.
-        if read_len != len - 2 {
-            return Ok(None);
-        }
-
         // Only deserialize the desired messages.
-        match ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len])) {
+        match ClientMessage::deserialize(bytes) {
             Ok(msg) => {
-                debug!(parent: self.node().span(), "received a {} from {}", msg.name(), source);
+                debug!(parent: &self.span, "received a {} from {}", msg.name(), self.addr);
                 Ok(Some(InboundMessage::Handled(Box::new(msg))))
             }
             Err(e) => {
-                error!(parent: self.node().span(), "a message from {} failed to deserialize: {}", source, e);
+                error!(parent: &self.span, "a message from {} failed to deserialize: {}", self.addr, e);
                 Err(io::ErrorKind::InvalidData.into())
             }
         }
+    }
+}
+
+/// Inbound message processing logic for the crawler nodes.
+#[async_trait::async_trait]
+impl Reading for Crawler {
+    type Codec = CrawlerDecoder<Client<CurrentNetwork>>;
+    type Message = InboundMessage;
+
+    fn codec(&self, addr: SocketAddr) -> Self::Codec {
+        Self::Codec::new(addr, self.node().span().clone())
     }
 
     async fn process_message(&self, source: SocketAddr, message: Self::Message) -> io::Result<()> {
