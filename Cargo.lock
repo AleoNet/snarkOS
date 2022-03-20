@@ -2027,14 +2027,17 @@ checksum = "0744126afe1a6dd7f394cb50a716dbe086cb06e255e53d8d0185d82828358fb5"
 
 [[package]]
 name = "pea2pea"
-version = "0.34.0"
+version = "0.35.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0d90feae3311b6204e24def79e34e663816bed86264bf3788de3a1c20a391f7e"
+checksum = "9d7e5fcdd19c10159e75fe65227f3c6fd2290df79a91e1ce1400362911bc4ac7"
 dependencies = [
  "async-trait",
+ "bytes",
+ "futures-util",
  "once_cell",
  "parking_lot 0.12.0",
  "tokio",
+ "tokio-util 0.7.0",
  "tracing",
 ]
 
@@ -2893,6 +2896,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "bincode",
+ "bytes",
  "clap 3.1.6",
  "nalgebra",
  "native-tls",
@@ -2910,6 +2914,7 @@ dependencies = [
  "time 0.3.7",
  "tokio",
  "tokio-postgres",
+ "tokio-util 0.7.0",
  "tracing",
  "tracing-subscriber",
 ]
@@ -3038,6 +3043,7 @@ name = "snarkos-synthetic-node"
 version = "2.0.2"
 dependencies = [
  "async-trait",
+ "futures-util",
  "parking_lot 0.12.0",
  "pea2pea",
  "rand",
@@ -3045,6 +3051,7 @@ dependencies = [
  "snarkos-network",
  "snarkvm",
  "tokio",
+ "tokio-util 0.7.0",
  "tracing",
  "tracing-subscriber",
 ]
