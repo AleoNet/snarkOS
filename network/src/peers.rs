@@ -24,7 +24,6 @@ use snarkvm::dpc::prelude::*;
 #[cfg(any(feature = "test", feature = "prometheus"))]
 use snarkos_metrics as metrics;
 
-use anyhow::Result;
 use once_cell::sync::OnceCell;
 use rand::{prelude::IteratorRandom, rngs::OsRng, thread_rng, Rng};
 use std::{
@@ -33,15 +32,7 @@ use std::{
     sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
-use tokio::{
-    net::TcpStream,
-    sync::{oneshot, RwLock},
-    task,
-    time::timeout,
-};
-
-/// Shorthand for the parent half of the connection result channel.
-pub(crate) type ConnectionResult = oneshot::Sender<Result<()>>;
+use tokio::{net::TcpStream, sync::RwLock, time::timeout};
 
 ///
 /// A list of peers connected to the node server.
@@ -186,7 +177,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
         self.connected_peers.read().await.values().copied().collect()
     }
 
-    pub async fn connect(&self, peer_ip: SocketAddr, conn_result_router: ConnectionResult) {
+    pub async fn connect(&self, peer_ip: SocketAddr) {
         // Ensure the peer IP is not this node.
         if peer_ip == self.local_ip
             || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
@@ -237,19 +228,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
                             .await
                             {
                                 Ok(peer) => {
-                                    // If the optional connection result router is given, report a successful connection result.
-                                    if conn_result_router.send(Ok(())).is_err() {
-                                        warn!("Failed to report a successful connection");
-                                    }
-
                                     self.peers.write().await.insert(peer_ip, peer);
                                 }
                                 Err(error) => {
                                     trace!("{}", error);
-                                    // If the optional connection result router is given, report a failed connection result.
-                                    if conn_result_router.send(Err(error)).is_err() {
-                                        warn!("Failed to report a failed connection");
-                                    }
                                 }
                             };
                         }
@@ -323,23 +305,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
             let connected_peers = self.connected_peers().await.into_iter().collect::<HashSet<_>>();
             let trusted_nodes = E::trusted_nodes();
             let disconnected_trusted_nodes = trusted_nodes.difference(&connected_peers).copied();
+
             for peer_ip in disconnected_trusted_nodes {
                 // Initialize the connection process.
-                let (router, handler) = oneshot::channel();
-                self.expect_network_state().peers.connect(peer_ip, router).await;
-
-                // TODO: remove routing.
-                // Do not wait for the result of each connection.
-                // Procure a resource id to register the task with, as it might be terminated at any point in time.
-                let resource_id = E::resources().procure_id();
-                E::resources().register_task(
-                    Some(resource_id),
-                    task::spawn(async move {
-                        let _ = handler.await;
-
-                        E::resources().deregister(resource_id);
-                    }),
-                );
+                self.connect(peer_ip).await;
             }
         }
 
@@ -381,21 +350,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             if !self.is_connected_to(peer_ip).await {
                 trace!("Attempting connection to {}...", peer_ip);
 
-                // Initialize the connection process.
-                let (router, handler) = oneshot::channel();
-                self.expect_network_state().peers.connect(peer_ip, router).await;
-
-                // Do not wait for the result of each connection.
-                // Procure a resource id to register the task with, as it might be terminated at any point in time.
-                let resource_id = E::resources().procure_id();
-                E::resources().register_task(
-                    Some(resource_id),
-                    task::spawn(async move {
-                        let _ = handler.await;
-
-                        E::resources().deregister(resource_id);
-                    }),
-                );
+                self.connect(peer_ip).await;
             }
         }
     }

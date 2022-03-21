@@ -90,13 +90,8 @@ impl<N: Network, E: Environment> Server<N, E> {
                     // Notify the outer function that the task is ready.
                     let _ = router.send(());
                     loop {
-                        // Initialize the connection process.
-                        let (router, handler) = oneshot::channel();
                         // Route a `Connect` request to the pool.
-                        peers.connect(pool_ip, router).await;
-
-                        // Wait until the connection task is initialized.
-                        let _ = handler.await;
+                        peers.connect(pool_ip).await;
 
                         // Sleep for `30` seconds.
                         tokio::time::sleep(std::time::Duration::from_secs(30)).await;
@@ -151,15 +146,9 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Sends a connection request to the given IP address.
     ///
     #[inline]
-    pub async fn connect_to(&self, peer_ip: SocketAddr) -> Result<()> {
-        // Initialize the connection process.
-        let (router, handler) = oneshot::channel();
-
+    pub async fn connect_to(&self, peer_ip: SocketAddr) {
         // Route a `Connect` request to the peer manager.
-        self.network_state.peers.connect(peer_ip, router).await;
-
-        // Wait until the connection task is initialized.
-        handler.await.map(|_| ()).map_err(|e| e.into())
+        self.network_state.peers.connect(peer_ip).await
     }
 
     ///
