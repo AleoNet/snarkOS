@@ -21,15 +21,11 @@ use crate::{
 use snarkvm::{dpc::posw::PoSWProof, prelude::*};
 
 use ::bytes::{Buf, BufMut, Bytes, BytesMut};
-use anyhow::{anyhow, Result};
+use anyhow::{bail, Result};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
-use std::{
-    io::{Cursor, Seek, Write},
-    marker::PhantomData,
-    net::SocketAddr,
-};
+use std::{io::Write, marker::PhantomData, net::SocketAddr};
 use tokio::task;
-use tokio_util::codec::{Decoder, Encoder};
+use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
 /// This object enables deferred deserialization / ahead-of-time serialization for objects that
 /// take a while to deserialize / serialize, in order to allow these operations to be non-blocking.
@@ -255,152 +251,149 @@ impl<N: Network, E: Environment> Message<N, E> {
 
     /// Deserializes the given buffer into a message.
     #[inline]
-    pub fn deserialize<R: Read + Seek>(reader: &mut R) -> Result<Self> {
+    pub fn deserialize(mut bytes: BytesMut) -> Result<Self> {
+        // Make sure there is an id available.
+        if bytes.remaining() < 2 {
+            bail!("Missing message ID");
+        }
+
         // Read the message ID.
-        let id: u16 = bincode::deserialize_from(&mut *reader)?;
-
-        // Helper function to read all the remaining bytes from a reader.
-        let read_to_end = |reader: &mut R| -> Result<Bytes> {
-            let mut data = vec![];
-            reader.read_to_end(&mut data)?;
-
-            Ok(data.into())
-        };
+        let id: u16 = bytes.get_u16_le();
 
         // Deserialize the data field.
         let message = match id {
-            0 => Self::BlockRequest(bincode::deserialize_from(&mut *reader)?, bincode::deserialize_from(&mut *reader)?),
-            1 => Self::BlockResponse(Data::Buffer(read_to_end(&mut *reader)?)),
+            0 => {
+                let mut reader = bytes.reader();
+                Self::BlockRequest(bincode::deserialize_from(&mut reader)?, bincode::deserialize_from(&mut reader)?)
+            }
+            1 => Self::BlockResponse(Data::Buffer(bytes.freeze())),
             2 => {
                 let (version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight) =
-                    bincode::deserialize_from(&mut *reader)?;
+                    bincode::deserialize_from(&mut bytes.reader())?;
 
                 Self::ChallengeRequest(version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight)
             }
-            3 => Self::ChallengeResponse(Data::Buffer(read_to_end(&mut *reader)?)),
+            3 => Self::ChallengeResponse(Data::Buffer(bytes.freeze())),
             4 => {
-                let data = read_to_end(&mut *reader)?;
-
-                if data.is_empty() {
+                if bytes.remaining() == 0 {
                     Self::Disconnect(DisconnectReason::NoReasonGiven)
-                } else if let Ok(reason) = bincode::deserialize(&data) {
+                } else if let Ok(reason) = bincode::deserialize_from(&mut bytes.reader()) {
                     Self::Disconnect(reason)
                 } else {
-                    return Err(anyhow!("Invalid 'Disconnect' message: {:?}", data));
+                    bail!("Invalid 'Disconnect' message");
                 }
             }
-            5 => {
-                let data = read_to_end(&mut *reader)?;
-
-                match data.is_empty() {
-                    true => Self::PeerRequest,
-                    false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?}", data)),
-                }
-            }
-            6 => Self::PeerResponse(bincode::deserialize_from(&mut *reader)?),
+            5 => match bytes.remaining() == 0 {
+                true => Self::PeerRequest,
+                false => bail!("Invalid 'PeerRequest' message"),
+            },
+            6 => Self::PeerResponse(bincode::deserialize_from(&mut bytes.reader())?),
             7 => {
-                let (version, fork_depth, node_type, status, block_hash) = bincode::deserialize_from(&mut *reader)?;
-                let block_header = Data::Buffer(read_to_end(&mut *reader)?);
+                let mut reader = bytes.reader();
+                let (version, fork_depth, node_type, status, block_hash) = bincode::deserialize_from(&mut reader)?;
+                let block_header = Data::Buffer(reader.into_inner().freeze());
 
                 Self::Ping(version, fork_depth, node_type, status, block_hash, block_header)
             }
             8 => {
-                let fork_flag: u8 = bincode::deserialize_from(&mut *reader)?;
-                let data = read_to_end(&mut *reader)?;
+                // Make sure a byte for the fork flag is available.
+                if bytes.remaining() == 0 {
+                    bail!("Missing fork flag in a 'Pong'");
+                }
+
+                let fork_flag = bytes.get_u8();
 
                 let is_fork = match fork_flag {
                     0 => None,
                     1 => Some(true),
                     2 => Some(false),
-                    _ => return Err(anyhow!("Invalid 'Pong' message: {:?}", data)),
+                    _ => bail!("Invalid 'Pong' message"),
                 };
 
-                Self::Pong(is_fork, Data::Buffer(data))
+                Self::Pong(is_fork, Data::Buffer(bytes.freeze()))
             }
-            9 => Self::UnconfirmedBlock(
-                bincode::deserialize_from(&mut *reader)?,
-                bincode::deserialize_from(&mut *reader)?,
-                Data::Buffer(read_to_end(&mut *reader)?),
-            ),
-            10 => Self::UnconfirmedTransaction(Data::Buffer(read_to_end(&mut *reader)?)),
-            11 => Self::PoolRegister(bincode::deserialize_from(&mut *reader)?),
-            12 => Self::PoolRequest(bincode::deserialize_from(&mut *reader)?, Data::Buffer(read_to_end(&mut *reader)?)),
-            13 => Self::PoolResponse(
-                bincode::deserialize_from(&mut *reader)?,
-                bincode::deserialize_from(&mut *reader)?,
-                Data::Buffer(read_to_end(&mut *reader)?),
-            ),
-            _ => return Err(anyhow!("Invalid message ID {}", id)),
+            9 => {
+                let mut reader = bytes.reader();
+                Self::UnconfirmedBlock(
+                    bincode::deserialize_from(&mut reader)?,
+                    bincode::deserialize_from(&mut reader)?,
+                    Data::Buffer(reader.into_inner().freeze()),
+                )
+            }
+            10 => Self::UnconfirmedTransaction(Data::Buffer(bytes.freeze())),
+            11 => Self::PoolRegister(bincode::deserialize_from(&mut bytes.reader())?),
+            12 => {
+                let mut reader = bytes.reader();
+                Self::PoolRequest(bincode::deserialize_from(&mut reader)?, Data::Buffer(reader.into_inner().freeze()))
+            }
+            13 => {
+                let mut reader = bytes.reader();
+                Self::PoolResponse(
+                    bincode::deserialize_from(&mut reader)?,
+                    bincode::deserialize_from(&mut reader)?,
+                    Data::Buffer(reader.into_inner().freeze()),
+                )
+            }
+            _ => bail!("Invalid message ID {}", id),
         };
 
         Ok(message)
     }
 }
 
-impl<N: Network, E: Environment> Encoder<Message<N, E>> for Message<N, E> {
-    type Error = anyhow::Error;
+/// The codec used to decode and encode network `Message`s.
+pub struct MessageCodec<N: Network, E: Environment> {
+    codec: LengthDelimitedCodec,
+    _phantoms: (PhantomData<N>, PhantomData<E>),
+}
 
-    fn encode(&mut self, message: Message<N, E>, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        // Prepare the room for the length of the payload.
-        dst.extend_from_slice(&0u32.to_le_bytes());
-
-        // Serialize the payload directly into dst.
-        message.serialize_into(&mut dst.writer())?;
-
-        // Calculate the length of the serialized payload.
-        let len_slice = (dst[4..].len() as u32).to_le_bytes();
-
-        // Overwrite the initial 4B reserved before with the length of the payload.
-        dst[..4].copy_from_slice(&len_slice);
-
-        Ok(())
+impl<N: Network, E: Environment> Default for MessageCodec<N, E> {
+    fn default() -> Self {
+        Self {
+            codec: LengthDelimitedCodec::builder()
+                .max_frame_length(E::MAXIMUM_MESSAGE_SIZE)
+                .little_endian()
+                .new_codec(),
+            _phantoms: Default::default(),
+        }
     }
 }
 
-impl<N: Network, E: Environment> Decoder for Message<N, E> {
+impl<N: Network, E: Environment> Encoder<Message<N, E>> for MessageCodec<N, E> {
+    type Error = io::Error;
+
+    fn encode(&mut self, message: Message<N, E>, dst: &mut BytesMut) -> Result<(), Self::Error> {
+        // Serialize the payload directly into dst.
+        message
+            .serialize_into(&mut dst.writer())
+            // This error should never happen, the conversion is for greater compatibility.
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "serialization error"))?;
+
+        let serialized_message = dst.split_to(dst.len()).freeze();
+
+        self.codec.encode(serialized_message, dst)
+    }
+}
+
+impl<N: Network, E: Environment> Decoder for MessageCodec<N, E> {
     type Error = std::io::Error;
     type Item = Message<N, E>;
 
     fn decode(&mut self, source: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
-        // Ensure there is enough bytes to read the length marker.
-        if source.len() < 4 {
+        // Decode a frame containing bytes belonging to a message.
+        let bytes = if let Some(bytes) = self.codec.decode(source)? {
+            bytes
+        } else {
             return Ok(None);
-        }
-
-        // Read the length marker.
-        let mut length_bytes = [0u8; 4];
-        length_bytes.copy_from_slice(&source[..4]);
-        let length = u32::from_le_bytes(length_bytes) as usize;
-
-        // Check that the length is not too large to avoid a denial of
-        // service attack where the node server runs out of memory.
-        if length > E::MAXIMUM_MESSAGE_SIZE {
-            return Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("Frame of length {} is too large.", length),
-            ));
-        }
-
-        if source.len() < 4 + length {
-            // The full message has not yet arrived.
-            //
-            // We reserve more space in the buffer. This is not strictly
-            // necessary, but is a good idea performance-wise.
-            source.reserve(4 + length - source.len());
-
-            // We inform `Framed` that we need more bytes to form the next frame.
-            return Ok(None);
-        }
-
-        // Convert the buffer to a message, or fail if it is not valid.
-        let message = match Message::deserialize(&mut Cursor::new(&source[4..][..length])) {
-            Ok(message) => Ok(Some(message)),
-            Err(error) => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, error)),
         };
 
-        // Use `advance` to modify the source such that it no longer contains this frame.
-        source.advance(4 + length);
-
-        message
+        // Convert the bytes to a message, or fail if it is not valid.
+        match Message::deserialize(bytes) {
+            Ok(message) => Ok(Some(message)),
+            Err(error) => {
+                error!("Failed to deserialize a message: {}", error);
+                Err(io::ErrorKind::InvalidData.into())
+            }
+        }
     }
 }
