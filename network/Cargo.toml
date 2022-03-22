@@ -41,6 +41,7 @@ version = "1"
 [dependencies.snarkos-environment]
 path = "../environment"
 version = "2.0.2"
+features = [ "network" ]
 
 [dependencies.snarkos-metrics]
 path = "../metrics"

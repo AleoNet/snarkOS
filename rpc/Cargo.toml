@@ -48,7 +48,7 @@ version = "2.0.2"
 path = "../network"
 version = "2.0.2"
 
-[dependencies.snarkos-storage]
+[dev-dependencies.snarkos-storage]
 path = "../storage"
 version = "2.0.2"
 

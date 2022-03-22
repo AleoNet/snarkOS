@@ -33,10 +33,7 @@ version = "0.8"
 [dependencies.snarkos-environment]
 path = "../environment"
 version = "2.0.2"
-
-[dependencies.snarkos-network]
-path = "../network"
-version = "2.0.2"
+features = [ "network" ]
 
 [dependencies.snarkvm]
 version = "0.8.0"

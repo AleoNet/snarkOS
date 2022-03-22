@@ -15,13 +15,12 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_environment::{
-    helpers::{NodeType, State},
+    helpers::{BlockLocators, NodeType, State},
+    network::Data,
     Client,
     CurrentNetwork,
     Environment,
 };
-use snarkos_network::Data;
-use snarkos_storage::BlockLocators;
 use snarkos_synthetic_node::{ClientMessage, ClientState, SynthNode, MAXIMUM_FORK_DEPTH, MESSAGE_LENGTH_PREFIX_SIZE, MESSAGE_VERSION};
 use snarkvm::traits::Network;
 

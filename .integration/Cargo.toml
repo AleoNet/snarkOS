@@ -16,24 +16,27 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
+[features]
+test = [ "anyhow", "clap", "snarkos", "peak_alloc", "snarkos-metrics", "tracing-subscriber" ]
+
 [dependencies.anyhow]
 version = "1"
+optional = true
 
 [dependencies.async-trait]
 version = "0.1"
-
-[dependencies.bincode]
-version = "1"
 
 [dependencies.pea2pea]
 version = "0.34"
 
 [dependencies.peak_alloc]
 version = "0.1"
+optional = true
 
 [dependencies.snarkos]
 path = ".."
 version = "2.0.2"
+optional = true
 features = [ "test" ]
 
 [dependencies.snarkos-environment]
@@ -43,15 +46,7 @@ version = "2.0.2"
 [dependencies.snarkos-metrics]
 path = "../metrics"
 features = [ "test" ]
-
-[dependencies.snarkos-network]
-path = "../network"
-version = "2.0.2"
-features = [ "test" ]
-
-[dependencies.snarkos-storage]
-path = "../storage"
-version = "2.0.2"
+optional = true
 
 [dependencies.snarkos-synthetic-node]
 path = "../.synthetic_node"
@@ -63,6 +58,7 @@ version = "0.8.0"
 [dependencies.clap]
 version = "3.1"
 features = [ "derive" ]
+optional = true
 
 [dependencies.tokio]
 version = "1"
@@ -74,3 +70,4 @@ version = "0.1"
 [dependencies.tracing-subscriber]
 version = "0.3"
 features = [ "env-filter", "parking_lot" ]
+optional = true

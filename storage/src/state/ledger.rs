@@ -16,11 +16,8 @@
 
 #[cfg(any(test, feature = "test"))]
 use crate::storage::rocksdb::RocksDB;
-use crate::{
-    helpers::BlockLocators,
-    storage::{DataMap, Map, MapId, Storage},
-};
-use snarkos_environment::helpers::Resource;
+use crate::storage::{DataMap, Map, MapId, Storage};
+use snarkos_environment::helpers::{block_locators::*, Resource};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -38,13 +35,6 @@ use std::{
 };
 use time::OffsetDateTime;
 use tokio::sync::oneshot::{self, error::TryRecvError};
-
-/// The maximum number of linear block locators.
-pub const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 64;
-/// The maximum number of quadratic block locators.
-pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 32;
-/// The total maximum number of block locators.
-pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
 
 ///
 /// A helper struct containing transaction metadata.

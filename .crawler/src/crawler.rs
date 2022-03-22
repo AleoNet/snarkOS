@@ -18,11 +18,10 @@
 use crate::storage::PostgresOpts;
 use crate::{constants::*, known_network::KnownNetwork, metrics::NetworkMetrics};
 use snarkos_environment::{
-    helpers::{NodeType, State},
+    helpers::{BlockLocators, NodeType, State},
+    network::Data,
     CurrentNetwork,
 };
-use snarkos_network::Data;
-use snarkos_storage::BlockLocators;
 use snarkos_synthetic_node::{ClientMessage, SynthNode, MESSAGE_LENGTH_PREFIX_SIZE};
 use snarkvm::traits::Network;
 
