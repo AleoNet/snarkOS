@@ -58,7 +58,7 @@ commands:
             TEST_NAMES=$(circleci tests split test_names.txt)
             for i in $(echo $TEST_NAMES | sed "s/ / /g")
             do
-                RUST_MIN_STACK=8388608 cargo test $i
+                RUST_MIN_STACK=8388608 cargo test --features=<< parameters.features >> $i
             done
 
   install_rust_nightly:
