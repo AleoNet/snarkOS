@@ -2169,7 +2169,7 @@ dependencies = [
  "bytes",
  "fallible-iterator",
  "postgres-protocol",
- "time 0.3.7",
+ "time 0.3.9",
 ]
 
 [[package]]
@@ -2905,7 +2905,7 @@ dependencies = [
  "snarkos-metrics",
  "snarkos-synthetic-node",
  "snarkvm",
- "time 0.3.7",
+ "time 0.3.9",
  "tokio",
  "tokio-postgres",
  "tracing",
@@ -2976,7 +2976,7 @@ dependencies = [
  "snarkos-metrics",
  "snarkos-storage",
  "snarkvm",
- "time 0.3.7",
+ "time 0.3.9",
  "tokio",
  "tokio-stream",
  "tokio-util 0.7.0",
@@ -3003,7 +3003,7 @@ dependencies = [
  "snarkvm",
  "tempfile",
  "thiserror",
- "time 0.3.7",
+ "time 0.3.9",
  "tokio",
  "tracing",
 ]
@@ -3027,7 +3027,7 @@ dependencies = [
  "snarkos-storage",
  "snarkvm",
  "tempfile",
- "time 0.3.7",
+ "time 0.3.9",
  "tokio",
  "tracing",
 ]
@@ -3470,9 +3470,9 @@ dependencies = [
 
 [[package]]
 name = "time"
-version = "0.3.7"
+version = "0.3.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "004cbc98f30fa233c61a38bc77e96a9106e65c88f2d3bef182ae952027e5753d"
+checksum = "c2702e08a7a860f005826c6815dcac101b19b5eb330c27fe4a5928fec1d20ddd"
 dependencies = [
  "libc",
  "num_threads",
