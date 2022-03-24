@@ -91,7 +91,8 @@ impl<N: Network, E: Environment> Server<N, E> {
                     let _ = router.send(());
                     loop {
                         // Route a `Connect` request to the pool.
-                        peers.connect(pool_ip).await;
+                        // TODO: handle error?
+                        let _ = peers.connect(pool_ip).await;
 
                         // Sleep for `30` seconds.
                         tokio::time::sleep(std::time::Duration::from_secs(30)).await;
@@ -146,7 +147,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Sends a connection request to the given IP address.
     ///
     #[inline]
-    pub async fn connect_to(&self, peer_ip: SocketAddr) {
+    pub async fn connect_to(&self, peer_ip: SocketAddr) -> Result<()> {
         // Route a `Connect` request to the peer manager.
         self.network_state.peers.connect(peer_ip).await
     }
