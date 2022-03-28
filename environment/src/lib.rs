@@ -264,3 +264,16 @@ impl<N: Network> Environment for ProverTrial<N> {
     const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
     const COINBASE_IS_PUBLIC: bool = true;
 }
+
+#[derive(Clone, Debug, Default)]
+pub struct TestEnvironment<N: Network>(PhantomData<N>);
+
+#[rustfmt::skip]
+impl<N: Network> Environment for TestEnvironment<N> {
+    type Network = N;
+    const NODE_TYPE: NodeType = NodeType::Prover;
+    const SYNC_NODES: &'static [&'static str] = &[];
+    const MINIMUM_NUMBER_OF_PEERS: usize = 1;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 5;
+    const COINBASE_IS_PUBLIC: bool = true;
+}

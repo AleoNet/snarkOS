@@ -15,7 +15,8 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::common::spawn_test_node_with_nonce;
-use snarkos_integration::{wait_until, ClientNode, TestNode, MAXIMUM_NUMBER_OF_PEERS};
+use snarkos_environment::{CurrentNetwork, Environment, TestEnvironment};
+use snarkos_integration::{wait_until, ClientNode, TestNode};
 
 use pea2pea::Pea2Pea;
 use std::sync::{
@@ -147,6 +148,8 @@ async fn concurrent_duplicate_connection_attempts_fail() {
 async fn connection_limits_are_obeyed() {
     // Start a snarkOS node.
     let client_node = ClientNode::default().await;
+
+    const MAXIMUM_NUMBER_OF_PEERS: usize = TestEnvironment::<CurrentNetwork>::MAXIMUM_NUMBER_OF_PEERS as usize;
 
     // Start the maximum number of test nodes the snarkOS node is permitted to connect to at once.
     let mut test_nodes = Vec::with_capacity(MAXIMUM_NUMBER_OF_PEERS);
