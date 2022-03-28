@@ -23,11 +23,13 @@ use metrics_util::{
 
 pub struct TestMetrics(Snapshotter);
 
-impl TestMetrics {
-    pub fn new() -> Self {
+impl Default for TestMetrics {
+    fn default() -> Self {
         Self(crate::initialize())
     }
+}
 
+impl TestMetrics {
     pub fn get_val_for(&self, metric: &'static str) -> MetricVal {
         let key = CompositeKey::new(MetricKind::Gauge, Key::from_name(metric));
 

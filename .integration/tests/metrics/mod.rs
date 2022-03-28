@@ -22,7 +22,7 @@ use pea2pea::Pea2Pea;
 #[tokio::test]
 async fn metrics_initialization() {
     // Initialise the metrics, we need to call this manually in tests.
-    let metrics = metrics::TestMetrics::new();
+    let metrics = metrics::TestMetrics::default();
 
     // Verify the metrics have been properly initialised, expect the block height to be set.
     assert_eq!(metrics.get_val_for(metrics::blocks::HEIGHT), metrics::MetricVal::Gauge(0.0));
@@ -37,7 +37,7 @@ async fn connect_disconnect() {
     let test_node = TestNode::default().await;
 
     // Initialise the metrics, we need to call this manually in tests.
-    let metrics = metrics::TestMetrics::new();
+    let metrics = metrics::TestMetrics::default();
 
     // Start a snarkOS node.
     let client_node = ClientNode::default().await;
@@ -57,7 +57,7 @@ async fn connect_disconnect() {
         // Shut down the node, force a disconnect.
         test_node.node().disconnect(client_node.local_addr()).await;
 
-        wait_until!(1, client_node.connected_peers().await.len() == 0);
+        wait_until!(1, client_node.connected_peers().await.is_empty());
 
         // Check the metrics.
         assert_eq!(metrics.get_val_for(metrics::peers::CONNECTED), metrics::MetricVal::Gauge(0.0));

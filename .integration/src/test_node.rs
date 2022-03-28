@@ -54,7 +54,7 @@ pub struct TestNode(SynthNode);
 
 impl Pea2Pea for TestNode {
     fn node(&self) -> &Pea2PeaNode {
-        &self.0.node()
+        self.0.node()
     }
 }
 
