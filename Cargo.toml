@@ -67,6 +67,10 @@ features = [
   "compression-flate2"
 ]
 
+[dev-dependencies.snarkos]
+path = "."
+features = [ "test" ] # a workaround to use the `test` feature in tests by default
+
 [dependencies.snarkos-environment]
 path = "./environment"
 version = "2.0.2"

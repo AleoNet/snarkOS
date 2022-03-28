@@ -19,6 +19,10 @@ edition = "2021"
 [features]
 test = [ "anyhow", "clap", "snarkos", "peak_alloc", "snarkos-metrics", "tracing-subscriber" ]
 
+[dev-dependencies.snarkos-integration]
+path = "."
+features = [ "test" ] # a workaround to use the `test` feature in tests by default
+
 [dependencies.anyhow]
 version = "1"
 optional = true
