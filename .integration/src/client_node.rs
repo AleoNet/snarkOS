@@ -36,6 +36,11 @@ impl ClientNode {
         self.server.peers().connected_peers().await
     }
 
+    /// Returns the number of connected peers of the node.
+    pub async fn number_of_connected_peers(&self) -> usize {
+        self.server.peers().number_of_connected_peers().await
+    }
+
     /// Resets the node's known peers. This is practical, as it makes the node not reconnect
     /// to known peers in test cases where it's undesirable.
     pub async fn reset_known_peers(&self) {
