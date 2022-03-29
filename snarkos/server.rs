@@ -17,6 +17,7 @@
 use crate::{display::notification_message, Node};
 use snarkos_environment::{
     helpers::{NodeType, State},
+    network::DisconnectReason,
     Environment,
 };
 use snarkos_network::{
@@ -232,6 +233,11 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Wait until the connection task is initialized.
         handler.await.map(|_| ()).map_err(|e| e.into())
+    }
+
+    #[inline]
+    pub async fn disconnect_from(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
+        self.ledger.disconnect(peer_ip, reason).await
     }
 
     ///

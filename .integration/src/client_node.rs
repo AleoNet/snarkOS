@@ -16,7 +16,7 @@
 
 use clap::Parser;
 use snarkos::Server;
-use snarkos_environment::{CurrentNetwork, TestEnvironment};
+use snarkos_environment::{network::DisconnectReason, CurrentNetwork, TestEnvironment};
 
 use std::{fs, net::SocketAddr};
 
@@ -50,6 +50,11 @@ impl ClientNode {
     /// Attempts to connect the node to the given address.
     pub async fn connect(&self, addr: SocketAddr) -> anyhow::Result<()> {
         self.server.connect_to(addr).await
+    }
+
+    /// Disonnects the node from the given address.
+    pub async fn disconnect(&self, addr: SocketAddr) {
+        self.server.disconnect_from(addr, DisconnectReason::NoReasonGiven).await
     }
 
     /// Starts a snarkOS node with all the default characteristics from `ClientNode::with_args`.
