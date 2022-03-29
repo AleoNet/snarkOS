@@ -76,7 +76,7 @@ impl TestNode {
 
         let pea2pea_node = Pea2PeaNode::new(Some(config)).await.unwrap();
         let client_state = Default::default();
-        let node = TestNode(SynthNode::new(pea2pea_node, client_state));
+        let node = TestNode::new(pea2pea_node, client_state);
         node.enable_disconnect().await;
         node.enable_handshake().await;
         node.enable_reading().await;
