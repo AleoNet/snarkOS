@@ -14,7 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_integration::{wait_until, ClientNode};
+use pea2pea::{protocols::Writing, Pea2Pea};
+use snarkos_environment::network::Message;
+use snarkos_integration::{wait_until, ClientNode, TestNode};
 
 use std::time::{Duration, Instant};
 
@@ -63,4 +65,34 @@ async fn measure_connection_time() {
 
     // Display the result.
     println!("snarkOS connection time: {:?}", avg_conn_time);
+}
+
+#[tokio::test]
+#[ignore = "this test is purely informational; latest result: ~2ms"]
+async fn measure_peer_request_time() {
+    const NUM_ITERATIONS: usize = 10;
+    let mut avg_request_time = Duration::default();
+
+    let test_node = TestNode::default().await;
+    let client_node = ClientNode::default().await;
+    let client_addr = client_node.local_addr();
+    test_node.node().connect(client_addr).await.unwrap();
+    wait_until!(1, client_node.number_of_connected_peers().await == 1);
+    wait_until!(1, test_node.node().stats().received().0 as usize == 1);
+
+    let init_recv_count = test_node.node().stats().received().0 as usize;
+    for i in 0..NUM_ITERATIONS {
+        let start = Instant::now();
+        test_node
+            .send_direct_message(client_addr, Message::PeerRequest)
+            .unwrap()
+            .await
+            .unwrap();
+        wait_until!(1, test_node.node().stats().received().0 as usize == init_recv_count + i + 1);
+        avg_request_time += start.elapsed();
+    }
+    avg_request_time /= NUM_ITERATIONS as u32;
+
+    // Display the result.
+    println!("snarkOS peer request time: {:?}", avg_request_time);
 }
