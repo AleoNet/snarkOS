@@ -16,6 +16,7 @@
 
 use crate::common::display_bytes;
 use snarkos_integration::{wait_until, ClientNode, TestNode};
+use snarkvm::dpc::Network;
 
 use pea2pea::Pea2Pea;
 use peak_alloc::PeakAlloc;
@@ -25,8 +26,11 @@ use peak_alloc::PeakAlloc;
 static PEAK_ALLOC: PeakAlloc = PeakAlloc;
 
 #[tokio::test]
-#[ignore = "this test is purely informational; latest result: 159.81 MB"]
+#[ignore = "this test is purely informational; latest result: 11.73 MB"]
 async fn measure_node_overhead() {
+    // It takes a lot of memory to set up the snarkVM bits related to the Network, so filter it out.
+    let _genesis_block = snarkos_environment::CurrentNetwork::genesis_block();
+
     // Register initial memory use.
     let initial_mem = PEAK_ALLOC.current_usage();
 
@@ -41,7 +45,8 @@ async fn measure_node_overhead() {
 }
 
 #[tokio::test]
-#[ignore = "TODO@ljedrz: no obvious leaks anymore; investigate larger conn counts and a Ping workaround"]
+// TODO@ljedrz: investigate larger connection counts
+// latest result: 46.37 KB
 async fn inbound_connect_and_disconnect_doesnt_leak() {
     // Start a test node.
     let test_node = TestNode::default().await;
@@ -70,24 +75,19 @@ async fn inbound_connect_and_disconnect_doesnt_leak() {
             // Measure memory use caused by the 1st connect and disconnect.
             first_conn_mem = Some(PEAK_ALLOC.current_usage());
             println!(
-                "Memory increase after a single outbound connection: {}",
+                "Memory increase after a single inbound connection: {}",
                 display_bytes((first_conn_mem.unwrap() - pre_connection_mem) as f64)
             );
         }
     }
 
-    // Sleeping here for a time a few seconds more than `PING_SLEEP_IN_SECS` results in a pass, as expected.
-
-    // Measure memory use after the repeated connections.
-    let final_mem = PEAK_ALLOC.current_usage();
-
     // Check if there is a connection-related leak.
-    let leaked_mem = final_mem.saturating_sub(first_conn_mem.unwrap());
-    assert_eq!(leaked_mem, 0);
+    wait_until!(3, PEAK_ALLOC.current_usage().saturating_sub(first_conn_mem.unwrap()) == 0);
 }
 
 #[tokio::test]
-#[ignore = "TODO@ljedrz: no obvious leaks anymore; investigate larger conn counts and a Ping workaround"]
+// TODO@ljedrz: investigate larger connection counts
+// latest result: 46.01 KB
 async fn outbound_connect_and_disconnect_doesnt_leak() {
     // Start a snarkOS node.
     let client_node = ClientNode::default().await;
@@ -124,32 +124,28 @@ async fn outbound_connect_and_disconnect_doesnt_leak() {
         }
     }
 
-    // Sleeping here for a time a few seconds more than `PING_SLEEP_IN_SECS` results in a pass, as expected.
-
-    // Measure memory use after the repeated connections.
-    let final_mem = PEAK_ALLOC.current_usage();
-
     // Check if there is a connection-related leak.
-    let leaked_mem = final_mem.saturating_sub(first_conn_mem.unwrap());
-    assert_eq!(leaked_mem, 0);
+    wait_until!(3, PEAK_ALLOC.current_usage().saturating_sub(first_conn_mem.unwrap()) == 0);
 }
 
 #[tokio::test]
 #[ignore = "TODO: currently fails"]
 async fn node_shutdown_doesnt_leak() {
+    tracing_subscriber::fmt::init();
+
+    // It takes a lot of memory to set up the snarkVM bits related to the Network, so filter it out.
+    let _genesis_block = snarkos_environment::CurrentNetwork::genesis_block();
+
     // Register initial memory use.
     let initial_mem = PEAK_ALLOC.current_usage();
 
     // Start a snarkOS node.
     let client_node = ClientNode::default().await;
 
-    // Trigger `Server::shut_down` via the `Drop` impl.
+    // Perform a full shutdown and cleanup.
+    client_node.shut_down().await;
     drop(client_node);
 
-    // Measure memory use after the shutdown.
-    let final_mem = PEAK_ALLOC.current_usage();
-
     // Check if there are any leaks.
-    let leaked_mem = final_mem.saturating_sub(initial_mem);
-    assert_eq!(leaked_mem, 0);
+    wait_until!(3, PEAK_ALLOC.current_usage().saturating_sub(initial_mem) == 0);
 }

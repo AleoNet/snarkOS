@@ -61,8 +61,8 @@ pub(crate) struct Peer<N: Network, E: Environment> {
     node_type: NodeType,
     /// The node type of the peer.
     status: Status,
-    /// The block header of the peer.
-    block_header: BlockHeader<N>,
+    /// The block height of the peer.
+    block_height: u32,
     /// The timestamp of the last message received from this peer.
     last_seen: Instant,
     /// The TCP socket that handles sending and receiving data with this peer.
@@ -128,7 +128,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             version: 0,
             node_type,
             status,
-            block_header: N::genesis_block().header().clone(),
+            block_height: 0,
             last_seen: Instant::now(),
             outbound_socket,
             outbound_handler,
@@ -571,8 +571,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                                 break;
                                             }
 
-                                            // Update the block header of the peer.
-                                            peer.block_header = block_header;
+                                            // Update peer's block height.
+                                            peer.block_height = block_header.height();
                                         }
                                         Err(error) => warn!("[Ping] {}", error),
                                     }
@@ -585,7 +585,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     peer.status.update(status);
 
                                     // Determine if the peer is on a fork (or unknown).
-                                    let is_fork = match ledger_reader.get_block_hash(peer.block_header.height()) {
+                                    let is_fork = match ledger_reader.get_block_hash(peer.block_height) {
                                         Ok(expected_block_hash) => Some(expected_block_hash != block_hash),
                                         Err(_) => None,
                                     };

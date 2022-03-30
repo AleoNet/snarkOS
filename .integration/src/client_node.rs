@@ -64,16 +64,16 @@ impl ClientNode {
 
         ClientNode { server }
     }
+
+    pub async fn shut_down(&self) {
+        self.server.shut_down().await;
+    }
 }
 
 // Remove the storage artifacts after each test.
 impl Drop for ClientNode {
     fn drop(&mut self) {
         // TODO (howardwu): @ljedrz to implement a wrapping scope for Display within Node/Server.
-        #[allow(unused_must_use)]
-        {
-            self.server.shut_down();
-        }
 
         let db_path = format!("/tmp/snarkos-test-ledger-{}", self.local_addr().port());
         assert!(

@@ -103,10 +103,15 @@ impl Resources {
             while let Some(request) = receiver.recv().await {
                 match request {
                     ResourceRequest::Register(resource, id) => {
+                        let resource_name = match resource {
+                            Resource::Task(..) => "task",
+                            Resource::Thread(..) => "thread",
+                        };
+
                         if resources.insert(id, resource).is_some() {
-                            error!("A resource with the id {} already exists!", id);
+                            error!("A resource with id {} already exists!", id);
                         } else {
-                            trace!("Registered a resource under the id {}", id);
+                            trace!("Registered a {} as resource {}", resource_name, id);
                         }
                     }
                     ResourceRequest::Deregister(id) => {
@@ -115,11 +120,11 @@ impl Resources {
                             // to-be-aborted task to free its resources.
                             tokio::spawn(async move {
                                 sleep(Duration::from_secs(1)).await;
-                                trace!("Aborting resource with the id {}", id);
+                                trace!("Aborting resource with id {}", id);
                                 resource.abort().await;
                             });
                         } else {
-                            error!("Resource with the id {} was not found", id);
+                            error!("Resource with id {} was not found", id);
                         }
                     }
                     ResourceRequest::Shutdown => break,
@@ -136,7 +141,12 @@ impl Resources {
                     }
                 }
             }
-            for resource in resources.into_values() {
+
+            let mut resources = resources.into_iter().collect::<Vec<_>>();
+            resources.sort_unstable_by_key(|(id, _res)| *id);
+
+            for (id, resource) in resources.into_iter().rev() {
+                trace!("Aborting resource with id {}", id);
                 resource.abort().await;
             }
         });
