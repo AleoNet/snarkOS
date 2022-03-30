@@ -82,7 +82,7 @@ checksum = "2b85aed1b7ca965b6613d14ab243c746316180401cbb9ba3b2cb22bff16fc08f"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
 ]
 
 [[package]]
@@ -149,7 +149,7 @@ checksum = "ed6aa3524a2dfcf9fe180c51eae2b58738348d819517ceadf95789c51fff7600"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
 ]
 
 [[package]]
@@ -513,7 +513,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
 ]
 
 [[package]]
@@ -809,7 +809,7 @@ checksum = "fcc3dd5e9e9c0b295d6e1e4d811fb6f157d5ffd784b8d202fc62eac8035a770b"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
 ]
 
 [[package]]
@@ -1053,7 +1053,7 @@ checksum = "33c1e13800337f4d4d7a316bf45a567dbcb6ffe087f16424852d97e97a91f512"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
 ]
 
 [[package]]
@@ -1647,7 +1647,7 @@ checksum = "49e30813093f757be5cf21e50389a24dc7dbb22c49f23b7e8f51d69b508a5ffa"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
 ]
 
 [[package]]
@@ -1753,14 +1753,14 @@ checksum = "01fcc0b8149b4632adc89ac3b7b31a12fb6099a0317a4eb2ebff574ef7de7218"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
 ]
 
 [[package]]
 name = "native-tls"
-version = "0.2.9"
+version = "0.2.10"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "09bf6f32a3afefd0b587ee42ed19acd945c6d1f3b5424040f50b2f24ab16be77"
+checksum = "fd7e2f3618557f980e0b17e8856252eee3c97fa12c54dff0ca290fb6266ca4a9"
 dependencies = [
  "lazy_static",
  "libc",
@@ -2196,7 +2196,7 @@ dependencies = [
  "proc-macro-error-attr",
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
  "version_check",
 ]
 
@@ -2509,7 +2509,7 @@ checksum = "43ce8670a1a1d0fc2514a3b846dacdb65646f9bd494b6674cfacbb4ce430bd7e"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
 ]
 
 [[package]]
@@ -2716,7 +2716,7 @@ checksum = "08597e7152fcd306f41838ed3e37be9eaeed2b61c42e2117266a554fab4662f9"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
 ]
 
 [[package]]
@@ -2928,7 +2928,7 @@ dependencies = [
  "snarkvm",
  "tokio",
  "tokio-metrics",
- "tokio-util 0.7.0",
+ "tokio-util 0.7.1",
  "tracing",
  "tracing-subscriber",
 ]
@@ -2980,7 +2980,7 @@ dependencies = [
  "time 0.3.9",
  "tokio",
  "tokio-stream",
- "tokio-util 0.7.0",
+ "tokio-util 0.7.1",
  "tracing",
 ]
 
@@ -3117,7 +3117,7 @@ dependencies = [
  "proc-macro-error",
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
 ]
 
 [[package]]
@@ -3364,9 +3364,9 @@ dependencies = [
 
 [[package]]
 name = "syn"
-version = "1.0.89"
+version = "1.0.90"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ea297be220d52398dcc07ce15a209fce436d361735ac1db700cab3b6cdfb9f54"
+checksum = "704df27628939572cd88d33f171cd6f896f4eaca85252c6e0a72d8d8287ee86f"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
@@ -3447,7 +3447,7 @@ checksum = "aa32fd3f627f367fe16f893e2597ae3c05020f8bba2666a4e6ea73d377e5714b"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
 ]
 
 [[package]]
@@ -3532,7 +3532,7 @@ checksum = "b557f72f448c511a979e2564e55d74e6c4432fc96ff4f6241bc6bded342643b7"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
 ]
 
 [[package]]
@@ -3617,16 +3617,16 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "64910e1b9c1901aaf5375561e35b9c057d95ff41a44ede043a03e09279eabaf1"
+checksum = "0edfdeb067411dba2044da6d1cb2df793dd35add7888d73c16e3381ded401764"
 dependencies = [
  "bytes",
  "futures-core",
  "futures-sink",
- "log",
  "pin-project-lite",
  "tokio",
+ "tracing",
 ]
 
 [[package]]
@@ -3664,7 +3664,7 @@ checksum = "2e65ce065b4b5c53e73bb28912318cb8c9e9ad3921f1d669eb0e68b4c8143a2b"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
 ]
 
 [[package]]
@@ -3876,7 +3876,7 @@ dependencies = [
  "log",
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
  "wasm-bindgen-shared",
 ]
 
@@ -3910,7 +3910,7 @@ checksum = "bfa8a30d46208db204854cadbb5d4baf5fcf8071ba5bf48190c3e59937962ebc"
 dependencies = [
  "proc-macro2 1.0.36",
  "quote 1.0.17",
- "syn 1.0.89",
+ "syn 1.0.90",
  "wasm-bindgen-backend",
  "wasm-bindgen-shared",
 ]
