@@ -15,8 +15,15 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use pea2pea::{protocols::Writing, Pea2Pea};
-use snarkos_environment::network::Message;
+use snarkos_environment::{
+    helpers::{NodeType, State},
+    network::{Data, Message},
+    Client,
+    CurrentNetwork,
+    Environment,
+};
 use snarkos_integration::{wait_until, ClientNode, TestNode};
+use snarkvm::dpc::traits::network::Network;
 
 use std::time::{Duration, Instant};
 
@@ -95,4 +102,39 @@ async fn measure_peer_request_time() {
 
     // Display the result.
     println!("snarkOS peer request time: {:?}", avg_request_time);
+}
+
+#[tokio::test]
+#[ignore = "this test is purely informational; latest result: ~55ms"]
+async fn measure_ping_time() {
+    const NUM_ITERATIONS: usize = 10;
+    let mut avg_request_time = Duration::default();
+
+    let test_node = TestNode::default().await;
+    let client_node = ClientNode::default().await;
+    let client_addr = client_node.local_addr();
+    test_node.node().connect(client_addr).await.unwrap();
+    wait_until!(1, client_node.number_of_connected_peers().await == 1);
+    wait_until!(1, test_node.node().stats().received().0 as usize == 1);
+
+    let ping = Message::Ping(
+        <Client<CurrentNetwork>>::MESSAGE_VERSION,
+        CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH,
+        NodeType::Client,
+        State::Ready,
+        CurrentNetwork::genesis_block().hash(),
+        Data::Object(CurrentNetwork::genesis_block().header().clone()),
+    );
+
+    let init_recv_count = test_node.node().stats().received().0 as usize;
+    for i in 0..NUM_ITERATIONS {
+        let start = Instant::now();
+        test_node.send_direct_message(client_addr, ping.clone()).unwrap().await.unwrap();
+        wait_until!(1, test_node.node().stats().received().0 as usize == init_recv_count + i + 1);
+        avg_request_time += start.elapsed();
+    }
+    avg_request_time /= NUM_ITERATIONS as u32;
+
+    // Display the result.
+    println!("snarkOS ping time: {:?}", avg_request_time);
 }
