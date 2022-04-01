@@ -33,6 +33,9 @@ use snarkos_environment::{
 };
 use snarkvm::dpc::prelude::*;
 
+#[cfg(any(feature = "test", feature = "prometheus"))]
+use snarkos_metrics as metrics;
+
 use anyhow::{anyhow, bail, Result};
 use futures::SinkExt;
 use std::{
@@ -457,6 +460,10 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     peer.last_seen = Instant::now();
                                 }
                             }
+
+                            #[cfg(any(feature = "test", feature = "prometheus"))]
+                            let rtt_start = Instant::now();
+
                             // Process the message.
                             trace!("Received '{}' from {}", message.name(), peer_ip);
                             match message {
@@ -589,6 +596,12 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         Ok(expected_block_hash) => Some(expected_block_hash != block_hash),
                                         Err(_) => None,
                                     };
+
+
+                                    // Stop the clock on internal RTT.
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    metrics::histogram!(metrics::internal_rtt::PING, rtt_start.elapsed());
+
                                     // Send a `Pong` message to the peer.
                                     if let Err(error) = peer.send(Message::Pong(is_fork, Data::Object(ledger_reader.latest_block_locators()))).await {
                                         warn!("[Pong] {}", error);
