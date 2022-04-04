@@ -434,6 +434,13 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
                                     is_ready_to_send
                                 }
+                                Message::PeerResponse(_, _rtt_start) => {
+                                    // Stop the clock on internal RTT.
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    metrics::histogram!(metrics::internal_rtt::PEERS_REQUEST, _rtt_start.expect("rtt should be present with metrics enabled").elapsed());
+
+                                    true
+                                }
                                 _ => true,
                             };
                             // Send the message if it is ready.
@@ -549,15 +556,11 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         warn!("[PeerRequest] {}", error);
                                     }
                                 }
-                                Message::PeerResponse(peer_ips, _rtt_start) => {
+                                Message::PeerResponse(peer_ips, _) => {
                                     // Adds the given peer IPs to the list of candidate peers.
                                     if let Err(error) = peers_router.send(PeersRequest::ReceivePeerResponse(peer_ips)).await {
                                         warn!("[PeerResponse] {}", error);
                                     }
-
-                                    // Stop the clock on internal RTT.
-                                    #[cfg(any(feature = "test", feature = "prometheus"))]
-                                    metrics::histogram!(metrics::internal_rtt::PEERS_REQUEST, _rtt_start.expect("rtt should be present with metrics enabled").elapsed());
                                 }
                                 Message::Ping(version, fork_depth, node_type, status, block_hash, block_header) => {
                                     // Ensure the message protocol version is not outdated.
