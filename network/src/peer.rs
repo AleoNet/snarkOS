@@ -497,6 +497,10 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                             break;
                                         }
                                     }
+
+                                    // Stop the clock on internal RTT.
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    metrics::histogram!(metrics::internal_rtt::BLOCK_REQUEST, rtt_start.elapsed());
                                 },
                                 Message::BlockResponse(block) => {
                                     // Perform the deferred non-blocking deserialization of the block.
@@ -596,7 +600,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         Ok(expected_block_hash) => Some(expected_block_hash != block_hash),
                                         Err(_) => None,
                                     };
-
 
                                     // Stop the clock on internal RTT.
                                     #[cfg(any(feature = "test", feature = "prometheus"))]
