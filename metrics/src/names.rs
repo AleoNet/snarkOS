@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 pub const GAUGE_NAMES: [&str; 4] = [blocks::HEIGHT, peers::CONNECTED, peers::CANDIDATE, peers::RESTRICTED];
-pub const HISTOGRAM_NAMES: [&str; 2] = [internal_rtt::PING, internal_rtt::PONG];
+pub const HISTOGRAM_NAMES: [&str; 3] = [internal_rtt::PING, internal_rtt::PONG, internal_rtt::BLOCK_REQUEST];
 
 pub mod blocks {
     pub const HEIGHT: &str = "snarkos_blocks_height_total";
@@ -30,4 +30,5 @@ pub mod peers {
 pub mod internal_rtt {
     pub const PING: &str = "snarkos_internal_rtt_ping";
     pub const PONG: &str = "snarkos_internal_rtt_pong";
+    pub const BLOCK_REQUEST: &str = "snarkos_internal_rtt_block_request";
 }
