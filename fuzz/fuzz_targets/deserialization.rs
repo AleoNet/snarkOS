@@ -3,6 +3,11 @@ use libfuzzer_sys::fuzz_target;
 
 use snarkos_environment::{network::Message, Client, CurrentNetwork};
 
+// This fuzz target tests network message deserialization, including
+// the deferred deserialization of the heavier objects.
+
+// To start fuzzing, run `cargo +nightly fuzz run deserialization`.
+
 fuzz_target!(|message: &[u8]| {
     if let Ok(message) = Message::<CurrentNetwork, Client<CurrentNetwork>>::deserialize(message.into()) {
         match message {
