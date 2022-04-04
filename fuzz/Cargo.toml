@@ -22,13 +22,13 @@ features = [ "network" ]
 members = ["."]
 
 [[bin]]
-name = "fuzz_target_1"
-path = "fuzz_targets/fuzz_target_1.rs"
+name = "network"
+path = "fuzz_targets/network.rs"
 test = false
 doc = false
 
 [[bin]]
-name = "fuzz_target_2"
-path = "fuzz_targets/fuzz_target_2.rs"
+name = "deserialization"
+path = "fuzz_targets/deserialization.rs"
 test = false
 doc = false
