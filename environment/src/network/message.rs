@@ -27,6 +27,7 @@ use std::{
     io::{Cursor, Seek, Write},
     marker::PhantomData,
     net::SocketAddr,
+    time::Instant,
 };
 use tokio::task;
 use tokio_util::codec::{Decoder, Encoder};
@@ -125,7 +126,7 @@ pub enum Message<N: Network, E: Environment> {
     /// PeerRequest := ()
     PeerRequest,
     /// PeerResponse := (\[peer_ip\])
-    PeerResponse(Vec<SocketAddr>),
+    PeerResponse(Vec<SocketAddr>, Option<Instant>),
     /// Ping := (version, fork_depth, node_type, status, block_hash, block_header)
     Ping(u32, u32, NodeType, State, N::BlockHash, Data<BlockHeader<N>>),
     /// Pong := (is_fork, block_locators)
@@ -208,7 +209,7 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::ChallengeResponse(block_header) => Ok(block_header.serialize_blocking_into(writer)?),
             Self::Disconnect(reason) => Ok(bincode::serialize_into(writer, reason)?),
             Self::PeerRequest => Ok(()),
-            Self::PeerResponse(peer_ips) => Ok(bincode::serialize_into(writer, peer_ips)?),
+            Self::PeerResponse(peer_ips, _) => Ok(bincode::serialize_into(writer, peer_ips)?),
             Self::Ping(version, fork_depth, node_type, status, block_hash, block_header) => {
                 bincode::serialize_into(&mut *writer, &(version, fork_depth, node_type, status, block_hash))?;
                 block_header.serialize_blocking_into(writer)
@@ -297,7 +298,7 @@ impl<N: Network, E: Environment> Message<N, E> {
                     false => return Err(anyhow!("Invalid 'PeerRequest' message: {:?}", data)),
                 }
             }
-            6 => Self::PeerResponse(bincode::deserialize_from(&mut *reader)?),
+            6 => Self::PeerResponse(bincode::deserialize_from(&mut *reader)?, None),
             7 => {
                 let (version, fork_depth, node_type, status, block_hash) = bincode::deserialize_from(&mut *reader)?;
                 let block_header = Data::Buffer(read_to_end(&mut *reader)?);
