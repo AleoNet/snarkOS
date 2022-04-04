@@ -608,10 +608,17 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 },
                                 Message::Pong(is_fork, block_locators) => {
+                                    // Unfortunately can't be feature-flagged because of the enum
+                                    // it's passed around in.
+                                    let _rtt_start_instant: Option<Instant> = None;
+
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    let _rtt_start_instant = Some(rtt_start);
+
                                     // Perform the deferred non-blocking deserialization of block locators.
                                     let request = match block_locators.deserialize().await {
                                         // Route the `Pong` to the ledger.
-                                        Ok(block_locators) => LedgerRequest::Pong(peer_ip, peer.node_type, peer.status.get(), is_fork, block_locators),
+                                        Ok(block_locators) => LedgerRequest::Pong(peer_ip, peer.node_type, peer.status.get(), is_fork, block_locators, _rtt_start_instant),
                                         // Route the `Failure` to the ledger.
                                         Err(error) => LedgerRequest::Failure(peer_ip, format!("{}", error)),
                                     };
@@ -639,6 +646,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }
+
 
                                         E::resources().deregister(ping_resource_id);
                                     }));
