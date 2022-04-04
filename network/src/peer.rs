@@ -475,6 +475,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             trace!("Received '{}' from {}", message.name(), peer_ip);
                             match message {
                                 Message::BlockRequest(start_block_height, end_block_height) => {
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    metrics::increment_counter!(metrics::message_counts::BLOCK_REQUEST);
+
                                     // Ensure the request is within the accepted limits.
                                     let number_of_blocks = end_block_height.saturating_sub(start_block_height);
                                     if number_of_blocks > E::MAXIMUM_BLOCK_REQUEST {
@@ -510,6 +513,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     metrics::histogram!(metrics::internal_rtt::BLOCK_REQUEST, rtt_start.elapsed());
                                 },
                                 Message::BlockResponse(block) => {
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    metrics::increment_counter!(metrics::message_counts::BLOCK_RESPONSE);
+
                                     // Perform the deferred non-blocking deserialization of the block.
                                     match block.deserialize().await {
                                         Ok(block) => {
@@ -540,10 +546,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     break;
                                 },
                                 Message::Disconnect(reason) => {
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    metrics::increment_counter!(metrics::message_counts::DISCONNECT);
+
                                     debug!("Peer {} disconnected for the following reason: {:?}", peer_ip, reason);
                                     break;
                                 },
                                 Message::PeerRequest => {
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    metrics::increment_counter!(metrics::message_counts::PEER_REQUEST);
+
                                     // Unfortunately can't be feature-flagged because of the enum
                                     // it's passed around in.
                                     let _rtt_start_instant: Option<Instant> = None;
@@ -557,12 +569,18 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::PeerResponse(peer_ips, _) => {
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    metrics::increment_counter!(metrics::message_counts::PEER_RESPONSE);
+
                                     // Adds the given peer IPs to the list of candidate peers.
                                     if let Err(error) = peers_router.send(PeersRequest::ReceivePeerResponse(peer_ips)).await {
                                         warn!("[PeerResponse] {}", error);
                                     }
                                 }
                                 Message::Ping(version, fork_depth, node_type, status, block_hash, block_header) => {
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    metrics::increment_counter!(metrics::message_counts::PING);
+
                                     // Ensure the message protocol version is not outdated.
                                     if version < E::MESSAGE_VERSION {
                                         warn!("Dropping {} on version {} (outdated)", peer_ip, version);
@@ -625,6 +643,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 },
                                 Message::Pong(is_fork, block_locators) => {
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    metrics::increment_counter!(metrics::message_counts::PONG);
+
                                     // Unfortunately can't be feature-flagged because of the enum
                                     // it's passed around in.
                                     let _rtt_start_instant: Option<Instant> = None;
@@ -668,6 +689,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }));
                                 }
                                 Message::UnconfirmedBlock(block_height, block_hash, block) => {
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    metrics::increment_counter!(metrics::message_counts::UNCONFIRMED_BLOCK);
+
                                     // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
                                     let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
                                     if frequency >= 10 {
@@ -721,6 +745,9 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                 }
                                 Message::UnconfirmedTransaction(transaction) => {
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    metrics::increment_counter!(metrics::message_counts::UNCONFIRMED_TRANSACTION);
+
                                     // Drop the peer, if they have sent more than 500 unconfirmed transactions in the last 5 seconds.
                                     let frequency = peer.seen_inbound_transactions.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
                                     if frequency >= 500 {
