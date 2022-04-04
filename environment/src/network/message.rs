@@ -252,7 +252,7 @@ impl<N: Network, E: Environment> Message<N, E> {
     /// Deserializes the given buffer into a message.
     #[inline]
     pub fn deserialize(mut bytes: BytesMut) -> Result<Self> {
-        // Make sure there is an id available.
+        // Ensure there is at least a message ID in the buffer.
         if bytes.remaining() < 2 {
             bail!("Missing message ID");
         }
@@ -381,10 +381,9 @@ impl<N: Network, E: Environment> Decoder for MessageCodec<N, E> {
 
     fn decode(&mut self, source: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // Decode a frame containing bytes belonging to a message.
-        let bytes = if let Some(bytes) = self.codec.decode(source)? {
-            bytes
-        } else {
-            return Ok(None);
+        let bytes = match self.codec.decode(source)? {
+            Some(bytes) => bytes,
+            None => return Ok(None),
         };
 
         // Convert the bytes to a message, or fail if it is not valid.
