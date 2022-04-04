@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub const GAUGE_NAMES: [&str; 4] = [blocks::HEIGHT, peers::CONNECTED, peers::CANDIDATE, peers::RESTRICTED];
-pub const HISTOGRAM_NAMES: [&str; 4] = [
+pub const GAUGES: [&str; 4] = [blocks::HEIGHT, peers::CONNECTED, peers::CANDIDATE, peers::RESTRICTED];
+pub const HISTOGRAMS: [&str; 4] = [
     internal_rtt::PING,
     internal_rtt::PONG,
     internal_rtt::PEER_REQUEST,
