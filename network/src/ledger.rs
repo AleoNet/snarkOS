@@ -71,7 +71,7 @@ pub enum LedgerRequest<N: Network> {
     /// Heartbeat := (prover_router)
     Heartbeat(ProverRouter<N>),
     /// Pong := (peer_ip, node_type, status, is_fork, block_locators)
-    Pong(SocketAddr, NodeType, State, Option<bool>, BlockLocators<N>),
+    Pong(SocketAddr, NodeType, State, Option<bool>, BlockLocators<N>, Option<Instant>),
     /// UnconfirmedBlock := (peer_ip, block, prover_router)
     UnconfirmedBlock(SocketAddr, Block<N>, ProverRouter<N>),
 }
@@ -251,11 +251,18 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     connected_peers,
                 );
             }
-            LedgerRequest::Pong(peer_ip, node_type, status, is_fork, block_locators) => {
+            LedgerRequest::Pong(peer_ip, node_type, status, is_fork, block_locators, _rtt_start) => {
                 // Ensure the peer has been initialized in the ledger.
                 self.initialize_peer(peer_ip).await;
                 // Process the pong.
                 self.update_peer(peer_ip, node_type, status, is_fork, block_locators).await;
+
+                // Stop the clock on internal RTT.
+                #[cfg(any(feature = "test", feature = "prometheus"))]
+                metrics::histogram!(
+                    metrics::internal_rtt::PONG,
+                    _rtt_start.expect("rtt should be present with metrics enabled").elapsed()
+                );
             }
             LedgerRequest::UnconfirmedBlock(peer_ip, block, prover_router) => {
                 // Ensure the node is not peering.
