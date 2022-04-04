@@ -537,16 +537,27 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     break;
                                 },
                                 Message::PeerRequest => {
+                                    // Unfortunately can't be feature-flagged because of the enum
+                                    // it's passed around in.
+                                    let _rtt_start_instant: Option<Instant> = None;
+
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    let _rtt_start_instant = Some(rtt_start);
+
                                     // Send a `PeerResponse` message.
-                                    if let Err(error) = peers_router.send(PeersRequest::SendPeerResponse(peer_ip)).await {
+                                    if let Err(error) = peers_router.send(PeersRequest::SendPeerResponse(peer_ip, _rtt_start_instant)).await {
                                         warn!("[PeerRequest] {}", error);
                                     }
                                 }
-                                Message::PeerResponse(peer_ips) => {
+                                Message::PeerResponse(peer_ips, _rtt_start) => {
                                     // Adds the given peer IPs to the list of candidate peers.
                                     if let Err(error) = peers_router.send(PeersRequest::ReceivePeerResponse(peer_ips)).await {
                                         warn!("[PeerResponse] {}", error);
                                     }
+
+                                    // Stop the clock on internal RTT.
+                                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                                    metrics::histogram!(metrics::internal_rtt::PEERS_REQUEST, _rtt_start.expect("rtt should be present with metrics enabled").elapsed());
                                 }
                                 Message::Ping(version, fork_depth, node_type, status, block_hash, block_header) => {
                                     // Ensure the message protocol version is not outdated.
@@ -649,7 +660,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         if let Err(error) = peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
                                             warn!("[Ping] {}", error);
                                         }
-
 
                                         E::resources().deregister(ping_resource_id);
                                     }));
