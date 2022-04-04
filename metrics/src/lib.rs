@@ -65,11 +65,11 @@ pub fn initialize() -> Snapshotter {
 }
 
 fn register_metrics() {
-    for name in GAUGE_NAMES {
+    for name in GAUGES {
         register_gauge!(name);
     }
 
-    for name in HISTOGRAM_NAMES {
+    for name in HISTOGRAMS {
         register_histogram!(name);
     }
 }
