@@ -18,7 +18,7 @@ pub const GAUGE_NAMES: [&str; 4] = [blocks::HEIGHT, peers::CONNECTED, peers::CAN
 pub const HISTOGRAM_NAMES: [&str; 4] = [
     internal_rtt::PING,
     internal_rtt::PONG,
-    internal_rtt::PEERS_REQUEST,
+    internal_rtt::PEER_REQUEST,
     internal_rtt::BLOCK_REQUEST,
 ];
 
@@ -35,6 +35,6 @@ pub mod peers {
 pub mod internal_rtt {
     pub const PING: &str = "snarkos_internal_rtt_ping";
     pub const PONG: &str = "snarkos_internal_rtt_pong";
-    pub const PEERS_REQUEST: &str = "snarkos_internal_rtt_peers_request";
+    pub const PEER_REQUEST: &str = "snarkos_internal_rtt_peer_request";
     pub const BLOCK_REQUEST: &str = "snarkos_internal_rtt_block_request";
 }

@@ -319,10 +319,10 @@
         },
         {
           "exemplar": true,
-          "expr": "rate(snarkos_internal_rtt_peers_request_sum[$__rate_interval])/rate(snarkos_internal_rtt_peers_request_count[$__rate_interval])",
+          "expr": "rate(snarkos_internal_rtt_peer_request_sum[$__rate_interval])/rate(snarkos_internal_rtt_peer_request_count[$__rate_interval])",
           "hide": false,
           "interval": "",
-          "legendFormat": "peers_request",
+          "legendFormat": "peer_request",
           "refId": "C"
         },
         {
