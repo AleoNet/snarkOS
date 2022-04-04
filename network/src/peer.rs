@@ -437,7 +437,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 Message::PeerResponse(_, _rtt_start) => {
                                     // Stop the clock on internal RTT.
                                     #[cfg(any(feature = "test", feature = "prometheus"))]
-                                    metrics::histogram!(metrics::internal_rtt::PEERS_REQUEST, _rtt_start.expect("rtt should be present with metrics enabled").elapsed());
+                                    metrics::histogram!(metrics::internal_rtt::PEER_REQUEST, _rtt_start.expect("rtt should be present with metrics enabled").elapsed());
 
                                     true
                                 }
