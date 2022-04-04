@@ -21,7 +21,7 @@ pub const HISTOGRAMS: [&str; 4] = [
     internal_rtt::PEER_REQUEST,
     internal_rtt::BLOCK_REQUEST,
 ];
-pub const COUNTER_NAMES: [&str; 9] = [
+pub const COUNTERS: [&str; 9] = [
     message_counts::PING,
     message_counts::PONG,
     message_counts::PEER_REQUEST,

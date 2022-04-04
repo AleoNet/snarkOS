@@ -73,7 +73,7 @@ fn register_metrics() {
         register_histogram!(name);
     }
 
-    for name in COUNTER_NAMES {
+    for name in COUNTERS {
         register_counter!(name);
     }
 }
