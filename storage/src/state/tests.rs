@@ -346,3 +346,40 @@ fn test_transaction_fees() {
     assert_eq!(new_coinbase_record.value(), expected_block_reward);
     assert_eq!(output_record.value(), amount);
 }
+
+#[test]
+fn test_get_all_ciphertexts() {
+    let rng = &mut thread_rng();
+    let terminator = AtomicBool::new(false);
+    // Initialize a new ledger.
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
+
+    // Initialize a new account.
+    let account = Account::<Testnet2>::new(&mut thread_rng());
+    let address = account.address();
+
+    // Mine the next block.
+    let (block, _) = ledger
+        .mine_next_block(address, true, &[], &terminator, rng)
+        .expect("Failed to mine");
+    ledger.add_next_block(&block).expect("Failed to add next block to ledger");
+
+    // Get the ciphertexts from the genesis block.
+    let mut expected_ciphertexts: Vec<_> = ledger
+        .get_block(0)
+        .unwrap()
+        .commitments()
+        .map(|commitment| ledger.get_ciphertext(commitment).unwrap())
+        .collect();
+
+    // Append the ciphertexts for the added block.
+    expected_ciphertexts.append(
+        &mut block
+            .commitments()
+            .map(|commitment| ledger.get_ciphertext(commitment).unwrap())
+            .collect(),
+    );
+
+    let ciphertexts = ledger.get_ciphertexts().unwrap();
+    assert_eq!(ciphertexts, expected_ciphertexts);
+}
