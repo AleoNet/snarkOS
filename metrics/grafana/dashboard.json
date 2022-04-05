@@ -547,19 +547,11 @@
       "targets": [
         {
           "exemplar": true,
-          "expr": "rate(snarkos_message_counts_ping[$__rate_interval])",
-          "format": "time_series",
-          "interval": "",
-          "legendFormat": "ping",
-          "refId": "A"
-        },
-        {
-          "exemplar": true,
-          "expr": "rate(snarkos_message_counts_pong[$__rate_interval])",
+          "expr": "rate(snarkos_message_counts_disconnect[$__rate_interval])",
           "hide": false,
           "interval": "",
-          "legendFormat": "pong",
-          "refId": "B"
+          "legendFormat": "disconnect",
+          "refId": "I"
         },
         {
           "exemplar": true,
@@ -595,6 +587,22 @@
         },
         {
           "exemplar": true,
+          "expr": "rate(snarkos_message_counts_ping[$__rate_interval])",
+          "format": "time_series",
+          "interval": "",
+          "legendFormat": "ping",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_message_counts_pong[$__rate_interval])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "pong",
+          "refId": "B"
+        },
+        {
+          "exemplar": true,
           "expr": "rate(snarkos_message_counts_unconfirmed_block[$__rate_interval])",
           "hide": false,
           "interval": "",
@@ -608,14 +616,6 @@
           "interval": "",
           "legendFormat": "unconfirmed_transaction",
           "refId": "H"
-        },
-        {
-          "exemplar": true,
-          "expr": "rate(snarkos_message_counts_disconnect[$__rate_interval])",
-          "hide": false,
-          "interval": "",
-          "legendFormat": "disconnect",
-          "refId": "I"
         }
       ],
       "title": "Inbound messages (rate extrapolated to /min values)",
@@ -637,5 +637,5 @@
   "timezone": "",
   "title": "snarkOS v2",
   "uid": "f7OaOQB7z",
-  "version": 15
+  "version": 18
 }
