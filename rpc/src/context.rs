@@ -144,7 +144,7 @@ pub async fn initialize_rpc_server<N: Network, E: Environment>(
         .expect("Invalid JSON-RPC server resource")
         .max_request_body_size(10 * 1024 * 1024) // Explicitly select the body size limit (jsonrpsee's default, 10MiB) for greater visibility.
         .set_middleware(RpcMiddleware)
-        .build(rpc_server_addr).expect("Failed to create the RPC server");
+        .build(rpc_server_addr).await.expect("Failed to create the RPC server");
 
     let server_addr = server.local_addr().expect("Can't obtain RPC server's local address");
 
