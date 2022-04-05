@@ -618,7 +618,7 @@
           "refId": "H"
         }
       ],
-      "title": "Inbound messages (rate extrapolated to /min values)",
+      "title": "Inbound message breakdown",
       "type": "timeseries"
     }
   ],
@@ -630,12 +630,12 @@
     "list": []
   },
   "time": {
-    "from": "now-1h",
+    "from": "now-6h",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "snarkOS v2",
   "uid": "f7OaOQB7z",
-  "version": 18
+  "version": 19
 }
