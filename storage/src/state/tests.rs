@@ -381,7 +381,7 @@ fn test_get_all_ciphertexts() {
             .map(|commitment| ledger.get_ciphertext(commitment).unwrap())
             .collect::<Vec<_>>(),
     );
-    let ciphertexts_set = to_hash_set_test::<Testnet2>(ledger.get_ciphertexts().unwrap());
+    let ciphertexts_set = to_hash_set_test::<Testnet2>(ledger.get_ciphertexts().unwrap().collect());
 
     assert_eq!(expected_ciphertexts_set, ciphertexts_set);
 }

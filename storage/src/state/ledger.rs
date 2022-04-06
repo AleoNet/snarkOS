@@ -467,7 +467,7 @@ impl<N: Network> LedgerState<N> {
     }
 
     // Returns all the ciphertexts in ledger.
-    pub fn get_ciphertexts(&self) -> Result<Vec<N::RecordCiphertext>> {
+    pub fn get_ciphertexts(&self) -> Result<impl Iterator<Item = N::RecordCiphertext> + '_> {
         self.blocks.get_ciphertexts()
     }
 
@@ -1298,7 +1298,7 @@ impl<N: Network> BlockState<N> {
     }
 
     // Returns all the record ciphertexts.
-    fn get_ciphertexts(&self) -> Result<Vec<N::RecordCiphertext>> {
+    fn get_ciphertexts(&self) -> Result<impl Iterator<Item = N::RecordCiphertext> + '_> {
         self.transactions.get_ciphertexts()
     }
 
@@ -1578,12 +1578,11 @@ impl<N: Network> TransactionState<N> {
     }
 
     // Returns all the record ciphertexts.
-    fn get_ciphertexts(&self) -> Result<Vec<N::RecordCiphertext>> {
+    fn get_ciphertexts(&self) -> Result<impl Iterator<Item = N::RecordCiphertext> + '_> {
         Ok(self
             .commitments
             .keys()
-            .map(|commitment| self.get_ciphertext(&commitment).unwrap())
-            .collect::<Vec<N::RecordCiphertext>>())
+            .map(move |commitment| self.get_ciphertext(&commitment).unwrap()))
     }
 
     /// Returns the transition for a given transition ID.
