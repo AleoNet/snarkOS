@@ -466,7 +466,7 @@ impl<N: Network> LedgerState<N> {
         self.blocks.get_previous_ledger_root(block_height)
     }
 
-    // Returns the record ciphertexts for a given block.
+    // Returns all the ciphertexts in ledger.
     pub fn get_ciphertexts(&self) -> Result<Vec<N::RecordCiphertext>> {
         self.blocks.get_ciphertexts()
     }
@@ -1297,6 +1297,7 @@ impl<N: Network> BlockState<N> {
         self.transactions.get_ciphertext(commitment)
     }
 
+    // Returns all the record ciphertexts.
     fn get_ciphertexts(&self) -> Result<Vec<N::RecordCiphertext>> {
         self.transactions.get_ciphertexts()
     }
@@ -1576,11 +1577,12 @@ impl<N: Network> TransactionState<N> {
         Err(anyhow!("Commitment {} is missing in storage", commitment))
     }
 
+    // Returns all the record ciphertexts.
     fn get_ciphertexts(&self) -> Result<Vec<N::RecordCiphertext>> {
         Ok(self
             .commitments
-            .iter()
-            .map(|(commitment, _)| self.get_ciphertext(&commitment).unwrap())
+            .keys()
+            .map(|commitment| self.get_ciphertext(&commitment).unwrap())
             .collect::<Vec<N::RecordCiphertext>>())
     }
 
