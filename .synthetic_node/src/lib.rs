@@ -16,13 +16,14 @@
 
 use snarkos_environment::{
     helpers::{NodeType, State},
-    network::{Data, DisconnectReason, Message},
+    network::{Data, DisconnectReason, Message, MessageCodec},
     Client,
     CurrentNetwork,
     Environment,
 };
 use snarkvm::traits::Network;
 
+use futures_util::{sink::SinkExt, TryStreamExt};
 use parking_lot::RwLock;
 use pea2pea::{
     protocols::{Disconnect, Handshake, Writing},
@@ -31,13 +32,10 @@ use pea2pea::{
     Pea2Pea,
 };
 use rand::{thread_rng, Rng};
-use std::{collections::HashMap, convert::TryInto, io, net::SocketAddr, sync::Arc};
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use std::{collections::HashMap, io, net::SocketAddr, sync::Arc};
+use tokio_util::codec::Framed;
 use tracing::*;
 use tracing_subscriber::filter::LevelFilter;
-
-/// The number of bytes indicating the length of network messages.
-pub const MESSAGE_LENGTH_PREFIX_SIZE: usize = 4;
 
 /// These 3 values are checked during the handshake.
 pub const MESSAGE_VERSION: u32 = <Client<CurrentNetwork>>::MESSAGE_VERSION;
@@ -120,7 +118,7 @@ impl SynthNode {
 impl Handshake for SynthNode {
     async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
         let own_ip = self.node().listening_addr()?;
-        let peer_addr = connection.addr;
+        let peer_addr = connection.addr();
 
         // An immediate duplicate connection check.
         if self.state.address_map.read().contains_key(&peer_addr) {
@@ -129,6 +127,9 @@ impl Handshake for SynthNode {
 
         // The genesis block header is used in the handshake.
         let genesis_block_header = CurrentNetwork::genesis_block().header();
+
+        let stream = self.borrow_stream(&mut connection);
+        let mut framed = Framed::new(stream, MessageCodec::default());
 
         // Send a challenge request to the peer.
         let own_request = ClientMessage::ChallengeRequest(
@@ -141,23 +142,13 @@ impl Handshake for SynthNode {
             0,
         );
         trace!(parent: self.node().span(), "sending a challenge request to {}", peer_addr);
-        let mut msg = Vec::new();
-        own_request.serialize_into(&mut msg).unwrap();
-        let len = u32::to_le_bytes(msg.len() as u32);
-        connection.writer().write_all(&len).await?;
-        connection.writer().write_all(&msg).await?;
-
-        // A buffer for reading handshake messages.
-        let mut buf = [0u8; 1024];
+        framed.send(own_request).await?;
 
         // Read the challenge request from the peer.
-        connection.reader().read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE]).await?;
-        let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
-        connection.reader().read_exact(&mut buf[..len]).await?;
-        let peer_request = ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len]));
+        let peer_request = framed.try_next().await?;
 
         // Register peer's nonce.
-        let (peer_listening_addr, peer_nonce, peer_node_type, cumulative_weight, peer_version) = if let Ok(Message::ChallengeRequest(
+        let (peer_listening_addr, peer_nonce, peer_node_type, cumulative_weight, peer_version) = if let Some(Message::ChallengeRequest(
             peer_version,
             _peer_fork_depth,
             peer_node_type,
@@ -178,7 +169,7 @@ impl Handshake for SynthNode {
             trace!(parent: self.node().span(), "received a challenge request from {}", peer_addr);
 
             (peer_listening_addr, peer_nonce, peer_node_type, cumulative_weight, peer_version)
-        } else if let Ok(Message::Disconnect(reason)) = peer_request {
+        } else if let Some(Message::Disconnect(reason)) = peer_request {
             warn!(parent: self.node().span(), "{} disconnected: {:?}", peer_addr, reason);
             return Err(io::ErrorKind::NotConnected.into());
         } else {
@@ -189,19 +180,12 @@ impl Handshake for SynthNode {
         // Respond with own challenge request.
         let own_response = ClientMessage::ChallengeResponse(Data::Object(genesis_block_header.clone()));
         trace!(parent: self.node().span(), "sending a challenge response to {}", peer_addr);
-        let mut msg = Vec::new();
-        own_response.serialize_into(&mut msg).unwrap();
-        let len = u32::to_le_bytes(msg.len() as u32);
-        connection.writer().write_all(&len).await?;
-        connection.writer().write_all(&msg).await?;
+        framed.send(own_response).await?;
 
         // Wait for the challenge response to come in.
-        connection.reader().read_exact(&mut buf[..MESSAGE_LENGTH_PREFIX_SIZE]).await?;
-        let len = u32::from_le_bytes(buf[..MESSAGE_LENGTH_PREFIX_SIZE].try_into().unwrap()) as usize;
-        connection.reader().read_exact(&mut buf[..len]).await?;
-        let peer_response = ClientMessage::deserialize(&mut io::Cursor::new(&buf[..len]));
+        let peer_response = framed.try_next().await?;
 
-        if let Ok(Message::ChallengeResponse(block_header)) = peer_response {
+        if let Some(Message::ChallengeResponse(block_header)) = peer_response {
             let block_header = block_header.deserialize().await.unwrap();
 
             trace!(parent: self.node().span(), "received a challenge response from {}", peer_addr);
@@ -234,7 +218,7 @@ impl Handshake for SynthNode {
                 error!(parent: self.node().span(), "invalid challenge response from {}", peer_addr);
                 Err(io::ErrorKind::InvalidData.into())
             }
-        } else if let Ok(Message::Disconnect(reason)) = peer_response {
+        } else if let Some(Message::Disconnect(reason)) = peer_response {
             warn!(parent: self.node().span(), "{} disconnected: {:?}", peer_addr, reason);
             return Err(io::ErrorKind::NotConnected.into());
         } else {
@@ -246,15 +230,11 @@ impl Handshake for SynthNode {
 
 /// Outbound message processing logic for the test nodes.
 impl Writing for SynthNode {
+    type Codec = MessageCodec<CurrentNetwork, Client<CurrentNetwork>>;
     type Message = ClientMessage;
 
-    fn write_message<W: io::Write>(&self, _target: SocketAddr, payload: &Self::Message, writer: &mut W) -> io::Result<()> {
-        let mut msg = Vec::new();
-        payload.serialize_into(&mut msg).unwrap();
-        let len = u32::to_le_bytes(msg.len() as u32);
-
-        writer.write_all(&len)?;
-        writer.write_all(&msg)
+    fn codec(&self, _addr: SocketAddr) -> Self::Codec {
+        Default::default()
     }
 }
 
