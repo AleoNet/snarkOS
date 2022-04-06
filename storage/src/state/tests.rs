@@ -21,7 +21,7 @@ use crate::{
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use rand::{thread_rng, Rng};
-use std::sync::atomic::AtomicBool;
+use std::{collections::HashSet, sync::atomic::AtomicBool};
 
 fn temp_dir() -> std::path::PathBuf {
     tempfile::tempdir().expect("Failed to open temporary directory").into_path()
@@ -30,6 +30,14 @@ fn temp_dir() -> std::path::PathBuf {
 /// Initializes a new instance of the ledger.
 fn create_new_ledger<N: Network, S: Storage>() -> LedgerState<N> {
     LedgerState::open_writer_with_increment::<S, _>(temp_dir(), 1).expect("Failed to initialize ledger")
+}
+
+fn to_hash_set_test<N: Network>(ciphertexts: Vec<N::RecordCiphertext>) -> HashSet<N::RecordCiphertext> {
+    let mut set = HashSet::new();
+    for ciphertext in ciphertexts {
+        set.insert(ciphertext);
+    }
+    set
 }
 
 #[test]
@@ -364,22 +372,16 @@ fn test_get_all_ciphertexts() {
         .expect("Failed to mine");
     ledger.add_next_block(&block).expect("Failed to add next block to ledger");
 
-    // Get the ciphertexts from the genesis block.
-    let mut expected_ciphertexts: Vec<_> = ledger
-        .get_block(0)
-        .unwrap()
-        .commitments()
-        .map(|commitment| ledger.get_ciphertext(commitment).unwrap())
-        .collect();
-
-    // Append the ciphertexts for the added block.
-    expected_ciphertexts.append(
-        &mut block
-            .commitments()
+    let expected_ciphertexts_set = to_hash_set_test::<Testnet2>(
+        ledger
+            .get_blocks(0, ledger.latest_block_height())
+            .unwrap()
+            .iter()
+            .flat_map(|block| block.commitments())
             .map(|commitment| ledger.get_ciphertext(commitment).unwrap())
-            .collect(),
+            .collect::<Vec<_>>(),
     );
+    let ciphertexts_set = to_hash_set_test::<Testnet2>(ledger.get_ciphertexts().unwrap());
 
-    let ciphertexts = ledger.get_ciphertexts().unwrap();
-    assert_eq!(ciphertexts, expected_ciphertexts);
+    assert_eq!(expected_ciphertexts_set, ciphertexts_set);
 }
