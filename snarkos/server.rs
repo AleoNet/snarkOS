@@ -27,7 +27,6 @@ use snarkos_network::{
     prover::Prover,
     State,
 };
-use snarkos_storage::storage::rocksdb::RocksDB;
 use snarkvm::prelude::*;
 
 #[cfg(feature = "rpc")]
@@ -75,13 +74,13 @@ impl<N: Network, E: Environment> Server<N, E> {
         let (peers, peers_handler) = Peers::new(None, state.clone()).await;
 
         // Initialize a new instance for managing the ledger.
-        let (ledger, ledger_handler) = Ledger::<N, E>::open::<RocksDB, _>(&ledger_storage_path, state.clone()).await?;
+        let (ledger, ledger_handler) = Ledger::<N, E>::open::<_>(&ledger_storage_path, state.clone()).await?;
 
         // Initialize a new instance for managing the prover.
-        let (prover, prover_handler) = Prover::open::<RocksDB, _>(&prover_storage_path, pool_ip, state.clone()).await?;
+        let (prover, prover_handler) = Prover::open::<_>(&prover_storage_path, pool_ip, state.clone()).await?;
 
         // Initialize a new instance for managing the operator.
-        let (operator, operator_handler) = Operator::open::<RocksDB, _>(&operator_storage_path, state.clone()).await?;
+        let (operator, operator_handler) = Operator::open::<_>(&operator_storage_path, state.clone()).await?;
 
         // Initialise the metrics exporter.
         #[cfg(any(feature = "test", feature = "prometheus"))]

@@ -25,7 +25,10 @@ use snarkos_environment::{
     network::{Data, DisconnectReason, Message},
     Environment,
 };
-use snarkos_storage::{storage::Storage, LedgerState};
+use snarkos_storage::{
+    storage::{rocksdb::RocksDB, ReadOnly, ReadWrite},
+    LedgerState,
+};
 use snarkvm::dpc::prelude::*;
 
 #[cfg(any(feature = "test", feature = "prometheus"))]
@@ -45,7 +48,7 @@ use tokio::sync::{mpsc, Mutex, RwLock};
 /// The maximum number of unconfirmed blocks that can be held by the ledger.
 const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 250;
 
-pub type LedgerReader<N> = std::sync::Arc<snarkos_storage::LedgerState<N>>;
+pub type LedgerReader<N> = std::sync::Arc<snarkos_storage::LedgerState<N, ReadOnly>>;
 
 /// Shorthand for the parent half of the `Ledger` message channel.
 pub type LedgerRouter<N> = mpsc::Sender<LedgerRequest<N>>;
@@ -81,9 +84,9 @@ pub struct Ledger<N: Network, E: Environment> {
     /// The ledger router of the node.
     ledger_router: LedgerRouter<N>,
     /// The canonical chain of blocks.
-    canon: LedgerState<N>,
+    canon: LedgerState<N, ReadWrite>,
     /// The canonical chain of blocks in read-only mode.
-    canon_reader: Arc<LedgerState<N>>,
+    canon_reader: LedgerReader<N>,
     /// A lock to ensure methods that need to be mutually-exclusive are enforced.
     /// In this context, `add_block`, and `revert_to_block_height` must be mutually-exclusive.
     canon_lock: Mutex<()>,
@@ -106,15 +109,12 @@ pub struct Ledger<N: Network, E: Environment> {
 
 impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger, paired with its handler.
-    pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
-        path: P,
-        state: Arc<State<N, E>>,
-    ) -> Result<(Self, mpsc::Receiver<LedgerRequest<N>>)> {
+    pub async fn open<P: AsRef<Path> + Copy>(path: P, state: Arc<State<N, E>>) -> Result<(Self, mpsc::Receiver<LedgerRequest<N>>)> {
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
         let (ledger_router, ledger_handler) = mpsc::channel(1024);
 
-        let canon = LedgerState::open_writer::<S, P>(path)?;
-        let (canon_reader, reader_resource) = LedgerState::open_reader::<S, P>(path)?;
+        let canon = LedgerState::open_writer::<RocksDB, P>(path)?;
+        let (canon_reader, reader_resource) = LedgerState::open_reader::<RocksDB<ReadOnly>, P>(path)?;
         // Register the thread; no need to provide an id, as it will run indefinitely.
         E::resources().register(reader_resource, None);
 

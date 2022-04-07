@@ -20,7 +20,10 @@ use snarkos_environment::{
     network::{Data, Message},
     Environment,
 };
-use snarkos_storage::{storage::Storage, OperatorState};
+use snarkos_storage::{
+    storage::{rocksdb::RocksDB, ReadWrite},
+    OperatorState,
+};
 use snarkvm::dpc::{prelude::*, PoSWProof};
 
 use anyhow::Result;
@@ -59,7 +62,7 @@ const HEARTBEAT_IN_SECONDS: Duration = Duration::from_secs(1);
 ///
 pub struct Operator<N: Network, E: Environment> {
     /// The state storage of the operator.
-    operator_state: Arc<OperatorState<N>>,
+    operator_state: Arc<OperatorState<N, ReadWrite>>,
     /// The current block template that is being mined on by the operator.
     block_template: RwLock<Option<BlockTemplate<N>>>,
     /// A list of provers and their associated state := (last_submitted, share_difficulty)
@@ -75,15 +78,12 @@ pub struct Operator<N: Network, E: Environment> {
 impl<N: Network, E: Environment> Operator<N, E> {
     /// Initializes a new instance of the operator, paired with its handler.
     #[allow(clippy::too_many_arguments)]
-    pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
-        path: P,
-        state: Arc<State<N, E>>,
-    ) -> Result<(Self, mpsc::Receiver<OperatorRequest<N>>)> {
+    pub async fn open<P: AsRef<Path> + Copy>(path: P, state: Arc<State<N, E>>) -> Result<(Self, mpsc::Receiver<OperatorRequest<N>>)> {
         // Initialize an mpsc channel for sending requests to the `Operator` struct.
         let (operator_router, operator_handler) = mpsc::channel(1024);
         // Initialize the operator.
         let operator = Self {
-            operator_state: Arc::new(OperatorState::open_writer::<S, P>(path)?),
+            operator_state: Arc::new(OperatorState::open::<RocksDB, P>(path)?),
             block_template: RwLock::new(None),
             provers: Default::default(),
             known_nonces: Default::default(),

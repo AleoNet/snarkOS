@@ -15,7 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_environment::CurrentNetwork;
-use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
+use snarkos_storage::{
+    storage::{rocksdb::RocksDB, ReadOnly},
+    LedgerState,
+};
 use snarkvm::dpc::traits::network::Network;
 
 #[test]
@@ -31,6 +34,6 @@ fn dump_blocks() {
     // The number of blocks to dump.
     let num_blocks = 10;
 
-    let (ledger, _) = LedgerState::<CurrentNetwork>::open_reader::<RocksDB, _>(source_path).unwrap();
+    let (ledger, _) = LedgerState::<CurrentNetwork, _>::open_reader::<RocksDB<ReadOnly>, _>(source_path).unwrap();
     ledger.dump_blocks(target_path, num_blocks).unwrap();
 }

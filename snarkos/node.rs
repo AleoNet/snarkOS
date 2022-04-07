@@ -29,14 +29,17 @@ use snarkos_environment::{
     ProverTrial,
     SyncNode,
 };
-use snarkos_storage::storage::rocksdb::RocksDB;
+use snarkos_storage::{
+    storage::{rocksdb::RocksDB, ReadOnly},
+    LedgerState,
+};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
 use clap::Parser;
 use colored::*;
 use crossterm::tty::IsTty;
-use std::{fmt::Write, io, net::SocketAddr, path::PathBuf, str::FromStr};
+use std::{fmt::Write, io, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use tokio::sync::mpsc;
 use tracing_subscriber::EnvFilter;
 
@@ -459,12 +462,12 @@ impl MinerStats {
 
         // Initialize the ledger storage.
         let ledger_storage_path = node.ledger_storage_path(ip);
-        let (ledger, ledger_resource) =
-            snarkos_storage::LedgerState::<CurrentNetwork>::open_reader::<RocksDB, _>(ledger_storage_path).unwrap();
+        let (ledger, ledger_resource): (Arc<LedgerState<CurrentNetwork, _>>, _) =
+            snarkos_storage::LedgerState::open_reader::<RocksDB<ReadOnly>, _>(ledger_storage_path).unwrap();
 
         // Initialize the prover storage.
         let prover_storage_path = node.prover_storage_path(ip);
-        let prover = snarkos_storage::ProverState::<CurrentNetwork>::open::<RocksDB, _>(prover_storage_path, true).unwrap();
+        let prover = snarkos_storage::ProverState::open::<RocksDB<ReadOnly>, _>(prover_storage_path).unwrap();
 
         // Retrieve the latest block height.
         let latest_block_height = ledger.latest_block_height();

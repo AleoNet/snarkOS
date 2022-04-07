@@ -16,7 +16,7 @@
 
 use crate::ledger::PeersState;
 use snarkos_environment::{helpers::BlockLocators, network::DisconnectReason, Environment};
-use snarkos_storage::LedgerState;
+use snarkos_storage::{storage::StorageAccess, LedgerState};
 use snarkvm::dpc::prelude::*;
 
 use std::net::SocketAddr;
@@ -63,7 +63,10 @@ pub fn find_maximal_peer<N: Network, E: Environment>(
 
 /// Returns the common ancestor and the first deviating locator (if it exists),
 /// given the block locators of a peer. If the peer has invalid block locators, returns an error.
-pub fn find_common_ancestor<N: Network>(canon: &LedgerState<N>, block_locators: &BlockLocators<N>) -> Result<(u32, Option<u32>), String> {
+pub fn find_common_ancestor<N: Network, A: StorageAccess>(
+    canon: &LedgerState<N, A>,
+    block_locators: &BlockLocators<N>,
+) -> Result<(u32, Option<u32>), String> {
     // Determine the common ancestor block height between this ledger and the peer.
     let mut maximum_common_ancestor = 0;
     // Determine the first locator (smallest height) that does not exist in this ledger.

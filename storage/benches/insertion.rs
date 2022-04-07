@@ -16,7 +16,7 @@
 
 use snarkos_environment::CurrentNetwork;
 use snarkos_storage::{
-    storage::{rocksdb::RocksDB, Storage},
+    storage::{rocksdb::RocksDB, ReadWrite, Storage},
     LedgerState,
 };
 
@@ -30,7 +30,7 @@ const NUM_BLOCKS: u32 = 1_000;
 fn insertion(c: &mut Criterion) {
     let temp_dir1 = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
     // Create an empty ledger.
-    let ledger1: LedgerState<CurrentNetwork> =
+    let ledger1: LedgerState<CurrentNetwork, ReadWrite> =
         LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir1, 1).expect("Failed to initialize ledger");
     // Import a dump of a ledger containing 1k blocks.
     ledger1
@@ -39,7 +39,7 @@ fn insertion(c: &mut Criterion) {
         .expect("Couldn't import the test ledger");
     // Reopen the ledger so that it applies the storage changes to its in-memory components.
     drop(ledger1);
-    let ledger1: LedgerState<CurrentNetwork> =
+    let ledger1: LedgerState<CurrentNetwork, ReadWrite> =
         LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir1, NUM_BLOCKS).expect("Failed to initialize ledger");
 
     // Prepare a second test ledger that will be importing blocks belonging to the first one.
