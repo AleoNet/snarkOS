@@ -32,6 +32,9 @@ version = "0.2"
 version = "0.3.21"
 features = [ "thread-pool" ]
 
+[dependencies.once_cell]
+version = "1"
+
 [dependencies.rand]
 version = "0.8"
 

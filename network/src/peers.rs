@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{LedgerReader, LedgerRouter, OperatorRouter, OutboundRouter, Peer, ProverRouter};
+use crate::{OutboundRouter, Peer, State};
 use snarkos_environment::{
     network::{Data, DisconnectReason, Message},
     Environment,
@@ -41,9 +41,8 @@ use tokio::{
 
 /// Shorthand for the parent half of the `Peers` message channel.
 pub type PeersRouter<N, E> = mpsc::Sender<PeersRequest<N, E>>;
-#[allow(unused)]
 /// Shorthand for the child half of the `Peers` message channel.
-type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
+pub type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
 
 /// Shorthand for the parent half of the connection result channel.
 pub(crate) type ConnectionResult = oneshot::Sender<Result<()>>;
@@ -53,30 +52,16 @@ pub(crate) type ConnectionResult = oneshot::Sender<Result<()>>;
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network, E: Environment> {
-    /// Connect := (peer_ip, ledger_reader, ledger_router, operator_router, prover_router, connection_result)
-    Connect(
-        SocketAddr,
-        LedgerReader<N>,
-        LedgerRouter<N>,
-        OperatorRouter<N>,
-        ProverRouter<N>,
-        ConnectionResult,
-    ),
-    /// Heartbeat := (ledger_reader, ledger_router, operator_router, prover_router)
-    Heartbeat(LedgerReader<N>, LedgerRouter<N>, OperatorRouter<N>, ProverRouter<N>),
+    /// Connect := (peer_ip, connection_result)
+    Connect(SocketAddr, ConnectionResult),
+    /// Heartbeat
+    Heartbeat,
     /// MessagePropagate := (peer_ip, message)
     MessagePropagate(SocketAddr, Message<N, E>),
     /// MessageSend := (peer_ip, message)
     MessageSend(SocketAddr, Message<N, E>),
-    /// PeerConnecting := (stream, peer_ip, ledger_reader, ledger_router, operator_router, prover_router)
-    PeerConnecting(
-        TcpStream,
-        SocketAddr,
-        LedgerReader<N>,
-        LedgerRouter<N>,
-        OperatorRouter<N>,
-        ProverRouter<N>,
-    ),
+    /// PeerConnecting := (stream, peer_ip)
+    PeerConnecting(TcpStream, SocketAddr),
     /// PeerConnected := (peer_ip, peer_nonce, outbound_router)
     PeerConnected(SocketAddr, u64, OutboundRouter<N, E>),
     /// PeerDisconnected := (peer_ip)
@@ -96,8 +81,6 @@ pub enum PeersRequest<N: Network, E: Environment> {
 pub struct Peers<N: Network, E: Environment> {
     /// The peers router of the node.
     peers_router: PeersRouter<N, E>,
-    /// The local address of this node.
-    local_ip: SocketAddr,
     /// The local nonce for this node session.
     local_nonce: u64,
     /// The map connected peer IPs to their nonce and outbound message router.
@@ -110,15 +93,17 @@ pub struct Peers<N: Network, E: Environment> {
     seen_inbound_connections: RwLock<HashMap<SocketAddr, ((u16, u32), SystemTime)>>,
     /// The map of peers to the timestamp of their last outbound connection request.
     seen_outbound_connections: RwLock<HashMap<SocketAddr, SystemTime>>,
+    /// The shared state of the owning node.
+    state: Arc<State<N, E>>,
 }
 
 impl<N: Network, E: Environment> Peers<N, E> {
     ///
-    /// Initializes a new instance of `Peers`.
+    /// Initializes a new instance of `Peers` and its corresponding handler.
     ///
-    pub async fn new(local_ip: SocketAddr, local_nonce: Option<u64>) -> Arc<Self> {
+    pub async fn new(local_nonce: Option<u64>, state: Arc<State<N, E>>) -> (Self, mpsc::Receiver<PeersRequest<N, E>>) {
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
-        let (peers_router, mut peers_handler) = mpsc::channel(1024);
+        let (peers_router, peers_handler) = mpsc::channel(1024);
 
         // Sample the nonce.
         let local_nonce = match local_nonce {
@@ -127,55 +112,23 @@ impl<N: Network, E: Environment> Peers<N, E> {
         };
 
         // Initialize the peers.
-        let peers = Arc::new(Self {
+        let peers = Self {
             peers_router,
-            local_ip,
             local_nonce,
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             seen_inbound_connections: Default::default(),
             seen_outbound_connections: Default::default(),
-        });
+            state,
+        };
 
-        // Initialize the peers router process.
-        {
-            let peers = peers.clone();
-            let (router, handler) = oneshot::channel();
-            E::resources().register_task(
-                None, // No need to provide an id, as the task will run indefinitely.
-                task::spawn(async move {
-                    // Notify the outer function that the task is ready.
-                    let _ = router.send(());
-                    // Asynchronously wait for a peers request.
-                    while let Some(request) = peers_handler.recv().await {
-                        let peers = peers.clone();
-                        // Procure a resource id to register the task with, as it might be terminated at any point in time.
-                        let resource_id = E::resources().procure_id();
-                        // Asynchronously process a peers request.
-                        E::resources().register_task(
-                            Some(resource_id),
-                            task::spawn(async move {
-                                // Update the state of the peers.
-                                peers.update(request).await;
-
-                                E::resources().deregister(resource_id);
-                            }),
-                        );
-                    }
-                }),
-            );
-
-            // Wait until the peers router task is ready.
-            let _ = handler.await;
-        }
-
-        peers
+        (peers, peers_handler)
     }
 
     /// Returns an instance of the peers router.
-    pub fn router(&self) -> PeersRouter<N, E> {
-        self.peers_router.clone()
+    pub fn router(&self) -> &PeersRouter<N, E> {
+        &self.peers_router
     }
 
     ///
@@ -273,12 +226,12 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Performs the given `request` to the peers.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(&self, request: PeersRequest<N, E>) {
+    pub async fn update(&self, request: PeersRequest<N, E>) {
         match request {
-            PeersRequest::Connect(peer_ip, ledger_reader, ledger_router, operator_router, prover_router, connection_result) => {
+            PeersRequest::Connect(peer_ip, connection_result) => {
                 // Ensure the peer IP is not this node.
-                if peer_ip == self.local_ip
-                    || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
+                if peer_ip == self.state.local_ip
+                    || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.state.local_ip.port()
                 {
                     debug!("Skipping connection request to {} (attempted to self-connect)", peer_ip);
                 }
@@ -318,15 +271,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
                                 Ok(stream) => {
                                     Peer::handler(
                                         stream,
-                                        self.local_ip,
                                         self.local_nonce,
-                                        &self.peers_router,
-                                        ledger_reader,
-                                        ledger_router,
-                                        prover_router,
-                                        operator_router,
                                         self.connected_nonces().await,
                                         Some(connection_result),
+                                        self.state.clone(),
                                     )
                                     .await
                                 }
@@ -343,7 +291,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
             }
-            PeersRequest::Heartbeat(ledger_reader, ledger_router, operator_router, prover_router) => {
+            PeersRequest::Heartbeat => {
                 // Obtain the number of connected peers.
                 let number_of_connected_peers = self.number_of_connected_peers().await;
                 // Ensure the number of connected peers is below the maximum threshold.
@@ -404,14 +352,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     for peer_ip in disconnected_trusted_nodes {
                         // Initialize the connection process.
                         let (router, handler) = oneshot::channel();
-                        let request = PeersRequest::Connect(
-                            peer_ip,
-                            ledger_reader.clone(),
-                            ledger_router.clone(),
-                            operator_router.clone(),
-                            prover_router.clone(),
-                            router,
-                        );
+                        let request = PeersRequest::Connect(peer_ip, router);
                         if let Err(error) = self.peers_router.send(request).await {
                             warn!("Failed to transmit the request: '{}'", error);
                         }
@@ -472,14 +413,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                         // Initialize the connection process.
                         let (router, handler) = oneshot::channel();
-                        let request = PeersRequest::Connect(
-                            peer_ip,
-                            ledger_reader.clone(),
-                            ledger_router.clone(),
-                            operator_router.clone(),
-                            prover_router.clone(),
-                            router,
-                        );
+                        let request = PeersRequest::Connect(peer_ip, router);
                         if let Err(error) = self.peers_router.send(request).await {
                             warn!("Failed to transmit the request: '{}'", error);
                         }
@@ -503,10 +437,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
             PeersRequest::MessageSend(sender, message) => {
                 self.send(sender, message).await;
             }
-            PeersRequest::PeerConnecting(stream, peer_ip, ledger_reader, ledger_router, operator_router, prover_router) => {
+            PeersRequest::PeerConnecting(stream, peer_ip) => {
                 // Ensure the peer IP is not this node.
-                if peer_ip == self.local_ip
-                    || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
+                if peer_ip == self.state.local_ip
+                    || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.state.local_ip.port()
                 {
                     debug!("Skipping connection request to {} (attempted to self-connect)", peer_ip);
                 }
@@ -565,19 +499,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         drop(seen_inbound_connections);
 
                         // Initialize the peer handler.
-                        Peer::handler(
-                            stream,
-                            self.local_ip,
-                            self.local_nonce,
-                            &self.peers_router,
-                            ledger_reader,
-                            ledger_router,
-                            prover_router,
-                            operator_router,
-                            self.connected_nonces().await,
-                            None,
-                        )
-                        .await;
+                        Peer::handler(stream, self.local_nonce, self.connected_nonces().await, None, self.state.clone()).await;
                     }
                 }
             }
@@ -652,8 +574,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
         // Ensure the combined number of peers does not surpass the threshold.
         for peer_ip in peers.take(E::MAXIMUM_CANDIDATE_PEERS.saturating_sub(candidate_peers.len())) {
             // Ensure the peer is not self and is a new candidate peer.
-            let is_self = *peer_ip == self.local_ip
-                || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port();
+            let is_self = *peer_ip == self.state.local_ip
+                || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.state.local_ip.port();
             if !is_self && !self.is_connected_to(*peer_ip).await {
                 // Proceed to insert each new candidate peer IP.
                 candidate_peers.insert(*peer_ip);

@@ -16,7 +16,7 @@
 
 use crate::{initialize_rpc_server, rpc_trait::RpcFunctions, RpcContext};
 use snarkos_environment::{helpers::Status, Client, CurrentNetwork, Environment};
-use snarkos_network::{ledger::Ledger, Operator, Peers, Prover};
+use snarkos_network::{ledger::Ledger, Operator, Peers, Prover, State};
 use snarkos_storage::{
     storage::{rocksdb::RocksDB, Storage},
     LedgerState,
@@ -42,6 +42,7 @@ use std::{
     fs,
     net::SocketAddr,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
 fn temp_dir() -> std::path::PathBuf {
@@ -83,51 +84,32 @@ async fn new_rpc_context<N: Network, E: Environment, S: Storage, P: AsRef<Path>>
     // Derive the storage paths.
     let (ledger_path, prover_path, operator_storage_path) = (path.as_ref().to_path_buf(), temp_dir(), temp_dir());
 
+    let state = Arc::new(State::new(node_addr));
+
     // Initialize a new instance for managing peers.
-    let peers = Peers::new(node_addr, None).await;
+    let (peers, peers_handler) = Peers::new(None, state.clone()).await;
 
     // Initialize a new instance for managing the ledger.
-    let ledger = Ledger::<N, E>::open::<S, _>(&ledger_path, peers.router())
+    let (ledger, ledger_handler) = Ledger::<N, E>::open::<S, _>(&ledger_path, state.clone())
         .await
         .expect("Failed to initialize ledger");
 
     // Initialize a new instance for managing the prover.
-    let prover = Prover::open::<S, _>(
-        &prover_path,
-        None,
-        node_addr,
-        Some(node_addr),
-        peers.router(),
-        ledger.reader(),
-        ledger.router(),
-    )
-    .await
-    .expect("Failed to initialize prover");
+    let (prover, prover_handler) = Prover::open::<S, _>(&prover_path, None, Some(node_addr), state.clone())
+        .await
+        .expect("Failed to initialize prover");
 
     // Initialize a new instance for managing the operator.
-    let operator = Operator::open::<RocksDB, _>(
-        &operator_storage_path,
-        None,
-        node_addr,
-        prover.memory_pool(),
-        peers.router(),
-        ledger.reader(),
-        ledger.router(),
-        prover.router(),
-    )
-    .await
-    .expect("Failed to initialize operator");
+    let (operator, operator_handler) = Operator::open::<RocksDB, _>(&operator_storage_path, state.clone())
+        .await
+        .expect("Failed to initialize operator");
 
-    RpcContext::new(
-        username,
-        password,
-        None,
-        peers,
-        ledger.reader(),
-        operator,
-        prover.router(),
-        prover.memory_pool(),
-    )
+    state.initialize_peers(peers, peers_handler).await;
+    state.initialize_ledger(ledger, ledger_handler).await;
+    state.initialize_prover(prover, prover_handler).await;
+    state.initialize_operator(operator, operator_handler).await;
+
+    RpcContext::new(username, password, None, state.clone())
 }
 
 /// Initializes a new instance of the rpc.
