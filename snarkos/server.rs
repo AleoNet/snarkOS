@@ -16,7 +16,7 @@
 
 use crate::{display::notification_message, Node};
 use snarkos_environment::{
-    helpers::{NodeType, State},
+    helpers::{NodeType, Status},
     network::DisconnectReason,
     Environment,
 };
@@ -247,7 +247,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     pub async fn shut_down(&self) {
         info!("Shutting down...");
         // Update the node status.
-        E::status().update(State::ShuttingDown);
+        E::status().update(Status::ShuttingDown);
 
         // Shut down the ledger.
         trace!("Proceeding to shut down the ledger...");

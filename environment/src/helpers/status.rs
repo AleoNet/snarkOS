@@ -25,7 +25,7 @@ use std::{
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[repr(u8)]
-pub enum State {
+pub enum Status {
     /// The ledger is ready to handle requests.
     Ready = 0,
     /// The ledger is mining the next block.
@@ -38,66 +38,66 @@ pub enum State {
     ShuttingDown,
 }
 
-impl fmt::Display for State {
+impl fmt::Display for Status {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self)
     }
 }
 
 #[derive(Clone, Debug)]
-pub struct Status(Arc<AtomicU8>);
+pub struct RawStatus(Arc<AtomicU8>);
 
-impl Status {
-    /// Initializes a new instance of `Status`.
+impl RawStatus {
+    /// Initializes a new instance of `RawStatus`.
     pub fn new() -> Self {
-        Self(Arc::new(AtomicU8::new(State::Peering as u8)))
+        Self(Arc::new(AtomicU8::new(Status::Peering as u8)))
     }
 
-    /// Updates the status to the given state.
-    pub fn update(&self, state: State) {
-        self.0.store(state as u8, Ordering::SeqCst);
+    /// Updates the status to the given value.
+    pub fn update(&self, status: Status) {
+        self.0.store(status as u8, Ordering::SeqCst);
     }
 
-    /// Returns the state of the node.
-    pub fn get(&self) -> State {
+    /// Returns the status of the node.
+    pub fn get(&self) -> Status {
         match self.0.load(Ordering::SeqCst) {
-            0 => State::Ready,
-            1 => State::Mining,
-            2 => State::Peering,
-            3 => State::Syncing,
-            4 => State::ShuttingDown,
+            0 => Status::Ready,
+            1 => Status::Mining,
+            2 => Status::Peering,
+            3 => Status::Syncing,
+            4 => Status::ShuttingDown,
             _ => unreachable!("Invalid status code"),
         }
     }
 
     /// Returns `true` if the node is ready to handle requests.
     pub fn is_ready(&self) -> bool {
-        self.get() == State::Ready
+        self.get() == Status::Ready
     }
 
     /// Returns `true` if the node is currently mining.
     pub fn is_mining(&self) -> bool {
-        self.get() == State::Mining
+        self.get() == Status::Mining
     }
 
     /// Returns `true` if the node is currently peering.
     pub fn is_peering(&self) -> bool {
-        self.get() == State::Peering
+        self.get() == Status::Peering
     }
 
     /// Returns `true` if the node is currently syncing.
     pub fn is_syncing(&self) -> bool {
-        self.get() == State::Syncing
+        self.get() == Status::Syncing
     }
 }
 
-impl fmt::Display for Status {
+impl fmt::Display for RawStatus {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self.get())
     }
 }
 
-impl Default for Status {
+impl Default for RawStatus {
     fn default() -> Self {
         Self::new()
     }

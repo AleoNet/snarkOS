@@ -24,4 +24,4 @@ mod resources;
 pub use resources::{Resource, Resources};
 
 mod status;
-pub use status::{State, Status};
+pub use status::{RawStatus, Status};

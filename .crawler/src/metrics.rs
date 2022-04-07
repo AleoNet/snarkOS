@@ -24,7 +24,7 @@ use std::{
 
 use nalgebra::{DMatrix, DVector, SymmetricEigen};
 #[cfg(not(feature = "postgres"))]
-use snarkos_environment::helpers::{NodeType, State};
+use snarkos_environment::helpers::{NodeType, Status};
 #[cfg(not(feature = "postgres"))]
 use time::Duration;
 
@@ -45,8 +45,8 @@ pub struct NetworkSummary {
     types: HashMap<NodeType, usize>,
     // The versions of nodes and their respective counts.
     versions: HashMap<u32, usize>,
-    // The node states of nodes and their respective counts.
-    states: HashMap<State, usize>,
+    // The node statuses of nodes and their respective counts.
+    statuses: HashMap<Status, usize>,
     // The heights of nodes and their respective counts.
     heights: HashMap<u32, usize>,
     // Corresponds to the same field in the NetworkMetrics.
@@ -94,7 +94,7 @@ impl fmt::Display for NetworkSummary {
         write!(f, "by protocol version: ")?;
         print_breakdown(f, &self.versions, 0)?;
         write!(f, "by current state: ")?;
-        print_breakdown(f, &self.states, 0)?;
+        print_breakdown(f, &self.statuses, 0)?;
 
         writeln!(f, "\nNetwork metrics:")?;
         writeln!(f, "density: {:.4}", self.density)?;
@@ -202,7 +202,7 @@ impl NetworkMetrics {
     #[cfg(not(feature = "postgres"))]
     pub fn summary(&self) -> NetworkSummary {
         let mut versions = HashMap::with_capacity(self.node_count);
-        let mut states = HashMap::with_capacity(self.node_count);
+        let mut statuses = HashMap::with_capacity(self.node_count);
         let mut types = HashMap::with_capacity(self.node_count);
         let mut heights = HashMap::with_capacity(self.node_count);
 
@@ -213,7 +213,7 @@ impl NetworkMetrics {
         for (_, meta, centrality) in &self.per_node {
             if let Some(ref state) = meta.state {
                 versions.entry(state.version).and_modify(|count| *count += 1).or_insert(1);
-                states.entry(state.state).and_modify(|count| *count += 1).or_insert(1);
+                statuses.entry(state.status).and_modify(|count| *count += 1).or_insert(1);
                 types.entry(state.node_type).and_modify(|count| *count += 1).or_insert(1);
                 heights.entry(state.height).and_modify(|count| *count += 1).or_insert(1);
             } else {
@@ -252,7 +252,7 @@ impl NetworkMetrics {
             nodes_pending_state,
             versions,
             heights,
-            states,
+            statuses,
             types,
             density: self.density,
             algebraic_connectivity: self.algebraic_connectivity,

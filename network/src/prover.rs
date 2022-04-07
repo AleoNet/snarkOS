@@ -16,7 +16,7 @@
 
 use crate::{LedgerReader, LedgerRequest, LedgerRouter, PeersRequest, PeersRouter};
 use snarkos_environment::{
-    helpers::{NodeType, State},
+    helpers::{NodeType, Status},
     network::{Data, Message},
     Environment,
 };
@@ -234,7 +234,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                         // already, mine the next block.
                         if !E::terminator().load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
                             // Set the status to `Mining`.
-                            E::status().update(State::Mining);
+                            E::status().update(Status::Mining);
 
                             let block_height = block_template.block_height();
                             let block_template = block_template.clone();
@@ -263,7 +263,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             })
                             .await;
 
-                            E::status().update(State::Ready);
+                            E::status().update(Status::Ready);
 
                             match result {
                                 Ok(Ok((nonce, proof, proof_difficulty))) => {
@@ -334,7 +334,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             // If `terminator` is `false` and the status is not `Peering` or `Mining` already, mine the next block.
                             if !E::terminator().load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
                                 // Set the status to `Mining`.
-                                E::status().update(State::Mining);
+                                E::status().update(Status::Mining);
 
                                 // Prepare the unconfirmed transactions and dependent objects.
                                 let state = prover.state.clone();
@@ -364,7 +364,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                         .map_err(|e| e.into());
 
                                         // Set the status to `Ready`.
-                                        E::status().update(State::Ready);
+                                        E::status().update(Status::Ready);
 
                                         match result {
                                             Ok(Ok((block, coinbase_record))) => {

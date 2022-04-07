@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{initialize_rpc_server, rpc_trait::RpcFunctions, RpcContext};
-use snarkos_environment::{helpers::State, Client, CurrentNetwork, Environment};
+use snarkos_environment::{helpers::Status, Client, CurrentNetwork, Environment};
 use snarkos_network::{ledger::Ledger, Operator, Peers, Prover};
 use snarkos_storage::{
     storage::{rocksdb::RocksDB, Storage},
@@ -78,7 +78,7 @@ async fn new_rpc_context<N: Network, E: Environment, S: Storage, P: AsRef<Path>>
     let node_addr: SocketAddr = "127.0.0.1:8888".parse().expect("Failed to parse ip");
 
     // Initialize the status indicator.
-    E::status().update(State::Ready);
+    E::status().update(Status::Ready);
 
     // Derive the storage paths.
     let (ledger_path, prover_path, operator_storage_path) = (path.as_ref().to_path_buf(), temp_dir(), temp_dir());

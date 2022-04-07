@@ -205,7 +205,7 @@ impl Crawler {
                         &meta.timestamp,
                         &meta.state.as_ref().map(|s| s.node_type as i16),
                         &meta.state.as_ref().map(|s| s.version as i32),
-                        &meta.state.as_ref().map(|s| s.state as i16),
+                        &meta.state.as_ref().map(|s| s.status as i16),
                         &meta.state.as_ref().map(|s| s.height as i64),
                         &meta.handshake_time.map(|t| t.whole_milliseconds() as i32),
                     ])

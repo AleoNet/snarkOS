@@ -23,7 +23,7 @@ pub mod helpers;
 #[cfg(feature = "network")]
 pub mod network;
 
-use crate::helpers::{NodeType, Resources, Status};
+use crate::helpers::{NodeType, RawStatus, Resources};
 use snarkvm::dpc::Network;
 
 use once_cell::sync::OnceCell;
@@ -115,9 +115,9 @@ pub trait Environment: 'static + Clone + Debug + Default + Send + Sync {
     }
 
     /// Returns the status of the node.
-    fn status() -> &'static Status {
-        static STATUS: OnceCell<Status> = OnceCell::new();
-        STATUS.get_or_init(Status::new)
+    fn status() -> &'static RawStatus {
+        static STATUS: OnceCell<RawStatus> = OnceCell::new();
+        STATUS.get_or_init(RawStatus::default)
     }
 
     /// Returns the terminator bit for the prover.

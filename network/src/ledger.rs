@@ -22,7 +22,7 @@ use crate::{
     ProverRouter,
 };
 use snarkos_environment::{
-    helpers::{block_locators::*, NodeType, State},
+    helpers::{block_locators::*, NodeType, Status},
     network::{Data, DisconnectReason, Message},
     Environment,
 };
@@ -71,12 +71,12 @@ pub enum LedgerRequest<N: Network> {
     /// Heartbeat := (prover_router)
     Heartbeat(ProverRouter<N>),
     /// Pong := (peer_ip, node_type, status, is_fork, block_locators)
-    Pong(SocketAddr, NodeType, State, Option<bool>, BlockLocators<N>, Option<Instant>),
+    Pong(SocketAddr, NodeType, Status, Option<bool>, BlockLocators<N>, Option<Instant>),
     /// UnconfirmedBlock := (peer_ip, block, prover_router)
     UnconfirmedBlock(SocketAddr, Block<N>, ProverRouter<N>),
 }
 
-pub type PeersState<N> = HashMap<SocketAddr, Option<(NodeType, State, Option<bool>, u32, BlockLocators<N>)>>;
+pub type PeersState<N> = HashMap<SocketAddr, Option<(NodeType, Status, Option<bool>, u32, BlockLocators<N>)>>;
 
 ///
 /// A ledger for a specific network on the node server.
@@ -350,7 +350,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     };
 
                     // If the peer is not a sync node and is syncing, and the peer is ahead, proceed to disconnect.
-                    if *node_type != NodeType::Sync && *status == State::Syncing && cumulative_weight > latest_cumulative_weight {
+                    if *node_type != NodeType::Sync && *status == Status::Syncing && cumulative_weight > latest_cumulative_weight {
                         // Append the peer to the list of disconnects.
                         peer_ips_to_disconnect.push(*peer_ip);
                     }
@@ -419,7 +419,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         let mut status = E::status().get();
 
         // If the node is shutting down, skip the update.
-        if status == State::ShuttingDown {
+        if status == Status::ShuttingDown {
             trace!("Ledger is shutting down");
             // Set the terminator bit to `true` to ensure it stops mining.
             E::terminator().store(true, Ordering::SeqCst);
@@ -427,14 +427,14 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
         // If there is an insufficient number of connected peers, set the status to `Peering`.
         else if self.peers_state.read().await.len() < E::MINIMUM_NUMBER_OF_PEERS {
-            status = State::Peering;
+            status = Status::Peering;
         }
         // If the ledger is out of date, set the status to `Syncing`.
         else {
             // Update the status to `Ready` or `Mining`.
             status = match status {
-                State::Mining => State::Mining,
-                _ => State::Ready,
+                Status::Mining => Status::Mining,
+                _ => Status::Ready,
             };
 
             // Retrieve the latest cumulative weight of this node.
@@ -450,7 +450,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     // If the cumulative weight is greater than MAXIMUM_LINEAR_BLOCK_LOCATORS, set the status to `Syncing`.
                     if cumulative_weight.saturating_sub(latest_cumulative_weight) > MAXIMUM_LINEAR_BLOCK_LOCATORS as u128 {
                         // Set the status to `Syncing`.
-                        status = State::Syncing;
+                        status = Status::Syncing;
                         break;
                     }
                 }
@@ -458,7 +458,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
 
         // If the node is `Peering` or `Syncing`, it should not be mining.
-        if status == State::Peering || status == State::Syncing {
+        if status == Status::Peering || status == Status::Syncing {
             // Set the terminator bit to `true` to ensure it does not mine.
             E::terminator().store(true, Ordering::SeqCst);
         } else {
@@ -643,7 +643,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         &self,
         peer_ip: SocketAddr,
         node_type: NodeType,
-        status: State,
+        status: Status,
         is_fork: Option<bool>,
         block_locators: BlockLocators<N>,
     ) {
