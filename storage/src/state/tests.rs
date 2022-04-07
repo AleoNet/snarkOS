@@ -32,14 +32,6 @@ fn create_new_ledger<N: Network, S: Storage>() -> LedgerState<N> {
     LedgerState::open_writer_with_increment::<S, _>(temp_dir(), 1).expect("Failed to initialize ledger")
 }
 
-fn to_hash_set_test<N: Network>(ciphertexts: Vec<N::RecordCiphertext>) -> HashSet<N::RecordCiphertext> {
-    let mut set = HashSet::new();
-    for ciphertext in ciphertexts {
-        set.insert(ciphertext);
-    }
-    set
-}
-
 #[test]
 fn test_genesis() {
     // Initialize a new ledger.
@@ -357,31 +349,20 @@ fn test_transaction_fees() {
 
 #[test]
 fn test_get_all_ciphertexts() {
-    let rng = &mut thread_rng();
-    let terminator = AtomicBool::new(false);
     // Initialize a new ledger.
     let ledger = create_new_ledger::<Testnet2, RocksDB>();
 
-    // Initialize a new account.
-    let account = Account::<Testnet2>::new(&mut thread_rng());
-    let address = account.address();
+    let expected_ciphertexts_set = ledger
+        .get_block(0)
+        .unwrap()
+        .commitments()
+        .map(|commitment| ledger.get_ciphertext(commitment).unwrap())
+        .collect::<HashSet<_>>();
 
-    // Mine the next block.
-    let (block, _) = ledger
-        .mine_next_block(address, true, &[], &terminator, rng)
-        .expect("Failed to mine");
-    ledger.add_next_block(&block).expect("Failed to add next block to ledger");
-
-    let expected_ciphertexts_set = to_hash_set_test::<Testnet2>(
-        ledger
-            .get_blocks(0, ledger.latest_block_height())
-            .unwrap()
-            .iter()
-            .flat_map(|block| block.commitments())
-            .map(|commitment| ledger.get_ciphertext(commitment).unwrap())
-            .collect::<Vec<_>>(),
-    );
-    let ciphertexts_set = to_hash_set_test::<Testnet2>(ledger.get_ciphertexts().unwrap().collect());
+    let ciphertexts_set = ledger
+        .get_ciphertexts()
+        .filter_map(|ciphertext_result| ciphertext_result.ok())
+        .collect();
 
     assert_eq!(expected_ciphertexts_set, ciphertexts_set);
 }
