@@ -18,10 +18,11 @@ use crate::{
     storage::{rocksdb::RocksDB, Storage},
     LedgerState,
 };
+use rayon::iter::{ParallelBridge, ParallelIterator};
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use rand::{thread_rng, Rng};
-use std::sync::atomic::AtomicBool;
+use std::{fs, sync::atomic::AtomicBool};
 
 fn temp_dir() -> std::path::PathBuf {
     tempfile::tempdir().expect("Failed to open temporary directory").into_path()
@@ -345,4 +346,32 @@ fn test_transaction_fees() {
     // Check that the output record balances are correct.
     assert_eq!(new_coinbase_record.value(), expected_block_reward);
     assert_eq!(output_record.value(), amount);
+}
+
+// This test Fails or Pass randomly because par_bridge does not garantee the order of the iterator.
+#[test]
+fn test_get_blocks_iterator() {
+    // Initialize a new temporary directory.
+    let directory = temp_dir();
+
+    // Initialize an empty ledger.
+    let ledger_state = LedgerState::open_writer::<RocksDB, _>(directory.clone()).expect("Failed to initialize ledger");
+
+    // Read the test blocks; note: they don't include the genesis block, as it's always available when creating a ledger.
+    // note: the `blocks_100` file was generated on a testnet2 storage using `LedgerState::dump_blocks`.
+    let test_blocks = fs::read("benches/blocks_1").unwrap_or_else(|_| panic!("Missing the test blocks file"));
+    let blocks: Vec<Block<Testnet2>> = bincode::deserialize(&test_blocks).expect("Failed to deserialize a block dump");
+
+    // Load a test block into the ledger.
+    ledger_state.add_next_block(&blocks[0]).expect("Failed to add a test block");
+    let blocks_result: Vec<_> = ledger_state
+        .get_blocks(0, ledger_state.latest_block_height() + 1)
+        .unwrap()
+        .par_bridge()
+        .filter_map(|block_result| block_result.ok())
+        .collect();
+
+    drop(ledger_state);
+
+    assert_eq!(blocks_result, vec![Testnet2::genesis_block().clone(), blocks[0].clone()]);
 }

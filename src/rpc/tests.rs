@@ -259,6 +259,7 @@ async fn test_get_block() {
     assert_eq!(response, *Testnet2::genesis_block());
 }
 
+// This test Fails or Pass randomly because par_bridge does not guarantees the order of the iterator.
 #[tokio::test]
 async fn test_get_blocks() {
     // Initialize a new temporary directory.
