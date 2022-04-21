@@ -148,9 +148,9 @@ async fn test_handle_rpc() {
     let response: Result<serde_json::Value, _> = rpc_client.request("", None).await;
 
     // Expect an error response.
-    if let Err(JsonrpseeError::Call(CallError::Custom { code, .. })) = response {
+    if let Err(JsonrpseeError::Call(CallError::Custom(err))) = response {
         // Verify the error code.
-        assert!(code == METHOD_NOT_FOUND_CODE);
+        assert!(err.code() == METHOD_NOT_FOUND_CODE);
     } else {
         panic!("Should have received an error response, got {:?}", response);
     }
