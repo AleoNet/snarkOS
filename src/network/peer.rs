@@ -480,7 +480,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                     }
                                     // Retrieve the requested blocks.
                                     let blocks = match ledger_reader.get_blocks(start_block_height, end_block_height) {
-                                        Ok(blocks) => blocks,
+                                        Ok(blocks) => blocks.filter_map(|block_result| block_result.ok()),
                                         Err(error) => {
                                             // Route a `Failure` to the ledger.
                                             if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
