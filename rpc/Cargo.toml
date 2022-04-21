@@ -30,7 +30,7 @@ features = [ "thread-pool" ]
 version = "0.4"
 
 [dependencies.jsonrpsee]
-version = "0.9"
+version = "0.11"
 features = [ "http-server" ]
 
 [dependencies.serde]
@@ -71,7 +71,7 @@ version = "0.1"
 version = "1.0"
 
 [dev-dependencies.jsonrpsee]
-version = "0.9"
+version = "0.11"
 features = [ "http-client" ]
 
 [dev-dependencies.rand]
