@@ -110,7 +110,7 @@ version = "0.3"
 features = [ "env-filter", "parking_lot" ]
 
 [dependencies.tui]
-version = "0.17"
+version = "0.18"
 optional = true
 
 [dev-dependencies.rusty-hook]
