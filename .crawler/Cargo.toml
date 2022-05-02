@@ -39,7 +39,7 @@ version = "3.1"
 features = [ "derive" ]
 
 [dependencies.nalgebra]
-version = "0.30"
+version = "0.31"
 
 [dependencies.native-tls]
 version = "0.2"
