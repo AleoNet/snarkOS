@@ -29,7 +29,7 @@ use snarkvm::{
     utilities::{FromBytes, ToBytes},
 };
 
-use rayon::iter::{ParallelBridge, ParallelIterator};
+use rayon::iter::ParallelIterator;
 use serde_json::Value;
 use time::OffsetDateTime;
 
@@ -81,7 +81,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
     async fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>, RpcError> {
         let safe_start_height = max(start_block_height, end_block_height.saturating_sub(E::MAXIMUM_BLOCK_REQUEST - 1));
         match self.ledger.get_blocks(safe_start_height, end_block_height) {
-            Ok(blocks_iter) => Ok(blocks_iter.par_bridge().filter_map(|block_result| block_result.ok()).collect()),
+            Ok(blocks_iter) => Ok(blocks_iter.filter_map(|block_result| block_result.ok()).collect()),
             Err(error) => Err(AnyhowError(error)),
         }
     }

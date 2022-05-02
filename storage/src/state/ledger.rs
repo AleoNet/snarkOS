@@ -457,7 +457,11 @@ impl<N: Network> LedgerState<N> {
     }
 
     /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
-    pub fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<impl Iterator<Item = Result<Block<N>>> + '_> {
+    pub fn get_blocks(
+        &self,
+        start_block_height: u32,
+        end_block_height: u32,
+    ) -> Result<impl ParallelIterator<Item = Result<Block<N>>> + '_> {
         self.blocks.get_blocks(start_block_height, end_block_height)
     }
 
@@ -874,7 +878,6 @@ impl<N: Network> LedgerState<N> {
         let start_block_height = latest_block_height.saturating_sub(number_of_blocks);
         let blocks: BTreeMap<u32, Block<N>> = self
             .get_blocks(start_block_height, latest_block_height)?
-            .par_bridge()
             .filter_map(|block_result| block_result.ok())
             .map(|block| (block.height(), block))
             .collect();
@@ -1417,14 +1420,14 @@ impl<N: Network> BlockState<N> {
     }
 
     /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
-    fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<impl Iterator<Item = Result<Block<N>>> + '_> {
+    fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<impl ParallelIterator<Item = Result<Block<N>>> + '_> {
         // Ensure the starting block height is less than the ending block height.
         if start_block_height > end_block_height {
             return Err(anyhow!("Invalid starting and ending block heights"));
         }
 
         Ok((start_block_height..=end_block_height)
-            .into_iter()
+            .into_par_iter()
             .map(move |height| self.get_block(height)))
     }
 

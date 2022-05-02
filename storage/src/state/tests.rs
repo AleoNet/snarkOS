@@ -18,7 +18,7 @@ use crate::{
     storage::{rocksdb::RocksDB, Storage},
     LedgerState,
 };
-use rayon::iter::{ParallelBridge, ParallelIterator};
+use rayon::iter::ParallelIterator;
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use rand::{thread_rng, Rng};
@@ -348,7 +348,6 @@ fn test_transaction_fees() {
     assert_eq!(output_record.value(), amount);
 }
 
-// This test Fails or Pass randomly because par_bridge does not garantee the order of the iterator.
 #[test]
 fn test_get_blocks_iterator() {
     // Initialize a new temporary directory.
@@ -367,7 +366,6 @@ fn test_get_blocks_iterator() {
     let blocks_result: Vec<_> = ledger_state
         .get_blocks(0, ledger_state.latest_block_height() + 1)
         .unwrap()
-        .par_bridge()
         .filter_map(|block_result| block_result.ok())
         .collect();
 
