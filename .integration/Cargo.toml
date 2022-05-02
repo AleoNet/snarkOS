@@ -27,7 +27,7 @@ optional = true
 version = "0.1"
 
 [dependencies.pea2pea]
-version = "0.35"
+version = "0.36"
 
 [dependencies.peak_alloc]
 version = "0.1"

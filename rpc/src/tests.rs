@@ -31,7 +31,7 @@ use jsonrpsee::{
     core::{client::ClientT, Error as JsonrpseeError},
     http_client::{HttpClient, HttpClientBuilder},
     rpc_params,
-    types::error::METHOD_NOT_FOUND_CODE,
+    types::error::{CallError, METHOD_NOT_FOUND_CODE},
 };
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
@@ -148,12 +148,11 @@ async fn test_handle_rpc() {
     let response: Result<serde_json::Value, _> = rpc_client.request("", None).await;
 
     // Expect an error response.
-    if let Err(JsonrpseeError::Request(error)) = response {
+    if let Err(JsonrpseeError::Call(CallError::Custom(err))) = response {
         // Verify the error code.
-        let json: serde_json::Value = serde_json::from_str(&error).expect("The response is not valid JSON");
-        assert!(json["error"]["code"] == METHOD_NOT_FOUND_CODE);
+        assert!(err.code() == METHOD_NOT_FOUND_CODE);
     } else {
-        panic!("Should have received an error response");
+        panic!("Should have received an error response, got {:?}", response);
     }
 }
 
