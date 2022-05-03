@@ -29,10 +29,10 @@ fn temp_dir() -> std::path::PathBuf {
 }
 
 /// Returns 3 test blocks.
+// Note: the `blocks_3` file was generated on a testnet2 storage using `LedgerState::dump_blocks`.
 fn test_blocks_3() -> Vec<Block<CurrentNetwork>> {
     let mut test_block_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     test_block_path.push("benches");
-    // note: the `blocks_3` file was generated on a testnet2 storage using `LedgerState::dump_blocks`.
     test_block_path.push("blocks_3");
 
     let test_blocks = fs::read(test_block_path).unwrap_or_else(|_| panic!("Missing the test blocks file"));
