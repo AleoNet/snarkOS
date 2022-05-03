@@ -358,7 +358,7 @@ fn test_get_blocks_iterator() {
 
     // Read the test blocks;
     // note: they don't include the genesis block, as it's always available when creating a ledger.
-    let test_blocks = fs::read("benches/blocks_1").unwrap_or_else(|_| panic!("Missing the test blocks file"));
+    let test_blocks = fs::read("benches/blocks_1").expect("Missing the test blocks file");
     let blocks: Vec<Block<Testnet2>> = bincode::deserialize(&test_blocks).expect("Failed to deserialize a block dump");
 
     // Load a test block into the ledger.
