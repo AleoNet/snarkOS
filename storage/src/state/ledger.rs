@@ -20,7 +20,7 @@ use crate::{
 };
 use snarkvm::dpc::prelude::*;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Result};
 use circular_queue::CircularQueue;
 use itertools::Itertools;
 use parking_lot::RwLock;
@@ -876,12 +876,15 @@ impl<N: Network> LedgerState<N> {
         // Fetch the blocks to be removed. This ensures the blocks to be removed exist in the ledger,
         // and is used during the removal process to expedite the procedure.
         let start_block_height = latest_block_height.saturating_sub(number_of_blocks);
-        let blocks: BTreeMap<u32, Block<N>> = self
+        let blocks: Result<BTreeMap<u32, Block<N>>> = self
             .get_blocks(start_block_height, latest_block_height)?
-            .filter_map(|block_result| block_result.ok())
-            .map(|block| (block.height(), block))
+            .map(|block| match block {
+                Ok(block) => Ok((block.height(), block)),
+                Err(err) => Err(err),
+            })
             .collect();
 
+        let blocks = blocks?;
         // Acquire the map lock to ensure the following operations aren't interrupted by a shutdown.
         let _map_lock = self.map_lock.read();
 
@@ -1422,9 +1425,7 @@ impl<N: Network> BlockState<N> {
     /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
     fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<impl ParallelIterator<Item = Result<Block<N>>> + '_> {
         // Ensure the starting block height is less than the ending block height.
-        if start_block_height > end_block_height {
-            return Err(anyhow!("Invalid starting and ending block heights"));
-        }
+        ensure!(start_block_height > end_block_height, "Invalid starting and ending block heights");
 
         Ok((start_block_height..=end_block_height)
             .into_par_iter()
