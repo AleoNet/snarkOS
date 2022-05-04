@@ -22,8 +22,7 @@ use rayon::iter::ParallelIterator;
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use rand::{thread_rng, Rng};
-use std::{fs, sync::atomic::AtomicBool};
-use std::{collections::HashSet, sync::atomic::AtomicBool};
+use std::{collections::HashSet, fs, sync::atomic::AtomicBool};
 
 fn temp_dir() -> std::path::PathBuf {
     tempfile::tempdir().expect("Failed to open temporary directory").into_path()
