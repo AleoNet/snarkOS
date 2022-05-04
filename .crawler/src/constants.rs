@@ -42,11 +42,6 @@ pub const STALE_CONNECTION_CUTOFF_TIME_HRS: i64 = 4;
 pub const DESIRED_PEER_SET_COUNT: u8 = 3;
 /// The maximum number of connections to attempt to initiate when updating peers.
 pub const NUM_CONCURRENT_CONNECTION_ATTEMPTS: u8 = 50;
-/// The maximum time (in milliseconds) a handshake can take; doesn't have to match the one in the snarkOS node.
-pub const MAX_HANDSHAKE_TIME_MS: u64 = 10_000;
-/// The size of the per-connection read buffer.
-// TODO: double-check maximum message length
-pub const READ_BUFFER_SIZE: usize = 16 * 1024;
 /// The number of peers shared with the crawled nodes when requested.
 pub const SHARED_PEER_COUNT: usize = 15;
 /// The number of connection failures after which a node is removed from the list of known nodes.
