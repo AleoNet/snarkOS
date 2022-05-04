@@ -83,7 +83,8 @@ pub enum PeersRequest<N: Network, E: Environment> {
     PeerDisconnected(SocketAddr),
     /// PeerRestricted := (peer_ip)
     PeerRestricted(SocketAddr),
-    /// SendPeerResponse := (peer_ip)
+    /// SendPeerResponse := (peer_ip, rtt_start)
+    /// Note: rtt_start is for the request/response cycle for sharing peers.
     SendPeerResponse(SocketAddr, Option<Instant>),
     /// ReceivePeerResponse := (\[peer_ip\])
     ReceivePeerResponse(Vec<SocketAddr>),
