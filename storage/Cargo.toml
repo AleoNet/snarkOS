@@ -87,7 +87,7 @@ version = "3.2"
 
 [dev-dependencies.snarkos-storage]
 path = "."
-features = [ "test" ]
+features = [ "test" ] # a workaround to use the `test` feature in tests by default
 
 [features]
 default = [ "rocks" ]

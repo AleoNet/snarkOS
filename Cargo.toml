@@ -116,6 +116,10 @@ optional = true
 [dev-dependencies.rusty-hook]
 version = "0.11"
 
+[dev-dependencies.snarkos]
+path = "."
+features = [ "test" ] # a workaround to use the `test` feature in tests by default
+
 [profile.release]
 opt-level = 3
 lto = "thin"

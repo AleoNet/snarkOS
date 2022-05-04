@@ -1276,7 +1276,7 @@ impl<N: Network> LedgerState<N> {
     }
 
     ///
-    /// Dump the specified number of blocks to the given location.
+    /// Dump the specified number of blocks - excluding the genesis - to the given location.
     ///
     #[cfg(test)]
     #[allow(dead_code)]
@@ -1285,8 +1285,8 @@ impl<N: Network> LedgerState<N> {
         let mut blocks = Vec::with_capacity(count as usize);
 
         println!("Commencing block dump");
-        for i in 1..count {
-            if i % 10 == 0 {
+        for i in 1..=count {
+            if i % 10 == 0 || count < 10 {
                 println!("Dumping block {}/{}", i, count);
             }
             let block = self.get_block(i)?;

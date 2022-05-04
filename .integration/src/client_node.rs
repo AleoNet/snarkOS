@@ -16,13 +16,13 @@
 
 use clap::Parser;
 use snarkos::Server;
-use snarkos_environment::{Client, CurrentNetwork};
+use snarkos_environment::{network::DisconnectReason, CurrentNetwork, TestEnvironment};
 
 use std::{fs, net::SocketAddr};
 
 /// A facade for a snarkOS client node.
 pub struct ClientNode {
-    pub server: Server<CurrentNetwork, Client<CurrentNetwork>>,
+    pub server: Server<CurrentNetwork, TestEnvironment<CurrentNetwork>>,
 }
 
 impl ClientNode {
@@ -36,6 +36,11 @@ impl ClientNode {
         self.server.peers().connected_peers().await
     }
 
+    /// Returns the number of connected peers of the node.
+    pub async fn number_of_connected_peers(&self) -> usize {
+        self.server.peers().number_of_connected_peers().await
+    }
+
     /// Resets the node's known peers. This is practical, as it makes the node not reconnect
     /// to known peers in test cases where it's undesirable.
     pub async fn reset_known_peers(&self) {
@@ -45,6 +50,11 @@ impl ClientNode {
     /// Attempts to connect the node to the given address.
     pub async fn connect(&self, addr: SocketAddr) -> anyhow::Result<()> {
         self.server.connect_to(addr).await
+    }
+
+    /// Disonnects the node from the given address.
+    pub async fn disconnect(&self, addr: SocketAddr) {
+        self.server.disconnect_from(addr, DisconnectReason::NoReasonGiven).await
     }
 
     /// Starts a snarkOS node with all the default characteristics from `ClientNode::with_args`.
@@ -58,7 +68,7 @@ impl ClientNode {
         let permanent_args = &["snarkos", "--norpc"];
         let combined_args = permanent_args.iter().chain(extra_args.iter());
         let config = snarkos::Node::parse_from(combined_args);
-        let server = Server::<CurrentNetwork, Client<CurrentNetwork>>::initialize(&config, None, None)
+        let server = Server::<CurrentNetwork, TestEnvironment<CurrentNetwork>>::initialize(&config, None, None)
             .await
             .unwrap();
 

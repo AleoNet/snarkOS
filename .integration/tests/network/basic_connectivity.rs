@@ -15,17 +15,14 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::common::spawn_test_node_with_nonce;
-use snarkos_integration::{wait_until, ClientNode, TestNode, MAXIMUM_NUMBER_OF_PEERS};
+use snarkos_environment::{CurrentNetwork, Environment, TestEnvironment};
+use snarkos_integration::{wait_until, ClientNode, TestNode};
 
 use pea2pea::Pea2Pea;
-use std::{
-    sync::{
-        atomic::{AtomicU8, Ordering::*},
-        Arc,
-    },
-    time::Duration,
+use std::sync::{
+    atomic::{AtomicU8, Ordering::*},
+    Arc,
 };
-use tokio::{task, time};
 
 #[tokio::test]
 async fn client_nodes_can_connect_to_each_other() {
@@ -135,7 +132,7 @@ async fn concurrent_duplicate_connection_attempts_fail() {
         let test_node = test_node.clone();
         let error_count = error_count.clone();
 
-        task::spawn(async move {
+        tokio::spawn(async move {
             if test_node.node().connect(client_node_addr).await.is_err() {
                 error_count.fetch_add(1, Relaxed);
             }
@@ -152,11 +149,17 @@ async fn connection_limits_are_obeyed() {
     // Start a snarkOS node.
     let client_node = ClientNode::default().await;
 
+    const MAXIMUM_NUMBER_OF_PEERS: usize = TestEnvironment::<CurrentNetwork>::MAXIMUM_NUMBER_OF_PEERS as usize;
+
     // Start the maximum number of test nodes the snarkOS node is permitted to connect to at once.
     let mut test_nodes = Vec::with_capacity(MAXIMUM_NUMBER_OF_PEERS);
     for _ in 0..MAXIMUM_NUMBER_OF_PEERS {
         test_nodes.push(TestNode::default().await);
     }
+
+    // Create one additional test node.
+    let extra_test_node = TestNode::default().await;
+    let extra_test_node_addr = extra_test_node.node().listening_addr().unwrap();
 
     // All the test nodes should be able to connect to the snarkOS node.
     for test_node in &test_nodes {
@@ -164,13 +167,9 @@ async fn connection_limits_are_obeyed() {
     }
 
     // A short sleep to ensure all the connections are ready.
-    time::sleep(Duration::from_millis(10)).await;
+    wait_until!(1, client_node.number_of_connected_peers().await == MAXIMUM_NUMBER_OF_PEERS);
 
-    // Create one additional test node.
-    let extra_test_node = TestNode::default().await;
-    let extra_test_node_addr = extra_test_node.node().listening_addr().unwrap();
-
-    // Assert that snarkOS can't connect to it.
+    // Assert that snarkOS can't connect to the extra node.
     assert!(client_node.connect(extra_test_node_addr).await.is_err());
 
     // Assert that the test node can't connect to the snarkOS node either.
