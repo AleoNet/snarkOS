@@ -878,10 +878,7 @@ impl<N: Network> LedgerState<N> {
         let start_block_height = latest_block_height.saturating_sub(number_of_blocks);
         let blocks: Result<BTreeMap<u32, Block<N>>> = self
             .get_blocks(start_block_height, latest_block_height)?
-            .map(|block| match block {
-                Ok(block) => Ok((block.height(), block)),
-                Err(err) => Err(err),
-            })
+            .map(|block| block.map(|block| (block.height(), block)))
             .collect();
 
         let blocks = blocks?;
