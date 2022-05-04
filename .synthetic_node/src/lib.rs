@@ -116,6 +116,8 @@ impl SynthNode {
 /// Automated handshake handling for the test nodes.
 #[async_trait::async_trait]
 impl Handshake for SynthNode {
+    const TIMEOUT_MS: u64 = 10_000;
+
     async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
         let own_ip = self.node().listening_addr()?;
         let peer_addr = connection.addr();
