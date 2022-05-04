@@ -466,6 +466,11 @@ impl<N: Network> LedgerState<N> {
         self.blocks.get_previous_ledger_root(block_height)
     }
 
+    // Returns all the ciphertexts in ledger.
+    pub fn get_ciphertexts(&self) -> impl Iterator<Item = Result<N::RecordCiphertext>> + '_ {
+        self.blocks.get_ciphertexts()
+    }
+
     /// Returns the block locators of the current ledger, from the given block height.
     pub fn get_block_locators(&self, block_height: u32) -> Result<BlockLocators<N>> {
         // Initialize the current block height that a block locator is obtained from.
@@ -1292,6 +1297,11 @@ impl<N: Network> BlockState<N> {
         self.transactions.get_ciphertext(commitment)
     }
 
+    // Returns all the record ciphertexts.
+    fn get_ciphertexts(&self) -> impl Iterator<Item = Result<N::RecordCiphertext>> + '_ {
+        self.transactions.get_ciphertexts()
+    }
+
     /// Returns the transition for a given transition ID.
     fn get_transition(&self, transition_id: &N::TransitionID) -> Result<Transition<N>> {
         self.transactions.get_transition(transition_id)
@@ -1565,6 +1575,11 @@ impl<N: Network> TransactionState<N> {
         }
 
         Err(anyhow!("Commitment {} is missing in storage", commitment))
+    }
+
+    // Returns all the record ciphertexts.
+    fn get_ciphertexts(&self) -> impl Iterator<Item = Result<N::RecordCiphertext>> + '_ {
+        self.commitments.keys().map(move |commitment| self.get_ciphertext(&commitment))
     }
 
     /// Returns the transition for a given transition ID.

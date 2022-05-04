@@ -21,7 +21,7 @@ use crate::{
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use rand::{thread_rng, Rng};
-use std::sync::atomic::AtomicBool;
+use std::{collections::HashSet, sync::atomic::AtomicBool};
 
 fn temp_dir() -> std::path::PathBuf {
     tempfile::tempdir().expect("Failed to open temporary directory").into_path()
@@ -345,4 +345,24 @@ fn test_transaction_fees() {
     // Check that the output record balances are correct.
     assert_eq!(new_coinbase_record.value(), expected_block_reward);
     assert_eq!(output_record.value(), amount);
+}
+
+#[test]
+fn test_get_all_ciphertexts() {
+    // Initialize a new ledger.
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
+
+    let expected_ciphertexts_set = ledger
+        .get_block(0)
+        .unwrap()
+        .commitments()
+        .map(|commitment| ledger.get_ciphertext(commitment).unwrap())
+        .collect::<HashSet<_>>();
+
+    let ciphertexts_set = ledger
+        .get_ciphertexts()
+        .filter_map(|ciphertext_result| ciphertext_result.ok())
+        .collect();
+
+    assert_eq!(expected_ciphertexts_set, ciphertexts_set);
 }
