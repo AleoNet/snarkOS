@@ -1422,7 +1422,7 @@ impl<N: Network> BlockState<N> {
     /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
     fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<impl ParallelIterator<Item = Result<Block<N>>> + '_> {
         // Ensure the starting block height is less than the ending block height.
-        ensure!(start_block_height > end_block_height, "Invalid starting and ending block heights");
+        ensure!(start_block_height <= end_block_height, "Invalid starting and ending block heights");
 
         Ok((start_block_height..=end_block_height)
             .into_par_iter()
