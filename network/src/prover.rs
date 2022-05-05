@@ -72,7 +72,7 @@ pub struct Prover<N: Network, E: Environment> {
     /// The pool of unconfirmed transactions.
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
     /// The shared state of the owning node.
-    pub state: Arc<State<N, E>>,
+    state: Arc<State<N, E>>,
 }
 
 impl<N: Network, E: Environment> Prover<N, E> {
@@ -184,7 +184,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
     /// Performs the given `request` to the prover.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub async fn update(&self, request: ProverRequest<N>) {
+    pub(super) async fn update(&self, request: ProverRequest<N>) {
         match request {
             ProverRequest::PoolRequest(operator_ip, share_difficulty, block_template) => {
                 // Process the pool request message.
@@ -207,7 +207,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
     ///
     /// Sends a `PoolRegister` message to the pool IP address.
     ///
-    pub async fn send_pool_register(&self) {
+    async fn send_pool_register(&self) {
         if E::NODE_TYPE == NodeType::Prover {
             if let Some(recipient) = self.address {
                 if let Some(pool_ip) = self.pool {
@@ -328,7 +328,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
     ///
     /// Initialize the miner, if the node type is a miner.
     ///
-    pub async fn start_miner(&self) {
+    async fn start_miner(&self) {
         // Initialize a new instance of the miner.
         if E::NODE_TYPE == NodeType::Miner && self.pool.is_none() {
             if let Some(recipient) = self.address {

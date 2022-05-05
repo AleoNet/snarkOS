@@ -169,7 +169,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub async fn update(&self, request: LedgerRequest<N>) {
+    pub(super) async fn update(&self, request: LedgerRequest<N>) {
         match request {
             LedgerRequest::BlockResponse(peer_ip, block) => {
                 // Remove the block request from the ledger.

@@ -69,7 +69,7 @@ pub struct Operator<N: Network, E: Environment> {
     /// The operator router of the node.
     operator_router: OperatorRouter<N>,
     /// The shared state of the owning node.
-    pub state: Arc<State<N, E>>,
+    state: Arc<State<N, E>>,
 }
 
 impl<N: Network, E: Environment> Operator<N, E> {
@@ -194,7 +194,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
     /// Performs the given `request` to the operator.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub async fn update(&self, request: OperatorRequest<N>) {
+    pub(super) async fn update(&self, request: OperatorRequest<N>) {
         match request {
             OperatorRequest::PoolRegister(peer_ip, address) => {
                 if let Some(block_template) = self.block_template.read().await.clone() {

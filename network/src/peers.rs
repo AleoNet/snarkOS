@@ -226,7 +226,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Performs the given `request` to the peers.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub async fn update(&self, request: PeersRequest<N, E>) {
+    pub(super) async fn update(&self, request: PeersRequest<N, E>) {
         match request {
             PeersRequest::Connect(peer_ip, connection_result) => {
                 // Ensure the peer IP is not this node.
