@@ -63,8 +63,6 @@ pub enum ProverRequest<N: Network> {
 pub struct Prover<N: Network, E: Environment> {
     /// The state storage of the prover.
     prover_state: Arc<ProverState<N>>,
-    /// The Aleo address of the prover.
-    pub address: Option<Address<N>>,
     /// The IP address of the connected pool.
     pool: Option<SocketAddr>,
     /// The prover router of the node.
@@ -79,7 +77,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
     /// Initializes a new instance of the prover, paired with its handler.
     pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
         path: P,
-        address: Option<Address<N>>,
         pool_ip: Option<SocketAddr>,
         state: Arc<State<N, E>>,
     ) -> Result<(Self, mpsc::Receiver<ProverRequest<N>>)> {
@@ -88,7 +85,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
         // Initialize the prover.
         let prover = Self {
             prover_state: Arc::new(ProverState::open::<S, P>(path, false)?),
-            address,
             pool: pool_ip,
             prover_router,
             memory_pool: Arc::new(RwLock::new(MemoryPool::new())),
@@ -209,7 +205,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
     ///
     async fn send_pool_register(&self) {
         if E::NODE_TYPE == NodeType::Prover {
-            if let Some(recipient) = self.address {
+            if let Some(recipient) = self.state.address {
                 if let Some(pool_ip) = self.pool {
                     // Proceed to register the prover to receive a block template.
                     let request = PeersRequest::MessageSend(pool_ip, Message::PoolRegister(recipient));
@@ -230,7 +226,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
     ///
     async fn process_pool_request(&self, operator_ip: SocketAddr, share_difficulty: u64, block_template: BlockTemplate<N>) {
         if E::NODE_TYPE == NodeType::Prover {
-            if let Some(recipient) = self.address {
+            if let Some(recipient) = self.state.address {
                 if let Some(pool_ip) = self.pool {
                     // Refuse work from any pool other than the registered one.
                     if pool_ip == operator_ip {
@@ -331,7 +327,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
     async fn start_miner(&self) {
         // Initialize a new instance of the miner.
         if E::NODE_TYPE == NodeType::Miner && self.pool.is_none() {
-            if let Some(recipient) = self.address {
+            if let Some(recipient) = self.state.address {
                 // Initialize the prover process.
                 let (router, handler) = oneshot::channel();
                 let state = self.state.clone();

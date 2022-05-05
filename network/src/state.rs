@@ -31,6 +31,8 @@ use crate::{
 pub struct State<N: Network, E: Environment> {
     /// The local address of the node.
     pub local_ip: SocketAddr,
+    /// The Aleo address corresponding to the Node's prover and/or operator.
+    pub address: Option<Address<N>>,
     /// The list of peers for the node.
     peers: OnceBox<Peers<N, E>>,
     /// The ledger of the node.
@@ -42,9 +44,10 @@ pub struct State<N: Network, E: Environment> {
 }
 
 impl<N: Network, E: Environment> State<N, E> {
-    pub fn new(local_ip: SocketAddr) -> Self {
+    pub fn new(local_ip: SocketAddr, address: Option<Address<N>>) -> Self {
         Self {
             local_ip,
+            address,
             peers: Default::default(),
             ledger: Default::default(),
             operator: Default::default(),

@@ -84,7 +84,7 @@ async fn new_rpc_context<N: Network, E: Environment, S: Storage, P: AsRef<Path>>
     // Derive the storage paths.
     let (ledger_path, prover_path, operator_storage_path) = (path.as_ref().to_path_buf(), temp_dir(), temp_dir());
 
-    let state = Arc::new(State::new(node_addr));
+    let state = Arc::new(State::new(node_addr, None));
 
     // Initialize a new instance for managing peers.
     let (peers, peers_handler) = Peers::new(None, state.clone()).await;
@@ -95,7 +95,7 @@ async fn new_rpc_context<N: Network, E: Environment, S: Storage, P: AsRef<Path>>
         .expect("Failed to initialize ledger");
 
     // Initialize a new instance for managing the prover.
-    let (prover, prover_handler) = Prover::open::<S, _>(&prover_path, None, Some(node_addr), state.clone())
+    let (prover, prover_handler) = Prover::open::<S, _>(&prover_path, Some(node_addr), state.clone())
         .await
         .expect("Failed to initialize prover");
 

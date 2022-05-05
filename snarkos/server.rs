@@ -69,7 +69,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let prover_storage_path = node.prover_storage_path(local_ip);
 
         // Initialize the shared state.
-        let state = Arc::new(State::new(local_ip));
+        let state = Arc::new(State::new(local_ip, address));
 
         // Initialize a new instance for managing peers.
         let (peers, peers_handler) = Peers::new(None, state.clone()).await;
@@ -78,7 +78,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         let (ledger, ledger_handler) = Ledger::<N, E>::open::<RocksDB, _>(&ledger_storage_path, state.clone()).await?;
 
         // Initialize a new instance for managing the prover.
-        let (prover, prover_handler) = Prover::open::<RocksDB, _>(&prover_storage_path, address, pool_ip, state.clone()).await?;
+        let (prover, prover_handler) = Prover::open::<RocksDB, _>(&prover_storage_path, pool_ip, state.clone()).await?;
 
         // Initialize a new instance for managing the operator.
         let (operator, operator_handler) = Operator::open::<RocksDB, _>(&operator_storage_path, state.clone()).await?;

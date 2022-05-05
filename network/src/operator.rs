@@ -96,7 +96,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
     pub async fn initialize(&self) {
         if E::NODE_TYPE == NodeType::Operator {
-            if let Some(recipient) = self.state.prover().address {
+            if let Some(recipient) = self.state.address {
                 // Initialize an update loop for the block template.
                 let state = self.state.clone();
                 let (router, handler) = oneshot::channel();
