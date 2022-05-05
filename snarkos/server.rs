@@ -128,7 +128,7 @@ impl<N: Network, E: Environment> Server<N, E> {
 
     #[inline]
     pub async fn disconnect_from(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
-        self.ledger.disconnect(peer_ip, reason).await
+        self.state.ledger().disconnect(peer_ip, reason).await
     }
 
     ///
