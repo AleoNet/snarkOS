@@ -19,7 +19,7 @@ use crate::{
     LedgerState,
 };
 use snarkos_environment::CurrentNetwork;
-use snarkvm::dpc::prelude::*;
+use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use rand::{thread_rng, Rng};
 use std::{fs, path::PathBuf, sync::atomic::AtomicBool};
@@ -285,4 +285,21 @@ fn test_transaction_fees() {
     // Check that the output record balances are correct.
     assert_eq!(new_coinbase_record.value(), expected_block_reward);
     assert_eq!(output_record.value(), amount);
+}
+
+#[test]
+fn test_get_all_ciphertexts() {
+    // Initialize a new ledger.
+    let ledger = create_new_ledger::<Testnet2, RocksDB>();
+
+    let expected_ciphertexts: Vec<_> = ledger
+        .get_block(0)
+        .unwrap()
+        .commitments()
+        .map(|commitment| ledger.get_ciphertext(commitment).unwrap())
+        .collect();
+
+    let ciphertexts: Vec<_> = ledger.get_ciphertexts().collect();
+
+    assert_eq!(expected_ciphertexts, ciphertexts);
 }
