@@ -471,7 +471,7 @@ impl<N: Network> LedgerState<N> {
     }
 
     // Returns all the ciphertexts in ledger.
-    pub fn get_ciphertexts(&self) -> impl Iterator<Item = Result<N::RecordCiphertext>> + '_ {
+    pub fn get_ciphertexts(&self) -> impl Iterator<Item = N::RecordCiphertext> + '_ {
         self.blocks.get_ciphertexts()
     }
 
@@ -1301,7 +1301,7 @@ impl<N: Network> BlockState<N> {
     }
 
     // Returns all the record ciphertexts.
-    fn get_ciphertexts(&self) -> impl Iterator<Item = Result<N::RecordCiphertext>> + '_ {
+    fn get_ciphertexts(&self) -> impl Iterator<Item = N::RecordCiphertext> + '_ {
         self.transactions.get_ciphertexts()
     }
 
@@ -1578,8 +1578,10 @@ impl<N: Network> TransactionState<N> {
     }
 
     // Returns all the record ciphertexts.
-    fn get_ciphertexts(&self) -> impl Iterator<Item = Result<N::RecordCiphertext>> + '_ {
-        self.commitments.keys().map(move |commitment| self.get_ciphertext(&commitment))
+    fn get_ciphertexts(&self) -> impl Iterator<Item = N::RecordCiphertext> + '_ {
+        self.transitions
+            .values()
+            .flat_map(|(_, _, transition)| transition.ciphertexts().cloned().collect::<Vec<N::RecordCiphertext>>())
     }
 
     /// Returns the transition for a given transition ID.
