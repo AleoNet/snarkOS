@@ -22,8 +22,7 @@ use rayon::iter::ParallelIterator;
 use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
 
 use rand::{thread_rng, Rng};
-use std::{collections::HashSet, fs, sync::atomic::AtomicBool};
-
+use std::{sync::atomic::AtomicBool, fs};
 fn temp_dir() -> std::path::PathBuf {
     tempfile::tempdir().expect("Failed to open temporary directory").into_path()
 }
@@ -377,17 +376,14 @@ fn test_get_all_ciphertexts() {
     // Initialize a new ledger.
     let ledger = create_new_ledger::<Testnet2, RocksDB>();
 
-    let expected_ciphertexts_set = ledger
+    let expected_ciphertexts: Vec<_> = ledger
         .get_block(0)
         .unwrap()
         .commitments()
         .map(|commitment| ledger.get_ciphertext(commitment).unwrap())
-        .collect::<HashSet<_>>();
-
-    let ciphertexts_set = ledger
-        .get_ciphertexts()
-        .filter_map(|ciphertext_result| ciphertext_result.ok())
         .collect();
 
-    assert_eq!(expected_ciphertexts_set, ciphertexts_set);
+    let ciphertexts: Vec<_> = ledger.get_ciphertexts().collect();
+
+    assert_eq!(expected_ciphertexts, ciphertexts);
 }
