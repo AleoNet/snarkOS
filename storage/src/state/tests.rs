@@ -369,8 +369,6 @@ fn test_get_blocks_iterator() {
         .filter_map(|block_result| block_result.ok())
         .collect();
 
-    drop(ledger_state);
-
     assert_eq!(blocks_result, vec![Testnet2::genesis_block().clone(), blocks[0].clone()]);
 }
 

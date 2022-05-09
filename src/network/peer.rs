@@ -480,16 +480,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         continue;
                                     }
                                     // Retrieve the requested blocks.
-                                    let blocks: Vec<Block<N>> = match ledger_reader.get_blocks(start_block_height, end_block_height) {
-                                        Ok(blocks) => match blocks.collect() {
-                                            Ok(blocks) => blocks,
-                                            Err(error) => {
-                                                if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
-                                                    warn!("[Failure] {}", error);
-                                                }
-                                                continue;
-                                            }
-                                        },
+                                    let blocks: Vec<Block<N>> = match ledger_reader.get_blocks(start_block_height, end_block_height).and_then(|blocks| blocks.collect()) {
+                                        Ok(blocks) => blocks,
                                         Err(error) => {
                                             // Route a `Failure` to the ledger.
                                             if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {

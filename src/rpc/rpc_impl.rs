@@ -76,13 +76,11 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
     /// Returns up to `MAXIMUM_BLOCK_REQUEST` blocks from the given `start_block_height` to `end_block_height` (inclusive).
     async fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>, RpcError> {
         let safe_start_height = max(start_block_height, end_block_height.saturating_sub(E::MAXIMUM_BLOCK_REQUEST - 1));
-        let blocks: Result<Vec<Block<N>>, _> = self
+        Ok(self
             .ledger
             .get_blocks(safe_start_height, end_block_height)?
             .map(|block_result| block_result)
-            .collect();
-
-        Ok(blocks?)
+            .collect::<Result<Vec<Block<N>>, _>>()?)
     }
 
     /// Returns the block height for the given the block hash.
