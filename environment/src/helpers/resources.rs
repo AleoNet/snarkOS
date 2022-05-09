@@ -103,11 +103,6 @@ impl Resources {
             while let Some(request) = receiver.recv().await {
                 match request {
                     ResourceRequest::Register(resource, id) => {
-                        let _resource_name = match resource {
-                            Resource::Task(..) => "task",
-                            Resource::Thread(..) => "thread",
-                        };
-
                         if resources.insert(id, resource).is_some() {
                             error!("A resource with id {} already exists!", id);
                         }
