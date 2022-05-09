@@ -19,7 +19,7 @@ use crate::{
     LedgerState,
 };
 use snarkos_environment::CurrentNetwork;
-use snarkvm::dpc::{prelude::*, testnet2::Testnet2};
+use snarkvm::dpc::prelude::*;
 
 use rand::{thread_rng, Rng};
 use std::{fs, path::PathBuf, sync::atomic::AtomicBool};
