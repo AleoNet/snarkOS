@@ -14,7 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub const GAUGE_NAMES: [&str; 4] = [blocks::HEIGHT, peers::CONNECTED, peers::CANDIDATE, peers::RESTRICTED];
+pub const GAUGES: [&str; 4] = [blocks::HEIGHT, peers::CONNECTED, peers::CANDIDATE, peers::RESTRICTED];
+pub const HISTOGRAMS: [&str; 4] = [
+    internal_rtt::PING,
+    internal_rtt::PONG,
+    internal_rtt::PEER_REQUEST,
+    internal_rtt::BLOCK_REQUEST,
+];
 
 pub mod blocks {
     pub const HEIGHT: &str = "snarkos_blocks_height_total";
@@ -24,4 +30,11 @@ pub mod peers {
     pub const CONNECTED: &str = "snarkos_peers_connected_total";
     pub const CANDIDATE: &str = "snarkos_peers_candidate_total";
     pub const RESTRICTED: &str = "snarkos_peers_restricted_total";
+}
+
+pub mod internal_rtt {
+    pub const PING: &str = "snarkos_internal_rtt_ping";
+    pub const PONG: &str = "snarkos_internal_rtt_pong";
+    pub const PEER_REQUEST: &str = "snarkos_internal_rtt_peer_request";
+    pub const BLOCK_REQUEST: &str = "snarkos_internal_rtt_block_request";
 }

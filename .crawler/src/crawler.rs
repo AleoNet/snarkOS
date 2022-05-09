@@ -304,7 +304,7 @@ impl Reading for Crawler {
                     self.process_peer_request(source)?;
                     Ok(())
                 }
-                ClientMessage::PeerResponse(peer_ips) => {
+                ClientMessage::PeerResponse(peer_ips, _) => {
                     self.process_peer_response(source, peer_ips)?;
                     Ok(())
                 }
@@ -342,7 +342,7 @@ impl Crawler {
             .choose_multiple(&mut self.rng(), SHARED_PEER_COUNT);
 
         debug!(parent: self.node().span(), "sending a PeerResponse to {}", source);
-        self.send_direct_message(source, ClientMessage::PeerResponse(peers))?;
+        self.send_direct_message(source, ClientMessage::PeerResponse(peers, None))?;
 
         Ok(())
     }

@@ -61,7 +61,7 @@
             "stacking": {
               "group": "A",
               "mode": "none"
-            },
+           },
             "thresholdsStyle": {
               "mode": "off"
             }
@@ -229,8 +229,116 @@
       ],
       "title": "Block Height",
       "type": "timeseries"
+    },
+    {
+      "datasource": null,
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "axisLabel": "",
+            "axisPlacement": "auto",
+            "barAlignment": 0,
+            "drawStyle": "line",
+            "fillOpacity": 0,
+            "gradientMode": "none",
+            "hideFrom": {
+              "legend": false,
+              "tooltip": false,
+              "viz": false
+            },
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "pointSize": 5,
+            "scaleDistribution": {
+              "log": 10,
+              "type": "log"
+            },
+            "showPoints": "auto",
+            "spanNulls": false,
+            "stacking": {
+              "group": "A",
+              "mode": "none"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            }
+          },
+          "mappings": [],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 80
+              }
+            ]
+          },
+          "unit": "s"
+        },
+        "overrides": []
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 10
+      },
+      "id": 6,
+      "options": {
+        "legend": {
+          "calcs": [],
+          "displayMode": "list",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "single"
+        }
+      },
+      "targets": [
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_internal_rtt_ping_sum[$__rate_interval])/rate(snarkos_internal_rtt_ping_count[$__rate_interval])",
+          "interval": "",
+          "legendFormat": "ping",
+          "refId": "A"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_internal_rtt_pong_sum[$__rate_interval])/rate(snarkos_internal_rtt_pong_count[$__rate_interval])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "pong (processing, no response)",
+          "refId": "B"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_internal_rtt_peer_request_sum[$__rate_interval])/rate(snarkos_internal_rtt_peer_request_count[$__rate_interval])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "peer_request",
+          "refId": "C"
+        },
+        {
+          "exemplar": true,
+          "expr": "rate(snarkos_internal_rtt_block_request_sum[$__rate_interval])/rate(snarkos_internal_rtt_block_request_count[$__rate_interval])",
+          "hide": false,
+          "interval": "",
+          "legendFormat": "block_request",
+          "refId": "D"
+        }
+      ],
+      "title": "Internal RTT for request/response cycles",
+      "type": "timeseries"
     }
   ],
+  "refresh": "10s",
   "schemaVersion": 31,
   "style": "dark",
   "tags": [],
@@ -238,12 +346,12 @@
     "list": []
   },
   "time": {
-    "from": "now-30m",
+    "from": "now-5m",
     "to": "now"
   },
   "timepicker": {},
   "timezone": "",
   "title": "snarkOS v2",
   "uid": "f7OaOQB7z",
-  "version": 2
+  "version": 6
 }

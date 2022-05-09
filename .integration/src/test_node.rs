@@ -153,7 +153,7 @@ impl Reading for TestNode {
                 debug!("Peer {} disconnected for the following reason: {:?}", source, reason);
             }
             ClientMessage::PeerRequest => self.process_peer_request(source).await?,
-            ClientMessage::PeerResponse(peer_addrs) => self.process_peer_response(source, peer_addrs).await?,
+            ClientMessage::PeerResponse(peer_addrs, _) => self.process_peer_response(source, peer_addrs).await?,
             ClientMessage::Ping(version, _fork_depth, _peer_type, _peer_state, _block_hash, block_header) => {
                 // Deserialise the block header.
                 let block_header = block_header.deserialize().await.unwrap();
@@ -176,7 +176,7 @@ impl Reading for TestNode {
 impl TestNode {
     async fn process_peer_request(&self, source: SocketAddr) -> io::Result<()> {
         let peers = self.state.peers.read().keys().copied().collect::<Vec<_>>();
-        let msg = ClientMessage::PeerResponse(peers);
+        let msg = ClientMessage::PeerResponse(peers, None);
         info!(parent: self.node().span(), "sending a PeerResponse to {}", source);
 
         self.send_direct_message(source, msg)?;

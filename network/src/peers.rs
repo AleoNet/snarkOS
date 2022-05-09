@@ -83,8 +83,9 @@ pub enum PeersRequest<N: Network, E: Environment> {
     PeerDisconnected(SocketAddr),
     /// PeerRestricted := (peer_ip)
     PeerRestricted(SocketAddr),
-    /// SendPeerResponse := (peer_ip)
-    SendPeerResponse(SocketAddr),
+    /// SendPeerResponse := (peer_ip, rtt_start)
+    /// Note: rtt_start is for the request/response cycle for sharing peers.
+    SendPeerResponse(SocketAddr, Option<Instant>),
     /// ReceivePeerResponse := (\[peer_ip\])
     ReceivePeerResponse(Vec<SocketAddr>),
 }
@@ -622,10 +623,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     metrics::gauge!(metrics::peers::RESTRICTED, number_of_restricted_peers as f64);
                 }
             }
-            PeersRequest::SendPeerResponse(recipient) => {
+            PeersRequest::SendPeerResponse(recipient, rtt_start) => {
                 // Send a `PeerResponse` message.
                 let connected_peers = self.connected_peers().await;
-                self.send(recipient, Message::PeerResponse(connected_peers)).await;
+                self.send(recipient, Message::PeerResponse(connected_peers, rtt_start)).await;
             }
             PeersRequest::ReceivePeerResponse(peer_ips) => {
                 self.add_candidate_peers(peer_ips.iter()).await;
