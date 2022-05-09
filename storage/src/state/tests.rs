@@ -290,7 +290,7 @@ fn test_transaction_fees() {
 #[test]
 fn test_get_all_ciphertexts() {
     // Initialize a new ledger.
-    let ledger = create_new_ledger::<Testnet2, RocksDB>();
+    let ledger = create_new_ledger::<CurrentNetwork, RocksDB>();
 
     let expected_ciphertexts: Vec<_> = ledger
         .get_block(0)
