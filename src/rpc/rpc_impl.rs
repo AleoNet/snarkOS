@@ -79,7 +79,6 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
         Ok(self
             .ledger
             .get_blocks(safe_start_height, end_block_height)?
-            .map(|block_result| block_result)
             .collect::<Result<Vec<Block<N>>, _>>()?)
     }
 

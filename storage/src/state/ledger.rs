@@ -881,7 +881,7 @@ impl<N: Network> LedgerState<N> {
         // Fetch the blocks to be removed. This ensures the blocks to be removed exist in the ledger,
         // and is used during the removal process to expedite the procedure.
         let start_block_height = latest_block_height.saturating_sub(number_of_blocks);
-        let blocks: BTreeMap<u32, Block<N>> = self
+        let blocks = self
             .get_blocks(start_block_height, latest_block_height)?
             .map(|block| block.map(|block| (block.height(), block)))
             .collect::<Result<BTreeMap<u32, Block<N>>>>()?;
