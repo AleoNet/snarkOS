@@ -2951,6 +2951,7 @@ dependencies = [
 name = "snarkos-storage"
 version = "2.0.2"
 dependencies = [
+ "aleo-std",
  "anyhow",
  "bincode",
  "circular-queue",
