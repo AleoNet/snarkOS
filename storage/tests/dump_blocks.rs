@@ -16,12 +16,16 @@
 
 use snarkos_environment::CurrentNetwork;
 use snarkos_storage::{storage::rocksdb::RocksDB, LedgerState};
+use snarkvm::dpc::traits::network::Network;
 
 #[test]
 #[ignore = "This can be run whenever a block dump is needed."]
 fn dump_blocks() {
-    // The path containing the ledger to dump from.
-    let source_path = "/home/<user>/.aleo/storage/ledger-2";
+    // Compose the correct file path for the parameter file.
+    let mut source_path = aleo_std::aleo_dir();
+    source_path.push("storage");
+    source_path.push(format!("ledger-{}", CurrentNetwork::NETWORK_ID));
+
     // The path to dump the blocks to.
     let target_path = "./blocks.dump";
     // The number of blocks to dump.
