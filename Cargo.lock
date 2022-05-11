@@ -1345,42 +1345,14 @@ dependencies = [
 
 [[package]]
 name = "jsonrpsee"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1d02a921aa22006ed979c2e1c407fd21302ac6049e5b544634ec5ec41516363d"
-dependencies = [
- "jsonrpsee-core 0.11.0",
- "jsonrpsee-http-client",
- "jsonrpsee-types 0.11.0",
-]
-
-[[package]]
-name = "jsonrpsee"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "eae63f7fdeb51700b35e9b28bf92e8d233951590968c186ed79510b6c12fa3d9"
 dependencies = [
- "jsonrpsee-core 0.13.0",
+ "jsonrpsee-core",
+ "jsonrpsee-http-client",
  "jsonrpsee-http-server",
- "jsonrpsee-types 0.13.0",
-]
-
-[[package]]
-name = "jsonrpsee-core"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8066473754794e7784c61808d25d60dfb68e1025a625792a6a1bc680d1ab700a"
-dependencies = [
- "anyhow",
- "async-trait",
- "beef",
- "futures-channel",
- "futures-util",
- "hyper",
- "jsonrpsee-types 0.11.0",
- "serde",
- "serde_json",
- "thiserror",
+ "jsonrpsee-types",
 ]
 
 [[package]]
@@ -1396,7 +1368,7 @@ dependencies = [
  "futures-channel",
  "futures-util",
  "hyper",
- "jsonrpsee-types 0.13.0",
+ "jsonrpsee-types",
  "parking_lot 0.12.0",
  "rand",
  "rustc-hash",
@@ -1409,15 +1381,15 @@ dependencies = [
 
 [[package]]
 name = "jsonrpsee-http-client"
-version = "0.11.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "157df2774b82fddf37a297fd5c8f711601b158176608f86d2adb5d227c524506"
+checksum = "c75812b0f7982c664b10c8779a774390d138fdb32f080560ea972c1a094c9407"
 dependencies = [
  "async-trait",
  "hyper",
  "hyper-rustls",
- "jsonrpsee-core 0.11.0",
- "jsonrpsee-types 0.11.0",
+ "jsonrpsee-core",
+ "jsonrpsee-types",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -1436,27 +1408,13 @@ dependencies = [
  "futures-util",
  "globset",
  "hyper",
- "jsonrpsee-core 0.13.0",
- "jsonrpsee-types 0.13.0",
+ "jsonrpsee-core",
+ "jsonrpsee-types",
  "lazy_static",
  "serde_json",
  "tokio",
  "tracing",
  "unicase",
-]
-
-[[package]]
-name = "jsonrpsee-types"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd42e08ae7f0de7b00319f723f7b06e2d461ab69bfa615a611fab5dec00b192e"
-dependencies = [
- "anyhow",
- "beef",
- "serde",
- "serde_json",
- "thiserror",
- "tracing",
 ]
 
 [[package]]
@@ -2953,8 +2911,7 @@ dependencies = [
  "bincode",
  "futures",
  "hex",
- "jsonrpsee 0.11.0",
- "jsonrpsee 0.13.0",
+ "jsonrpsee",
  "rand",
  "rand_chacha",
  "serde",
