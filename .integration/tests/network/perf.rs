@@ -94,6 +94,7 @@ async fn measure_peer_request_time() {
             .send_direct_message(client_addr, Message::PeerRequest)
             .unwrap()
             .await
+            .unwrap()
             .unwrap();
         wait_until!(1, test_node.node().stats().received().0 as usize == init_recv_count + i + 1);
         avg_request_time += start.elapsed();
@@ -129,7 +130,12 @@ async fn measure_ping_time() {
     let init_recv_count = test_node.node().stats().received().0 as usize;
     for i in 0..NUM_ITERATIONS {
         let start = Instant::now();
-        test_node.send_direct_message(client_addr, ping.clone()).unwrap().await.unwrap();
+        test_node
+            .send_direct_message(client_addr, ping.clone())
+            .unwrap()
+            .await
+            .unwrap()
+            .unwrap();
         wait_until!(1, test_node.node().stats().received().0 as usize == init_recv_count + i + 1);
         avg_request_time += start.elapsed();
     }
