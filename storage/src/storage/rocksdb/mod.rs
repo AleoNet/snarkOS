@@ -56,6 +56,13 @@ pub struct RocksDB {
     is_read_only: bool,
 }
 
+impl RocksDB {
+    #[cfg(feature = "test")]
+    pub fn inner(&self) -> &rocksdb::DB {
+        &self.rocksdb
+    }
+}
+
 impl Storage for RocksDB {
     ///
     /// Opens storage at the given `path` and `context`.
