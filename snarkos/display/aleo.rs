@@ -18,6 +18,8 @@ use snarkvm::dpc::prelude::*;
 
 use colored::*;
 
+use std::fmt::Write;
+
 pub fn welcome_message() -> String {
     let mut output = String::new();
     output += &r#"
@@ -85,7 +87,8 @@ pub fn notification_message<N: Network>(miner: Option<Address<N>>) -> String {
     .bold();
 
     if let Some(miner) = miner {
-        output += &format!(
+        let _ = write!(
+            output,
             "
      Your Aleo miner address is {}
 
