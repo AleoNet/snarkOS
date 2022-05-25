@@ -97,17 +97,25 @@ fn lookups(c: &mut Criterion) {
         })
     });
 
-    c.bench_function("txs_lookup_by_commitment", |b| {
-        let tx_commitments = ledger
-            .storage()
-            .open_map::<<CurrentNetwork as Network>::Commitment, <CurrentNetwork as Network>::TransitionID>(MapId::Commitments)
-            .unwrap()
-            .keys()
-            .collect::<Vec<_>>();
+    // Commitments are used for multiple lookups.
+    let tx_commitments = ledger
+        .storage()
+        .open_map::<<CurrentNetwork as Network>::Commitment, <CurrentNetwork as Network>::TransitionID>(MapId::Commitments)
+        .unwrap()
+        .keys()
+        .collect::<Vec<_>>();
 
+    c.bench_function("txs_lookup_by_commitment", |b| {
         b.iter(|| {
             let id = tx_commitments.choose(&mut rng).unwrap();
             ledger.contains_commitment(id).expect("Lookup by commitment failed");
+        })
+    });
+
+    c.bench_function("ciphertext_lookup_by_commitment", |b| {
+        b.iter(|| {
+            let id = tx_commitments.choose(&mut rng).unwrap();
+            ledger.get_ciphertext(id).expect("Lookup by commitment failed");
         })
     });
 
