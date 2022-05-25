@@ -103,15 +103,8 @@ impl Resources {
             while let Some(request) = receiver.recv().await {
                 match request {
                     ResourceRequest::Register(resource, id) => {
-                        let resource_name = match resource {
-                            Resource::Task(..) => "task",
-                            Resource::Thread(..) => "thread",
-                        };
-
                         if resources.insert(id, resource).is_some() {
                             error!("A resource with id {} already exists!", id);
-                        } else {
-                            trace!("Registered a {} as resource {}", resource_name, id);
                         }
                     }
                     ResourceRequest::Deregister(id) => {
@@ -120,7 +113,6 @@ impl Resources {
                             // to-be-aborted task to free its resources.
                             tokio::spawn(async move {
                                 sleep(Duration::from_secs(1)).await;
-                                trace!("Aborting resource with id {}", id);
                                 resource.abort().await;
                             });
                         } else {
