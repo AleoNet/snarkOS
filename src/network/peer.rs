@@ -37,6 +37,7 @@ use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, bail, Result};
 use futures::SinkExt;
+use rayon::iter::ParallelIterator;
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -479,7 +480,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         continue;
                                     }
                                     // Retrieve the requested blocks.
-                                    let blocks = match ledger_reader.get_blocks(start_block_height, end_block_height) {
+                                    let blocks: Vec<Block<N>> = match ledger_reader.get_blocks(start_block_height, end_block_height).and_then(|blocks| blocks.collect()) {
                                         Ok(blocks) => blocks,
                                         Err(error) => {
                                             // Route a `Failure` to the ledger.
