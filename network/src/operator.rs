@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{LedgerReader, LedgerRequest, LedgerRouter, PeersRequest, PeersRouter, ProverRouter};
+use crate::{LedgerRequest, PeersRequest, State};
 use snarkos_environment::{
     helpers::NodeType,
     network::{Data, Message},
@@ -24,7 +24,6 @@ use snarkos_storage::{storage::Storage, OperatorState};
 use snarkvm::dpc::{prelude::*, PoSWProof};
 
 use anyhow::Result;
-use rand::thread_rng;
 use std::{
     collections::{HashMap, HashSet},
     net::SocketAddr,
@@ -32,16 +31,12 @@ use std::{
     sync::Arc,
     time::{Duration, Instant},
 };
-use tokio::{
-    sync::{mpsc, oneshot, RwLock},
-    task,
-};
+use tokio::sync::{mpsc, oneshot, RwLock};
 
 /// Shorthand for the parent half of the `Operator` message channel.
 pub type OperatorRouter<N> = mpsc::Sender<OperatorRequest<N>>;
-#[allow(unused)]
 /// Shorthand for the child half of the `Operator` message channel.
-type OperatorHandler<N> = mpsc::Receiver<OperatorRequest<N>>;
+pub type OperatorHandler<N> = mpsc::Receiver<OperatorRequest<N>>;
 
 ///
 /// An enum of requests that the `Operator` struct processes.
@@ -62,14 +57,9 @@ const HEARTBEAT_IN_SECONDS: Duration = Duration::from_secs(1);
 ///
 /// An operator for a program on a specific network in the node server.
 ///
-#[derive(Debug)]
 pub struct Operator<N: Network, E: Environment> {
-    /// The address of the operator.
-    address: Option<Address<N>>,
-    /// The local address of this node.
-    local_ip: SocketAddr,
     /// The state storage of the operator.
-    state: Arc<OperatorState<N>>,
+    operator_state: Arc<OperatorState<N>>,
     /// The current block template that is being mined on by the operator.
     block_template: RwLock<Option<BlockTemplate<N>>>,
     /// A list of provers and their associated state := (last_submitted, share_difficulty)
@@ -78,99 +68,66 @@ pub struct Operator<N: Network, E: Environment> {
     known_nonces: RwLock<HashSet<N::PoSWNonce>>,
     /// The operator router of the node.
     operator_router: OperatorRouter<N>,
-    /// The pool of unconfirmed transactions.
-    memory_pool: Arc<RwLock<MemoryPool<N>>>,
-    /// The peers router of the node.
-    peers_router: PeersRouter<N, E>,
-    /// The ledger state of the node.
-    ledger_reader: LedgerReader<N>,
-    /// The ledger router of the node.
-    ledger_router: LedgerRouter<N>,
-    /// The prover router of the node.
-    prover_router: ProverRouter<N>,
+    /// The shared state of the owning node.
+    state: Arc<State<N, E>>,
 }
 
 impl<N: Network, E: Environment> Operator<N, E> {
-    /// Initializes a new instance of the operator.
+    /// Initializes a new instance of the operator, paired with its handler.
     #[allow(clippy::too_many_arguments)]
     pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
         path: P,
-        address: Option<Address<N>>,
-        local_ip: SocketAddr,
-        memory_pool: Arc<RwLock<MemoryPool<N>>>,
-        peers_router: PeersRouter<N, E>,
-        ledger_reader: LedgerReader<N>,
-        ledger_router: LedgerRouter<N>,
-        prover_router: ProverRouter<N>,
-    ) -> Result<Arc<Self>> {
+        state: Arc<State<N, E>>,
+    ) -> Result<(Self, mpsc::Receiver<OperatorRequest<N>>)> {
         // Initialize an mpsc channel for sending requests to the `Operator` struct.
-        let (operator_router, mut operator_handler) = mpsc::channel(1024);
+        let (operator_router, operator_handler) = mpsc::channel(1024);
         // Initialize the operator.
-        let operator = Arc::new(Self {
-            address,
-            local_ip,
-            state: Arc::new(OperatorState::open_writer::<S, P>(path)?),
+        let operator = Self {
+            operator_state: Arc::new(OperatorState::open_writer::<S, P>(path)?),
             block_template: RwLock::new(None),
             provers: Default::default(),
             known_nonces: Default::default(),
             operator_router,
-            memory_pool,
-            peers_router,
-            ledger_reader,
-            ledger_router,
-            prover_router,
-        });
+            state,
+        };
 
+        Ok((operator, operator_handler))
+    }
+
+    pub async fn initialize(&self) {
         if E::NODE_TYPE == NodeType::Operator {
-            // Initialize the handler for the operator.
-            let operator_clone = operator.clone();
-            let (router, handler) = oneshot::channel();
-            E::resources().register_task(
-                None, // No need to provide an id, as the task will run indefinitely.
-                task::spawn(async move {
-                    // Notify the outer function that the task is ready.
-                    let _ = router.send(());
-                    // Asynchronously wait for a operator request.
-                    while let Some(request) = operator_handler.recv().await {
-                        operator_clone.update(request).await;
-                    }
-                }),
-            );
-
-            // Wait until the operator handler is ready.
-            let _ = handler.await;
-        }
-
-        if E::NODE_TYPE == NodeType::Operator {
-            if let Some(recipient) = operator.address {
+            if let Some(recipient) = self.state.address {
                 // Initialize an update loop for the block template.
-                let operator = operator.clone();
+                let state = self.state.clone();
                 let (router, handler) = oneshot::channel();
                 E::resources().register_task(
                     None, // No need to provide an id, as the task will run indefinitely.
-                    task::spawn(async move {
+                    tokio::spawn(async move {
+                        let operator = &state.operator();
                         // Notify the outer function that the task is ready.
                         let _ = router.send(());
                         // TODO (julesdesmit): Add logic to the loop to retarget share difficulty.
                         loop {
                             // Determine if the current block template is stale.
                             let is_block_template_stale = match &*operator.block_template.read().await {
-                                Some(template) => operator.ledger_reader.latest_block_height().saturating_add(1) != template.block_height(),
+                                Some(template) => {
+                                    operator.state.ledger().reader().latest_block_height().saturating_add(1) != template.block_height()
+                                }
                                 None => true,
                             };
 
                             // Update the block template if it is stale.
                             if is_block_template_stale {
                                 // Construct a new block template.
-                                let transactions = operator.memory_pool.read().await.transactions();
-                                let ledger_reader = operator.ledger_reader.clone();
-                                let result = task::spawn_blocking(move || {
+                                let transactions = operator.state.prover().memory_pool().read().await.transactions();
+                                let ledger_reader = operator.state.ledger().reader().clone();
+                                let result = tokio::task::spawn_blocking(move || {
                                     E::thread_pool().install(move || {
                                         match ledger_reader.get_block_template(
                                             recipient,
                                             E::COINBASE_IS_PUBLIC,
                                             &transactions,
-                                            &mut thread_rng(),
+                                            &mut rand::thread_rng(),
                                         ) {
                                             Ok(block_template) => Ok(block_template),
                                             Err(error) => Err(format!("Failed to produce a new block template: {}", error)),
@@ -204,35 +161,33 @@ impl<N: Network, E: Environment> Operator<N, E> {
                 error!("Missing operator address. Please specify an Aleo address in order to operate a pool");
             }
         }
-
-        Ok(operator)
     }
 
     /// Returns an instance of the operator router.
-    pub fn router(&self) -> OperatorRouter<N> {
-        self.operator_router.clone()
+    pub fn router(&self) -> &OperatorRouter<N> {
+        &self.operator_router
     }
 
     /// Returns all the shares in storage.
     pub fn to_shares(&self) -> Vec<((u32, Record<N>), HashMap<Address<N>, u64>)> {
-        self.state.to_shares()
+        self.operator_state.to_shares()
     }
 
     /// Returns the shares for a specific block, given the block height and coinbase record commitment.
     pub fn get_shares_for_block(&self, block_height: u32, coinbase_record: Record<N>) -> Result<HashMap<Address<N>, u64>> {
-        self.state.get_shares_for_block(block_height, coinbase_record)
+        self.operator_state.get_shares_for_block(block_height, coinbase_record)
     }
 
     /// Returns the shares for a specific prover, given the prover address.
     pub fn get_shares_for_prover(&self, prover: &Address<N>) -> u64 {
-        self.state.get_shares_for_prover(prover)
+        self.operator_state.get_shares_for_prover(prover)
     }
 
     ///
     /// Returns a list of all provers which have submitted shares to this operator.
     ///
     pub fn get_provers(&self) -> Vec<Address<N>> {
-        self.state.get_provers()
+        self.operator_state.get_provers()
     }
 
     ///
@@ -254,7 +209,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                     // Route a `PoolRequest` to the peer.
                     let message = Message::PoolRequest(share_difficulty, Data::Object(block_template));
-                    if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(peer_ip, message)).await {
+                    if let Err(error) = self.state.peers().router().send(PeersRequest::MessageSend(peer_ip, message)).await {
                         warn!("[PoolRequest] {}", error);
                     }
                 } else {
@@ -307,7 +262,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
 
                     // Increment the share count for the prover.
                     let coinbase_record = block_template.coinbase_record().clone();
-                    match self.state.increment_share(block_height, coinbase_record, &prover) {
+                    match self.operator_state.increment_share(block_height, coinbase_record, &prover) {
                         Ok(..) => info!(
                             "Operator has received a valid share from {} ({}) for block {}",
                             prover, peer_ip, block_height,
@@ -327,8 +282,8 @@ impl<N: Network, E: Environment> Operator<N, E> {
                     ) {
                         if let Ok(block) = Block::from(previous_block_hash, block_header, transactions) {
                             info!("Operator has found unconfirmed block {} ({})", block.height(), block.hash());
-                            let request = LedgerRequest::UnconfirmedBlock(self.local_ip, block, self.prover_router.clone());
-                            if let Err(error) = self.ledger_router.send(request).await {
+                            let request = LedgerRequest::UnconfirmedBlock(self.state.local_ip, block);
+                            if let Err(error) = self.state.ledger().router().send(request).await {
                                 warn!("Failed to broadcast mined block - {}", error);
                             }
                         }

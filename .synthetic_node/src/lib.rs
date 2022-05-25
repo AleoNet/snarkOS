@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_environment::{
-    helpers::{NodeType, State},
+    helpers::{NodeType, Status},
     network::{Data, DisconnectReason, Message, MessageCodec},
     Client,
     CurrentNetwork,
@@ -45,7 +45,7 @@ pub const MAXIMUM_FORK_DEPTH: u32 = CurrentNetwork::ALEO_MAXIMUM_FORK_DEPTH;
 pub type ClientMessage = Message<CurrentNetwork, Client<CurrentNetwork>>;
 pub type ClientNonce = u64;
 
-/// The test node; it consists of a `Pea2PeaNode` that handles networking and `State`
+/// The test node; it consists of a `Pea2PeaNode` that handles networking and state
 /// that can be extended freely based on test requirements.
 #[derive(Clone)]
 pub struct SynthNode {
@@ -93,7 +93,7 @@ impl Pea2Pea for SynthNode {
 }
 
 impl SynthNode {
-    /// Creates a test node using the given `Pea2Pea` node and with the given `State`.
+    /// Creates a test node using the given `Pea2Pea` node and with the given `ClientState`.
     pub fn new(node: Pea2PeaNode, state: ClientState) -> Self {
         Self { node, state }
     }
@@ -138,7 +138,7 @@ impl Handshake for SynthNode {
             MESSAGE_VERSION,
             MAXIMUM_FORK_DEPTH,
             NodeType::Client,
-            State::Ready,
+            Status::Ready,
             own_ip.port(),
             self.state.local_nonce,
             0,

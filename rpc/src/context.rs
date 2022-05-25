@@ -18,8 +18,8 @@
 
 use crate::RpcFunctions;
 use snarkos_environment::Environment;
-use snarkos_network::{LedgerReader, Operator, Peers, ProverRouter};
-use snarkvm::dpc::{Address, MemoryPool, Network};
+use snarkos_network::{LedgerReader, State};
+use snarkvm::dpc::{Address, Network};
 
 use futures::TryFutureExt;
 use jsonrpsee::{
@@ -28,7 +28,7 @@ use jsonrpsee::{
 };
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
-use tokio::sync::{oneshot, RwLock};
+use tokio::sync::oneshot;
 
 // The details on resource-limiting can be found at https://github.com/paritytech/jsonrpsee/blob/master/core/src/server/resource_limiting.rs
 // note: jsonrpsee expects string literals as resource names; we'll be distinguishing
@@ -42,11 +42,7 @@ const ALL_CONCURRENT_REQUESTS_LIMIT: u16 = 10;
 #[doc(hidden)]
 pub struct RpcInner<N: Network, E: Environment> {
     pub(crate) address: Option<Address<N>>,
-    pub(crate) peers: Arc<Peers<N, E>>,
-    pub(crate) ledger: LedgerReader<N>,
-    pub(crate) operator: Arc<Operator<N, E>>,
-    pub(crate) prover_router: ProverRouter<N>,
-    pub(crate) memory_pool: Arc<RwLock<MemoryPool<N>>>,
+    pub(crate) state: Arc<State<N, E>>,
     /// RPC credentials for accessing guarded endpoints
     #[allow(unused)]
     pub(crate) credentials: RpcCredentials,
@@ -68,26 +64,17 @@ impl<N: Network, E: Environment> Deref for RpcContext<N, E> {
 impl<N: Network, E: Environment> RpcContext<N, E> {
     /// Creates a new struct for calling public and private RPC endpoints.
     #[allow(clippy::too_many_arguments)]
-    pub fn new(
-        username: String,
-        password: String,
-        address: Option<Address<N>>,
-        peers: Arc<Peers<N, E>>,
-        ledger: LedgerReader<N>,
-        operator: Arc<Operator<N, E>>,
-        prover_router: ProverRouter<N>,
-        memory_pool: Arc<RwLock<MemoryPool<N>>>,
-    ) -> Self {
+    pub fn new(username: String, password: String, address: Option<Address<N>>, state: Arc<State<N, E>>) -> Self {
         Self(Arc::new(RpcInner {
             address,
-            peers,
-            ledger,
-            operator,
-            prover_router,
-            memory_pool,
+            state,
             credentials: RpcCredentials { username, password },
             launched: Instant::now(),
         }))
+    }
+
+    pub(crate) fn ledger(&self) -> &LedgerReader<N> {
+        self.state.ledger().reader()
     }
 }
 

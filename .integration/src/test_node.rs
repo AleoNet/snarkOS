@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_environment::{
-    helpers::{BlockLocators, NodeType, State},
+    helpers::{BlockLocators, NodeType, Status},
     network::{Data, MessageCodec},
     Client,
     CurrentNetwork,
@@ -46,8 +46,7 @@ const DESIRED_CONNECTIONS: usize = <Client<CurrentNetwork>>::MINIMUM_NUMBER_OF_P
 
 pub const MAXIMUM_NUMBER_OF_PEERS: usize = <Client<CurrentNetwork>>::MAXIMUM_NUMBER_OF_PEERS;
 
-/// The test node; it consists of a `Node` that handles networking and `State`
-/// that can be extended freely based on test requirements.
+/// The test node; it contains a `SynthNode` with some custom behavior.
 #[derive(Clone)]
 pub struct TestNode(SynthNode);
 
@@ -98,7 +97,7 @@ impl TestNode {
                 MESSAGE_VERSION,
                 MAXIMUM_FORK_DEPTH,
                 NodeType::Client,
-                State::Ready,
+                Status::Ready,
                 genesis.hash(),
                 Data::Object(genesis.header().clone()),
             );

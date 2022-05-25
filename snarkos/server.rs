@@ -16,15 +16,16 @@
 
 use crate::{display::notification_message, Node};
 use snarkos_environment::{
-    helpers::{NodeType, State},
+    helpers::{NodeType, Status},
     network::DisconnectReason,
     Environment,
 };
 use snarkos_network::{
-    ledger::{Ledger, LedgerReader, LedgerRequest, LedgerRouter},
-    operator::{Operator, OperatorRouter},
-    peers::{Peers, PeersRequest, PeersRouter},
-    prover::{Prover, ProverRouter},
+    ledger::{Ledger, LedgerRequest},
+    operator::Operator,
+    peers::{Peers, PeersRequest},
+    prover::Prover,
+    State,
 };
 use snarkos_storage::storage::rocksdb::RocksDB;
 use snarkvm::prelude::*;
@@ -34,9 +35,8 @@ use snarkos_rpc::{initialize_rpc_server, RpcContext};
 
 #[cfg(any(feature = "test", feature = "prometheus"))]
 use snarkos_metrics as metrics;
-
-#[cfg(feature = "rpc")]
-use tokio::sync::RwLock;
+#[cfg(any(feature = "test", feature = "prometheus"))]
+use snarkos_network::LedgerReader;
 
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -47,23 +47,13 @@ use tokio::{net::TcpListener, sync::oneshot, task};
 ///
 #[derive(Clone)]
 pub struct Server<N: Network, E: Environment> {
-    /// The local address of the node.
-    local_ip: SocketAddr,
-    /// The list of peers for the node.
-    peers: Arc<Peers<N, E>>,
-    /// The ledger of the node.
-    ledger: Arc<Ledger<N, E>>,
-    /// The operator of the node.
-    operator: Arc<Operator<N, E>>,
-    /// The prover of the node.
-    prover: Arc<Prover<N, E>>,
+    pub state: Arc<State<N, E>>,
 }
 
 impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Starts the connection listener for peers.
     ///
-    #[inline]
     pub async fn initialize(node: &Node, address: Option<Address<N>>, pool_ip: Option<SocketAddr>) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(node.node).await {
@@ -78,158 +68,59 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize the prover storage path.
         let prover_storage_path = node.prover_storage_path(local_ip);
 
+        // Initialize the shared state.
+        let state = Arc::new(State::new(local_ip, address));
+
         // Initialize a new instance for managing peers.
-        let peers = Peers::new(local_ip, None).await;
+        let (peers, peers_handler) = Peers::new(None, state.clone()).await;
+
         // Initialize a new instance for managing the ledger.
-        let ledger = Ledger::<N, E>::open::<RocksDB, _>(&ledger_storage_path, peers.router()).await?;
+        let (ledger, ledger_handler) = Ledger::<N, E>::open::<RocksDB, _>(&ledger_storage_path, state.clone()).await?;
+
         // Initialize a new instance for managing the prover.
-        let prover = Prover::open::<RocksDB, _>(
-            &prover_storage_path,
-            address,
-            local_ip,
-            pool_ip,
-            peers.router(),
-            ledger.reader(),
-            ledger.router(),
-        )
-        .await?;
+        let (prover, prover_handler) = Prover::open::<RocksDB, _>(&prover_storage_path, pool_ip, state.clone()).await?;
+
         // Initialize a new instance for managing the operator.
-        let operator = Operator::open::<RocksDB, _>(
-            &operator_storage_path,
-            address,
-            local_ip,
-            prover.memory_pool(),
-            peers.router(),
-            ledger.reader(),
-            ledger.router(),
-            prover.router(),
-        )
-        .await?;
-
-        // TODO (howardwu): This is a hack for the prover.
-        //  Check that the prover is connected to the pool before sending a PoolRegister message.
-        if let Some(pool_ip) = pool_ip {
-            let peers_router = peers.router();
-            let ledger_reader = ledger.reader();
-            let ledger_router = ledger.router();
-            let operator_router = operator.router();
-            let prover_router = prover.router();
-
-            let (router, handler) = oneshot::channel();
-            E::resources().register_task(
-                None, // No need to provide an id, as the task will run indefinitely.
-                task::spawn(async move {
-                    // Notify the outer function that the task is ready.
-                    let _ = router.send(());
-                    loop {
-                        // Initialize the connection process.
-                        let (router, handler) = oneshot::channel();
-                        // Route a `Connect` request to the pool.
-                        if let Err(error) = peers_router
-                            .send(PeersRequest::Connect(
-                                pool_ip,
-                                ledger_reader.clone(),
-                                ledger_router.clone(),
-                                operator_router.clone(),
-                                prover_router.clone(),
-                                router,
-                            ))
-                            .await
-                        {
-                            trace!("[Connect] {}", error);
-                        }
-                        // Wait until the connection task is initialized.
-                        let _ = handler.await;
-
-                        // Sleep for `30` seconds.
-                        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
-                    }
-                }),
-            );
-
-            // Wait until the prover handler is ready.
-            let _ = handler.await;
-        }
-
-        // Initialize the connection listener for new peers.
-        Self::initialize_listener(
-            local_ip,
-            listener,
-            peers.clone(),
-            ledger.reader(),
-            ledger.router(),
-            operator.router(),
-            prover.router(),
-        )
-        .await;
-
-        // Initialize a new instance of the heartbeat.
-        Self::initialize_heartbeat(peers.router(), ledger.reader(), ledger.router(), operator.router(), prover.router()).await;
-
-        #[cfg(feature = "rpc")]
-        // Initialize a new instance of the RPC server.
-        Self::initialize_rpc(
-            node,
-            address,
-            peers.clone(),
-            ledger.reader(),
-            operator.clone(),
-            prover.router(),
-            prover.memory_pool(),
-        )
-        .await;
-
-        // Initialize a new instance of the notification.
-        Self::initialize_notification(ledger.reader(), prover.clone(), address).await;
+        let (operator, operator_handler) = Operator::open::<RocksDB, _>(&operator_storage_path, state.clone()).await?;
 
         // Initialise the metrics exporter.
         #[cfg(any(feature = "test", feature = "prometheus"))]
-        Self::initialize_metrics(ledger.reader());
+        Self::initialize_metrics(ledger.reader().clone());
 
-        Ok(Self {
-            local_ip,
-            peers,
-            ledger,
-            operator,
-            prover,
-        })
+        let server = Self { state };
+
+        server.state.initialize_peers(peers, peers_handler).await;
+        server.state.initialize_ledger(ledger, ledger_handler).await;
+        server.state.initialize_prover(prover, prover_handler).await;
+        server.state.initialize_operator(operator, operator_handler).await;
+
+        server.state.prover().initialize_miner().await;
+        server.state.prover().initialize_pooling().await;
+        server.state.prover().initialize_pool_connection_loop(pool_ip).await;
+        server.state.operator().initialize().await;
+
+        server.initialize_notification(address).await;
+        server.initialize_listener(listener).await;
+        server.initialize_heartbeat().await;
+        server.initialize_rpc(node, address).await;
+
+        Ok(server)
     }
 
     /// Returns the IP address of this node.
     pub fn local_ip(&self) -> SocketAddr {
-        self.local_ip
-    }
-
-    /// Returns the peer manager of this node.
-    pub fn peers(&self) -> Arc<Peers<N, E>> {
-        self.peers.clone()
-    }
-
-    /// Returns the ledger of this node.
-    pub fn ledger(&self) -> Arc<Ledger<N, E>> {
-        self.ledger.clone()
+        self.state.local_ip
     }
 
     ///
     /// Sends a connection request to the given IP address.
     ///
-    #[inline]
     pub async fn connect_to(&self, peer_ip: SocketAddr) -> Result<()> {
         // Initialize the connection process.
         let (router, handler) = oneshot::channel();
 
         // Route a `Connect` request to the peer manager.
-        self.peers
-            .router()
-            .send(PeersRequest::Connect(
-                peer_ip,
-                self.ledger.reader(),
-                self.ledger.router(),
-                self.operator.router(),
-                self.prover.router(),
-                router,
-            ))
-            .await?;
+        self.state.peers().router().send(PeersRequest::Connect(peer_ip, router)).await?;
 
         // Wait until the connection task is initialized.
         handler.await.map(|_| ()).map_err(|e| e.into())
@@ -237,21 +128,20 @@ impl<N: Network, E: Environment> Server<N, E> {
 
     #[inline]
     pub async fn disconnect_from(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
-        self.ledger.disconnect(peer_ip, reason).await
+        self.state.ledger().disconnect(peer_ip, reason).await
     }
 
     ///
     /// Disconnects from peers and proceeds to shut down the node.
     ///
-    #[inline]
     pub async fn shut_down(&self) {
         info!("Shutting down...");
         // Update the node status.
-        E::status().update(State::ShuttingDown);
+        E::status().update(Status::ShuttingDown);
 
         // Shut down the ledger.
         trace!("Proceeding to shut down the ledger...");
-        self.ledger.shut_down().await;
+        self.state.ledger().shut_down().await;
 
         // Flush the tasks.
         E::resources().shut_down();
@@ -261,40 +151,25 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Initialize the connection listener for new peers.
     ///
-    #[inline]
-    async fn initialize_listener(
-        local_ip: SocketAddr,
-        listener: TcpListener,
-        peers: Arc<Peers<N, E>>,
-        ledger_reader: LedgerReader<N>,
-        ledger_router: LedgerRouter<N>,
-        operator_router: OperatorRouter<N>,
-        prover_router: ProverRouter<N>,
-    ) {
+    async fn initialize_listener(&self, listener: TcpListener) {
         // Initialize the listener process.
         let (router, handler) = oneshot::channel();
+        let state = self.state.clone();
         E::resources().register_task(
             None, // No need to provide an id, as the task will run indefinitely.
             task::spawn(async move {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
-                info!("Listening for peers at {}", local_ip);
+                info!("Listening for peers at {}", state.local_ip);
                 loop {
                     // Don't accept connections if the node is breaching the configured peer limit.
-                    if peers.number_of_connected_peers().await < E::MAXIMUM_NUMBER_OF_PEERS {
+                    if state.peers().number_of_connected_peers().await < E::MAXIMUM_NUMBER_OF_PEERS {
                         // Asynchronously wait for an inbound TcpStream.
                         match listener.accept().await {
                             // Process the inbound connection request.
                             Ok((stream, peer_ip)) => {
-                                let request = PeersRequest::PeerConnecting(
-                                    stream,
-                                    peer_ip,
-                                    ledger_reader.clone(),
-                                    ledger_router.clone(),
-                                    operator_router.clone(),
-                                    prover_router.clone(),
-                                );
-                                if let Err(error) = peers.router().send(request).await {
+                                let request = PeersRequest::PeerConnecting(stream, peer_ip);
+                                if let Err(error) = state.peers().router().send(request).await {
                                     error!("Failed to send request to peers: {}", error)
                                 }
                             }
@@ -317,16 +192,10 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Initialize a new instance of the heartbeat.
     ///
-    #[inline]
-    async fn initialize_heartbeat(
-        peers_router: PeersRouter<N, E>,
-        ledger_reader: LedgerReader<N>,
-        ledger_router: LedgerRouter<N>,
-        operator_router: OperatorRouter<N>,
-        prover_router: ProverRouter<N>,
-    ) {
+    async fn initialize_heartbeat(&self) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
+        let state = self.state.clone();
         E::resources().register_task(
             None, // No need to provide an id, as the task will run indefinitely.
             task::spawn(async move {
@@ -334,17 +203,12 @@ impl<N: Network, E: Environment> Server<N, E> {
                 let _ = router.send(());
                 loop {
                     // Transmit a heartbeat request to the ledger.
-                    if let Err(error) = ledger_router.send(LedgerRequest::Heartbeat(prover_router.clone())).await {
+                    if let Err(error) = state.ledger().router().send(LedgerRequest::Heartbeat).await {
                         error!("Failed to send heartbeat to ledger: {}", error)
                     }
                     // Transmit a heartbeat request to the peers.
-                    let request = PeersRequest::Heartbeat(
-                        ledger_reader.clone(),
-                        ledger_router.clone(),
-                        operator_router.clone(),
-                        prover_router.clone(),
-                    );
-                    if let Err(error) = peers_router.send(request).await {
+                    let request = PeersRequest::Heartbeat;
+                    if let Err(error) = state.peers().router().send(request).await {
                         error!("Failed to send heartbeat to peers: {}", error)
                     }
                     // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
@@ -360,29 +224,11 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Initialize a new instance of the RPC server.
     ///
-    #[inline]
     #[cfg(feature = "rpc")]
-    async fn initialize_rpc(
-        node: &Node,
-        address: Option<Address<N>>,
-        peers: Arc<Peers<N, E>>,
-        ledger_reader: LedgerReader<N>,
-        operator: Arc<Operator<N, E>>,
-        prover_router: ProverRouter<N>,
-        memory_pool: Arc<RwLock<MemoryPool<N>>>,
-    ) {
+    async fn initialize_rpc(&self, node: &Node, address: Option<Address<N>>) {
         if !node.norpc {
             // Initialize a new instance of the RPC server.
-            let rpc_context = RpcContext::new(
-                node.rpc_username.clone(),
-                node.rpc_password.clone(),
-                address,
-                peers,
-                ledger_reader,
-                operator,
-                prover_router,
-                memory_pool,
-            );
+            let rpc_context = RpcContext::new(node.rpc_username.clone(), node.rpc_password.clone(), address, self.state.clone());
             let (rpc_server_addr, rpc_server_handle) = initialize_rpc_server::<N, E>(node.rpc, rpc_context).await;
 
             debug!("JSON-RPC server listening on {}", rpc_server_addr);
@@ -395,10 +241,10 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Initialize a new instance of the notification.
     ///
-    #[inline]
-    async fn initialize_notification(ledger: LedgerReader<N>, prover: Arc<Prover<N, E>>, address: Option<Address<N>>) {
+    async fn initialize_notification(&self, address: Option<Address<N>>) {
         // Initialize the heartbeat process.
         let (router, handler) = oneshot::channel();
+        let state = self.state.clone();
         E::resources().register_task(
             None, // No need to provide an id, as the task will run indefinitely.
             task::spawn(async move {
@@ -410,16 +256,16 @@ impl<N: Network, E: Environment> Server<N, E> {
                     if E::NODE_TYPE == NodeType::Miner {
                         if let Some(miner_address) = address {
                             // Retrieve the latest block height.
-                            let latest_block_height = ledger.latest_block_height();
+                            let latest_block_height = state.ledger().reader().latest_block_height();
 
                             // Prepare a list of confirmed and pending coinbase records.
                             let mut confirmed = vec![];
                             let mut pending = vec![];
 
                             // Iterate through the coinbase records from storage.
-                            for (block_height, record) in prover.to_coinbase_records() {
+                            for (block_height, record) in state.prover().to_coinbase_records() {
                                 // Filter the coinbase records by determining if they exist on the canonical chain.
-                                if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
+                                if let Ok(true) = state.ledger().reader().contains_commitment(&record.commitment()) {
                                     // Ensure the record owner matches.
                                     if record.owner() == miner_address {
                                         // Add the block to the appropriate list.

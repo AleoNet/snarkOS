@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    helpers::{BlockLocators, NodeType, State},
+    helpers::{BlockLocators, NodeType, Status},
     Environment,
 };
 use snarkvm::{dpc::posw::PoSWProof, prelude::*};
@@ -113,7 +113,7 @@ pub enum Message<N: Network, E: Environment> {
     /// BlockResponse := (block)
     BlockResponse(Data<Block<N>>),
     /// ChallengeRequest := (version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight)
-    ChallengeRequest(u32, u32, NodeType, State, u16, u64, u128),
+    ChallengeRequest(u32, u32, NodeType, Status, u16, u64, u128),
     /// ChallengeResponse := (block_header)
     ChallengeResponse(Data<BlockHeader<N>>),
     /// Disconnect := ()
@@ -123,7 +123,7 @@ pub enum Message<N: Network, E: Environment> {
     /// PeerResponse := (\[peer_ip\])
     PeerResponse(Vec<SocketAddr>, Option<Instant>),
     /// Ping := (version, fork_depth, node_type, status, block_hash, block_header)
-    Ping(u32, u32, NodeType, State, N::BlockHash, Data<BlockHeader<N>>),
+    Ping(u32, u32, NodeType, Status, N::BlockHash, Data<BlockHeader<N>>),
     /// Pong := (is_fork, block_locators)
     Pong(Option<bool>, Data<BlockLocators<N>>),
     /// UnconfirmedBlock := (block_height, block_hash, block)

@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{LedgerReader, LedgerRequest, LedgerRouter, PeersRequest, PeersRouter};
+use crate::{LedgerRequest, PeersRequest, State};
 use snarkos_environment::{
-    helpers::{NodeType, State},
+    helpers::{NodeType, Status},
     network::{Data, Message},
     Environment,
 };
@@ -38,9 +38,8 @@ use tokio::{
 
 /// Shorthand for the parent half of the `Prover` message channel.
 pub type ProverRouter<N> = mpsc::Sender<ProverRequest<N>>;
-#[allow(unused)]
 /// Shorthand for the child half of the `Prover` message channel.
-type ProverHandler<N> = mpsc::Receiver<ProverRequest<N>>;
+pub type ProverHandler<N> = mpsc::Receiver<ProverRequest<N>>;
 
 /// The miner heartbeat in seconds.
 const MINER_HEARTBEAT_IN_SECONDS: Duration = Duration::from_secs(2);
@@ -61,80 +60,51 @@ pub enum ProverRequest<N: Network> {
 ///
 /// A prover for a specific network on the node server.
 ///
-#[derive(Debug)]
 pub struct Prover<N: Network, E: Environment> {
     /// The state storage of the prover.
-    state: Arc<ProverState<N>>,
-    /// The Aleo address of the prover.
-    address: Option<Address<N>>,
+    prover_state: Arc<ProverState<N>>,
     /// The IP address of the connected pool.
     pool: Option<SocketAddr>,
     /// The prover router of the node.
     prover_router: ProverRouter<N>,
     /// The pool of unconfirmed transactions.
     memory_pool: Arc<RwLock<MemoryPool<N>>>,
-    /// The peers router of the node.
-    peers_router: PeersRouter<N, E>,
-    /// The ledger state of the node.
-    ledger_reader: LedgerReader<N>,
-    /// The ledger router of the node.
-    ledger_router: LedgerRouter<N>,
+    /// The shared state of the owning node.
+    state: Arc<State<N, E>>,
 }
 
 impl<N: Network, E: Environment> Prover<N, E> {
-    /// Initializes a new instance of the prover.
+    /// Initializes a new instance of the prover, paired with its handler.
     pub async fn open<S: Storage, P: AsRef<Path> + Copy>(
         path: P,
-        address: Option<Address<N>>,
-        local_ip: SocketAddr,
         pool_ip: Option<SocketAddr>,
-        peers_router: PeersRouter<N, E>,
-        ledger_reader: LedgerReader<N>,
-        ledger_router: LedgerRouter<N>,
-    ) -> Result<Arc<Self>> {
+        state: Arc<State<N, E>>,
+    ) -> Result<(Self, mpsc::Receiver<ProverRequest<N>>)> {
         // Initialize an mpsc channel for sending requests to the `Prover` struct.
-        let (prover_router, mut prover_handler) = mpsc::channel(1024);
+        let (prover_router, prover_handler) = mpsc::channel(1024);
         // Initialize the prover.
-        let prover = Arc::new(Self {
-            state: Arc::new(ProverState::open::<S, P>(path, false)?),
-            address,
+        let prover = Self {
+            prover_state: Arc::new(ProverState::open::<S, P>(path, false)?),
             pool: pool_ip,
             prover_router,
             memory_pool: Arc::new(RwLock::new(MemoryPool::new())),
-            peers_router,
-            ledger_reader,
-            ledger_router,
-        });
+            state,
+        };
 
-        // Initialize the handler for the prover.
-        {
-            let prover = prover.clone();
-            let (router, handler) = oneshot::channel();
-            E::resources().register_task(
-                None, // No need to provide an id, as the task will run indefinitely.
-                task::spawn(async move {
-                    // Notify the outer function that the task is ready.
-                    let _ = router.send(());
-                    // Asynchronously wait for a prover request.
-                    while let Some(request) = prover_handler.recv().await {
-                        // Update the state of the prover.
-                        prover.update(request).await;
-                    }
-                }),
-            );
+        Ok((prover, prover_handler))
+    }
 
-            // Wait until the prover handler is ready.
-            let _ = handler.await;
-        }
-
+    pub async fn initialize_miner(&self) {
         // Initialize the miner, if the node type is a miner.
-        if E::NODE_TYPE == NodeType::Miner && prover.pool.is_none() {
-            Self::start_miner(prover.clone(), local_ip).await;
+        if E::NODE_TYPE == NodeType::Miner && self.pool.is_none() {
+            self.state.prover().start_miner().await;
         }
+    }
 
+    pub async fn initialize_pooling(&self) {
         // Initialize the prover, if the node type is a prover.
-        if E::NODE_TYPE == NodeType::Prover && prover.pool.is_some() {
-            let prover = prover.clone();
+        if E::NODE_TYPE == NodeType::Prover && self.pool.is_some() {
+            let state = self.state.clone();
             let (router, handler) = oneshot::channel();
             E::resources().register_task(
                 None, // No need to provide an id, as the task will run indefinitely.
@@ -148,7 +118,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                         // TODO (howardwu): Check that the prover is connected to the pool before proceeding.
                         //  Currently we use a sleep function to probabilistically ensure the peer is connected.
                         if !E::terminator().load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
-                            prover.send_pool_register().await;
+                            state.prover().send_pool_register().await;
                         }
                     }
                 }),
@@ -157,13 +127,43 @@ impl<N: Network, E: Environment> Prover<N, E> {
             // Wait until the operator handler is ready.
             let _ = handler.await;
         }
+    }
 
-        Ok(prover)
+    pub async fn initialize_pool_connection_loop(&self, pool_ip: Option<SocketAddr>) {
+        // TODO (howardwu): This is a hack for the prover.
+        // Check that the prover is connected to the pool before sending a PoolRegister message.
+        if let Some(pool_ip) = pool_ip {
+            let peers_router = self.state.peers().router().clone();
+            let (router, handler) = oneshot::channel();
+            E::resources().register_task(
+                None, // No need to provide an id, as the task will run indefinitely.
+                task::spawn(async move {
+                    // Notify the outer function that the task is ready.
+                    let _ = router.send(());
+                    loop {
+                        // Initialize the connection process.
+                        let (router, handler) = oneshot::channel();
+                        // Route a `Connect` request to the pool.
+                        if let Err(error) = peers_router.send(PeersRequest::Connect(pool_ip, router)).await {
+                            trace!("[Connect] {}", error);
+                        }
+                        // Wait until the connection task is initialized.
+                        let _ = handler.await;
+
+                        // Sleep for `30` seconds.
+                        tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+                    }
+                }),
+            );
+
+            // Wait until the prover handler is ready.
+            let _ = handler.await;
+        }
     }
 
     /// Returns an instance of the prover router.
-    pub fn router(&self) -> ProverRouter<N> {
-        self.prover_router.clone()
+    pub fn router(&self) -> &ProverRouter<N> {
+        &self.prover_router
     }
 
     /// Returns an instance of the memory pool.
@@ -173,7 +173,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
     /// Returns all coinbase records in storage.
     pub fn to_coinbase_records(&self) -> Vec<(u32, Record<N>)> {
-        self.state.to_coinbase_records()
+        self.prover_state.to_coinbase_records()
     }
 
     ///
@@ -205,11 +205,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
     ///
     async fn send_pool_register(&self) {
         if E::NODE_TYPE == NodeType::Prover {
-            if let Some(recipient) = self.address {
+            if let Some(recipient) = self.state.address {
                 if let Some(pool_ip) = self.pool {
                     // Proceed to register the prover to receive a block template.
                     let request = PeersRequest::MessageSend(pool_ip, Message::PoolRegister(recipient));
-                    if let Err(error) = self.peers_router.send(request).await {
+                    if let Err(error) = self.state.peers().router().send(request).await {
                         warn!("[PoolRegister] {}", error);
                     }
                 } else {
@@ -226,7 +226,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
     ///
     async fn process_pool_request(&self, operator_ip: SocketAddr, share_difficulty: u64, block_template: BlockTemplate<N>) {
         if E::NODE_TYPE == NodeType::Prover {
-            if let Some(recipient) = self.address {
+            if let Some(recipient) = self.state.address {
                 if let Some(pool_ip) = self.pool {
                     // Refuse work from any pool other than the registered one.
                     if pool_ip == operator_ip {
@@ -234,7 +234,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                         // already, mine the next block.
                         if !E::terminator().load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
                             // Set the status to `Mining`.
-                            E::status().update(State::Mining);
+                            E::status().update(Status::Mining);
 
                             let block_height = block_template.block_height();
                             let block_template = block_template.clone();
@@ -263,7 +263,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             })
                             .await;
 
-                            E::status().update(State::Ready);
+                            E::status().update(Status::Ready);
 
                             match result {
                                 Ok(Ok((nonce, proof, proof_difficulty))) => {
@@ -274,7 +274,13 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
                                     // Send a `PoolResponse` to the operator.
                                     let message = Message::PoolResponse(recipient, nonce, Data::Object(proof));
-                                    if let Err(error) = self.peers_router.send(PeersRequest::MessageSend(operator_ip, message)).await {
+                                    if let Err(error) = self
+                                        .state
+                                        .peers()
+                                        .router()
+                                        .send(PeersRequest::MessageSend(operator_ip, message))
+                                        .await
+                                    {
                                         warn!("[PoolResponse] {}", error);
                                     }
                                 }
@@ -299,14 +305,14 @@ impl<N: Network, E: Environment> Prover<N, E> {
         // Process the unconfirmed transaction.
         trace!("Received unconfirmed transaction {} from {}", transaction.transaction_id(), peer_ip);
         // Ensure the unconfirmed transaction is new.
-        if let Ok(false) = self.ledger_reader.contains_transaction(&transaction.transaction_id()) {
+        if let Ok(false) = self.state.ledger().reader().contains_transaction(&transaction.transaction_id()) {
             debug!("Adding unconfirmed transaction {} to memory pool", transaction.transaction_id());
             // Attempt to add the unconfirmed transaction to the memory pool.
             match self.memory_pool.write().await.add_transaction(&transaction) {
                 Ok(()) => {
                     // Upon success, propagate the unconfirmed transaction to the connected peers.
                     let request = PeersRequest::MessagePropagate(peer_ip, Message::UnconfirmedTransaction(Data::Object(transaction)));
-                    if let Err(error) = self.peers_router.send(request).await {
+                    if let Err(error) = self.state.peers().router().send(request).await {
                         warn!("[UnconfirmedTransaction] {}", error);
                     }
                 }
@@ -318,13 +324,15 @@ impl<N: Network, E: Environment> Prover<N, E> {
     ///
     /// Initialize the miner, if the node type is a miner.
     ///
-    async fn start_miner(prover: Arc<Self>, local_ip: SocketAddr) {
+    async fn start_miner(&self) {
         // Initialize a new instance of the miner.
-        if E::NODE_TYPE == NodeType::Miner && prover.pool.is_none() {
-            if let Some(recipient) = prover.address {
+        if E::NODE_TYPE == NodeType::Miner && self.pool.is_none() {
+            if let Some(recipient) = self.state.address {
                 // Initialize the prover process.
-                let prover = prover.clone();
                 let (router, handler) = oneshot::channel();
+                let state = self.state.clone();
+                let prover_state = self.prover_state.clone();
+                let local_ip = state.local_ip;
                 E::resources().register_task(
                     None, // No need to provide an id, as the task will run indefinitely.
                     task::spawn(async move {
@@ -334,14 +342,13 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             // If `terminator` is `false` and the status is not `Peering` or `Mining` already, mine the next block.
                             if !E::terminator().load(Ordering::SeqCst) && !E::status().is_peering() && !E::status().is_mining() {
                                 // Set the status to `Mining`.
-                                E::status().update(State::Mining);
+                                E::status().update(Status::Mining);
 
                                 // Prepare the unconfirmed transactions and dependent objects.
-                                let state = prover.state.clone();
-                                let canon = prover.ledger_reader.clone(); // This is *safe* as the ledger only reads.
-                                let unconfirmed_transactions = prover.memory_pool.read().await.transactions();
-                                let ledger_router = prover.ledger_router.clone();
-                                let prover_router = prover.prover_router.clone();
+                                let prover_state = prover_state.clone();
+                                let canon = state.ledger().reader().clone(); // This is *safe* as the ledger only reads.
+                                let unconfirmed_transactions = state.prover().memory_pool.read().await.transactions();
+                                let ledger_router = state.ledger().router().clone();
 
                                 // Procure a resource id to register the task with, as it might be terminated at any point in time.
                                 let mining_task_id = E::resources().procure_id();
@@ -364,18 +371,18 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                         .map_err(|e| e.into());
 
                                         // Set the status to `Ready`.
-                                        E::status().update(State::Ready);
+                                        E::status().update(Status::Ready);
 
                                         match result {
                                             Ok(Ok((block, coinbase_record))) => {
                                                 debug!("Miner has found unconfirmed block {} ({})", block.height(), block.hash());
                                                 // Store the coinbase record.
-                                                if let Err(error) = state.add_coinbase_record(block.height(), coinbase_record) {
+                                                if let Err(error) = prover_state.add_coinbase_record(block.height(), coinbase_record) {
                                                     warn!("[Miner] Failed to store coinbase record - {}", error);
                                                 }
 
                                                 // Broadcast the next block.
-                                                let request = LedgerRequest::UnconfirmedBlock(local_ip, block, prover_router.clone());
+                                                let request = LedgerRequest::UnconfirmedBlock(local_ip, block);
                                                 if let Err(error) = ledger_router.send(request).await {
                                                     warn!("Failed to broadcast mined block - {}", error);
                                                 }

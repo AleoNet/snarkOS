@@ -2862,6 +2862,7 @@ dependencies = [
  "bytes",
  "circular-queue",
  "futures",
+ "once_cell",
  "rand",
  "serde",
  "snarkos-environment",
