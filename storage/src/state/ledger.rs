@@ -1278,9 +1278,9 @@ impl<N: Network> LedgerState<N> {
     ///
     /// Dump the specified number of blocks - excluding the genesis - to the given location.
     ///
-    #[cfg(test)]
+    #[cfg(feature = "test")]
     #[allow(dead_code)]
-    fn dump_blocks<P: AsRef<Path>>(&self, path: P, count: u32) -> Result<()> {
+    pub fn dump_blocks<P: AsRef<Path>>(&self, path: P, count: u32) -> Result<()> {
         let mut file = std::fs::File::create(path)?;
         let mut blocks = Vec::with_capacity(count as usize);
 
