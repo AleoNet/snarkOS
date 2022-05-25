@@ -36,7 +36,7 @@ use anyhow::{anyhow, Result};
 use clap::Parser;
 use colored::*;
 use crossterm::tty::IsTty;
-use std::{io, net::SocketAddr, path::PathBuf, str::FromStr};
+use std::{fmt::Write, io, net::SocketAddr, path::PathBuf, str::FromStr};
 use tokio::sync::mpsc;
 use tracing_subscriber::EnvFilter;
 
@@ -193,7 +193,7 @@ impl Node {
         // Initialize the display, if enabled.
         if self.display {
             println!("\nThe snarkOS console is initializing...\n");
-            let _display = Display::<N, E>::start(server.clone(), self.verbosity)?;
+            Display::<N, E>::start(server.clone(), self.verbosity)?;
         };
 
         // Connect to peer(s) if given as an argument.
@@ -408,13 +408,14 @@ impl NewAccount {
 
         // Print the new Aleo account.
         let mut output = "".to_string();
-        output += &format!(
+        write!(
+            output,
             "\n {:>12}\n",
             "Attention - Remember to store this account private key and view key.".red().bold()
-        );
-        output += &format!("\n {:>12}  {}\n", "Private Key".cyan().bold(), account.private_key());
-        output += &format!(" {:>12}  {}\n", "View Key".cyan().bold(), account.view_key());
-        output += &format!(" {:>12}  {}\n", "Address".cyan().bold(), account.address());
+        )?;
+        writeln!(output, "\n {:>12}  {}", "Private Key".cyan().bold(), account.private_key())?;
+        writeln!(output, " {:>12}  {}", "View Key".cyan().bold(), account.view_key())?;
+        writeln!(output, " {:>12}  {}", "Address".cyan().bold(), account.address())?;
 
         Ok(output)
     }
