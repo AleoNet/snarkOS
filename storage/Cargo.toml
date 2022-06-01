@@ -77,7 +77,7 @@ features = [ "sync" ]
 version = "0.1"
 
 [dev-dependencies.aleo-std]
-version = "0.1.12"
+version = "0.1.14"
 
 [dev-dependencies.criterion]
 version = "0.3"
