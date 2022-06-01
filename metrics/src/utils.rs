@@ -44,7 +44,11 @@ impl TestMetrics {
 impl Drop for TestMetrics {
     fn drop(&mut self) {
         // Clear the recorder to avoid the global state bleeding into other tests.
-        metrics::clear_recorder();
+        // Safety: this is ok since it is only ever used in tests that are to be run sequentially
+        // on one thread.
+        unsafe {
+            metrics::clear_recorder();
+        }
     }
 }
 
