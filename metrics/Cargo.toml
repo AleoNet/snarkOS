@@ -22,13 +22,13 @@ prometheus = [ "metrics-exporter-prometheus" ]
 test = []
 
 [dependencies.metrics]
-version = "0.18"
+version = "0.19"
 
 [dependencies.metrics-util]
-version = "0.12"
+version = "0.13"
 
 [dependencies.metrics-exporter-prometheus]
-version = "0.9"
+version = "0.10"
 optional = true
 
 [dependencies.tokio]
