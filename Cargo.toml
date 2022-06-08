@@ -37,7 +37,7 @@ task-metrics = [ "snarkos-environment/task-metrics" ]
 test = [ "snarkos-metrics/test", "snarkos-network/test" ]
 
 [dependencies.aleo-std]
-version = "0.1.12"
+version = "0.1.14"
 
 [dependencies.anyhow]
 version = "1"
