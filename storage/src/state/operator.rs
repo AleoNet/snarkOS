@@ -113,7 +113,7 @@ impl<N: Network> SharesState<N> {
     fn get_shares_for_block(&self, block_height: u32, coinbase_record: Record<N>) -> Result<HashMap<Address<N>, u64>> {
         match self.shares.get(&(block_height, coinbase_record))? {
             Some(shares) => Ok(shares),
-            None => return Err(anyhow!("Block {} does not exist in shares storage", block_height)),
+            None => Err(anyhow!("Block {} does not exist in shares storage", block_height)),
         }
     }
 

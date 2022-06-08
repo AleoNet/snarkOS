@@ -98,7 +98,7 @@ impl<N: Network> CoinbaseState<N> {
     fn get_record(&self, commitment: &N::Commitment) -> Result<(u32, Record<N>)> {
         match self.records.get(commitment)? {
             Some((block_height, record)) => Ok((block_height, record)),
-            None => return Err(anyhow!("Record with commitment {} does not exist in storage", commitment)),
+            None => Err(anyhow!("Record with commitment {} does not exist in storage", commitment)),
         }
     }
 
