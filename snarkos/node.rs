@@ -490,12 +490,12 @@ impl MinerStats {
 
         tokio::spawn(ledger_resource.abort());
 
-        return Ok(format!(
+        Ok(format!(
             "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
             confirmed.len(),
             pending.len(),
             miner
-        ));
+        ))
     }
 }
 

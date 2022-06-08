@@ -1378,7 +1378,7 @@ impl<N: Network> BlockState<N> {
     fn get_block_height(&self, block_hash: &N::BlockHash) -> Result<u32> {
         match self.block_headers.get(block_hash)? {
             Some(block_header) => Ok(block_header.height()),
-            None => return Err(anyhow!("Block {} missing from block headers map", block_hash)),
+            None => Err(anyhow!("Block {} missing from block headers map", block_hash)),
         }
     }
 
@@ -1406,7 +1406,7 @@ impl<N: Network> BlockState<N> {
             true => Ok(N::genesis_block().previous_block_hash()),
             false => match self.block_heights.get(&(block_height - 1))? {
                 Some(block_hash) => Ok(block_hash),
-                None => return Err(anyhow!("Block {} missing in block heights map", block_height - 1)),
+                None => Err(anyhow!("Block {} missing in block heights map", block_height - 1)),
             },
         }
     }
@@ -1418,7 +1418,7 @@ impl<N: Network> BlockState<N> {
 
         match self.block_headers.get(&block_hash)? {
             Some(block_header) => Ok(block_header),
-            None => return Err(anyhow!("Block {} missing from block headers map", block_hash)),
+            None => Err(anyhow!("Block {} missing from block headers map", block_hash)),
         }
     }
 
@@ -1633,7 +1633,7 @@ impl<N: Network> TransactionState<N> {
     fn get_transition(&self, transition_id: &N::TransitionID) -> Result<Transition<N>> {
         match self.transitions.get(transition_id)? {
             Some((_, _, transition)) => Ok(transition),
-            None => return Err(anyhow!("Transition {} does not exist in storage", transition_id)),
+            None => Err(anyhow!("Transition {} does not exist in storage", transition_id)),
         }
     }
 
