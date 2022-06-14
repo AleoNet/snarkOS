@@ -47,50 +47,50 @@ use tracing_subscriber::EnvFilter;
 #[clap(name = "snarkos", author = "The Aleo Team <hello@aleo.org>")]
 pub struct Node {
     /// Specify the IP address and port of a peer to connect to.
-    #[clap(long = "connect")]
+    #[clap(long, action)]
     pub connect: Option<String>,
     /// Specify this as a mining node, with the given miner address.
-    #[clap(long = "miner")]
+    #[clap(long, action)]
     pub miner: Option<String>,
     /// Specify this as an operating node, with the given operator address.
-    #[clap(long = "operator")]
+    #[clap(long, action)]
     pub operator: Option<String>,
     /// Specify this as a prover node, with the given prover address.
-    #[clap(long = "prover")]
+    #[clap(long, action)]
     pub prover: Option<String>,
     /// Specify the pool that a prover node is contributing to.
-    #[clap(long = "pool")]
+    #[clap(long, action)]
     pub pool: Option<SocketAddr>,
     /// Specify the network of this node.
-    #[clap(default_value = "2", long = "network")]
+    #[clap(long, default_value = "2", action)]
     pub network: u16,
     /// Specify the IP address and port for the node server.
-    #[clap(parse(try_from_str), default_value = "0.0.0.0:4132", long = "node")]
+    #[clap(long, default_value = "0.0.0.0:4132", action)]
     pub node: SocketAddr,
     /// Specify the IP address and port for the RPC server.
-    #[clap(parse(try_from_str), default_value = "0.0.0.0:3032", long = "rpc")]
+    #[clap(long, default_value = "0.0.0.0:3032", action)]
     pub rpc: SocketAddr,
     /// Specify the username for the RPC server.
-    #[clap(default_value = "root", long = "username")]
+    #[clap(default_value = "root", long = "username", action)]
     pub rpc_username: String,
     /// Specify the password for the RPC server.
-    #[clap(default_value = "pass", long = "password")]
+    #[clap(default_value = "pass", long = "password", action)]
     pub rpc_password: String,
     /// Specify the verbosity of the node [options: 0, 1, 2, 3]
-    #[clap(default_value = "2", long = "verbosity")]
+    #[clap(default_value = "2", long, action)]
     pub verbosity: u8,
     /// Enables development mode, specify a unique ID for the local node.
-    #[clap(long)]
+    #[clap(long, action)]
     pub dev: Option<u16>,
     /// If the flag is set, the node will render a read-only display.
-    #[clap(long)]
+    #[clap(long, action)]
     pub display: bool,
     /// If the flag is set, the node will not initialize the RPC server.
-    #[clap(long)]
+    #[clap(long, action)]
     pub norpc: bool,
-    #[clap(hide = true, long)]
+    #[clap(hide = true, long, action)]
     pub trial: bool,
-    #[clap(hide = true, long)]
+    #[clap(hide = true, long, action)]
     pub sync: bool,
     /// Specify an optional subcommand.
     #[clap(subcommand)]
@@ -305,10 +305,10 @@ impl io::Write for LogWriter {
 #[derive(Debug, Parser)]
 pub struct Clean {
     /// Specify the network of the ledger to remove from storage.
-    #[clap(default_value = "2", long = "network")]
+    #[clap(long, default_value = "2", action)]
     pub network: u16,
     /// Enables development mode, specify the unique ID of the local node to clean.
-    #[clap(long)]
+    #[clap(long, action)]
     pub dev: Option<u16>,
 }
 
@@ -342,13 +342,13 @@ impl Clean {
 #[derive(Debug, Parser)]
 pub struct Update {
     /// Lists all available versions of snarkOS
-    #[clap(short = 'l', long)]
+    #[clap(short, long, action)]
     list: bool,
     /// Suppress outputs to terminal
-    #[clap(short = 'q', long)]
+    #[clap(short, long, action)]
     quiet: bool,
     /// Update to specified version
-    #[clap(short = 'v', long)]
+    #[clap(short, long, action)]
     version: Option<String>,
 }
 
@@ -446,7 +446,7 @@ pub enum MinerCommands {
 
 #[derive(Debug, Parser)]
 pub struct MinerStats {
-    #[clap()]
+    #[clap(action)]
     address: String,
 }
 

@@ -51,7 +51,7 @@ pub struct StorageClient;
 #[derive(Debug, Parser)]
 pub struct Opts {
     /// Specify the IP address and port for the node server.
-    #[clap(long = "addr", short = 'a', parse(try_from_str), default_value = "0.0.0.0:4132")]
+    #[clap(long, short, default_value = "0.0.0.0:4132", action)]
     pub addr: SocketAddr,
     #[cfg(feature = "postgres")]
     #[clap(flatten)]
