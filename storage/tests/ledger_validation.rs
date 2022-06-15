@@ -16,7 +16,7 @@
 
 use snarkos_environment::CurrentNetwork;
 use snarkos_storage::{
-    storage::{rocksdb::RocksDB, Storage},
+    storage::{rocksdb::RocksDB, ReadWrite, Storage},
     LedgerState,
 };
 
@@ -33,7 +33,7 @@ fn test_ledger_validation() {
     // Prepare a test ledger and an iterator of blocks to insert.
     let temp_dir = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
     {
-        let ledger: LedgerState<CurrentNetwork> =
+        let ledger: LedgerState<CurrentNetwork, ReadWrite> =
             LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir, 1).expect("Failed to initialize ledger");
         ledger
             .storage()
@@ -47,7 +47,7 @@ fn test_ledger_validation() {
     for _ in 0..NUM_CHECKS {
         let increment: u32 = rng.gen_range(1..=NUM_BLOCKS as u32);
         println!("Validating with an increment = {}", increment);
-        let _ledger: LedgerState<CurrentNetwork> =
+        let _ledger: LedgerState<CurrentNetwork, ReadWrite> =
             LedgerState::open_writer_with_increment::<RocksDB, &Path>(&temp_dir, increment).expect("Failed to initialize ledger");
     }
 }

@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    storage::{rocksdb::RocksDB, Storage},
+    storage::{rocksdb::RocksDB, ReadWrite, Storage},
     LedgerState,
 };
 use snarkos_environment::CurrentNetwork;
@@ -40,7 +40,7 @@ fn test_blocks_3() -> Vec<Block<CurrentNetwork>> {
 }
 
 /// Initializes a new instance of the ledger.
-fn create_new_ledger<N: Network, S: Storage>() -> LedgerState<N> {
+fn create_new_ledger<N: Network, S: Storage<Access = ReadWrite>>() -> LedgerState<N, ReadWrite> {
     LedgerState::open_writer_with_increment::<S, _>(temp_dir(), 1).expect("Failed to initialize ledger")
 }
 

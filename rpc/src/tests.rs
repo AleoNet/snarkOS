@@ -18,7 +18,7 @@ use crate::{initialize_rpc_server, rpc_trait::RpcFunctions, RpcContext};
 use snarkos_environment::{helpers::Status, Client, CurrentNetwork, Environment};
 use snarkos_network::{ledger::Ledger, Operator, Peers, Prover, State};
 use snarkos_storage::{
-    storage::{rocksdb::RocksDB, Storage},
+    storage::{rocksdb::RocksDB, ReadWrite, Storage},
     LedgerState,
 };
 use snarkvm::{
@@ -50,10 +50,10 @@ fn temp_dir() -> std::path::PathBuf {
 }
 
 /// Initializes a new instance of the ledger state.
-fn new_ledger_state<N: Network, S: Storage, P: AsRef<Path>>(path: Option<P>) -> LedgerState<N> {
+fn new_ledger_state<N: Network, S: Storage<Access = ReadWrite>, P: AsRef<Path>>(path: Option<P>) -> LedgerState<N, ReadWrite> {
     match path {
-        Some(path) => LedgerState::<N>::open_writer::<S, _>(path).expect("Failed to initialize ledger"),
-        None => LedgerState::<N>::open_writer::<S, _>(temp_dir()).expect("Failed to initialize ledger"),
+        Some(path) => LedgerState::<N, _>::open_writer::<S, _>(path).expect("Failed to initialize ledger"),
+        None => LedgerState::<N, _>::open_writer::<S, _>(temp_dir()).expect("Failed to initialize ledger"),
     }
 }
 
@@ -90,17 +90,17 @@ async fn new_rpc_context<N: Network, E: Environment, S: Storage, P: AsRef<Path>>
     let (peers, peers_handler) = Peers::new(None, state.clone()).await;
 
     // Initialize a new instance for managing the ledger.
-    let (ledger, ledger_handler) = Ledger::<N, E>::open::<S, _>(&ledger_path, state.clone())
+    let (ledger, ledger_handler) = Ledger::<N, E>::open::<_>(&ledger_path, state.clone())
         .await
         .expect("Failed to initialize ledger");
 
     // Initialize a new instance for managing the prover.
-    let (prover, prover_handler) = Prover::open::<S, _>(&prover_path, Some(node_addr), state.clone())
+    let (prover, prover_handler) = Prover::open::<_>(&prover_path, Some(node_addr), state.clone())
         .await
         .expect("Failed to initialize prover");
 
     // Initialize a new instance for managing the operator.
-    let (operator, operator_handler) = Operator::open::<RocksDB, _>(&operator_storage_path, state.clone())
+    let (operator, operator_handler) = Operator::open::<_>(&operator_storage_path, state.clone())
         .await
         .expect("Failed to initialize operator");
 

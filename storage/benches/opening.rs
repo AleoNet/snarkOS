@@ -16,7 +16,7 @@
 
 use snarkos_environment::CurrentNetwork;
 use snarkos_storage::{
-    storage::{rocksdb::RocksDB, Storage},
+    storage::{rocksdb::RocksDB, ReadWrite, Storage},
     LedgerState,
 };
 
@@ -30,7 +30,7 @@ const NUM_BLOCKS: u32 = 1_000;
 fn opening(c: &mut Criterion) {
     let temp_dir = tempfile::tempdir().expect("Failed to open temporary directory").into_path();
     // Create an empty ledger.
-    let ledger: LedgerState<CurrentNetwork> =
+    let ledger: LedgerState<CurrentNetwork, ReadWrite> =
         LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir, 1).expect("Failed to initialize ledger");
     // Import a dump of a ledger containing 1k blocks.
     ledger
@@ -42,7 +42,7 @@ fn opening(c: &mut Criterion) {
 
     c.bench_function("Ledger::open_writer", |b| {
         b.iter(|| {
-            let _ledger: LedgerState<CurrentNetwork> =
+            let _ledger: LedgerState<CurrentNetwork, ReadWrite> =
                 LedgerState::open_writer_with_increment::<RocksDB, _>(&temp_dir, NUM_BLOCKS).expect("Failed to initialize ledger");
         })
     });

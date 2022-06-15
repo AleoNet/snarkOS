@@ -16,7 +16,7 @@
 
 #[cfg(any(test, feature = "test"))]
 use crate::storage::rocksdb::RocksDB;
-use crate::storage::{DataMap, Map, MapId, Storage};
+use crate::storage::{DataMap, MapId, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite};
 use snarkos_environment::helpers::{block_locators::*, Resource};
 use snarkvm::dpc::prelude::*;
 
@@ -63,7 +63,7 @@ impl<N: Network> Metadata<N> {
 }
 
 #[derive(Debug)]
-pub struct LedgerState<N: Network> {
+pub struct LedgerState<N: Network, A: StorageAccess> {
     /// The current ledger tree of block hashes.
     ledger_tree: RwLock<LedgerTree<N>>,
     /// The latest block of the ledger.
@@ -73,160 +73,12 @@ pub struct LedgerState<N: Network> {
     /// The block locators from the latest block of the ledger.
     latest_block_locators: RwLock<BlockLocators<N>>,
     /// The ledger root corresponding to each block height.
-    ledger_roots: DataMap<N::LedgerRoot, u32>,
+    ledger_roots: DataMap<N::LedgerRoot, u32, A>,
     /// The blocks of the ledger in storage.
-    blocks: BlockState<N>,
-    /// The indicator bit and tracker for a ledger in read-only mode.
-    read_only: (bool, RwLock<Block<N>>),
+    blocks: BlockState<N, A>,
 }
 
-impl<N: Network> LedgerState<N> {
-    ///
-    /// Opens a new writable instance of `LedgerState` from the given storage path.
-    /// For a read-only instance of `LedgerState`, use `LedgerState::open_reader`.
-    ///
-    /// A writable instance of `LedgerState` possesses full functionality, whereas
-    /// a read-only instance of `LedgerState` may only call immutable methods.
-    ///
-    pub fn open_writer<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_writer_with_increment::<S, P>(path, 10_000)
-    }
-
-    /// This function is hidden, as it's intended to be used directly in tests only.
-    /// The `validation_increment` parameter determines the number of blocks to be
-    /// handled during the incremental validation process.
-    #[doc(hidden)]
-    pub fn open_writer_with_increment<S: Storage, P: AsRef<Path>>(path: P, validation_increment: u32) -> Result<Self> {
-        // Open storage.
-        let context = N::NETWORK_ID;
-        let is_read_only = false;
-        let storage = S::open(path, context, is_read_only)?;
-
-        // Initialize the ledger.
-        let ledger = Self {
-            ledger_tree: RwLock::new(LedgerTree::<N>::new()?),
-            latest_block: RwLock::new(N::genesis_block().clone()),
-            latest_block_hashes_and_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
-            latest_block_locators: Default::default(),
-            ledger_roots: storage.open_map(MapId::LedgerRoots)?,
-            blocks: BlockState::open(storage)?,
-            read_only: (is_read_only, RwLock::new(N::genesis_block().clone())),
-        };
-
-        // Determine the latest block height.
-        let mut latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
-            (Some(latest_block_height_0), Some(latest_block_height_1)) => match latest_block_height_0 == latest_block_height_1 {
-                true => latest_block_height_0,
-                false => match ledger.try_fixing_inconsistent_state(None) {
-                    Ok(current_block_height) => current_block_height,
-                    Err(error) => return Err(error),
-                },
-            },
-            (None, None) => 0u32,
-            _ => return Err(anyhow!("Ledger storage state is inconsistent")),
-        };
-
-        // If this is new storage, initialize it with the genesis block.
-        if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
-            let genesis = N::genesis_block();
-
-            // Perform all the associated storage operations as an atomic batch.
-            let batch = ledger.ledger_roots.prepare_batch();
-
-            ledger
-                .ledger_roots
-                .insert(&genesis.previous_ledger_root(), &genesis.height(), Some(batch))?;
-            ledger.blocks.add_block(genesis, Some(batch))?;
-
-            // Execute the pending storage batch.
-            ledger.ledger_roots.execute_batch(batch)?;
-        }
-
-        // Check that all canonical block headers exist in storage.
-        let count = ledger.blocks.get_block_header_count()?;
-        assert_eq!(count, latest_block_height.saturating_add(1));
-
-        // TODO (howardwu): TEMPORARY - Remove this after testnet2.
-        // Sanity check for a V12 ledger.
-        if N::NETWORK_ID == 2
-            && latest_block_height > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
-            && ledger.get_block(latest_block_height).is_err()
-        {
-            let revert_block_height = snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT.saturating_sub(1);
-            warn!("Ledger is not V12-compliant, reverting to block {}", revert_block_height);
-            warn!("{:?}", ledger.get_block(latest_block_height));
-            latest_block_height = ledger.clear_incompatible_blocks(latest_block_height, revert_block_height)?;
-            info!("Ledger successfully transitioned and is now V12-compliant");
-        }
-
-        // Iterate and append each block hash from genesis to tip to validate ledger state.
-        let mut start_block_height = 0u32;
-        while start_block_height <= latest_block_height {
-            // Compute the end block height (inclusive) for this iteration.
-            let end_block_height = std::cmp::min(start_block_height.saturating_add(validation_increment), latest_block_height);
-
-            // Retrieve the block hashes.
-            let block_hashes = ledger.get_block_hashes(start_block_height, end_block_height)?;
-
-            // Split the block hashes into (last_block_hash, [start_block_hash, ..., penultimate_block_hash]).
-            if let Some((last_block_hash, block_hashes_excluding_last)) = block_hashes.split_last() {
-                // It's possible that the batch only contains one block.
-                if !block_hashes_excluding_last.is_empty() {
-                    // Add the block hashes (up to penultimate) to the ledger tree.
-                    ledger.ledger_tree.write().add_all(block_hashes_excluding_last)?;
-                }
-
-                // Check 1 - Ensure the root of the ledger tree matches the one saved in the ledger roots map.
-                let ledger_root = ledger.get_previous_ledger_root(end_block_height)?;
-                if ledger_root != ledger.ledger_tree.read().root() {
-                    return Err(anyhow!("Ledger has incorrect ledger tree state at block {}", end_block_height));
-                }
-
-                // Check 2 - Ensure the saved block height corresponding to this ledger root matches the expected block height.
-                let candidate_height = match ledger.ledger_roots.get(&ledger_root)? {
-                    Some(candidate_height) => candidate_height,
-                    None => return Err(anyhow!("Ledger is missing ledger root for block {}", end_block_height)),
-                };
-                if end_block_height != candidate_height {
-                    return Err(anyhow!(
-                        "Ledger expected block {}, found block {}",
-                        end_block_height,
-                        candidate_height
-                    ));
-                }
-
-                // Add the last block hash to the ledger tree.
-                ledger.ledger_tree.write().add(last_block_hash)?;
-            }
-
-            // Log the progress of the validation procedure.
-            let progress = (end_block_height as f64 / latest_block_height as f64 * 100f64) as u8;
-            debug!("Validating the ledger up to block {} ({}%)", end_block_height, progress);
-
-            // Update the starting block height for the next iteration.
-            start_block_height = end_block_height.saturating_add(1);
-        }
-
-        // If this is new storage, the while loop above did not execute,
-        // and proceed to add the genesis block hash into the ledger tree.
-        if start_block_height == 0u32 {
-            // Add the genesis block hash to the ledger tree.
-            ledger.ledger_tree.write().add(&N::genesis_block().hash())?;
-        }
-
-        // Update the latest ledger state.
-        *ledger.latest_block.write() = ledger.get_block(latest_block_height)?;
-        ledger.regenerate_latest_ledger_state()?;
-
-        // Validate the ledger root one final time.
-        let latest_ledger_root = ledger.ledger_tree.read().root();
-        ledger.regenerate_ledger_tree()?;
-        assert_eq!(ledger.ledger_tree.read().root(), latest_ledger_root);
-
-        info!("Ledger successfully loaded at block {}", ledger.latest_block_height());
-        Ok(ledger)
-    }
-
+impl<N: Network, A: StorageAccess> LedgerState<N, A> {
     ///
     /// Opens a read-only instance of `LedgerState` from the given storage path.
     /// For a writable instance of `LedgerState`, use `LedgerState::open_writer`.
@@ -234,11 +86,10 @@ impl<N: Network> LedgerState<N> {
     /// A writable instance of `LedgerState` possesses full functionality, whereas
     /// a read-only instance of `LedgerState` may only call immutable methods.
     ///
-    pub fn open_reader<S: Storage, P: AsRef<Path>>(path: P) -> Result<(Arc<Self>, Resource)> {
+    pub fn open_reader<S: Storage<Access = A>, P: AsRef<Path>>(path: P) -> Result<(Arc<Self>, Resource)> {
         // Open storage.
         let context = N::NETWORK_ID;
-        let is_read_only = true;
-        let storage = S::open(path, context, is_read_only)?;
+        let storage = S::open(path, context)?;
 
         // Initialize the ledger.
         let ledger = Arc::new(Self {
@@ -248,7 +99,6 @@ impl<N: Network> LedgerState<N> {
             latest_block_locators: Default::default(),
             ledger_roots: storage.open_map(MapId::LedgerRoots)?,
             blocks: BlockState::open(storage)?,
-            read_only: (is_read_only, RwLock::new(N::genesis_block().clone())),
         });
 
         // Determine the latest block height.
@@ -265,22 +115,6 @@ impl<N: Network> LedgerState<N> {
             _ => return Err(anyhow!("Ledger storage state is inconsistent")),
         };
 
-        // If this is new storage, initialize it with the genesis block.
-        if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
-            let genesis = N::genesis_block();
-
-            // Perform all the associated storage operations as an atomic batch.
-            let batch = ledger.ledger_roots.prepare_batch();
-
-            ledger
-                .ledger_roots
-                .insert(&genesis.previous_ledger_root(), &genesis.height(), Some(batch))?;
-            ledger.blocks.add_block(genesis, Some(batch))?;
-
-            // Execute the pending storage batch.
-            ledger.ledger_roots.execute_batch(batch)?;
-        }
-
         // Update the latest ledger state.
         let latest_block = ledger.get_block(latest_block_height)?;
         *ledger.latest_block.write() = latest_block.clone();
@@ -292,11 +126,6 @@ impl<N: Network> LedgerState<N> {
 
         trace!("[Read-Only] Ledger successfully loaded at block {}", ledger.latest_block_height());
         Ok((ledger, resource))
-    }
-
-    /// Returns `true` if the ledger is in read-only mode.
-    pub fn is_read_only(&self) -> bool {
-        self.read_only.0
     }
 
     /// Returns the latest block.
@@ -678,6 +507,214 @@ impl<N: Network> LedgerState<N> {
         ))
     }
 
+    ///
+    /// Returns a ledger proof for the given commitment.
+    ///
+    pub fn get_ledger_inclusion_proof(&self, commitment: N::Commitment) -> Result<LedgerProof<N>> {
+        // TODO (raychu86): Add getter functions.
+        let commitment_transition_id = match self.blocks.transactions.commitments.get(&commitment)? {
+            Some(transition_id) => transition_id,
+            None => return Err(anyhow!("commitment {} missing from commitments map", commitment)),
+        };
+
+        let transaction_id = match self.blocks.transactions.transitions.get(&commitment_transition_id)? {
+            Some((transaction_id, _, _)) => transaction_id,
+            None => return Err(anyhow!("transition id {} missing from transactions map", commitment_transition_id)),
+        };
+
+        let transaction = self.get_transaction(&transaction_id)?;
+
+        let block_hash = match self.blocks.transactions.transactions.get(&transaction_id)? {
+            Some((_, _, metadata)) => metadata.block_hash,
+            None => return Err(anyhow!("transaction id {} missing from transactions map", transaction_id)),
+        };
+
+        let block_header = match self.blocks.block_headers.get(&block_hash)? {
+            Some(block_header) => block_header,
+            None => return Err(anyhow!("Block {} missing from block headers map", block_hash)),
+        };
+
+        // Generate the local proof for the commitment.
+        let local_proof = transaction.to_local_proof(commitment)?;
+
+        let transaction_id = local_proof.transaction_id();
+        let transactions = self.get_block_transactions(block_header.height())?;
+
+        // Compute the transactions inclusion proof.
+        let transactions_inclusion_proof = {
+            let index = transactions.transaction_ids().position(|id| id == transaction_id).unwrap();
+            transactions.to_transactions_inclusion_proof(index, transaction_id)?
+        };
+
+        // Compute the block header inclusion proof.
+        let transactions_root = transactions.transactions_root();
+        let block_header_inclusion_proof = block_header.to_header_inclusion_proof(1, transactions_root)?;
+        let block_header_root = block_header.to_header_root()?;
+
+        // Determine the previous block hash.
+        let previous_block_hash = self.get_previous_block_hash(self.get_block_height(&block_hash)?)?;
+
+        // Generate the record proof.
+        let record_proof = RecordProof::new(
+            block_hash,
+            previous_block_hash,
+            block_header_root,
+            block_header_inclusion_proof,
+            transactions_root,
+            transactions_inclusion_proof,
+            local_proof,
+        )?;
+
+        // Generate the ledger root inclusion proof.
+        let ledger_root = self.ledger_tree.read().root();
+        let ledger_root_inclusion_proof = self.ledger_tree.read().to_ledger_inclusion_proof(&block_hash)?;
+
+        LedgerProof::new(ledger_root, ledger_root_inclusion_proof, record_proof)
+    }
+
+    /// Updates the latest block hashes and block headers.
+    fn regenerate_latest_ledger_state(&self) -> Result<()> {
+        // Compute the start block height and end block height (inclusive).
+        let end_block_height = self.latest_block_height();
+        let start_block_height = end_block_height.saturating_sub(MAXIMUM_LINEAR_BLOCK_LOCATORS - 1);
+
+        // Retrieve the latest block hashes and block headers.
+        let block_hashes = self.get_block_hashes(start_block_height, end_block_height)?;
+        let block_headers = self.get_block_headers(start_block_height, end_block_height)?;
+        assert_eq!(block_hashes.len(), block_headers.len());
+
+        {
+            // Acquire the write lock for the latest block hashes and block headers.
+            let mut latest_block_hashes_and_headers = self.latest_block_hashes_and_headers.write();
+
+            // Upon success, clear the latest block hashes and block headers.
+            latest_block_hashes_and_headers.clear();
+
+            // Add the latest block hashes and block headers.
+            for (block_hash, block_header) in block_hashes.into_iter().zip_eq(block_headers) {
+                latest_block_hashes_and_headers.push((block_hash, block_header));
+            }
+        }
+
+        *self.latest_block_locators.write() = self.get_block_locators(end_block_height)?;
+
+        Ok(())
+    }
+
+    /// Regenerates the ledger tree.
+    fn regenerate_ledger_tree(&self) -> Result<()> {
+        // Acquire the ledger tree write lock.
+        let mut ledger_tree = self.ledger_tree.write();
+
+        // Retrieve all of the block hashes.
+        let block_hashes = self.get_block_hashes(0, self.latest_block_height())?;
+
+        // Add the block hashes to create the new ledger tree.
+        let mut new_ledger_tree = LedgerTree::<N>::new()?;
+        new_ledger_tree.add_all(&block_hashes)?;
+
+        // Update the current ledger tree with the current state.
+        *ledger_tree = new_ledger_tree;
+
+        Ok(())
+    }
+
+    /// Updates the ledger tree.
+    fn update_ledger_tree(&self, outdated_block_height: u32, new_block_height: u32) -> Result<()> {
+        // Acquire the ledger tree write lock.
+        let mut ledger_tree = self.ledger_tree.write();
+
+        let mut new_ledger_tree = ledger_tree.clone();
+
+        // Retrieve all the new block hashes.
+        let block_hashes = self.get_block_hashes(outdated_block_height + 1, new_block_height)?;
+
+        // Add the block hashes to create the new ledger tree.
+        new_ledger_tree.add_all(&block_hashes)?;
+
+        // Update the current ledger tree with the current state.
+        *ledger_tree = new_ledger_tree;
+
+        Ok(())
+    }
+
+    /// Initializes a heartbeat to keep the ledger reader in sync, with the given starting block height.
+    fn initialize_reader_heartbeat(self: &Arc<Self>, mut current_block: Block<N>) -> Result<Resource> {
+        let (abort_sender, mut abort_receiver) = oneshot::channel();
+
+        let ledger = self.clone();
+        let thread_handle = thread::spawn(move || {
+            loop {
+                // Check if the thread shouldn't be aborted.
+                match abort_receiver.try_recv() {
+                    Ok(_) | Err(TryRecvError::Closed) => return,
+                    _ => (),
+                };
+
+                // Refresh the ledger storage state.
+                if ledger.ledger_roots.refresh() {
+                    // After catching up the reader, determine the latest block height.
+                    if let Some(latest_block_height) = ledger.blocks.block_heights.keys().max() {
+                        let current_block_height = current_block.height();
+                        let current_block_hash = current_block.hash();
+                        trace!(
+                            "[Read-Only] Updating ledger state from block {} to {}",
+                            current_block_height,
+                            latest_block_height
+                        );
+
+                        // Update the last seen block.
+                        let latest_block = ledger.get_block(latest_block_height);
+                        match &latest_block {
+                            Ok(ref block) => *ledger.latest_block.write() = block.clone(),
+                            Err(error) => warn!("[Read-Only] {}", error),
+                        };
+
+                        // A flag indicating whether a fast ledger tree update is feasible.
+                        let mut quick_update = false;
+
+                        // Only consider an update if the latest height is actually greater than the current height.
+                        if latest_block_height > current_block_height {
+                            // If the last known top block hash still exists at the expected height, there was no rollback
+                            // beyond it, which means we only need to update the ledger tree with the new hashes.
+                            if let Ok(found_block_hash) = ledger.get_block_hash(current_block_height) {
+                                if found_block_hash == current_block_hash {
+                                    // Update the ledger tree.
+                                    if let Err(error) = ledger.update_ledger_tree(current_block_height, latest_block_height) {
+                                        warn!("[Read-Only] {}", error);
+                                    } else {
+                                        quick_update = true;
+                                    }
+                                }
+                            }
+                        }
+
+                        // If a quick ledger tree update was infeasible, regenerate it in its entirety.
+                        if !quick_update {
+                            // Regenerate the entire ledger tree.
+                            if let Err(error) = ledger.regenerate_ledger_tree() {
+                                warn!("[Read-Only] {}", error);
+                            };
+                        }
+
+                        // Regenerate the latest ledger state.
+                        if let Err(error) = ledger.regenerate_latest_ledger_state() {
+                            warn!("[Read-Only] {}", error);
+                        };
+
+                        // Update the last known block in the reader.
+                        if let Ok(block) = latest_block {
+                            current_block = block;
+                        }
+                    }
+                }
+                thread::sleep(std::time::Duration::from_secs(6));
+            }
+        });
+
+        Ok(Resource::Thread(thread_handle, abort_sender))
+    }
+
     /// Mines a new block using the latest state of the given ledger.
     pub fn mine_next_block<R: Rng + CryptoRng>(
         &self,
@@ -697,13 +734,183 @@ impl<N: Network> LedgerState<N> {
         }
     }
 
-    /// Adds the given block as the next block in the ledger to storage.
-    pub fn add_next_block(&self, block: &Block<N>) -> Result<()> {
-        // If the storage is in read-only mode, this method cannot be called.
-        if self.is_read_only() {
-            return Err(anyhow!("Ledger is in read-only mode"));
+    ///
+    /// Dump the specified number of blocks to the given location.
+    ///
+    #[cfg(feature = "test")]
+    #[allow(dead_code)]
+    pub fn dump_blocks<P: AsRef<Path>>(&self, path: P, count: u32) -> Result<()> {
+        let mut file = std::fs::File::create(path)?;
+        let mut blocks = Vec::with_capacity(count as usize);
+
+        println!("Commencing block dump");
+        for i in 1..=count {
+            if i % 10 == 0 || count < 10 {
+                println!("Dumping block {}/{}", i, count);
+            }
+            let block = self.get_block(i)?;
+            blocks.push(block);
+        }
+        println!("Block dump complete");
+
+        bincode::serialize_into(&mut file, &blocks)?;
+
+        Ok(())
+    }
+
+    #[cfg(any(test, feature = "test"))]
+    pub fn storage(&self) -> &RocksDB<A> {
+        self.ledger_roots.storage()
+    }
+}
+
+impl<N: Network, A: StorageReadWrite> LedgerState<N, A> {
+    ///
+    /// Opens a new writable instance of `LedgerState` from the given storage path.
+    /// For a read-only instance of `LedgerState`, use `LedgerState::open_reader`.
+    ///
+    /// A writable instance of `LedgerState` possesses full functionality, whereas
+    /// a read-only instance of `LedgerState` may only call immutable methods.
+    ///
+    pub fn open_writer<S: Storage<Access = A>, P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::open_writer_with_increment::<S, P>(path, 10_000)
+    }
+
+    /// This function is hidden, as it's intended to be used directly in tests only.
+    /// The `validation_increment` parameter determines the number of blocks to be
+    /// handled during the incremental validation process.
+    #[doc(hidden)]
+    pub fn open_writer_with_increment<S: Storage<Access = A>, P: AsRef<Path>>(path: P, validation_increment: u32) -> Result<Self> {
+        // Open storage.
+        let context = N::NETWORK_ID;
+        let storage = S::open(path, context)?;
+
+        // Initialize the ledger.
+        let ledger = Self {
+            ledger_tree: RwLock::new(LedgerTree::<N>::new()?),
+            latest_block: RwLock::new(N::genesis_block().clone()),
+            latest_block_hashes_and_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
+            latest_block_locators: Default::default(),
+            ledger_roots: storage.open_map(MapId::LedgerRoots)?,
+            blocks: BlockState::open(storage)?,
+        };
+
+        // Determine the latest block height.
+        let mut latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
+            (Some(latest_block_height_0), Some(latest_block_height_1)) => match latest_block_height_0 == latest_block_height_1 {
+                true => latest_block_height_0,
+                false => match ledger.try_fixing_inconsistent_state(None) {
+                    Ok(current_block_height) => current_block_height,
+                    Err(error) => return Err(error),
+                },
+            },
+            (None, None) => 0u32,
+            _ => return Err(anyhow!("Ledger storage state is inconsistent")),
+        };
+
+        // If this is new storage, initialize it with the genesis block.
+        if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
+            let genesis = N::genesis_block();
+
+            // Perform all the associated storage operations as an atomic batch.
+            let batch = ledger.ledger_roots.prepare_batch();
+
+            ledger
+                .ledger_roots
+                .insert(&genesis.previous_ledger_root(), &genesis.height(), Some(batch))?;
+            ledger.blocks.add_block(genesis, Some(batch))?;
+
+            // Execute the pending storage batch.
+            ledger.ledger_roots.execute_batch(batch)?;
         }
 
+        // Check that all canonical block headers exist in storage.
+        let count = ledger.blocks.get_block_header_count()?;
+        assert_eq!(count, latest_block_height.saturating_add(1));
+
+        // TODO (howardwu): TEMPORARY - Remove this after testnet2.
+        // Sanity check for a V12 ledger.
+        if N::NETWORK_ID == 2
+            && latest_block_height > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
+            && ledger.get_block(latest_block_height).is_err()
+        {
+            let revert_block_height = snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT.saturating_sub(1);
+            warn!("Ledger is not V12-compliant, reverting to block {}", revert_block_height);
+            warn!("{:?}", ledger.get_block(latest_block_height));
+            latest_block_height = ledger.clear_incompatible_blocks(latest_block_height, revert_block_height)?;
+            info!("Ledger successfully transitioned and is now V12-compliant");
+        }
+
+        // Iterate and append each block hash from genesis to tip to validate ledger state.
+        let mut start_block_height = 0u32;
+        while start_block_height <= latest_block_height {
+            // Compute the end block height (inclusive) for this iteration.
+            let end_block_height = std::cmp::min(start_block_height.saturating_add(validation_increment), latest_block_height);
+
+            // Retrieve the block hashes.
+            let block_hashes = ledger.get_block_hashes(start_block_height, end_block_height)?;
+
+            // Split the block hashes into (last_block_hash, [start_block_hash, ..., penultimate_block_hash]).
+            if let Some((last_block_hash, block_hashes_excluding_last)) = block_hashes.split_last() {
+                // It's possible that the batch only contains one block.
+                if !block_hashes_excluding_last.is_empty() {
+                    // Add the block hashes (up to penultimate) to the ledger tree.
+                    ledger.ledger_tree.write().add_all(block_hashes_excluding_last)?;
+                }
+
+                // Check 1 - Ensure the root of the ledger tree matches the one saved in the ledger roots map.
+                let ledger_root = ledger.get_previous_ledger_root(end_block_height)?;
+                if ledger_root != ledger.ledger_tree.read().root() {
+                    return Err(anyhow!("Ledger has incorrect ledger tree state at block {}", end_block_height));
+                }
+
+                // Check 2 - Ensure the saved block height corresponding to this ledger root matches the expected block height.
+                let candidate_height = match ledger.ledger_roots.get(&ledger_root)? {
+                    Some(candidate_height) => candidate_height,
+                    None => return Err(anyhow!("Ledger is missing ledger root for block {}", end_block_height)),
+                };
+                if end_block_height != candidate_height {
+                    return Err(anyhow!(
+                        "Ledger expected block {}, found block {}",
+                        end_block_height,
+                        candidate_height
+                    ));
+                }
+
+                // Add the last block hash to the ledger tree.
+                ledger.ledger_tree.write().add(last_block_hash)?;
+            }
+
+            // Log the progress of the validation procedure.
+            let progress = (end_block_height as f64 / latest_block_height as f64 * 100f64) as u8;
+            debug!("Validating the ledger up to block {} ({}%)", end_block_height, progress);
+
+            // Update the starting block height for the next iteration.
+            start_block_height = end_block_height.saturating_add(1);
+        }
+
+        // If this is new storage, the while loop above did not execute,
+        // and proceed to add the genesis block hash into the ledger tree.
+        if start_block_height == 0u32 {
+            // Add the genesis block hash to the ledger tree.
+            ledger.ledger_tree.write().add(&N::genesis_block().hash())?;
+        }
+
+        // Update the latest ledger state.
+        *ledger.latest_block.write() = ledger.get_block(latest_block_height)?;
+        ledger.regenerate_latest_ledger_state()?;
+
+        // Validate the ledger root one final time.
+        let latest_ledger_root = ledger.ledger_tree.read().root();
+        ledger.regenerate_ledger_tree()?;
+        assert_eq!(ledger.ledger_tree.read().root(), latest_ledger_root);
+
+        info!("Ledger successfully loaded at block {}", ledger.latest_block_height());
+        Ok(ledger)
+    }
+
+    /// Adds the given block as the next block in the ledger to storage.
+    pub fn add_next_block(&self, block: &Block<N>) -> Result<()> {
         // Ensure the block itself is valid.
         if !block.is_valid() {
             return Err(anyhow!("Block {} is invalid", block.height()));
@@ -847,11 +1054,6 @@ impl<N: Network> LedgerState<N> {
 
     /// Reverts the ledger state back to the given block height, returning the removed blocks on success.
     pub fn revert_to_block_height(&self, block_height: u32) -> Result<Vec<Block<N>>> {
-        // If the storage is in read-only mode, this method cannot be called.
-        if self.is_read_only() {
-            return Err(anyhow!("Ledger is in read-only mode"));
-        }
-
         // Determine the number of blocks to remove.
         let latest_block_height = self.latest_block_height();
         let number_of_blocks = latest_block_height.saturating_sub(block_height);
@@ -913,229 +1115,8 @@ impl<N: Network> LedgerState<N> {
         Ok(blocks.values().skip(1).cloned().collect())
     }
 
-    ///
-    /// Returns a ledger proof for the given commitment.
-    ///
-    pub fn get_ledger_inclusion_proof(&self, commitment: N::Commitment) -> Result<LedgerProof<N>> {
-        // TODO (raychu86): Add getter functions.
-        let commitment_transition_id = match self.blocks.transactions.commitments.get(&commitment)? {
-            Some(transition_id) => transition_id,
-            None => return Err(anyhow!("commitment {} missing from commitments map", commitment)),
-        };
-
-        let transaction_id = match self.blocks.transactions.transitions.get(&commitment_transition_id)? {
-            Some((transaction_id, _, _)) => transaction_id,
-            None => return Err(anyhow!("transition id {} missing from transactions map", commitment_transition_id)),
-        };
-
-        let transaction = self.get_transaction(&transaction_id)?;
-
-        let block_hash = match self.blocks.transactions.transactions.get(&transaction_id)? {
-            Some((_, _, metadata)) => metadata.block_hash,
-            None => return Err(anyhow!("transaction id {} missing from transactions map", transaction_id)),
-        };
-
-        let block_header = match self.blocks.block_headers.get(&block_hash)? {
-            Some(block_header) => block_header,
-            None => return Err(anyhow!("Block {} missing from block headers map", block_hash)),
-        };
-
-        // Generate the local proof for the commitment.
-        let local_proof = transaction.to_local_proof(commitment)?;
-
-        let transaction_id = local_proof.transaction_id();
-        let transactions = self.get_block_transactions(block_header.height())?;
-
-        // Compute the transactions inclusion proof.
-        let transactions_inclusion_proof = {
-            let index = transactions.transaction_ids().position(|id| id == transaction_id).unwrap();
-            transactions.to_transactions_inclusion_proof(index, transaction_id)?
-        };
-
-        // Compute the block header inclusion proof.
-        let transactions_root = transactions.transactions_root();
-        let block_header_inclusion_proof = block_header.to_header_inclusion_proof(1, transactions_root)?;
-        let block_header_root = block_header.to_header_root()?;
-
-        // Determine the previous block hash.
-        let previous_block_hash = self.get_previous_block_hash(self.get_block_height(&block_hash)?)?;
-
-        // Generate the record proof.
-        let record_proof = RecordProof::new(
-            block_hash,
-            previous_block_hash,
-            block_header_root,
-            block_header_inclusion_proof,
-            transactions_root,
-            transactions_inclusion_proof,
-            local_proof,
-        )?;
-
-        // Generate the ledger root inclusion proof.
-        let ledger_root = self.ledger_tree.read().root();
-        let ledger_root_inclusion_proof = self.ledger_tree.read().to_ledger_inclusion_proof(&block_hash)?;
-
-        LedgerProof::new(ledger_root, ledger_root_inclusion_proof, record_proof)
-    }
-
-    /// Updates the latest block hashes and block headers.
-    fn regenerate_latest_ledger_state(&self) -> Result<()> {
-        // Compute the start block height and end block height (inclusive).
-        let end_block_height = self.latest_block_height();
-        let start_block_height = end_block_height.saturating_sub(MAXIMUM_LINEAR_BLOCK_LOCATORS - 1);
-
-        // Retrieve the latest block hashes and block headers.
-        let block_hashes = self.get_block_hashes(start_block_height, end_block_height)?;
-        let block_headers = self.get_block_headers(start_block_height, end_block_height)?;
-        assert_eq!(block_hashes.len(), block_headers.len());
-
-        {
-            // Acquire the write lock for the latest block hashes and block headers.
-            let mut latest_block_hashes_and_headers = self.latest_block_hashes_and_headers.write();
-
-            // Upon success, clear the latest block hashes and block headers.
-            latest_block_hashes_and_headers.clear();
-
-            // Add the latest block hashes and block headers.
-            for (block_hash, block_header) in block_hashes.into_iter().zip_eq(block_headers) {
-                latest_block_hashes_and_headers.push((block_hash, block_header));
-            }
-        }
-
-        *self.latest_block_locators.write() = self.get_block_locators(end_block_height)?;
-
-        Ok(())
-    }
-
-    /// Regenerates the ledger tree.
-    fn regenerate_ledger_tree(&self) -> Result<()> {
-        // Acquire the ledger tree write lock.
-        let mut ledger_tree = self.ledger_tree.write();
-
-        // Retrieve all of the block hashes.
-        let block_hashes = self.get_block_hashes(0, self.latest_block_height())?;
-
-        // Add the block hashes to create the new ledger tree.
-        let mut new_ledger_tree = LedgerTree::<N>::new()?;
-        new_ledger_tree.add_all(&block_hashes)?;
-
-        // Update the current ledger tree with the current state.
-        *ledger_tree = new_ledger_tree;
-
-        Ok(())
-    }
-
-    /// Updates the ledger tree.
-    fn update_ledger_tree(&self, outdated_block_height: u32, new_block_height: u32) -> Result<()> {
-        // Acquire the ledger tree write lock.
-        let mut ledger_tree = self.ledger_tree.write();
-
-        let mut new_ledger_tree = ledger_tree.clone();
-
-        // Retrieve all the new block hashes.
-        let block_hashes = self.get_block_hashes(outdated_block_height + 1, new_block_height)?;
-
-        // Add the block hashes to create the new ledger tree.
-        new_ledger_tree.add_all(&block_hashes)?;
-
-        // Update the current ledger tree with the current state.
-        *ledger_tree = new_ledger_tree;
-
-        Ok(())
-    }
-
-    /// Initializes a heartbeat to keep the ledger reader in sync, with the given starting block height.
-    fn initialize_reader_heartbeat(self: &Arc<Self>, starting_block: Block<N>) -> Result<Resource> {
-        // If the storage is *not* in read-only mode, this method cannot be called.
-        if !self.is_read_only() {
-            return Err(anyhow!("Ledger must be read-only to initialize a reader heartbeat"));
-        }
-        *self.read_only.1.write() = starting_block;
-
-        let (abort_sender, mut abort_receiver) = oneshot::channel();
-
-        let ledger = self.clone();
-        let thread_handle = thread::spawn(move || {
-            loop {
-                // Check if the thread shouldn't be aborted.
-                match abort_receiver.try_recv() {
-                    Ok(_) | Err(TryRecvError::Closed) => return,
-                    _ => (),
-                };
-
-                // Refresh the ledger storage state.
-                if ledger.ledger_roots.refresh() {
-                    // After catching up the reader, determine the latest block height.
-                    if let Some(latest_block_height) = ledger.blocks.block_heights.keys().max() {
-                        let current_block = ledger.read_only.1.read().clone();
-
-                        let current_block_height = current_block.height();
-                        let current_block_hash = current_block.hash();
-                        trace!(
-                            "[Read-Only] Updating ledger state from block {} to {}",
-                            current_block_height,
-                            latest_block_height
-                        );
-
-                        // Update the last seen block.
-                        let latest_block = ledger.get_block(latest_block_height);
-                        match &latest_block {
-                            Ok(ref block) => *ledger.latest_block.write() = block.clone(),
-                            Err(error) => warn!("[Read-Only] {}", error),
-                        };
-
-                        // A flag indicating whether a fast ledger tree update is feasible.
-                        let mut quick_update = false;
-
-                        // Only consider an update if the latest height is actually greater than the current height.
-                        if latest_block_height > current_block_height {
-                            // If the last known top block hash still exists at the expected height, there was no rollback
-                            // beyond it, which means we only need to update the ledger tree with the new hashes.
-                            if let Ok(found_block_hash) = ledger.get_block_hash(current_block_height) {
-                                if found_block_hash == current_block_hash {
-                                    // Update the ledger tree.
-                                    if let Err(error) = ledger.update_ledger_tree(current_block_height, latest_block_height) {
-                                        warn!("[Read-Only] {}", error);
-                                    } else {
-                                        quick_update = true;
-                                    }
-                                }
-                            }
-                        }
-
-                        // If a quick ledger tree update was infeasible, regenerate it in its entirety.
-                        if !quick_update {
-                            // Regenerate the entire ledger tree.
-                            if let Err(error) = ledger.regenerate_ledger_tree() {
-                                warn!("[Read-Only] {}", error);
-                            };
-                        }
-
-                        // Regenerate the latest ledger state.
-                        if let Err(error) = ledger.regenerate_latest_ledger_state() {
-                            warn!("[Read-Only] {}", error);
-                        };
-
-                        // Update the last known block in the reader.
-                        if let Ok(block) = latest_block {
-                            *ledger.read_only.1.write() = block;
-                        }
-                    }
-                }
-                thread::sleep(std::time::Duration::from_secs(6));
-            }
-        });
-
-        Ok(Resource::Thread(thread_handle, abort_sender))
-    }
-
     /// Attempts to automatically resolve inconsistent ledger state.
     fn try_fixing_inconsistent_state(&self, batch: Option<usize>) -> Result<u32> {
-        // If the storage is in read-only mode, this method cannot be called.
-        if self.is_read_only() {
-            return Err(anyhow!("Ledger must be writable to fix inconsistent state"));
-        }
-
         // Remember whether this operation is within an existing batch.
         let is_part_of_a_batch = batch.is_some();
 
@@ -1274,48 +1255,19 @@ impl<N: Network> LedgerState<N> {
 
         Ok(current_block_height)
     }
-
-    ///
-    /// Dump the specified number of blocks - excluding the genesis - to the given location.
-    ///
-    #[cfg(feature = "test")]
-    #[allow(dead_code)]
-    pub fn dump_blocks<P: AsRef<Path>>(&self, path: P, count: u32) -> Result<()> {
-        let mut file = std::fs::File::create(path)?;
-        let mut blocks = Vec::with_capacity(count as usize);
-
-        println!("Commencing block dump");
-        for i in 1..=count {
-            if i % 10 == 0 || count < 10 {
-                println!("Dumping block {}/{}", i, count);
-            }
-            let block = self.get_block(i)?;
-            blocks.push(block);
-        }
-        println!("Block dump complete");
-
-        bincode::serialize_into(&mut file, &blocks)?;
-
-        Ok(())
-    }
-
-    #[cfg(any(test, feature = "test"))]
-    pub fn storage(&self) -> &RocksDB {
-        self.ledger_roots.storage()
-    }
 }
 
 #[derive(Clone, Debug)]
-struct BlockState<N: Network> {
-    block_heights: DataMap<u32, N::BlockHash>,
-    block_headers: DataMap<N::BlockHash, BlockHeader<N>>,
-    block_transactions: DataMap<N::BlockHash, Vec<N::TransactionID>>,
-    transactions: TransactionState<N>,
+struct BlockState<N: Network, A: StorageAccess> {
+    block_heights: DataMap<u32, N::BlockHash, A>,
+    block_headers: DataMap<N::BlockHash, BlockHeader<N>, A>,
+    block_transactions: DataMap<N::BlockHash, Vec<N::TransactionID>, A>,
+    transactions: TransactionState<N, A>,
 }
 
-impl<N: Network> BlockState<N> {
+impl<N: Network, A: StorageAccess> BlockState<N, A> {
     /// Initializes a new instance of `BlockState`.
-    fn open<S: Storage>(storage: S) -> Result<Self> {
+    fn open<S: Storage<Access = A>>(storage: S) -> Result<Self> {
         Ok(Self {
             block_heights: storage.open_map(MapId::BlockHeights)?,
             block_headers: storage.open_map(MapId::BlockHeaders)?,
@@ -1497,7 +1449,9 @@ impl<N: Network> BlockState<N> {
         // Return the ledger root in the block header.
         Ok(block_header.previous_ledger_root())
     }
+}
 
+impl<N: Network, A: StorageReadWrite> BlockState<N, A> {
     /// Adds the given block to storage.
     fn add_block(&self, block: &Block<N>, batch: Option<usize>) -> Result<()> {
         // Ensure the block does not exist.
@@ -1572,16 +1526,16 @@ impl<N: Network> BlockState<N> {
 
 #[derive(Clone, Debug)]
 #[allow(clippy::type_complexity)]
-struct TransactionState<N: Network> {
-    transactions: DataMap<N::TransactionID, (N::LedgerRoot, Vec<N::TransitionID>, Metadata<N>)>,
-    transitions: DataMap<N::TransitionID, (N::TransactionID, u8, Transition<N>)>,
-    serial_numbers: DataMap<N::SerialNumber, N::TransitionID>,
-    commitments: DataMap<N::Commitment, N::TransitionID>,
+struct TransactionState<N: Network, A: StorageAccess> {
+    transactions: DataMap<N::TransactionID, (N::LedgerRoot, Vec<N::TransitionID>, Metadata<N>), A>,
+    transitions: DataMap<N::TransitionID, (N::TransactionID, u8, Transition<N>), A>,
+    serial_numbers: DataMap<N::SerialNumber, N::TransitionID, A>,
+    commitments: DataMap<N::Commitment, N::TransitionID, A>,
 }
 
-impl<N: Network> TransactionState<N> {
+impl<N: Network, A: StorageAccess> TransactionState<N, A> {
     /// Initializes a new instance of `TransactionState`.
-    fn open<S: Storage>(storage: S) -> Result<Self> {
+    fn open<S: Storage<Access = A>>(storage: S) -> Result<Self> {
         Ok(Self {
             transactions: storage.open_map(MapId::Transactions)?,
             transitions: storage.open_map(MapId::Transitions)?,
@@ -1665,7 +1619,9 @@ impl<N: Network> TransactionState<N> {
             None => Err(anyhow!("Transaction {} does not exist in storage", transaction_id)),
         }
     }
+}
 
+impl<N: Network, A: StorageReadWrite> TransactionState<N, A> {
     /// Adds the given transaction to storage.
     fn add_transaction(&self, transaction: &Transaction<N>, metadata: Metadata<N>, batch: Option<usize>) -> Result<()> {
         // Ensure the transaction does not exist.

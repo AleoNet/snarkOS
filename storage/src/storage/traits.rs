@@ -20,18 +20,43 @@ use anyhow::Result;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{borrow::Borrow, path::Path};
 
+/// A trait applicable to all access modes of database operations.
+pub trait StorageAccess: Send + Sync + 'static {}
+/// A marker trait for storage functionalities require write access.
+pub trait StorageReadWrite: StorageAccess {}
+
+/// A marker type for objects with read-only storage capabilities.
+#[derive(Clone, Copy)]
+pub struct ReadOnly;
+/// A marker type for objects with read-write storage capabilities.
+#[derive(Clone, Copy)]
+pub struct ReadWrite;
+
+// Both `ReadOnly` and `ReadWrite` are storage access modes...
+impl StorageAccess for ReadOnly {}
+impl StorageAccess for ReadWrite {}
+
+// But only `ReadWrite` implements `StorageReadWrite`
+impl StorageReadWrite for ReadWrite {}
+
 pub trait Storage {
+    /// A concrete type indicating access mode, i.e. `ReadOnly` or `ReadWrite`.
+    type Access: StorageAccess;
+
     ///
     /// Opens storage at the given `path` and `context`.
     ///
-    fn open<P: AsRef<Path>>(path: P, context: u16, is_read_only: bool) -> Result<Self>
+    fn open<P: AsRef<Path>>(path: P, context: u16) -> Result<Self>
     where
         Self: Sized;
 
     ///
     /// Opens a map with the given `context` from storage.
     ///
-    fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(&self, map_id: MapId) -> Result<DataMap<K, V>>;
+    fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(
+        &self,
+        map_id: MapId,
+    ) -> Result<DataMap<K, V, Self::Access>>;
 
     ///
     /// Imports a file with the given path to reconstruct storage.
@@ -44,7 +69,8 @@ pub trait Storage {
     fn export<P: AsRef<Path>>(&self, path: P) -> Result<()>;
 }
 
-pub trait Map<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
+/// A trait representing map-like storage operations with read-only capabilities.
+pub trait MapRead<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
     type Iterator: Iterator<Item = (K, V)>;
     type Keys: Iterator<Item = K>;
     type Values: Iterator<Item = V>;
@@ -66,6 +92,31 @@ pub trait Map<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwn
         Q: Serialize + ?Sized;
 
     ///
+    /// Returns an iterator visiting each key-value pair in the map.
+    ///
+    fn iter(&'a self) -> Self::Iterator;
+
+    ///
+    /// Returns an iterator over each key in the map.
+    ///
+    fn keys(&'a self) -> Self::Keys;
+
+    ///
+    /// Returns an iterator over each value in the map.
+    ///
+    fn values(&'a self) -> Self::Values;
+
+    ///
+    /// Performs a refresh operation for implementations of `Map` that perform periodic operations.
+    /// This method is implemented here for RocksDB to catch up a reader (secondary) database.
+    /// Returns `true` if the sequence number of the database has increased.
+    ///
+    fn refresh(&self) -> bool;
+}
+
+/// A trait representing map-like storage operations with read-write capabilities.
+pub trait MapReadWrite<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>: MapRead<'a, K, V> {
+    ///
     /// Inserts the given key-value pair into the map. Can be paired with a numeric
     /// batch id, which defers the operation until `execute_batch` is called using
     /// the same id.
@@ -84,30 +135,6 @@ pub trait Map<'a, K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwn
     where
         K: Borrow<Q>,
         Q: Serialize + ?Sized;
-
-    ///
-    /// Returns an iterator visiting each key-value pair in the map.
-    ///
-    fn iter(&'a self) -> Self::Iterator;
-
-    ///
-    /// Returns an iterator over each key in the map.
-    ///
-    fn keys(&'a self) -> Self::Keys;
-
-    ///
-    /// Returns an iterator over each value in the map.
-    ///
-    fn values(&'a self) -> Self::Values;
-
-    ///
-    /// Performs a refresh operation for implementations of `Map` that perform periodic operations.
-    /// Returns `true` if the database state has been updated.
-    ///
-    fn refresh(&self) -> bool {
-        // Currently, this method is implemented for RocksDB to catch up a reader (secondary) database.
-        true
-    }
 
     ///
     /// Prepares an atomic batch of writes and returns its numeric id which can later be used to include

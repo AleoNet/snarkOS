@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::storage::{DataMap, Map, MapId, Storage};
+use crate::storage::{DataMap, MapId, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite};
 use snarkvm::dpc::prelude::*;
 
 use anyhow::{anyhow, Result};
@@ -25,19 +25,16 @@ use std::{
 };
 
 #[derive(Debug)]
-pub struct OperatorState<N: Network> {
-    shares: SharesState<N>,
+pub struct OperatorState<N: Network, A: StorageAccess> {
+    shares: SharesState<N, A>,
 }
 
-impl<N: Network> OperatorState<N> {
-    ///
-    /// Opens a new writable instance of `OperatorState` from the given storage path.
-    ///
-    pub fn open_writer<S: Storage, P: AsRef<Path>>(path: P) -> Result<Self> {
+impl<N: Network, A: StorageAccess> OperatorState<N, A> {
+    /// Opens a new instance of `OperatorState` from the given storage path.
+    pub fn open<S: Storage<Access = A>, P: AsRef<Path>>(path: P) -> Result<Self> {
         // Open storage.
         let context = N::NETWORK_ID;
-        let is_read_only = false;
-        let storage = S::open(path, context, is_read_only)?;
+        let storage = S::open(path, context)?;
 
         // Initialize the operator.
         let operator = Self {
@@ -68,6 +65,13 @@ impl<N: Network> OperatorState<N> {
         self.shares.get_shares_for_prover(prover)
     }
 
+    /// Returns a list of provers which have submitted shares to an operator.
+    pub fn get_provers(&self) -> Vec<Address<N>> {
+        self.shares.get_provers()
+    }
+}
+
+impl<N: Network, A: StorageReadWrite> OperatorState<N, A> {
     /// Increments the share count by one for a given block height, coinbase record and prover address.
     pub fn increment_share(&self, block_height: u32, coinbase_record: Record<N>, prover: &Address<N>) -> Result<()> {
         self.shares.increment_share(block_height, coinbase_record, prover)
@@ -77,23 +81,18 @@ impl<N: Network> OperatorState<N> {
     pub fn remove_shares(&self, block_height: u32, coinbase_record: Record<N>) -> Result<()> {
         self.shares.remove_shares(block_height, coinbase_record)
     }
-
-    /// Returns a list of provers which have submitted shares to an operator.
-    pub fn get_provers(&self) -> Vec<Address<N>> {
-        self.shares.get_provers()
-    }
 }
 
 #[derive(Clone, Debug)]
 #[allow(clippy::type_complexity)]
-struct SharesState<N: Network> {
+struct SharesState<N: Network, A: StorageAccess> {
     /// The miner shares for each block.
-    shares: DataMap<(u32, Record<N>), HashMap<Address<N>, u64>>,
+    shares: DataMap<(u32, Record<N>), HashMap<Address<N>, u64>, A>,
 }
 
-impl<N: Network> SharesState<N> {
+impl<N: Network, A: StorageAccess> SharesState<N, A> {
     /// Initializes a new instance of `SharesState`.
-    fn open<S: Storage>(storage: S) -> Result<Self> {
+    fn open<S: Storage<Access = A>>(storage: S) -> Result<Self> {
         Ok(Self {
             shares: storage.open_map(MapId::Shares)?,
         })
@@ -122,6 +121,17 @@ impl<N: Network> SharesState<N> {
         self.shares.iter().filter_map(|((_, _), shares)| shares.get(prover).copied()).sum()
     }
 
+    fn get_provers(&self) -> Vec<Address<N>> {
+        let set: HashSet<Address<N>> = self
+            .shares
+            .iter()
+            .flat_map(|((_, _), shares)| shares.keys().copied().collect::<Vec<_>>())
+            .collect();
+        Vec::from_iter(set)
+    }
+}
+
+impl<N: Network, A: StorageReadWrite> SharesState<N, A> {
     /// Increments the share count by one for a given block height, coinbase record, and prover address.
     fn increment_share(&self, block_height: u32, coinbase_record: Record<N>, prover: &Address<N>) -> Result<()> {
         // Retrieve the current shares for a given block height.
@@ -141,14 +151,5 @@ impl<N: Network> SharesState<N> {
     /// Removes all of the shares for a given block height and coinbase record.
     fn remove_shares(&self, block_height: u32, coinbase_record: Record<N>) -> Result<()> {
         self.shares.remove(&(block_height, coinbase_record), None)
-    }
-
-    fn get_provers(&self) -> Vec<Address<N>> {
-        let set: HashSet<Address<N>> = self
-            .shares
-            .iter()
-            .flat_map(|((_, _), shares)| shares.keys().copied().collect::<Vec<_>>())
-            .collect();
-        Vec::from_iter(set)
     }
 }
