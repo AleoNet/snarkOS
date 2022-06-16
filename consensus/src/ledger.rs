@@ -6,6 +6,10 @@ pub struct Ledger;
 // TODO: these methods are not implemented in the whitepaper
 
 impl Ledger {
+    pub fn new() -> Self {
+        todo!()
+    }
+
     // apply txns speculatively
     pub fn speculate(&mut self, prev_block_id: BlockId, block_id: BlockId, txns: Vec<()>) -> () {
         todo!()

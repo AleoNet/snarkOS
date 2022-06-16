@@ -21,6 +21,12 @@ pub struct Safety {
 }
 
 impl Safety {
+    pub fn new() -> Self {
+        // do `highest_vote_round` and `highest_qc_round` persist?
+
+        todo!()
+    }
+
     fn increase_highest_vote_round(&mut self, round: Round) {
         // commit not to vote in rounds lower than round
         if round > self.highest_vote_round {

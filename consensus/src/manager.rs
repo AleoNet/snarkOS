@@ -1,3 +1,8 @@
+#[cfg(feature = "test")]
+use tokio::sync::mpsc;
+
+#[cfg(feature = "test")]
+use crate::message::TestMessage;
 use crate::{
     block_tree::{BlockTree, QuorumCertificate, VoteMsg},
     election::Election,
@@ -8,17 +13,52 @@ use crate::{
     safety::Safety,
 };
 
-struct Manager {
+/// The central object responsible for the consensus process.
+// TODO: once the initial implementation is finalized, this
+// should likely be made into a finite state machine.
+pub struct Manager {
     block_tree: BlockTree,
     election: Election,
     ledger: Ledger,
     mempool: Mempool,
     pacemaker: Pacemaker,
     safety: Safety,
+
+    // Used to send messages to other managers in tests.
+    #[cfg(feature = "test")]
+    outbound_sender: mpsc::Sender<TestMessage>,
 }
 
 impl Manager {
-    fn start_event_processing(&mut self, msg: Message) {
+    #[cfg(not(feature = "test"))]
+    pub fn new(/* TODO: pass the ledger here */) -> Self {
+        Self {
+            block_tree: BlockTree::new(),
+            election: Election::new(),
+            ledger: Ledger::new(),
+            mempool: Mempool::new(),
+            pacemaker: Pacemaker::new(),
+            safety: Safety::new(),
+        }
+    }
+
+    #[cfg(feature = "test")]
+    pub fn new(
+        // TODO: include the same arguments as the non-test version
+        outbound_sender: mpsc::Sender<TestMessage>, // a clone of `common_msg_sender`
+    ) -> Self {
+        Self {
+            block_tree: BlockTree::new(),
+            election: Election::new(),
+            ledger: Ledger::new(),
+            mempool: Mempool::new(),
+            pacemaker: Pacemaker::new(outbound_sender.clone()),
+            safety: Safety::new(),
+            outbound_sender,
+        }
+    }
+
+    pub fn start_event_processing(&mut self, msg: Message) {
         match msg {
             Message::LocalTimeout => self.pacemaker.local_timeout_round(&self.block_tree, &mut self.safety),
             Message::Proposal(msg) => self.process_proposal_msg(msg),
@@ -59,7 +99,13 @@ impl Manager {
             .make_vote(p.block, p.last_round_tc.unwrap(), &self.ledger, &self.block_tree)
         {
             let leader = self.election.get_leader(current_round + 1);
+
             // TODO: send vote msg to the leader
+
+            #[cfg(feature = "test")]
+            self.outbound_sender
+                .blocking_send(TestMessage::new(todo!(), Some(todo!())))
+                .unwrap();
         }
     }
 
@@ -90,7 +136,11 @@ impl Manager {
             .block_tree
             .generate_block(self.mempool.get_transactions(), self.pacemaker.current_round);
         let proposal_msg = ProposalMsg::new(block, last_tc, self.block_tree.high_commit_qc.clone());
+
         // TODO: broadcast proposal_msg ProposalMsg〈b, last tc, Block-Tree.high commit qc〉
+
+        #[cfg(feature = "test")]
+        self.outbound_sender.blocking_send(TestMessage::new(todo!(), None)).unwrap();
         // }
     }
 }

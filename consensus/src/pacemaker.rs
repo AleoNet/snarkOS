@@ -1,5 +1,10 @@
 use std::collections::HashMap;
 
+#[cfg(feature = "test")]
+use tokio::sync::mpsc;
+
+#[cfg(feature = "test")]
+use crate::message::TestMessage;
 use crate::{
     block_tree::{BlockTree, QuorumCertificate},
     message::{TimeoutCertificate, TimeoutInfo, TimeoutMsg},
@@ -15,9 +20,28 @@ pub struct Pacemaker {
     last_round_tc: Option<TimeoutCertificate>,
     // Timeouts per round
     pending_timeouts: HashMap<Round, HashMap<(), TimeoutInfo>>,
+
+    // Used to send messages to other managers in tests.
+    #[cfg(feature = "test")]
+    outbound_sender: mpsc::Sender<TestMessage>,
 }
 
 impl Pacemaker {
+    #[cfg(not(feature = "test"))]
+    pub fn new() -> Self {
+        // does `current_round` persist?
+
+        todo!()
+    }
+
+    #[cfg(feature = "test")]
+    pub fn new(
+        // TODO: include the same arguments as the non-test version
+        outbound_sender: mpsc::Sender<TestMessage>, // a clone of `common_msg_sender`
+    ) -> Self {
+        todo!()
+    }
+
     pub fn get_round_timer(&self, round: Round) -> () {
         // FIXME: timer
         // round timer formula // For example, use 4 × ∆ or α + βcommit gap(r) if ∆ is unknown.
@@ -52,6 +76,9 @@ impl Pacemaker {
         };
 
         // TODO: broadcast timeout_msg
+
+        #[cfg(feature = "test")]
+        self.outbound_sender.blocking_send(TestMessage::new(todo!(), None)).unwrap();
     }
 
     pub fn process_remote_timeout(&mut self, tmo: TimeoutMsg, block_tree: &BlockTree, safety: &mut Safety) -> Option<TimeoutCertificate> {

@@ -1,8 +1,13 @@
 use std::{cmp, collections::HashMap, hash::Hash};
 
+#[cfg(feature = "test")]
+use tokio::sync::mpsc;
+
+#[cfg(feature = "test")]
+use crate::message::TestMessage;
 use crate::{hash, ledger::Ledger, BlockRound, F};
 
-#[derive(Clone, Hash)]
+#[derive(Clone, Debug, Hash)]
 pub struct VoteInfo {
     // Id of block
     pub id: BlockId,
@@ -17,7 +22,7 @@ pub struct VoteInfo {
 }
 
 // speculated new committed state to vote directly on
-#[derive(Clone, Hash)]
+#[derive(Clone, Debug, Hash)]
 pub struct LedgerCommitInfo {
     // ⊥ if no commit happens when this vote is aggregated to QC
     pub commit_state_id: Option<()>,
@@ -25,6 +30,7 @@ pub struct LedgerCommitInfo {
     pub vote_info_hash: u64,
 }
 
+#[derive(Clone, Debug)]
 pub struct VoteMsg {
     // A VoteInfo record
     vote_info: VoteInfo,
@@ -51,7 +57,7 @@ impl VoteMsg {
 }
 
 // QC is a VoteMsg with multiple signatures
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct QuorumCertificate {
     pub vote_info: VoteInfo,
     ledger_commit_info: LedgerCommitInfo,
@@ -86,7 +92,7 @@ impl PartialOrd for QuorumCertificate {
 pub type BlockId = u64;
 
 // FIXME: integrate with the snarkVM Block
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Block {
     // The author of the block, may not be the same as qc.author after view-change
     pub author: (),
@@ -112,6 +118,13 @@ pub struct BlockTree {
 }
 
 impl BlockTree {
+    pub fn new() -> Self {
+        // are `high_qc` and `high_commit_qc` persistent? are they always available?
+        // otherwise they should be `Option`s
+
+        todo!()
+    }
+
     pub fn process_qc(&mut self, qc: QuorumCertificate, ledger: &mut Ledger) {
         if qc.ledger_commit_info.commit_state_id.is_none() {
             ledger.commit(qc.vote_info.parent_id.clone());

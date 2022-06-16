@@ -3,9 +3,9 @@ use std::hash::Hash;
 mod block_tree;
 mod election;
 mod ledger;
-mod manager;
+pub mod manager;
 mod mempool;
-mod message;
+pub mod message;
 mod pacemaker;
 mod safety;
 

@@ -14,6 +14,12 @@ pub struct Election {
 }
 
 impl Election {
+    pub fn new() -> Self {
+        // is the list of validators known beforehand?
+
+        todo!()
+    }
+
     pub fn elect_reputation_leader(&self, qc: QuorumCertificate, ledger: &Ledger) -> () {
         let mut active_validators = vec![]; // validators that signed the last window size committed blocks
         let mut last_authors = vec![]; // ordered set of authors of last exclude size committed blocks

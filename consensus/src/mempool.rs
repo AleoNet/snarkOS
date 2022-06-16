@@ -2,6 +2,10 @@
 pub struct Mempool;
 
 impl Mempool {
+    pub fn new() -> Self {
+        Self
+    }
+
     pub fn get_transactions(&self) -> Vec<()> {
         todo!() // not implemented in the whitepaper
     }

@@ -16,6 +16,23 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
-# TODO: remove
+[features]
+test = [ ]
+
+# TODO: remove when integrating with snarkOS
 [workspace]
-members = ["."]
+members = [ "." ]
+
+[dependencies.tokio]
+version = "1"
+features = [ "macros", "rt", "sync" ]
+
+[dependencies.tracing]
+version = "0.1"
+
+[dev-dependencies.tracing-subscriber]
+version = "0.3"
+
+[dev-dependencies.snarkos-consensus]
+path = "."
+features = [ "test" ]

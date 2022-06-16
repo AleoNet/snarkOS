@@ -4,6 +4,7 @@ use crate::{
     Round,
 };
 
+#[derive(Clone, Debug)]
 pub enum Message {
     LocalTimeout,
     Proposal(ProposalMsg),
@@ -11,7 +12,7 @@ pub enum Message {
     Timeout(TimeoutMsg),
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TimeoutInfo {
     pub round: Round,
     pub high_qc: QuorumCertificate,
@@ -32,7 +33,7 @@ impl TimeoutInfo {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TimeoutCertificate {
     // All timeout messages that form TC have the same round
     pub round: Round,
@@ -42,6 +43,7 @@ pub struct TimeoutCertificate {
     pub signatures: Vec<()>,
 }
 
+#[derive(Clone, Debug)]
 pub struct TimeoutMsg {
     // TimeoutInfo for some round with a high qc
     pub tmo_info: TimeoutInfo,
@@ -51,6 +53,7 @@ pub struct TimeoutMsg {
     pub high_commit_qc: QuorumCertificate,
 }
 
+#[derive(Clone, Debug)]
 pub struct ProposalMsg {
     pub block: Block,
     // TC for block.round − 1 if block.qc.vote info.round != block.round − 1, else ⊥
@@ -68,5 +71,23 @@ impl ProposalMsg {
             high_commit_qc,
             signature: (),
         }
+    }
+}
+
+// A message dedicated to tests.
+#[cfg(feature = "test")]
+#[derive(Debug)]
+pub struct TestMessage {
+    // The actual message.
+    pub message: Message,
+    // The index of the manager to relay the message to; None is a broadcast.
+    pub target: Option<usize>,
+    // note: it should be possible to identify the source based on the message signature.
+}
+
+#[cfg(feature = "test")]
+impl TestMessage {
+    pub fn new(message: Message, target: Option<usize>) -> Self {
+        Self { message, target }
     }
 }
