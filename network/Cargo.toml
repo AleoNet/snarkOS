@@ -59,7 +59,7 @@ version = "2.0.2"
 version = "0.8.0"
 
 [dependencies.time]
-version = "0.3.7"
+version = "0.3.10"
 
 [dependencies.tokio]
 version = "1"
