@@ -120,6 +120,9 @@ version = "0.11"
 path = "."
 features = [ "test" ] # a workaround to use the `test` feature in tests by default
 
+[build-dependencies.walkdir]
+version = "2"
+
 [profile.release]
 opt-level = 3
 lto = "thin"
