@@ -38,26 +38,26 @@ use crate::{
 #[derive(Debug, Parser)]
 pub struct PostgresOpts {
     /// The hostname of the postgres instance (defaults to "localhost").
-    #[clap(long = "postgres-host", default_value = "localhost")]
+    #[clap(long = "postgres-host", default_value = "localhost", action)]
     pub host: String,
     /// The port of the postgres instance (defaults to 5432).
-    #[clap(long = "postgres-port", default_value = "5432")]
+    #[clap(long = "postgres-port", default_value = "5432", action)]
     pub port: u16,
     /// The user of the postgres instance (defaults to "postgres").
-    #[clap(long = "postgres-user", default_value = "postgres")]
+    #[clap(long = "postgres-user", default_value = "postgres", action)]
     pub user: String,
     /// The password for the postgres instance (defaults to nothing).
-    #[clap(long = "postgres-pass", default_value = "")]
+    #[clap(long = "postgres-pass", default_value = "", action)]
     pub pass: String,
     /// The hostname of the postgres instance (defaults to "postgres").
-    #[clap(long = "postgres-dbname", default_value = "postgres")]
+    #[clap(long = "postgres-dbname", default_value = "postgres", action)]
     pub dbname: String,
     /// If set to `true`, re-creates the crawler's database tables.
-    #[clap(long = "postgres-clean")]
+    #[clap(long = "postgres-clean", action)]
     pub clean: bool,
     /// The path to a certificate file to be used for a TLS connection with the postgres instance.
     #[cfg(feature = "postgres-tls")]
-    #[clap(long = "postgres-cert-path")]
+    #[clap(long = "postgres-cert-path", action)]
     pub cert_path: PathBuf,
 }
 
