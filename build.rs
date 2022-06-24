@@ -34,7 +34,6 @@ fn check_file_licenses<P: AsRef<Path>>(path: P) {
 
         // Skip the specified directories.
         if entry_type.is_dir() && DIRS_TO_SKIP.contains(&entry.file_name().to_str().unwrap_or("")) {
-            // println!("Skipping {}", entry.file_name().to_str().unwrap());
             iter.skip_current_dir();
 
             continue;
