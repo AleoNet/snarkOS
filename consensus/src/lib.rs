@@ -23,7 +23,6 @@ mod block_tree;
 mod ledger;
 pub mod manager;
 pub mod message;
-mod pacemaker;
 mod safety;
 
 pub type N = snarkvm::console::network::Testnet3;

@@ -1,17 +1,17 @@
 #[cfg(feature = "test")]
-use tokio::sync::mpsc;
-
-#[cfg(feature = "test")]
 use crate::message::TestMessage;
 use crate::{
     block_tree::{BlockTree, QuorumCertificate},
     ledger::Ledger,
-    message::{Message, Propose, Timeout, TimeoutCertificate, Vote},
-    pacemaker::Pacemaker,
+    message::{Message, Propose, Timeout, TimeoutCertificate, TimeoutInfo, Vote},
     safety::Safety,
+    F,
 };
 
 use anyhow::Result;
+
+#[cfg(feature = "test")]
+use tokio::sync::mpsc;
 
 // TODO: integrate with snarkVM's mempool
 pub struct Mempool;
@@ -33,7 +33,6 @@ pub struct Manager {
     block_tree: BlockTree,
     ledger: Ledger,
     mempool: Mempool,
-    pacemaker: Pacemaker,
     safety: Safety,
 
     // Leader Selection //
@@ -46,6 +45,15 @@ pub struct Manager {
     exclude_size: usize,
     // Map from round numbers to leaders elected due to the reputation scheme
     reputation_leaders: HashMap<Round, Address>,
+
+    // Pacemaker //
+
+    // Initially zero
+    pub current_round: Round,
+    // Initially ⊥
+    last_round_tc: Option<TimeoutCertificate>,
+    // Timeouts per round
+    pending_timeouts: HashMap<Round, HashMap<(), TimeoutInfo>>,
 
     // Testing //
 
@@ -61,13 +69,16 @@ impl Manager {
             block_tree: BlockTree::new(),
             ledger: Ledger::new(),
             mempool: Mempool::new(),
-            pacemaker: Pacemaker::new(),
             safety: Safety::new(),
 
             validators: vec![],
             window_size: 0,
             exclude_size: 0,
             reputation_leaders: HashMap::new(),
+
+            current_round: 0,
+            last_round_tc: None,
+            pending_timeouts: HashMap::new(),
         }
     }
 
@@ -80,7 +91,6 @@ impl Manager {
             block_tree: BlockTree::new(),
             ledger: Ledger::new(),
             mempool: Mempool::new(),
-            pacemaker: Pacemaker::new(outbound_sender.clone()),
             safety: Safety::new(),
 
             validators: vec![],
@@ -88,13 +98,17 @@ impl Manager {
             exclude_size: 0,
             reputation_leaders: HashMap::new(),
 
+            current_round: 0,
+            last_round_tc: None,
+            pending_timeouts: HashMap::new(),
+
             outbound_sender,
         }
     }
 
     pub fn start_event_processing(&mut self, msg: Message) -> Result<()> {
         match msg {
-            Message::LocalTimeout => self.pacemaker.local_timeout_round(&self.block_tree, &mut self.safety),
+            Message::LocalTimeout => self.local_timeout_round(),
             Message::Propose(msg) => self.process_propose(msg),
             Message::Timeout(msg) => self.process_timeout(msg),
             Message::Vote(msg) => self.process_vote(msg),
@@ -105,10 +119,10 @@ impl Manager {
         self.process_qc(propose.block.qc.clone())?;
         self.process_qc(propose.high_commit_qc.clone())?;
 
-        self.pacemaker.advance_round_tc(propose.last_round_tc.clone());
+        self.advance_round_tc(propose.last_round_tc.clone());
 
         // note: the whitepaper assigns to 'round' here
-        let current_round = self.pacemaker.current_round;
+        let current_round = self.current_round;
         let leader = self.get_leader(current_round);
 
         // note: the whitepaper uses 'round' instead of 'current_round' here
@@ -142,11 +156,11 @@ impl Manager {
         self.process_qc(timeout.tmo_info.high_qc.clone())?;
         self.process_qc(timeout.high_commit_qc.clone())?;
 
-        self.pacemaker.advance_round_tc(timeout.last_round_tc.clone());
+        self.advance_round_tc(timeout.last_round_tc.clone());
 
-        if let Some(tc) = self.pacemaker.process_remote_timeout(timeout, &self.block_tree, &mut self.safety) {
+        if let Some(tc) = self.process_remote_timeout(timeout) {
             // FIXME: method not specified in the whitepaper again, and uses a different type now
-            // self.pacemaker.advance_round(tc);
+            // self.advance_round(tc);
             self.process_new_round_event(Some(tc));
         }
 
@@ -166,15 +180,13 @@ impl Manager {
         self.block_tree.process_qc(qc.clone(), &mut self.ledger);
         self.update_leaders(qc)
         // FIXME: method not specified in the whitepaper
-        // self.pacemaker.advance_round(qc.vote_info.round);
+        // self.advance_round(qc.vote_info.round);
     }
 
     fn process_new_round_event(&self, last_tc: Option<TimeoutCertificate>) {
-        // TODO: if <US> == self.election.get_leader(self.pacemaker.current_round) {
+        // TODO: if <US> == self.election.get_leader(self.current_round) {
         // Leader code: generate proposal.
-        let block = self
-            .block_tree
-            .generate_block(self.mempool.get_transactions(), self.pacemaker.current_round);
+        let block = self.block_tree.generate_block(self.mempool.get_transactions(), self.current_round);
         let proposal_msg = Propose::new(block, last_tc, self.block_tree.high_commit_qc.clone(), todo!());
 
         // TODO: broadcast proposal_msg ProposalMsg〈b, last tc, Block-Tree.high commit qc〉
@@ -202,7 +214,7 @@ impl Manager {
     pub fn update_leaders(&mut self, qc: QuorumCertificate) -> Result<()> {
         let extended_round = qc.vote_info.parent_round;
         let qc_round = qc.vote_info.round;
-        let current_round = self.pacemaker.current_round;
+        let current_round = self.current_round;
 
         if extended_round + 1 == qc_round && qc_round + 1 == current_round {
             self.reputation_leaders.insert(current_round + 1, self.elect_reputation_leader(qc)?);
@@ -242,4 +254,110 @@ impl Manager {
         // active validators.pick_one(seed ← qc.voteinfo.round)
         Ok(active_validators[0])
     }
+}
+
+// Pacemaker
+impl Manager {
+    // pub fn get_round_timer(&self, round: Round) -> () {
+    //     // FIXME: timer
+    //     // round timer formula // For example, use 4 × ∆ or α + βcommit gap(r) if ∆ is unknown.
+    //
+    //     todo!()
+    // }
+    //
+    // pub fn start_timer(&mut self, new_round: Round) {
+    //     // FIXME: timer
+    //     // stop_timer(current round)
+    //
+    //     self.current_round = new_round;
+    //
+    //     // start local timer for round current round for duration get round timer(current round)
+    //
+    //     todo!()
+    // }
+
+    pub fn local_timeout_round(&mut self) -> Result<()> {
+        // FIXME: what should this do
+        // save_consensus_state()
+
+        let high_qc = self.block_tree.high_qc.clone();
+        // TODO: are the unwraps safe?
+        let timeout_info = self
+            .safety
+            .make_timeout(self.current_round, high_qc, self.last_round_tc.clone().unwrap())
+            .unwrap();
+        let timeout_msg = Timeout {
+            tmo_info: timeout_info,
+            last_round_tc: self.last_round_tc.clone(),
+            high_commit_qc: self.block_tree.high_commit_qc.clone(),
+        };
+
+        // TODO: broadcast timeout_msg
+
+        #[cfg(feature = "test")]
+        self.outbound_sender.blocking_send(TestMessage::new(todo!(), None)).unwrap();
+
+        Ok(())
+    }
+
+    pub fn process_remote_timeout(&mut self, tmo: Timeout) -> Option<TimeoutCertificate> {
+        let tmo_info = &tmo.tmo_info;
+
+        if tmo_info.round < self.current_round {
+            return None;
+        }
+
+        if !self.pending_timeouts[&tmo_info.round].contains_key(&tmo_info.sender) {
+            if let Some(infos) = self.pending_timeouts.get_mut(&tmo_info.round) {
+                infos.insert(tmo_info.sender, tmo_info.clone());
+            }
+        }
+
+        let num_round_senders = self.pending_timeouts[&tmo_info.round].len();
+
+        if num_round_senders == F + 1 {
+            // FIXME: timer
+            // stop_timer(current round)
+
+            self.local_timeout_round().unwrap() // Bracha timeout
+        }
+
+        if num_round_senders == 2 * F + 1 {
+            return Some(TimeoutCertificate {
+                round: tmo_info.round,
+                // TODO: what's t? is it a bitwise OR? {t.high_qc.round | t ∈ pending_timeouts[tmo_info.round]}
+                tmo_high_qc_rounds: todo!(),
+                // TODO: what's t? is it a bitwise OR? {t.signature | t ∈ pending_timeouts[tmo_info.round]}
+                signatures: todo!(),
+            });
+        }
+
+        None
+    }
+
+    pub fn advance_round_tc(&mut self, tc: Option<TimeoutCertificate>) -> bool {
+        if tc.is_none() || tc.as_ref().unwrap().round < self.current_round {
+            return false;
+        }
+
+        self.last_round_tc = tc;
+
+        // FIXME: timer
+        // start timer(tc.round + 1)
+
+        true
+    }
+
+    // pub fn advance_round_qc(&mut self, qc: QuorumCertificate) -> bool {
+    //     if qc.vote_info.round < self.current_round {
+    //         return false;
+    //     }
+    //
+    //     self.last_round_tc = None;
+    //
+    //     // FIXME: timer
+    //     // start timer(qc.vote_info.round + 1)
+    //
+    //     true
+    // }
 }
