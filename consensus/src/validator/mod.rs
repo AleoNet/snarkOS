@@ -33,11 +33,11 @@ pub(super) type Stake = u64;
 pub struct Validator {
     /// The address of the validator.
     address: Address,
-    /// The amount of stake that the validator has bonded.
+    /// The amount of stake held by this validator.
     stake: Stake,
-    /// The score of the bonded validator.
+    /// The score of the validator.
     score: Score,
-    /// The amount of stake that each staker (including the validator) has bonded.
+    /// The amount of stake that each staker (including the validator) has.
     staked: IndexMap<Address, Stake>,
     /// The amount of rewards that each staker (including the validator) has received.
     rewards: IndexMap<Address, Reward>,
@@ -69,7 +69,7 @@ impl Validator {
         &self.address
     }
 
-    /// Returns the amount of stake that is bonded with this validator.
+    /// Returns the amount of stake held by this validator.
     pub const fn stake(&self) -> Stake {
         self.stake
     }
@@ -103,8 +103,8 @@ impl Validator {
 impl Validator {
     /// Increments the staked amount by the given amount.
     pub fn increment_stake_by(&mut self, staker: &Address, amount: Stake) -> Result<()> {
-        // Ensure the staker is bonding a nonzero amount.
-        ensure!(amount > 0, "Staker must bond a nonzero amount");
+        // Ensure the staker is incrementing a nonzero amount.
+        ensure!(amount > 0, "Staker must increment stake by a nonzero amount");
 
         // Update the stake.
         match self.stake.checked_add(amount) {
@@ -126,8 +126,8 @@ impl Validator {
     pub fn decrement_stake_by(&mut self, staker: &Address, amount: Stake) -> Result<()> {
         // Ensure the staker exists.
         ensure!(self.staked.contains_key(staker), "Staker does not exist in validator");
-        // Ensure the staker is unbonding a nonzero amount.
-        ensure!(amount > 0, "Staker must unbond a nonzero amount");
+        // Ensure the staker is decrementing a nonzero amount.
+        ensure!(amount > 0, "Staker must decrement stake by a nonzero amount");
 
         // Retrieve the staked amount.
         let mut entry = match self.staked.get_mut(staker) {
