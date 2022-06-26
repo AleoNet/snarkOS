@@ -1,16 +1,18 @@
-#[cfg(feature = "test")]
-use crate::message::TestMessage;
 use crate::{
-    bft::Round,
-    block::Block,
-    block_tree::{BlockTree, LedgerCommitInfo, QuorumCertificate, VoteInfo},
-    hash,
-    ledger::Ledger,
-    message::{Message, Propose, Timeout, TimeoutCertificate, TimeoutInfo, Vote},
+    reference::{
+        block_tree::BlockTree,
+        hash,
+        ledger::{Block, Ledger},
+        message::{LedgerCommitInfo, Message, Propose, QuorumCertificate, Timeout, TimeoutCertificate, TimeoutInfo, Vote, VoteInfo},
+        Round,
+        F,
+    },
     Address,
     Signature,
-    F,
 };
+
+#[cfg(feature = "test")]
+use crate::reference::message::TestMessage;
 
 use anyhow::Result;
 use std::{cmp, collections::HashMap};

@@ -1,82 +1,21 @@
 use crate::{
-    bft::Round,
-    block::{Block, BlockHash},
-    hash,
-    ledger::Ledger,
-    message::Vote,
+    reference::{
+        hash,
+        ledger::{Block, BlockHash, Ledger},
+        message::{QuorumCertificate, Vote},
+        Round,
+        F,
+    },
     Signature,
-    F,
 };
 
 #[cfg(feature = "test")]
-use crate::message::TestMessage;
+use crate::reference::message::TestMessage;
 
-use std::{cmp, collections::HashMap, hash::Hash};
+use std::{collections::HashMap, hash::Hash};
 
 #[cfg(feature = "test")]
 use tokio::sync::mpsc;
-
-#[derive(Clone, Debug, Hash)]
-pub struct VoteInfo {
-    // Id of block
-    pub id: BlockHash,
-    // round of block
-    pub round: Round,
-    // Id of parent
-    pub parent_id: BlockHash,
-    // round of parent
-    pub parent_round: Round,
-    // Speculated execution state
-    pub exec_state_id: Option<()>,
-}
-
-// speculated new committed state to vote directly on
-#[derive(Clone, Debug, Hash)]
-pub struct LedgerCommitInfo {
-    // ⊥ if no commit happens when this vote is aggregated to QC
-    pub commit_state_id: Option<()>,
-    // Hash of VoteMsg.vote info
-    pub vote_info_hash: u64,
-}
-
-// QC is a VoteMsg with multiple signatures
-#[derive(Clone, Debug)]
-pub struct QuorumCertificate {
-    pub vote_info: VoteInfo,
-    ledger_commit_info: LedgerCommitInfo,
-    // A quorum of signatures
-    pub signatures: Vec<Signature>,
-    // The validator that produced the qc
-    author: (),
-    author_signature: (),
-}
-
-impl QuorumCertificate {
-    /// Returns the signatures.
-    pub fn signatures(&self) -> &[Signature] {
-        &self.signatures
-    }
-}
-
-impl PartialEq for QuorumCertificate {
-    fn eq(&self, other: &Self) -> bool {
-        todo!()
-    }
-}
-
-impl Eq for QuorumCertificate {}
-
-impl Ord for QuorumCertificate {
-    fn cmp(&self, other: &Self) -> cmp::Ordering {
-        todo!()
-    }
-}
-
-impl PartialOrd for QuorumCertificate {
-    fn partial_cmp(&self, other: &Self) -> Option<cmp::Ordering> {
-        Some(self.cmp(other))
-    }
-}
 
 pub struct BlockTree {
     // tree of blocks pending commitment

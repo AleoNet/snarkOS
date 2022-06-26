@@ -1,7 +1,7 @@
 use tokio::sync::mpsc;
 use tracing::*;
 
-use snarkos_consensus::{
+use snarkos_consensus::reference::{
     message::{Message, TestMessage},
     validator::Validator,
 };

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{bft::Round, Address};
+use crate::{round::Round, Address};
 
 /// This value defines the height of a block, which is always less than or equal to the round number.
 pub type Height = u32;
@@ -36,14 +36,14 @@ pub struct Block {
     pub round: Round,
     // Proposed transaction(s)
     pub payload: Vec<()>,
-    // QC for parent block
-    pub qc: crate::block_tree::QuorumCertificate,
+    // // QC for parent block
+    // pub qc: crate::message::QuorumCertificate,
 }
 
 impl Block {
     /// Returns the round number of the block.
-    pub const fn round(&self) -> Round {
-        self.round
+    pub const fn round(&self) -> &Round {
+        &self.round
     }
 
     /// Returns the leader of the round.

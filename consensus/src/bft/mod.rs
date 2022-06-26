@@ -15,7 +15,3 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod messages;
-
-/// This value defines the number of rounds that have taken place since genesis,
-/// and includes both successful and timed out rounds.
-pub type Round = u64;

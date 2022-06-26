@@ -14,11 +14,24 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod bft;
-mod block;
-pub mod reference;
-mod round;
+use crate::Address;
 
-pub type N = snarkvm::console::network::Testnet3;
-pub type Address = snarkvm::console::account::Address<N>;
-pub type Signature = snarkvm::console::account::Signature<N>;
+#[derive(Clone, Debug)]
+pub struct Round {
+    /// The number of rounds since the genesis round, including committed and aborted rounds.
+    pub id: u64,
+    // The leader of the round, may not be the same as qc.author after view-change
+    pub leader: Address,
+}
+
+impl Round {
+    /// Returns the round number.
+    pub const fn id(&self) -> u64 {
+        self.id
+    }
+
+    /// Returns the leader of the round.
+    pub const fn leader(&self) -> Address {
+        self.leader
+    }
+}
