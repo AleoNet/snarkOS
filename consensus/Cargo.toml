@@ -23,6 +23,11 @@ test = [ ]
 [workspace]
 members = [ "." ]
 
+[dependencies.snarkvm]
+git = "https://github.com/AleoHQ/snarkVM.git"
+branch = "feat/bytecode"
+features = ["console"]
+
 [dependencies.tokio]
 version = "1"
 features = [ "macros", "rt", "sync" ]

@@ -9,17 +9,14 @@ pub mod message;
 mod pacemaker;
 mod safety;
 
+use snarkvm::console::account::Address;
+
 // TODO: what should the value of f be?
 pub const F: usize = 11;
 
-// TODO: decide on the type; also, Diem only recognizes a single round type
-pub type Round = usize;
-
-// TODO: decide on the type; used in the whitepaper, but might be the same as Round
-pub type BlockRound = usize;
-
-// TODO: decide on the type; used in the whitepaper, but might be the same as Round
-pub type QcRound = usize;
+/// This value defines the number of rounds that have taken place since genesis,
+/// and includes both successful and timed out rounds.
+pub type Round = u64;
 
 // FIXME: pick a hash function
 pub fn hash<T: Hash>(object: &T) -> u64 {

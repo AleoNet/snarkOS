@@ -5,18 +5,18 @@ use tokio::sync::mpsc;
 
 #[cfg(feature = "test")]
 use crate::message::TestMessage;
-use crate::{hash, ledger::Ledger, BlockRound, F};
+use crate::{hash, ledger::Ledger, Round, F};
 
 #[derive(Clone, Debug, Hash)]
 pub struct VoteInfo {
     // Id of block
     pub id: BlockId,
     // round of block
-    pub round: BlockRound,
+    pub round: Round,
     // Id of parent
     pub parent_id: BlockId,
     // round of parent
-    pub parent_round: BlockRound,
+    pub parent_round: Round,
     // Speculated execution state
     pub exec_state_id: Option<()>,
 }
@@ -97,7 +97,7 @@ pub struct Block {
     // The author of the block, may not be the same as qc.author after view-change
     pub author: (),
     // The round that generated this proposal
-    pub round: BlockRound,
+    pub round: Round,
     // Proposed transaction(s)
     payload: Vec<()>,
     // QC for parent block
@@ -184,7 +184,7 @@ impl BlockTree {
         None
     }
 
-    pub fn generate_block(&self, txns: Vec<()>, current_round: BlockRound) -> Block {
+    pub fn generate_block(&self, txns: Vec<()>, current_round: Round) -> Block {
         /*
 
         TODO: roll the values below into the desired hash

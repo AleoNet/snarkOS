@@ -1,6 +1,5 @@
 use crate::{
     block_tree::{Block, QuorumCertificate, VoteMsg},
-    QcRound,
     Round,
 };
 
@@ -38,7 +37,7 @@ pub struct TimeoutCertificate {
     // All timeout messages that form TC have the same round
     pub round: Round,
     // A vector of 2f + 1 high qc round numbers of timeout messages that form TC
-    pub tmo_high_qc_rounds: Vec<QcRound>,
+    pub tmo_high_qc_rounds: Vec<Round>,
     // A vector of 2f + 1 validator signatures on (round, respective high qc round)
     pub signatures: Vec<()>,
 }
