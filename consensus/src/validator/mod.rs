@@ -16,23 +16,23 @@
 
 use crate::Address;
 
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use indexmap::{map::Entry, IndexMap};
 
 /// The type for representing rewards.
-type Reward = u64;
+pub(super) type Reward = u64;
 /// The type for representing the round.
-type Round = u64;
+pub(super) type Round = u64;
 /// The type for representing the validator score.
-type Score = i128;
+pub(super) type Score = i128;
 /// The type for representing stake.
-type Stake = u64;
+pub(super) type Stake = u64;
 
 /// A validator in the validator set.
 #[derive(Clone)]
 pub struct Validator {
     /// The address of the validator.
-    id: Address,
+    address: Address,
     /// The amount of stake that the validator has bonded.
     stake: Stake,
     /// The score of the bonded validator.
@@ -51,26 +51,26 @@ pub struct Validator {
 
 impl Validator {
     /// Initializes a new validator with the given address and amount staked.
-    pub fn new(id: Address, stake: Stake) -> Self {
+    pub fn new(address: Address, stake: Stake) -> Self {
         Self {
-            id,
+            address,
             stake,
             score: stake as Score,
-            staked: [(id, stake)].iter().copied().collect(),
-            rewards: [(id, 0)].iter().copied().collect(),
+            staked: [(address, stake)].iter().copied().collect(),
+            rewards: [(address, 0)].iter().copied().collect(),
             leader_in: Vec::new(),
             participated_in: Vec::new(),
             byzantine: 0,
         }
     }
 
-    /// Returns the validator ID.
-    pub const fn id(&self) -> &Address {
-        &self.id
+    /// Returns the validator address.
+    pub const fn address(&self) -> &Address {
+        &self.address
     }
 
-    /// Returns the staked amount.
-    pub const fn staked(&self) -> Stake {
+    /// Returns the amount of stake that is bonded with this validator.
+    pub const fn stake(&self) -> Stake {
         self.stake
     }
 
@@ -102,7 +102,10 @@ impl Validator {
 
 impl Validator {
     /// Increments the staked amount by the given amount.
-    pub fn increment_stake_by(&mut self, staker: Address, amount: Stake) -> Result<()> {
+    pub fn increment_stake_by(&mut self, staker: &Address, amount: Stake) -> Result<()> {
+        // Ensure the staker is bonding a nonzero amount.
+        ensure!(amount > 0, "Staker must bond a nonzero amount");
+
         // Update the stake.
         match self.stake.checked_add(amount) {
             Some(staked) => self.stake = staked,
@@ -110,7 +113,7 @@ impl Validator {
         }
 
         // Update the staked amount.
-        let mut entry = self.staked.entry(staker).or_insert(0);
+        let mut entry = self.staked.entry(*staker).or_insert(0);
         match entry.checked_add(amount) {
             Some(staked) => *entry = staked,
             None => bail!("Detected overflow incrementing staked amount"),
@@ -120,15 +123,14 @@ impl Validator {
     }
 
     /// Decrements the staked amount by the given amount.
-    pub fn decrement_stake_by(&mut self, staker: Address, amount: Stake) -> Result<()> {
-        // Update the stake.
-        match self.stake.checked_sub(amount) {
-            Some(staked) => self.stake = staked,
-            None => bail!("Detected underflow decrementing stake"),
-        }
+    pub fn decrement_stake_by(&mut self, staker: &Address, amount: Stake) -> Result<()> {
+        // Ensure the staker exists.
+        ensure!(self.staked.contains_key(staker), "Staker does not exist in validator");
+        // Ensure the staker is unbonding a nonzero amount.
+        ensure!(amount > 0, "Staker must unbond a nonzero amount");
 
         // Retrieve the staked amount.
-        let mut entry = match self.staked.get_mut(&staker) {
+        let mut entry = match self.staked.get_mut(staker) {
             Some(entry) => entry,
             None => bail!("Detected staker is not staked with validator"),
         };
@@ -138,6 +140,12 @@ impl Validator {
             Some(staked) => *entry = staked,
             None => bail!("Detected underflow decrementing staked amount"),
         };
+
+        // Update the stake.
+        match self.stake.checked_sub(amount) {
+            Some(staked) => self.stake = staked,
+            None => bail!("Detected underflow decrementing stake"),
+        }
 
         Ok(())
     }
@@ -173,5 +181,117 @@ impl Validator {
     /// Stores the given round number as one that the validator participated in.
     pub fn set_participated_in(&mut self, round: Round) {
         self.participated_in.push(round);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snarkvm::console::prelude::*;
+
+    #[test]
+    fn test_increment_stake_by() {
+        let address_0 = Address::rand(&mut test_crypto_rng());
+        let address_1 = Address::rand(&mut test_crypto_rng());
+
+        let mut validator = Validator::new(address_0, 0);
+        assert_eq!(validator.stake(), 0);
+        assert_eq!(validator.staked_by(&address_0), 0);
+        assert_eq!(validator.staked_by(&address_1), 0);
+
+        // Ensure incrementing zero stake fails.
+        assert!(validator.increment_stake_by(&address_0, 0).is_err());
+        assert_eq!(validator.stake(), 0);
+        assert_eq!(validator.staked_by(&address_0), 0);
+        assert_eq!(validator.staked_by(&address_1), 0);
+
+        // Ensure incrementing nonzero stake succeeds.
+        assert!(validator.increment_stake_by(&address_0, 1).is_ok());
+        assert_eq!(validator.stake(), 1);
+        assert_eq!(validator.staked_by(&address_0), 1);
+        assert_eq!(validator.staked_by(&address_1), 0);
+
+        // Ensure incrementing updates the correct staker.
+        assert!(validator.increment_stake_by(&address_1, 1).is_ok());
+        assert_eq!(validator.stake(), 2);
+        assert_eq!(validator.staked_by(&address_0), 1);
+        assert_eq!(validator.staked_by(&address_1), 1);
+
+        // Ensure incrementing to u64::MAX succeeds.
+        assert!(validator.increment_stake_by(&address_0, u64::MAX - 2).is_ok());
+        assert_eq!(validator.stake(), u64::MAX);
+        assert_eq!(validator.staked_by(&address_0), u64::MAX - 1);
+        assert_eq!(validator.staked_by(&address_1), 1);
+
+        // Ensure incrementing past u64::MAX fails.
+        assert!(validator.increment_stake_by(&address_0, 1).is_err());
+        assert_eq!(validator.stake(), u64::MAX);
+        assert_eq!(validator.staked_by(&address_0), u64::MAX - 1);
+        assert_eq!(validator.staked_by(&address_1), 1);
+    }
+
+    #[test]
+    fn test_decrement_stake_by() {
+        let address_0 = Address::rand(&mut test_crypto_rng());
+        let address_1 = Address::rand(&mut test_crypto_rng());
+
+        let mut validator = Validator::new(address_0, 1_000_000);
+        assert_eq!(validator.stake(), 1_000_000);
+        assert_eq!(validator.staked_by(&address_0), 1_000_000);
+        assert_eq!(validator.staked_by(&address_1), 0);
+
+        // Ensure decrementing zero stake fails.
+        assert!(validator.decrement_stake_by(&address_0, 0).is_err());
+        assert_eq!(validator.stake(), 1_000_000);
+        assert_eq!(validator.staked_by(&address_0), 1_000_000);
+        assert_eq!(validator.staked_by(&address_1), 0);
+
+        // Ensure decrementing nonzero stake succeeds.
+        assert!(validator.decrement_stake_by(&address_0, 1).is_ok());
+        assert_eq!(validator.stake(), 999_999);
+        assert_eq!(validator.staked_by(&address_0), 999_999);
+        assert_eq!(validator.staked_by(&address_1), 0);
+
+        // Ensure decrementing nonexistent staker fails.
+        assert!(validator.decrement_stake_by(&address_1, 1).is_err());
+        assert_eq!(validator.stake(), 999_999);
+        assert_eq!(validator.staked_by(&address_0), 999_999);
+        assert_eq!(validator.staked_by(&address_1), 0);
+
+        // Ensure decrementing below 0 fails.
+        assert!(validator.decrement_stake_by(&address_0, 1_000_000).is_err());
+        assert_eq!(validator.stake(), 999_999);
+        assert_eq!(validator.staked_by(&address_0), 999_999);
+        assert_eq!(validator.staked_by(&address_1), 0);
+
+        // Ensure incrementing a new staker succeeds.
+        assert!(validator.increment_stake_by(&address_1, 1).is_ok());
+        assert_eq!(validator.stake(), 1_000_000);
+        assert_eq!(validator.staked_by(&address_0), 999_999);
+        assert_eq!(validator.staked_by(&address_1), 1);
+
+        // Ensure decrementing updates the correct staker.
+        assert!(validator.decrement_stake_by(&address_0, 1).is_ok());
+        assert_eq!(validator.stake(), 999_999);
+        assert_eq!(validator.staked_by(&address_0), 999_998);
+        assert_eq!(validator.staked_by(&address_1), 1);
+
+        // Ensure decrementing the validator to 0 succeeds.
+        assert!(validator.decrement_stake_by(&address_0, 999_998).is_ok());
+        assert_eq!(validator.stake(), 1);
+        assert_eq!(validator.staked_by(&address_0), 0);
+        assert_eq!(validator.staked_by(&address_1), 1);
+
+        // Ensure underflow fails.
+        assert!(validator.decrement_stake_by(&address_0, 1).is_err());
+        assert_eq!(validator.stake(), 1);
+        assert_eq!(validator.staked_by(&address_0), 0);
+        assert_eq!(validator.staked_by(&address_1), 1);
+
+        // Ensure decrementing the staker to 0 succeeds.
+        assert!(validator.decrement_stake_by(&address_1, 1).is_ok());
+        assert_eq!(validator.stake(), 0);
+        assert_eq!(validator.staked_by(&address_0), 0);
+        assert_eq!(validator.staked_by(&address_1), 0);
     }
 }
