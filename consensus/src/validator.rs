@@ -1,14 +1,20 @@
 #[cfg(feature = "test")]
 use crate::message::TestMessage;
 use crate::{
-    block_tree::{BlockTree, QuorumCertificate},
+    bft::Round,
+    block::Block,
+    block_tree::{BlockTree, LedgerCommitInfo, QuorumCertificate, VoteInfo},
+    hash,
     ledger::Ledger,
     message::{Message, Propose, Timeout, TimeoutCertificate, TimeoutInfo, Vote},
     safety::Safety,
+    Address,
+    Signature,
     F,
 };
 
 use anyhow::Result;
+use std::{cmp, collections::HashMap};
 
 #[cfg(feature = "test")]
 use tokio::sync::mpsc;
@@ -33,7 +39,6 @@ pub struct Validator {
     block_tree: BlockTree,
     ledger: Ledger,
     mempool: Mempool,
-    safety: Safety,
 
     // Leader Selection //
 
@@ -55,6 +60,16 @@ pub struct Validator {
     // Timeouts per round
     pending_timeouts: HashMap<Round, HashMap<(), TimeoutInfo>>,
 
+    // Safety //
+
+    // Own private key
+    private_key: (),
+    // Public keys of all validators
+    public_keys: Vec<()>,
+    // initially 0
+    highest_vote_round: Round,
+    highest_qc_round: Round,
+
     // Testing //
 
     // Used to send messages to other validators in tests.
@@ -65,11 +80,11 @@ pub struct Validator {
 impl Validator {
     #[cfg(not(feature = "test"))]
     pub fn new(/* TODO: pass the ledger here */) -> Self {
+        // do `highest_vote_round` and `highest_qc_round` persist?
         Self {
             block_tree: BlockTree::new(),
             ledger: Ledger::new(),
             mempool: Mempool::new(),
-            safety: Safety::new(),
 
             validators: vec![],
             window_size: 0,
@@ -79,6 +94,11 @@ impl Validator {
             current_round: 0,
             last_round_tc: None,
             pending_timeouts: HashMap::new(),
+
+            private_key: (),
+            public_keys: vec![],
+            highest_vote_round: 0,
+            highest_qc_round: 0,
         }
     }
 
@@ -87,11 +107,11 @@ impl Validator {
         // TODO: include the same arguments as the non-test version
         outbound_sender: mpsc::Sender<TestMessage>, // a clone of `common_msg_sender`
     ) -> Self {
+        // do `highest_vote_round` and `highest_qc_round` persist?
         Self {
             block_tree: BlockTree::new(),
             ledger: Ledger::new(),
             mempool: Mempool::new(),
-            safety: Safety::new(),
 
             validators: vec![],
             window_size: 0,
@@ -101,6 +121,11 @@ impl Validator {
             current_round: 0,
             last_round_tc: None,
             pending_timeouts: HashMap::new(),
+
+            private_key: (),
+            public_keys: vec![],
+            highest_vote_round: 0,
+            highest_qc_round: 0,
 
             outbound_sender,
         }
@@ -135,10 +160,7 @@ impl Validator {
         self.block_tree.execute_and_insert(propose.block.clone(), &mut self.ledger); // Adds a new speculative state to the Ledger
 
         // FIXME: the whitepaper doesn't consider when 'p.last_round_tc' is ⊥
-        if let Some(vote_msg) = self
-            .safety
-            .make_vote(propose.block, propose.last_round_tc.unwrap(), &self.ledger, &self.block_tree)
-        {
+        if let Some(vote_msg) = self.make_vote(propose.block, propose.last_round_tc.unwrap()) {
             let leader = self.get_leader(current_round + 1);
 
             // TODO: send vote msg to the leader
@@ -196,10 +218,6 @@ impl Validator {
         // }
     }
 }
-
-use crate::{bft::Round, Address};
-
-use std::collections::HashMap;
 
 // Leader selection
 impl Validator {
@@ -283,7 +301,6 @@ impl Validator {
         let high_qc = self.block_tree.high_qc.clone();
         // TODO: are the unwraps safe?
         let timeout_info = self
-            .safety
             .make_timeout(self.current_round, high_qc, self.last_round_tc.clone().unwrap())
             .unwrap();
         let timeout_msg = Timeout {
@@ -360,4 +377,115 @@ impl Validator {
     //
     //     true
     // }
+}
+
+// Safety
+impl Validator {
+    pub fn make_vote(&mut self, block: Block, last_tc: TimeoutCertificate) -> Option<Vote> {
+        let qc_round = block.qc.vote_info.round;
+
+        if Self::is_valid_signatures(&block.qc.signatures)
+            && Self::is_valid_signatures(&last_tc.signatures)
+            && self.safe_to_vote(block.round, qc_round, last_tc)
+        {
+            self.update_highest_qc_round(qc_round); // Protect qc round
+            self.increase_highest_vote_round(block.round); // Don’t vote again in this (or lower) round
+
+            // VoteInfo carries the potential QC info with ids and rounds of the parent QC
+            let vote_info = VoteInfo {
+                id: block.hash,
+                round: block.round,
+                parent_id: block.qc.vote_info.id,
+                parent_round: qc_round,
+                exec_state_id: self.ledger.pending_state(block.hash),
+            };
+
+            let ledger_commit_info = LedgerCommitInfo {
+                commit_state_id: self.commit_state_id_candidate(block.round(), block.qc),
+                vote_info_hash: hash(&vote_info),
+            };
+
+            Some(Vote::new(vote_info, ledger_commit_info, self.block_tree.high_commit_qc.clone(), ()))
+        } else {
+            None
+        }
+    }
+
+    pub fn make_timeout(&mut self, round: Round, high_qc: QuorumCertificate, last_tc: TimeoutCertificate) -> Option<TimeoutInfo> {
+        let qc_round = high_qc.vote_info.round;
+
+        if Self::is_valid_signatures(&high_qc.signatures)
+            && Self::is_valid_signatures(&last_tc.signatures)
+            && self.safe_to_timeout(round, qc_round, last_tc)
+        {
+            self.increase_highest_vote_round(round); // Stop voting for round
+
+            Some(TimeoutInfo::new(round, high_qc, ()))
+        } else {
+            None
+        }
+    }
+}
+
+// Safety
+impl Validator {
+    fn increase_highest_vote_round(&mut self, round: Round) {
+        // commit not to vote in rounds lower than round
+        if round > self.highest_vote_round {
+            self.highest_vote_round = round;
+        }
+    }
+
+    fn update_highest_qc_round(&mut self, qc_round: Round) {
+        if qc_round > self.highest_qc_round {
+            self.highest_qc_round = qc_round;
+        }
+    }
+
+    fn safe_to_extend(&self, block_round: Round, qc_round: Round, tc: TimeoutCertificate) -> bool {
+        // TODO: is the unwrap safe here?
+        Self::is_consecutive(block_round, tc.round) && qc_round >= *tc.tmo_high_qc_rounds.iter().max().unwrap()
+    }
+
+    fn safe_to_vote(&self, block_round: Round, qc_round: Round, tc: TimeoutCertificate) -> bool {
+        if block_round <= cmp::max(self.highest_qc_round, qc_round) {
+            // 1. must vote in monotonically increasing rounds
+            // 2. must extend a smaller round
+            false
+        } else {
+            // Extending qc from previous round or safe to extend due to tc
+            Self::is_consecutive(block_round, qc_round) || self.safe_to_extend(block_round, qc_round, tc)
+        }
+    }
+
+    fn safe_to_timeout(&self, round: Round, qc_round: Round, tc: TimeoutCertificate) -> bool {
+        if qc_round < self.highest_qc_round || round <= cmp::max(self.highest_vote_round - 1, qc_round) {
+            // respect highest qc round and don’t timeout in a past round
+            false
+        } else {
+            // qc or tc must allow entering the round to timeout
+            Self::is_consecutive(round, qc_round) || Self::is_consecutive(round, tc.round)
+        }
+    }
+
+    fn commit_state_id_candidate(&self, block_round: Round, qc: QuorumCertificate) -> Option<()> {
+        // find the committed id in case a qc is formed in the vote round
+        if Self::is_consecutive(block_round, qc.vote_info.round) {
+            self.ledger.pending_state(qc.vote_info.id)
+        } else {
+            None
+        }
+    }
+
+    fn is_consecutive(block_round: Round, round: Round) -> bool {
+        round + 1 == block_round
+    }
+
+    fn is_valid_signatures(signatures: &[Signature]) -> bool {
+        // valid signatures call in the beginning of these functions checks
+        // the well-formedness and signatures on all parameters provided
+        // to construct the votes (using the public keys of other validators
+
+        true
+    }
 }
