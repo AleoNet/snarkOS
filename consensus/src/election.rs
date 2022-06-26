@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use crate::{block_tree::QuorumCertificate, ledger::Ledger, pacemaker::Pacemaker, Round};
+use crate::{bft::Round, block_tree::QuorumCertificate, ledger::Ledger, pacemaker::Pacemaker};
 
 pub struct Election {
     // The list of current validators

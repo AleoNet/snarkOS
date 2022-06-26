@@ -1,14 +1,15 @@
 use crate::{
-    block_tree::{Block, QuorumCertificate, VoteMsg},
-    Round,
+    bft::Round,
+    block::Block,
+    block_tree::{LedgerCommitInfo, QuorumCertificate, VoteInfo},
 };
 
 #[derive(Clone, Debug)]
 pub enum Message {
     LocalTimeout,
-    Proposal(ProposalMsg),
-    Vote(VoteMsg),
-    Timeout(TimeoutMsg),
+    Propose(Propose),
+    Timeout(Timeout),
+    Vote(Vote),
 }
 
 #[derive(Clone, Debug)]
@@ -43,7 +44,7 @@ pub struct TimeoutCertificate {
 }
 
 #[derive(Clone, Debug)]
-pub struct TimeoutMsg {
+pub struct Timeout {
     // TimeoutInfo for some round with a high qc
     pub tmo_info: TimeoutInfo,
     // TC for tmo info.round − 1 if tmo info.high_qc.round != tmo info.round − 1, else ⊥
@@ -53,7 +54,7 @@ pub struct TimeoutMsg {
 }
 
 #[derive(Clone, Debug)]
-pub struct ProposalMsg {
+pub struct Propose {
     pub block: Block,
     // TC for block.round − 1 if block.qc.vote info.round != block.round − 1, else ⊥
     pub last_round_tc: Option<TimeoutCertificate>,
@@ -62,12 +63,38 @@ pub struct ProposalMsg {
     pub signature: (),
 }
 
-impl ProposalMsg {
+impl Propose {
     pub fn new(block: Block, last_round_tc: Option<TimeoutCertificate>, high_commit_qc: QuorumCertificate) -> Self {
         Self {
             block,
             last_round_tc,
             high_commit_qc,
+            signature: (),
+        }
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Vote {
+    // A VoteInfo record
+    vote_info: VoteInfo,
+    // Speculated ledger info
+    pub ledger_commit_info: LedgerCommitInfo,
+    // QC to synchronize on committed blocks
+    pub high_commit_qc: QuorumCertificate,
+    // Added automatically when constructed
+    sender: (),
+    // Signed automatically when constructed
+    signature: (),
+}
+
+impl Vote {
+    pub fn new(vote_info: VoteInfo, ledger_commit_info: LedgerCommitInfo, high_commit_qc: QuorumCertificate, author: ()) -> Self {
+        Self {
+            vote_info,
+            ledger_commit_info,
+            high_commit_qc,
+            sender: (),
             signature: (),
         }
     }

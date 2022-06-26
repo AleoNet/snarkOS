@@ -19,10 +19,6 @@ edition = "2021"
 [features]
 test = [ ]
 
-# TODO: remove when integrating with snarkOS
-[workspace]
-members = [ "." ]
-
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
 branch = "feat/bytecode"

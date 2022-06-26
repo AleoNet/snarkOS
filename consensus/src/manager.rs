@@ -4,14 +4,26 @@ use tokio::sync::mpsc;
 #[cfg(feature = "test")]
 use crate::message::TestMessage;
 use crate::{
-    block_tree::{BlockTree, QuorumCertificate, VoteMsg},
+    block_tree::{BlockTree, QuorumCertificate},
     election::Election,
     ledger::Ledger,
-    mempool::Mempool,
-    message::{Message, ProposalMsg, TimeoutCertificate, TimeoutMsg},
+    message::{Message, Propose, Timeout, TimeoutCertificate, Vote},
     pacemaker::Pacemaker,
     safety::Safety,
 };
+
+// TODO: integrate with snarkVM's mempool
+pub struct Mempool;
+
+impl Mempool {
+    pub fn new() -> Self {
+        Self
+    }
+
+    pub fn get_transactions(&self) -> Vec<()> {
+        todo!() // not implemented in the whitepaper
+    }
+}
 
 /// The central object responsible for the consensus process.
 // TODO: once the initial implementation is finalized, this
@@ -61,9 +73,9 @@ impl Manager {
     pub fn start_event_processing(&mut self, msg: Message) {
         match msg {
             Message::LocalTimeout => self.pacemaker.local_timeout_round(&self.block_tree, &mut self.safety),
-            Message::Proposal(msg) => self.process_proposal_msg(msg),
-            Message::Vote(msg) => self.process_vote_msg(msg),
-            Message::Timeout(msg) => self.process_timeout_msg(msg),
+            Message::Propose(msg) => self.process_propose(msg),
+            Message::Timeout(msg) => self.process_timeout(msg),
+            Message::Vote(msg) => self.process_vote(msg),
         }
     }
 
@@ -74,7 +86,7 @@ impl Manager {
         // self.pacemaker.advance_round(qc.vote_info.round);
     }
 
-    fn process_proposal_msg(&mut self, p: ProposalMsg) {
+    fn process_propose(&mut self, p: Propose) {
         self.process_certificate_qc(p.block.qc.clone());
         self.process_certificate_qc(p.high_commit_qc);
 
@@ -109,21 +121,21 @@ impl Manager {
         }
     }
 
-    fn process_timeout_msg(&mut self, m: TimeoutMsg) {
-        self.process_certificate_qc(m.tmo_info.high_qc.clone());
-        self.process_certificate_qc(m.high_commit_qc.clone());
+    fn process_timeout(&mut self, timeout: Timeout) {
+        self.process_certificate_qc(timeout.tmo_info.high_qc.clone());
+        self.process_certificate_qc(timeout.high_commit_qc.clone());
 
-        self.pacemaker.advance_round_tc(m.last_round_tc.clone());
+        self.pacemaker.advance_round_tc(timeout.last_round_tc.clone());
 
-        if let Some(tc) = self.pacemaker.process_remote_timeout(m, &self.block_tree, &mut self.safety) {
+        if let Some(tc) = self.pacemaker.process_remote_timeout(timeout, &self.block_tree, &mut self.safety) {
             // FIXME: method not specified in the whitepaper again, and uses a different type now
             // self.pacemaker.advance_round(tc);
             self.process_new_round_event(Some(tc));
         }
     }
 
-    fn process_vote_msg(&mut self, m: VoteMsg) {
-        if let Some(qc) = self.block_tree.process_vote(m, &mut self.ledger) {
+    fn process_vote(&mut self, vote: Vote) {
+        if let Some(qc) = self.block_tree.process_vote(vote, &mut self.ledger) {
             self.process_certificate_qc(qc);
             self.process_new_round_event(None)
         }
@@ -135,7 +147,7 @@ impl Manager {
         let block = self
             .block_tree
             .generate_block(self.mempool.get_transactions(), self.pacemaker.current_round);
-        let proposal_msg = ProposalMsg::new(block, last_tc, self.block_tree.high_commit_qc.clone());
+        let proposal_msg = Propose::new(block, last_tc, self.block_tree.high_commit_qc.clone());
 
         // TODO: broadcast proposal_msg ProposalMsg〈b, last tc, Block-Tree.high commit qc〉
 

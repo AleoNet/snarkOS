@@ -14,25 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use std::hash::Hash;
+mod messages;
 
-mod bft;
-mod block;
-
-mod block_tree;
-mod election;
-mod ledger;
-pub mod manager;
-pub mod message;
-mod pacemaker;
-mod safety;
-
-use snarkvm::console::account::Address;
-
-// TODO: what should the value of f be?
-pub const F: usize = 11;
-
-// FIXME: pick a hash function
-pub fn hash<T: Hash>(object: &T) -> u64 {
-    todo!()
-}
+/// This value defines the number of rounds that have taken place since genesis,
+/// and includes both successful and timed out rounds.
+pub type Round = u64;

@@ -1,11 +1,12 @@
 use std::cmp;
 
 use crate::{
-    block_tree::{Block, BlockTree, LedgerCommitInfo, QuorumCertificate, VoteInfo, VoteMsg},
+    bft::Round,
+    block::Block,
+    block_tree::{BlockTree, LedgerCommitInfo, QuorumCertificate, VoteInfo},
     hash,
     ledger::Ledger,
-    message::{TimeoutCertificate, TimeoutInfo},
-    Round,
+    message::{TimeoutCertificate, TimeoutInfo, Vote},
 };
 
 pub struct Safety {
@@ -77,7 +78,7 @@ impl Safety {
         }
     }
 
-    pub fn make_vote(&mut self, b: Block, last_tc: TimeoutCertificate, ledger: &Ledger, block_tree: &BlockTree) -> Option<VoteMsg> {
+    pub fn make_vote(&mut self, b: Block, last_tc: TimeoutCertificate, ledger: &Ledger, block_tree: &BlockTree) -> Option<Vote> {
         let qc_round = b.qc.vote_info.round;
 
         if valid_signatures(&b.qc.signatures) && valid_signatures(&last_tc.signatures) && self.safe_to_vote(b.round, qc_round, last_tc) {
@@ -86,11 +87,11 @@ impl Safety {
 
             // VoteInfo carries the potential QC info with ids and rounds of the parent QC
             let vote_info = VoteInfo {
-                id: b.id,
+                id: b.hash,
                 round: b.round,
                 parent_id: b.qc.vote_info.id,
                 parent_round: qc_round,
-                exec_state_id: ledger.pending_state(b.id),
+                exec_state_id: ledger.pending_state(b.hash),
             };
 
             let ledger_commit_info = LedgerCommitInfo {
@@ -98,7 +99,7 @@ impl Safety {
                 vote_info_hash: hash(&vote_info),
             };
 
-            Some(VoteMsg::new(vote_info, ledger_commit_info, block_tree.high_commit_qc.clone(), ()))
+            Some(Vote::new(vote_info, ledger_commit_info, block_tree.high_commit_qc.clone(), ()))
         } else {
             None
         }

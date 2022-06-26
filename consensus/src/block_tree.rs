@@ -5,16 +5,23 @@ use tokio::sync::mpsc;
 
 #[cfg(feature = "test")]
 use crate::message::TestMessage;
-use crate::{hash, ledger::Ledger, Round, F};
+use crate::{
+    bft::Round,
+    block::{Block, BlockHash},
+    hash,
+    ledger::Ledger,
+    message::Vote,
+    F,
+};
 
 #[derive(Clone, Debug, Hash)]
 pub struct VoteInfo {
     // Id of block
-    pub id: BlockId,
+    pub id: BlockHash,
     // round of block
     pub round: Round,
     // Id of parent
-    pub parent_id: BlockId,
+    pub parent_id: BlockHash,
     // round of parent
     pub parent_round: Round,
     // Speculated execution state
@@ -28,32 +35,6 @@ pub struct LedgerCommitInfo {
     pub commit_state_id: Option<()>,
     // Hash of VoteMsg.vote info
     pub vote_info_hash: u64,
-}
-
-#[derive(Clone, Debug)]
-pub struct VoteMsg {
-    // A VoteInfo record
-    vote_info: VoteInfo,
-    // Speculated ledger info
-    ledger_commit_info: LedgerCommitInfo,
-    // QC to synchronize on committed blocks
-    high_commit_qc: QuorumCertificate,
-    // Added automatically when constructed
-    sender: (),
-    // Signed automatically when constructed
-    signature: (),
-}
-
-impl VoteMsg {
-    pub fn new(vote_info: VoteInfo, ledger_commit_info: LedgerCommitInfo, high_commit_qc: QuorumCertificate, author: ()) -> Self {
-        Self {
-            vote_info,
-            ledger_commit_info,
-            high_commit_qc,
-            sender: (),
-            signature: (),
-        }
-    }
 }
 
 // QC is a VoteMsg with multiple signatures
@@ -88,29 +69,11 @@ impl PartialOrd for QuorumCertificate {
     }
 }
 
-// FIXME: integrate with the snarkVM BlockHash OR height
-pub type BlockId = u64;
-
-// FIXME: integrate with the snarkVM Block
-#[derive(Clone, Debug)]
-pub struct Block {
-    // The author of the block, may not be the same as qc.author after view-change
-    pub author: (),
-    // The round that generated this proposal
-    pub round: Round,
-    // Proposed transaction(s)
-    payload: Vec<()>,
-    // QC for parent block
-    pub qc: QuorumCertificate,
-    // A unique digest of author, round, payload, qc.vote info.id and qc.signatures
-    pub id: BlockId,
-}
-
 pub struct BlockTree {
     // tree of blocks pending commitment
-    pending_block_tree: HashMap<BlockId, Block>,
+    pending_block_tree: HashMap<BlockHash, Block>,
     // collected votes per block indexed by their LedgerInfo hash
-    pending_votes: HashMap<u64, Vec<VoteMsg>>,
+    pending_votes: HashMap<u64, Vec<Vote>>,
     // highest known QC
     pub high_qc: QuorumCertificate,
     // highest QC that serves as a commit certificate
@@ -140,12 +103,12 @@ impl BlockTree {
     }
 
     pub fn execute_and_insert(&mut self, b: Block, ledger: &mut Ledger) {
-        ledger.speculate(b.qc.vote_info.parent_id.clone(), b.id.clone(), b.payload.clone());
+        ledger.speculate(b.qc.vote_info.parent_id.clone(), b.hash.clone(), b.payload.clone());
 
-        self.pending_block_tree.insert(b.id.clone(), b);
+        self.pending_block_tree.insert(b.hash.clone(), b);
     }
 
-    pub fn process_vote(&mut self, v: VoteMsg, ledger: &mut Ledger) -> Option<QuorumCertificate> {
+    pub fn process_vote(&mut self, v: Vote, ledger: &mut Ledger) -> Option<QuorumCertificate> {
         self.process_qc(v.high_commit_qc, ledger);
 
         let vote_idx = hash(&v.ledger_commit_info);
@@ -195,11 +158,11 @@ impl BlockTree {
         let id = 0;
 
         Block {
+            hash: id,
             author: (), // TODO: it's the own validator ID
             round: current_round,
             payload: txns,
             qc: self.high_qc.clone(),
-            id,
         }
     }
 }

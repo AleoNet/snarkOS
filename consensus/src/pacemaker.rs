@@ -6,10 +6,10 @@ use tokio::sync::mpsc;
 #[cfg(feature = "test")]
 use crate::message::TestMessage;
 use crate::{
+    bft::Round,
     block_tree::{BlockTree, QuorumCertificate},
-    message::{TimeoutCertificate, TimeoutInfo, TimeoutMsg},
+    message::{Timeout, TimeoutCertificate, TimeoutInfo},
     safety::Safety,
-    Round,
     F,
 };
 
@@ -69,7 +69,7 @@ impl Pacemaker {
         let timeout_info = safety
             .make_timeout(self.current_round, high_qc, self.last_round_tc.clone().unwrap())
             .unwrap();
-        let timeout_msg = TimeoutMsg {
+        let timeout_msg = Timeout {
             tmo_info: timeout_info,
             last_round_tc: self.last_round_tc.clone(),
             high_commit_qc: block_tree.high_commit_qc.clone(),
@@ -81,7 +81,7 @@ impl Pacemaker {
         self.outbound_sender.blocking_send(TestMessage::new(todo!(), None)).unwrap();
     }
 
-    pub fn process_remote_timeout(&mut self, tmo: TimeoutMsg, block_tree: &BlockTree, safety: &mut Safety) -> Option<TimeoutCertificate> {
+    pub fn process_remote_timeout(&mut self, tmo: Timeout, block_tree: &BlockTree, safety: &mut Safety) -> Option<TimeoutCertificate> {
         let tmo_info = &tmo.tmo_info;
 
         if tmo_info.round < self.current_round {
