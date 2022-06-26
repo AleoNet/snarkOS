@@ -43,23 +43,23 @@ impl Pacemaker {
         todo!()
     }
 
-    pub fn get_round_timer(&self, round: Round) -> () {
-        // FIXME: timer
-        // round timer formula // For example, use 4 × ∆ or α + βcommit gap(r) if ∆ is unknown.
-
-        todo!()
-    }
-
-    pub fn start_timer(&mut self, new_round: Round) {
-        // FIXME: timer
-        // stop_timer(current round)
-
-        self.current_round = new_round;
-
-        // start local timer for round current round for duration get round timer(current round)
-
-        todo!()
-    }
+    // pub fn get_round_timer(&self, round: Round) -> () {
+    //     // FIXME: timer
+    //     // round timer formula // For example, use 4 × ∆ or α + βcommit gap(r) if ∆ is unknown.
+    //
+    //     todo!()
+    // }
+    //
+    // pub fn start_timer(&mut self, new_round: Round) {
+    //     // FIXME: timer
+    //     // stop_timer(current round)
+    //
+    //     self.current_round = new_round;
+    //
+    //     // start local timer for round current round for duration get round timer(current round)
+    //
+    //     todo!()
+    // }
 
     pub fn local_timeout_round(&self, block_tree: &BlockTree, safety: &mut Safety) -> Result<()> {
         // FIXME: what should this do
@@ -132,16 +132,16 @@ impl Pacemaker {
         true
     }
 
-    pub fn advance_round_qc(&mut self, qc: QuorumCertificate) -> bool {
-        if qc.vote_info.round < self.current_round {
-            return false;
-        }
-
-        self.last_round_tc = None;
-
-        // FIXME: timer
-        // start timer(qc.vote_info.round + 1)
-
-        true
-    }
+    // pub fn advance_round_qc(&mut self, qc: QuorumCertificate) -> bool {
+    //     if qc.vote_info.round < self.current_round {
+    //         return false;
+    //     }
+    //
+    //     self.last_round_tc = None;
+    //
+    //     // FIXME: timer
+    //     // start timer(qc.vote_info.round + 1)
+    //
+    //     true
+    // }
 }

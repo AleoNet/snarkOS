@@ -5,7 +5,6 @@ use tokio::sync::mpsc;
 use crate::message::TestMessage;
 use crate::{
     block_tree::{BlockTree, QuorumCertificate},
-    election::Election,
     ledger::Ledger,
     message::{Message, Propose, Timeout, TimeoutCertificate, Vote},
     pacemaker::Pacemaker,
@@ -32,11 +31,23 @@ impl Mempool {
 // should likely be made into a finite state machine.
 pub struct Manager {
     block_tree: BlockTree,
-    election: Election,
     ledger: Ledger,
     mempool: Mempool,
     pacemaker: Pacemaker,
     safety: Safety,
+
+    // Leader Selection //
+
+    // The list of current validators
+    validators: Vec<Address>,
+    // A parameter for the leader reputation algorithm
+    window_size: usize,
+    // Between f and 2f , number of excluded authors of last committed blocks
+    exclude_size: usize,
+    // Map from round numbers to leaders elected due to the reputation scheme
+    reputation_leaders: HashMap<Round, Address>,
+
+    // Testing //
 
     // Used to send messages to other managers in tests.
     #[cfg(feature = "test")]
@@ -48,11 +59,15 @@ impl Manager {
     pub fn new(/* TODO: pass the ledger here */) -> Self {
         Self {
             block_tree: BlockTree::new(),
-            election: Election::new(),
             ledger: Ledger::new(),
             mempool: Mempool::new(),
             pacemaker: Pacemaker::new(),
             safety: Safety::new(),
+
+            validators: vec![],
+            window_size: 0,
+            exclude_size: 0,
+            reputation_leaders: HashMap::new(),
         }
     }
 
@@ -63,11 +78,16 @@ impl Manager {
     ) -> Self {
         Self {
             block_tree: BlockTree::new(),
-            election: Election::new(),
             ledger: Ledger::new(),
             mempool: Mempool::new(),
             pacemaker: Pacemaker::new(outbound_sender.clone()),
             safety: Safety::new(),
+
+            validators: vec![],
+            window_size: 0,
+            exclude_size: 0,
+            reputation_leaders: HashMap::new(),
+
             outbound_sender,
         }
     }
@@ -89,7 +109,7 @@ impl Manager {
 
         // note: the whitepaper assigns to 'round' here
         let current_round = self.pacemaker.current_round;
-        let leader = self.election.get_leader(current_round);
+        let leader = self.get_leader(current_round);
 
         // note: the whitepaper uses 'round' instead of 'current_round' here
         // note: the whitepaper uses 'p.sender' instead of 'p.signature' here
@@ -105,7 +125,7 @@ impl Manager {
             .safety
             .make_vote(propose.block, propose.last_round_tc.unwrap(), &self.ledger, &self.block_tree)
         {
-            let leader = self.election.get_leader(current_round + 1);
+            let leader = self.get_leader(current_round + 1);
 
             // TODO: send vote msg to the leader
 
@@ -144,7 +164,7 @@ impl Manager {
 
     fn process_qc(&mut self, qc: QuorumCertificate) -> Result<()> {
         self.block_tree.process_qc(qc.clone(), &mut self.ledger);
-        self.election.update_leaders(qc, &self.pacemaker, &self.ledger)
+        self.update_leaders(qc)
         // FIXME: method not specified in the whitepaper
         // self.pacemaker.advance_round(qc.vote_info.round);
     }
@@ -162,5 +182,64 @@ impl Manager {
         #[cfg(feature = "test")]
         self.outbound_sender.blocking_send(TestMessage::new(todo!(), None)).unwrap();
         // }
+    }
+}
+
+use crate::{bft::Round, Address};
+
+use std::collections::HashMap;
+
+// Leader selection
+impl Manager {
+    pub fn get_leader(&self, round: Round) -> &Address {
+        if let Some(leader) = self.reputation_leaders.get(&round) {
+            leader
+        } else {
+            &self.validators[(round as f32 / 2.0).floor() as usize % self.validators.len()] // Round-robin leader (two rounds per leader)
+        }
+    }
+
+    pub fn update_leaders(&mut self, qc: QuorumCertificate) -> Result<()> {
+        let extended_round = qc.vote_info.parent_round;
+        let qc_round = qc.vote_info.round;
+        let current_round = self.pacemaker.current_round;
+
+        if extended_round + 1 == qc_round && qc_round + 1 == current_round {
+            self.reputation_leaders.insert(current_round + 1, self.elect_reputation_leader(qc)?);
+        }
+
+        Ok(())
+    }
+
+    fn elect_reputation_leader(&self, qc: QuorumCertificate) -> Result<Address> {
+        let mut active_validators = vec![]; // validators that signed the last window size committed blocks
+        let mut past_leaders = vec![]; // ordered set of authors of last exclude size committed blocks
+        let mut current_qc = qc.clone();
+
+        let mut i = 0;
+        while i < self.window_size || past_leaders.len() < self.exclude_size {
+            if i < self.window_size {
+                active_validators.extend(&current_qc.signatures().iter().map(|s| s.signer()).collect::<Result<Vec<_>>>()?);
+                // whitepaper comment:
+                // |current qc.signatures.signers()| ≥ 2f + 1
+            }
+
+            // Retrieve the current block.
+            let current_block = self.ledger.get_block(current_qc.vote_info.parent_id);
+
+            if past_leaders.len() < self.exclude_size {
+                past_leaders.push(current_block.leader());
+            }
+
+            current_qc = current_block.qc.clone();
+
+            i += 1;
+        }
+
+        active_validators = active_validators.into_iter().filter(|v| !past_leaders.contains(v)).collect();
+
+        // TODO: pick an active validator
+        // active validators.pick_one(seed ← qc.voteinfo.round)
+        Ok(active_validators[0])
     }
 }
