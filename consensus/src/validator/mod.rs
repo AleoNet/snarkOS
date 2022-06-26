@@ -17,7 +17,7 @@
 use crate::Address;
 
 use anyhow::{bail, Result};
-use indexmap::IndexMap;
+use indexmap::{map::Entry, IndexMap};
 
 /// The type for representing rewards.
 type Reward = u64;
@@ -103,19 +103,42 @@ impl Validator {
 impl Validator {
     /// Increments the staked amount by the given amount.
     pub fn increment_stake_by(&mut self, staker: Address, amount: Stake) -> Result<()> {
+        // Update the stake.
         match self.stake.checked_add(amount) {
             Some(staked) => self.stake = staked,
             None => bail!("Detected overflow incrementing stake"),
         }
+
+        // Update the staked amount.
+        let mut entry = self.staked.entry(staker).or_insert(0);
+        match entry.checked_add(amount) {
+            Some(staked) => *entry = staked,
+            None => bail!("Detected overflow incrementing staked amount"),
+        };
+
         Ok(())
     }
 
     /// Decrements the staked amount by the given amount.
     pub fn decrement_stake_by(&mut self, staker: Address, amount: Stake) -> Result<()> {
+        // Update the stake.
         match self.stake.checked_sub(amount) {
             Some(staked) => self.stake = staked,
             None => bail!("Detected underflow decrementing stake"),
         }
+
+        // Retrieve the staked amount.
+        let mut entry = match self.staked.get_mut(&staker) {
+            Some(entry) => entry,
+            None => bail!("Detected staker is not staked with validator"),
+        };
+
+        // Update the staked amount.
+        match entry.checked_sub(amount) {
+            Some(staked) => *entry = staked,
+            None => bail!("Detected underflow decrementing staked amount"),
+        };
+
         Ok(())
     }
 
