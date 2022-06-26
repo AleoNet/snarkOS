@@ -14,11 +14,46 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod bft;
-mod block;
 pub mod reference;
+
+mod block;
+mod message;
 mod round;
+mod validator;
+mod validators;
 
 pub type N = snarkvm::console::network::Testnet3;
 pub type Address = snarkvm::console::account::Address<N>;
 pub type Signature = snarkvm::console::account::Signature<N>;
+
+use crate::round::Round;
+
+#[derive(Copy, Clone, Debug)]
+pub enum Status {
+    /// The round is running.
+    Running,
+    /// The round is aborting.
+    Aborting,
+    /// The round succeeded.
+    Completed,
+    /// The round failed.
+    Failed,
+}
+
+/// The consensus struct contains state that is tracked by all validators in the network.
+pub struct Consensus {
+    /// The current round of consensus.
+    round: Round,
+}
+
+impl Consensus {
+    /// Initializes a new consensus struct.
+    pub const fn new(round: Round) -> Self {
+        Self { round }
+    }
+
+    /// Returns the current round.
+    pub const fn round(&self) -> &Round {
+        &self.round
+    }
+}

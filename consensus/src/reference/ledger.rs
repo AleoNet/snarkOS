@@ -6,9 +6,6 @@ pub type Height = u32;
 // FIXME: integrate with the snarkVM BlockHash OR height
 pub type BlockHash = u64;
 
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct Header {}
-
 #[derive(Clone, Debug)]
 pub struct Block {
     // A unique digest of author, round, payload, qc.vote info.id and qc.signatures

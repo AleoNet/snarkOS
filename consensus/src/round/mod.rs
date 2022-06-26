@@ -14,24 +14,41 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Address;
+use crate::{Address, Status};
 
 #[derive(Clone, Debug)]
 pub struct Round {
-    /// The number of rounds since the genesis round, including committed and aborted rounds.
-    pub id: u64,
+    /// The number of rounds since the genesis round.
+    id: u64,
+    /// The status of the round.
+    status: Status,
+
     // The leader of the round, may not be the same as qc.author after view-change
-    pub leader: Address,
+    leader: Address,
 }
 
 impl Round {
+    /// Initializes a new round, given the round ID and leader address.
+    pub const fn new(id: u64, leader: Address) -> Self {
+        Self {
+            id,
+            status: Status::Running,
+            leader,
+        }
+    }
+
     /// Returns the round number.
     pub const fn id(&self) -> u64 {
         self.id
     }
 
+    /// Returns the status of the round.
+    pub const fn status(&self) -> Status {
+        self.status
+    }
+
     /// Returns the leader of the round.
-    pub const fn leader(&self) -> Address {
-        self.leader
+    pub const fn leader(&self) -> &Address {
+        &self.leader
     }
 }

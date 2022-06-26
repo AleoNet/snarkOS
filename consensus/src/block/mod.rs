@@ -14,40 +14,37 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{round::Round, Address};
-
-/// This value defines the height of a block, which is always less than or equal to the round number.
-pub type Height = u32;
+use crate::Address;
 
 // FIXME: integrate with the snarkVM BlockHash OR height
-pub type BlockHash = u64;
+pub type BlockHash = u128;
 
 #[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct Header {}
-
-#[derive(Clone, Debug)]
-pub struct Block {
-    // A unique digest of author, round, payload, qc.vote info.id and qc.signatures
-    pub hash: BlockHash,
-
-    // The leader of the round, may not be the same as qc.author after view-change
-    pub leader: Address,
-    // The round that generated this proposal
-    pub round: Round,
-    // Proposed transaction(s)
-    pub payload: Vec<()>,
-    // // QC for parent block
-    // pub qc: crate::message::QuorumCertificate,
+pub struct Header {
+    /// The round that produced this block.
+    round: u64,
+    /// The height of this block.
+    height: u32,
 }
 
-impl Block {
+impl Header {
     /// Returns the round number of the block.
-    pub const fn round(&self) -> &Round {
-        &self.round
+    pub const fn round(&self) -> u64 {
+        self.round
     }
 
-    /// Returns the leader of the round.
-    pub const fn leader(&self) -> Address {
-        self.leader
+    /// Returns the height of the block.
+    pub const fn height(&self) -> u32 {
+        self.height
     }
+}
+
+#[derive(Clone)]
+pub struct Block {
+    // A unique digest of author, round, payload, qc.vote info.id and qc.signatures
+    hash: BlockHash,
+    /// The header of the block.
+    header: Header,
+    // // QC for parent block
+    // pub qc: crate::message::QuorumCertificate,
 }

@@ -28,6 +28,9 @@ features = ["console"]
 [dependencies.anyhow]
 version = "1"
 
+[dependencies.indexmap]
+version = "1.8"
+
 [dependencies.tokio]
 version = "1"
 features = [ "macros", "rt", "sync" ]
