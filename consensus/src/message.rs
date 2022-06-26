@@ -2,7 +2,11 @@ use crate::{
     bft::Round,
     block::Block,
     block_tree::{LedgerCommitInfo, QuorumCertificate, VoteInfo},
+    Address,
+    Signature,
 };
+
+use anyhow::Result;
 
 #[derive(Clone, Debug)]
 pub enum Message {
@@ -40,7 +44,7 @@ pub struct TimeoutCertificate {
     // A vector of 2f + 1 high qc round numbers of timeout messages that form TC
     pub tmo_high_qc_rounds: Vec<Round>,
     // A vector of 2f + 1 validator signatures on (round, respective high qc round)
-    pub signatures: Vec<()>,
+    pub signatures: Vec<Signature>,
 }
 
 #[derive(Clone, Debug)]
@@ -60,17 +64,22 @@ pub struct Propose {
     pub last_round_tc: Option<TimeoutCertificate>,
     // QC to synchronize on committed blocks
     pub high_commit_qc: QuorumCertificate,
-    pub signature: (),
+    pub signature: Signature,
 }
 
 impl Propose {
-    pub fn new(block: Block, last_round_tc: Option<TimeoutCertificate>, high_commit_qc: QuorumCertificate) -> Self {
+    pub fn new(block: Block, last_round_tc: Option<TimeoutCertificate>, high_commit_qc: QuorumCertificate, signature: Signature) -> Self {
         Self {
             block,
             last_round_tc,
             high_commit_qc,
-            signature: (),
+            signature,
         }
+    }
+
+    /// Returns the address of the leader who proposed this block.
+    pub fn leader(&self) -> Result<Address> {
+        self.signature.signer()
     }
 }
 

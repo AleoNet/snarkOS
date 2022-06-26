@@ -20,9 +20,13 @@ edition = "2021"
 test = [ ]
 
 [dependencies.snarkvm]
-git = "https://github.com/AleoHQ/snarkVM.git"
-branch = "feat/bytecode"
+path = "../../snarkVM"
+#git = "https://github.com/AleoHQ/snarkVM.git"
+#branch = "feat/bytecode"
 features = ["console"]
+
+[dependencies.anyhow]
+version = "1"
 
 [dependencies.tokio]
 version = "1"

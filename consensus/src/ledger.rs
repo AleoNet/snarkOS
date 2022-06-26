@@ -1,6 +1,6 @@
 use crate::block::{Block, BlockHash};
 
-// TODO: integrate with snarkOS ledger
+/// The ledger contains blocks that have been committed by consensus.
 pub struct Ledger;
 
 // TODO: these methods are not implemented in the whitepaper
@@ -25,8 +25,8 @@ impl Ledger {
         todo!()
     }
 
-    // returns a committed block given its id
-    pub fn committed_block(&self, block_hash: BlockHash) -> Block {
+    /// Returns the block given the block hash.
+    pub fn get_block(&self, block_hash: BlockHash) -> Block {
         todo!()
     }
 }

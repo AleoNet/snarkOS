@@ -12,6 +12,8 @@ use crate::{
     safety::Safety,
 };
 
+use anyhow::Result;
+
 // TODO: integrate with snarkVM's mempool
 pub struct Mempool;
 
@@ -70,7 +72,7 @@ impl Manager {
         }
     }
 
-    pub fn start_event_processing(&mut self, msg: Message) {
+    pub fn start_event_processing(&mut self, msg: Message) -> Result<()> {
         match msg {
             Message::LocalTimeout => self.pacemaker.local_timeout_round(&self.block_tree, &mut self.safety),
             Message::Propose(msg) => self.process_propose(msg),
@@ -79,18 +81,11 @@ impl Manager {
         }
     }
 
-    fn process_certificate_qc(&mut self, qc: QuorumCertificate) {
-        self.block_tree.process_qc(qc.clone(), &mut self.ledger);
-        self.election.update_leaders(qc, &self.pacemaker, &self.ledger);
-        // FIXME: method not specified in the whitepaper
-        // self.pacemaker.advance_round(qc.vote_info.round);
-    }
+    fn process_propose(&mut self, propose: Propose) -> Result<()> {
+        self.process_qc(propose.block.qc.clone())?;
+        self.process_qc(propose.high_commit_qc.clone())?;
 
-    fn process_propose(&mut self, p: Propose) {
-        self.process_certificate_qc(p.block.qc.clone());
-        self.process_certificate_qc(p.high_commit_qc);
-
-        self.pacemaker.advance_round_tc(p.last_round_tc.clone());
+        self.pacemaker.advance_round_tc(propose.last_round_tc.clone());
 
         // note: the whitepaper assigns to 'round' here
         let current_round = self.pacemaker.current_round;
@@ -98,17 +93,17 @@ impl Manager {
 
         // note: the whitepaper uses 'round' instead of 'current_round' here
         // note: the whitepaper uses 'p.sender' instead of 'p.signature' here
-        if p.block.round != current_round || p.signature != leader || p.block.author != leader {
-            return;
+        if propose.block.round() != current_round || propose.leader()? != *leader || propose.block.leader() != *leader {
+            return Ok(());
         }
 
         // note: the whitepaper passes the entire 'p' here instead of 'p.block'
-        self.block_tree.execute_and_insert(p.block.clone(), &mut self.ledger); // Adds a new speculative state to the Ledger
+        self.block_tree.execute_and_insert(propose.block.clone(), &mut self.ledger); // Adds a new speculative state to the Ledger
 
         // FIXME: the whitepaper doesn't consider when 'p.last_round_tc' is ⊥
         if let Some(vote_msg) = self
             .safety
-            .make_vote(p.block, p.last_round_tc.unwrap(), &self.ledger, &self.block_tree)
+            .make_vote(propose.block, propose.last_round_tc.unwrap(), &self.ledger, &self.block_tree)
         {
             let leader = self.election.get_leader(current_round + 1);
 
@@ -119,11 +114,13 @@ impl Manager {
                 .blocking_send(TestMessage::new(todo!(), Some(todo!())))
                 .unwrap();
         }
+
+        Ok(())
     }
 
-    fn process_timeout(&mut self, timeout: Timeout) {
-        self.process_certificate_qc(timeout.tmo_info.high_qc.clone());
-        self.process_certificate_qc(timeout.high_commit_qc.clone());
+    fn process_timeout(&mut self, timeout: Timeout) -> Result<()> {
+        self.process_qc(timeout.tmo_info.high_qc.clone())?;
+        self.process_qc(timeout.high_commit_qc.clone())?;
 
         self.pacemaker.advance_round_tc(timeout.last_round_tc.clone());
 
@@ -132,13 +129,24 @@ impl Manager {
             // self.pacemaker.advance_round(tc);
             self.process_new_round_event(Some(tc));
         }
+
+        Ok(())
     }
 
-    fn process_vote(&mut self, vote: Vote) {
+    fn process_vote(&mut self, vote: Vote) -> Result<()> {
         if let Some(qc) = self.block_tree.process_vote(vote, &mut self.ledger) {
-            self.process_certificate_qc(qc);
-            self.process_new_round_event(None)
+            self.process_qc(qc)?;
+            self.process_new_round_event(None);
         }
+
+        Ok(())
+    }
+
+    fn process_qc(&mut self, qc: QuorumCertificate) -> Result<()> {
+        self.block_tree.process_qc(qc.clone(), &mut self.ledger);
+        self.election.update_leaders(qc, &self.pacemaker, &self.ledger)
+        // FIXME: method not specified in the whitepaper
+        // self.pacemaker.advance_round(qc.vote_info.round);
     }
 
     fn process_new_round_event(&self, last_tc: Option<TimeoutCertificate>) {
@@ -147,7 +155,7 @@ impl Manager {
         let block = self
             .block_tree
             .generate_block(self.mempool.get_transactions(), self.pacemaker.current_round);
-        let proposal_msg = Propose::new(block, last_tc, self.block_tree.high_commit_qc.clone());
+        let proposal_msg = Propose::new(block, last_tc, self.block_tree.high_commit_qc.clone(), todo!());
 
         // TODO: broadcast proposal_msg ProposalMsg〈b, last tc, Block-Tree.high commit qc〉
 

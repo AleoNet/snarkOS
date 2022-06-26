@@ -1,5 +1,3 @@
-use std::cmp;
-
 use crate::{
     bft::Round,
     block::Block,
@@ -7,7 +5,10 @@ use crate::{
     hash,
     ledger::Ledger,
     message::{TimeoutCertificate, TimeoutInfo, Vote},
+    Signature,
 };
+
+use std::cmp;
 
 pub struct Safety {
     // Own private key
@@ -78,24 +79,27 @@ impl Safety {
         }
     }
 
-    pub fn make_vote(&mut self, b: Block, last_tc: TimeoutCertificate, ledger: &Ledger, block_tree: &BlockTree) -> Option<Vote> {
-        let qc_round = b.qc.vote_info.round;
+    pub fn make_vote(&mut self, block: Block, last_tc: TimeoutCertificate, ledger: &Ledger, block_tree: &BlockTree) -> Option<Vote> {
+        let qc_round = block.qc.vote_info.round;
 
-        if valid_signatures(&b.qc.signatures) && valid_signatures(&last_tc.signatures) && self.safe_to_vote(b.round, qc_round, last_tc) {
+        if valid_signatures(&block.qc.signatures)
+            && valid_signatures(&last_tc.signatures)
+            && self.safe_to_vote(block.round, qc_round, last_tc)
+        {
             self.update_highest_qc_round(qc_round); // Protect qc round
-            self.increase_highest_vote_round(b.round); // Don’t vote again in this (or lower) round
+            self.increase_highest_vote_round(block.round); // Don’t vote again in this (or lower) round
 
             // VoteInfo carries the potential QC info with ids and rounds of the parent QC
             let vote_info = VoteInfo {
-                id: b.hash,
-                round: b.round,
-                parent_id: b.qc.vote_info.id,
+                id: block.hash,
+                round: block.round,
+                parent_id: block.qc.vote_info.id,
                 parent_round: qc_round,
-                exec_state_id: ledger.pending_state(b.hash),
+                exec_state_id: ledger.pending_state(block.hash),
             };
 
             let ledger_commit_info = LedgerCommitInfo {
-                commit_state_id: self.commit_state_id_candidate(b.round, b.qc, ledger),
+                commit_state_id: self.commit_state_id_candidate(block.round(), block.qc, ledger),
                 vote_info_hash: hash(&vote_info),
             };
 
@@ -119,7 +123,7 @@ impl Safety {
     }
 }
 
-fn valid_signatures(signatures: &[()]) -> bool {
+fn valid_signatures(signatures: &[Signature]) -> bool {
     // valid signatures call in the beginning of these functions checks
     // the well-formedness and signatures on all parameters provided
     // to construct the votes (using the public keys of other validators

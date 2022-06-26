@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 #[cfg(feature = "test")]
 use tokio::sync::mpsc;
 
@@ -12,6 +10,9 @@ use crate::{
     safety::Safety,
     F,
 };
+
+use anyhow::Result;
+use std::collections::HashMap;
 
 pub struct Pacemaker {
     // Initially zero
@@ -60,7 +61,7 @@ impl Pacemaker {
         todo!()
     }
 
-    pub fn local_timeout_round(&self, block_tree: &BlockTree, safety: &mut Safety) {
+    pub fn local_timeout_round(&self, block_tree: &BlockTree, safety: &mut Safety) -> Result<()> {
         // FIXME: what should this do
         // save_consensus_state()
 
@@ -79,6 +80,8 @@ impl Pacemaker {
 
         #[cfg(feature = "test")]
         self.outbound_sender.blocking_send(TestMessage::new(todo!(), None)).unwrap();
+
+        Ok(())
     }
 
     pub fn process_remote_timeout(&mut self, tmo: Timeout, block_tree: &BlockTree, safety: &mut Safety) -> Option<TimeoutCertificate> {
@@ -100,7 +103,7 @@ impl Pacemaker {
             // FIXME: timer
             // stop_timer(current round)
 
-            self.local_timeout_round(block_tree, safety) // Bracha timeout
+            self.local_timeout_round(block_tree, safety).unwrap() // Bracha timeout
         }
 
         if num_round_senders == 2 * F + 1 {

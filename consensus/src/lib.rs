@@ -27,7 +27,9 @@ pub mod message;
 mod pacemaker;
 mod safety;
 
-use snarkvm::console::account::Address;
+pub type N = snarkvm::console::network::Testnet3;
+pub type Address = snarkvm::console::account::Address<N>;
+pub type Signature = snarkvm::console::account::Signature<N>;
 
 // TODO: what should the value of f be?
 pub const F: usize = 11;

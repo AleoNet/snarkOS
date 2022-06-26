@@ -1,18 +1,20 @@
-use std::{cmp, collections::HashMap, hash::Hash};
-
-#[cfg(feature = "test")]
-use tokio::sync::mpsc;
-
-#[cfg(feature = "test")]
-use crate::message::TestMessage;
 use crate::{
     bft::Round,
     block::{Block, BlockHash},
     hash,
     ledger::Ledger,
     message::Vote,
+    Signature,
     F,
 };
+
+#[cfg(feature = "test")]
+use crate::message::TestMessage;
+
+use std::{cmp, collections::HashMap, hash::Hash};
+
+#[cfg(feature = "test")]
+use tokio::sync::mpsc;
 
 #[derive(Clone, Debug, Hash)]
 pub struct VoteInfo {
@@ -43,10 +45,17 @@ pub struct QuorumCertificate {
     pub vote_info: VoteInfo,
     ledger_commit_info: LedgerCommitInfo,
     // A quorum of signatures
-    pub signatures: Vec<()>,
+    pub signatures: Vec<Signature>,
     // The validator that produced the qc
     author: (),
     author_signature: (),
+}
+
+impl QuorumCertificate {
+    /// Returns the signatures.
+    pub fn signatures(&self) -> &[Signature] {
+        &self.signatures
+    }
 }
 
 impl PartialEq for QuorumCertificate {
@@ -159,7 +168,7 @@ impl BlockTree {
 
         Block {
             hash: id,
-            author: (), // TODO: it's the own validator ID
+            leader: todo!(), // TODO: it's the own validator ID
             round: current_round,
             payload: txns,
             qc: self.high_qc.clone(),
