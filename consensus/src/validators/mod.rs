@@ -19,6 +19,7 @@ use crate::{
     Address,
 };
 
+use core::ops::Deref;
 use indexmap::IndexMap;
 
 /// The validator set.
@@ -49,5 +50,14 @@ impl Validators {
     /// Returns the validator with the given address, if the validator exists.
     pub fn get(&self, address: &Address) -> Option<&Validator> {
         self.validators.get(address)
+    }
+}
+
+impl Deref for Validators {
+    type Target = IndexMap<Address, Validator>;
+
+    /// Returns the underlying validator map.
+    fn deref(&self) -> &Self::Target {
+        &self.validators
     }
 }

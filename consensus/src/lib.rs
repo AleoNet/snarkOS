@@ -26,7 +26,7 @@ pub type N = snarkvm::console::network::Testnet3;
 pub type Address = snarkvm::console::account::Address<N>;
 pub type Signature = snarkvm::console::account::Signature<N>;
 
-use crate::round::Round;
+use crate::{round::Round, validators::Validators};
 
 #[derive(Copy, Clone, Debug)]
 pub enum Status {
@@ -44,16 +44,26 @@ pub enum Status {
 pub struct Consensus {
     /// The current round of consensus.
     round: Round,
+    /// The current validators in the network.
+    validators: Validators,
 }
 
 impl Consensus {
     /// Initializes a new consensus struct.
-    pub const fn new(round: Round) -> Self {
-        Self { round }
+    pub fn new(round: Round) -> Self {
+        Self {
+            round,
+            validators: Validators::new(),
+        }
     }
 
     /// Returns the current round.
     pub const fn round(&self) -> &Round {
         &self.round
+    }
+
+    /// Returns the current validators.
+    pub const fn validators(&self) -> &Validators {
+        &self.validators
     }
 }
