@@ -22,7 +22,6 @@ mod block;
 mod block_tree;
 mod ledger;
 pub mod message;
-mod safety;
 pub mod validator;
 
 pub type N = snarkvm::console::network::Testnet3;

@@ -7,7 +7,6 @@ use crate::{
     hash,
     ledger::Ledger,
     message::{Message, Propose, Timeout, TimeoutCertificate, TimeoutInfo, Vote},
-    safety::Safety,
     Address,
     Signature,
     F,
