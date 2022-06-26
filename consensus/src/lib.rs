@@ -21,9 +21,9 @@ mod block;
 
 mod block_tree;
 mod ledger;
-pub mod manager;
 pub mod message;
 mod safety;
+pub mod validator;
 
 pub type N = snarkvm::console::network::Testnet3;
 pub type Address = snarkvm::console::account::Address<N>;

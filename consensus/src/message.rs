@@ -115,7 +115,7 @@ impl Vote {
 pub struct TestMessage {
     // The actual message.
     pub message: Message,
-    // The index of the manager to relay the message to; None is a broadcast.
+    // The index of the validator to relay the message to; None is a broadcast.
     pub target: Option<usize>,
     // note: it should be possible to identify the source based on the message signature.
 }

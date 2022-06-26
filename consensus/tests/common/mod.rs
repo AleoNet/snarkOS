@@ -2,8 +2,8 @@ use tokio::sync::mpsc;
 use tracing::*;
 
 use snarkos_consensus::{
-    manager::Manager,
     message::{Message, TestMessage},
+    validator::Validator,
 };
 
 // Spawns the desired number of consensus managers within their dedicated tasks
@@ -21,7 +21,7 @@ pub fn create_test_managers(num: usize) -> Vec<mpsc::Sender<Message>> {
         let (msg_sender, mut msg_receiver) = mpsc::channel(16);
 
         // The sender passed here is for sending messages FROM the consensus manager.
-        let mut manager = Manager::new(common_msg_sender.clone());
+        let mut manager = Validator::new(common_msg_sender.clone());
 
         // Spawn a dedicated consensus manager task.
         let _manager_task = tokio::spawn(async move {

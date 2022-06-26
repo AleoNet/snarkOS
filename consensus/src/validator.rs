@@ -29,7 +29,7 @@ impl Mempool {
 /// The central object responsible for the consensus process.
 // TODO: once the initial implementation is finalized, this
 // should likely be made into a finite state machine.
-pub struct Manager {
+pub struct Validator {
     block_tree: BlockTree,
     ledger: Ledger,
     mempool: Mempool,
@@ -57,12 +57,12 @@ pub struct Manager {
 
     // Testing //
 
-    // Used to send messages to other managers in tests.
+    // Used to send messages to other validators in tests.
     #[cfg(feature = "test")]
     outbound_sender: mpsc::Sender<TestMessage>,
 }
 
-impl Manager {
+impl Validator {
     #[cfg(not(feature = "test"))]
     pub fn new(/* TODO: pass the ledger here */) -> Self {
         Self {
@@ -202,7 +202,7 @@ use crate::{bft::Round, Address};
 use std::collections::HashMap;
 
 // Leader selection
-impl Manager {
+impl Validator {
     pub fn get_leader(&self, round: Round) -> &Address {
         if let Some(leader) = self.reputation_leaders.get(&round) {
             leader
@@ -257,7 +257,7 @@ impl Manager {
 }
 
 // Pacemaker
-impl Manager {
+impl Validator {
     // pub fn get_round_timer(&self, round: Round) -> () {
     //     // FIXME: timer
     //     // round timer formula // For example, use 4 × ∆ or α + βcommit gap(r) if ∆ is unknown.

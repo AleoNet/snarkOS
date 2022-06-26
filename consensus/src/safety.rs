@@ -21,64 +21,6 @@ pub struct Safety {
 }
 
 impl Safety {
-    pub fn new() -> Self {
-        // do `highest_vote_round` and `highest_qc_round` persist?
-
-        todo!()
-    }
-
-    fn increase_highest_vote_round(&mut self, round: Round) {
-        // commit not to vote in rounds lower than round
-        if round > self.highest_vote_round {
-            self.highest_vote_round = round;
-        }
-    }
-
-    fn update_highest_qc_round(&mut self, qc_round: Round) {
-        if qc_round > self.highest_qc_round {
-            self.highest_qc_round = qc_round;
-        }
-    }
-
-    fn consecutive(&self, block_round: Round, round: Round) -> bool {
-        round + 1 == block_round
-    }
-
-    fn safe_to_extend(&self, block_round: Round, qc_round: Round, tc: TimeoutCertificate) -> bool {
-        // TODO: is the unwrap safe here?
-        self.consecutive(block_round, tc.round) && qc_round >= *tc.tmo_high_qc_rounds.iter().max().unwrap()
-    }
-
-    fn safe_to_vote(&self, block_round: Round, qc_round: Round, tc: TimeoutCertificate) -> bool {
-        if block_round <= cmp::max(self.highest_qc_round, qc_round) {
-            // 1. must vote in monotonically increasing rounds
-            // 2. must extend a smaller round
-            false
-        } else {
-            // Extending qc from previous round or safe to extend due to tc
-            self.consecutive(block_round, qc_round) || self.safe_to_extend(block_round, qc_round, tc)
-        }
-    }
-
-    fn safe_to_timeout(&self, round: Round, qc_round: Round, tc: TimeoutCertificate) -> bool {
-        if qc_round < self.highest_qc_round || round <= cmp::max(self.highest_vote_round - 1, qc_round) {
-            // respect highest qc round and don’t timeout in a past round
-            false
-        } else {
-            // qc or tc must allow entering the round to timeout
-            self.consecutive(round, qc_round) || self.consecutive(round, tc.round)
-        }
-    }
-
-    fn commit_state_id_candidate(&self, block_round: Round, qc: QuorumCertificate, ledger: &Ledger) -> Option<()> {
-        // find the committed id in case a qc is formed in the vote round
-        if self.consecutive(block_round, qc.vote_info.round) {
-            ledger.pending_state(qc.vote_info.id)
-        } else {
-            None
-        }
-    }
-
     pub fn make_vote(&mut self, block: Block, last_tc: TimeoutCertificate, ledger: &Ledger, block_tree: &BlockTree) -> Option<Vote> {
         let qc_round = block.qc.vote_info.round;
 
@@ -117,6 +59,66 @@ impl Safety {
             self.increase_highest_vote_round(round); // Stop voting for round
 
             Some(TimeoutInfo::new(round, high_qc, ()))
+        } else {
+            None
+        }
+    }
+}
+
+impl Safety {
+    pub fn new() -> Self {
+        // do `highest_vote_round` and `highest_qc_round` persist?
+
+        todo!()
+    }
+
+    fn increase_highest_vote_round(&mut self, round: Round) {
+        // commit not to vote in rounds lower than round
+        if round > self.highest_vote_round {
+            self.highest_vote_round = round;
+        }
+    }
+
+    fn update_highest_qc_round(&mut self, qc_round: Round) {
+        if qc_round > self.highest_qc_round {
+            self.highest_qc_round = qc_round;
+        }
+    }
+
+    fn is_consecutive(&self, block_round: Round, round: Round) -> bool {
+        round + 1 == block_round
+    }
+
+    fn safe_to_extend(&self, block_round: Round, qc_round: Round, tc: TimeoutCertificate) -> bool {
+        // TODO: is the unwrap safe here?
+        self.is_consecutive(block_round, tc.round) && qc_round >= *tc.tmo_high_qc_rounds.iter().max().unwrap()
+    }
+
+    fn safe_to_vote(&self, block_round: Round, qc_round: Round, tc: TimeoutCertificate) -> bool {
+        if block_round <= cmp::max(self.highest_qc_round, qc_round) {
+            // 1. must vote in monotonically increasing rounds
+            // 2. must extend a smaller round
+            false
+        } else {
+            // Extending qc from previous round or safe to extend due to tc
+            self.is_consecutive(block_round, qc_round) || self.safe_to_extend(block_round, qc_round, tc)
+        }
+    }
+
+    fn safe_to_timeout(&self, round: Round, qc_round: Round, tc: TimeoutCertificate) -> bool {
+        if qc_round < self.highest_qc_round || round <= cmp::max(self.highest_vote_round - 1, qc_round) {
+            // respect highest qc round and don’t timeout in a past round
+            false
+        } else {
+            // qc or tc must allow entering the round to timeout
+            self.is_consecutive(round, qc_round) || self.is_consecutive(round, tc.round)
+        }
+    }
+
+    fn commit_state_id_candidate(&self, block_round: Round, qc: QuorumCertificate, ledger: &Ledger) -> Option<()> {
+        // find the committed id in case a qc is formed in the vote round
+        if self.is_consecutive(block_round, qc.vote_info.round) {
+            ledger.pending_state(qc.vote_info.id)
         } else {
             None
         }
