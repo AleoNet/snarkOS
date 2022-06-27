@@ -49,7 +49,7 @@ pub struct Consensus {
 }
 
 impl Consensus {
-    /// Initializes a new consensus struct.
+    /// Initializes a new instance of consensus.
     pub fn new(round: Round) -> Self {
         Self {
             round,
@@ -57,8 +57,8 @@ impl Consensus {
         }
     }
 
-    /// Returns the current round.
-    pub const fn round(&self) -> &Round {
+    /// Returns the latest round.
+    pub const fn latest_round(&self) -> &Round {
         &self.round
     }
 

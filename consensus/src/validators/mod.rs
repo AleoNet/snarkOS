@@ -19,6 +19,7 @@ use crate::{
     Address,
 };
 
+use anyhow::{bail, Result};
 use core::ops::Deref;
 use indexmap::IndexMap;
 
@@ -41,15 +42,44 @@ impl Validators {
         self.validators.len()
     }
 
+    /// Returns the validator with the given address, if the validator exists.
+    pub fn get(&self, address: &Address) -> Option<&Validator> {
+        self.validators.get(address)
+    }
+
     /// Returns the total amount staked.
-    pub fn total_stake(&self) -> Stake {
+    pub fn get_total_stake(&self) -> Stake {
         // Note: As the total supply cannot exceed 2^64, this is call to `sum` is safe.
         self.validators.values().map(Validator::stake).sum()
     }
 
-    /// Returns the validator with the given address, if the validator exists.
-    pub fn get(&self, address: &Address) -> Option<&Validator> {
-        self.validators.get(address)
+    /// Returns the current leader.
+    pub fn get_leader(&self) -> Result<Address> {
+        // Retrieve the validator with the highest score.
+        let leader = self
+            .validators
+            .iter()
+            .map(|(address, validator)| (address, validator.score()))
+            .fold((None, Score::MIN), |(a, power_a), (b, power_b)| match power_a > power_b {
+                true => (a, power_a),
+                false => (Some(*b), power_b),
+            })
+            .0;
+
+        // Return the leader address.
+        match leader {
+            Some(leader) => Ok(leader),
+            None => bail!("No leader was found"),
+        }
+    }
+}
+
+impl Validators {
+    /// Increments
+    pub fn increment_stake(&mut self, address: &Address, stake: Stake) {
+        if let Some(validator) = self.validators.get_mut(address) {
+            validator.increment_staked(stake);
+        }
     }
 }
 
@@ -59,5 +89,16 @@ impl Deref for Validators {
     /// Returns the underlying validator map.
     fn deref(&self) -> &Self::Target {
         &self.validators
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_get_total_stake() {
+        let validators = Validators::new();
+        assert_eq!(validators.get_total_stake(), 0);
     }
 }

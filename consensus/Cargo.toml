@@ -28,6 +28,9 @@ features = ["console"]
 [dependencies.anyhow]
 version = "1"
 
+[dependencies.fixed]
+version = "1.15"
+
 [dependencies.indexmap]
 version = "1.8"
 
