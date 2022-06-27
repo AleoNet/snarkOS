@@ -28,6 +28,7 @@ use parking_lot::RwLock;
 use pea2pea::{
     protocols::{Disconnect, Handshake, Writing},
     Connection,
+    ConnectionSide,
     Node as Pea2PeaNode,
     Pea2Pea,
 };
@@ -235,7 +236,7 @@ impl Writing for SynthNode {
     type Codec = MessageCodec<CurrentNetwork, Client<CurrentNetwork>>;
     type Message = ClientMessage;
 
-    fn codec(&self, _addr: SocketAddr) -> Self::Codec {
+    fn codec(&self, _addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
         Default::default()
     }
 }

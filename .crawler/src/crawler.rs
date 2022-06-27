@@ -32,6 +32,7 @@ use clap::Parser;
 use pea2pea::{
     protocols::{Disconnect, Handshake, Reading, Writing},
     Config,
+    ConnectionSide,
     Node as Pea2PeaNode,
     Pea2Pea,
 };
@@ -289,7 +290,7 @@ impl Reading for Crawler {
     type Codec = CrawlerDecoder<Client<CurrentNetwork>>;
     type Message = InboundMessage;
 
-    fn codec(&self, addr: SocketAddr) -> Self::Codec {
+    fn codec(&self, addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
         Self::Codec::new(addr, self.node().span().clone())
     }
 

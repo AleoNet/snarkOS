@@ -27,6 +27,7 @@ use snarkvm::traits::Network;
 use pea2pea::{
     protocols::{Disconnect, Handshake, Reading, Writing},
     Config,
+    ConnectionSide,
     Node as Pea2PeaNode,
     Pea2Pea,
 };
@@ -140,7 +141,7 @@ impl Reading for TestNode {
     type Codec = MessageCodec<CurrentNetwork, Client<CurrentNetwork>>;
     type Message = ClientMessage;
 
-    fn codec(&self, _addr: SocketAddr) -> Self::Codec {
+    fn codec(&self, _addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
         Default::default()
     }
 
