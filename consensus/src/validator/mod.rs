@@ -80,6 +80,11 @@ impl Validator {
         self.score
     }
 
+    /// Returns the number of stakers (including the validator) for this validator.
+    pub fn num_stakers(&self) -> usize {
+        self.staked.len()
+    }
+
     /// Returns the staked amount of the given staker.
     pub fn staked_by(&self, staker: &Address) -> Stake {
         self.staked.get(staker).copied().unwrap_or_default()
@@ -106,7 +111,8 @@ impl Validator {
     pub(crate) fn increment_staked(&mut self, amount: Stake) -> Result<()> {
         // Ensure the staker is incrementing a nonzero amount.
         ensure!(amount > 0, "Staker must increment stake by a nonzero amount");
-
+        // Ensure the current stake is nonzero.
+        ensure!(self.stake > 0, "Stake is zero");
         // Ensure incrementing the stake does not overflow.
         ensure!(self.stake.checked_add(amount).is_some(), "Incrementing the stake overflows");
 
@@ -115,24 +121,32 @@ impl Validator {
 
         // Ensure the increment for each staker succeeds.
         for (staker, stake) in &mut self.staked {
+            // Ensure the stake of the staker does not exceed the sum of stakes.
+            ensure!(*stake <= self.stake, "Stake of staker exceeds sum of stakes");
+
             // Compute the multiplier.
             let multiplier = *stake / self.stake;
-            // Ensure the multiplier is nonzero.
-            ensure!(multiplier > Stake::ZERO, "Multiplier is zero");
+            // Ensure the multiplier is less than or equal to 1.
+            ensure!(multiplier <= Stake::ONE, "Multiplier is above 1");
 
-            // Compute the proportional change for the staker.
+            // Compute the proportional change for the staker as `(amount * stake_i / stake_sum)`.
             let change = amount * multiplier;
-
-            // Ensure incrementing does not overflow.
+            // Ensure incrementing by change does not overflow.
             ensure!(stake.checked_add(change).is_some(), "Incrementing the stake for staker overflows");
 
             // Add the staker and change to the vector.
             staked_increments.push((*staker, change));
         }
 
-        // Ensure the sum of the staked increments equals the amount.
-        let expected_amount = staked_increments.iter().map(|(_, amount)| amount).sum::<Stake>();
-        ensure!(expected_amount == amount, "Sum of staked increments is incorrect");
+        // Compute the candidate amount, by summing the increments.
+        let candidate_amount = staked_increments.iter().map(|(_, amount)| amount).sum::<Stake>();
+        // Ensure the sum of the staked increments is less than or equal to the given amount.
+        ensure!(
+            candidate_amount <= amount,
+            "Sum of increments must be <= {amount}: found {candidate_amount}"
+        );
+        // Ensure the candidate amount is off by one gate at most.
+        ensure!(amount - candidate_amount < 1, "Sum of increments is off by more than one gate");
 
         // Increment the stake for each staker.
         for (staker, change) in staked_increments {
@@ -146,7 +160,8 @@ impl Validator {
     pub(crate) fn decrement_staked(&mut self, amount: Stake) -> Result<()> {
         // Ensure the staker is decrementing a nonzero amount.
         ensure!(amount > 0, "Staker must decrement stake by a nonzero amount");
-
+        // Ensure the current stake is nonzero.
+        ensure!(self.stake > 0, "Stake is zero");
         // Ensure decrementing the stake does not underflow.
         ensure!(self.stake.checked_sub(amount).is_some(), "Decrementing the stake underflows");
 
@@ -155,24 +170,32 @@ impl Validator {
 
         // Ensure the decrement for each staker succeeds.
         for (staker, stake) in &mut self.staked {
+            // Ensure the stake of the staker does not exceed the sum of stakes.
+            ensure!(*stake <= self.stake, "Stake of staker exceeds sum of stakes");
+
             // Compute the multiplier.
             let multiplier = *stake / self.stake;
-            // Ensure the multiplier is nonzero.
-            ensure!(multiplier > Stake::ZERO, "Multiplier is zero");
+            // Ensure the multiplier is less than or equal to 1.
+            ensure!(multiplier <= Stake::ONE, "Multiplier is above 1");
 
-            // Compute the proportional change for the staker.
+            // Compute the proportional change for the staker as `(amount * stake_i / stake_sum)`.
             let change = amount * multiplier;
-
-            // Ensure decrementing does not underflow.
+            // Ensure decrementing by change does not underflow.
             ensure!(stake.checked_sub(change).is_some(), "Decrementing the stake for staker underflows");
 
             // Add the staker and change to the vector.
             staked_decrements.push((*staker, change));
         }
 
-        // Ensure the sum of the staked decrements equals the amount.
-        let expected_amount = staked_decrements.iter().map(|(_, amount)| amount).sum::<Stake>();
-        ensure!(expected_amount == amount, "Sum of staked decrements is incorrect");
+        // Compute the candidate amount, by summing the decrements.
+        let candidate_amount = staked_decrements.iter().map(|(_, amount)| amount).sum::<Stake>();
+        // Ensure the sum of the staked decrements is less than or equal to the given amount.
+        ensure!(
+            candidate_amount <= amount,
+            "Sum of decrements must be <= {amount}: found {candidate_amount}"
+        );
+        // Ensure the candidate amount is off by one gate at most.
+        ensure!(amount - candidate_amount < 1, "Sum of decrements is off by more than one gate");
 
         // Decrement the stake for each staker.
         for (staker, change) in staked_decrements {
@@ -226,6 +249,11 @@ impl Validator {
             None => bail!("Detected underflow decrementing staked amount"),
         };
 
+        // // Remove the staker if it has no staked amount.
+        // if *entry == Stake::ZERO {
+        //     self.staked.remove(staker);
+        // }
+
         // Update the stake.
         match self.stake.checked_sub(amount) {
             Some(staked) => self.stake = staked,
@@ -270,6 +298,7 @@ impl Validator {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
     use snarkvm::console::prelude::*;
@@ -292,6 +321,8 @@ mod tests {
 
         let one_half = one / two;
         assert_eq!(one_half, Stake::from_num(0.5));
+        assert_eq!(one_half.to_string(), "0.5");
+        assert_eq!(Stake::from_num(0.5).to_string(), "0.5");
 
         let one_third = one / three;
         assert_eq!(one_third.to_string(), "0.3333333333333333333");
@@ -302,6 +333,137 @@ mod tests {
         // These do **not** equal.
         let stake = Stake::MAX;
         assert_ne!(stake, Stake::from_num(u64::MAX));
+    }
+
+    #[test]
+    fn test_increment_staked() {
+        let address_0 = Address::rand(&mut test_crypto_rng());
+        let address_1 = Address::rand(&mut test_crypto_rng());
+        let address_2 = Address::rand(&mut test_crypto_rng());
+
+        let u64_0 = Stake::ZERO;
+        let u64_1 = Stake::ONE;
+        let u64_2 = Stake::from_num(2);
+        let u64_3 = Stake::from_num(3);
+        let u64_4 = Stake::from_num(4);
+        let u64_5 = Stake::from_num(5);
+        let u64_6 = Stake::from_num(6);
+        let u64_10 = Stake::from_num(10);
+        let u64_15 = Stake::from_num(15);
+        let u64_16 = Stake::from_num(16);
+
+        let mut validator = Validator::new(address_0, u64_0);
+        assert_eq!(validator.stake(), u64_0);
+
+        // Set the staker to 1.
+        assert!(validator.increment_staker_by(&address_0, u64_1).is_ok());
+        assert_eq!(validator.stake(), u64_1);
+        assert_eq!(validator.num_stakers(), 1);
+
+        // Set the staker to 1.
+        assert!(validator.increment_staker_by(&address_1, u64_1).is_ok());
+        assert_eq!(validator.stake(), u64_2);
+        assert_eq!(validator.num_stakers(), 2);
+
+        // Set the staker to 1.
+        assert!(validator.increment_staker_by(&address_2, u64_1).is_ok());
+        assert_eq!(validator.stake(), u64_3);
+        assert_eq!(validator.num_stakers(), 3);
+
+        // Increment the staked amount by 3 (increment each by 1).
+        validator.increment_staked(u64_3).unwrap();
+        assert!(validator.stake() <= u64_6);
+        assert!(validator.staked_by(&address_0) <= u64_2);
+        assert!(validator.staked_by(&address_1) <= u64_2);
+        assert!(validator.staked_by(&address_2) <= u64_2);
+
+        // Decrement the first staker by 1.
+        assert!(validator.decrement_staker_by(&address_0, u64_1).is_ok());
+        assert!(validator.stake() <= u64_5);
+        assert!(validator.staked_by(&address_0) <= u64_1);
+        assert!(validator.staked_by(&address_1) <= u64_2);
+        assert!(validator.staked_by(&address_2) <= u64_2);
+
+        // Increment the staked amount by 5 (increment first by 1, rest by 2).
+        validator.increment_staked(u64_5).unwrap();
+        assert!(validator.stake() <= u64_10);
+        assert!(validator.staked_by(&address_0) <= u64_2);
+        assert!(validator.staked_by(&address_1) <= u64_4);
+        assert!(validator.staked_by(&address_2) <= u64_4);
+
+        // Increment the staked amount by 5 (increment first by 1, rest by 2).
+        validator.increment_staked(u64_5).unwrap();
+        assert!(validator.stake() <= u64_15);
+        assert!(validator.staked_by(&address_0) <= u64_3);
+        assert!(validator.staked_by(&address_1) <= u64_6);
+        assert!(validator.staked_by(&address_2) <= u64_6);
+
+        // Increment the staked amount by 1 (increment first by 0.2, rest by 0.4).
+        validator.increment_staked(u64_1).unwrap();
+        assert!(validator.stake() <= u64_16);
+        assert!(validator.staked_by(&address_0) <= Stake::from_num(3.2));
+        assert!(validator.staked_by(&address_1) <= Stake::from_num(6.4));
+        assert!(validator.staked_by(&address_2) <= Stake::from_num(6.4));
+    }
+
+    #[test]
+    fn test_decrement_staked() {
+        let address_0 = Address::rand(&mut test_crypto_rng());
+        let address_1 = Address::rand(&mut test_crypto_rng());
+        let address_2 = Address::rand(&mut test_crypto_rng());
+
+        let u64_0 = Stake::ZERO;
+        let u64_1 = Stake::ONE;
+        let u64_2 = Stake::from_num(2);
+        let u64_3 = Stake::from_num(3);
+        let u64_4 = Stake::from_num(4);
+        let u64_5 = Stake::from_num(5);
+        let u64_6 = Stake::from_num(6);
+        let u64_10 = Stake::from_num(10);
+        let u64_15 = Stake::from_num(15);
+        let u64_16 = Stake::from_num(16);
+
+        let mut validator = Validator::new(address_0, u64_0);
+        assert_eq!(validator.stake(), u64_0);
+
+        // Set the staker to 1.
+        assert!(validator.increment_staker_by(&address_0, u64_1).is_ok());
+        assert_eq!(validator.stake(), u64_1);
+
+        // Set the staker to 1.
+        assert!(validator.increment_staker_by(&address_1, u64_1).is_ok());
+        assert_eq!(validator.stake(), u64_2);
+
+        // Set the staker to 1.
+        assert!(validator.increment_staker_by(&address_2, u64_1).is_ok());
+        assert_eq!(validator.stake(), u64_3);
+
+        // Decrement the staked amount by 3 (decrement each by 1).
+        validator.decrement_staked(u64_3).unwrap();
+        assert!(validator.stake() >= u64_0);
+        assert!(validator.staked_by(&address_0) >= u64_0);
+        assert!(validator.staked_by(&address_1) >= u64_0);
+        assert!(validator.staked_by(&address_2) >= u64_0);
+        assert_eq!(validator.num_stakers(), 3);
+
+        // Set the staker to 1.
+        assert!(validator.increment_staker_by(&address_0, u64_1).is_ok());
+        assert!(validator.stake() >= u64_1);
+
+        // Set the staker to 2.
+        assert!(validator.increment_staker_by(&address_1, u64_2).is_ok());
+        assert!(validator.stake() >= u64_3);
+
+        // Set the staker to 3.
+        assert!(validator.increment_staker_by(&address_2, u64_3).is_ok());
+        assert!(validator.stake() >= u64_6);
+
+        // Decrement the staked amount by 3 (decrement first by 0.5, decrement second by ).
+        validator.decrement_staked(u64_3).unwrap();
+        assert!(validator.stake() >= u64_3);
+        assert!(validator.staked_by(&address_0) >= Stake::from_num(0.5));
+        assert!(validator.staked_by(&address_1) >= u64_1);
+        assert!(validator.staked_by(&address_2) >= Stake::from_num(1.5));
     }
 
     #[test]
