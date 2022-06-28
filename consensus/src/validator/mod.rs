@@ -27,6 +27,11 @@ pub(super) type Score = i128;
 /// The type for representing stake (in gates).
 pub(super) type Stake = U64F64;
 
+/// A conservative bound on the maximum amount of stake (in gates) that can be contributed at once.
+/// The value is set to 2^52 to start as the total supply starts at 2^50 and a staker can
+/// never contribute more than 1/3 of the total supply. Thus, this bound should never be hit.
+const MAX_STAKE: u64 = 1 << 52;
+
 /// A validator in the validator set.
 #[derive(Clone)]
 pub struct Validator {
@@ -48,8 +53,11 @@ pub struct Validator {
 
 impl Validator {
     /// Initializes a new validator with the given address and amount staked.
-    pub fn new(address: Address, stake: Stake) -> Self {
-        Self {
+    pub fn new(address: Address, stake: Stake) -> Result<Self> {
+        // Ensure the stake is less than the maximum stake as a sanity check.
+        ensure!(stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
+
+        Ok(Self {
             address,
             stake,
             score: 0,
@@ -57,20 +65,20 @@ impl Validator {
             leader_in: Vec::new(),
             participated_in: Vec::new(),
             byzantine: 0,
-        }
+        })
     }
 
-    /// Returns the validator address.
+    /// Returns the address of the validator.
     pub const fn address(&self) -> &Address {
         &self.address
     }
 
-    /// Returns the amount of stake held by this validator.
+    /// Returns the amount of stake held by this validator, which is the sum of all bonded and earned stake.
     pub const fn stake(&self) -> Stake {
         self.stake
     }
 
-    /// Returns the validator score.
+    /// Returns the validator score, which is used for leader selection.
     pub const fn score(&self) -> Score {
         self.score
     }
@@ -80,7 +88,7 @@ impl Validator {
         self.staked.len()
     }
 
-    /// Returns the staked amount of the given staker.
+    /// Returns the staked amount of the given staker, which is the sum of the bonded and earned stake.
     pub fn staked_by(&self, staker: &Address) -> Stake {
         self.bonded_by(staker) + self.earned_by(staker)
     }
@@ -111,6 +119,10 @@ impl Validator {
     pub(crate) fn increment_bonded_for(&mut self, staker: &Address, amount: Stake) -> Result<()> {
         // Ensure the staker is incrementing a nonzero amount.
         ensure!(amount > 0, "Staker must increment bonded stake by a nonzero amount");
+        // Ensure the amount is less than the maximum stake as a sanity check.
+        ensure!(amount < MAX_STAKE, "Amount cannot exceed the maximum stake");
+        // Ensure the stake is less than the maximum stake as a sanity check.
+        ensure!(self.stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
 
         // Retrieve the bonded amount for the staker.
         let mut entry = self.staked.entry(*staker).or_default();
@@ -136,12 +148,15 @@ impl Validator {
     }
 
     /// Decrements the bonded amount for the given staker by the given amount.
-    /// This is to be used as an internal function only.
     pub(crate) fn decrement_bonded_for(&mut self, staker: &Address, amount: Stake) -> Result<()> {
         // Ensure the staker exists.
         ensure!(self.staked.contains_key(staker), "Staker does not exist in validator");
         // Ensure the staker is decrementing a nonzero amount.
         ensure!(amount > 0, "Staker must decrement bonded stake by a nonzero amount");
+        // Ensure the amount is less than the maximum stake as a sanity check.
+        ensure!(amount < MAX_STAKE, "Amount cannot exceed the maximum stake");
+        // Ensure the stake is less than the maximum stake as a sanity check.
+        ensure!(self.stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
 
         // Retrieve the staked amount.
         let mut entry = match self.staked.get_mut(staker) {
@@ -169,8 +184,13 @@ impl Validator {
     pub(crate) fn increment_earned_by(&mut self, amount: Stake) -> Result<()> {
         // Ensure the staker is incrementing a nonzero amount.
         ensure!(amount > 0, "Staker must increment stake by a nonzero amount");
+        // Ensure the amount is less than the maximum stake as a sanity check.
+        ensure!(amount < MAX_STAKE, "Amount cannot exceed the maximum stake");
+
         // Ensure the current stake is nonzero.
         ensure!(self.stake > 0, "Stake is zero");
+        // Ensure the stake is less than the maximum stake as a sanity check.
+        ensure!(self.stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
         // Ensure incrementing the stake does not overflow.
         ensure!(self.stake.checked_add(amount).is_some(), "Incrementing the stake overflows");
 
@@ -232,8 +252,13 @@ impl Validator {
     pub(crate) fn decrement_staked_by(&mut self, amount: Stake) -> Result<()> {
         // Ensure the staker is decrementing a nonzero amount.
         ensure!(amount > 0, "Staker must decrement stake by a nonzero amount");
+        // Ensure the amount is less than the maximum stake as a sanity check.
+        ensure!(amount < MAX_STAKE, "Amount cannot exceed the maximum stake");
+
         // Ensure the current stake is nonzero.
         ensure!(self.stake > 0, "Stake is zero");
+        // Ensure the stake is less than the maximum stake as a sanity check.
+        ensure!(self.stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
         // Ensure decrementing the stake does not underflow.
         ensure!(self.stake.checked_sub(amount).is_some(), "Decrementing the stake underflows");
 
@@ -318,6 +343,10 @@ impl Validator {
     fn increment_earned_for(&mut self, staker: &Address, amount: Stake) -> Result<()> {
         // Ensure the staker is incrementing a nonzero amount.
         ensure!(amount > 0, "Staker must increment earned stake by a nonzero amount");
+        // Ensure the amount is less than the maximum stake as a sanity check.
+        ensure!(amount < MAX_STAKE, "Stake cannot exceed the maximum stake");
+        // Ensure the stake is less than the maximum stake as a sanity check.
+        ensure!(self.stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
 
         // Update the stake.
         match self.stake.checked_add(amount) {
@@ -342,6 +371,10 @@ impl Validator {
         ensure!(self.staked.contains_key(staker), "Staker does not exist in validator");
         // Ensure the staker is decrementing a nonzero amount.
         ensure!(amount > 0, "Staker must decrement earned stake by a nonzero amount");
+        // Ensure the amount is less than the maximum stake as a sanity check.
+        ensure!(amount < MAX_STAKE, "Stake cannot exceed the maximum stake");
+        // Ensure the stake is less than the maximum stake as a sanity check.
+        ensure!(self.stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
 
         // Retrieve the staked amount.
         let mut entry = match self.staked.get_mut(staker) {
@@ -444,10 +477,7 @@ mod tests {
         let u64_0 = Stake::ZERO;
         let u64_1 = Stake::ONE;
 
-        // let u64_0 = 0;
-        // let u64_1 = 1;
-
-        let mut validator = Validator::new(address_0, u64_0);
+        let mut validator = Validator::new(address_0, u64_0).unwrap();
         assert_eq!(validator.stake(), u64_0);
         assert_eq!(validator.staked_by(&address_0), u64_0);
         assert_eq!(validator.staked_by(&address_1), u64_0);
@@ -486,22 +516,26 @@ mod tests {
         assert_eq!(validator.earned_by(&address_0), u64_0);
         assert_eq!(validator.earned_by(&address_1), u64_0);
 
-        // Ensure incrementing to U64::MAX succeeds.
-        assert!(validator.increment_bonded_for(&address_0, Stake::MAX - u64_1 - u64_1).is_ok());
-        assert_eq!(validator.stake(), Stake::MAX);
-        assert_eq!(validator.staked_by(&address_0), Stake::MAX - u64_1);
+        // Ensure incrementing to MAX_STAKE succeeds.
+        assert!(
+            validator
+                .increment_bonded_for(&address_0, Stake::from_num(MAX_STAKE) - u64_1 - u64_1)
+                .is_ok()
+        );
+        assert_eq!(validator.stake(), Stake::from_num(MAX_STAKE));
+        assert_eq!(validator.staked_by(&address_0), Stake::from_num(MAX_STAKE) - u64_1);
         assert_eq!(validator.staked_by(&address_1), u64_1);
-        assert_eq!(validator.bonded_by(&address_0), Stake::MAX - u64_1);
+        assert_eq!(validator.bonded_by(&address_0), Stake::from_num(MAX_STAKE) - u64_1);
         assert_eq!(validator.bonded_by(&address_1), u64_1);
         assert_eq!(validator.earned_by(&address_0), u64_0);
         assert_eq!(validator.earned_by(&address_1), u64_0);
 
-        // Ensure incrementing past U64::MAX fails.
+        // Ensure incrementing past MAX_STAKE fails.
         assert!(validator.increment_bonded_for(&address_0, u64_1).is_err());
-        assert_eq!(validator.stake(), Stake::MAX);
-        assert_eq!(validator.staked_by(&address_0), Stake::MAX - u64_1);
+        assert_eq!(validator.stake(), Stake::from_num(MAX_STAKE));
+        assert_eq!(validator.staked_by(&address_0), Stake::from_num(MAX_STAKE) - u64_1);
         assert_eq!(validator.staked_by(&address_1), u64_1);
-        assert_eq!(validator.bonded_by(&address_0), Stake::MAX - u64_1);
+        assert_eq!(validator.bonded_by(&address_0), Stake::from_num(MAX_STAKE) - u64_1);
         assert_eq!(validator.bonded_by(&address_1), u64_1);
         assert_eq!(validator.earned_by(&address_0), u64_0);
         assert_eq!(validator.earned_by(&address_1), u64_0);
@@ -518,13 +552,7 @@ mod tests {
         let u64_999_999 = Stake::from_num(999_999);
         let u64_999_998 = Stake::from_num(999_998);
 
-        // let u64_0 = 0;
-        // let u64_1 = 1;
-        // let u64_999_998 = 999_998;
-        // let u64_999_999 = 999_999;
-        // let u64_1_000_000 = 1_000_000;
-
-        let mut validator = Validator::new(address_0, u64_1_000_000);
+        let mut validator = Validator::new(address_0, u64_1_000_000).unwrap();
         assert_eq!(validator.stake(), u64_1_000_000);
         assert_eq!(validator.staked_by(&address_0), u64_1_000_000);
         assert_eq!(validator.staked_by(&address_1), u64_0);
@@ -641,7 +669,7 @@ mod tests {
         let u64_15 = Stake::from_num(15);
         let u64_16 = Stake::from_num(16);
 
-        let mut validator = Validator::new(address_0, u64_0);
+        let mut validator = Validator::new(address_0, u64_0).unwrap();
         assert_eq!(validator.stake(), u64_0);
 
         // Set the staker to 1.
@@ -727,7 +755,7 @@ mod tests {
         let u64_15 = Stake::from_num(15);
         let u64_16 = Stake::from_num(16);
 
-        let mut validator = Validator::new(address_0, u64_0);
+        let mut validator = Validator::new(address_0, u64_0).unwrap();
         assert_eq!(validator.stake(), u64_0);
 
         // Set the staker to 1.
@@ -777,11 +805,9 @@ mod tests {
 
         let u64_0 = Stake::ZERO;
         let u64_1 = Stake::ONE;
+        let u64_2 = Stake::from_num(2);
 
-        // let u64_0 = 0;
-        // let u64_1 = 1;
-
-        let mut validator = Validator::new(address_0, u64_0);
+        let mut validator = Validator::new(address_0, u64_0).unwrap();
         assert_eq!(validator.stake(), u64_0);
         assert_eq!(validator.staked_by(&address_0), u64_0);
         assert_eq!(validator.staked_by(&address_1), u64_0);
@@ -800,20 +826,24 @@ mod tests {
 
         // Ensure incrementing updates the correct staker.
         assert!(validator.increment_earned_for(&address_1, u64_1).is_ok());
-        assert_eq!(validator.stake(), 2);
+        assert_eq!(validator.stake(), u64_2);
         assert_eq!(validator.staked_by(&address_0), u64_1);
         assert_eq!(validator.staked_by(&address_1), u64_1);
 
-        // Ensure incrementing to U64::MAX succeeds.
-        assert!(validator.increment_earned_for(&address_0, Stake::MAX - u64_1 - u64_1).is_ok());
-        assert_eq!(validator.stake(), Stake::MAX);
-        assert_eq!(validator.staked_by(&address_0), Stake::MAX - u64_1);
+        // Ensure incrementing to MAX_STAKE succeeds.
+        assert!(
+            validator
+                .increment_earned_for(&address_0, Stake::from_num(MAX_STAKE) - u64_2)
+                .is_ok()
+        );
+        assert_eq!(validator.stake(), Stake::from_num(MAX_STAKE));
+        assert_eq!(validator.staked_by(&address_0), Stake::from_num(MAX_STAKE) - u64_1);
         assert_eq!(validator.staked_by(&address_1), u64_1);
 
-        // Ensure incrementing past U64::MAX fails.
+        // Ensure incrementing past MAX_STAKE fails.
         assert!(validator.increment_earned_for(&address_0, u64_1).is_err());
-        assert_eq!(validator.stake(), Stake::MAX);
-        assert_eq!(validator.staked_by(&address_0), Stake::MAX - u64_1);
+        assert_eq!(validator.stake(), Stake::from_num(MAX_STAKE));
+        assert_eq!(validator.staked_by(&address_0), Stake::from_num(MAX_STAKE) - u64_1);
         assert_eq!(validator.staked_by(&address_1), u64_1);
     }
 }

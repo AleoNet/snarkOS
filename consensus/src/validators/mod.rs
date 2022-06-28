@@ -19,9 +19,9 @@ use crate::{
     Address,
 };
 
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use core::ops::Deref;
-use indexmap::IndexMap;
+use indexmap::{map::Entry, IndexMap};
 
 /// The validator set.
 #[derive(Clone)]
@@ -75,10 +75,32 @@ impl Validators {
 }
 
 impl Validators {
-    /// Increments
-    pub fn increment_stake(&mut self, address: &Address, stake: Stake) {
-        if let Some(validator) = self.validators.get_mut(address) {
-            validator.increment_earned_by(stake);
+    /// Increments the bonded stake for the given validator address, as the given staker address with the given amount.
+    pub fn bond(&mut self, validator: Address, staker: Address, amount: Stake) -> Result<()> {
+        // If the validator does not exist, ensure the staker is the validator.
+        if self.validators.get(&validator).is_none() {
+            ensure!(
+                validator == staker,
+                "The staker must be the validator, as the validator does not exist yet"
+            );
+        }
+
+        // Ensure the stake amount is nonzero.
+        ensure!(amount > 0, "The stake amount must be nonzero");
+
+        // Retrieve the validator with the given address.
+        match self.validators.entry(validator) {
+            // If the validator exists, increment the bonded stake.
+            Entry::Occupied(mut entry) => {
+                let validator = entry.get_mut();
+                // Increment the bonded stake for the validator.
+                validator.increment_bonded_for(&staker, amount)
+            }
+            // If the validator does not exist, create a new validator.
+            Entry::Vacant(entry) => {
+                entry.insert(Validator::new(validator, amount)?);
+                Ok(())
+            }
         }
     }
 }
