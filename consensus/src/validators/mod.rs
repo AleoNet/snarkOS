@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    validator::{Reward, Round, Score, Stake, Validator},
+    validator::{Round, Score, Stake, Validator},
     Address,
 };
 
@@ -78,7 +78,7 @@ impl Validators {
     /// Increments
     pub fn increment_stake(&mut self, address: &Address, stake: Stake) {
         if let Some(validator) = self.validators.get_mut(address) {
-            validator.increment_staked(stake);
+            validator.increment_earned_by(stake);
         }
     }
 }
