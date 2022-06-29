@@ -63,6 +63,8 @@ pub(super) type Supply = U64F64;
 /// The validator set.
 #[derive(Clone)]
 pub struct Validators {
+    /// The current round number of the network.
+    round: Round,
     /// The total supply (in gates) of the network.
     total_supply: Supply,
     /// The active validators in the network.
@@ -78,11 +80,17 @@ impl Validators {
     /// Initializes a new validator set.
     pub fn new() -> Self {
         Self {
+            round: 0,
             total_supply: Supply::from_num(STARTING_SUPPLY),
             active_validators: Default::default(),
             inactive_validators: Default::default(),
             unbonding: Default::default(),
         }
+    }
+
+    /// Returns the current round number of the network.
+    pub const fn round(&self) -> Round {
+        self.round
     }
 
     /// Returns the total supply (in gates) of the network.
@@ -341,6 +349,40 @@ impl Validators {
         *self = validators;
 
         Ok(leader)
+    }
+
+    /// Processes the end of the round, by updating the score of all validators.
+    fn round_finish(&mut self, leader: Address) -> Result<()> {
+        // Clone the validator set.
+        let mut validators = self.clone();
+
+        // Retrieve the current round.
+        let round = validators.round();
+        // Retrieve the current leader.
+        let current_leader = validators.get_leader()?;
+        // Ensure the leader is the same as the current leader.
+        ensure!(leader == current_leader, "The leader does not match the expected leader");
+
+        // Compute the total stake.
+        let total_stake = validators.total_stake().floor().to_num::<u64>();
+
+        // Update each validator.
+        validators.active_validators.values_mut().try_for_each(|validator| {
+            // Increment the validator by their staked amount.
+            validator.increment_score_by(Score::from_num(validator.stake().floor().to_num::<u64>()))?;
+            // Store that the validator participated in the round.
+            validator.set_participated_in(round);
+
+            // If this validator was the leader, decrement by the total staked.
+            if validator.address() == &leader {
+                // Decrement the validator by the total stake.
+                validator.decrement_score_by(Score::from_num(total_stake))?;
+                // Store that the validator led this round.
+                validator.set_leader_in(round);
+            }
+
+            Ok(())
+        })
     }
 }
 

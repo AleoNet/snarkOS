@@ -777,12 +777,7 @@ mod tests {
         let u64_1 = Stake::ONE;
         let u64_2 = Stake::from_num(2);
         let u64_3 = Stake::from_num(3);
-        let u64_4 = Stake::from_num(4);
-        let u64_5 = Stake::from_num(5);
         let u64_6 = Stake::from_num(6);
-        let u64_10 = Stake::from_num(10);
-        let u64_15 = Stake::from_num(15);
-        let u64_16 = Stake::from_num(16);
 
         let mut validator = Validator::new(address_0, u64_0).unwrap();
         assert_eq!(validator.stake(), u64_0);
