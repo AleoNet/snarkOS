@@ -17,13 +17,13 @@
 use crate::Address;
 
 use anyhow::{anyhow, bail, ensure, Result};
-use fixed::types::U64F64;
-use indexmap::{map::Entry, IndexMap};
+use fixed::types::{I128F0, U64F64};
+use indexmap::IndexMap;
 
 /// The type for representing the round.
 pub(super) type Round = u64;
 /// The type for representing the validator score.
-pub(super) type Score = i128;
+pub(super) type Score = I128F0;
 /// The type for representing stake (in gates).
 pub(super) type Stake = U64F64;
 
@@ -57,10 +57,35 @@ impl Validator {
         // Ensure the stake is less than the maximum stake as a sanity check.
         ensure!(stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
 
+        // Compute the score as `-1.125 * stake`.
+        let score = {
+            // Cast the stake into an `i128` to compute the score.
+            let stake = Score::from_num(stake.floor().to_num::<u64>());
+            // Ensure the stake is less than the maximum stake as a sanity check.
+            ensure!(stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
+            // Compute 1/8 of the stake.
+            let one_eighth = match stake.checked_shr(3) {
+                Some(one_eighth) => one_eighth,
+                None => bail!("Failed to compute 1/8 of the given stake"),
+            };
+            // Compute `stake + stake / 8`.
+            let value = match stake.checked_add(one_eighth) {
+                Some(value) => value,
+                None => bail!("Failed to compute the score"),
+            };
+            // Negate the value to compute the score.
+            match value.checked_neg() {
+                Some(score) => score,
+                None => bail!("Failed to compute the score"),
+            }
+        };
+        // Ensure the score is 0 or negative.
+        ensure!(score <= 0, "Score must be 0 or negative");
+
         Ok(Self {
             address,
             stake,
-            score: 0,
+            score,
             staked: [(address, (stake, Stake::ZERO))].iter().copied().collect(),
             leader_in: Vec::new(),
             participated_in: Vec::new(),
@@ -87,6 +112,8 @@ impl Validator {
     pub fn num_stakers(&self) -> usize {
         self.staked.len()
     }
+
+    /// Returns `true`
 
     /// Returns the staked amount of the given staker, which is the sum of the bonded and earned stake.
     pub fn staked_by(&self, staker: &Address) -> Stake {
@@ -396,11 +423,6 @@ impl Validator {
 
         Ok(())
     }
-
-    // /// Sets the score of the validator.
-    // pub fn set_score(&mut self, score: Score) {
-    //     self.score = score;
-    // }
 
     /// Increments the score by the given amount.
     pub fn increment_score_by(&mut self, amount: Score) -> Result<()> {
