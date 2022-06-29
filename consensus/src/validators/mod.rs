@@ -353,7 +353,7 @@ impl Validators {
 
     /// Processes the end of the round, by updating the score of all validators.
     fn round_finish(&mut self, leader: Address) -> Result<()> {
-        // TODO (howardwu): Update total supply and any unbonding.
+        // TODO (howardwu): Update total supply and any unbonding. Also add processor for faults.
 
         // Clone the validator set.
         let mut validators = self.clone();
