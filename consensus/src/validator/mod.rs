@@ -57,35 +57,10 @@ impl Validator {
         // Ensure the stake is less than the maximum stake as a sanity check.
         ensure!(stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
 
-        // Compute the score as `-1.125 * stake`.
-        let score = {
-            // Cast the stake into an `i128` to compute the score.
-            let stake = Score::from_num(stake.floor().to_num::<u64>());
-            // Ensure the stake is less than the maximum stake as a sanity check.
-            ensure!(stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
-            // Compute 1/8 of the stake.
-            let one_eighth = match stake.checked_shr(3) {
-                Some(one_eighth) => one_eighth,
-                None => bail!("Failed to compute 1/8 of the given stake"),
-            };
-            // Compute `stake + stake / 8`.
-            let value = match stake.checked_add(one_eighth) {
-                Some(value) => value,
-                None => bail!("Failed to compute the score"),
-            };
-            // Negate the value to compute the score.
-            match value.checked_neg() {
-                Some(score) => score,
-                None => bail!("Failed to compute the score"),
-            }
-        };
-        // Ensure the score is 0 or negative.
-        ensure!(score <= 0, "Score must be 0 or negative");
-
         Ok(Self {
             address,
             stake,
-            score,
+            score: Score::ZERO,
             staked: [(address, (stake, Stake::ZERO))].iter().copied().collect(),
             leader_in: Vec::new(),
             participated_in: Vec::new(),
@@ -449,6 +424,11 @@ impl Validator {
         }
 
         Ok(())
+    }
+
+    /// Sets the score of the validator.
+    pub fn set_score(&mut self, score: Score) {
+        self.score = score;
     }
 
     /// Increments the score by the given amount.

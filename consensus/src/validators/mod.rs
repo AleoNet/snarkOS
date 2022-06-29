@@ -24,6 +24,29 @@ use core::ops::Deref;
 use fixed::types::U64F64;
 use indexmap::{map::Entry, IndexMap};
 
+pub struct Bond {
+    validator: Address,
+    staker: Address,
+    amount: Stake,
+}
+
+impl Bond {
+    /// Returns the address of the validator.
+    pub const fn validator(&self) -> &Address {
+        &self.validator
+    }
+}
+
+pub struct Unbond {
+    validator: Address,
+    staker: Address,
+    amount: Stake,
+}
+
+pub struct UnbondValidator {
+    validator: Address,
+}
+
 /// The starting supply (in gates) of the network.
 pub const STARTING_SUPPLY: u64 = 1_000_000_000_000_000; // 1B credits
 /// The minimum bonded stake (in gates) of a validator.
@@ -69,13 +92,13 @@ impl Validators {
 
     /// Returns the total amount staked that is bonded.
     pub fn total_stake(&self) -> Stake {
-        // Note: As the total supply cannot exceed 2^64, this is call to `sum` is safe.
+        // Note: As the total supply cannot exceed 2^64, this call to `sum` is safe.
         self.active_validators.values().map(Validator::stake).sum()
     }
 
     /// Returns the total amount of stake that is unbonding.
     pub fn total_stake_unbonding(&self) -> u64 {
-        // Note: As the total supply cannot exceed 2^64, this is call to `sum` is safe.
+        // Note: As the total supply cannot exceed 2^64, this call to `sum` is safe.
         self.unbonding.keys().map(|&(_, _, stake)| stake).sum()
     }
 
@@ -152,6 +175,7 @@ impl Validators {
 
                 // Create a new validator.
                 entry.insert(Validator::new(validator, amount)?);
+
                 Ok(())
             }
         }
@@ -231,6 +255,92 @@ impl Validators {
         }
 
         Ok(validator)
+    }
+}
+
+impl Validators {
+    /// Processes all bonding and unbonding requests sequentially, and returns the new leader of the round.
+    fn round_start(&mut self, bonds: &[Bond], unbonds: &[Unbond], unbond_validators: &[UnbondValidator]) -> Result<Address> {
+        // Clone the validator set.
+        let mut validators = self.clone();
+
+        // Initialize a vector for the addresses of the new validators.
+        let mut new_validators = Vec::new();
+
+        // Iterate through the bonds, to increase the total staked and determine which validators are new.
+        for bond in bonds.iter() {
+            // Determine if the validator is new.
+            let is_new_validator = !validators.active_validators.contains_key(bond.validator());
+
+            // Add the bonding stake to the validator set.
+            validators.bond(bond.validator, bond.staker, bond.amount)?;
+
+            // If the validator does not exist, store the validator address.
+            if is_new_validator {
+                new_validators.push(bond.validator());
+            }
+        }
+
+        // If there are new validators, update their score.
+        if !new_validators.is_empty() {
+            // Compute the total stake.
+            let total_stake = validators.total_stake().floor().to_num::<u64>();
+
+            // Initialize each validator score as `-1.125 * total_stake`.
+            let score = {
+                // Cast the stake into an `i128` to compute the score.
+                let stake = Score::from_num(total_stake);
+                // Compute 1/8 of the total stake.
+                let one_eighth = match stake.checked_shr(3) {
+                    Some(one_eighth) => one_eighth,
+                    None => bail!("Failed to compute 1/8 of the total stake"),
+                };
+                // Compute `stake + stake / 8`.
+                let value = match stake.checked_add(one_eighth) {
+                    Some(value) => value,
+                    None => bail!("Failed to compute the score"),
+                };
+                // Negate the value to compute the score.
+                match value.checked_neg() {
+                    Some(score) => score,
+                    None => bail!("Failed to compute the score"),
+                }
+            };
+            // Ensure the score is 0 or negative.
+            ensure!(score <= Score::ZERO, "Score must be 0 or negative");
+
+            // Update the score for each newly bonding validator.
+            for validator in new_validators {
+                // Retrieve the validator from the validator set.
+                let validator = validators
+                    .active_validators
+                    .get_mut(validator)
+                    .ok_or_else(|| anyhow!("The validator does not exist"))?;
+
+                // Update the score.
+                validator.set_score(score);
+            }
+        }
+
+        // Iterate through the unbonds, to decrement the unbonded stake.
+        for unbond in unbonds.iter() {
+            // Decrement the bonded stake for the validator.
+            validators.unbond(unbond.validator, unbond.staker, unbond.amount)?;
+        }
+
+        // Iterate through the unbond validators, to unbond the validator.
+        for unbond_validator in unbond_validators.iter() {
+            // Unbond the validator.
+            validators.unbond_validator(unbond_validator.validator)?;
+        }
+
+        // Determine the leader.
+        let leader = validators.get_leader()?;
+
+        // Update the validator set.
+        *self = validators;
+
+        Ok(leader)
     }
 }
 
