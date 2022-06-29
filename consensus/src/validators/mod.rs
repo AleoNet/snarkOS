@@ -19,7 +19,7 @@ use crate::{
     Address,
 };
 
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Error, Result};
 use core::ops::Deref;
 use fixed::types::U64F64;
 use indexmap::{map::Entry, IndexMap};
@@ -353,6 +353,8 @@ impl Validators {
 
     /// Processes the end of the round, by updating the score of all validators.
     fn round_finish(&mut self, leader: Address) -> Result<()> {
+        // TODO (howardwu): Update total supply and any unbonding.
+
         // Clone the validator set.
         let mut validators = self.clone();
 
@@ -381,8 +383,13 @@ impl Validators {
                 validator.set_leader_in(round);
             }
 
-            Ok(())
-        })
+            Ok::<_, Error>(())
+        })?;
+
+        // Update the validator set.
+        *self = validators;
+
+        Ok(())
     }
 }
 
