@@ -63,8 +63,8 @@ pub(super) type Supply = U64F64;
 /// The validator set.
 #[derive(Clone)]
 pub struct Validators {
-    /// The current round number of the network.
-    round: Round,
+    /// The current round number of the network, if a round is active.
+    round: Option<Round>,
     /// The total supply (in gates) of the network.
     total_supply: Supply,
     /// The active validators in the network.
@@ -80,7 +80,7 @@ impl Validators {
     /// Initializes a new validator set.
     pub fn new() -> Self {
         Self {
-            round: 0,
+            round: None,
             total_supply: Supply::from_num(STARTING_SUPPLY),
             active_validators: Default::default(),
             inactive_validators: Default::default(),
@@ -88,8 +88,8 @@ impl Validators {
         }
     }
 
-    /// Returns the current round number of the network.
-    pub const fn round(&self) -> Round {
+    /// Returns the current round number of the network, if there is an active round.
+    pub const fn round(&self) -> Option<Round> {
         self.round
     }
 
@@ -122,6 +122,9 @@ impl Validators {
 
     /// Returns the current leader.
     pub fn get_leader(&self) -> Result<Address> {
+        // Ensure that there is an active round.
+        ensure!(self.round.is_some(), "Cannot retrieve a leader without an active round");
+
         // Retrieve the validator with the highest score.
         let leader = self
             .active_validators
@@ -268,7 +271,7 @@ impl Validators {
 
 impl Validators {
     /// Processes all bonding and unbonding requests sequentially, and returns the new leader of the round.
-    fn round_start(&mut self, bonds: &[Bond], unbonds: &[Unbond], unbond_validators: &[UnbondValidator]) -> Result<Address> {
+    fn round_start(&mut self, round: Round, bonds: &[Bond], unbonds: &[Unbond], unbond_validators: &[UnbondValidator]) -> Result<Address> {
         // Clone the validator set.
         let mut validators = self.clone();
 
@@ -342,6 +345,9 @@ impl Validators {
             validators.unbond_validator(unbond_validator.validator)?;
         }
 
+        // Set the round number.
+        validators.round = Some(round);
+
         // Determine the leader.
         let leader = validators.get_leader()?;
 
@@ -359,7 +365,10 @@ impl Validators {
         let mut validators = self.clone();
 
         // Retrieve the current round.
-        let round = validators.round();
+        let round = match validators.round() {
+            Some(round) => round,
+            None => bail!("The round either did not start, or has already finished"),
+        };
         // Retrieve the current leader.
         let current_leader = validators.get_leader()?;
         // Ensure the leader is the same as the current leader.
@@ -385,6 +394,9 @@ impl Validators {
 
             Ok::<_, Error>(())
         })?;
+
+        // Unset the current round number.
+        validators.round = None;
 
         // Update the validator set.
         *self = validators;
