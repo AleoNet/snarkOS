@@ -25,9 +25,11 @@ use fixed::types::U64F64;
 use indexmap::{map::Entry, IndexMap};
 
 /// The starting supply (in gates) of the network.
-pub const STARTING_SUPPLY: u64 = 1_000_000_000_000_000;
-/// The minimum stake (in gates) of a validator.
-pub const MIN_STAKE: u64 = 1_000_000_000_000;
+pub const STARTING_SUPPLY: u64 = 1_000_000_000_000_000; // 1B credits
+/// The minimum bonded stake (in gates) of a validator.
+pub const MIN_VALIDATOR_BOND: u64 = 1_000_000_000_000; // 1M credits
+/// The minimum stake (in gates) of a delegator.
+pub const ONE_CREDIT: u64 = 1_000_000; // 1 credit
 
 /// The unbonding period (in number of blocks) for a staker.
 pub const UNBONDING_PERIOD: u32 = 40_320; // 4 * 60 * 24 * 7 ~= 1 week
@@ -77,7 +79,7 @@ impl Validators {
     }
 
     /// Returns the validator with the given address, if the validator exists.
-    pub fn get(&self, address: &Address) -> Option<&Validator> {
+    pub fn get_validator(&self, address: &Address) -> Option<&Validator> {
         self.active_validators.get(address)
     }
 
@@ -106,18 +108,18 @@ impl Validators {
     /// Increments the bonded stake for the given validator address, as the given staker address with the given amount.
     pub(crate) fn bond(&mut self, validator: Address, staker: Address, amount: Stake) -> Result<()> {
         // If the validator does not exist, ensure the staker is the validator.
-        if self.active_validators.get(&validator).is_none() {
+        if !self.active_validators.contains_key(&validator) {
             ensure!(
                 validator == staker,
                 "The staker must be the validator, as the validator does not exist yet"
             );
         }
 
-        // Ensure the stake amount is nonzero.
-        ensure!(amount > 0, "The stake amount must be nonzero");
-        // Ensure the stake amount does not exceed 1/3 of the total supply.
+        // Ensure the stake amount is at least one credit.
+        ensure!(amount >= ONE_CREDIT, "The stake amount must be at least 1 credit");
+        // Ensure the stake amount is less than 1/3 of the total supply.
         ensure!(
-            amount <= self.total_supply / 3,
+            amount < self.total_supply / 3,
             "The stake must be less than 1/3 of the total supply"
         );
 
@@ -128,10 +130,10 @@ impl Validators {
                 // Retrieve the validator.
                 let validator = entry.get_mut();
 
-                // Ensure the validator does not exceed 1/3 of the total supply.
+                // Ensure the validator is less than 1/3 of the total supply.
                 ensure!(
-                    validator.stake().saturating_add(amount) <= self.total_supply / 3,
-                    "The validator stake must be less than 1/3 of the total supply"
+                    validator.stake().saturating_add(amount) < self.total_supply / 3,
+                    "Stake must be less than 1/3 of the total supply"
                 );
 
                 // Increment the bonded stake for the validator.
@@ -140,7 +142,7 @@ impl Validators {
             // If the validator does not exist, create a new validator.
             Entry::Vacant(entry) => {
                 // Ensure the validator has the minimum required stake.
-                ensure!(amount >= MIN_STAKE, "The validator must have the minimum required stake");
+                ensure!(amount >= MIN_VALIDATOR_BOND, "The validator must have the minimum required stake");
 
                 // Create a new validator.
                 entry.insert(Validator::new(validator, amount)?);
@@ -164,7 +166,7 @@ impl Validators {
         if staker == *validator.address() {
             // Ensure the validator maintains the minimum required stake.
             ensure!(
-                validator.stake().saturating_sub(amount) >= MIN_STAKE,
+                validator.stake().saturating_sub(amount) >= MIN_VALIDATOR_BOND,
                 "The validator must maintain the minimum required stake"
             );
         }
@@ -199,19 +201,25 @@ impl Validators {
         );
 
         // Retrieve the stakers and their stake amounts from the validator.
-        for (staker, stake) in validator.stakers()? {
+        let stakers = validator.stakers()?;
+
+        // Remove the validator from the validator set.
+        let validator = self
+            .active_validators
+            .remove(&validator_address)
+            .ok_or_else(|| anyhow!("The validator could not be removed"))?;
+
+        // Add the validator to the inactive validators.
+        self.inactive_validators.insert(validator_address, validator.clone());
+
+        // Retrieve the unbonding amounts from the validator.
+        for (staker, stake) in stakers {
             // Add the staker and unbonded amount to the unbonding map.
             self.unbonding
                 .insert((validator_address, staker, stake.floor().to_num()), UNBONDING_PERIOD);
         }
 
-        // Add the validator to the inactive validators.
-        self.inactive_validators.insert(validator_address, validator.clone());
-
-        // Remove the validator from the validator set.
-        self.active_validators
-            .remove(&validator_address)
-            .ok_or_else(|| anyhow!("The validator could not be removed"))
+        Ok(validator)
     }
 }
 
@@ -225,12 +233,121 @@ impl Deref for Validators {
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 mod tests {
     use super::*;
+    use snarkvm::console::prelude::*;
 
     #[test]
     fn test_get_total_stake() {
-        let validators = Validators::new();
+        // Initialize the validator set.
+        let mut validators = Validators::new();
         assert_eq!(validators.total_stake(), 0);
+
+        // Add one validator.
+        let address_0 = Address::rand(&mut test_crypto_rng());
+        validators.bond(address_0, address_0, Stake::from_num(MIN_VALIDATOR_BOND)).unwrap();
+        assert_eq!(validators.total_stake(), Stake::from_num(MIN_VALIDATOR_BOND));
+
+        // Add one delegator.
+        let address_1 = Address::rand(&mut test_crypto_rng());
+        validators.bond(address_0, address_1, Stake::from_num(MIN_VALIDATOR_BOND)).unwrap();
+        assert_eq!(validators.total_stake(), Stake::from_num(2 * MIN_VALIDATOR_BOND));
+
+        // Add another validator.
+        let address_2 = Address::rand(&mut test_crypto_rng());
+        validators
+            .bond(address_2, address_2, Stake::from_num(2 * MIN_VALIDATOR_BOND))
+            .unwrap();
+        assert_eq!(validators.total_stake(), Stake::from_num(4 * MIN_VALIDATOR_BOND));
+    }
+
+    #[test]
+    fn test_get_total_supply() {
+        // Initialize the validator set.
+        let validators = Validators::new();
+        assert_eq!(validators.total_supply(), STARTING_SUPPLY);
+    }
+
+    #[test]
+    fn test_num_validators() {
+        // Initialize the validator set.
+        let mut validators = Validators::new();
+        assert_eq!(validators.num_validators(), 0);
+
+        // Add one validator.
+        let address_0 = Address::rand(&mut test_crypto_rng());
+        validators.bond(address_0, address_0, Stake::from_num(MIN_VALIDATOR_BOND)).unwrap();
+        assert_eq!(validators.num_validators(), 1);
+
+        // Add another validator.
+        let address_1 = Address::rand(&mut test_crypto_rng());
+        validators
+            .bond(address_1, address_1, Stake::from_num(2 * MIN_VALIDATOR_BOND))
+            .unwrap();
+        assert_eq!(validators.num_validators(), 2);
+    }
+
+    #[test]
+    fn test_bond() {
+        // Initialize the validator set.
+        let mut validators = Validators::new();
+        assert_eq!(validators.total_stake(), 0);
+        assert_eq!(validators.num_validators(), 0);
+
+        // Bond one validator.
+        let address_0 = Address::rand(&mut test_crypto_rng());
+        validators.bond(address_0, address_0, Stake::from_num(MIN_VALIDATOR_BOND)).unwrap();
+        assert_eq!(validators.total_stake(), Stake::from_num(MIN_VALIDATOR_BOND));
+        assert_eq!(validators.num_validators(), 1);
+
+        // Bond more to the same validator.
+        validators.bond(address_0, address_0, Stake::from_num(ONE_CREDIT)).unwrap();
+        assert_eq!(validators.total_stake(), Stake::from_num(MIN_VALIDATOR_BOND + ONE_CREDIT));
+        assert_eq!(validators.num_validators(), 1);
+
+        // Ensure bonding 0 fails.
+        assert!(validators.bond(address_0, address_0, Stake::from_num(0)).is_err());
+        // Ensure bonding less than the minimum delegate amount fails.
+        assert!(validators.bond(address_0, address_0, Stake::from_num(ONE_CREDIT - 1)).is_err());
+        // Ensure bonding more than 1/3 of the total supply fails.
+        assert!(
+            validators
+                .bond(
+                    address_0,
+                    address_0,
+                    Stake::from_num((STARTING_SUPPLY / 3) - MIN_VALIDATOR_BOND - ONE_CREDIT + 1)
+                )
+                .is_err()
+        );
+
+        // Ensure bonding less than 1/3 of the total supply succeeds.
+        assert!(
+            validators
+                .bond(
+                    address_0,
+                    address_0,
+                    Stake::from_num((STARTING_SUPPLY / 3) - MIN_VALIDATOR_BOND - ONE_CREDIT)
+                )
+                .is_ok()
+        );
+
+        // Bond a new validator.
+        let address_1 = Address::rand(&mut test_crypto_rng());
+        validators.bond(address_1, address_1, Stake::from_num(MIN_VALIDATOR_BOND)).unwrap();
+        assert_eq!(
+            validators.total_stake(),
+            Stake::from_num((STARTING_SUPPLY / 3) + MIN_VALIDATOR_BOND)
+        );
+        assert_eq!(validators.num_validators(), 2);
+
+        // Add a delegator to the same validator.
+        let address_2 = Address::rand(&mut test_crypto_rng());
+        validators.bond(address_1, address_2, Stake::from_num(ONE_CREDIT)).unwrap();
+        assert_eq!(
+            validators.total_stake(),
+            Stake::from_num((STARTING_SUPPLY / 3) + MIN_VALIDATOR_BOND + ONE_CREDIT)
+        );
+        assert_eq!(validators.num_validators(), 2);
     }
 }

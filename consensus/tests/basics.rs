@@ -3,6 +3,7 @@ mod common;
 // Simulate a small network producing and agreeing on a single
 // new block.
 #[tokio::test]
+#[ignore]
 async fn process_one_block() {
     // Initiate the logger.
     let _ = tracing_subscriber::fmt().try_init();
@@ -21,6 +22,7 @@ async fn process_one_block() {
 // This test verifies that a straightforward process works.
 // Only the necessary messages are received by a single manager.
 #[tokio::test]
+#[ignore]
 async fn accept_one_hardcoded_block() {
     // Initiate the logger.
     let _ = tracing_subscriber::fmt().try_init();
