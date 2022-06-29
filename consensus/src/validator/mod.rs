@@ -113,7 +113,34 @@ impl Validator {
         self.staked.len()
     }
 
-    /// Returns `true`
+    /// Returns the stakers (including the validator) with their stake (in gates).
+    pub fn stakers(&self) -> Result<IndexMap<Address, Stake>> {
+        // Ensure the stake is less than the maximum stake as a sanity check.
+        ensure!(self.stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
+
+        // Initialize a vector to store the stakers and their proportional changes.
+        let mut stakers = IndexMap::with_capacity(self.staked.len());
+
+        // Ensure the increment for each staker succeeds.
+        for (staker, (bonded, earned)) in &self.staked {
+            // Ensure the bonded stake of the staker does not exceed the sum of stakes.
+            ensure!(*bonded <= self.stake, "Bonded stake of staker exceeds sum of stakes");
+            // Ensure the earned stake of the staker does not exceed the sum of stakes.
+            ensure!(*earned <= self.stake, "Earned stake of staker exceeds sum of stakes");
+
+            // Compute the sum of the bonded and earned stake.
+            let stake = bonded
+                .checked_add(*earned)
+                .ok_or_else(|| anyhow!("Sum of bonded & earned stake overflows"))?;
+            // Ensure the stake of the staker does not exceed the sum of stakes.
+            ensure!(stake <= self.stake, "Stake of staker exceeds sum of stakes");
+
+            // Add the staker and stake change to the vector.
+            stakers.insert(*staker, stake);
+        }
+
+        Ok(stakers)
+    }
 
     /// Returns the staked amount of the given staker, which is the sum of the bonded and earned stake.
     pub fn staked_by(&self, staker: &Address) -> Stake {

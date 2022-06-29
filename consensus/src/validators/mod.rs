@@ -29,36 +29,46 @@ pub const STARTING_SUPPLY: u64 = 1_000_000_000_000_000;
 /// The minimum stake (in gates) of a validator.
 pub const MIN_STAKE: u64 = 1_000_000_000_000;
 
+/// The unbonding period (in number of blocks) for a staker.
+pub const UNBONDING_PERIOD: u32 = 40_320; // 4 * 60 * 24 * 7 ~= 1 week
+
 /// The type for representing the supply (in gates).
 pub(super) type Supply = U64F64;
 
 /// The validator set.
 #[derive(Clone)]
 pub struct Validators {
-    /// The current validators in the network.
-    active_validators: IndexMap<Address, Validator>,
     /// The total supply (in gates) of the network.
     total_supply: Supply,
+    /// The active validators in the network.
+    active_validators: IndexMap<Address, Validator>,
+    /// The inactive validators in the network.
+    inactive_validators: IndexMap<Address, Validator>,
+    /// The map of unbonding stakes to the remaining number of blocks to wait,
+    /// in the format of: `(validator, staker, stake) => remaining_blocks`
+    unbonding: IndexMap<(Address, Address, u64), u32>,
 }
 
 impl Validators {
     /// Initializes a new validator set.
     pub fn new() -> Self {
         Self {
-            active_validators: Default::default(),
             total_supply: Supply::from_num(STARTING_SUPPLY),
+            active_validators: Default::default(),
+            inactive_validators: Default::default(),
+            unbonding: Default::default(),
         }
+    }
+
+    /// Returns the total supply (in gates) of the network.
+    pub const fn total_supply(&self) -> Supply {
+        self.total_supply
     }
 
     /// Returns the total amount staked.
     pub fn total_stake(&self) -> Stake {
         // Note: As the total supply cannot exceed 2^64, this is call to `sum` is safe.
         self.active_validators.values().map(Validator::stake).sum()
-    }
-
-    /// Returns the total supply (in gates) of the network.
-    pub const fn total_supply(&self) -> Supply {
-        self.total_supply
     }
 
     /// Returns the number of validators.
@@ -94,7 +104,7 @@ impl Validators {
 
 impl Validators {
     /// Increments the bonded stake for the given validator address, as the given staker address with the given amount.
-    pub fn bond(&mut self, validator: Address, staker: Address, amount: Stake) -> Result<()> {
+    pub(crate) fn bond(&mut self, validator: Address, staker: Address, amount: Stake) -> Result<()> {
         // If the validator does not exist, ensure the staker is the validator.
         if self.active_validators.get(&validator).is_none() {
             ensure!(
@@ -140,7 +150,7 @@ impl Validators {
     }
 
     /// Decrements the bonded stake for the given validator address, as the given staker address with the given amount.
-    pub fn unbond(&mut self, validator: Address, staker: Address, amount: Stake) -> Result<()> {
+    pub(crate) fn unbond(&mut self, validator: Address, staker: Address, amount: Stake) -> Result<()> {
         // Ensure the stake amount is nonzero.
         ensure!(amount > Stake::ZERO, "The stake amount must be nonzero");
 
@@ -160,34 +170,48 @@ impl Validators {
         }
 
         // Decrement the bonded stake for the validator.
-        validator.decrement_bonded_for(&staker, amount)
+        validator.decrement_bonded_for(&staker, amount)?;
+
+        // Add the staker and unbonded amount to the unbonding map.
+        self.unbonding
+            .insert((*validator.address(), staker, amount.floor().to_num()), UNBONDING_PERIOD);
+
+        Ok(())
     }
 
     /// Decrements the bonded stake for the given validator address with the given amount.
     ///
     /// This method is used when a validator wishes to unbond their stake below the minimum required stake.
     /// This subsequently unbonds all stakers in the validator and removes the validator from the validator set.
-    pub fn unbond_validator(&mut self, validator: Address, staker: Address, amount: Stake) -> Result<()> {
-        // Ensure the stake amount is nonzero.
-        ensure!(amount > Stake::ZERO, "The stake amount must be nonzero");
-
+    pub(crate) fn unbond_validator(&mut self, address: Address) -> Result<Validator> {
         // Retrieve the validator from the validator set.
         let validator = self
             .active_validators
-            .get_mut(&validator)
+            .get(&address)
             .ok_or_else(|| anyhow!("The validator does not exist"))?;
 
-        // If the staker is the validator, ensure they maintain the minimum required stake.
-        if staker == *validator.address() {
-            // Ensure the validator maintains the minimum required stake.
-            ensure!(
-                validator.stake().saturating_sub(amount) >= MIN_STAKE,
-                "The validator must maintain the minimum required stake"
-            );
+        // Retrieve the validator address.
+        let validator_address = *validator.address();
+        // Ensure the validator address is correct.
+        ensure!(
+            validator_address == address,
+            "The validator address must be the same as the validator"
+        );
+
+        // Retrieve the stakers and their stake amounts from the validator.
+        for (staker, stake) in validator.stakers()? {
+            // Add the staker and unbonded amount to the unbonding map.
+            self.unbonding
+                .insert((validator_address, staker, stake.floor().to_num()), UNBONDING_PERIOD);
         }
 
-        // Decrement the bonded stake for the validator.
-        validator.decrement_bonded_for(&staker, amount)
+        // Add the validator to the inactive validators.
+        self.inactive_validators.insert(validator_address, validator.clone());
+
+        // Remove the validator from the validator set.
+        self.active_validators
+            .remove(&validator_address)
+            .ok_or_else(|| anyhow!("The validator could not be removed"))
     }
 }
 
