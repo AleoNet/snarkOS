@@ -28,9 +28,9 @@ pub(super) type Score = I128F0;
 pub(super) type Stake = U64F64;
 
 /// A conservative bound on the maximum amount of stake (in gates) that can be contributed at once.
-/// The value is set to 2^52 to start as the total supply starts at 2^50 and a staker can
+/// The value is set to 2^54 to start as the total supply starts at 2^50 and a staker can
 /// never contribute more than 1/3 of the total supply. Thus, this bound should never be hit.
-const MAX_STAKE: u64 = 1 << 52;
+const MAX_STAKE: u64 = 1 << 54;
 
 /// A validator in the validator set.
 #[derive(Clone)]
