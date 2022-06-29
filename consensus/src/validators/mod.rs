@@ -164,6 +164,11 @@ impl Validators {
 
         // If the staker is the validator, ensure they maintain the minimum required stake.
         if staker == *validator.address() {
+            // Log a helper message.
+            if validator.stake().saturating_sub(amount) < MIN_VALIDATOR_BOND {
+                eprintln!("Use the `unbond_validator` call instead to fully unbond a validator");
+            }
+
             // Ensure the validator maintains the minimum required stake.
             ensure!(
                 validator.stake().saturating_sub(amount) >= MIN_VALIDATOR_BOND,
@@ -349,5 +354,34 @@ mod tests {
             Stake::from_num((STARTING_SUPPLY / 3) + MIN_VALIDATOR_BOND + ONE_CREDIT)
         );
         assert_eq!(validators.num_validators(), 2);
+    }
+
+    #[test]
+    fn test_unbond() {
+        // Initialize the validator set.
+        let mut validators = Validators::new();
+        assert_eq!(validators.total_stake(), 0);
+        assert_eq!(validators.num_validators(), 0);
+
+        // Bond one validator.
+        let address_0 = Address::rand(&mut test_crypto_rng());
+        validators.bond(address_0, address_0, Stake::from_num(MIN_VALIDATOR_BOND)).unwrap();
+        assert_eq!(validators.total_stake(), Stake::from_num(MIN_VALIDATOR_BOND));
+        assert_eq!(validators.num_validators(), 1);
+
+        // Ensure the minimum validator bond is maintained.
+        assert!(validators.unbond(address_0, address_0, Stake::from_num(1)).is_err());
+        assert_eq!(validators.total_stake(), Stake::from_num(MIN_VALIDATOR_BOND));
+
+        // Add a delegator to the validator.
+        let address_1 = Address::rand(&mut test_crypto_rng());
+        validators.bond(address_0, address_1, Stake::from_num(ONE_CREDIT)).unwrap();
+        assert_eq!(validators.total_stake(), Stake::from_num(MIN_VALIDATOR_BOND + ONE_CREDIT));
+        assert_eq!(validators.num_validators(), 1);
+
+        // Unbond the delegator.
+        validators.unbond(address_0, address_1, Stake::from_num(ONE_CREDIT)).unwrap();
+        assert_eq!(validators.total_stake(), Stake::from_num(MIN_VALIDATOR_BOND));
+        assert_eq!(validators.num_validators(), 1);
     }
 }
