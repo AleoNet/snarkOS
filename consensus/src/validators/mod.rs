@@ -67,10 +67,16 @@ impl Validators {
         self.total_supply
     }
 
-    /// Returns the total amount staked.
+    /// Returns the total amount staked that is bonded.
     pub fn total_stake(&self) -> Stake {
         // Note: As the total supply cannot exceed 2^64, this is call to `sum` is safe.
         self.active_validators.values().map(Validator::stake).sum()
+    }
+
+    /// Returns the total amount of stake that is unbonding.
+    pub fn total_stake_unbonding(&self) -> u64 {
+        // Note: As the total supply cannot exceed 2^64, this is call to `sum` is safe.
+        self.unbonding.keys().map(|&(_, _, stake)| stake).sum()
     }
 
     /// Returns the number of validators.
@@ -382,6 +388,27 @@ mod tests {
         // Unbond the delegator.
         validators.unbond(address_0, address_1, Stake::from_num(ONE_CREDIT)).unwrap();
         assert_eq!(validators.total_stake(), Stake::from_num(MIN_VALIDATOR_BOND));
+        assert_eq!(validators.total_stake_unbonding(), ONE_CREDIT);
         assert_eq!(validators.num_validators(), 1);
+    }
+
+    #[test]
+    fn test_unbond_validator() {
+        // Initialize the validator set.
+        let mut validators = Validators::new();
+        assert_eq!(validators.total_stake(), 0);
+        assert_eq!(validators.num_validators(), 0);
+
+        // Bond one validator.
+        let address_0 = Address::rand(&mut test_crypto_rng());
+        validators.bond(address_0, address_0, Stake::from_num(MIN_VALIDATOR_BOND)).unwrap();
+        assert_eq!(validators.total_stake(), Stake::from_num(MIN_VALIDATOR_BOND));
+        assert_eq!(validators.num_validators(), 1);
+
+        // Unbond the validator.
+        assert!(validators.unbond_validator(address_0).is_ok());
+        assert_eq!(validators.total_stake(), Stake::from_num(0));
+        assert_eq!(validators.total_stake_unbonding(), MIN_VALIDATOR_BOND);
+        assert_eq!(validators.num_validators(), 0);
     }
 }
