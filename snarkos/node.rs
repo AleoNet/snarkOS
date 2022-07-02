@@ -67,6 +67,9 @@ pub struct Node {
     /// Specify the IP address and port for the node server.
     #[clap(long, default_value = "0.0.0.0:4132", action)]
     pub node: SocketAddr,
+    /// If the flag is set, the node will attempt to use UPnP to open its listening port.
+    #[structopt(long = "upnp")]
+    pub upnp: bool,
     /// Specify the IP address and port for the RPC server.
     #[clap(long, default_value = "0.0.0.0:3032", action)]
     pub rpc: SocketAddr,
