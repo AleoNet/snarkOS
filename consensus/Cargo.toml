@@ -20,9 +20,9 @@ edition = "2021"
 test = [ ]
 
 [dependencies.snarkvm]
-#path = "../../snarkVM"
-git = "https://github.com/AleoHQ/snarkVM.git"
-branch = "feat/bytecode"
+path = "../../snarkVM"
+#git = "https://github.com/AleoHQ/snarkVM.git"
+#branch = "testnet3"
 features = ["console"]
 
 [dependencies.anyhow]
@@ -33,6 +33,13 @@ version = "1.15"
 
 [dependencies.indexmap]
 version = "1.8"
+
+[dependencies.serde]
+version = "1.0"
+features = ["derive"]
+
+[dependencies.serde_json]
+version = "1.0"
 
 [dependencies.tokio]
 version = "1"

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub mod reference;
+// pub mod reference;
 
 mod block;
 mod message;
@@ -22,11 +22,8 @@ mod round;
 mod validator;
 mod validators;
 
-pub type N = snarkvm::console::network::Testnet3;
-pub type Address = snarkvm::console::account::Address<N>;
-pub type Signature = snarkvm::console::account::Signature<N>;
-
 use crate::{round::Round, validators::Validators};
+use snarkvm::prelude::Network;
 
 #[derive(Copy, Clone, Debug)]
 pub enum Status {
@@ -41,16 +38,16 @@ pub enum Status {
 }
 
 /// The consensus struct contains state that is tracked by all validators in the network.
-pub struct Consensus {
+pub struct Consensus<N: Network> {
     /// The current round of consensus.
-    round: Round,
+    round: Round<N>,
     /// The current validators in the network.
-    validators: Validators,
+    validators: Validators<N>,
 }
 
-impl Consensus {
+impl<N: Network> Consensus<N> {
     /// Initializes a new instance of consensus.
-    pub fn new(round: Round) -> Self {
+    pub fn new(round: Round<N>) -> Self {
         Self {
             round,
             validators: Validators::new(),
@@ -58,12 +55,12 @@ impl Consensus {
     }
 
     /// Returns the latest round.
-    pub const fn latest_round(&self) -> &Round {
+    pub const fn latest_round(&self) -> &Round<N> {
         &self.round
     }
 
     /// Returns the current validators.
-    pub const fn validators(&self) -> &Validators {
+    pub const fn validators(&self) -> &Validators<N> {
         &self.validators
     }
 }

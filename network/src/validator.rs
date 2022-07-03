@@ -15,9 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{LedgerRequest, PeersRequest, State};
+use crate::{Data, Message};
 use snarkos_environment::{
     helpers::NodeType,
-    network::{Data, Message},
     Environment,
 };
 use snarkos_storage::{
@@ -95,7 +95,7 @@ impl<N: Network, E: Environment> Operator<N, E> {
     }
 
     pub async fn initialize(&self) {
-        if E::NODE_TYPE == NodeType::Operator {
+        if E::NODE_TYPE == NodeType::Validator {
             if let Some(recipient) = self.state.address {
                 // Initialize an update loop for the block template.
                 let state = self.state.clone();

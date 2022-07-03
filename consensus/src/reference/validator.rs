@@ -6,9 +6,9 @@ use crate::{
         message::{LedgerCommitInfo, Message, Propose, QuorumCertificate, Timeout, TimeoutCertificate, TimeoutInfo, Vote, VoteInfo},
         Round,
         F,
+        Address,
+        Signature,
     },
-    Address,
-    Signature,
 };
 
 #[cfg(feature = "test")]

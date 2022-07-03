@@ -2,9 +2,9 @@ use crate::{
     reference::{
         ledger::{Block, BlockHash},
         Round,
+        Address,
+        Signature,
     },
-    Address,
-    Signature,
 };
 
 use anyhow::Result;

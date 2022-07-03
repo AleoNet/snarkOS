@@ -16,35 +16,35 @@
 
 use crate::{
     validator::{Round, Score, Stake, Validator},
-    Address,
 };
+use snarkvm::prelude::{Network, Address};
 
 use anyhow::{anyhow, bail, ensure, Error, Result};
 use core::ops::Deref;
 use fixed::types::U64F64;
 use indexmap::{map::Entry, IndexMap};
 
-pub struct Bond {
-    validator: Address,
-    staker: Address,
+pub struct Bond<N: Network> {
+    validator: Address<N>,
+    staker: Address<N>,
     amount: Stake,
 }
 
-impl Bond {
+impl<N: Network> Bond<N> {
     /// Returns the address of the validator.
-    pub const fn validator(&self) -> &Address {
+    pub const fn validator(&self) -> &Address<N> {
         &self.validator
     }
 }
 
-pub struct Unbond {
-    validator: Address,
-    staker: Address,
+pub struct Unbond<N: Network> {
+    validator: Address<N>,
+    staker: Address<N>,
     amount: Stake,
 }
 
-pub struct UnbondValidator {
-    validator: Address,
+pub struct UnbondValidator<N: Network> {
+    validator: Address<N>,
 }
 
 /// The starting supply (in gates) of the network.
@@ -62,21 +62,21 @@ pub(super) type Supply = U64F64;
 
 /// The validator set.
 #[derive(Clone)]
-pub struct Validators {
+pub struct Validators<N: Network> {
     /// The current round number of the network, if a round is active.
     round: Option<Round>,
     /// The total supply (in gates) of the network.
     total_supply: Supply,
     /// The active validators in the network.
-    active_validators: IndexMap<Address, Validator>,
+    active_validators: IndexMap<Address<N>, Validator<N>>,
     /// The inactive validators in the network.
-    inactive_validators: IndexMap<Address, Validator>,
+    inactive_validators: IndexMap<Address<N>, Validator<N>>,
     /// The map of unbonding stakes to the remaining number of blocks to wait,
     /// in the format of: `(validator, staker, stake) => remaining_blocks`
-    unbonding: IndexMap<(Address, Address, u64), u32>,
+    unbonding: IndexMap<(Address<N>, Address<N>, u64), u32>,
 }
 
-impl Validators {
+impl<N: Network> Validators<N> {
     /// Initializes a new validator set.
     pub fn new() -> Self {
         Self {
@@ -116,12 +116,12 @@ impl Validators {
     }
 
     /// Returns the validator with the given address, if the validator exists.
-    pub fn get_validator(&self, address: &Address) -> Option<&Validator> {
+    pub fn get_validator(&self, address: &Address<N>) -> Option<&Validator<N>> {
         self.active_validators.get(address)
     }
 
     /// Returns the current leader.
-    pub fn get_leader(&self) -> Result<Address> {
+    pub fn get_leader(&self) -> Result<Address<N>> {
         // Ensure that there is an active round.
         ensure!(self.round.is_some(), "Cannot retrieve a leader without an active round");
 
@@ -144,9 +144,9 @@ impl Validators {
     }
 }
 
-impl Validators {
+impl<N: Network> Validators<N> {
     /// Increments the bonded stake for the given validator address, as the given staker address with the given amount.
-    pub(crate) fn bond(&mut self, validator: Address, staker: Address, amount: Stake) -> Result<()> {
+    pub(crate) fn bond(&mut self, validator: Address<N>, staker: Address<N>, amount: Stake) -> Result<()> {
         // If the validator does not exist, ensure the staker is the validator.
         if !self.active_validators.contains_key(&validator) {
             ensure!(
@@ -193,7 +193,7 @@ impl Validators {
     }
 
     /// Decrements the bonded stake for the given validator address, as the given staker address with the given amount.
-    pub(crate) fn unbond(&mut self, validator: Address, staker: Address, amount: Stake) -> Result<()> {
+    pub(crate) fn unbond(&mut self, validator: Address<N>, staker: Address<N>, amount: Stake) -> Result<()> {
         // Ensure the stake amount is nonzero.
         ensure!(amount > Stake::ZERO, "The stake amount must be nonzero");
 
@@ -231,7 +231,7 @@ impl Validators {
     ///
     /// This method is used when a validator wishes to unbond their stake below the minimum required stake.
     /// This subsequently unbonds all stakers in the validator and removes the validator from the validator set.
-    pub(crate) fn unbond_validator(&mut self, address: Address) -> Result<Validator> {
+    pub(crate) fn unbond_validator(&mut self, address: Address<N>) -> Result<Validator<N>> {
         // Retrieve the validator from the validator set.
         let validator = self
             .active_validators
@@ -269,9 +269,9 @@ impl Validators {
     }
 }
 
-impl Validators {
+impl<N: Network> Validators<N> {
     /// Processes all bonding and unbonding requests sequentially, and returns the new leader of the round.
-    fn round_start(&mut self, round: Round, bonds: &[Bond], unbonds: &[Unbond], unbond_validators: &[UnbondValidator]) -> Result<Address> {
+    fn round_start(&mut self, round: Round, bonds: &[Bond<N>], unbonds: &[Unbond<N>], unbond_validators: &[UnbondValidator<N>]) -> Result<Address<N>> {
         // Clone the validator set.
         let mut validators = self.clone();
 
@@ -358,7 +358,7 @@ impl Validators {
     }
 
     /// Processes the end of the round, by updating the score of all validators.
-    fn round_finish(&mut self, leader: Address) -> Result<()> {
+    fn round_finish(&mut self, leader: Address<N>) -> Result<()> {
         // TODO (howardwu): Update total supply and any unbonding. Also add processor for faults.
 
         // Clone the validator set.
@@ -405,8 +405,8 @@ impl Validators {
     }
 }
 
-impl Deref for Validators {
-    type Target = IndexMap<Address, Validator>;
+impl<N: Network> Deref for Validators<N> {
+    type Target = IndexMap<Address<N>, Validator<N>>;
 
     /// Returns the underlying validator map.
     fn deref(&self) -> &Self::Target {
@@ -418,16 +418,18 @@ impl Deref for Validators {
 #[allow(deprecated)]
 mod tests {
     use super::*;
-    use snarkvm::console::prelude::*;
+    use snarkvm::prelude::{Testnet3, test_crypto_rng};
+
+    type CurrentNetwork = Testnet3;
 
     #[test]
     fn test_get_total_stake() {
         // Initialize the validator set.
-        let mut validators = Validators::new();
+        let mut validators = Validators::<CurrentNetwork>::new();
         assert_eq!(validators.total_stake(), 0);
 
         // Add one validator.
-        let address_0 = Address::rand(&mut test_crypto_rng());
+        let address_0 = Address::<CurrentNetwork>::rand(&mut test_crypto_rng());
         validators.bond(address_0, address_0, Stake::from_num(MIN_VALIDATOR_BOND)).unwrap();
         assert_eq!(validators.total_stake(), Stake::from_num(MIN_VALIDATOR_BOND));
 
@@ -447,14 +449,14 @@ mod tests {
     #[test]
     fn test_get_total_supply() {
         // Initialize the validator set.
-        let validators = Validators::new();
+        let mut validators = Validators::<CurrentNetwork>::new();
         assert_eq!(validators.total_supply(), STARTING_SUPPLY);
     }
 
     #[test]
     fn test_num_validators() {
         // Initialize the validator set.
-        let mut validators = Validators::new();
+        let mut validators = Validators::<CurrentNetwork>::new();
         assert_eq!(validators.num_validators(), 0);
 
         // Add one validator.
@@ -473,7 +475,7 @@ mod tests {
     #[test]
     fn test_bond() {
         // Initialize the validator set.
-        let mut validators = Validators::new();
+        let mut validators = Validators::<CurrentNetwork>::new();
         assert_eq!(validators.total_stake(), 0);
         assert_eq!(validators.num_validators(), 0);
 
@@ -536,7 +538,7 @@ mod tests {
     #[test]
     fn test_unbond() {
         // Initialize the validator set.
-        let mut validators = Validators::new();
+        let mut validators = Validators::<CurrentNetwork>::new();
         assert_eq!(validators.total_stake(), 0);
         assert_eq!(validators.num_validators(), 0);
 
@@ -566,7 +568,7 @@ mod tests {
     #[test]
     fn test_unbond_validator() {
         // Initialize the validator set.
-        let mut validators = Validators::new();
+        let mut validators = Validators::<CurrentNetwork>::new();
         assert_eq!(validators.total_stake(), 0);
         assert_eq!(validators.num_validators(), 0);
 

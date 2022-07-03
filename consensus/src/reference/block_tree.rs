@@ -5,8 +5,8 @@ use crate::{
         message::{QuorumCertificate, Vote},
         Round,
         F,
+        Signature,
     },
-    Signature,
 };
 
 #[cfg(feature = "test")]

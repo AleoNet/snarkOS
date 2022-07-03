@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Address;
+use snarkvm::prelude::{Network, Address};
 
 use anyhow::{anyhow, bail, ensure, Result};
 use fixed::types::{I128F0, U64F64};
@@ -34,15 +34,15 @@ const MAX_STAKE: u64 = 1 << 54;
 
 /// A validator in the validator set.
 #[derive(Clone)]
-pub struct Validator {
+pub struct Validator<N: Network> {
     /// The address of the validator.
-    address: Address,
+    address: Address<N>,
     /// The amount of stake (in gates) held by this validator.
     stake: Stake,
     /// The score of the validator.
     score: Score,
     /// The amount of stake (in gates) that each staker (including the validator) has is comprised of the (bonded, earned) amounts.
-    staked: IndexMap<Address, (Stake, Stake)>,
+    staked: IndexMap<Address<N>, (Stake, Stake)>,
     /// The round numbers that the validator successfully led.
     leader_in: Vec<Round>,
     /// The round numbers that the validator participated in (including rounds led by validator).
@@ -51,9 +51,9 @@ pub struct Validator {
     byzantine: u8,
 }
 
-impl Validator {
+impl<N: Network> Validator<N> {
     /// Initializes a new validator with the given address and amount staked.
-    pub fn new(address: Address, stake: Stake) -> Result<Self> {
+    pub fn new(address: Address<N>, stake: Stake) -> Result<Self> {
         // Ensure the stake is less than the maximum stake as a sanity check.
         ensure!(stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
 
@@ -69,7 +69,7 @@ impl Validator {
     }
 
     /// Returns the address of the validator.
-    pub const fn address(&self) -> &Address {
+    pub const fn address(&self) -> &Address<N> {
         &self.address
     }
 
@@ -89,7 +89,7 @@ impl Validator {
     }
 
     /// Returns the stakers (including the validator) with their stake (in gates).
-    pub fn stakers(&self) -> Result<IndexMap<Address, Stake>> {
+    pub fn stakers(&self) -> Result<IndexMap<Address<N>, Stake>> {
         // Ensure the stake is less than the maximum stake as a sanity check.
         ensure!(self.stake < MAX_STAKE, "Stake cannot exceed the maximum stake");
 
@@ -118,17 +118,17 @@ impl Validator {
     }
 
     /// Returns the staked amount of the given staker, which is the sum of the bonded and earned stake.
-    pub fn staked_by(&self, staker: &Address) -> Stake {
+    pub fn staked_by(&self, staker: &Address<N>) -> Stake {
         self.bonded_by(staker) + self.earned_by(staker)
     }
 
     /// Returns the bonded amount of the given staker.
-    pub fn bonded_by(&self, staker: &Address) -> Stake {
+    pub fn bonded_by(&self, staker: &Address<N>) -> Stake {
         self.staked.get(staker).copied().unwrap_or_default().0
     }
 
     /// Returns the earned amount of the given staker.
-    pub fn earned_by(&self, staker: &Address) -> Stake {
+    pub fn earned_by(&self, staker: &Address<N>) -> Stake {
         self.staked.get(staker).copied().unwrap_or_default().1
     }
 
@@ -143,9 +143,9 @@ impl Validator {
     }
 }
 
-impl Validator {
+impl<N: Network> Validator<N> {
     /// Increments the bonded amount for the given staker by the given amount.
-    pub(crate) fn increment_bonded_for(&mut self, staker: &Address, amount: Stake) -> Result<()> {
+    pub(crate) fn increment_bonded_for(&mut self, staker: &Address<N>, amount: Stake) -> Result<()> {
         // Ensure the staker is incrementing a nonzero amount.
         ensure!(amount > 0, "Staker must increment bonded stake by a nonzero amount");
         // Ensure the amount is less than the maximum stake as a sanity check.
@@ -177,7 +177,7 @@ impl Validator {
     }
 
     /// Decrements the bonded amount for the given staker by the given amount.
-    pub(crate) fn decrement_bonded_for(&mut self, staker: &Address, amount: Stake) -> Result<()> {
+    pub(crate) fn decrement_bonded_for(&mut self, staker: &Address<N>, amount: Stake) -> Result<()> {
         // Ensure the staker exists.
         ensure!(self.staked.contains_key(staker), "Staker does not exist in validator");
         // Ensure the staker is decrementing a nonzero amount.
@@ -366,10 +366,10 @@ impl Validator {
     }
 }
 
-impl Validator {
+impl<N: Network> Validator<N> {
     /// Increments the earned amount for the given staker by the given amount.
     /// This is to be used as an internal function only.
-    fn increment_earned_for(&mut self, staker: &Address, amount: Stake) -> Result<()> {
+    fn increment_earned_for(&mut self, staker: &Address<N>, amount: Stake) -> Result<()> {
         // Ensure the staker is incrementing a nonzero amount.
         ensure!(amount > 0, "Staker must increment earned stake by a nonzero amount");
         // Ensure the amount is less than the maximum stake as a sanity check.
@@ -395,7 +395,7 @@ impl Validator {
 
     /// Decrements the earned amount for the given staker by the given amount.
     /// This is to be used as an internal function only.
-    fn decrement_earned_for(&mut self, staker: &Address, amount: Stake) -> Result<()> {
+    fn decrement_earned_for(&mut self, staker: &Address<N>, amount: Stake) -> Result<()> {
         // Ensure the staker exists.
         ensure!(self.staked.contains_key(staker), "Staker does not exist in validator");
         // Ensure the staker is decrementing a nonzero amount.
@@ -464,7 +464,9 @@ impl Validator {
 #[allow(deprecated)]
 mod tests {
     use super::*;
-    use snarkvm::console::prelude::*;
+    use snarkvm::prelude::{Testnet3, test_crypto_rng};
+
+    type CurrentNetwork = Testnet3;
 
     #[test]
     fn test_stake_arithmetic() {
@@ -500,7 +502,7 @@ mod tests {
 
     #[test]
     fn test_increment_bonded_for() {
-        let address_0 = Address::rand(&mut test_crypto_rng());
+        let address_0 = Address::<CurrentNetwork>::rand(&mut test_crypto_rng());
         let address_1 = Address::rand(&mut test_crypto_rng());
 
         let u64_0 = Stake::ZERO;
@@ -572,7 +574,7 @@ mod tests {
 
     #[test]
     fn test_decrement_bonded_for() {
-        let address_0 = Address::rand(&mut test_crypto_rng());
+        let address_0 = Address::<CurrentNetwork>::rand(&mut test_crypto_rng());
         let address_1 = Address::rand(&mut test_crypto_rng());
 
         let u64_0 = Stake::ZERO;
@@ -683,7 +685,7 @@ mod tests {
 
     #[test]
     fn test_increment_earned_by() {
-        let address_0 = Address::rand(&mut test_crypto_rng());
+        let address_0 = Address::<CurrentNetwork>::rand(&mut test_crypto_rng());
         let address_1 = Address::rand(&mut test_crypto_rng());
         let address_2 = Address::rand(&mut test_crypto_rng());
 
@@ -769,7 +771,7 @@ mod tests {
 
     #[test]
     fn test_decrement_staked() {
-        let address_0 = Address::rand(&mut test_crypto_rng());
+        let address_0 = Address::<CurrentNetwork>::rand(&mut test_crypto_rng());
         let address_1 = Address::rand(&mut test_crypto_rng());
         let address_2 = Address::rand(&mut test_crypto_rng());
 
@@ -824,7 +826,7 @@ mod tests {
 
     #[test]
     fn test_increment_earned_for() {
-        let address_0 = Address::rand(&mut test_crypto_rng());
+        let address_0 = Address::<CurrentNetwork>::rand(&mut test_crypto_rng());
         let address_1 = Address::rand(&mut test_crypto_rng());
 
         let u64_0 = Stake::ZERO;
