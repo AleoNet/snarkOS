@@ -22,27 +22,21 @@ use std::fmt;
 pub enum NodeType {
     /// A client node is a full node, capable of sending and receiving blocks.
     Client = 0,
-    /// A mining node is a full node, capable of producing new blocks.
-    Miner,
-    /// A beacon node is a discovery node, capable of sharing peers of the network.
-    Beacon,
-    /// A sync node is a discovery node, capable of syncing nodes for the network.
-    Sync,
-    /// An operating node is a full node, capable of coordinating provers in a pool.
-    Operator,
-    /// A proving node is a full node, capable of producing proofs for a pool.
+    /// A prover is a full node, capable of producing proofs for consensus.
     Prover,
+    /// A validator is a full node, capable of producing blocks with provers.
+    Validator,
+    /// A beacon is a discovery node, capable of syncing nodes on the network.
+    Beacon,
 }
 
 impl NodeType {
     pub fn description(&self) -> &str {
         match self {
-            Self::Client => "a client node",
-            Self::Miner => "a mining node",
-            Self::Beacon => "a beacon node",
-            Self::Sync => "a sync node",
-            Self::Operator => "an operating node",
-            Self::Prover => "a proving node",
+            Self::Client => "a client",
+            Self::Prover => "a prover",
+            Self::Validator => "a validator",
+            Self::Beacon => "a beacon",
         }
     }
 }

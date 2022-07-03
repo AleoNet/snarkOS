@@ -22,7 +22,7 @@ pub const MAXIMUM_QUADRATIC_BLOCK_LOCATORS: u32 = 32;
 pub const MAXIMUM_BLOCK_LOCATORS: u32 = MAXIMUM_LINEAR_BLOCK_LOCATORS.saturating_add(MAXIMUM_QUADRATIC_BLOCK_LOCATORS);
 
 use snarkvm::{
-    dpc::{BlockHeader, Network},
+    prelude::{Network},
     utilities::{
         fmt,
         io::{Read, Result as IoResult, Write},
