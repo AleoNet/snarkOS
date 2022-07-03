@@ -14,11 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{OutboundRouter, Peer, State};
-use snarkos_environment::{
-    network::{Data, DisconnectReason, Message},
-    Environment,
-};
+use crate::{Data, DisconnectReason, Message, OutboundRouter, Peer, State};
+use snarkos_environment::Environment;
 use snarkvm::dpc::prelude::*;
 
 #[cfg(any(feature = "test", feature = "prometheus"))]
@@ -40,9 +37,9 @@ use tokio::{
 };
 
 /// Shorthand for the parent half of the `Peers` message channel.
-pub type PeersRouter<N, E> = mpsc::Sender<PeersRequest<N, E>>;
+pub type PeersRouter<N> = mpsc::Sender<PeersRequest<N>>;
 /// Shorthand for the child half of the `Peers` message channel.
-pub type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
+pub type PeersHandler<N> = mpsc::Receiver<PeersRequest<N>>;
 
 /// Shorthand for the parent half of the connection result channel.
 pub(crate) type ConnectionResult = oneshot::Sender<Result<()>>;
@@ -51,19 +48,19 @@ pub(crate) type ConnectionResult = oneshot::Sender<Result<()>>;
 /// An enum of requests that the `Peers` struct processes.
 ///
 #[derive(Debug)]
-pub enum PeersRequest<N: Network, E: Environment> {
+pub enum PeersRequest<N: Network> {
     /// Connect := (peer_ip, connection_result)
     Connect(SocketAddr, ConnectionResult),
     /// Heartbeat
     Heartbeat,
     /// MessagePropagate := (peer_ip, message)
-    MessagePropagate(SocketAddr, Message<N, E>),
+    MessagePropagate(SocketAddr, Message<N>),
     /// MessageSend := (peer_ip, message)
-    MessageSend(SocketAddr, Message<N, E>),
+    MessageSend(SocketAddr, Message<N>),
     /// PeerConnecting := (stream, peer_ip)
     PeerConnecting(TcpStream, SocketAddr),
     /// PeerConnected := (peer_ip, peer_nonce, outbound_router)
-    PeerConnected(SocketAddr, u64, OutboundRouter<N, E>),
+    PeerConnected(SocketAddr, u64, OutboundRouter<N>),
     /// PeerDisconnected := (peer_ip)
     PeerDisconnected(SocketAddr),
     /// PeerRestricted := (peer_ip)
@@ -80,11 +77,11 @@ pub enum PeersRequest<N: Network, E: Environment> {
 ///
 pub struct Peers<N: Network, E: Environment> {
     /// The peers router of the node.
-    peers_router: PeersRouter<N, E>,
+    peers_router: PeersRouter<N>,
     /// The local nonce for this node session.
     local_nonce: u64,
     /// The map connected peer IPs to their nonce and outbound message router.
-    connected_peers: RwLock<HashMap<SocketAddr, (u64, OutboundRouter<N, E>)>>,
+    connected_peers: RwLock<HashMap<SocketAddr, (u64, OutboundRouter<N>)>>,
     /// The set of candidate peer IPs.
     candidate_peers: RwLock<HashSet<SocketAddr>>,
     /// The set of restricted peer IPs.
@@ -101,7 +98,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Initializes a new instance of `Peers` and its corresponding handler.
     ///
-    pub async fn new(local_nonce: Option<u64>, state: Arc<State<N, E>>) -> (Self, mpsc::Receiver<PeersRequest<N, E>>) {
+    pub async fn new(local_nonce: Option<u64>, state: Arc<State<N, E>>) -> (Self, mpsc::Receiver<PeersRequest<N>>) {
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
         let (peers_router, peers_handler) = mpsc::channel(1024);
 
@@ -127,7 +124,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     }
 
     /// Returns an instance of the peers router.
-    pub fn router(&self) -> &PeersRouter<N, E> {
+    pub fn router(&self) -> &PeersRouter<N> {
         &self.peers_router
     }
 
@@ -166,7 +163,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Returns the set of connected sync nodes.
     ///
     pub async fn connected_sync_nodes(&self) -> HashSet<SocketAddr> {
-        let sync_nodes = E::sync_nodes();
+        let sync_nodes = E::beacon_nodes();
         self.connected_peers
             .read()
             .await
@@ -180,7 +177,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Returns the number of connected sync nodes.
     ///
     pub async fn number_of_connected_sync_nodes(&self) -> usize {
-        let sync_nodes = E::sync_nodes();
+        let sync_nodes = E::beacon_nodes();
         self.connected_peers
             .read()
             .await
@@ -226,7 +223,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Performs the given `request` to the peers.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(&self, request: PeersRequest<N, E>) {
+    pub(super) async fn update(&self, request: PeersRequest<N>) {
         match request {
             PeersRequest::Connect(peer_ip, connection_result) => {
                 // Ensure the peer IP is not this node.
@@ -305,11 +302,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         .read()
                         .await
                         .iter()
-                        .filter(|(peer_ip, _)| {
-                            !E::sync_nodes().contains(peer_ip)
-                                && !E::beacon_nodes().contains(peer_ip)
-                                && !E::trusted_nodes().contains(peer_ip)
-                        })
+                        .filter(|(peer_ip, _)| !E::beacon_nodes().contains(peer_ip) && !E::trusted_nodes().contains(peer_ip))
                         .take(num_excess_peers)
                         .map(|(&peer_ip, _)| peer_ip)
                         .collect::<Vec<SocketAddr>>();
@@ -387,11 +380,8 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                 // Add the sync nodes to the list of candidate peers.
                 if number_of_connected_sync_nodes == 0 {
-                    self.add_candidate_peers(E::sync_nodes().iter()).await;
+                    self.add_candidate_peers(E::beacon_nodes().iter()).await;
                 }
-
-                // Add the beacon nodes to the list of candidate peers.
-                self.add_candidate_peers(E::beacon_nodes().iter()).await;
 
                 // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
                 // Select the peers randomly from the list of candidate peers.
@@ -404,7 +394,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     .choose_multiple(&mut OsRng::default(), midpoint_number_of_peers)
                 {
                     // Ensure this node is not connected to more than the permitted number of sync nodes.
-                    if E::sync_nodes().contains(&peer_ip) && number_of_connected_sync_nodes >= 1 {
+                    if E::beacon_nodes().contains(&peer_ip) && number_of_connected_sync_nodes >= 1 {
                         continue;
                     }
 
@@ -586,7 +576,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Sends the given message to specified peer.
     ///
-    async fn send(&self, peer: SocketAddr, message: Message<N, E>) {
+    async fn send(&self, peer: SocketAddr, message: Message<N>) {
         let target_peer = self.connected_peers.read().await.get(&peer).cloned();
         match target_peer {
             Some((_, outbound)) => {
@@ -608,7 +598,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Sends the given message to every connected peer, excluding the sender.
     ///
-    async fn propagate(&self, sender: SocketAddr, mut message: Message<N, E>) {
+    async fn propagate(&self, sender: SocketAddr, mut message: Message<N>) {
         // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         if let Message::UnconfirmedBlock(_, _, ref mut data) = message {
             let serialized_block = Data::serialize(data.clone()).await.expect("Block serialization is bugged");
@@ -620,7 +610,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
             .connected_peers()
             .await
             .iter()
-            .filter(|peer_ip| *peer_ip != &sender && !E::sync_nodes().contains(peer_ip) && !E::beacon_nodes().contains(peer_ip))
+            .filter(|peer_ip| *peer_ip != &sender && !E::beacon_nodes().contains(peer_ip))
             .copied()
             .collect::<Vec<_>>()
         {

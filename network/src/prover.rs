@@ -80,7 +80,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
     /// Initializes a new instance of the prover, paired with its handler.
     pub async fn open<P: AsRef<Path> + Copy>(
         path: P,
-        pool_ip: Option<SocketAddr>,
         state: Arc<State<N, E>>,
     ) -> Result<(Self, mpsc::Receiver<ProverRequest<N>>)> {
         // Initialize an mpsc channel for sending requests to the `Prover` struct.

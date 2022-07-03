@@ -15,19 +15,18 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    Data,
+    DisconnectReason,
     helpers::{block_requests::*, BlockRequest, CircularMap},
-    PeersRequest,
-    ProverRequest,
-    State,
+    Message, PeersRequest, ProverRequest, State,
 };
 use snarkos_environment::{
-    helpers::{block_locators::*, NodeType, Status},
-    network::{Data, DisconnectReason, Message},
     Environment,
+    helpers::{NodeType, Status},
 };
 use snarkos_storage::{
-    storage::{rocksdb::RocksDB, ReadOnly, ReadWrite},
     LedgerState,
+    storage::{ReadOnly, ReadWrite, rocksdb::RocksDB},
 };
 use snarkvm::dpc::prelude::*;
 
@@ -39,7 +38,7 @@ use std::{
     collections::HashMap,
     net::SocketAddr,
     path::Path,
-    sync::{atomic::Ordering, Arc},
+    sync::{Arc, atomic::Ordering},
     time::{Duration, Instant},
 };
 use time::OffsetDateTime;
@@ -308,7 +307,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Performs a heartbeat update for the sync nodes.
     ///
     async fn update_sync_nodes(&self) {
-        if E::NODE_TYPE == NodeType::Sync {
+        if E::NODE_TYPE == NodeType::Beacon {
             // Lock peers_state for further processing.
             let peers_state = self.peers_state.read().await;
 
@@ -328,7 +327,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     };
 
                     // If the peer is not a sync node and is syncing, and the peer is ahead, proceed to disconnect.
-                    if *node_type != NodeType::Sync && *status == Status::Syncing && cumulative_weight > latest_cumulative_weight {
+                    if *node_type != NodeType::Beacon && *status == Status::Syncing && cumulative_weight > latest_cumulative_weight {
                         // Append the peer to the list of disconnects.
                         peer_ips_to_disconnect.push(*peer_ip);
                     }

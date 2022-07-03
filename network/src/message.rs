@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    helpers::{BlockLocators, NodeType, Status},
+use snarkos_environment::{
+    helpers::{NodeType, Status},
     Environment,
 };
 use snarkvm::{dpc::posw::PoSWProof, prelude::*};
@@ -107,13 +107,13 @@ pub enum DisconnectReason {
 }
 
 #[derive(Clone, Debug)]
-pub enum Message<N: Network, E: Environment> {
+pub enum Message<N: Network> {
     /// BlockRequest := (start_block_height, end_block_height (inclusive))
     BlockRequest(u32, u32),
     /// BlockResponse := (block)
     BlockResponse(Data<Block<N>>),
-    /// ChallengeRequest := (version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight)
-    ChallengeRequest(u32, u32, NodeType, Status, u16, u64, u128),
+    /// ChallengeRequest := (version, fork_depth, node_type, status, listener_port, nonce)
+    ChallengeRequest(u32, u32, NodeType, Status, u16, u64),
     /// ChallengeResponse := (block_header)
     ChallengeResponse(Data<BlockHeader<N>>),
     /// Disconnect := ()
@@ -122,26 +122,17 @@ pub enum Message<N: Network, E: Environment> {
     PeerRequest,
     /// PeerResponse := (\[peer_ip\])
     PeerResponse(Vec<SocketAddr>, Option<Instant>),
-    /// Ping := (version, fork_depth, node_type, status, block_hash, block_header)
-    Ping(u32, u32, NodeType, Status, N::BlockHash, Data<BlockHeader<N>>),
-    /// Pong := (is_fork, block_locators)
-    Pong(Option<bool>, Data<BlockLocators<N>>),
+    /// Ping := (version, fork_depth, node_type, status)
+    Ping(u32, u32, NodeType, Status),
+    /// Pong := (is_fork)
+    Pong(Option<bool>),
     /// UnconfirmedBlock := (block_height, block_hash, block)
     UnconfirmedBlock(u32, N::BlockHash, Data<Block<N>>),
     /// UnconfirmedTransaction := (transaction)
     UnconfirmedTransaction(Data<Transaction<N>>),
-    /// PoolRegister := (address)
-    PoolRegister(Address<N>),
-    /// PoolRequest := (share_difficulty, block_template)
-    PoolRequest(u64, Data<BlockTemplate<N>>),
-    /// PoolResponse := (address, nonce, proof)
-    PoolResponse(Address<N>, N::PoSWNonce, Data<PoSWProof<N>>),
-    /// Unused
-    #[allow(unused)]
-    Unused(PhantomData<E>),
 }
 
-impl<N: Network, E: Environment> Message<N, E> {
+impl<N: Network> Message<N> {
     /// Returns the message name.
     #[inline]
     pub fn name(&self) -> &str {
@@ -157,10 +148,6 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Pong(..) => "Pong",
             Self::UnconfirmedBlock(..) => "UnconfirmedBlock",
             Self::UnconfirmedTransaction(..) => "UnconfirmedTransaction",
-            Self::PoolRegister(..) => "PoolRegister",
-            Self::PoolRequest(..) => "PoolRequest",
-            Self::PoolResponse(..) => "PoolResponse",
-            Self::Unused(..) => "Unused",
         }
     }
 
@@ -179,10 +166,6 @@ impl<N: Network, E: Environment> Message<N, E> {
             Self::Pong(..) => 8,
             Self::UnconfirmedBlock(..) => 9,
             Self::UnconfirmedTransaction(..) => 10,
-            Self::PoolRegister(..) => 11,
-            Self::PoolRequest(..) => 12,
-            Self::PoolResponse(..) => 13,
-            Self::Unused(..) => 14,
         }
     }
 
@@ -195,21 +178,18 @@ impl<N: Network, E: Environment> Message<N, E> {
                 Ok(writer.write_all(&bytes)?)
             }
             Self::BlockResponse(block) => block.serialize_blocking_into(writer),
-            Self::ChallengeRequest(version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight) => {
-                Ok(bincode::serialize_into(
-                    writer,
-                    &(version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight),
-                )?)
-            }
+            Self::ChallengeRequest(version, fork_depth, node_type, status, listener_port, nonce) => Ok(bincode::serialize_into(
+                writer,
+                &(version, fork_depth, node_type, status, listener_port, nonce),
+            )?),
             Self::ChallengeResponse(block_header) => Ok(block_header.serialize_blocking_into(writer)?),
             Self::Disconnect(reason) => Ok(bincode::serialize_into(writer, reason)?),
             Self::PeerRequest => Ok(()),
             Self::PeerResponse(peer_ips, _) => Ok(bincode::serialize_into(writer, peer_ips)?),
-            Self::Ping(version, fork_depth, node_type, status, block_hash, block_header) => {
-                bincode::serialize_into(&mut *writer, &(version, fork_depth, node_type, status, block_hash))?;
-                block_header.serialize_blocking_into(writer)
+            Self::Ping(version, fork_depth, node_type, status) => {
+                Ok(bincode::serialize_into(&mut *writer, &(version, fork_depth, node_type, status))?)
             }
-            Self::Pong(is_fork, block_locators) => {
+            Self::Pong(is_fork) => {
                 let serialized_is_fork: u8 = match is_fork {
                     None => 0,
                     Some(fork) => match fork {
@@ -218,8 +198,7 @@ impl<N: Network, E: Environment> Message<N, E> {
                     },
                 };
 
-                writer.write_all(&[serialized_is_fork])?;
-                block_locators.serialize_blocking_into(writer)
+                Ok(writer.write_all(&[serialized_is_fork])?)
             }
             Self::UnconfirmedBlock(block_height, block_hash, block) => {
                 writer.write_all(&block_height.to_le_bytes())?;
@@ -227,17 +206,6 @@ impl<N: Network, E: Environment> Message<N, E> {
                 block.serialize_blocking_into(writer)
             }
             Self::UnconfirmedTransaction(transaction) => Ok(transaction.serialize_blocking_into(writer)?),
-            Self::PoolRegister(address) => Ok(bincode::serialize_into(writer, address)?),
-            Self::PoolRequest(share_difficulty, block_template) => {
-                bincode::serialize_into(&mut *writer, share_difficulty)?;
-                block_template.serialize_blocking_into(writer)
-            }
-            Self::PoolResponse(address, nonce, proof) => {
-                bincode::serialize_into(&mut *writer, address)?;
-                bincode::serialize_into(&mut *writer, nonce)?;
-                proof.serialize_blocking_into(writer)
-            }
-            Self::Unused(_) => Ok(()),
         }
     }
 
@@ -268,10 +236,9 @@ impl<N: Network, E: Environment> Message<N, E> {
             }
             1 => Self::BlockResponse(Data::Buffer(bytes.freeze())),
             2 => {
-                let (version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight) =
-                    bincode::deserialize_from(&mut bytes.reader())?;
+                let (version, fork_depth, node_type, status, listener_port, nonce) = bincode::deserialize_from(&mut bytes.reader())?;
 
-                Self::ChallengeRequest(version, fork_depth, node_type, status, listener_port, nonce, cumulative_weight)
+                Self::ChallengeRequest(version, fork_depth, node_type, status, listener_port, nonce)
             }
             3 => Self::ChallengeResponse(Data::Buffer(bytes.freeze())),
             4 => {
@@ -290,10 +257,9 @@ impl<N: Network, E: Environment> Message<N, E> {
             6 => Self::PeerResponse(bincode::deserialize_from(&mut bytes.reader())?, None),
             7 => {
                 let mut reader = bytes.reader();
-                let (version, fork_depth, node_type, status, block_hash) = bincode::deserialize_from(&mut reader)?;
-                let block_header = Data::Buffer(reader.into_inner().freeze());
+                let (version, fork_depth, node_type, status) = bincode::deserialize_from(&mut reader)?;
 
-                Self::Ping(version, fork_depth, node_type, status, block_hash, block_header)
+                Self::Ping(version, fork_depth, node_type, status)
             }
             8 => {
                 // Make sure a byte for the fork flag is available.
@@ -310,7 +276,7 @@ impl<N: Network, E: Environment> Message<N, E> {
                     _ => bail!("Invalid 'Pong' message"),
                 };
 
-                Self::Pong(is_fork, Data::Buffer(bytes.freeze()))
+                Self::Pong(is_fork)
             }
             9 => {
                 let mut reader = bytes.reader();
@@ -321,19 +287,6 @@ impl<N: Network, E: Environment> Message<N, E> {
                 )
             }
             10 => Self::UnconfirmedTransaction(Data::Buffer(bytes.freeze())),
-            11 => Self::PoolRegister(bincode::deserialize_from(&mut bytes.reader())?),
-            12 => {
-                let mut reader = bytes.reader();
-                Self::PoolRequest(bincode::deserialize_from(&mut reader)?, Data::Buffer(reader.into_inner().freeze()))
-            }
-            13 => {
-                let mut reader = bytes.reader();
-                Self::PoolResponse(
-                    bincode::deserialize_from(&mut reader)?,
-                    bincode::deserialize_from(&mut reader)?,
-                    Data::Buffer(reader.into_inner().freeze()),
-                )
-            }
             _ => bail!("Invalid message ID {}", id),
         };
 
@@ -341,28 +294,31 @@ impl<N: Network, E: Environment> Message<N, E> {
     }
 }
 
+/// The maximum size of a message that can be transmitted in the network.
+const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
+
 /// The codec used to decode and encode network `Message`s.
-pub struct MessageCodec<N: Network, E: Environment> {
+pub struct MessageCodec<N: Network> {
     codec: LengthDelimitedCodec,
-    _phantoms: (PhantomData<N>, PhantomData<E>),
+    _phantom: PhantomData<N>,
 }
 
-impl<N: Network, E: Environment> Default for MessageCodec<N, E> {
+impl<N: Network> Default for MessageCodec<N> {
     fn default() -> Self {
         Self {
             codec: LengthDelimitedCodec::builder()
-                .max_frame_length(E::MAXIMUM_MESSAGE_SIZE)
+                .max_frame_length(MAXIMUM_MESSAGE_SIZE)
                 .little_endian()
                 .new_codec(),
-            _phantoms: Default::default(),
+            _phantom: Default::default(),
         }
     }
 }
 
-impl<N: Network, E: Environment> Encoder<Message<N, E>> for MessageCodec<N, E> {
+impl<N: Network> Encoder<Message<N>> for MessageCodec<N> {
     type Error = io::Error;
 
-    fn encode(&mut self, message: Message<N, E>, dst: &mut BytesMut) -> Result<(), Self::Error> {
+    fn encode(&mut self, message: Message<N>, dst: &mut BytesMut) -> Result<(), Self::Error> {
         // Serialize the payload directly into dst.
         message
             .serialize_into(&mut dst.writer())
@@ -375,9 +331,9 @@ impl<N: Network, E: Environment> Encoder<Message<N, E>> for MessageCodec<N, E> {
     }
 }
 
-impl<N: Network, E: Environment> Decoder for MessageCodec<N, E> {
+impl<N: Network> Decoder for MessageCodec<N> {
     type Error = std::io::Error;
-    type Item = Message<N, E>;
+    type Item = Message<N>;
 
     fn decode(&mut self, source: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // Decode a frame containing bytes belonging to a message.

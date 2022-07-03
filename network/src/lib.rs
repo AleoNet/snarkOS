@@ -24,11 +24,11 @@ extern crate tracing;
 
 pub mod helpers;
 
-pub mod ledger;
-pub use ledger::*;
+// pub mod ledger;
+// pub use ledger::*;
 
-pub mod operator;
-pub use operator::*;
+mod message;
+pub use message::*;
 
 pub(crate) mod peer;
 pub(crate) use peer::*;
@@ -36,8 +36,11 @@ pub(crate) use peer::*;
 pub mod peers;
 pub use peers::*;
 
-pub mod prover;
-pub use prover::*;
+// pub mod prover;
+// pub use prover::*;
 
 pub mod state;
 pub use state::*;
+
+// pub mod validator;
+// pub use validator::*;

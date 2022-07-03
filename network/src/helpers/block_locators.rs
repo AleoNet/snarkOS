@@ -218,7 +218,7 @@ impl<N: Network> Deref for BlockLocators<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::CurrentNetwork;
+    use snarkos_environment::CurrentNetwork;
 
     #[test]
     fn test_block_locators_serde_json() {

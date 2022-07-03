@@ -21,26 +21,21 @@ use snarkos_environment::{helpers::NodeType, Environment};
 use snarkvm::prelude::*;
 use tokio::sync::oneshot;
 
-use crate::{
-    ledger::{Ledger, LedgerHandler},
-    operator::{Operator, OperatorHandler},
-    peers::{Peers, PeersHandler},
-    prover::{Prover, ProverHandler},
-};
+use crate::peers::{Peers, PeersHandler};
 
 pub struct State<N: Network, E: Environment> {
     /// The local address of the node.
     pub local_ip: SocketAddr,
-    /// The Aleo address corresponding to the Node's prover and/or operator.
+    /// The Aleo address corresponding to the Node's prover and/or validator.
     pub address: Option<Address<N>>,
     /// The list of peers for the node.
     peers: OnceBox<Peers<N, E>>,
-    /// The ledger of the node.
-    ledger: OnceBox<Ledger<N, E>>,
-    /// The prover of the node.
-    prover: OnceBox<Prover<N, E>>,
-    /// The operator of the node.
-    operator: OnceBox<Operator<N, E>>,
+    // /// The ledger of the node.
+    // ledger: OnceBox<Ledger<N, E>>,
+    // /// The prover of the node.
+    // prover: OnceBox<Prover<N, E>>,
+    // /// The validator of the node.
+    // validator: OnceBox<Operator<N, E>>,
 }
 
 impl<N: Network, E: Environment> State<N, E> {
@@ -49,13 +44,13 @@ impl<N: Network, E: Environment> State<N, E> {
             local_ip,
             address,
             peers: Default::default(),
-            ledger: Default::default(),
-            operator: Default::default(),
-            prover: Default::default(),
+            // ledger: Default::default(),
+            // validator: Default::default(),
+            // prover: Default::default(),
         }
     }
 
-    pub async fn initialize_peers(self: &Arc<Self>, peers: Peers<N, E>, mut peers_handler: PeersHandler<N, E>) {
+    pub async fn initialize_peers(self: &Arc<Self>, peers: Peers<N, E>, mut peers_handler: PeersHandler<N>) {
         self.peers.set(peers.into()).map_err(|_| ()).unwrap();
 
         let state = self.clone();
@@ -88,89 +83,89 @@ impl<N: Network, E: Environment> State<N, E> {
         let _ = handler.await;
     }
 
-    pub async fn initialize_ledger(self: &Arc<Self>, ledger: Ledger<N, E>, mut ledger_handler: LedgerHandler<N>) {
-        self.ledger.set(ledger.into()).map_err(|_| ()).unwrap();
-
-        let state = self.clone();
-        let (router, handler) = oneshot::channel();
-        E::resources().register_task(
-            None, // No need to provide an id, as the task will run indefinitely.
-            tokio::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                // Asynchronously wait for a ledger request.
-                while let Some(request) = ledger_handler.recv().await {
-                    // Update the state of the ledger.
-                    // Note: Do not wrap this call in a `tokio::spawn` as `BlockResponse` messages
-                    // will end up being processed out of order.
-                    state.ledger().update(request).await;
-                }
-            }),
-        );
-
-        // Wait until the ledger handler is ready.
-        let _ = handler.await;
-    }
-
-    pub async fn initialize_prover(self: &Arc<Self>, prover: Prover<N, E>, mut prover_handler: ProverHandler<N>) {
-        self.prover.set(prover.into()).map_err(|_| ()).unwrap();
-
-        let state = self.clone();
-        let (router, handler) = oneshot::channel();
-        E::resources().register_task(
-            None, // No need to provide an id, as the task will run indefinitely.
-            tokio::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                // Asynchronously wait for a prover request.
-                while let Some(request) = prover_handler.recv().await {
-                    // Update the state of the prover.
-                    state.prover().update(request).await;
-                }
-            }),
-        );
-
-        // Wait until the prover handler is ready.
-        let _ = handler.await;
-    }
-
-    pub async fn initialize_operator(self: &Arc<Self>, operator: Operator<N, E>, mut operator_handler: OperatorHandler<N>) {
-        self.operator.set(operator.into()).map_err(|_| ()).unwrap();
-
-        if E::NODE_TYPE == NodeType::Operator {
-            // Initialize the handler for the operator.
-            let state = self.clone();
-            let (router, handler) = oneshot::channel();
-            E::resources().register_task(
-                None, // No need to provide an id, as the task will run indefinitely.
-                tokio::spawn(async move {
-                    // Notify the outer function that the task is ready.
-                    let _ = router.send(());
-                    // Asynchronously wait for a operator request.
-                    while let Some(request) = operator_handler.recv().await {
-                        state.operator().update(request).await;
-                    }
-                }),
-            );
-
-            // Wait until the operator handler is ready.
-            let _ = handler.await;
-        }
-    }
+    // pub async fn initialize_ledger(self: &Arc<Self>, ledger: Ledger<N, E>, mut ledger_handler: LedgerHandler<N>) {
+    //     self.ledger.set(ledger.into()).map_err(|_| ()).unwrap();
+    //
+    //     let state = self.clone();
+    //     let (router, handler) = oneshot::channel();
+    //     E::resources().register_task(
+    //         None, // No need to provide an id, as the task will run indefinitely.
+    //         tokio::spawn(async move {
+    //             // Notify the outer function that the task is ready.
+    //             let _ = router.send(());
+    //             // Asynchronously wait for a ledger request.
+    //             while let Some(request) = ledger_handler.recv().await {
+    //                 // Update the state of the ledger.
+    //                 // Note: Do not wrap this call in a `tokio::spawn` as `BlockResponse` messages
+    //                 // will end up being processed out of order.
+    //                 state.ledger().update(request).await;
+    //             }
+    //         }),
+    //     );
+    //
+    //     // Wait until the ledger handler is ready.
+    //     let _ = handler.await;
+    // }
+    //
+    // pub async fn initialize_prover(self: &Arc<Self>, prover: Prover<N, E>, mut prover_handler: ProverHandler<N>) {
+    //     self.prover.set(prover.into()).map_err(|_| ()).unwrap();
+    //
+    //     let state = self.clone();
+    //     let (router, handler) = oneshot::channel();
+    //     E::resources().register_task(
+    //         None, // No need to provide an id, as the task will run indefinitely.
+    //         tokio::spawn(async move {
+    //             // Notify the outer function that the task is ready.
+    //             let _ = router.send(());
+    //             // Asynchronously wait for a prover request.
+    //             while let Some(request) = prover_handler.recv().await {
+    //                 // Update the state of the prover.
+    //                 state.prover().update(request).await;
+    //             }
+    //         }),
+    //     );
+    //
+    //     // Wait until the prover handler is ready.
+    //     let _ = handler.await;
+    // }
+    //
+    // pub async fn initialize_validator(self: &Arc<Self>, validator: Operator<N, E>, mut validator_handler: OperatorHandler<N>) {
+    //     self.validator.set(validator.into()).map_err(|_| ()).unwrap();
+    //
+    //     if E::NODE_TYPE == NodeType::Validator {
+    //         // Initialize the handler for the validator.
+    //         let state = self.clone();
+    //         let (router, handler) = oneshot::channel();
+    //         E::resources().register_task(
+    //             None, // No need to provide an id, as the task will run indefinitely.
+    //             tokio::spawn(async move {
+    //                 // Notify the outer function that the task is ready.
+    //                 let _ = router.send(());
+    //                 // Asynchronously wait for a validator request.
+    //                 while let Some(request) = validator_handler.recv().await {
+    //                     state.validator().update(request).await;
+    //                 }
+    //             }),
+    //         );
+    //
+    //         // Wait until the validator handler is ready.
+    //         let _ = handler.await;
+    //     }
+    // }
 
     pub fn peers(&self) -> &Peers<N, E> {
         self.peers.get().unwrap()
     }
 
-    pub fn ledger(&self) -> &Ledger<N, E> {
-        self.ledger.get().unwrap()
-    }
-
-    pub fn prover(&self) -> &Prover<N, E> {
-        self.prover.get().unwrap()
-    }
-
-    pub fn operator(&self) -> &Operator<N, E> {
-        self.operator.get().unwrap()
-    }
+    // pub fn ledger(&self) -> &Ledger<N, E> {
+    //     self.ledger.get().unwrap()
+    // }
+    //
+    // pub fn prover(&self) -> &Prover<N, E> {
+    //     self.prover.get().unwrap()
+    // }
+    //
+    // pub fn validator(&self) -> &Operator<N, E> {
+    //     self.validator.get().unwrap()
+    // }
 }
