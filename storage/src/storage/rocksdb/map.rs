@@ -16,49 +16,11 @@
 
 use super::*;
 
-pub const PREFIX_LEN: usize = 4; // N::NETWORK_ID (u16) + MapId (u16)
-
 use anyhow::bail;
+use core::fmt;
 use rand::{thread_rng, Rng};
-use std::fmt;
 
 use crate::storage::StorageReadWrite;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-#[repr(u16)]
-pub enum MapId {
-    BlockHeaders = 0,
-    BlockHeights,
-    BlockTransactions,
-    Commitments,
-    LedgerRoots,
-    Records,
-    SerialNumbers,
-    Transactions,
-    Transitions,
-    Shares,
-    #[cfg(test)]
-    Test,
-}
-
-#[cfg(feature = "test")]
-impl From<u16> for MapId {
-    fn from(id: u16) -> Self {
-        match id {
-            0 => Self::BlockHeaders,
-            1 => Self::BlockHeights,
-            2 => Self::BlockTransactions,
-            3 => Self::Commitments,
-            4 => Self::LedgerRoots,
-            5 => Self::Records,
-            6 => Self::SerialNumbers,
-            7 => Self::Transactions,
-            8 => Self::Transitions,
-            9 => Self::Shares,
-            x => panic!("Unexpected map id: {}", x),
-        }
-    }
-}
 
 #[derive(Clone)]
 pub struct DataMap<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned, A: StorageAccess = ReadWrite> {

@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::storage::{DataMap, MapId, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite};
-use snarkvm::dpc::prelude::*;
+use crate::storage::{DataMap, DataID, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite};
+use snarkvm::prelude::*;
 
 use anyhow::{anyhow, Result};
 use std::path::Path;
@@ -30,7 +30,7 @@ impl<N: Network, A: StorageAccess> ProverState<N, A> {
     /// Opens a new instance of `ProverState` from the given storage path.
     pub fn open<S: Storage<Access = A>, P: AsRef<Path>>(path: P) -> Result<Self> {
         // Open storage.
-        let context = N::NETWORK_ID;
+        let context = N::ID;
         let storage = S::open(path, context)?;
 
         // Initialize the prover.
@@ -80,7 +80,7 @@ impl<N: Network, A: StorageAccess> CoinbaseState<N, A> {
     /// Initializes a new instance of `CoinbaseState`.
     fn open<S: Storage<Access = A>>(storage: S) -> Result<Self> {
         Ok(Self {
-            records: storage.open_map(MapId::Records)?,
+            records: storage.open_map(DataID::Records)?,
         })
     }
 

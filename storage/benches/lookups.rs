@@ -16,7 +16,7 @@
 
 use snarkos_environment::CurrentNetwork;
 use snarkos_storage::{
-    storage::{rocksdb::RocksDB, MapId, MapRead, ReadWrite, Storage},
+    storage::{rocksdb::RocksDB, DataID, MapRead, ReadWrite, Storage},
     LedgerState,
     Metadata,
 };
@@ -47,7 +47,7 @@ fn lookups(c: &mut Criterion) {
     c.bench_function("ledger_roots_lookup", |b| {
         let ledger_roots = ledger
             .storage()
-            .open_map::<<CurrentNetwork as Network>::LedgerRoot, u32>(MapId::LedgerRoots)
+            .open_map::<<CurrentNetwork as Network>::LedgerRoot, u32>(DataID::LedgerRoots)
             .unwrap()
             .keys()
             .collect::<Vec<_>>();
@@ -68,7 +68,7 @@ fn lookups(c: &mut Criterion) {
     c.bench_function("blocks_lookup_by_hash", |b| {
         let block_hashes = ledger
             .storage()
-            .open_map::<<CurrentNetwork as Network>::BlockHash, BlockHeader<CurrentNetwork>>(MapId::BlockHeaders)
+            .open_map::<<CurrentNetwork as Network>::BlockHash, BlockHeader<CurrentNetwork>>(DataID::BlockHeaders)
             .unwrap()
             .keys()
             .collect::<Vec<_>>();
@@ -86,7 +86,7 @@ fn lookups(c: &mut Criterion) {
                 <CurrentNetwork as Network>::LedgerRoot,
                 Vec<<CurrentNetwork as Network>::TransitionID>,
                 Metadata<CurrentNetwork>,
-            )>(MapId::Transactions)
+            )>(DataID::Transactions)
             .unwrap()
             .keys()
             .collect::<Vec<_>>();
@@ -100,7 +100,7 @@ fn lookups(c: &mut Criterion) {
     // Commitments are used for multiple lookups.
     let tx_commitments = ledger
         .storage()
-        .open_map::<<CurrentNetwork as Network>::Commitment, <CurrentNetwork as Network>::TransitionID>(MapId::Commitments)
+        .open_map::<<CurrentNetwork as Network>::Commitment, <CurrentNetwork as Network>::TransitionID>(DataID::Commitments)
         .unwrap()
         .keys()
         .collect::<Vec<_>>();
@@ -122,7 +122,7 @@ fn lookups(c: &mut Criterion) {
     c.bench_function("txs_lookup_by_serial_number", |b| {
         let tx_serial_numbers = ledger
             .storage()
-            .open_map::<<CurrentNetwork as Network>::SerialNumber, <CurrentNetwork as Network>::TransitionID>(MapId::SerialNumbers)
+            .open_map::<<CurrentNetwork as Network>::SerialNumber, <CurrentNetwork as Network>::TransitionID>(DataID::SerialNumbers)
             .unwrap()
             .keys()
             .collect::<Vec<_>>();

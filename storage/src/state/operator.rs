@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::storage::{DataMap, MapId, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite};
-use snarkvm::dpc::prelude::*;
+use crate::storage::{DataMap, DataID, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite};
+use snarkvm::prelude::*;
 
 use anyhow::{anyhow, Result};
 use std::{
@@ -33,7 +33,7 @@ impl<N: Network, A: StorageAccess> OperatorState<N, A> {
     /// Opens a new instance of `OperatorState` from the given storage path.
     pub fn open<S: Storage<Access = A>, P: AsRef<Path>>(path: P) -> Result<Self> {
         // Open storage.
-        let context = N::NETWORK_ID;
+        let context = N::ID;
         let storage = S::open(path, context)?;
 
         // Initialize the operator.
@@ -94,7 +94,7 @@ impl<N: Network, A: StorageAccess> SharesState<N, A> {
     /// Initializes a new instance of `SharesState`.
     fn open<S: Storage<Access = A>>(storage: S) -> Result<Self> {
         Ok(Self {
-            shares: storage.open_map(MapId::Shares)?,
+            shares: storage.open_map(DataID::Shares)?,
         })
     }
 

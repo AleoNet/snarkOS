@@ -29,7 +29,7 @@ use values::*;
 #[cfg(test)]
 mod tests;
 
-use crate::storage::{MapRead, MapReadWrite, ReadOnly, ReadWrite, Storage, StorageAccess};
+use crate::storage::{DataID, MapRead, MapReadWrite, ReadOnly, ReadWrite, Storage, StorageAccess};
 
 use anyhow::Result;
 use parking_lot::Mutex;
@@ -44,6 +44,8 @@ use std::{
     path::Path,
     sync::Arc,
 };
+
+pub const PREFIX_LEN: usize = 4; // N::ID (u16) + DataID (u16)
 
 ///
 /// An instance of a RocksDB database.
@@ -100,10 +102,10 @@ impl Storage for RocksDB {
     ///
     fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(
         &self,
-        map_id: MapId,
+        data_id: DataID,
     ) -> Result<DataMap<K, V, ReadWrite>> {
         // Convert the new context into bytes.
-        let new_context = (map_id as u16).to_le_bytes();
+        let new_context = (data_id as u16).to_le_bytes();
 
         // Combine contexts to create a new scope.
         let mut context_bytes = self.context.clone();
@@ -213,9 +215,12 @@ impl Storage for RocksDB<ReadOnly> {
     ///
     /// Opens a map with the given `context` from storage.
     ///
-    fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(&self, map_id: MapId) -> Result<DataMap<K, V, ReadOnly>> {
+    fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(
+        &self,
+        data_id: DataID,
+    ) -> Result<DataMap<K, V, ReadOnly>> {
         // Convert the new context into bytes.
-        let new_context = (map_id as u16).to_le_bytes();
+        let new_context = (data_id as u16).to_le_bytes();
 
         // Combine contexts to create a new scope.
         let mut context_bytes = self.context.clone();

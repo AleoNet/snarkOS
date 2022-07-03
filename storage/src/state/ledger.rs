@@ -16,9 +16,9 @@
 
 #[cfg(any(test, feature = "test"))]
 use crate::storage::rocksdb::RocksDB;
-use crate::storage::{DataMap, MapId, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite};
-use snarkos_environment::helpers::{block_locators::*, Resource};
-use snarkvm::dpc::prelude::*;
+use crate::storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite};
+use snarkos_environment::helpers::Resource;
+use snarkvm::prelude::*;
 
 use anyhow::{anyhow, Result};
 use circular_queue::CircularQueue;
@@ -30,11 +30,12 @@ use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashSet},
     path::Path,
-    sync::{atomic::AtomicBool, Arc},
+    sync::{Arc, atomic::AtomicBool},
     thread,
 };
 use time::OffsetDateTime;
 use tokio::sync::oneshot::{self, error::TryRecvError};
+use snarkos_network::helpers::block_locators::*;
 
 ///
 /// A helper struct containing transaction metadata.
@@ -88,7 +89,7 @@ impl<N: Network, A: StorageAccess> LedgerState<N, A> {
     ///
     pub fn open_reader<S: Storage<Access = A>, P: AsRef<Path>>(path: P) -> Result<(Arc<Self>, Resource)> {
         // Open storage.
-        let context = N::NETWORK_ID;
+        let context = N::ID;
         let storage = S::open(path, context)?;
 
         // Initialize the ledger.
@@ -97,7 +98,7 @@ impl<N: Network, A: StorageAccess> LedgerState<N, A> {
             latest_block: RwLock::new(N::genesis_block().clone()),
             latest_block_hashes_and_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
             latest_block_locators: Default::default(),
-            ledger_roots: storage.open_map(MapId::LedgerRoots)?,
+            ledger_roots: storage.open_map(DataID::LedgerRoots)?,
             blocks: BlockState::open(storage)?,
         });
 
@@ -430,9 +431,9 @@ impl<N: Network, A: StorageAccess> LedgerState<N, A> {
         );
 
         // Compute the block difficulty target.
-        let difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+        let difficulty_target = if N::ID == 3 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
             Blocks::<N>::compute_difficulty_target(latest_block.header(), block_timestamp, block_height)
-        } else if N::NETWORK_ID == 2 {
+        } else if N::ID == 3 {
             let anchor_block_header = self.get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
             Blocks::<N>::compute_difficulty_target(&anchor_block_header, block_timestamp, block_height)
         } else {
@@ -782,7 +783,7 @@ impl<N: Network, A: StorageReadWrite> LedgerState<N, A> {
     #[doc(hidden)]
     pub fn open_writer_with_increment<S: Storage<Access = A>, P: AsRef<Path>>(path: P, validation_increment: u32) -> Result<Self> {
         // Open storage.
-        let context = N::NETWORK_ID;
+        let context = N::ID;
         let storage = S::open(path, context)?;
 
         // Initialize the ledger.
@@ -791,7 +792,7 @@ impl<N: Network, A: StorageReadWrite> LedgerState<N, A> {
             latest_block: RwLock::new(N::genesis_block().clone()),
             latest_block_hashes_and_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
             latest_block_locators: Default::default(),
-            ledger_roots: storage.open_map(MapId::LedgerRoots)?,
+            ledger_roots: storage.open_map(DataID::LedgerRoots)?,
             blocks: BlockState::open(storage)?,
         };
 
@@ -830,7 +831,7 @@ impl<N: Network, A: StorageReadWrite> LedgerState<N, A> {
 
         // TODO (howardwu): TEMPORARY - Remove this after testnet2.
         // Sanity check for a V12 ledger.
-        if N::NETWORK_ID == 2
+        if N::ID == 3
             && latest_block_height > snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT
             && ledger.get_block(latest_block_height).is_err()
         {
@@ -949,9 +950,9 @@ impl<N: Network, A: StorageReadWrite> LedgerState<N, A> {
         }
 
         // Compute the expected difficulty target.
-        let expected_difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+        let expected_difficulty_target = if N::ID == 3 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
             Blocks::<N>::compute_difficulty_target(current_block.header(), block.timestamp(), block.height())
-        } else if N::NETWORK_ID == 2 {
+        } else if N::ID == 3 {
             let anchor_block_header = self.get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
             Blocks::<N>::compute_difficulty_target(&anchor_block_header, block.timestamp(), block.height())
         } else {
@@ -1269,9 +1270,9 @@ impl<N: Network, A: StorageAccess> BlockState<N, A> {
     /// Initializes a new instance of `BlockState`.
     fn open<S: Storage<Access = A>>(storage: S) -> Result<Self> {
         Ok(Self {
-            block_heights: storage.open_map(MapId::BlockHeights)?,
-            block_headers: storage.open_map(MapId::BlockHeaders)?,
-            block_transactions: storage.open_map(MapId::BlockTransactions)?,
+            block_heights: storage.open_map(DataID::BlockHeights)?,
+            block_headers: storage.open_map(DataID::BlockHeaders)?,
+            block_transactions: storage.open_map(DataID::BlockTransactions)?,
             transactions: TransactionState::open(storage)?,
         })
     }
@@ -1537,10 +1538,10 @@ impl<N: Network, A: StorageAccess> TransactionState<N, A> {
     /// Initializes a new instance of `TransactionState`.
     fn open<S: Storage<Access = A>>(storage: S) -> Result<Self> {
         Ok(Self {
-            transactions: storage.open_map(MapId::Transactions)?,
-            transitions: storage.open_map(MapId::Transitions)?,
-            serial_numbers: storage.open_map(MapId::SerialNumbers)?,
-            commitments: storage.open_map(MapId::Commitments)?,
+            transactions: storage.open_map(DataID::Transactions)?,
+            transitions: storage.open_map(DataID::Transitions)?,
+            serial_numbers: storage.open_map(DataID::SerialNumbers)?,
+            commitments: storage.open_map(DataID::Commitments)?,
         })
     }
 

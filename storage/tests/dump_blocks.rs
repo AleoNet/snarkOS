@@ -14,26 +14,26 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_environment::CurrentNetwork;
-use snarkos_storage::{
-    storage::{rocksdb::RocksDB, ReadOnly},
-    LedgerState,
-};
-use snarkvm::dpc::traits::network::Network;
-
-#[test]
-#[ignore = "This can be run whenever a block dump is needed."]
-fn dump_blocks() {
-    // Compose the correct file path for the parameter file.
-    let mut source_path = aleo_std::aleo_dir();
-    source_path.push("storage");
-    source_path.push(format!("ledger-{}", CurrentNetwork::NETWORK_ID));
-
-    // The path to dump the blocks to.
-    let target_path = "./blocks.dump";
-    // The number of blocks to dump.
-    let num_blocks = 10;
-
-    let (ledger, _) = LedgerState::<CurrentNetwork, _>::open_reader::<RocksDB<ReadOnly>, _>(source_path).unwrap();
-    ledger.dump_blocks(target_path, num_blocks).unwrap();
-}
+// use snarkos_environment::CurrentNetwork;
+// use snarkos_storage::{
+//     storage::{rocksdb::RocksDB, ReadOnly},
+//     LedgerState,
+// };
+// use snarkvm::prelude::Network;
+//
+// #[test]
+// #[ignore = "This can be run whenever a block dump is needed."]
+// fn dump_blocks() {
+//     // Compose the correct file path for the parameter file.
+//     let mut source_path = aleo_std::aleo_dir();
+//     source_path.push("storage");
+//     source_path.push(format!("ledger-{}", CurrentNetwork::ID));
+//
+//     // The path to dump the blocks to.
+//     let target_path = "./blocks.dump";
+//     // The number of blocks to dump.
+//     let num_blocks = 10;
+//
+//     let (ledger, _) = LedgerState::<CurrentNetwork, _>::open_reader::<RocksDB<ReadOnly>, _>(source_path).unwrap();
+//     ledger.dump_blocks(target_path, num_blocks).unwrap();
+// }
