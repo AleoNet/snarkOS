@@ -3561,9 +3561,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.3.12"
+version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfbbce75cad20b56f4f4200e413b894c990c7bbd7e47245ff5cbc2b82511e4da"
+checksum = "3a713421342a5a666b7577783721d3117f1b69a393df803ee17bb73b1e122a59"
 dependencies = [
  "ansi_term",
  "matchers",
