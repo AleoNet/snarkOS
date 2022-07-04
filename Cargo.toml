@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2021"
 
 [workspace]
-members = [ ".crawler", ".integration", ".synthetic_node", "consensus", "environment", "metrics", "network", "rpc", "storage" ]
+members = [ "consensus", "environment", "metrics", "network", "rpc", "storage" ]
 
 [lib]
 path = "snarkos/lib.rs"
@@ -28,12 +28,12 @@ path = "snarkos/main.rs"
 required-features = ["console"]
 
 [features]
-default = [ "console", "rpc" ]
+#default = [ "console", "rpc" ]
+default = [ "console" ]
 console = [ "crossterm", "tui" ]
 cuda = [ "snarkvm/cuda" ]
 prometheus = [ "snarkos-metrics/prometheus", "snarkos-network/prometheus" ]
-rpc = [ "snarkos-rpc" ]
-task-metrics = [ "snarkos-environment/task-metrics" ]
+#rpc = [ "snarkos-rpc" ]
 test = [ "snarkos-metrics/test", "snarkos-network/test" ]
 
 [dependencies.aleo-std]
@@ -41,6 +41,10 @@ version = "0.1.14"
 
 [dependencies.anyhow]
 version = "1"
+
+[dependencies.clap]
+version = "3.1"
+features = [ "derive" ]
 
 [dependencies.colored]
 version = "2.0"
@@ -80,21 +84,20 @@ optional = true
 path = "./network"
 version = "2.0.2"
 
-[dependencies.snarkos-rpc]
-path = "./rpc"
-version = "2.0.2"
-optional = true
+#[dependencies.snarkos-rpc]
+#path = "./rpc"
+#version = "2.0.2"
+#optional = true
 
 [dependencies.snarkos-storage]
 path = "./storage"
 version = "2.0.2"
 
 [dependencies.snarkvm]
-version = "0.8.0"
-
-[dependencies.clap]
-version = "3.1"
-features = [ "derive" ]
+path = "../snarkVM"
+#git = "https://github.com/AleoHQ/snarkVM.git"
+#branch = "testnet3"
+features = ["console"]
 
 [dependencies.thiserror]
 version = "1.0"

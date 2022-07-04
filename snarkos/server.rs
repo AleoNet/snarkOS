@@ -17,14 +17,14 @@
 use crate::{display::notification_message, Node};
 use snarkos_environment::{
     helpers::{NodeType, Status},
-    network::DisconnectReason,
     Environment,
 };
 use snarkos_network::{
-    ledger::{Ledger, LedgerRequest},
-    operator::Operator,
+    // ledger::{Ledger, LedgerRequest},
+    // validator::Operator,
     peers::{Peers, PeersRequest},
-    prover::Prover,
+    // prover::Prover,
+    DisconnectReason,
     State,
 };
 use snarkvm::prelude::*;
@@ -34,8 +34,6 @@ use snarkos_rpc::{initialize_rpc_server, RpcContext};
 
 #[cfg(any(feature = "test", feature = "prometheus"))]
 use snarkos_metrics as metrics;
-#[cfg(any(feature = "test", feature = "prometheus"))]
-use snarkos_network::LedgerReader;
 
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc, time::Duration};
@@ -53,7 +51,7 @@ impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Starts the connection listener for peers.
     ///
-    pub async fn initialize(node: &Node, address: Option<Address<N>>, pool_ip: Option<SocketAddr>) -> Result<Self> {
+    pub async fn initialize(node: &Node, address: Option<Address<N>>) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(node.node).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
@@ -62,10 +60,10 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Initialize the ledger storage path.
         let ledger_storage_path = node.ledger_storage_path(local_ip);
-        // Initialize the operator storage path.
-        let operator_storage_path = node.operator_storage_path(local_ip);
         // Initialize the prover storage path.
         let prover_storage_path = node.prover_storage_path(local_ip);
+        // Initialize the validator storage path.
+        let validator_storage_path = node.validator_storage_path(local_ip);
 
         // Initialize the shared state.
         let state = Arc::new(State::new(local_ip, address));
@@ -73,30 +71,30 @@ impl<N: Network, E: Environment> Server<N, E> {
         // Initialize a new instance for managing peers.
         let (peers, peers_handler) = Peers::new(None, state.clone()).await;
 
-        // Initialize a new instance for managing the ledger.
-        let (ledger, ledger_handler) = Ledger::<N, E>::open::<_>(&ledger_storage_path, state.clone()).await?;
+        // // Initialize a new instance for managing the ledger.
+        // let (ledger, ledger_handler) = Ledger::<N, E>::open::<_>(&ledger_storage_path, state.clone()).await?;
+        //
+        // // Initialize a new instance for managing the prover.
+        // let (prover, prover_handler) = Prover::open::<_>(&prover_storage_path, state.clone()).await?;
+        //
+        // // Initialize a new instance for managing the validator.
+        // let (validator, validator_handler) = Operator::open::<_>(&validator_storage_path, state.clone()).await?;
 
-        // Initialize a new instance for managing the prover.
-        let (prover, prover_handler) = Prover::open::<_>(&prover_storage_path, pool_ip, state.clone()).await?;
-
-        // Initialize a new instance for managing the operator.
-        let (operator, operator_handler) = Operator::open::<_>(&operator_storage_path, state.clone()).await?;
-
-        // Initialise the metrics exporter.
-        #[cfg(any(feature = "test", feature = "prometheus"))]
-        Self::initialize_metrics(ledger.reader().clone());
+        // // Initialise the metrics exporter.
+        // #[cfg(any(feature = "test", feature = "prometheus"))]
+        // Self::initialize_metrics(ledger.reader().clone());
 
         let server = Self { state };
 
         server.state.initialize_peers(peers, peers_handler).await;
-        server.state.initialize_ledger(ledger, ledger_handler).await;
-        server.state.initialize_prover(prover, prover_handler).await;
-        server.state.initialize_operator(operator, operator_handler).await;
+        // server.state.initialize_ledger(ledger, ledger_handler).await;
+        // server.state.initialize_prover(prover, prover_handler).await;
+        // server.state.initialize_validator(validator, validator_handler).await;
 
-        server.state.prover().initialize_miner().await;
-        server.state.prover().initialize_pooling().await;
-        server.state.prover().initialize_pool_connection_loop(pool_ip).await;
-        server.state.operator().initialize().await;
+        // server.state.prover().initialize_miner().await;
+        // server.state.prover().initialize_pooling().await;
+        // server.state.prover().initialize_pool_connection_loop(pool_ip).await;
+        // server.state.validator().initialize().await;
 
         server.initialize_notification(address).await;
         server.initialize_listener(listener).await;
@@ -201,10 +199,10 @@ impl<N: Network, E: Environment> Server<N, E> {
                 // Notify the outer function that the task is ready.
                 let _ = router.send(());
                 loop {
-                    // Transmit a heartbeat request to the ledger.
-                    if let Err(error) = state.ledger().router().send(LedgerRequest::Heartbeat).await {
-                        error!("Failed to send heartbeat to ledger: {}", error)
-                    }
+                    // // Transmit a heartbeat request to the ledger.
+                    // if let Err(error) = state.ledger().router().send(LedgerRequest::Heartbeat).await {
+                    //     error!("Failed to send heartbeat to ledger: {}", error)
+                    // }
                     // Transmit a heartbeat request to the peers.
                     let request = PeersRequest::Heartbeat;
                     if let Err(error) = state.peers().router().send(request).await {
@@ -295,15 +293,15 @@ impl<N: Network, E: Environment> Server<N, E> {
         let _ = handler.await;
     }
 
-    #[cfg(any(feature = "test", feature = "prometheus"))]
-    fn initialize_metrics(ledger: LedgerReader<N>) {
-        #[cfg(not(feature = "test"))]
-        if let Some(handler) = snarkos_metrics::initialize() {
-            // No need to provide an id, as the task will run indefinitely.
-            E::resources().register_task(None, handler);
-        }
-
-        // Set the block height as it could already be non-zero.
-        metrics::gauge!(metrics::blocks::HEIGHT, ledger.latest_block_height() as f64);
-    }
+    // #[cfg(any(feature = "test", feature = "prometheus"))]
+    // fn initialize_metrics(ledger: LedgerReader<N>) {
+    //     #[cfg(not(feature = "test"))]
+    //     if let Some(handler) = snarkos_metrics::initialize() {
+    //         // No need to provide an id, as the task will run indefinitely.
+    //         E::resources().register_task(None, handler);
+    //     }
+    //
+    //     // Set the block height as it could already be non-zero.
+    //     metrics::gauge!(metrics::blocks::HEIGHT, ledger.latest_block_height() as f64);
+    // }
 }

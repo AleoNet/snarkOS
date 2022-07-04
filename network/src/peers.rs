@@ -16,7 +16,7 @@
 
 use crate::{Data, DisconnectReason, Message, OutboundRouter, Peer, State};
 use snarkos_environment::Environment;
-use snarkvm::dpc::prelude::*;
+use snarkvm::prelude::Network;
 
 #[cfg(any(feature = "test", feature = "prometheus"))]
 use snarkos_metrics as metrics;

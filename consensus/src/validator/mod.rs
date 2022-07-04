@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm::prelude::{Network, Address};
+use snarkvm::prelude::{Address, Network};
 
 use anyhow::{anyhow, bail, ensure, Result};
 use fixed::types::{I128F0, U64F64};
@@ -464,7 +464,7 @@ impl<N: Network> Validator<N> {
 #[allow(deprecated)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::{Testnet3, test_crypto_rng};
+    use snarkvm::prelude::{test_crypto_rng, Testnet3};
 
     type CurrentNetwork = Testnet3;
 

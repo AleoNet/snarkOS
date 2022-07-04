@@ -44,7 +44,7 @@ pub use snarkos_storage as storage;
 pub use snarkos_rpc as rpc;
 
 pub use environment::CurrentNetwork;
-pub use snarkvm::dpc::{Address, Network};
+pub use snarkvm::prelude::{Address, Network};
 
 pub mod prelude {
     pub use crate::{environment::*, network::*, storage::*};
@@ -53,5 +53,5 @@ pub mod prelude {
     pub use crate::rpc::*;
 
     pub use snarkos_environment::CurrentNetwork;
-    pub use snarkvm::dpc::{Address, Network};
+    pub use snarkvm::prelude::{Address, Network};
 }

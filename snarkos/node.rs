@@ -21,24 +21,20 @@ use snarkos_environment::{
     ClientTrial,
     CurrentNetwork,
     Environment,
-    Miner,
-    MinerTrial,
-    Operator,
-    OperatorTrial,
     Prover,
     ProverTrial,
     SyncNode,
+    Validator,
+    ValidatorTrial,
 };
-use snarkos_storage::{
-    storage::{rocksdb::RocksDB, ReadOnly},
-    LedgerState,
-};
-use snarkvm::dpc::prelude::*;
+use snarkos_storage::storage::{rocksdb::RocksDB, ReadOnly};
+use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use colored::*;
 use crossterm::tty::IsTty;
+use rand::thread_rng;
 use std::{fmt::Write, io, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use tokio::sync::mpsc;
 use tracing_subscriber::EnvFilter;
@@ -49,26 +45,20 @@ pub struct Node {
     /// Specify the IP address and port of a peer to connect to.
     #[clap(long = "connect")]
     pub connect: Option<String>,
-    /// Specify this as a mining node, with the given miner address.
-    #[clap(long = "miner")]
-    pub miner: Option<String>,
-    /// Specify this as an operating node, with the given operator address.
-    #[clap(long = "operator")]
-    pub operator: Option<String>,
+    /// Specify this as a validator node, with the given validator address.
+    #[clap(long = "validator")]
+    pub validator: Option<String>,
     /// Specify this as a prover node, with the given prover address.
     #[clap(long = "prover")]
     pub prover: Option<String>,
-    /// Specify the pool that a prover node is contributing to.
-    #[clap(long = "pool")]
-    pub pool: Option<SocketAddr>,
     /// Specify the network of this node.
-    #[clap(default_value = "2", long = "network")]
+    #[clap(default_value = "3", long = "network")]
     pub network: u16,
     /// Specify the IP address and port for the node server.
-    #[clap(parse(try_from_str), default_value = "0.0.0.0:4132", long = "node")]
+    #[clap(parse(try_from_str), default_value = "0.0.0.0:4133", long = "node")]
     pub node: SocketAddr,
     /// Specify the IP address and port for the RPC server.
-    #[clap(parse(try_from_str), default_value = "0.0.0.0:3032", long = "rpc")]
+    #[clap(parse(try_from_str), default_value = "0.0.0.0:3033", long = "rpc")]
     pub rpc: SocketAddr,
     /// Specify the username for the RPC server.
     #[clap(default_value = "root", long = "username")]
@@ -89,8 +79,6 @@ pub struct Node {
     #[clap(long)]
     pub norpc: bool,
     #[clap(hide = true, long)]
-    pub trial: bool,
-    #[clap(hide = true, long)]
     pub sync: bool,
     /// Specify an optional subcommand.
     #[clap(subcommand)]
@@ -107,35 +95,27 @@ impl Node {
                 Ok(())
             }
             None => match &self.get_node_type() {
-                (NodeType::Client, false) => self.start_server::<CurrentNetwork, Client<CurrentNetwork>>(&None).await,
-                (NodeType::Miner, false) => self.start_server::<CurrentNetwork, Miner<CurrentNetwork>>(&self.miner).await,
-                (NodeType::Operator, false) => self.start_server::<CurrentNetwork, Operator<CurrentNetwork>>(&self.operator).await,
-                (NodeType::Prover, false) => self.start_server::<CurrentNetwork, Prover<CurrentNetwork>>(&self.prover).await,
-                (NodeType::Client, true) => self.start_server::<CurrentNetwork, ClientTrial<CurrentNetwork>>(&None).await,
-                (NodeType::Miner, true) => self.start_server::<CurrentNetwork, MinerTrial<CurrentNetwork>>(&self.miner).await,
-                (NodeType::Operator, true) => {
-                    self.start_server::<CurrentNetwork, OperatorTrial<CurrentNetwork>>(&self.operator)
+                NodeType::Client => self.start_server::<CurrentNetwork, Client<CurrentNetwork>>(&None).await,
+                NodeType::Validator => {
+                    self.start_server::<CurrentNetwork, Validator<CurrentNetwork>>(&self.validator)
                         .await
                 }
-                (NodeType::Prover, true) => self.start_server::<CurrentNetwork, ProverTrial<CurrentNetwork>>(&self.prover).await,
-                (NodeType::Sync, _) => self.start_server::<CurrentNetwork, SyncNode<CurrentNetwork>>(&None).await,
+                NodeType::Prover => self.start_server::<CurrentNetwork, Prover<CurrentNetwork>>(&self.prover).await,
+                NodeType::Beacon => self.start_server::<CurrentNetwork, SyncNode<CurrentNetwork>>(&None).await,
                 _ => panic!("Unsupported node configuration"),
             },
         }
     }
 
-    fn get_node_type(&self) -> (NodeType, bool) {
-        (
-            match (self.network, &self.miner, &self.operator, &self.prover, self.sync) {
-                (2, None, None, None, false) => NodeType::Client,
-                (2, Some(_), None, None, false) => NodeType::Miner,
-                (2, None, Some(_), None, false) => NodeType::Operator,
-                (2, None, None, Some(_), false) => NodeType::Prover,
-                (2, None, None, None, true) => NodeType::Sync,
-                _ => panic!("Unsupported node configuration"),
-            },
-            self.trial,
-        )
+    /// Returns the node type corresponding to the given node configurations.
+    fn get_node_type(&self) -> NodeType {
+        match (self.network, &self.validator, &self.prover, self.sync) {
+            (3, None, None, false) => NodeType::Client,
+            (3, Some(_), None, false) => NodeType::Validator,
+            (3, None, Some(_), false) => NodeType::Prover,
+            (3, None, None, true) => NodeType::Beacon,
+            _ => panic!("Unsupported node configuration"),
+        }
     }
 
     /// Returns the storage path of the ledger.
@@ -149,13 +129,14 @@ impl Node {
         }
     }
 
-    /// Returns the storage path of the operator.
-    pub(crate) fn operator_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
+    /// Returns the storage path of the validator.
+    pub(crate) fn validator_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
         if cfg!(feature = "test") {
             // Tests may use any available ports, and removes the storage artifacts afterwards,
             // so that there is no need to adhere to a specific number assignment logic.
-            PathBuf::from(format!("/tmp/snarkos-test-operator-{}", _local_ip.port()))
+            PathBuf::from(format!("/tmp/snarkos-test-validator-{}", _local_ip.port()))
         } else {
+            // TODO (howardwu): Rename to validator.
             aleo_std::aleo_operator_dir(self.network, self.dev)
         }
     }
@@ -175,19 +156,19 @@ impl Node {
         println!("{}", crate::display::welcome_message());
 
         let address = match (E::NODE_TYPE, address) {
-            (NodeType::Miner, Some(address)) | (NodeType::Operator, Some(address)) | (NodeType::Prover, Some(address)) => {
+            (NodeType::Validator, Some(address)) | (NodeType::Prover, Some(address)) => {
                 let address = Address::<N>::from_str(address)?;
-                println!("Your Aleo address is {}.\n", address);
+                println!("Your Aleo address is {address}.\n");
                 Some(address)
             }
             _ => None,
         };
 
-        println!("Starting {} on {}.", E::NODE_TYPE.description(), N::NETWORK_NAME);
+        println!("Starting {} on {}.", E::NODE_TYPE.description(), N::NAME);
         println!("{}", crate::display::notification_message::<N>(address));
 
         // Initialize the node's server.
-        let server = Server::<N, E>::initialize(self, address, self.pool).await?;
+        let server = Server::<N, E>::initialize(self, address).await?;
 
         // Initialize signal handling; it also maintains ownership of the Server
         // in order for it to not go out of scope.
@@ -255,8 +236,6 @@ pub enum Command {
     Update(Update),
     #[clap(name = "experimental", about = "Experimental features")]
     Experimental(Experimental),
-    #[clap(name = "miner", about = "Miner commands and settings")]
-    Miner(MinerSubcommand),
 }
 
 impl Command {
@@ -265,7 +244,6 @@ impl Command {
             Self::Clean(command) => command.parse(),
             Self::Update(command) => command.parse(),
             Self::Experimental(command) => command.parse(),
-            Self::Miner(command) => command.parse(),
         }
     }
 }
@@ -327,11 +305,7 @@ impl Clean {
             // Remove the ledger files from storage.
             match std::fs::remove_dir_all(&path) {
                 Ok(_) => Ok(format!("Successfully removed the ledger files from storage. ({})", path.display())),
-                Err(error) => Err(anyhow!(
-                    "Failed to remove the ledger files from storage. ({})\n{}",
-                    path.display(),
-                    error
-                )),
+                Err(error) => bail!("Failed to remove the ledger files from storage. ({})\n{}", path.display(), error),
             }
         } else {
             Ok(format!("No ledger files were found in storage. ({})", path.display()))
@@ -407,7 +381,10 @@ pub struct NewAccount {}
 
 impl NewAccount {
     pub fn parse(self) -> Result<String> {
-        let account = Account::<CurrentNetwork>::new(&mut rand::thread_rng());
+        // Sample a new private key, view key, and address.
+        let private_key = PrivateKey::<CurrentNetwork>::new(&mut rand::thread_rng())?;
+        let view_key = ViewKey::try_from(&private_key)?;
+        let address = Address::try_from(&view_key)?;
 
         // Print the new Aleo account.
         let mut output = "".to_string();
@@ -416,89 +393,11 @@ impl NewAccount {
             "\n {:>12}\n",
             "Attention - Remember to store this account private key and view key.".red().bold()
         )?;
-        writeln!(output, "\n {:>12}  {}", "Private Key".cyan().bold(), account.private_key())?;
-        writeln!(output, " {:>12}  {}", "View Key".cyan().bold(), account.view_key())?;
-        writeln!(output, " {:>12}  {}", "Address".cyan().bold(), account.address())?;
+        writeln!(output, "\n {:>12}  {}", "Private Key".cyan().bold(), private_key)?;
+        writeln!(output, " {:>12}  {}", "View Key".cyan().bold(), view_key)?;
+        writeln!(output, " {:>12}  {}", "Address".cyan().bold(), address)?;
 
         Ok(output)
-    }
-}
-
-#[derive(Debug, Parser)]
-pub struct MinerSubcommand {
-    #[clap(subcommand)]
-    commands: MinerCommands,
-}
-
-impl MinerSubcommand {
-    pub fn parse(self) -> Result<String> {
-        match self.commands {
-            MinerCommands::Stats(command) => command.parse(),
-        }
-    }
-}
-
-#[derive(Debug, Parser)]
-pub enum MinerCommands {
-    #[clap(name = "stats", about = "Prints statistics for the miner.")]
-    Stats(MinerStats),
-}
-
-#[derive(Debug, Parser)]
-pub struct MinerStats {
-    #[clap()]
-    address: String,
-}
-
-impl MinerStats {
-    pub fn parse(self) -> Result<String> {
-        // Parse the input address.
-        let miner = Address::<CurrentNetwork>::from_str(&self.address)?;
-
-        // Initialize the node.
-        let node = Node::parse_from(&["snarkos", "--norpc", "--verbosity", "0"]);
-
-        let ip = "0.0.0.0:1000".parse().unwrap();
-
-        // Initialize the ledger storage.
-        let ledger_storage_path = node.ledger_storage_path(ip);
-        let (ledger, ledger_resource): (Arc<LedgerState<CurrentNetwork, _>>, _) =
-            snarkos_storage::LedgerState::open_reader::<RocksDB<ReadOnly>, _>(ledger_storage_path).unwrap();
-
-        // Initialize the prover storage.
-        let prover_storage_path = node.prover_storage_path(ip);
-        let prover = snarkos_storage::ProverState::open::<RocksDB<ReadOnly>, _>(prover_storage_path).unwrap();
-
-        // Retrieve the latest block height.
-        let latest_block_height = ledger.latest_block_height();
-
-        // Prepare a list of confirmed and pending coinbase records.
-        let mut confirmed = vec![];
-        let mut pending = vec![];
-
-        // Iterate through the coinbase records from storage.
-        for (block_height, record) in prover.to_coinbase_records() {
-            // Filter the coinbase records by determining if they exist on the canonical chain.
-            if let Ok(true) = ledger.contains_commitment(&record.commitment()) {
-                // Ensure the record owner matches.
-                if record.owner() == miner {
-                    // Add the block to the appropriate list.
-                    match block_height + 2048 < latest_block_height {
-                        true => confirmed.push((block_height, record)),
-                        false => pending.push((block_height, record)),
-                    }
-                }
-            }
-        }
-
-        tokio::spawn(ledger_resource.abort());
-
-        Ok(format!(
-            "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
-            confirmed.len(),
-            pending.len(),
-            miner
-        ))
     }
 }
 

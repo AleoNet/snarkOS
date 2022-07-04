@@ -1,38 +1,42 @@
 // Copyright (C) 2019-2022 Aleo Systems Inc.
-// This file is part of the snarkVM library.
+// This file is part of the snarkOS library.
 
-// The snarkVM library is free software: you can redistribute it and/or modify
+// The snarkOS library is free software: you can redistribute it and/or modify
 // it under the terms of the GNU General Public License as published by
 // the Free Software Foundation, either version 3 of the License, or
 // (at your option) any later version.
 
-// The snarkVM library is distributed in the hope that it will be useful,
+// The snarkOS library is distributed in the hope that it will be useful,
 // but WITHOUT ANY WARRANTY; without even the implied warranty of
 // MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
 // GNU General Public License for more details.
 
 // You should have received a copy of the GNU General Public License
-// along with the snarkVM library. If not, see <https://www.gnu.org/licenses/>.
+// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm::prelude::Network;
-use snarkvm::console::collections::merkle_tree::{MerklePath, MerkleTree};
-use snarkvm::utilities::{
-    fmt,
-    io::{Read, Result as IoResult, Write},
-    str::FromStr,
-    FromBytes,
-    FromBytesDeserializer,
-    ToBytes,
-    ToBytesSerializer,
-    Uniform,error
+use snarkvm::{
+    console::collections::merkle_tree::{MerklePath, MerkleTree},
+    prelude::Network,
+    utilities::{
+        error,
+        fmt,
+        io::{Read, Result as IoResult, Write},
+        str::FromStr,
+        FromBytes,
+        FromBytesDeserializer,
+        ToBytes,
+        ToBytesSerializer,
+        Uniform,
+    },
 };
 
 use anyhow::{anyhow, bail, Result};
+use serde::{Deserialize, Serialize};
 // use serde::{de, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use std::{mem::size_of, sync::atomic::AtomicBool};
 
 /// The header for the block contains metadata that uniquely identifies the block.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct BlockHeader<N: Network> {
     /// The network ID of the block.
     network: u16,
@@ -94,7 +98,15 @@ impl<N: Network> BlockHeader<N> {
 
     /// Initializes a new instance of a genesis block header metadata.
     pub fn genesis() -> Self {
-        Self { network: N::ID, height: 0u32, round: 0u64, coinbase_target: u64::MAX, proof_target: u64::MAX, timestamp: 0i64, _phantom: std::marker::PhantomData }
+        Self {
+            network: N::ID,
+            height: 0u32,
+            round: 0u64,
+            coinbase_target: u64::MAX,
+            proof_target: u64::MAX,
+            timestamp: 0i64,
+            _phantom: std::marker::PhantomData,
+        }
     }
 
     /// Returns the network ID of the block.
@@ -126,7 +138,6 @@ impl<N: Network> BlockHeader<N> {
     pub fn timestamp(&self) -> i64 {
         self.timestamp
     }
-
 
     // /// Returns the size (in bytes) of a block header's metadata.
     // pub fn size() -> usize {
@@ -169,20 +180,18 @@ impl<N: Network> BlockHeader<N> {
         match self.height == 0u32 {
             true => self.is_genesis(),
             false => {
-
                 // Ensure the network ID is correct.
                 self.network == N::ID
                 // Ensure the timestamp in the block is greater than 0.
                 && self.timestamp > 0i64
-                    // // Ensure the PoSW proof is valid.
-                    // && N::posw().verify_from_block_header(self)
+                // // Ensure the PoSW proof is valid.
+                // && N::posw().verify_from_block_header(self)
             }
         }
     }
 
     /// Returns `true` if the block header is a genesis block header.
     pub fn is_genesis(&self) -> bool {
-
         // Ensure the network ID is correct.
         self.network == N::ID
             // Ensure the height in the genesis block is 0.
@@ -195,10 +204,10 @@ impl<N: Network> BlockHeader<N> {
             && self.coinbase_target == u64::MAX
             // Ensure the proof target in the genesis block is u64::MAX.
             && self.proof_target == u64::MAX
-            // // Ensure the cumulative weight in the genesis block is 0u128.
-            // && self.metadata.cumulative_weight == 0u128
-            // // Ensure the PoSW proof is valid.
-            // && N::posw().verify_from_block_header(self)
+        // // Ensure the cumulative weight in the genesis block is 0u128.
+        // && self.metadata.cumulative_weight == 0u128
+        // // Ensure the PoSW proof is valid.
+        // && N::posw().verify_from_block_header(self)
     }
 
     // /// Returns the previous ledger root from the block header.
@@ -256,14 +265,7 @@ impl<N: Network> FromBytes for BlockHeader<N> {
         let proof_target = u64::read_le(&mut reader)?;
         let timestamp = i64::read_le(&mut reader)?;
         // Construct the block header.
-        Self::new(
-            network,
-            height,
-            round,
-            coinbase_target,
-            proof_target,
-            timestamp,
-        ).map_err(|e| error("{e}"))
+        Self::new(network, height, round, coinbase_target, proof_target, timestamp).map_err(|e| error("{e}"))
     }
 }
 
@@ -294,14 +296,14 @@ impl<N: Network> ToBytes for BlockHeader<N> {
 //         write!(f, "{}", serde_json::to_string(self).map_err::<fmt::Error, _>(serde::ser::Error::custom)?)
 //     }
 // }
-//
+
 // impl<N: Network> Serialize for BlockHeader<N> {
 //     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
 //         match serializer.is_human_readable() {
 //             true => {
 //                 let mut header = serializer.serialize_struct("BlockHeader", 4)?;
-//                 header.serialize_field("previous_ledger_root", &self.previous_ledger_root)?;
-//                 header.serialize_field("transactions_root", &self.transactions_root)?;
+//                 // header.serialize_field("previous_ledger_root", &self.previous_ledger_root)?;
+//                 // header.serialize_field("transactions_root", &self.transactions_root)?;
 //                 header.serialize_field("metadata", &self.metadata)?;
 //                 header.serialize_field("nonce", &self.nonce)?;
 //                 header.serialize_field("proof", &self.proof)?;

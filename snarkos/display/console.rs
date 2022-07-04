@@ -20,7 +20,7 @@ use crate::{
     Server,
 };
 use snarkos_environment::Environment;
-use snarkvm::dpc::Network;
+use snarkvm::prelude::Network;
 
 use anyhow::Result;
 use crossterm::{

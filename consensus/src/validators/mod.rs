@@ -14,10 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    validator::{Round, Score, Stake, Validator},
-};
-use snarkvm::prelude::{Network, Address};
+use crate::validator::{Round, Score, Stake, Validator};
+use snarkvm::prelude::{Address, Network};
 
 use anyhow::{anyhow, bail, ensure, Error, Result};
 use core::ops::Deref;
@@ -271,7 +269,13 @@ impl<N: Network> Validators<N> {
 
 impl<N: Network> Validators<N> {
     /// Processes all bonding and unbonding requests sequentially, and returns the new leader of the round.
-    fn round_start(&mut self, round: Round, bonds: &[Bond<N>], unbonds: &[Unbond<N>], unbond_validators: &[UnbondValidator<N>]) -> Result<Address<N>> {
+    fn round_start(
+        &mut self,
+        round: Round,
+        bonds: &[Bond<N>],
+        unbonds: &[Unbond<N>],
+        unbond_validators: &[UnbondValidator<N>],
+    ) -> Result<Address<N>> {
         // Clone the validator set.
         let mut validators = self.clone();
 
@@ -418,7 +422,7 @@ impl<N: Network> Deref for Validators<N> {
 #[allow(deprecated)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::{Testnet3, test_crypto_rng};
+    use snarkvm::prelude::{test_crypto_rng, Testnet3};
 
     type CurrentNetwork = Testnet3;
 
@@ -449,7 +453,7 @@ mod tests {
     #[test]
     fn test_get_total_supply() {
         // Initialize the validator set.
-        let mut validators = Validators::<CurrentNetwork>::new();
+        let validators = Validators::<CurrentNetwork>::new();
         assert_eq!(validators.total_supply(), STARTING_SUPPLY);
     }
 

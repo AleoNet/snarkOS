@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Status};
-use snarkvm::prelude::{Network, Address};
+use crate::Status;
+use snarkvm::prelude::{Address, Network};
 
 #[derive(Clone, Debug)]
 pub struct Round<N: Network> {

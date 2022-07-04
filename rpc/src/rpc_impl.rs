@@ -112,9 +112,9 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
         let block_timestamp = OffsetDateTime::now_utc().unix_timestamp();
 
         // Compute the block difficulty target.
-        let difficulty_target = if N::NETWORK_ID == 2 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
+        let difficulty_target = if N::ID == 3 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
             Blocks::<N>::compute_difficulty_target(latest_block.header(), block_timestamp, block_height)
-        } else if N::NETWORK_ID == 2 {
+        } else if N::ID == 3 {
             let anchor_block_header = self.ledger().get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
             Blocks::<N>::compute_difficulty_target(&anchor_block_header, block_timestamp, block_height)
         } else {

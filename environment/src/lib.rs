@@ -78,8 +78,6 @@ pub trait Environment: 'static + Clone + Debug + Send + Sync {
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
 
-    /// The maximum size of a message that can be transmitted in the network.
-    const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
     /// The maximum number of blocks that may be fetched in one request.
     const MAXIMUM_BLOCK_REQUEST: u32 = 250;
     /// The maximum number of failures tolerated before disconnecting from a peer.

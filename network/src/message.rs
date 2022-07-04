@@ -14,11 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use snarkos_consensus::{Block, BlockHeader, Transaction};
 use snarkos_environment::{
     helpers::{NodeType, Status},
     Environment,
 };
-use snarkvm::{dpc::posw::PoSWProof, prelude::*};
+use snarkvm::prelude::{to_bytes_le, Network, ToBytes};
 
 use ::bytes::{Buf, BufMut, Bytes, BytesMut};
 use anyhow::{bail, Result};
@@ -316,14 +317,14 @@ impl<N: Network> Default for MessageCodec<N> {
 }
 
 impl<N: Network> Encoder<Message<N>> for MessageCodec<N> {
-    type Error = io::Error;
+    type Error = std::io::Error;
 
     fn encode(&mut self, message: Message<N>, dst: &mut BytesMut) -> Result<(), Self::Error> {
         // Serialize the payload directly into dst.
         message
             .serialize_into(&mut dst.writer())
             // This error should never happen, the conversion is for greater compatibility.
-            .map_err(|_| io::Error::new(io::ErrorKind::InvalidData, "serialization error"))?;
+            .map_err(|_| std::io::Error::new(std::io::ErrorKind::InvalidData, "serialization error"))?;
 
         let serialized_message = dst.split_to(dst.len()).freeze();
 
@@ -347,7 +348,7 @@ impl<N: Network> Decoder for MessageCodec<N> {
             Ok(message) => Ok(Some(message)),
             Err(error) => {
                 error!("Failed to deserialize a message: {}", error);
-                Err(io::ErrorKind::InvalidData.into())
+                Err(std::io::ErrorKind::InvalidData.into())
             }
         }
     }
