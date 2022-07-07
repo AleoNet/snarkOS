@@ -1769,9 +1769,9 @@ checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
 
 [[package]]
 name = "once_cell"
-version = "1.12.0"
+version = "1.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7709cef83f0c1f58f666e746a08b21e0085f7440fa6a29cc194d68aac97a4225"
+checksum = "18a6dbe30758c9f83eb00cbea4ac95966305f5a7772f3f42ebfc7fc7eddbd8e1"
 
 [[package]]
 name = "oorandom"
@@ -2760,7 +2760,9 @@ dependencies = [
  "anyhow",
  "clap 3.1.18",
  "colored",
+ "rand",
  "self_update",
+ "serde_json",
  "snarkvm-algorithms 0.7.5",
  "snarkvm-circuit",
  "snarkvm-compiler",
@@ -3036,6 +3038,7 @@ dependencies = [
  "anyhow",
  "colored",
  "indexmap",
+ "once_cell",
  "parking_lot 0.12.1",
  "paste",
  "rand",
