@@ -145,8 +145,8 @@ impl<N: Network> Transactions<N> {
     // }
 
     /// Returns the transactions root, by computing the root for a Merkle tree of the transaction IDs.
-    pub fn transactions_root(&self) -> Field<N> {
-        (*self.to_tree()?.root()).into()
+    pub fn transactions_root(&self) -> Result<Field<N>> {
+        Ok((*self.to_tree()?.root()).into())
     }
 
     /// Returns an inclusion proof for the transactions tree.
@@ -158,7 +158,12 @@ impl<N: Network> Transactions<N> {
     pub fn to_tree(&self) -> Result<Arc<TransactionTree<N>>> {
         // Compute the transactions tree.
         Ok(Arc::new(N::merkle_tree_bhp::<BLOCK_DEPTH>(
-            &self.transactions.iter().map(Transaction::id).collect::<Vec<_>>(),
+            &self
+                .transactions
+                .iter()
+                .map(Transaction::id)
+                .map(|id| (*id).to_bits_le())
+                .collect::<Vec<_>>(),
         )?))
     }
 
