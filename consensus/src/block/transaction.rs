@@ -21,25 +21,48 @@ use serde::ser::SerializeStruct;
 
 #[derive(Clone, PartialEq, Eq)]
 pub enum Transaction<N: Network> {
+    /// The deploy transaction enables developers to publish Aleo programs on the network.
     Deploy(N::TransactionID),
-    Execute(Vec<Transition<N>>),
+    /// The execute transaction represents a call to an Aleo program.
+    Execute(N::TransactionID, Vec<Transition<N>>),
 }
 
 impl<N: Network> Transaction<N> {
+    /// Initializes a new deployment transaction.
+    pub fn deploy(id: N::TransactionID) -> Result<Self> {
+        // Construct the deploy transaction.
+        let transaction = Self::Deploy(id);
+        // Ensure the transaction is valid.
+        match transaction.is_valid() {
+            true => Ok(transaction),
+            false => bail!("Invalid deploy transaction."),
+        }
+    }
+
+    /// Initializes a new execution transaction.
+    pub fn execute(id: N::TransactionID, transitions: Vec<Transition<N>>) -> Result<Self> {
+        // Construct the execute transaction.
+        let transaction = Self::Execute(id, transitions);
+        // Ensure the transaction is valid.
+        match transaction.is_valid() {
+            true => Ok(transaction),
+            false => bail!("Invalid execute transaction."),
+        }
+    }
+
     /// Returns the transaction ID.
     pub const fn id(&self) -> N::TransactionID {
         match self {
             Transaction::Deploy(id) => *id,
-            // Transaction::Execute(transitions) => transitions[0].id(),
-            Transaction::Execute(transitions) => todo!(),
+            Transaction::Execute(id, ..) => *id,
         }
     }
 
     /// Returns `true` if the transaction is valid.
     pub fn is_valid(&self) -> bool {
         match self {
-            Transaction::Deploy(_) => true,
-            Transaction::Execute(_) => true,
+            Transaction::Deploy(..) => true,
+            Transaction::Execute(..) => true,
         }
     }
 }
@@ -71,14 +94,16 @@ impl<N: Network> FromBytes for Transaction<N> {
         // Read the variant.
         let variant = u8::read_le(&mut reader)?;
         // Match the variant.
-        match variant {
+        let transaction = match variant {
             0 => {
                 // Read the ID.
                 let id = N::TransactionID::read_le(&mut reader)?;
                 // Construct the transaction.
-                Ok(Transaction::Deploy(id))
+                Transaction::Deploy(id)
             }
             1 => {
+                // Read the ID.
+                let id = N::TransactionID::read_le(&mut reader)?;
                 // Read the number of transitions.
                 let num_transitions = u16::read_le(&mut reader)?;
                 // Read the transitions.
@@ -86,9 +111,14 @@ impl<N: Network> FromBytes for Transaction<N> {
                     .map(|_| Transition::read_le(&mut reader))
                     .collect::<IoResult<Vec<_>>>()?;
                 // Construct the transaction.
-                Ok(Transaction::Execute(transitions))
+                Transaction::Execute(id, transitions)
             }
-            _ => Err(error("Invalid transaction variant")),
+            _ => return Err(error("Invalid transaction variant")),
+        };
+        // Ensure the transaction is valid.
+        match transaction.is_valid() {
+            true => Ok(transaction),
+            false => Err(error("Invalid transaction")),
         }
     }
 }
@@ -104,9 +134,11 @@ impl<N: Network> ToBytes for Transaction<N> {
                 // Write the ID.
                 id.write_le(&mut writer)
             }
-            Self::Execute(transitions) => {
+            Self::Execute(id, transitions) => {
                 // Write the variant.
                 1u8.write_le(&mut writer)?;
+                // Write the ID.
+                id.write_le(&mut writer)?;
                 // Write the number of transitions.
                 (transitions.len() as u16).write_le(&mut writer)?;
                 // Write the transitions.
@@ -120,7 +152,21 @@ impl<N: Network> Serialize for Transaction<N> {
     /// Serializes the transaction to a JSON-string or buffer.
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match serializer.is_human_readable() {
-            true => serializer.collect_str(self),
+            true => match self {
+                Self::Deploy(id) => {
+                    let mut transaction = serializer.serialize_struct("Transaction", 2)?;
+                    transaction.serialize_field("type", "deploy")?;
+                    transaction.serialize_field("change_me", &id)?;
+                    transaction.end()
+                }
+                Self::Execute(id, transitions) => {
+                    let mut transaction = serializer.serialize_struct("Transaction", 3)?;
+                    transaction.serialize_field("type", "execute")?;
+                    transaction.serialize_field("id", &id)?;
+                    transaction.serialize_field("transitions", &transitions)?;
+                    transaction.end()
+                }
+            },
             false => ToBytesSerializer::serialize_with_size_encoding(self, serializer),
         }
     }
@@ -131,12 +177,23 @@ impl<'de, N: Network> Deserialize<'de> for Transaction<N> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         match deserializer.is_human_readable() {
             true => {
-                let transaction: Transaction<N> = FromStr::from_str(&String::deserialize(deserializer)?).map_err(de::Error::custom)?;
+                let transaction = serde_json::Value::deserialize(deserializer)?;
+                let id: N::TransactionID = serde_json::from_value(transaction["id"].clone()).map_err(de::Error::custom)?;
 
-                // Ensure the transaction is valid.
-                match transaction.is_valid() {
-                    true => Ok(transaction),
-                    false => Err(error("Invalid transaction")).map_err(de::Error::custom),
+                // Recover the transaction.
+                let transaction = match transaction["type"].as_str() {
+                    Some("deploy") => Transaction::deploy(id).map_err(de::Error::custom)?,
+                    Some("execute") => {
+                        let transitions = serde_json::from_value(transaction["transitions"].clone()).map_err(de::Error::custom)?;
+                        Transaction::execute(id, transitions).map_err(de::Error::custom)?
+                    }
+                    _ => return Err(de::Error::custom("Invalid transaction type")),
+                };
+
+                // Ensure the transaction ID matches.
+                match id == transaction.id() {
+                    true => Ok(block),
+                    false => Err(error("Mismatching transaction ID, possible data corruption")).map_err(de::Error::custom),
                 }
             }
             false => FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "transaction"),
