@@ -84,7 +84,7 @@ impl<N: Network> FromBytes for Transaction<N> {
                 // Read the transitions.
                 let transitions = (0..num_transitions)
                     .map(|_| Transition::read_le(&mut reader))
-                    .collect::<Result<Vec<_>>>()?;
+                    .collect::<IoResult<Vec<_>>>()?;
                 // Construct the transaction.
                 Ok(Transaction::Execute(transitions))
             }
@@ -120,14 +120,7 @@ impl<N: Network> Serialize for Transaction<N> {
     /// Serializes the transaction to a JSON-string or buffer.
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match serializer.is_human_readable() {
-            true => {
-                let mut block = serializer.serialize_struct("Transaction", 4)?;
-                block.serialize_field("block_hash", &self.block_hash)?;
-                block.serialize_field("previous_hash", &self.previous_hash)?;
-                block.serialize_field("header", &self.header)?;
-                block.serialize_field("transactions", &self.transactions)?;
-                block.end()
-            }
+            true => serializer.collect_str(self),
             false => ToBytesSerializer::serialize_with_size_encoding(self, serializer),
         }
     }
@@ -138,24 +131,15 @@ impl<'de, N: Network> Deserialize<'de> for Transaction<N> {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         match deserializer.is_human_readable() {
             true => {
-                let block = serde_json::Value::deserialize(deserializer)?;
-                let block_hash: N::BlockHash = serde_json::from_value(block["block_hash"].clone()).map_err(de::Error::custom)?;
+                let transaction: Transaction<N> = FromStr::from_str(&String::deserialize(deserializer)?).map_err(de::Error::custom)?;
 
-                // Recover the block.
-                let block = Self::from(
-                    serde_json::from_value(block["previous_hash"].clone()).map_err(de::Error::custom)?,
-                    serde_json::from_value(block["header"].clone()).map_err(de::Error::custom)?,
-                    serde_json::from_value(block["transactions"].clone()).map_err(de::Error::custom)?,
-                )
-                .map_err(de::Error::custom)?;
-
-                // Ensure the block hash matches.
-                match block_hash == block.hash() {
-                    true => Ok(block),
-                    false => Err(error("Mismatching block hash, possible data corruption")).map_err(de::Error::custom),
+                // Ensure the transaction is valid.
+                match transaction.is_valid() {
+                    true => Ok(transaction),
+                    false => Err(error("Invalid transaction")).map_err(de::Error::custom),
                 }
             }
-            false => FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "block"),
+            false => FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "transaction"),
         }
     }
 }
