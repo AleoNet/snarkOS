@@ -99,7 +99,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         server.initialize_notification(address).await;
         server.initialize_listener(listener).await;
         server.initialize_heartbeat().await;
-        server.initialize_rpc(node, address).await;
+        // server.initialize_rpc(node, address).await;
 
         Ok(server)
     }
@@ -124,8 +124,10 @@ impl<N: Network, E: Environment> Server<N, E> {
     }
 
     #[inline]
-    pub async fn disconnect_from(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
-        self.state.ledger().disconnect(peer_ip, reason).await
+    pub async fn disconnect_from(&self, _peer_ip: SocketAddr, _reason: DisconnectReason) {
+        // self.state.ledger().disconnect(peer_ip, reason).await
+        // TODO (raychu86): Handle the disconnect case.
+        unimplemented!()
     }
 
     ///
@@ -138,7 +140,7 @@ impl<N: Network, E: Environment> Server<N, E> {
 
         // Shut down the ledger.
         trace!("Proceeding to shut down the ledger...");
-        self.state.ledger().shut_down().await;
+        // self.state.ledger().shut_down().await;
 
         // Flush the tasks.
         E::resources().shut_down();
@@ -250,38 +252,38 @@ impl<N: Network, E: Environment> Server<N, E> {
                 loop {
                     info!("{}", notification_message(address));
 
-                    if E::NODE_TYPE == NodeType::Miner {
-                        if let Some(miner_address) = address {
-                            // Retrieve the latest block height.
-                            let latest_block_height = state.ledger().reader().latest_block_height();
-
-                            // Prepare a list of confirmed and pending coinbase records.
-                            let mut confirmed = vec![];
-                            let mut pending = vec![];
-
-                            // Iterate through the coinbase records from storage.
-                            for (block_height, record) in state.prover().to_coinbase_records() {
-                                // Filter the coinbase records by determining if they exist on the canonical chain.
-                                if let Ok(true) = state.ledger().reader().contains_commitment(&record.commitment()) {
-                                    // Ensure the record owner matches.
-                                    if record.owner() == miner_address {
-                                        // Add the block to the appropriate list.
-                                        match block_height + 2048 < latest_block_height {
-                                            true => confirmed.push((block_height, record)),
-                                            false => pending.push((block_height, record)),
-                                        }
-                                    }
-                                }
-                            }
-
-                            info!(
-                                "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
-                                confirmed.len(),
-                                pending.len(),
-                                miner_address
-                            );
-                        }
-                    }
+                    // if E::NODE_TYPE == NodeType::Miner {
+                    //     if let Some(miner_address) = address {
+                    //         // Retrieve the latest block height.
+                    //         let latest_block_height = state.ledger().reader().latest_block_height();
+                    //
+                    //         // Prepare a list of confirmed and pending coinbase records.
+                    //         let mut confirmed = vec![];
+                    //         let mut pending = vec![];
+                    //
+                    //         // Iterate through the coinbase records from storage.
+                    //         for (block_height, record) in state.prover().to_coinbase_records() {
+                    //             // Filter the coinbase records by determining if they exist on the canonical chain.
+                    //             if let Ok(true) = state.ledger().reader().contains_commitment(&record.commitment()) {
+                    //                 // Ensure the record owner matches.
+                    //                 if record.owner() == miner_address {
+                    //                     // Add the block to the appropriate list.
+                    //                     match block_height + 2048 < latest_block_height {
+                    //                         true => confirmed.push((block_height, record)),
+                    //                         false => pending.push((block_height, record)),
+                    //                     }
+                    //                 }
+                    //             }
+                    //         }
+                    //
+                    //         info!(
+                    //             "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
+                    //             confirmed.len(),
+                    //             pending.len(),
+                    //             miner_address
+                    //         );
+                    //     }
+                    // }
 
                     // Sleep for `120` seconds.
                     tokio::time::sleep(Duration::from_secs(120)).await;

@@ -36,6 +36,9 @@ pub use server::*;
 pub mod updater;
 pub use updater::*;
 
+#[cfg(test)]
+pub mod tests;
+
 pub use snarkos_environment as environment;
 pub use snarkos_network as network;
 pub use snarkos_storage as storage;
