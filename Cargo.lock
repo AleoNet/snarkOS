@@ -2767,6 +2767,7 @@ dependencies = [
  "snarkvm-circuit",
  "snarkvm-compiler",
  "snarkvm-console",
+ "snarkvm-fields 0.7.5",
  "snarkvm-utilities 0.7.5",
  "thiserror",
  "walkdir",
@@ -2859,7 +2860,6 @@ dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-network",
  "snarkvm-circuit-program",
- "snarkvm-circuit-transition",
  "snarkvm-circuit-types",
 ]
 
@@ -2931,17 +2931,6 @@ dependencies = [
  "snarkvm-circuit-network",
  "snarkvm-circuit-types",
  "snarkvm-console-program",
- "snarkvm-utilities 0.7.5",
-]
-
-[[package]]
-name = "snarkvm-circuit-transition"
-version = "0.7.5"
-dependencies = [
- "snarkvm-circuit-account",
- "snarkvm-circuit-network",
- "snarkvm-circuit-types",
- "snarkvm-console-transition",
  "snarkvm-utilities 0.7.5",
 ]
 
@@ -3042,6 +3031,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "paste",
  "rand",
+ "serde_json",
  "snarkvm-algorithms 0.7.5",
  "snarkvm-circuit",
  "snarkvm-console",
@@ -3060,7 +3050,6 @@ dependencies = [
  "snarkvm-console-collections",
  "snarkvm-console-network",
  "snarkvm-console-program",
- "snarkvm-console-transition",
  "snarkvm-console-types",
 ]
 
@@ -3138,15 +3127,6 @@ dependencies = [
  "num-derive",
  "num-traits",
  "once_cell",
- "snarkvm-console-account",
- "snarkvm-console-network",
- "snarkvm-console-types",
-]
-
-[[package]]
-name = "snarkvm-console-transition"
-version = "0.7.5"
-dependencies = [
  "snarkvm-console-account",
  "snarkvm-console-network",
  "snarkvm-console-types",

@@ -23,7 +23,7 @@ test = [ ]
 path = "../../snarkVM"
 #git = "https://github.com/AleoHQ/snarkVM.git"
 #branch = "testnet3"
-features = ["console", "utilities"]
+features = ["console", "utilities", "fields"]
 
 [dependencies.anyhow]
 version = "1"

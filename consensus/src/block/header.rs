@@ -15,7 +15,12 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkvm::{
-    console::collections::merkle_tree::{MerklePath, MerkleTree},
+    console::{
+        collections::merkle_tree::{MerklePath, MerkleTree},
+        network::BHPMerkleTree,
+        types::field::{Field, Zero},
+    },
+    fields::{FieldParameters, PrimeField},
     prelude::Network,
     utilities::{
         error,
@@ -24,6 +29,7 @@ use snarkvm::{
         str::FromStr,
         FromBytes,
         FromBytesDeserializer,
+        ToBits,
         ToBytes,
         ToBytesSerializer,
         Uniform,
@@ -31,12 +37,15 @@ use snarkvm::{
 };
 
 use anyhow::{anyhow, bail, Result};
-use serde::{Deserialize, Serialize};
+use serde::{de, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 // use serde::{de, ser::SerializeStruct, Deserialize, Deserializer, Serialize, Serializer};
 use std::{mem::size_of, sync::atomic::AtomicBool};
 
+// TODO (raychu86): Move this declaration.
+const HEADER_TREE_DEPTH: u8 = 2;
+
 /// The header for the block contains metadata that uniquely identifies the block.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BlockHeader<N: Network> {
     /// The network ID of the block.
     network: u16,
@@ -50,15 +59,14 @@ pub struct BlockHeader<N: Network> {
     proof_target: u64,
     /// The Unix timestamp (UTC) for this block - 8 bytes.
     timestamp: i64,
-    // Phantom
-    _phantom: std::marker::PhantomData<N>,
     // /// The cumulative weight up to this block (inclusive) - 16 bytes.
     // cumulative_weight: u128,
 
-    // /// The Merkle root representing the blocks in the ledger up to the previous block
-    // previous_ledger_root: N::LedgerRoot,
-    // /// The Merkle root representing the transactions in the block
-    // transactions_root: N::TransactionsRoot,
+    // TODO (raychu86): Make formalized type in Network trait.
+    /// The Merkle root representing the blocks in the ledger up to the previous block
+    previous_ledger_root: Field<N>,
+    /// The Merkle root representing the transactions in the block
+    transactions_root: Field<N>,
 }
 
 impl<N: Network> BlockHeader<N> {
@@ -76,7 +84,16 @@ impl<N: Network> BlockHeader<N> {
     // }
 
     /// Initializes a new block header.
-    pub fn new(network: u16, height: u32, round: u64, coinbase_target: u64, proof_target: u64, timestamp: i64) -> Result<Self> {
+    pub fn new(
+        network: u16,
+        height: u32,
+        round: u64,
+        coinbase_target: u64,
+        proof_target: u64,
+        timestamp: i64,
+        previous_ledger_root: Field<N>,
+        transactions_root: Field<N>,
+    ) -> Result<Self> {
         // Construct a new block header.
         let header = Self {
             network,
@@ -85,9 +102,8 @@ impl<N: Network> BlockHeader<N> {
             coinbase_target,
             proof_target,
             timestamp,
-            _phantom: Default::default(),
-            // previous_ledger_root: N::LedgerRoot::default(),
-            // transactions_root: N::TransactionsRoot::default(),
+            previous_ledger_root,
+            transactions_root,
         };
         // Ensure the header is valid.
         match header.is_valid() {
@@ -105,7 +121,8 @@ impl<N: Network> BlockHeader<N> {
             coinbase_target: u64::MAX,
             proof_target: u64::MAX,
             timestamp: 0i64,
-            _phantom: std::marker::PhantomData,
+            previous_ledger_root: Field::zero(),
+            transactions_root: Field::zero(),
         }
     }
 
@@ -225,15 +242,49 @@ impl<N: Network> BlockHeader<N> {
     //     self.metadata.cumulative_weight
     // }
 
-    // /// Returns the block header size in bytes.
-    // pub fn size() -> usize {
-    //     N::HEADER_SIZE_IN_BYTES
-    // }
+    /// Returns the block header size in bytes.
+    pub fn size_in_bytes() -> usize {
+        2 + 4 + 8 + 8 + 8 + 8 + ((N::Field::size_in_bits() + <N::Field as PrimeField>::Parameters::REPR_SHAVE_BITS as usize) / 8) * 2
+    }
 
-    // /// Returns an instance of the block header tree.
-    // pub fn to_header_tree(&self) -> Result<MerkleTree<N::BlockHeaderRootParameters>> {
-    //     BlockTemplate::<N>::compute_block_header_tree(self.previous_ledger_root, self.transactions_root, &self.metadata)
-    // }
+    /// Returns an instance of the block header tree.
+    pub fn to_header_tree(&self) -> Result<BHPMerkleTree<N, HEADER_TREE_DEPTH>> {
+        // TODO (raychu86): Confirm the header tree inputs.
+
+        let previous_ledger_root = self.previous_ledger_root.to_bits_le();
+        assert_eq!(previous_ledger_root.len(), 256);
+
+        let transactions_root = self.transactions_root.to_bits_le();
+        assert_eq!(transactions_root.len(), 256);
+
+        let metadata_1 = vec![
+            self.network.to_bits_le(), // 2 bytes
+            self.height.to_bits_le(),  // 4 bytes
+            vec![false; 208],          // 208 bytes
+        ]
+        .concat(); // 256 bits
+        assert_eq!(metadata_1.len(), 256);
+
+        let metadata_2 = [
+            self.round.to_bits_le(),           // 8 bytes
+            self.coinbase_target.to_bits_le(), // 8 bytes
+            self.proof_target.to_bits_le(),    // 8 bytes
+            self.timestamp.to_bits_le(),       // 8 bytes
+        ]
+        .concat(); // 256 bits
+        assert_eq!(metadata_2.len(), 256);
+
+        let num_leaves = usize::pow(2, HEADER_TREE_DEPTH as u32);
+        let mut leaves: Vec<Vec<bool>> = Vec::with_capacity(num_leaves);
+        leaves.push(previous_ledger_root);
+        leaves.push(transactions_root);
+        leaves.push(metadata_1);
+        leaves.push(metadata_2);
+        // Sanity check that the correct number of leaves are allocated.
+        assert_eq!(num_leaves, leaves.len());
+
+        N::merkle_tree_bhp(&leaves)
+    }
 
     // /// Returns an instance of the block header tree.
     // pub fn to_header_inclusion_proof(
@@ -246,11 +297,11 @@ impl<N: Network> BlockHeader<N> {
     //
     //     Ok(self.to_header_tree()?.generate_proof(index, &leaf_bytes)?)
     // }
-    //
-    // /// Returns the block header root.
-    // pub fn to_header_root(&self) -> Result<N::BlockHeaderRoot> {
-    //     Ok((*self.to_header_tree()?.root()).into())
-    // }
+
+    /// Returns the block header root.
+    pub fn to_header_root(&self) -> Result<Field<N>> {
+        Ok((*self.to_header_tree()?.root()).into())
+    }
 }
 
 impl<N: Network> FromBytes for BlockHeader<N> {
@@ -264,8 +315,22 @@ impl<N: Network> FromBytes for BlockHeader<N> {
         let coinbase_target = u64::read_le(&mut reader)?;
         let proof_target = u64::read_le(&mut reader)?;
         let timestamp = i64::read_le(&mut reader)?;
+
+        let previous_ledger_root = Field::<N>::read_le(&mut reader)?;
+        let transactions_root = Field::<N>::read_le(&mut reader)?;
+
         // Construct the block header.
-        Self::new(network, height, round, coinbase_target, proof_target, timestamp).map_err(|e| error("{e}"))
+        Self::new(
+            network,
+            height,
+            round,
+            coinbase_target,
+            proof_target,
+            timestamp,
+            previous_ledger_root,
+            transactions_root,
+        )
+        .map_err(|e| error("{e}"))
     }
 }
 
@@ -279,7 +344,9 @@ impl<N: Network> ToBytes for BlockHeader<N> {
         self.round.write_le(&mut writer)?;
         self.coinbase_target.write_le(&mut writer)?;
         self.proof_target.write_le(&mut writer)?;
-        self.timestamp.write_le(&mut writer)
+        self.timestamp.write_le(&mut writer)?;
+        self.previous_ledger_root.write_le(&mut writer)?;
+        self.transactions_root.write_le(&mut writer)
     }
 }
 
@@ -297,41 +364,47 @@ impl<N: Network> ToBytes for BlockHeader<N> {
 //     }
 // }
 
-// impl<N: Network> Serialize for BlockHeader<N> {
-//     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-//         match serializer.is_human_readable() {
-//             true => {
-//                 let mut header = serializer.serialize_struct("BlockHeader", 4)?;
-//                 // header.serialize_field("previous_ledger_root", &self.previous_ledger_root)?;
-//                 // header.serialize_field("transactions_root", &self.transactions_root)?;
-//                 header.serialize_field("metadata", &self.metadata)?;
-//                 header.serialize_field("nonce", &self.nonce)?;
-//                 header.serialize_field("proof", &self.proof)?;
-//                 header.end()
-//             }
-//             false => ToBytesSerializer::serialize(self, serializer),
-//         }
-//     }
-// }
+impl<N: Network> Serialize for BlockHeader<N> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        match serializer.is_human_readable() {
+            true => {
+                let mut header = serializer.serialize_struct("BlockHeader", 8)?;
+                header.serialize_field("network", &self.network)?;
+                header.serialize_field("height", &self.height)?;
+                header.serialize_field("round", &self.round)?;
+                header.serialize_field("coinbase_target", &self.coinbase_target)?;
+                header.serialize_field("proof_target", &self.proof_target)?;
+                header.serialize_field("timestamp", &self.timestamp)?;
+                header.serialize_field("previous_ledger_root", &self.previous_ledger_root)?;
+                header.serialize_field("transactions_root", &self.transactions_root)?;
+                header.end()
+            }
+            false => ToBytesSerializer::serialize(self, serializer),
+        }
+    }
+}
 
-// impl<'de, N: Network> Deserialize<'de> for BlockHeader<N> {
-//     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-//         match deserializer.is_human_readable() {
-//             true => {
-//                 let header = serde_json::Value::deserialize(deserializer)?;
-//                 Ok(Self::from(
-//                     serde_json::from_value(header["previous_ledger_root"].clone()).map_err(de::Error::custom)?,
-//                     serde_json::from_value(header["transactions_root"].clone()).map_err(de::Error::custom)?,
-//                     serde_json::from_value(header["metadata"].clone()).map_err(de::Error::custom)?,
-//                     serde_json::from_value(header["nonce"].clone()).map_err(de::Error::custom)?,
-//                     serde_json::from_value(header["proof"].clone()).map_err(de::Error::custom)?,
-//                 )
-//                 .map_err(de::Error::custom)?)
-//             }
-//             false => FromBytesDeserializer::<Self>::deserialize(deserializer, "block header", N::HEADER_SIZE_IN_BYTES),
-//         }
-//     }
-// }
+impl<'de, N: Network> Deserialize<'de> for BlockHeader<N> {
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        match deserializer.is_human_readable() {
+            true => {
+                let header = serde_json::Value::deserialize(deserializer)?;
+                Ok(Self::new(
+                    serde_json::from_value(header["network"].clone()).map_err(de::Error::custom)?,
+                    serde_json::from_value(header["height"].clone()).map_err(de::Error::custom)?,
+                    serde_json::from_value(header["round"].clone()).map_err(de::Error::custom)?,
+                    serde_json::from_value(header["coinbase_target"].clone()).map_err(de::Error::custom)?,
+                    serde_json::from_value(header["proof_target"].clone()).map_err(de::Error::custom)?,
+                    serde_json::from_value(header["timestamp"].clone()).map_err(de::Error::custom)?,
+                    serde_json::from_value(header["previous_ledger_root"].clone()).map_err(de::Error::custom)?,
+                    serde_json::from_value(header["transactions_root"].clone()).map_err(de::Error::custom)?,
+                )
+                .map_err(de::Error::custom)?)
+            }
+            false => FromBytesDeserializer::<Self>::deserialize(deserializer, "block header", Self::size_in_bytes()),
+        }
+    }
+}
 
 #[cfg(test)]
 mod tests {
