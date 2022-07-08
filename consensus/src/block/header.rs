@@ -350,19 +350,23 @@ impl<N: Network> ToBytes for BlockHeader<N> {
     }
 }
 
-// impl<N: Network> FromStr for BlockHeader<N> {
-//     type Err = anyhow::Error;
-//
-//     fn from_str(header: &str) -> Result<Self, Self::Err> {
-//         Ok(serde_json::from_str(header)?)
-//     }
-// }
-//
-// impl<N: Network> fmt::Display for BlockHeader<N> {
-//     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-//         write!(f, "{}", serde_json::to_string(self).map_err::<fmt::Error, _>(serde::ser::Error::custom)?)
-//     }
-// }
+impl<N: Network> FromStr for BlockHeader<N> {
+    type Err = anyhow::Error;
+
+    fn from_str(header: &str) -> Result<Self, Self::Err> {
+        Ok(serde_json::from_str(header)?)
+    }
+}
+
+impl<N: Network> fmt::Display for BlockHeader<N> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            serde_json::to_string(self).map_err::<fmt::Error, _>(serde::ser::Error::custom)?
+        )
+    }
+}
 
 impl<N: Network> Serialize for BlockHeader<N> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {

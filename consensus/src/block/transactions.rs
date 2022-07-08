@@ -33,7 +33,7 @@ type TransactionTree<N> = BHPMerkleTree<N, BLOCK_DEPTH>;
 /// The Merkle path for transaction in a block.
 type TransactionPath<N> = MerklePath<N, BLOCK_DEPTH>;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Transactions<N: Network> {
     /// The list of transactions included in a block.
     transactions: Vec<Transaction<N>>,
@@ -67,6 +67,12 @@ impl<N: Network> Transactions<N> {
             return false;
         }
 
+        // Ensure there are no duplicate transactions.
+        if has_duplicates(self.transactions.iter().map(Transaction::id)) {
+            eprintln!("Found duplicate transaction id in the transactions list");
+            return false;
+        }
+
         // // Ensure there are no duplicate serial numbers.
         // if has_duplicates(self.transactions.iter().flat_map(Transaction::serial_numbers)) {
         //     eprintln!("Found duplicate serial numbers in the transactions list");
@@ -89,16 +95,16 @@ impl<N: Network> Transactions<N> {
         true
     }
 
-    // /// Returns the transaction IDs, by constructing a flattened list of transaction IDs from all transactions.
-    // pub fn transaction_ids(&self) -> impl Iterator<Item = N::TransactionID> + '_ {
-    //     self.transactions.iter().map(Transaction::transaction_id)
-    // }
-    //
+    /// Returns the transaction IDs, by constructing a flattened list of transaction IDs from all transactions.
+    pub fn transaction_ids(&self) -> impl Iterator<Item = N::TransactionID> + '_ {
+        self.transactions.iter().map(Transaction::id)
+    }
+
     // /// Returns the transition IDs, by constructing a flattened list of transition IDs from all transactions.
     // pub fn transition_ids(&self) -> impl Iterator<Item = N::TransitionID> + '_ {
     //     self.transactions.iter().flat_map(Transaction::transition_ids)
     // }
-    //
+
     // /// Returns the ledger roots, by constructing a flattened list of ledger roots from all transactions.
     // pub fn ledger_roots(&self) -> impl Iterator<Item = N::LedgerRoot> + '_ {
     //     self.transactions.iter().map(Transaction::ledger_root)

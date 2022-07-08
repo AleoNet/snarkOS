@@ -28,7 +28,7 @@ use snarkvm::prelude::*;
 use core::fmt;
 use serde::ser::SerializeStruct;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Block<N: Network> {
     /// The hash of this block.
     block_hash: N::BlockHash,

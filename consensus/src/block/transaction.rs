@@ -19,7 +19,7 @@ use snarkvm::{compiler::Transition, prelude::*};
 use core::fmt;
 use serde::ser::SerializeStruct;
 
-#[derive(Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Transaction<N: Network> {
     /// The deploy transaction enables developers to publish Aleo programs on the network.
     Deploy(N::TransactionID),
