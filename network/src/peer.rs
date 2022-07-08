@@ -94,12 +94,12 @@ impl<N: Network> Peer<N> {
         // Create a channel for this peer.
         let (outbound_router, outbound_handler) = mpsc::channel(1024);
 
-        //     // Add an entry for this `Peer` in the connected peers.
-        //     state
-        //         .peers()
-        //         .router()
-        //         .send(PeersRequest::PeerConnected(peer_ip, peer_nonce, outbound_router))
-        //         .await?;
+        // Add an entry for this `Peer` in the connected peers.
+        state
+            .peers()
+            .router()
+            .send(PeersRequest::PeerConnected(peer_ip, peer_nonce, outbound_router))
+            .await?;
 
         Ok(Peer {
             listener_ip: peer_ip,
