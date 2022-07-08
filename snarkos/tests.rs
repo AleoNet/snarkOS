@@ -91,7 +91,7 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn nodes_can_connect_to_each_other() {
+    async fn test_node_connection() {
         // Start 2 snarkOS nodes.
         let test_node1 = TestNode::new_with_custom_ip("127.0.0.1", 3000).await;
         let test_node2 = TestNode::new_with_custom_ip("127.0.0.1", 4000).await;
@@ -105,4 +105,37 @@ mod tests {
         assert_eq!(test_node2.number_of_connected_peers().await, 1);
         assert!(test_node2.connected_peers().await.contains(&test_node1.local_addr()));
     }
+
+    #[tokio::test]
+    async fn test_node_cant_connect_twice() {
+        // Start 2 snarkOS nodes.
+        let test_node1 = TestNode::new_with_custom_ip("127.0.0.1", 5000).await;
+        let test_node2 = TestNode::new_with_custom_ip("127.0.0.1", 6000).await;
+
+        // Connect the snarkOS node to the test node.
+        test_node1.connect(test_node2.local_addr()).await.unwrap();
+
+        // The second connection attempt should fail.
+        assert!(test_node1.connect(test_node2.local_addr()).await.is_err());
+    }
+
+    // TODO (raychu86): Implement disconnect.
+    // #[tokio::test]
+    // async fn test_node_disconnect() {
+    //     // Start 2 snarkOS nodes.
+    //     let test_node1 = TestNode::new_with_custom_ip("127.0.0.1", 7000).await;
+    //     let test_node2 = TestNode::new_with_custom_ip("127.0.0.1", 8000).await;
+    //
+    //     // Connect the snarkOS node to the test node.
+    //     test_node1.connect(test_node2.local_addr()).await.unwrap();
+    //
+    //     // Disconnect the snarkOS nodes.
+    //     test_node1.disconnect(test_node2.local_addr()).await;
+    //
+    //     assert_eq!(test_node1.number_of_connected_peers().await, 0);
+    //     assert!(!test_node1.connected_peers().await.contains(&test_node2.local_addr()));
+    //
+    //     assert_eq!(test_node2.number_of_connected_peers().await, 0);
+    //     assert!(!test_node2.connected_peers().await.contains(&test_node1.local_addr()));
+    // }
 }
