@@ -16,7 +16,7 @@
 
 use crate::block::Transaction;
 use snarkvm::{
-    console::{collections::merkle_tree::MerklePath, network::BHPMerkleTree},
+    console::{collections::merkle_tree::MerklePath, network::BHPMerkleTree, types::Field},
     prelude::*,
 };
 
