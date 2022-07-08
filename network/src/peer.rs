@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{ConnectionResult, Data, DisconnectReason, Message, MessageCodec, PeersRequest, State};
+use snarkos_consensus::BlockHeader;
 use snarkos_environment::{
     helpers::{NodeType, Status},
     Environment,
@@ -35,6 +36,9 @@ use std::{
 use tokio::{net::TcpStream, sync::mpsc, task, time::timeout};
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
+
+// TODO (raychu86): Move this declaration.
+const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 /// Shorthand for the parent half of the `Peer` outbound message channel.
 pub(crate) type OutboundRouter<N> = mpsc::Sender<Message<N>>;
@@ -83,7 +87,7 @@ impl<N: Network> Peer<N> {
             Peer::handshake::<E>(&mut outbound_socket, state.local_ip, local_nonce, connected_nonces).await?;
 
         // Send the first `Ping` message to the peer.
-        let message = Message::Ping(E::MESSAGE_VERSION, N::ALEO_MAXIMUM_FORK_DEPTH, E::NODE_TYPE, E::status().get());
+        let message = Message::Ping(E::MESSAGE_VERSION, ALEO_MAXIMUM_FORK_DEPTH, E::NODE_TYPE, E::status().get());
         trace!("Sending '{}' to {}", message.name(), peer_ip);
         outbound_socket.send(message).await?;
 
@@ -136,12 +140,12 @@ impl<N: Network> Peer<N> {
         let mut peer_ip = outbound_socket.get_ref().peer_addr()?;
 
         // Retrieve the genesis block header.
-        let genesis_header = N::genesis_block().header();
+        let genesis_header = BlockHeader::<N>::genesis();
 
         // Send a challenge request to the peer.
         let message = Message::<N>::ChallengeRequest(
             E::MESSAGE_VERSION,
-            N::ALEO_MAXIMUM_FORK_DEPTH,
+            ALEO_MAXIMUM_FORK_DEPTH,
             E::NODE_TYPE,
             E::status().get(),
             local_ip.port(),
@@ -168,7 +172,7 @@ impl<N: Network> Peer<N> {
                             bail!("Dropping {} on version {} (outdated)", peer_ip, version);
                         }
                         // Ensure the maximum fork depth is correct.
-                        if fork_depth != N::ALEO_MAXIMUM_FORK_DEPTH {
+                        if fork_depth != ALEO_MAXIMUM_FORK_DEPTH {
                             // Send the disconnect message.
                             let message = Message::Disconnect(DisconnectReason::InvalidForkDepth);
                             outbound_socket.send(message).await?;
@@ -245,7 +249,7 @@ impl<N: Network> Peer<N> {
                     Message::ChallengeResponse(block_header) => {
                         // Perform the deferred non-blocking deserialization of the block header.
                         let block_header = block_header.deserialize().await?;
-                        match &block_header == genesis_header {
+                        match block_header == genesis_header {
                             true => Ok((peer_ip, peer_nonce, node_type, status)),
                             false => Err(anyhow!("Challenge response from {} failed, received '{}'", peer_ip, block_header)),
                         }
@@ -348,17 +352,17 @@ impl<N: Network> Peer<N> {
                                     // Retrieve the last seen timestamp of this transaction for this peer.
                                     let last_seen = peer
                                         .seen_outbound_transactions
-                                        .entry(transaction.transaction_id())
+                                        .entry(transaction.id())
                                         .or_insert(SystemTime::UNIX_EPOCH);
                                     let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                                     // Update the timestamp for the peer and sent transaction.
-                                    peer.seen_outbound_transactions.insert(transaction.transaction_id(), SystemTime::now());
+                                    peer.seen_outbound_transactions.insert(transaction.id(), SystemTime::now());
                                     // Report the unconfirmed block height.
                                     if is_ready_to_send {
                                         trace!(
                                             "Preparing to send 'UnconfirmedTransaction {}' to {}",
-                                            transaction.transaction_id(),
+                                            transaction.id(),
                                             peer_ip
                                         );
                                     }
@@ -522,7 +526,7 @@ impl<N: Network> Peer<N> {
                                         break;
                                     }
                                     // Ensure the maximum fork depth is correct.
-                                    if fork_depth != N::ALEO_MAXIMUM_FORK_DEPTH {
+                                    if fork_depth != ALEO_MAXIMUM_FORK_DEPTH {
                                         warn!("Dropping {} for an incorrect maximum fork depth of {}", peer_ip, fork_depth);
                                         break;
                                     }
@@ -699,18 +703,18 @@ impl<N: Network> Peer<N> {
                                     match transaction.deserialize().await {
                                         Ok(transaction) => {
                                             // // Retrieve the last seen timestamp of the received transaction.
-                                            // let last_seen = peer.seen_inbound_transactions.entry(transaction.transaction_id()).or_insert(SystemTime::UNIX_EPOCH);
+                                            // let last_seen = peer.seen_inbound_transactions.entry(transaction.id()).or_insert(SystemTime::UNIX_EPOCH);
                                             // let is_router_ready = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
                                             //
                                             // // Update the timestamp for the received transaction.
-                                            // peer.seen_inbound_transactions.insert(transaction.transaction_id(), SystemTime::now());
+                                            // peer.seen_inbound_transactions.insert(transaction.id(), SystemTime::now());
                                             //
                                             // // Ensure the node is not peering.
                                             // let is_node_ready = !E::status().is_peering();
                                             //
                                             // // If this node is a beacon or sync node, skip this message, after updating the timestamp.
                                             // if E::NODE_TYPE == NodeType::Beacon || E::NODE_TYPE == NodeType::Beacon || !is_router_ready || !is_node_ready {
-                                            //     trace!("Skipping 'UnconfirmedTransaction {}' from {}", transaction.transaction_id(), peer_ip);
+                                            //     trace!("Skipping 'UnconfirmedTransaction {}' from {}", transaction.id(), peer_ip);
                                             // } else {
                                             //     // // Route the `UnconfirmedTransaction` to the prover.
                                             //     // if let Err(error) = state.prover().router().send(ProverRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
