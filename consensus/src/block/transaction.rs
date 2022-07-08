@@ -192,7 +192,7 @@ impl<'de, N: Network> Deserialize<'de> for Transaction<N> {
 
                 // Ensure the transaction ID matches.
                 match id == transaction.id() {
-                    true => Ok(block),
+                    true => Ok(transaction),
                     false => Err(error("Mismatching transaction ID, possible data corruption")).map_err(de::Error::custom),
                 }
             }
