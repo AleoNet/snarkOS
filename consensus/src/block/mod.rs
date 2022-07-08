@@ -49,7 +49,7 @@ impl<N: Network> Block<N> {
         ensure!(!transactions.is_empty(), "Cannot create block with no transactions");
 
         // Compute the block hash.
-        let block_hash = N::hash_bhp1024(&(previous_hash, header.to_root()).to_bits_le())?.into();
+        let block_hash = N::hash_bhp1024(&[previous_hash.to_bits_le(), header.to_header_root()?.to_bits_le()].concat())?.into();
         // N::block_hash_crh().hash_bytes(&to_bytes_le![previous_block_hash, header.to_header_root()?]?)?.into();
 
         // Construct the block.
