@@ -159,7 +159,7 @@ mod tests {
         const MAXIMUM_NUMBER_OF_PEERS: usize = TestEnvironment::<CurrentNetwork>::MAXIMUM_NUMBER_OF_PEERS as usize;
 
         // Start a snarkOS node.
-        let main_test_node = TestNode::new_with_custom_ip("127.0.0.1", 4000).await;
+        let main_test_node = TestNode::new_with_custom_ip("127.0.0.1", 3333).await;
 
         // Start the maximum number of test nodes the snarkOS node is permitted to connect to at once.
         let mut test_nodes = Vec::with_capacity(MAXIMUM_NUMBER_OF_PEERS);
@@ -168,7 +168,7 @@ mod tests {
         }
 
         // Create one additional test node.
-        let extra_test_node = TestNode::new_with_custom_ip("127.0.0.1", 4001).await;
+        let extra_test_node = TestNode::new_with_custom_ip("127.0.0.1", 3334).await;
 
         // All the test nodes should be able to connect to the snarkOS node.
         for test_node in &test_nodes {
