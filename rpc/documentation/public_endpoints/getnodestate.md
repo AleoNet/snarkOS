@@ -15,7 +15,7 @@ None
 |    `latest_cumulative_weight`     | number | The latest cumulative weight of the canonical chain. |
 |    `number_of_candidate_peers`    | number |            The number of candidate peers.            |
 |    `number_of_connected_peers`    | number |            The number of connected peers.            |
-| `number_of_connected_sync_nodes`  | number |            The number of connected peers.            |
+| `number_of_connected_beacon_nodes`  | number |            The number of connected peers.            |
 |            `software`             | string |       The rust cargo package name and version.       |
 |             `status`              | string |                The state of the node.                |
 |              `type`               | string |                The type of the node.                 |
@@ -48,7 +48,7 @@ curl --data-binary '{"jsonrpc": "2.0", "id":"1", "method": "getnodestate", "para
     "latest_cumulative_weight": "4668",
     "number_of_candidate_peers": 5,
     "number_of_connected_peers": 2,
-    "number_of_connected_sync_nodes": 0,
+    "number_of_connected_beacon_nodes": 0,
     "software": "snarkOS 2.0.0",
     "status": "Ready",
     "type": "Client",

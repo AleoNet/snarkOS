@@ -16,7 +16,7 @@
 
 use crate::{
     display::{initialize_logger, logs::Logs, overview::Overview},
-    Server,
+    Node,
 };
 use snarkos_environment::Environment;
 use snarkvm::prelude::Network;
@@ -67,14 +67,14 @@ impl<'a> TabsState<'a> {
 }
 
 pub(crate) struct Display<'a, N: Network, E: Environment> {
-    server: Server<N, E>,
+    server: Node<N, E>,
     tabs: TabsState<'a>,
     tick_rate: Duration,
     logs: Logs,
 }
 
 impl<'a, N: Network, E: Environment> Display<'a, N, E> {
-    pub fn start(server: Server<N, E>, verbosity: u8) -> Result<()> {
+    pub fn start(server: Node<N, E>, verbosity: u8) -> Result<()> {
         // Initialize the log channel.
         let (log_sender, log_receiver) = mpsc::channel(1024);
 

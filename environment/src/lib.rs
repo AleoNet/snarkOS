@@ -142,8 +142,8 @@ impl<N: Network> Environment for Validator<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Validator;
     const COINBASE_IS_PUBLIC: bool = true;
-    const MINIMUM_NUMBER_OF_PEERS: usize = 1;
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 1000;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 21;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 100;
 }
 
 #[derive(Clone, Debug, Default)]

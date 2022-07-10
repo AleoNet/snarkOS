@@ -30,16 +30,16 @@ pub fn find_maximal_peer<N: Network, E: Environment>(
 ) -> Option<(SocketAddr, bool, BlockLocators<N>)> {
     // Determine if the peers state has any sync nodes.
     // TODO: have nodes sync up to tip - 4096 with only sync nodes, then switch to syncing with the longest chain.
-    let peers_contains_sync_node = false;
+    let peers_contains_beacon_node = false;
     // for ip in peers_state.keys() {
-    //     peers_contains_sync_node |= sync_nodes.contains(ip);
+    //     peers_contains_beacon_node |= beacon_nodes.contains(ip);
     // }
 
     let mut maximal_peer = None;
 
     for (peer_ip, peer_state) in peers_state.iter() {
         // Only update the maximal peer if there are no sync nodes or the peer is a sync node.
-        if !peers_contains_sync_node || E::beacon_nodes().contains(peer_ip) {
+        if !peers_contains_beacon_node || E::beacon_nodes().contains(peer_ip) {
             // Update the maximal peer state if the peer is ahead and the peer knows if you are a fork or not.
             // This accounts for (Case 1 and Case 2(a))
             if let Some((_, _, is_on_fork, block_height, block_locators)) = peer_state {

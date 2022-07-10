@@ -149,7 +149,7 @@ impl Resources {
         }
     }
 
-    /// Obtains an id that can be used to register a resource.
+    /// Obtains an ID that can be used to register a resource.
     pub fn procure_id(&self) -> ResourceId {
         self.index.fetch_add(1, Ordering::SeqCst)
     }
@@ -158,20 +158,23 @@ impl Resources {
     /// with an associated resource id which - if provided - must be obtained
     /// earlier via `Resources::procure_id`.
     pub fn register(&self, resource: Resource, id: Option<ResourceId>) {
-        // Assign an id to the given resource if not provided.
-        let id = if let Some(id) = id { id } else { self.procure_id() };
-
-        // Prepare a resource request.
-        let request = ResourceRequest::Register(resource, id);
-
+        // Prepare a resource request, assigning a resource ID if one was not given.
+        let request = ResourceRequest::Register(resource, match id {
+            Some(id) => id,
+            None => self.procure_id(),
+        });
         // This channel will not be closed before the final shutdown.
         let _ = self.sender.send(request);
     }
 
-    /// Register the given task with the resource handler and optionally
-    /// with an associated resource id.
+    /// Register the given task with the resource handler and an (optional) resource id.
     pub fn register_task(&self, id: Option<ResourceId>, handle: tokio::task::JoinHandle<()>) {
         self.register(Resource::Task(handle), id);
+    }
+
+    /// Register the given thread with the resource handler and an (optional) resource id.
+    pub fn register_thread(&self, id: Option<ResourceId>, handle: std::thread::JoinHandle<()>, abort_sender: AbortSignal) {
+        self.register(Resource::Thread(handle, abort_sender), id);
     }
 
     /// Register a task and instrument it with the given `name`; useful metrics on it will be logged every `interval`.
@@ -211,14 +214,7 @@ impl Resources {
         );
     }
 
-    /// Register the given thread with the resource handler and optionally
-    /// with an associated resource id.
-    pub fn register_thread(&self, id: Option<ResourceId>, handle: std::thread::JoinHandle<()>, abort_sender: AbortSignal) {
-        let thread = Resource::Thread(handle, abort_sender);
-        self.register(thread, id);
-    }
-
-    // Deregisters and frees a resource with the given id.
+    /// Deregisters and frees a resource with the given ID.
     pub fn deregister(&self, id: ResourceId) {
         let request = ResourceRequest::Deregister(id);
 
@@ -226,7 +222,7 @@ impl Resources {
         let _ = self.sender.send(request);
     }
 
-    /// Terminate all processes related to registered resources, freeing them in the process.
+    /// Terminates all processes related to registered resources, freeing them in the process.
     pub fn shut_down(&self) {
         // This channel will not be closed before the final shutdown.
         let _ = self.sender.send(ResourceRequest::Shutdown);

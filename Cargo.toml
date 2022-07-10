@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2021"
 
 [workspace]
-members = [ "consensus", "environment", "metrics", "network", "storage" ]
+members = [ "consensus", "environment", "metrics", "storage" ]
 
 [lib]
 path = "snarkos/lib.rs"
@@ -32,15 +32,21 @@ required-features = ["console"]
 default = [ "console" ]
 console = [ "crossterm", "tui" ]
 cuda = [ "snarkvm/cuda" ]
-prometheus = [ "snarkos-metrics/prometheus", "snarkos-network/prometheus" ]
+prometheus = [ "snarkos-metrics/prometheus" ]
 #rpc = [ "snarkos-rpc" ]
-test = [ "snarkos-metrics/test", "snarkos-network/test" ]
+test = [ "snarkos-metrics/test" ]
 
 [dependencies.aleo-std]
 version = "0.1.14"
 
 [dependencies.anyhow]
 version = "1"
+
+[dependencies.bincode]
+version = "1.0"
+
+[dependencies.bytes]
+version = "1.0"
 
 [dependencies.clap]
 version = "3.1"
@@ -53,7 +59,14 @@ version = "2.0"
 version = "0.23"
 optional = true
 
+[dependencies.futures]
+version = "0.3.21"
+features = ["thread-pool"]
+
 [dependencies.num_cpus]
+version = "1"
+
+[dependencies.once_cell]
 version = "1"
 
 [dependencies.rand]
@@ -71,6 +84,13 @@ features = [
   "compression-flate2"
 ]
 
+[dependencies.serde]
+version = "1"
+
+[dependencies.snarkos-consensus]
+path = "./consensus"
+version = "2.0.2"
+
 [dependencies.snarkos-environment]
 path = "./environment"
 version = "2.0.2"
@@ -80,9 +100,9 @@ path = "./metrics"
 version = "2.0.2"
 optional = true
 
-[dependencies.snarkos-network]
-path = "./network"
-version = "2.0.2"
+#[dependencies.snarkos-network]
+#path = "./network"
+#version = "2.0.2"
 
 #[dependencies.snarkos-rpc]
 #path = "./rpc"
@@ -104,6 +124,23 @@ version = "1.0"
 
 [dependencies.tokio]
 version = "1"
+features = ["signal"]
+#features = [
+#  "io-util",
+#  "macros",
+#  "net",
+#  "rt-multi-thread",
+#  "signal",
+#  "sync",
+#  "time"
+#]
+
+[dependencies.tokio-stream]
+version = "0.1"
+
+[dependencies.tokio-util]
+version = "0.7"
+features = ["codec"]
 
 [dependencies.tracing]
 version = "0.1"

@@ -197,7 +197,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             }
             LedgerRequest::Heartbeat => {
                 // Update for sync nodes.
-                self.update_sync_nodes().await;
+                self.update_beacon_nodes().await;
                 // Update the ledger.
                 self.update_ledger().await;
                 // Update the status of the ledger.
@@ -306,7 +306,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Performs a heartbeat update for the sync nodes.
     ///
-    async fn update_sync_nodes(&self) {
+    async fn update_beacon_nodes(&self) {
         if E::NODE_TYPE == NodeType::Beacon {
             // Lock peers_state for further processing.
             let peers_state = self.peers_state.read().await;

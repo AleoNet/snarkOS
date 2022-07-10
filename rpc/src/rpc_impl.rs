@@ -223,7 +223,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
         let connected_peers = self.state.peers().connected_peers().await;
         let number_of_candidate_peers = candidate_peers.len();
         let number_of_connected_peers = connected_peers.len();
-        let number_of_connected_sync_nodes = self.state.peers().number_of_connected_sync_nodes().await;
+        let number_of_connected_beacon_nodes = self.state.peers().number_of_connected_beacon_nodes().await;
 
         let latest_block_hash = self.ledger().latest_block_hash();
         let latest_block_height = self.ledger().latest_block_height();
@@ -239,7 +239,7 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
             "launched": format!("{} minutes ago", self.launched.elapsed().as_secs() / 60),
             "number_of_candidate_peers": number_of_candidate_peers,
             "number_of_connected_peers": number_of_connected_peers,
-            "number_of_connected_sync_nodes": number_of_connected_sync_nodes,
+            "number_of_connected_beacon_nodes": number_of_connected_beacon_nodes,
             "software": format!("snarkOS {}", env!("CARGO_PKG_VERSION")),
             "status": E::status().to_string(),
             "type": E::NODE_TYPE,

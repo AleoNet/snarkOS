@@ -14,12 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{display::Display, Server, Updater};
+use crate::{display::Display, Account, Node, Updater};
 use snarkos_environment::{helpers::NodeType, Beacon, Client, Environment, Prover, Validator};
 use snarkos_storage::storage::{rocksdb::RocksDB, ReadOnly};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use clap::Parser;
 use colored::*;
 use rand::thread_rng;
@@ -31,6 +31,9 @@ pub struct CLI {
     /// Specify the network of this node.
     #[clap(default_value = "3", long = "network")]
     pub network: u16,
+    /// Specify the account private key of this node.
+    #[clap(long = "private_key")]
+    pub private_key: Option<String>,
 
     /// Specify the IP address and port for the node server.
     #[clap(parse(try_from_str), default_value = "0.0.0.0:4133", long = "node")]
@@ -88,53 +91,69 @@ impl CLI {
                 println!("{}", command.parse()?);
                 Ok(())
             }
-            None => match self.node_type() {
-                NodeType::Client => self.start_server::<Testnet3, Client<Testnet3>>(&None).await,
-                NodeType::Prover => self.start_server::<Testnet3, Prover<Testnet3>>(&self.prover).await,
-                NodeType::Validator => self.start_server::<Testnet3, Validator<Testnet3>>(&self.validator).await,
-                NodeType::Beacon => self.start_server::<Testnet3, Beacon<Testnet3>>(&None).await,
+            None => match (self.network, self.node_type()?) {
+                (3, NodeType::Client) => self.start_node::<Testnet3, Client<Testnet3>>(&None).await,
+                (3, NodeType::Prover) => self.start_node::<Testnet3, Prover<Testnet3>>(&self.prover).await,
+                (3, NodeType::Validator) => self.start_node::<Testnet3, Validator<Testnet3>>(&self.validator).await,
+                (3, NodeType::Beacon) => self.start_node::<Testnet3, Beacon<Testnet3>>(&None).await,
+                _ => bail!("Unsupported network"),
             },
         }
     }
 
     /// Returns the node type corresponding to the given CLI configurations.
-    fn node_type(&self) -> NodeType {
-        match (self.network, &self.prover, &self.validator, self.beacon) {
-            (3, None, None, false) => NodeType::Client,
-            (3, Some(_), None, false) => NodeType::Prover,
-            (3, None, Some(_), false) => NodeType::Validator,
-            (3, None, None, true) => NodeType::Beacon,
-            _ => panic!("Unsupported node configuration"),
+    pub fn node_type(&self) -> Result<NodeType> {
+        match (&self.prover, &self.validator, self.beacon) {
+            (None, None, false) => Ok(NodeType::Client),
+            (Some(_), None, false) => Ok(NodeType::Prover),
+            (None, Some(_), false) => Ok(NodeType::Validator),
+            (None, None, true) => Ok(NodeType::Beacon),
+            _ => bail!("Unsupported node type"),
         }
     }
 
     /// Starts the node server.
-    async fn start_server<N: Network, E: Environment>(&self, address: &Option<String>) -> Result<()> {
-        println!("{}", crate::display::welcome_message());
-
-        // Print the Aleo address.
-        let address = match (E::NODE_TYPE, address) {
-            (NodeType::Validator, Some(address)) | (NodeType::Prover, Some(address)) => {
-                let address = Address::<N>::from_str(address)?;
-                println!("Your Aleo address is {address}.\n");
-                Some(address)
+    async fn start_node<N: Network, E: Environment>(&self, address: &Option<String>) -> Result<()> {
+        // Construct the Aleo account.
+        let account = match (&self.private_key, address) {
+            (Some(private_key), Some(address)) => {
+                // Construct the account from the private key string.
+                let account = Account::from_str(private_key)?;
+                // Ensure the account address matches the declared address.
+                ensure!(
+                    account.address() == &Address::from_str(&address)?,
+                    "Mismatching private key and address"
+                );
+                // Return the account.
+                account
             }
-            _ => None,
+            // Construct the account from the private key string.
+            (Some(private_key), None) => Account::from_str(private_key)?,
+            // Throw an error, if no private key is provided but an address is given.
+            (None, Some(address)) => {
+                bail!("Missing a private key (use '--private_key {{PRIVATE_KEY}}') for address {address}")
+            }
+            // Sample a new account.
+            (None, None) => Account::sample()?,
         };
 
+        // Print the welcome.
+        println!("{}", crate::display::welcome_message());
+        // Print the Aleo address.
+        println!("Your Aleo address is {}.\n", account.address());
+        // Print the node type and network.
         println!("Starting {} on {}.", E::NODE_TYPE.description(), N::NAME);
 
-        // Initialize the node's server.
-        let server = Server::<N, E>::initialize(self, address).await?;
+        // Initialize the node.
+        let node = Node::<N, E>::new(self.node, account).await?;
 
-        // Initialize signal handling; it also maintains ownership of the Server
-        // in order for it to not go out of scope.
-        Self::handle_signals(server.clone());
+        // Initialize signal handling and maintain ownership of the node - to keep it in scope.
+        Self::handle_signals(node.clone());
 
         // Initialize the display, if enabled.
         if self.display {
             println!("\nThe snarkOS console is initializing...\n");
-            Display::<N, E>::start(server.clone(), self.verbosity)?;
+            Display::<N, E>::start(node.clone(), self.verbosity)?;
         };
 
         // Connect to peer(s) if given as an argument.
@@ -142,15 +161,14 @@ impl CLI {
             // Separate the IP addresses.
             for peer_ip in peer_ips.split(',') {
                 // Parse each IP address.
-                server
-                    .connect_to(match peer_ip.parse() {
-                        Ok(ip) => ip,
-                        Err(e) => {
-                            error!("The IP supplied to --connect ('{peer_ip}') is malformed: {e}");
-                            continue;
-                        }
-                    })
-                    .await?;
+                node.connect_to(match peer_ip.parse() {
+                    Ok(ip) => ip,
+                    Err(e) => {
+                        error!("The IP supplied to --connect ('{peer_ip}') is malformed: {e}");
+                        continue;
+                    }
+                })
+                .await?;
             }
         }
 
@@ -163,13 +181,13 @@ impl CLI {
 
     /// Handles OS signals for the node to intercept and perform a clean shutdown.
     /// Note: Only Ctrl-C is supported; it should work on both Unix-family systems and Windows.
-    pub fn handle_signals<N: Network, E: Environment>(server: Server<N, E>) {
+    pub fn handle_signals<N: Network, E: Environment>(node: Node<N, E>) {
         E::resources().register_task(
             None, // No need to provide an id, as the task will run indefinitely.
             tokio::task::spawn(async move {
                 match tokio::signal::ctrl_c().await {
                     Ok(()) => {
-                        server.shut_down().await;
+                        node.shut_down().await;
                         std::process::exit(0);
                     }
                     Err(error) => error!("tokio::signal::ctrl_c encountered an error: {}", error),

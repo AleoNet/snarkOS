@@ -14,9 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Server;
+use crate::{message::DisconnectReason, Account, Node};
 use snarkos_environment::TestEnvironment;
-use snarkos_network::DisconnectReason;
 
 use clap::Parser;
 use std::net::SocketAddr;
@@ -26,39 +25,39 @@ pub type CurrentNetwork = snarkvm::prelude::Testnet3;
 
 /// A snarkOS node used for local testing.
 pub struct TestNode {
-    pub server: Server<CurrentNetwork, TestEnvironment<CurrentNetwork>>,
+    pub node: Node<CurrentNetwork, TestEnvironment<CurrentNetwork>>,
 }
 
 impl TestNode {
     /// Returns the local listening address of the node.
     pub fn local_ip(&self) -> SocketAddr {
-        self.server.local_ip()
+        *self.node.local_ip()
     }
 
     /// Returns the list of connected peers of the node.
     pub async fn connected_peers(&self) -> Vec<SocketAddr> {
-        self.server.state.peers().connected_peers().await
+        self.node.peers().connected_peers().await
     }
 
     /// Returns the number of connected peers of the node.
     pub async fn number_of_connected_peers(&self) -> usize {
-        self.server.state.peers().number_of_connected_peers().await
+        self.node.peers().number_of_connected_peers().await
     }
 
     /// Resets the node's known peers. This is practical, as it makes the node not reconnect
     /// to known peers in test cases where it's undesirable.
     pub async fn reset_known_peers(&self) {
-        self.server.state.peers().reset_known_peers().await
+        self.node.peers().reset_known_peers().await
     }
 
     /// Attempts to connect the node to the given address.
     pub async fn connect(&self, addr: SocketAddr) -> anyhow::Result<()> {
-        self.server.connect_to(addr).await
+        self.node.connect_to(addr).await
     }
 
     /// Disconnects the node from the given address.
     pub async fn disconnect(&self, addr: SocketAddr) {
-        self.server.disconnect_from(addr, DisconnectReason::NoReasonGiven).await
+        self.node.disconnect_from(addr, DisconnectReason::NoReasonGiven).await
     }
 
     /// Starts a snarkOS node with all the default characteristics from `TestNode::with_args`.
@@ -77,15 +76,15 @@ impl TestNode {
         let permanent_args = &["snarkos", "--norpc"];
         let combined_args = permanent_args.iter().chain(extra_args.iter());
         let config = crate::CLI::parse_from(combined_args);
-        let server = Server::<CurrentNetwork, TestEnvironment<CurrentNetwork>>::initialize(&config, None)
+        let node = Node::<CurrentNetwork, TestEnvironment<CurrentNetwork>>::new(config.node, Account::sample().unwrap())
             .await
             .unwrap();
 
-        TestNode { server }
+        TestNode { node }
     }
 
     pub async fn shut_down(&self) {
-        self.server.shut_down().await;
+        self.node.shut_down().await;
     }
 }
 

@@ -495,7 +495,7 @@ async fn test_get_node_state() {
         "launched": format!("{} minutes ago", 0),
         "number_of_candidate_peers": 0usize,
         "number_of_connected_peers": 0usize,
-        "number_of_connected_sync_nodes": 0usize,
+        "number_of_connected_beacon_nodes": 0usize,
         "software": format!("snarkOS {}", env!("CARGO_PKG_VERSION")),
         "status": Client::<CurrentNetwork>::status().to_string(),
         "type": Client::<CurrentNetwork>::NODE_TYPE,

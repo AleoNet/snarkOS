@@ -2358,22 +2358,29 @@ version = "2.0.2"
 dependencies = [
  "aleo-std",
  "anyhow",
+ "bincode",
+ "bytes",
  "clap 3.1.18",
  "colored",
  "crossterm",
+ "futures",
  "num_cpus",
+ "once_cell",
  "rand",
  "rayon",
  "rusty-hook",
  "self_update",
+ "serde",
  "snarkos",
+ "snarkos-consensus",
  "snarkos-environment",
  "snarkos-metrics",
- "snarkos-network",
  "snarkos-storage",
  "snarkvm",
  "thiserror",
  "tokio",
+ "tokio-stream",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
  "tui",
@@ -2418,30 +2425,6 @@ dependencies = [
  "metrics-exporter-prometheus",
  "metrics-util",
  "tokio",
-]
-
-[[package]]
-name = "snarkos-network"
-version = "2.0.2"
-dependencies = [
- "anyhow",
- "bincode",
- "bytes",
- "circular-queue",
- "futures",
- "once_cell",
- "rand",
- "serde",
- "snarkos-consensus",
- "snarkos-environment",
- "snarkos-metrics",
- "snarkos-storage",
- "snarkvm",
- "time",
- "tokio",
- "tokio-stream",
- "tokio-util",
- "tracing",
 ]
 
 [[package]]

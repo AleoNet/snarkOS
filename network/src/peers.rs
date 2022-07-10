@@ -162,13 +162,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Returns the set of connected sync nodes.
     ///
-    pub async fn connected_sync_nodes(&self) -> HashSet<SocketAddr> {
-        let sync_nodes = E::beacon_nodes();
+    pub async fn connected_beacon_nodes(&self) -> HashSet<SocketAddr> {
+        let beacon_nodes = E::beacon_nodes();
         self.connected_peers
             .read()
             .await
             .keys()
-            .filter(|addr| sync_nodes.contains(addr))
+            .filter(|addr| beacon_nodes.contains(addr))
             .copied()
             .collect()
     }
@@ -176,13 +176,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Returns the number of connected sync nodes.
     ///
-    pub async fn number_of_connected_sync_nodes(&self) -> usize {
-        let sync_nodes = E::beacon_nodes();
+    pub async fn number_of_connected_beacon_nodes(&self) -> usize {
+        let beacon_nodes = E::beacon_nodes();
         self.connected_peers
             .read()
             .await
             .keys()
-            .filter(|addr| sync_nodes.contains(addr))
+            .filter(|addr| beacon_nodes.contains(addr))
             .count()
     }
 
@@ -223,7 +223,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Performs the given `request` to the peers.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(&self, request: PeersRequest<N>) {
+    pub async fn update(&self, request: PeersRequest<N>) {
         match request {
             PeersRequest::Connect(peer_ip, connection_result) => {
                 // Ensure the peer IP is not this node.
@@ -318,17 +318,17 @@ impl<N: Network, E: Environment> Peers<N, E> {
 
                 // TODO (howardwu): This logic can be optimized and unified with the context around it.
                 // Determine if the node is connected to more sync nodes than expected.
-                let connected_sync_nodes = self.connected_sync_nodes().await;
-                let number_of_connected_sync_nodes = connected_sync_nodes.len();
-                let num_excess_sync_nodes = number_of_connected_sync_nodes.saturating_sub(1);
-                if num_excess_sync_nodes > 0 {
+                let connected_beacon_nodes = self.connected_beacon_nodes().await;
+                let number_of_connected_beacon_nodes = connected_beacon_nodes.len();
+                let num_excess_beacon_nodes = number_of_connected_beacon_nodes.saturating_sub(1);
+                if num_excess_beacon_nodes > 0 {
                     debug!("Exceeded maximum number of sync nodes");
 
                     // Proceed to send disconnect requests to these peers.
-                    for peer_ip in connected_sync_nodes
+                    for peer_ip in connected_beacon_nodes
                         .iter()
                         .copied()
-                        .choose_multiple(&mut OsRng::default(), num_excess_sync_nodes)
+                        .choose_multiple(&mut OsRng::default(), num_excess_beacon_nodes)
                     {
                         info!("Disconnecting from {} (exceeded maximum connections)", peer_ip);
                         self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers)).await;
@@ -379,7 +379,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 };
 
                 // Add the sync nodes to the list of candidate peers.
-                if number_of_connected_sync_nodes == 0 {
+                if number_of_connected_beacon_nodes == 0 {
                     self.add_candidate_peers(E::beacon_nodes().iter()).await;
                 }
 
@@ -394,7 +394,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     .choose_multiple(&mut OsRng::default(), midpoint_number_of_peers)
                 {
                     // Ensure this node is not connected to more than the permitted number of sync nodes.
-                    if E::beacon_nodes().contains(&peer_ip) && number_of_connected_sync_nodes >= 1 {
+                    if E::beacon_nodes().contains(&peer_ip) && number_of_connected_beacon_nodes >= 1 {
                         continue;
                     }
 
