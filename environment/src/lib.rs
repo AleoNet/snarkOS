@@ -162,10 +162,10 @@ impl<N: Network> Environment for Prover<N> {
 }
 
 #[derive(Clone, Debug, Default)]
-pub struct SyncNode<N: Network>(PhantomData<N>);
+pub struct Beacon<N: Network>(PhantomData<N>);
 
 #[rustfmt::skip]
-impl<N: Network> Environment for SyncNode<N> {
+impl<N: Network> Environment for Beacon<N> {
     type Network = N;
     const NODE_TYPE: NodeType = NodeType::Beacon;
     const MINIMUM_NUMBER_OF_PEERS: usize = 35;

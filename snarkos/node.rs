@@ -17,13 +17,13 @@
 use crate::{Display, Server, Updater};
 use snarkos_environment::{
     helpers::NodeType,
+    Beacon,
     Client,
     ClientTrial,
     CurrentNetwork,
     Environment,
     Prover,
     ProverTrial,
-    SyncNode,
     Validator,
     ValidatorTrial,
 };
@@ -101,7 +101,7 @@ impl Node {
                         .await
                 }
                 NodeType::Prover => self.start_server::<CurrentNetwork, Prover<CurrentNetwork>>(&self.prover).await,
-                NodeType::Beacon => self.start_server::<CurrentNetwork, SyncNode<CurrentNetwork>>(&None).await,
+                NodeType::Beacon => self.start_server::<CurrentNetwork, Beacon<CurrentNetwork>>(&None).await,
                 _ => panic!("Unsupported node configuration"),
             },
         }
@@ -118,40 +118,6 @@ impl Node {
         }
     }
 
-    /// Returns the storage path of the ledger.
-    pub(crate) fn ledger_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
-        if cfg!(feature = "test") {
-            // Tests may use any available ports, and removes the storage artifacts afterwards,
-            // so that there is no need to adhere to a specific number assignment logic.
-            PathBuf::from(format!("/tmp/snarkos-test-ledger-{}", _local_ip.port()))
-        } else {
-            aleo_std::aleo_ledger_dir(self.network, self.dev)
-        }
-    }
-
-    /// Returns the storage path of the validator.
-    pub(crate) fn validator_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
-        if cfg!(feature = "test") {
-            // Tests may use any available ports, and removes the storage artifacts afterwards,
-            // so that there is no need to adhere to a specific number assignment logic.
-            PathBuf::from(format!("/tmp/snarkos-test-validator-{}", _local_ip.port()))
-        } else {
-            // TODO (howardwu): Rename to validator.
-            aleo_std::aleo_operator_dir(self.network, self.dev)
-        }
-    }
-
-    /// Returns the storage path of the prover.
-    pub(crate) fn prover_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
-        if cfg!(feature = "test") {
-            // Tests may use any available ports, and removes the storage artifacts afterwards,
-            // so that there is no need to adhere to a specific number assignment logic.
-            PathBuf::from(format!("/tmp/snarkos-test-prover-{}", _local_ip.port()))
-        } else {
-            aleo_std::aleo_prover_dir(self.network, self.dev)
-        }
-    }
-
     async fn start_server<N: Network, E: Environment>(&self, address: &Option<String>) -> Result<()> {
         println!("{}", crate::display::welcome_message());
 
@@ -165,7 +131,7 @@ impl Node {
         };
 
         println!("Starting {} on {}.", E::NODE_TYPE.description(), N::NAME);
-        println!("{}", crate::display::notification_message::<N>(address));
+        // println!("{}", crate::display::notification_message::<N>(address));
 
         // Initialize the node's server.
         let server = Server::<N, E>::initialize(self, address).await?;

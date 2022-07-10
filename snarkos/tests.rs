@@ -21,14 +21,14 @@ use snarkos_network::DisconnectReason;
 use clap::Parser;
 use std::net::SocketAddr;
 
-/// A snarkOS Node used for local testing.
+/// A snarkOS node used for local testing.
 pub struct TestNode {
     pub server: Server<CurrentNetwork, TestEnvironment<CurrentNetwork>>,
 }
 
 impl TestNode {
     /// Returns the local listening address of the node.
-    pub fn local_addr(&self) -> SocketAddr {
+    pub fn local_ip(&self) -> SocketAddr {
         self.server.local_ip()
     }
 
@@ -112,13 +112,13 @@ mod tests {
         let test_node2 = TestNode::new_with_custom_ip("127.0.0.1", 4000).await;
 
         // Connect one to the other.
-        test_node1.connect(test_node2.local_addr()).await.unwrap();
+        test_node1.connect(test_node2.local_ip()).await.unwrap();
 
         assert_eq!(test_node1.number_of_connected_peers().await, 1);
-        assert!(test_node1.connected_peers().await.contains(&test_node2.local_addr()));
+        assert!(test_node1.connected_peers().await.contains(&test_node2.local_ip()));
 
         assert_eq!(test_node2.number_of_connected_peers().await, 1);
-        assert!(test_node2.connected_peers().await.contains(&test_node1.local_addr()));
+        assert!(test_node2.connected_peers().await.contains(&test_node1.local_ip()));
     }
 
     #[tokio::test]
@@ -128,10 +128,10 @@ mod tests {
         let test_node2 = TestNode::new_with_custom_ip("127.0.0.1", 6000).await;
 
         // Connect the snarkOS node to the test node.
-        test_node1.connect(test_node2.local_addr()).await.unwrap();
+        test_node1.connect(test_node2.local_ip()).await.unwrap();
 
         // The second connection attempt should fail.
-        assert!(test_node1.connect(test_node2.local_addr()).await.is_err());
+        assert!(test_node1.connect(test_node2.local_ip()).await.is_err());
     }
 
     // TODO (raychu86): Implement disconnect.
@@ -172,13 +172,13 @@ mod tests {
 
         // All the test nodes should be able to connect to the snarkOS node.
         for test_node in &test_nodes {
-            test_node.connect(main_test_node.local_addr()).await.unwrap();
+            test_node.connect(main_test_node.local_ip()).await.unwrap();
         }
 
         // A short sleep to ensure all the connections are ready.
         wait_until!(1, main_test_node.number_of_connected_peers().await == MAXIMUM_NUMBER_OF_PEERS);
 
         // Assert that snarkOS node can't connect to the extra node.
-        assert!(main_test_node.connect(extra_test_node.local_addr()).await.is_err());
+        assert!(main_test_node.connect(extra_test_node.local_ip()).await.is_err());
     }
 }

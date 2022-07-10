@@ -58,18 +58,54 @@ impl<N: Network, E: Environment> Server<N, E> {
             Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
         };
 
-        // Initialize the ledger storage path.
-        let ledger_storage_path = node.ledger_storage_path(local_ip);
-        // Initialize the prover storage path.
-        let prover_storage_path = node.prover_storage_path(local_ip);
-        // Initialize the validator storage path.
-        let validator_storage_path = node.validator_storage_path(local_ip);
-
         // Initialize the shared state.
         let state = Arc::new(State::new(local_ip, address));
 
         // Initialize a new instance for managing peers.
         let (peers, peers_handler) = Peers::new(None, state.clone()).await;
+
+        let server = Self { state };
+
+        // /// Returns the storage path of the ledger.
+        // pub(crate) fn ledger_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
+        //     if cfg!(feature = "test") {
+        //         // Tests may use any available ports, and removes the storage artifacts afterwards,
+        //         // so that there is no need to adhere to a specific number assignment logic.
+        //         PathBuf::from(format!("/tmp/snarkos-test-ledger-{}", _local_ip.port()))
+        //     } else {
+        //         aleo_std::aleo_ledger_dir(self.network, self.dev)
+        //     }
+        // }
+        //
+        // /// Returns the storage path of the validator.
+        // pub(crate) fn validator_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
+        //     if cfg!(feature = "test") {
+        //         // Tests may use any available ports, and removes the storage artifacts afterwards,
+        //         // so that there is no need to adhere to a specific number assignment logic.
+        //         PathBuf::from(format!("/tmp/snarkos-test-validator-{}", _local_ip.port()))
+        //     } else {
+        //         // TODO (howardwu): Rename to validator.
+        //         aleo_std::aleo_operator_dir(self.network, self.dev)
+        //     }
+        // }
+        //
+        // /// Returns the storage path of the prover.
+        // pub(crate) fn prover_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
+        //     if cfg!(feature = "test") {
+        //         // Tests may use any available ports, and removes the storage artifacts afterwards,
+        //         // so that there is no need to adhere to a specific number assignment logic.
+        //         PathBuf::from(format!("/tmp/snarkos-test-prover-{}", _local_ip.port()))
+        //     } else {
+        //         aleo_std::aleo_prover_dir(self.network, self.dev)
+        //     }
+        // }
+        //
+        // // Initialize the ledger storage path.
+        // let ledger_storage_path = node.ledger_storage_path(local_ip);
+        // // Initialize the prover storage path.
+        // let prover_storage_path = node.prover_storage_path(local_ip);
+        // // Initialize the validator storage path.
+        // let validator_storage_path = node.validator_storage_path(local_ip);
 
         // // Initialize a new instance for managing the ledger.
         // let (ledger, ledger_handler) = Ledger::<N, E>::open::<_>(&ledger_storage_path, state.clone()).await?;
@@ -84,8 +120,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         // #[cfg(any(feature = "test", feature = "prometheus"))]
         // Self::initialize_metrics(ledger.reader().clone());
 
-        let server = Self { state };
-
         server.state.initialize_peers(peers, peers_handler).await;
         // server.state.initialize_ledger(ledger, ledger_handler).await;
         // server.state.initialize_prover(prover, prover_handler).await;
@@ -96,7 +130,7 @@ impl<N: Network, E: Environment> Server<N, E> {
         // server.state.prover().initialize_pool_connection_loop(pool_ip).await;
         // server.state.validator().initialize().await;
 
-        server.initialize_notification(address).await;
+        // server.initialize_notification(address).await;
         server.initialize_listener(listener).await;
         server.initialize_heartbeat().await;
         // server.initialize_rpc(node, address).await;
@@ -237,63 +271,63 @@ impl<N: Network, E: Environment> Server<N, E> {
         }
     }
 
-    ///
-    /// Initialize a new instance of the notification.
-    ///
-    async fn initialize_notification(&self, address: Option<Address<N>>) {
-        // Initialize the heartbeat process.
-        let (router, handler) = oneshot::channel();
-        let state = self.state.clone();
-        E::resources().register_task(
-            None, // No need to provide an id, as the task will run indefinitely.
-            task::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                loop {
-                    info!("{}", notification_message(address));
-
-                    // if E::NODE_TYPE == NodeType::Miner {
-                    //     if let Some(miner_address) = address {
-                    //         // Retrieve the latest block height.
-                    //         let latest_block_height = state.ledger().reader().latest_block_height();
-                    //
-                    //         // Prepare a list of confirmed and pending coinbase records.
-                    //         let mut confirmed = vec![];
-                    //         let mut pending = vec![];
-                    //
-                    //         // Iterate through the coinbase records from storage.
-                    //         for (block_height, record) in state.prover().to_coinbase_records() {
-                    //             // Filter the coinbase records by determining if they exist on the canonical chain.
-                    //             if let Ok(true) = state.ledger().reader().contains_commitment(&record.commitment()) {
-                    //                 // Ensure the record owner matches.
-                    //                 if record.owner() == miner_address {
-                    //                     // Add the block to the appropriate list.
-                    //                     match block_height + 2048 < latest_block_height {
-                    //                         true => confirmed.push((block_height, record)),
-                    //                         false => pending.push((block_height, record)),
-                    //                     }
-                    //                 }
-                    //             }
-                    //         }
-                    //
-                    //         info!(
-                    //             "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
-                    //             confirmed.len(),
-                    //             pending.len(),
-                    //             miner_address
-                    //         );
-                    //     }
-                    // }
-
-                    // Sleep for `120` seconds.
-                    tokio::time::sleep(Duration::from_secs(120)).await;
-                }
-            }),
-        );
-
-        // Wait until the heartbeat task is ready.
-        let _ = handler.await;
-    }
+    // ///
+    // /// Initialize a new instance of the notification.
+    // ///
+    // async fn initialize_notification(&self, address: Option<Address<N>>) {
+    //     // Initialize the heartbeat process.
+    //     let (router, handler) = oneshot::channel();
+    //     let state = self.state.clone();
+    //     E::resources().register_task(
+    //         None, // No need to provide an id, as the task will run indefinitely.
+    //         task::spawn(async move {
+    //             // Notify the outer function that the task is ready.
+    //             let _ = router.send(());
+    //             loop {
+    //                 // info!("{}", notification_message(address));
+    //
+    //                 // if E::NODE_TYPE == NodeType::Miner {
+    //                 //     if let Some(miner_address) = address {
+    //                 //         // Retrieve the latest block height.
+    //                 //         let latest_block_height = state.ledger().reader().latest_block_height();
+    //                 //
+    //                 //         // Prepare a list of confirmed and pending coinbase records.
+    //                 //         let mut confirmed = vec![];
+    //                 //         let mut pending = vec![];
+    //                 //
+    //                 //         // Iterate through the coinbase records from storage.
+    //                 //         for (block_height, record) in state.prover().to_coinbase_records() {
+    //                 //             // Filter the coinbase records by determining if they exist on the canonical chain.
+    //                 //             if let Ok(true) = state.ledger().reader().contains_commitment(&record.commitment()) {
+    //                 //                 // Ensure the record owner matches.
+    //                 //                 if record.owner() == miner_address {
+    //                 //                     // Add the block to the appropriate list.
+    //                 //                     match block_height + 2048 < latest_block_height {
+    //                 //                         true => confirmed.push((block_height, record)),
+    //                 //                         false => pending.push((block_height, record)),
+    //                 //                     }
+    //                 //                 }
+    //                 //             }
+    //                 //         }
+    //                 //
+    //                 //         info!(
+    //                 //             "Mining Report (confirmed_blocks = {}, pending_blocks = {}, miner_address = {})",
+    //                 //             confirmed.len(),
+    //                 //             pending.len(),
+    //                 //             miner_address
+    //                 //         );
+    //                 //     }
+    //                 // }
+    //
+    //                 // Sleep for `120` seconds.
+    //                 tokio::time::sleep(Duration::from_secs(120)).await;
+    //             }
+    //         }),
+    //     );
+    //
+    //     // Wait until the heartbeat task is ready.
+    //     let _ = handler.await;
+    // }
 
     // #[cfg(any(feature = "test", feature = "prometheus"))]
     // fn initialize_metrics(ledger: LedgerReader<N>) {
