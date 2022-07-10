@@ -14,16 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{display::Display, spawn_task, Server, Updater};
-use snarkos_environment::{helpers::NodeType, Beacon, Client, ClientTrial, Environment, Prover, ProverTrial, Validator, ValidatorTrial};
+use crate::{display::Display, Server, Updater};
+use snarkos_environment::{helpers::NodeType, Beacon, Client, Environment, Prover, Validator};
 use snarkos_storage::storage::{rocksdb::RocksDB, ReadOnly};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use clap::Parser;
 use colored::*;
 use rand::thread_rng;
-use std::{fmt::Write, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
+use std::{fmt::Write, net::SocketAddr, str::FromStr};
 
 #[derive(Debug, Parser)]
 #[clap(name = "snarkos", author = "The Aleo Team <hello@aleo.org>")]

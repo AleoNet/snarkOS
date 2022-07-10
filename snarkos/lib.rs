@@ -26,8 +26,8 @@ extern crate tracing;
 
 pub mod display;
 
-pub mod node;
-pub use node::*;
+pub mod cli;
+pub use cli::*;
 
 pub mod server;
 pub use server::*;

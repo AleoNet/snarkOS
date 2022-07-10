@@ -150,9 +150,6 @@ impl<N: Network, E: Environment> Server<N, E> {
         // server.state.initialize_prover(prover, prover_handler).await;
         // server.state.initialize_validator(validator, validator_handler).await;
 
-        // server.state.prover().initialize_miner().await;
-        // server.state.prover().initialize_pooling().await;
-        // server.state.prover().initialize_pool_connection_loop(pool_ip).await;
         // server.state.validator().initialize().await;
 
         // server.initialize_notification(address).await;
