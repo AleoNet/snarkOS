@@ -24,9 +24,9 @@ use tokio::sync::oneshot;
 use crate::peers::{Peers, PeersHandler};
 
 pub struct State<N: Network, E: Environment> {
-    /// The local address of the node.
+    /// The local IP of the node.
     pub local_ip: SocketAddr,
-    /// The Aleo address corresponding to the Node's prover and/or validator.
+    /// The Aleo address corresponding to the prover or validator.
     pub address: Option<Address<N>>,
     /// The list of peers for the node.
     peers: OnceBox<Peers<N, E>>,

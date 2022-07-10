@@ -171,8 +171,7 @@ impl Resources {
     /// Register the given task with the resource handler and optionally
     /// with an associated resource id.
     pub fn register_task(&self, id: Option<ResourceId>, handle: tokio::task::JoinHandle<()>) {
-        let task = Resource::Task(handle);
-        self.register(task, id);
+        self.register(Resource::Task(handle), id);
     }
 
     /// Register a task and instrument it with the given `name`; useful metrics on it will be logged every `interval`.

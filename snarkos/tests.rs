@@ -15,11 +15,14 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Server;
-use snarkos_environment::{CurrentNetwork, TestEnvironment};
+use snarkos_environment::TestEnvironment;
 use snarkos_network::DisconnectReason;
 
 use clap::Parser;
 use std::net::SocketAddr;
+
+/// A type alias for the current version of the network.
+pub type CurrentNetwork = snarkvm::prelude::Testnet3;
 
 /// A snarkOS node used for local testing.
 pub struct TestNode {
@@ -73,7 +76,7 @@ impl TestNode {
     pub async fn with_args(extra_args: &[&str]) -> Self {
         let permanent_args = &["snarkos", "--norpc"];
         let combined_args = permanent_args.iter().chain(extra_args.iter());
-        let config = crate::Node::parse_from(combined_args);
+        let config = crate::CLI::parse_from(combined_args);
         let server = Server::<CurrentNetwork, TestEnvironment<CurrentNetwork>>::initialize(&config, None)
             .await
             .unwrap();

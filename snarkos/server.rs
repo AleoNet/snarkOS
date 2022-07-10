@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{display::notification_message, Node};
+use crate::{display::notification_message, CLI};
 use snarkos_environment::{
     helpers::{NodeType, Status},
     Environment,
@@ -47,13 +47,38 @@ pub struct Server<N: Network, E: Environment> {
     pub state: Arc<State<N, E>>,
 }
 
+#[macro_export]
+macro_rules! spawn_task {
+    // Spawns a new task, without a task ID.
+    ($logic:block) => {{
+        // Initialize the listener process.
+        let (router, handler) = tokio::sync::oneshot::channel();
+
+        E::resources().register_task(
+            None, // No need to provide an id, as the task will run indefinitely.
+            tokio::task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+
+                $logic
+            }),
+        );
+
+        // Wait until the listener task is ready.
+        let _ = handler.await;
+    }};
+
+    // Spawns a new task, without a task ID.
+    ($logic:expr) => {{ $crate::spawn_task!({ $logic }) }};
+}
+
 impl<N: Network, E: Environment> Server<N, E> {
     ///
     /// Starts the connection listener for peers.
     ///
-    pub async fn initialize(node: &Node, address: Option<Address<N>>) -> Result<Self> {
+    pub async fn initialize(cli: &CLI, address: Option<Address<N>>) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
-        let (local_ip, listener) = match TcpListener::bind(node.node).await {
+        let (local_ip, listener) = match TcpListener::bind(cli.node).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
             Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
         };
@@ -185,84 +210,64 @@ impl<N: Network, E: Environment> Server<N, E> {
     /// Initialize the connection listener for new peers.
     ///
     async fn initialize_listener(&self, listener: TcpListener) {
-        // Initialize the listener process.
-        let (router, handler) = oneshot::channel();
         let state = self.state.clone();
-        E::resources().register_task(
-            None, // No need to provide an id, as the task will run indefinitely.
-            task::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                info!("Listening for peers at {}", state.local_ip);
-                loop {
-                    // Don't accept connections if the node is breaching the configured peer limit.
-                    if state.peers().number_of_connected_peers().await < E::MAXIMUM_NUMBER_OF_PEERS {
-                        // Asynchronously wait for an inbound TcpStream.
-                        match listener.accept().await {
-                            // Process the inbound connection request.
-                            Ok((stream, peer_ip)) => {
-                                let request = PeersRequest::PeerConnecting(stream, peer_ip);
-                                if let Err(error) = state.peers().router().send(request).await {
-                                    error!("Failed to send request to peers: {}", error)
-                                }
+        spawn_task!({
+            info!("Listening for peers at {}", state.local_ip);
+            loop {
+                // Don't accept connections if the node is breaching the configured peer limit.
+                if state.peers().number_of_connected_peers().await < E::MAXIMUM_NUMBER_OF_PEERS {
+                    // Asynchronously wait for an inbound TcpStream.
+                    match listener.accept().await {
+                        // Process the inbound connection request.
+                        Ok((stream, peer_ip)) => {
+                            let request = PeersRequest::PeerConnecting(stream, peer_ip);
+                            if let Err(error) = state.peers().router().send(request).await {
+                                error!("Failed to send request to peers: {}", error)
                             }
-                            Err(error) => error!("Failed to accept a connection: {}", error),
                         }
-                        // Add a small delay to prevent overloading the network from handshakes.
-                        tokio::time::sleep(Duration::from_millis(150)).await;
-                    } else {
-                        // Add a sleep delay as the node has reached peer capacity.
-                        tokio::time::sleep(Duration::from_secs(5)).await;
+                        Err(error) => error!("Failed to accept a connection: {}", error),
                     }
+                    // Add a small delay to prevent overloading the network from handshakes.
+                    tokio::time::sleep(Duration::from_millis(150)).await;
+                } else {
+                    // Add a sleep delay as the node has reached peer capacity.
+                    tokio::time::sleep(Duration::from_secs(5)).await;
                 }
-            }),
-        );
-
-        // Wait until the listener task is ready.
-        let _ = handler.await;
+            }
+        });
     }
 
     ///
     /// Initialize a new instance of the heartbeat.
     ///
     async fn initialize_heartbeat(&self) {
-        // Initialize the heartbeat process.
-        let (router, handler) = oneshot::channel();
         let state = self.state.clone();
-        E::resources().register_task(
-            None, // No need to provide an id, as the task will run indefinitely.
-            task::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-                loop {
-                    // // Transmit a heartbeat request to the ledger.
-                    // if let Err(error) = state.ledger().router().send(LedgerRequest::Heartbeat).await {
-                    //     error!("Failed to send heartbeat to ledger: {}", error)
-                    // }
-                    // Transmit a heartbeat request to the peers.
-                    let request = PeersRequest::Heartbeat;
-                    if let Err(error) = state.peers().router().send(request).await {
-                        error!("Failed to send heartbeat to peers: {}", error)
-                    }
-                    // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
-                    tokio::time::sleep(Duration::from_secs(E::HEARTBEAT_IN_SECS)).await;
+        spawn_task!({
+            loop {
+                // // Transmit a heartbeat request to the ledger.
+                // if let Err(error) = state.ledger().router().send(LedgerRequest::Heartbeat).await {
+                //     error!("Failed to send heartbeat to ledger: {}", error)
+                // }
+                // Transmit a heartbeat request to the peers.
+                let request = PeersRequest::Heartbeat;
+                if let Err(error) = state.peers().router().send(request).await {
+                    error!("Failed to send heartbeat to peers: {}", error)
                 }
-            }),
-        );
-
-        // Wait until the heartbeat task is ready.
-        let _ = handler.await;
+                // Sleep for `E::HEARTBEAT_IN_SECS` seconds.
+                tokio::time::sleep(Duration::from_secs(E::HEARTBEAT_IN_SECS)).await;
+            }
+        });
     }
 
     ///
     /// Initialize a new instance of the RPC server.
     ///
     #[cfg(feature = "rpc")]
-    async fn initialize_rpc(&self, node: &Node, address: Option<Address<N>>) {
-        if !node.norpc {
+    async fn initialize_rpc(&self, cli: &CLI, address: Option<Address<N>>) {
+        if !cli.norpc {
             // Initialize a new instance of the RPC server.
-            let rpc_context = RpcContext::new(node.rpc_username.clone(), node.rpc_password.clone(), address, self.state.clone());
-            let (rpc_server_addr, rpc_server_handle) = initialize_rpc_server::<N, E>(node.rpc, rpc_context).await;
+            let rpc_context = RpcContext::new(cli.rpc_username.clone(), cli.rpc_password.clone(), address, self.state.clone());
+            let (rpc_server_addr, rpc_server_handle) = initialize_rpc_server::<N, E>(cli.rpc, rpc_context).await;
 
             debug!("JSON-RPC server listening on {}", rpc_server_addr);
 

@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_environment::CurrentNetwork;
 use snarkos_storage::{
     storage::{rocksdb::RocksDB, ReadWrite, Storage},
     LedgerState,
@@ -23,6 +22,9 @@ use snarkos_storage::{
 use criterion::{criterion_group, criterion_main, Criterion};
 
 use std::time::Duration;
+
+/// A type alias for the current version of the network.
+pub type CurrentNetwork = snarkvm::prelude::Testnet3;
 
 // This value should be no greater than the number of blocks available in the loaded dump.
 const NUM_BLOCKS: u32 = 1_000;

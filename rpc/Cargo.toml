@@ -53,7 +53,10 @@ path = "../storage"
 version = "2.0.2"
 
 [dependencies.snarkvm]
-version = "0.8.0"
+path = "../snarkVM"
+#git = "https://github.com/AleoHQ/snarkVM.git"
+#branch = "testnet3"
+features = ["console"]
 
 [dependencies.thiserror]
 version = "1.0"

@@ -14,12 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-pub(crate) mod aleo;
-pub(crate) use aleo::*;
-
-pub(crate) mod console;
+mod console;
 pub(crate) use console::*;
 
-pub(super) mod logs;
+mod logger;
+pub use logger::*;
 
+pub(super) mod logs;
 pub(super) mod overview;

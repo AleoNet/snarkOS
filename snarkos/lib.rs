@@ -24,8 +24,7 @@ extern crate thiserror;
 #[macro_use]
 extern crate tracing;
 
-pub(crate) mod display;
-pub(crate) use display::*;
+pub mod display;
 
 pub mod node;
 pub use node::*;
@@ -46,7 +45,6 @@ pub use snarkos_storage as storage;
 #[cfg(feature = "rpc")]
 pub use snarkos_rpc as rpc;
 
-pub use environment::CurrentNetwork;
 pub use snarkvm::prelude::{Address, Network};
 
 pub mod prelude {
@@ -55,6 +53,5 @@ pub mod prelude {
     #[cfg(feature = "rpc")]
     pub use crate::rpc::*;
 
-    pub use snarkos_environment::CurrentNetwork;
     pub use snarkvm::prelude::{Address, Network};
 }

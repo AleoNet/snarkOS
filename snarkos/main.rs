@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos::{initialize_logger, Node};
+use snarkos::{display::initialize_logger, CLI};
 
 use anyhow::Result;
 use clap::Parser;
@@ -26,14 +26,14 @@ fn main() -> Result<()> {
     }
 
     // Parse the provided arguments.
-    let node = Node::parse();
+    let cli = CLI::parse();
 
     // Start logging, if enabled.
-    if !node.display {
-        initialize_logger(node.verbosity, None);
+    if !cli.display {
+        initialize_logger(cli.verbosity, None);
     }
 
-    let (num_tokio_worker_threads, max_tokio_blocking_threads) = if !node.sync {
+    let (num_tokio_worker_threads, max_tokio_blocking_threads) = if !cli.beacon {
         ((num_cpus::get() / 8 * 2).max(1), num_cpus::get())
     } else {
         (num_cpus::get(), 512) // 512 is tokio's current default
@@ -47,7 +47,7 @@ fn main() -> Result<()> {
         .max_blocking_threads(max_tokio_blocking_threads)
         .build()?;
 
-    let num_rayon_cores_global = if !node.sync {
+    let num_rayon_cores_global = if !cli.beacon {
         (num_cpus::get() / 8 * 5).max(1)
     } else {
         num_cpus::get()
@@ -61,7 +61,7 @@ fn main() -> Result<()> {
         .unwrap();
 
     runtime.block_on(async move {
-        node.start().await.expect("Failed to start the node");
+        cli.start().await.expect("Failed to start the node");
     });
 
     Ok(())

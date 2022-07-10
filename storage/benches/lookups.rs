@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_environment::CurrentNetwork;
 use snarkos_storage::{
     storage::{rocksdb::RocksDB, DataID, MapRead, ReadWrite, Storage},
     LedgerState,
@@ -28,6 +27,9 @@ use rand_xorshift::XorShiftRng;
 
 // This value should be no greater than the number of blocks available in the loaded dump.
 const NUM_BLOCKS: u32 = 1_000;
+
+/// A type alias for the current version of the network.
+pub type CurrentNetwork = snarkvm::prelude::Testnet3;
 
 fn lookups(c: &mut Criterion) {
     let temp_dir = tempfile::tempdir().expect("Failed to open temporary directory").into_path();

@@ -17,8 +17,69 @@
 use snarkvm::prelude::*;
 
 use colored::*;
+use crossterm::tty::IsTty;
+use std::{fmt::Write, io};
+use tokio::sync::mpsc;
+use tracing_subscriber::EnvFilter;
 
-use std::fmt::Write;
+pub enum LogWriter {
+    Stdout(io::Stdout),
+    Sender(mpsc::Sender<Vec<u8>>),
+}
+
+impl LogWriter {
+    pub fn new(log_sender: &Option<mpsc::Sender<Vec<u8>>>) -> Self {
+        if let Some(sender) = log_sender {
+            Self::Sender(sender.clone())
+        } else {
+            Self::Stdout(io::stdout())
+        }
+    }
+}
+
+impl io::Write for LogWriter {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        match self {
+            Self::Stdout(stdout) => stdout.write(buf),
+            Self::Sender(sender) => {
+                let log = buf.to_vec();
+                let _ = sender.try_send(log);
+                Ok(buf.len())
+            }
+        }
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+pub fn initialize_logger(verbosity: u8, log_sender: Option<mpsc::Sender<Vec<u8>>>) {
+    match verbosity {
+        0 => std::env::set_var("RUST_LOG", "info"),
+        1 => std::env::set_var("RUST_LOG", "debug"),
+        2 | 3 => std::env::set_var("RUST_LOG", "trace"),
+        _ => std::env::set_var("RUST_LOG", "info"),
+    };
+
+    // Filter out undesirable logs.
+    let filter = EnvFilter::from_default_env()
+        .add_directive("mio=off".parse().unwrap())
+        .add_directive("tokio_util=off".parse().unwrap())
+        .add_directive("hyper::proto::h1::conn=off".parse().unwrap())
+        .add_directive("hyper::proto::h1::decode=off".parse().unwrap())
+        .add_directive("hyper::proto::h1::io=off".parse().unwrap())
+        .add_directive("hyper::proto::h1::role=off".parse().unwrap())
+        .add_directive("jsonrpsee=off".parse().unwrap());
+
+    // Initialize tracing.
+    let _ = tracing_subscriber::fmt()
+        .with_env_filter(filter)
+        .with_ansi(log_sender.is_none() && io::stdout().is_tty())
+        .with_writer(move || LogWriter::new(&log_sender))
+        .with_target(verbosity == 3)
+        .try_init();
+}
 
 pub fn welcome_message() -> String {
     let mut output = String::new();

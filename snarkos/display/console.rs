@@ -15,8 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
-    display::{logs::Logs, overview::Overview},
-    initialize_logger,
+    display::{initialize_logger, logs::Logs, overview::Overview},
     Server,
 };
 use snarkos_environment::Environment;

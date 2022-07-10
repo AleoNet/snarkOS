@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{initialize_rpc_server, rpc_trait::RpcFunctions, RpcContext};
-use snarkos_environment::{helpers::Status, Client, CurrentNetwork, Environment};
+use snarkos_environment::{helpers::Status, Client, Environment};
 use snarkos_network::{ledger::Ledger, Operator, Peers, Prover, State};
 use snarkos_storage::{
     storage::{rocksdb::RocksDB, ReadWrite, Storage},
@@ -26,6 +26,7 @@ use snarkvm::{
     prelude::{Account, Block, BlockHeader},
     utilities::ToBytes,
 };
+use snarkvm::dpc::Record;
 
 use jsonrpsee::{
     core::{client::ClientT, Error as JsonrpseeError},
@@ -36,14 +37,15 @@ use jsonrpsee::{
 use rand::{thread_rng, Rng, SeedableRng};
 use rand_chacha::ChaChaRng;
 use serde::{Deserialize, Serialize};
-use snarkvm::dpc::Record;
-
 use std::{
     fs,
     net::SocketAddr,
     path::{Path, PathBuf},
     sync::Arc,
 };
+
+/// A type alias for the current version of the network.
+pub type CurrentNetwork = snarkvm::prelude::Testnet3;
 
 fn temp_dir() -> std::path::PathBuf {
     tempfile::tempdir().expect("Failed to open temporary directory").into_path()

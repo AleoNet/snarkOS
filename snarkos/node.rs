@@ -14,49 +14,31 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Display, Server, Updater};
-use snarkos_environment::{
-    helpers::NodeType,
-    Beacon,
-    Client,
-    ClientTrial,
-    CurrentNetwork,
-    Environment,
-    Prover,
-    ProverTrial,
-    Validator,
-    ValidatorTrial,
-};
+use crate::{display::Display, spawn_task, Server, Updater};
+use snarkos_environment::{helpers::NodeType, Beacon, Client, ClientTrial, Environment, Prover, ProverTrial, Validator, ValidatorTrial};
 use snarkos_storage::storage::{rocksdb::RocksDB, ReadOnly};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use colored::*;
-use crossterm::tty::IsTty;
 use rand::thread_rng;
-use std::{fmt::Write, io, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
-use tokio::sync::mpsc;
-use tracing_subscriber::EnvFilter;
+use std::{fmt::Write, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 
 #[derive(Debug, Parser)]
 #[clap(name = "snarkos", author = "The Aleo Team <hello@aleo.org>")]
-pub struct Node {
-    /// Specify the IP address and port of a peer to connect to.
-    #[clap(long = "connect")]
-    pub connect: Option<String>,
-    /// Specify this as a validator node, with the given validator address.
-    #[clap(long = "validator")]
-    pub validator: Option<String>,
-    /// Specify this as a prover node, with the given prover address.
-    #[clap(long = "prover")]
-    pub prover: Option<String>,
+pub struct CLI {
     /// Specify the network of this node.
     #[clap(default_value = "3", long = "network")]
     pub network: u16,
+
     /// Specify the IP address and port for the node server.
     #[clap(parse(try_from_str), default_value = "0.0.0.0:4133", long = "node")]
     pub node: SocketAddr,
+    /// Specify the IP address and port of a peer to connect to.
+    #[clap(long = "connect")]
+    pub connect: Option<String>,
+
     /// Specify the IP address and port for the RPC server.
     #[clap(parse(try_from_str), default_value = "0.0.0.0:3033", long = "rpc")]
     pub rpc: SocketAddr,
@@ -66,6 +48,19 @@ pub struct Node {
     /// Specify the password for the RPC server.
     #[clap(default_value = "pass", long = "password")]
     pub rpc_password: String,
+    /// If the flag is set, the node will not initialize the RPC server.
+    #[clap(long)]
+    pub norpc: bool,
+
+    /// Specify this as a prover node, with the given prover address.
+    #[clap(long = "prover")]
+    pub prover: Option<String>,
+    /// Specify this as a validator node, with the given validator address.
+    #[clap(long = "validator")]
+    pub validator: Option<String>,
+    #[clap(hide = true, long)]
+    pub beacon: bool,
+
     /// Specify the verbosity of the node [options: 0, 1, 2, 3]
     #[clap(default_value = "2", long = "verbosity")]
     pub verbosity: u8,
@@ -75,52 +70,49 @@ pub struct Node {
     /// If the flag is set, the node will render a read-only display.
     #[clap(long)]
     pub display: bool,
-    /// If the flag is set, the node will not initialize the RPC server.
-    #[clap(long)]
-    pub norpc: bool,
-    #[clap(hide = true, long)]
-    pub sync: bool,
+
     /// Specify an optional subcommand.
     #[clap(subcommand)]
     commands: Option<Command>,
 }
 
-impl Node {
+impl CLI {
     /// Starts the node.
     pub async fn start(self) -> Result<()> {
+        // A type for Aleo Testnet3.
+        pub type Testnet3 = snarkvm::prelude::Testnet3;
+
         // Parse optional subcommands first.
         match self.commands {
             Some(command) => {
                 println!("{}", command.parse()?);
                 Ok(())
             }
-            None => match &self.get_node_type() {
-                NodeType::Client => self.start_server::<CurrentNetwork, Client<CurrentNetwork>>(&None).await,
-                NodeType::Validator => {
-                    self.start_server::<CurrentNetwork, Validator<CurrentNetwork>>(&self.validator)
-                        .await
-                }
-                NodeType::Prover => self.start_server::<CurrentNetwork, Prover<CurrentNetwork>>(&self.prover).await,
-                NodeType::Beacon => self.start_server::<CurrentNetwork, Beacon<CurrentNetwork>>(&None).await,
-                _ => panic!("Unsupported node configuration"),
+            None => match self.node_type() {
+                NodeType::Client => self.start_server::<Testnet3, Client<Testnet3>>(&None).await,
+                NodeType::Prover => self.start_server::<Testnet3, Prover<Testnet3>>(&self.prover).await,
+                NodeType::Validator => self.start_server::<Testnet3, Validator<Testnet3>>(&self.validator).await,
+                NodeType::Beacon => self.start_server::<Testnet3, Beacon<Testnet3>>(&None).await,
             },
         }
     }
 
-    /// Returns the node type corresponding to the given node configurations.
-    fn get_node_type(&self) -> NodeType {
-        match (self.network, &self.validator, &self.prover, self.sync) {
+    /// Returns the node type corresponding to the given CLI configurations.
+    fn node_type(&self) -> NodeType {
+        match (self.network, &self.prover, &self.validator, self.beacon) {
             (3, None, None, false) => NodeType::Client,
-            (3, Some(_), None, false) => NodeType::Validator,
-            (3, None, Some(_), false) => NodeType::Prover,
+            (3, Some(_), None, false) => NodeType::Prover,
+            (3, None, Some(_), false) => NodeType::Validator,
             (3, None, None, true) => NodeType::Beacon,
             _ => panic!("Unsupported node configuration"),
         }
     }
 
+    /// Starts the node server.
     async fn start_server<N: Network, E: Environment>(&self, address: &Option<String>) -> Result<()> {
         println!("{}", crate::display::welcome_message());
 
+        // Print the Aleo address.
         let address = match (E::NODE_TYPE, address) {
             (NodeType::Validator, Some(address)) | (NodeType::Prover, Some(address)) => {
                 let address = Address::<N>::from_str(address)?;
@@ -131,14 +123,13 @@ impl Node {
         };
 
         println!("Starting {} on {}.", E::NODE_TYPE.description(), N::NAME);
-        // println!("{}", crate::display::notification_message::<N>(address));
 
         // Initialize the node's server.
         let server = Server::<N, E>::initialize(self, address).await?;
 
         // Initialize signal handling; it also maintains ownership of the Server
         // in order for it to not go out of scope.
-        handle_signals(server.clone());
+        Self::handle_signals(server.clone());
 
         // Initialize the display, if enabled.
         if self.display {
@@ -148,14 +139,18 @@ impl Node {
 
         // Connect to peer(s) if given as an argument.
         if let Some(peer_ips) = &self.connect {
+            // Separate the IP addresses.
             for peer_ip in peer_ips.split(',') {
-                let addr: SocketAddr = if let Ok(addr) = peer_ip.parse() {
-                    addr
-                } else {
-                    error!("The address supplied to --connect ('{}') is malformed.", peer_ip);
-                    continue;
-                };
-                let _ = server.connect_to(addr).await;
+                // Parse each IP address.
+                server
+                    .connect_to(match peer_ip.parse() {
+                        Ok(ip) => ip,
+                        Err(e) => {
+                            error!("The IP supplied to --connect ('{peer_ip}') is malformed: {e}");
+                            continue;
+                        }
+                    })
+                    .await?;
             }
         }
 
@@ -165,33 +160,23 @@ impl Node {
 
         Ok(())
     }
-}
 
-pub fn initialize_logger(verbosity: u8, log_sender: Option<mpsc::Sender<Vec<u8>>>) {
-    match verbosity {
-        0 => std::env::set_var("RUST_LOG", "info"),
-        1 => std::env::set_var("RUST_LOG", "debug"),
-        2 | 3 => std::env::set_var("RUST_LOG", "trace"),
-        _ => std::env::set_var("RUST_LOG", "info"),
-    };
-
-    // Filter out undesirable logs.
-    let filter = EnvFilter::from_default_env()
-        .add_directive("mio=off".parse().unwrap())
-        .add_directive("tokio_util=off".parse().unwrap())
-        .add_directive("hyper::proto::h1::conn=off".parse().unwrap())
-        .add_directive("hyper::proto::h1::decode=off".parse().unwrap())
-        .add_directive("hyper::proto::h1::io=off".parse().unwrap())
-        .add_directive("hyper::proto::h1::role=off".parse().unwrap())
-        .add_directive("jsonrpsee=off".parse().unwrap());
-
-    // Initialize tracing.
-    let _ = tracing_subscriber::fmt()
-        .with_env_filter(filter)
-        .with_ansi(log_sender.is_none() && io::stdout().is_tty())
-        .with_writer(move || LogWriter::new(&log_sender))
-        .with_target(verbosity == 3)
-        .try_init();
+    /// Handles OS signals for the node to intercept and perform a clean shutdown.
+    /// Note: Only Ctrl-C is supported; it should work on both Unix-family systems and Windows.
+    pub fn handle_signals<N: Network, E: Environment>(server: Server<N, E>) {
+        E::resources().register_task(
+            None, // No need to provide an id, as the task will run indefinitely.
+            tokio::task::spawn(async move {
+                match tokio::signal::ctrl_c().await {
+                    Ok(()) => {
+                        server.shut_down().await;
+                        std::process::exit(0);
+                    }
+                    Err(error) => error!("tokio::signal::ctrl_c encountered an error: {}", error),
+                }
+            }),
+        );
+    }
 }
 
 #[derive(Debug, Parser)]
@@ -211,38 +196,6 @@ impl Command {
             Self::Update(command) => command.parse(),
             Self::Experimental(command) => command.parse(),
         }
-    }
-}
-
-pub enum LogWriter {
-    Stdout(io::Stdout),
-    Sender(mpsc::Sender<Vec<u8>>),
-}
-
-impl LogWriter {
-    pub fn new(log_sender: &Option<mpsc::Sender<Vec<u8>>>) -> Self {
-        if let Some(sender) = log_sender {
-            Self::Sender(sender.clone())
-        } else {
-            Self::Stdout(io::stdout())
-        }
-    }
-}
-
-impl io::Write for LogWriter {
-    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
-        match self {
-            Self::Stdout(stdout) => stdout.write(buf),
-            Self::Sender(sender) => {
-                let log = buf.to_vec();
-                let _ = sender.try_send(log);
-                Ok(buf.len())
-            }
-        }
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
     }
 }
 
@@ -348,7 +301,7 @@ pub struct NewAccount {}
 impl NewAccount {
     pub fn parse(self) -> Result<String> {
         // Sample a new private key, view key, and address.
-        let private_key = PrivateKey::<CurrentNetwork>::new(&mut rand::thread_rng())?;
+        let private_key = PrivateKey::<snarkvm::prelude::Testnet3>::new(&mut rand::thread_rng())?;
         let view_key = ViewKey::try_from(&private_key)?;
         let address = Address::try_from(&view_key)?;
 
@@ -365,22 +318,4 @@ impl NewAccount {
 
         Ok(output)
     }
-}
-
-// This function is responsible for handling OS signals in order
-// for the node to be able to intercept them and perform a clean shutdown.
-// Note: Only Ctrl-C is supported; it should work on both Unix-family systems and Windows.
-pub fn handle_signals<N: Network, E: Environment>(server: Server<N, E>) {
-    E::resources().register_task(
-        None, // No need to provide an id, as the task will run indefinitely.
-        tokio::task::spawn(async move {
-            match tokio::signal::ctrl_c().await {
-                Ok(()) => {
-                    server.shut_down().await;
-                    std::process::exit(0);
-                }
-                Err(error) => error!("tokio::signal::ctrl_c encountered an error: {}", error),
-            }
-        }),
-    );
 }
