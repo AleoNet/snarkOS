@@ -22,7 +22,6 @@ use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 use anyhow::{bail, ensure, Result};
 use clap::Parser;
 use colored::*;
-use rand::thread_rng;
 use std::{fmt::Write, net::SocketAddr, str::FromStr};
 
 #[derive(Debug, Parser)]
