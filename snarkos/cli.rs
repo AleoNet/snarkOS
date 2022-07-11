@@ -141,7 +141,7 @@ impl CLI {
         // Print the Aleo address.
         println!("Your Aleo address is {}.\n", account.address());
         // Print the node type and network.
-        println!("Starting {} on {}.", E::NODE_TYPE.description(), N::NAME);
+        println!("Starting {} on {}.\n", E::NODE_TYPE.description(), N::NAME);
 
         // Initialize the node.
         let node = Node::<N, E>::new(self.node, account).await?;

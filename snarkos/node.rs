@@ -41,11 +41,14 @@ macro_rules! spawn_task {
         let (router, handler) = tokio::sync::oneshot::channel();
         // Register the task with the environment.
         // No need to provide an id, as the task will run indefinitely.
-        E::resources().register_task(None, tokio::task::spawn(async move {
-            // Notify the outer function that the task is ready.
-            let _ = router.send(());
-            $logic
-        }));
+        E::resources().register_task(
+            None,
+            tokio::task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                $logic
+            }),
+        );
         // Wait until the task is ready.
         let _ = handler.await;
     }};
@@ -55,23 +58,22 @@ macro_rules! spawn_task {
 
     // Spawns a new task, with a task ID.
     ($id:expr, $logic:block) => {{
-        let (router, handler) = tokio::sync::oneshot::channel();
         // Register the task with the environment.
-        E::resources().register_task(Some($id), tokio::task::spawn(async move {
-            // Notify the outer function that the task is ready.
-            let _ = router.send(());
-            $logic
-            E::resources().deregister($id);
-        }));
-        // Wait until the task is ready.
-        let _ = handler.await;
+        E::resources().register_task(
+            Some($id),
+            tokio::task::spawn(async move {
+                let result = $logic;
+                E::resources().deregister($id);
+                result
+            }),
+        );
     }};
 
     // Spawns a new task, with a task ID.
     ($id:expr, $logic:expr) => {{ $crate::spawn_task!($id, { $logic }) }};
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct State<N: Network, E: Environment> {
     /// The local IP of the node.
     local_ip: Arc<SocketAddr>,
@@ -140,7 +142,7 @@ impl<N: Network, E: Environment> State<N, E> {
     ///
     /// Initialize the connection listener for new peers.
     ///
-    async fn initialize_peers(&self, mut peers_handler: PeersHandler<N>) {
+    async fn initialize_peers(&self, mut peers_handler: PeersHandler<N, E>) {
         let state = self.clone();
         spawn_task!({
             // Asynchronously wait for a peers request.

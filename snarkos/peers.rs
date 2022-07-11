@@ -16,7 +16,7 @@
 
 use crate::{
     message::{Data, DisconnectReason, Message},
-    peer::{OutboundRouter, Peer},
+    peer::{Peer, PeerRouter},
     State,
 };
 use snarkos_environment::Environment;
@@ -43,9 +43,9 @@ use tokio::{
 };
 
 /// Shorthand for the parent half of the `Peers` message channel.
-pub type PeersRouter<N> = mpsc::Sender<PeersRequest<N>>;
+pub type PeersRouter<N, E> = mpsc::Sender<PeersRequest<N, E>>;
 /// Shorthand for the child half of the `Peers` message channel.
-pub type PeersHandler<N> = mpsc::Receiver<PeersRequest<N>>;
+pub type PeersHandler<N, E> = mpsc::Receiver<PeersRequest<N, E>>;
 
 /// Shorthand for the parent half of the connection result channel.
 pub(crate) type ConnectionResult = oneshot::Sender<Result<()>>;
@@ -54,7 +54,7 @@ pub(crate) type ConnectionResult = oneshot::Sender<Result<()>>;
 /// An enum of requests that the `Peers` struct processes.
 ///
 #[derive(Debug)]
-pub enum PeersRequest<N: Network> {
+pub enum PeersRequest<N: Network, E: Environment> {
     /// Connect := (peer_ip, connection_result)
     Connect(SocketAddr, ConnectionResult),
     /// Heartbeat
@@ -65,8 +65,8 @@ pub enum PeersRequest<N: Network> {
     MessageSend(SocketAddr, Message<N>),
     /// PeerConnecting := (stream, peer_ip)
     PeerConnecting(TcpStream, SocketAddr),
-    /// PeerConnected := (peer_ip, outbound_router)
-    PeerConnected(SocketAddr, OutboundRouter<N>),
+    /// PeerConnected := (peer_ip, peer)
+    PeerConnected(SocketAddr, Peer<N, E>),
     /// PeerDisconnected := (peer_ip)
     PeerDisconnected(SocketAddr),
     /// PeerRestricted := (peer_ip)
@@ -85,9 +85,9 @@ pub struct Peers<N: Network, E: Environment> {
     /// The state of the node.
     state: State<N, E>,
     /// The peers router of the node.
-    peers_router: PeersRouter<N>,
+    peers_router: PeersRouter<N, E>,
     /// The map connected peer IPs to their outbound message router.
-    connected_peers: RwLock<HashMap<SocketAddr, OutboundRouter<N>>>,
+    connected_peers: RwLock<HashMap<SocketAddr, Peer<N, E>>>,
     /// The set of candidate peer IPs.
     candidate_peers: RwLock<HashSet<SocketAddr>>,
     /// The set of restricted peer IPs.
@@ -102,7 +102,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Initializes a new instance of `Peers` and its corresponding handler.
     ///
-    pub async fn new(state: State<N, E>) -> (Self, mpsc::Receiver<PeersRequest<N>>) {
+    pub async fn new(state: State<N, E>) -> (Self, mpsc::Receiver<PeersRequest<N, E>>) {
         // Initialize an MPSC channel for sending requests to the `Peers` struct.
         let (peers_router, peers_handler) = mpsc::channel(1024);
 
@@ -123,7 +123,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Returns the peers router.
     ///
-    pub fn router(&self) -> &PeersRouter<N> {
+    pub fn router(&self) -> &PeersRouter<N, E> {
         &self.peers_router
     }
 
@@ -210,7 +210,9 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Performs the given `request` to the peers.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(crate) async fn update(&self, request: PeersRequest<N>) {
+    pub(crate) async fn update(&self, request: PeersRequest<N, E>) {
+        debug!("Peers: {:?}", self.connected_peers().await);
+
         match request {
             PeersRequest::Connect(peer_ip, connection_result) => {
                 // Ensure the peer IP is not this node.
@@ -247,10 +249,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         // Release the lock over seen_outbound_connections.
                         drop(seen_outbound_connections);
 
-                        // Initialize the peer handler.
+                        // Initialize the peer.
                         match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await {
                             Ok(stream) => match stream {
-                                Ok(stream) => Peer::handler(self.state.clone(), stream, Some(connection_result)).await,
+                                Ok(stream) => Peer::handshake(self.state.clone(), stream, Some(connection_result)).await,
                                 Err(error) => {
                                     trace!("Failed to connect to '{}': '{:?}'", peer_ip, error);
                                     self.candidate_peers.write().await.remove(&peer_ip);
@@ -277,10 +279,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         .connected_peers
                         .read()
                         .await
-                        .iter()
-                        .filter(|(peer_ip, _)| !E::beacon_nodes().contains(peer_ip) && !E::trusted_nodes().contains(peer_ip))
+                        .keys()
+                        .filter(|peer_ip| !E::beacon_nodes().contains(peer_ip) && !E::trusted_nodes().contains(peer_ip))
                         .take(num_excess_peers)
-                        .map(|(&peer_ip, _)| peer_ip)
+                        .copied()
                         .collect::<Vec<SocketAddr>>();
 
                     // Proceed to send disconnect requests to these peers.
@@ -459,13 +461,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         drop(seen_inbound_connections);
 
                         // Initialize the peer handler.
-                        Peer::handler(self.state.clone(), stream, None).await;
+                        Peer::handshake(self.state.clone(), stream, None).await;
                     }
                 }
             }
-            PeersRequest::PeerConnected(peer_ip, outbound) => {
+            PeersRequest::PeerConnected(peer_ip, peer) => {
                 // Add an entry for this `Peer` in the connected peers.
-                self.connected_peers.write().await.insert(peer_ip, outbound);
+                self.connected_peers.write().await.insert(peer_ip, peer);
                 // Remove an entry for this `Peer` in the candidate peers, if it exists.
                 self.candidate_peers.write().await.remove(&peer_ip);
 
@@ -540,13 +542,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
     }
 
     /// Sends the given message to specified peer.
-    async fn send(&self, peer: SocketAddr, message: Message<N>) {
-        let target_peer = self.connected_peers.read().await.get(&peer).cloned();
+    async fn send(&self, peer_ip: SocketAddr, message: Message<N>) {
+        let target_peer = self.connected_peers.read().await.get(&peer_ip).cloned();
         match target_peer {
-            Some(outbound) => {
-                if let Err(error) = outbound.send(message).await {
+            Some(peer) => {
+                if let Err(error) = peer.send(message).await {
                     trace!("Outbound channel failed: {}", error);
-                    self.connected_peers.write().await.remove(&peer);
+                    self.connected_peers.write().await.remove(&peer_ip);
 
                     #[cfg(any(feature = "test", feature = "prometheus"))]
                     {
@@ -555,7 +557,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
             }
-            None => warn!("Attempted to send to a non-connected peer {}", peer),
+            None => warn!("Attempted to send to a non-connected peer {peer_ip}"),
         }
     }
 

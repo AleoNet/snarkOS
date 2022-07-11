@@ -20,6 +20,7 @@ mod handshake;
 use crate::{
     message::{Data, DisconnectReason, Message, MessageCodec},
     peers::{ConnectionResult, PeersRequest},
+    spawn_task,
     State,
 };
 use snarkos_consensus::BlockHeader;
@@ -37,7 +38,12 @@ use std::{
     sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
-use tokio::{net::TcpStream, sync::mpsc, task, time::timeout};
+use tokio::{
+    net::TcpStream,
+    sync::{mpsc, RwLock},
+    task,
+    time::timeout,
+};
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
@@ -45,51 +51,51 @@ use tokio_util::codec::Framed;
 const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 /// Shorthand for the parent half of the `Peer` outbound message channel.
-pub(crate) type OutboundRouter<N> = mpsc::Sender<Message<N>>;
+pub(crate) type PeerRouter<N> = mpsc::Sender<Message<N>>;
 /// Shorthand for the child half of the `Peer` outbound message channel.
-type OutboundHandler<N> = mpsc::Receiver<Message<N>>;
+type PeerHandler<N> = mpsc::Receiver<Message<N>>;
 
 ///
 /// The state for each connected client.
 ///
-pub(crate) struct Peer<N: Network> {
+#[derive(Clone, Debug)]
+pub struct Peer<N: Network, E: Environment> {
+    /// The state of the node.
+    state: State<N, E>,
+    /// The router to the peer.
+    peer_router: PeerRouter<N>,
     /// The IP address of the peer, with the port set to the listener port.
-    listener_ip: SocketAddr,
+    listener_ip: Arc<SocketAddr>,
     /// The message version of the peer.
-    version: u32,
+    version: Arc<RwLock<u32>>,
     /// The node type of the peer.
-    node_type: NodeType,
+    node_type: Arc<RwLock<NodeType>>,
     /// The node type of the peer.
-    status: Status,
+    status: Arc<RwLock<Status>>,
     /// The block height of the peer.
-    block_height: u32,
+    block_height: Arc<RwLock<u32>>,
     /// The timestamp of the last message received from this peer.
-    last_seen: Instant,
-    /// The TCP socket that handles sending and receiving data with this peer.
-    outbound_socket: Framed<TcpStream, MessageCodec<N>>,
-    /// The `outbound_handler` half of the MPSC message channel, used to receive messages from peers.
-    /// When a message is received on this `OutboundHandler`, it will be written to the socket.
-    outbound_handler: OutboundHandler<N>,
+    last_seen: Arc<RwLock<Instant>>,
     /// The map of block hashes to their last seen timestamp.
-    seen_inbound_blocks: HashMap<N::BlockHash, SystemTime>,
+    seen_inbound_blocks: Arc<RwLock<HashMap<N::BlockHash, SystemTime>>>,
     /// The map of transaction IDs to their last seen timestamp.
-    seen_inbound_transactions: HashMap<N::TransactionID, SystemTime>,
+    seen_inbound_transactions: Arc<RwLock<HashMap<N::TransactionID, SystemTime>>>,
     /// The map of peers to a map of block hashes to their last seen timestamp.
-    seen_outbound_blocks: HashMap<N::BlockHash, SystemTime>,
+    seen_outbound_blocks: Arc<RwLock<HashMap<N::BlockHash, SystemTime>>>,
     /// The map of peers to a map of transaction IDs to their last seen timestamp.
-    seen_outbound_transactions: HashMap<N::TransactionID, SystemTime>,
+    seen_outbound_transactions: Arc<RwLock<HashMap<N::TransactionID, SystemTime>>>,
 }
 
-impl<N: Network> Peer<N> {
+impl<N: Network, E: Environment> Peer<N, E> {
     /// Returns the IP address of the peer, with the port set to the listener port.
-    pub const fn peer_ip(&self) -> SocketAddr {
-        self.listener_ip
+    pub fn ip(&self) -> &SocketAddr {
+        &self.listener_ip
     }
 
     /// Sends the given message to this peer.
-    pub async fn send(&mut self, message: Message<N>) -> Result<()> {
-        trace!("Sending '{}' to {}", message.name(), self.peer_ip());
-        self.outbound_socket.send(message).await?;
+    pub async fn send(&self, message: Message<N>) -> Result<()> {
+        trace!("Sending '{}' to {}", message.name(), self.ip());
+        self.peer_router.send(message).await?;
         Ok(())
     }
 }

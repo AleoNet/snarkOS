@@ -104,7 +104,7 @@ impl Resources {
                 match request {
                     ResourceRequest::Register(resource, id) => {
                         if resources.insert(id, resource).is_some() {
-                            error!("A resource with id {} already exists!", id);
+                            error!("A resource with ID {} already exists!", id);
                         }
                     }
                     ResourceRequest::Deregister(id) => {
@@ -116,7 +116,7 @@ impl Resources {
                                 resource.abort().await;
                             });
                         } else {
-                            error!("Resource with id {} was not found", id);
+                            error!("Resource with ID {} was not found", id);
                         }
                     }
                     ResourceRequest::Shutdown => break,
@@ -138,7 +138,7 @@ impl Resources {
             resources.sort_unstable_by_key(|(id, _res)| *id);
 
             for (id, resource) in resources.into_iter().rev() {
-                trace!("Aborting resource with id {}", id);
+                trace!("Aborting resource with ID {}", id);
                 resource.abort().await;
             }
         });

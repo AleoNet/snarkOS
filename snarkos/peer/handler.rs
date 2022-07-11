@@ -16,135 +16,111 @@
 
 use super::*;
 
-impl<N: Network> Peer<N> {
-    /// A handler to process an individual peer.
-    pub(crate) async fn handler<E: Environment>(state: State<N, E>, stream: TcpStream, connection_result: Option<ConnectionResult>) {
+impl<N: Network, E: Environment> Peer<N, E> {
+    ///
+    /// Initialize the handler for the new peer.
+    ///
+    pub(super) async fn handler(self, mut outbound_socket: Framed<TcpStream, MessageCodec<N>>, mut peer_handler: PeerHandler<N>) {
         // Retrieve the peers router.
-        let peers_router = state.peers().router().clone();
-
-        // Procure a resource id to register the task with, as it might be terminated at any point in time.
-        let peer_resource_id = E::resources().procure_id();
-        E::resources().register_task(Some(peer_resource_id), task::spawn(async move {
-            // Register our peer with state which internally sets up some channels.
-            let mut peer = match Peer::new(&state, stream).await {
-                Ok(peer) => {
-                    // If the optional connection result router is given, report a successful connection result.
-                    if let Some(router) = connection_result {
-                        if router.send(Ok(())).is_err() {
-                            warn!("Failed to report a successful connection");
-                        }
-                    }
-                    peer
-                }
-                Err(error) => {
-                    trace!("{}", error);
-                    // If the optional connection result router is given, report a failed connection result.
-                    if let Some(router) = connection_result {
-                        if router.send(Err(error)).is_err() {
-                            warn!("Failed to report a failed connection");
-                        }
-                    }
-                    E::resources().deregister(peer_resource_id);
-                    return;
-                }
-            };
-
+        let peers_router = self.state.peers().router().clone();
+        let peer = self.clone();
+        spawn_task!(E::resources().procure_id(), {
             // Retrieve the peer IP.
-            let peer_ip = peer.peer_ip();
+            let peer_ip = *peer.ip();
             info!("Connected to {}", peer_ip);
 
             // Process incoming messages until this stream is disconnected.
             loop {
                 tokio::select! {
                     // Message channel is routing a message outbound to the peer.
-                    Some(mut message) = peer.outbound_handler.recv() => {
+                    Some(mut message) = peer_handler.recv() => {
                         // Disconnect if the peer has not communicated back within the predefined time.
-                        if peer.last_seen.elapsed() > Duration::from_secs(E::RADIO_SILENCE_IN_SECS) {
-                            warn!("Peer {} has not communicated in {} seconds", peer_ip, peer.last_seen.elapsed().as_secs());
+                        let last_seen_elapsed = peer.last_seen.read().await.elapsed().as_secs();
+                        if last_seen_elapsed > E::RADIO_SILENCE_IN_SECS {
+                            warn!("Peer {peer_ip} has not communicated in {last_seen_elapsed} seconds");
                             break;
-                        } else {
-                            // Ensure sufficient time has passed before needing to send the message.
-                            let is_ready_to_send = match message {
-                                Message::UnconfirmedBlock(block_height, block_hash, ref mut data) => {
-                                    // Retrieve the last seen timestamp of this block for this peer.
-                                    let last_seen = peer.seen_outbound_blocks.entry(block_hash).or_insert(SystemTime::UNIX_EPOCH);
-                                    let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+                        }
 
-                                    // Update the timestamp for the peer and sent block.
-                                    peer.seen_outbound_blocks.insert(block_hash, SystemTime::now());
-                                    // Report the unconfirmed block height.
-                                    if is_ready_to_send {
-                                        trace!("Preparing to send 'UnconfirmedBlock {}' to {}", block_height, peer_ip);
-                                    }
+                        // Ensure sufficient time has passed before needing to send the message.
+                        let is_ready_to_send = match message {
+                            Message::UnconfirmedBlock(block_height, block_hash, ref mut data) => {
+                                // Retrieve the last seen timestamp of this block for this peer.
+                                let last_seen = peer.seen_outbound_blocks.write().await.entry(block_hash).or_insert(SystemTime::UNIX_EPOCH).elapsed().unwrap().as_secs();
+                                let is_ready_to_send = last_seen > E::RADIO_SILENCE_IN_SECS;
 
-                                    // Perform non-blocking serialization of the block (if it hasn't been serialized yet).
-                                    let serialized_block = Data::serialize(data.clone()).await.expect("Block serialization is bugged");
-                                    let _ = std::mem::replace(data, Data::Buffer(serialized_block));
-
-                                    is_ready_to_send
+                                // Update the timestamp for the peer and sent block.
+                                peer.seen_outbound_blocks.write().await.insert(block_hash, SystemTime::now());
+                                // Report the unconfirmed block height.
+                                if is_ready_to_send {
+                                    trace!("Preparing to send 'UnconfirmedBlock {}' to {}", block_height, peer_ip);
                                 }
-                                Message::UnconfirmedTransaction(ref mut data) => {
-                                    let transaction = if let Data::Object(transaction) = data {
-                                        transaction
-                                    } else {
-                                        panic!("Logic error: the transaction shouldn't have been serialized yet.");
-                                    };
 
-                                    // Retrieve the last seen timestamp of this transaction for this peer.
-                                    let last_seen = peer
-                                        .seen_outbound_transactions
-                                        .entry(transaction.id())
-                                        .or_insert(SystemTime::UNIX_EPOCH);
-                                    let is_ready_to_send = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+                                // Perform non-blocking serialization of the block (if it hasn't been serialized yet).
+                                let serialized_block = Data::serialize(data.clone()).await.expect("Block serialization is bugged");
+                                let _ = std::mem::replace(data, Data::Buffer(serialized_block));
 
-                                    // Update the timestamp for the peer and sent transaction.
-                                    peer.seen_outbound_transactions.insert(transaction.id(), SystemTime::now());
-                                    // Report the unconfirmed block height.
-                                    if is_ready_to_send {
-                                        trace!(
-                                            "Preparing to send 'UnconfirmedTransaction {}' to {}",
-                                            transaction.id(),
-                                            peer_ip
-                                        );
-                                    }
+                                is_ready_to_send
+                            }
+                            Message::UnconfirmedTransaction(ref mut data) => {
+                                let transaction = if let Data::Object(transaction) = data {
+                                    transaction
+                                } else {
+                                    panic!("Logic error: the transaction shouldn't have been serialized yet.");
+                                };
 
-                                    // Perform non-blocking serialization of the transaction.
-                                    let serialized_transaction = Data::serialize(data.clone()).await.expect("Transaction serialization is bugged");
-                                    let _ = std::mem::replace(data, Data::Buffer(serialized_transaction));
+                                // Retrieve the last seen timestamp of this transaction for this peer.
+                                let last_seen = peer.seen_outbound_transactions.write().await.entry(transaction.id()).or_insert(SystemTime::UNIX_EPOCH).elapsed().unwrap().as_secs();
+                                let is_ready_to_send = last_seen > E::RADIO_SILENCE_IN_SECS;
 
-                                    is_ready_to_send
+                                // Update the timestamp for the peer and sent transaction.
+                                peer.seen_outbound_transactions.write().await.insert(transaction.id(), SystemTime::now());
+                                // Report the unconfirmed block height.
+                                if is_ready_to_send {
+                                    trace!(
+                                        "Preparing to send 'UnconfirmedTransaction {}' to {}",
+                                        transaction.id(),
+                                        peer_ip
+                                    );
                                 }
-                                Message::PeerResponse(_, _rtt_start) => {
-                                    // Stop the clock on internal RTT.
-                                    #[cfg(any(feature = "test", feature = "prometheus"))]
-                                    metrics::histogram!(metrics::internal_rtt::PEER_REQUEST, _rtt_start.expect("rtt should be present with metrics enabled").elapsed());
 
-                                    true
-                                }
-                                _ => true,
-                            };
-                            // Send the message if it is ready.
-                            if is_ready_to_send {
-                                // Route a message to the peer.
-                                if let Err(error) = peer.send(message).await {
-                                    warn!("[OutboundRouter] {}", error);
-                                }
+                                // Perform non-blocking serialization of the transaction.
+                                let serialized_transaction = Data::serialize(data.clone()).await.expect("Transaction serialization is bugged");
+                                let _ = std::mem::replace(data, Data::Buffer(serialized_transaction));
+
+                                is_ready_to_send
+                            }
+                            Message::PeerResponse(_, _rtt_start) => {
+                                // Stop the clock on internal RTT.
+                                #[cfg(any(feature = "test", feature = "prometheus"))]
+                                metrics::histogram!(metrics::internal_rtt::PEER_REQUEST, _rtt_start.expect("rtt should be present with metrics enabled").elapsed());
+
+                                true
+                            }
+                            _ => true,
+                        };
+                        // Send the message if it is ready.
+                        if is_ready_to_send {
+                            trace!("Sending '{}' to {}", message.name(), self.ip());
+
+                            // Route the message to the peer.
+                            if let Err(error) = outbound_socket.send(message).await {
+                                warn!("[OutboundRouter] {}", error);
                             }
                         }
                     }
-                    result = peer.outbound_socket.next() => match result {
+                    result = outbound_socket.next() => match result {
                         // Received a message from the peer.
                         Some(Ok(message)) => {
                             // Disconnect if the peer has not communicated back within the predefined time.
-                            match peer.last_seen.elapsed() > Duration::from_secs(E::RADIO_SILENCE_IN_SECS) {
+                            let last_seen_elapsed = peer.last_seen.read().await.elapsed().as_secs();
+                            match last_seen_elapsed > E::RADIO_SILENCE_IN_SECS {
                                 true => {
-                                    let last_seen = peer.last_seen.elapsed().as_secs();
-                                    warn!("Failed to receive a message from {} in {} seconds", peer_ip, last_seen);
+                                    warn!("Failed to receive a message from {peer_ip} in {last_seen_elapsed} seconds");
                                     break;
                                 },
                                 false => {
                                     // Update the last seen timestamp.
-                                    peer.last_seen = Instant::now();
+                                    *peer.last_seen.write().await = Instant::now();
                                 }
                             }
 
@@ -301,11 +277,11 @@ impl<N: Network> Peer<N> {
                                     // }
 
                                     // Update the version of the peer.
-                                    peer.version = version;
+                                    *peer.version.write().await = version;
                                     // Update the node type of the peer.
-                                    peer.node_type = node_type;
+                                    *peer.node_type.write().await = node_type;
                                     // Update the status of the peer.
-                                    peer.status = status;
+                                    *peer.status.write().await = status;
 
                                     // // Determine if the peer is on a fork (or unknown).
                                     // let is_fork = match state.ledger().reader().get_block_hash(peer.block_height) {
@@ -373,7 +349,7 @@ impl<N: Network> Peer<N> {
                                     metrics::increment_counter!(metrics::message_counts::UNCONFIRMED_BLOCK);
 
                                     // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
-                                    let frequency = peer.seen_inbound_blocks.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
+                                    let frequency = peer.seen_inbound_blocks.read().await.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
                                     if frequency >= 10 {
                                         warn!("Dropping {} for spamming unconfirmed blocks (frequency = {})", peer_ip, frequency);
                                         // Send a `PeerRestricted` message.
@@ -383,12 +359,17 @@ impl<N: Network> Peer<N> {
                                         break;
                                     }
 
+                                    // Acquire the lock on the seen inbound blocks.
+                                    let mut seen_inbound_blocks = peer.seen_inbound_blocks.write().await;
+
                                     // Retrieve the last seen timestamp of the received block.
-                                    let last_seen = peer.seen_inbound_blocks.entry(block_hash).or_insert(SystemTime::UNIX_EPOCH);
+                                    let last_seen = seen_inbound_blocks.entry(block_hash).or_insert(SystemTime::UNIX_EPOCH);
                                     let is_router_ready = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
 
                                     // Update the timestamp for the received block.
-                                    peer.seen_inbound_blocks.insert(block_hash, SystemTime::now());
+                                    seen_inbound_blocks.insert(block_hash, SystemTime::now());
+                                    // Drop the lock on the seen inbound blocks.
+                                    drop(seen_inbound_blocks);
 
                                     // // Ensure the unconfirmed block is at least within 2 blocks of the latest block height,
                                     // // and no more that 2 blocks ahead of the latest block height.
@@ -429,7 +410,7 @@ impl<N: Network> Peer<N> {
                                     metrics::increment_counter!(metrics::message_counts::UNCONFIRMED_TRANSACTION);
 
                                     // Drop the peer, if they have sent more than 500 unconfirmed transactions in the last 5 seconds.
-                                    let frequency = peer.seen_inbound_transactions.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
+                                    let frequency = peer.seen_inbound_transactions.read().await.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
                                     if frequency >= 500 {
                                         warn!("Dropping {} for spamming unconfirmed transactions (frequency = {})", peer_ip, frequency);
                                         // Send a `PeerRestricted` message.
@@ -485,8 +466,6 @@ impl<N: Network> Peer<N> {
             // {
             //     warn!("[Peer::Disconnect] {}", error);
             // }
-
-            E::resources().deregister(peer_resource_id);
-        }));
+        });
     }
 }

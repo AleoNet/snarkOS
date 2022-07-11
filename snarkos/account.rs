@@ -19,6 +19,7 @@ use snarkvm::{console::types::Field, prelude::*};
 use ::rand::thread_rng;
 
 /// A helper struct for an Aleo account.
+#[derive(Debug)]
 pub struct Account<N: Network> {
     /// The account private key.
     private_key: PrivateKey<N>,

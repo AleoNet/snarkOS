@@ -16,51 +16,78 @@
 
 use super::*;
 
-impl<N: Network> Peer<N> {
-    /// Create a new instance of `Peer`.
-    pub(super) async fn new<E: Environment>(state: &State<N, E>, stream: TcpStream) -> Result<Self> {
-        // Construct the socket.
-        let mut outbound_socket = Framed::new(stream, Default::default());
+impl<N: Network, E: Environment> Peer<N, E> {
+    /// Initializes a handshake to connect with a peer.
+    pub(crate) async fn handshake(state: State<N, E>, stream: TcpStream, connection_result: Option<ConnectionResult>) {
+        spawn_task!(E::resources().procure_id(), {
+            // Register our peer with state which internally sets up some channels.
+            match Peer::initialize(&state, stream).await {
+                Ok(peer) => {
+                    // If the optional connection result router is given, report a successful connection result.
+                    if let Some(router) = connection_result {
+                        if router.send(Ok(())).is_err() {
+                            warn!("Failed to report a successful connection");
+                        }
+                    }
+                }
+                Err(error) => {
+                    trace!("{}", error);
+                    // If the optional connection result router is given, report a failed connection result.
+                    if let Some(router) = connection_result {
+                        if router.send(Err(error)).is_err() {
+                            warn!("Failed to report a failed connection");
+                        }
+                    }
+                }
+            };
+        })
+    }
 
+    /// Initializes a new instance of `Peer`.
+    pub(super) async fn initialize(state: &State<N, E>, stream: TcpStream) -> Result<Self> {
         // Perform the handshake before proceeding.
-        let (peer_ip, node_type, status) = Peer::handshake::<E>(&mut outbound_socket, *state.local_ip()).await?;
+        let (mut outbound_socket, peer_ip, node_type, status) = Self::perform_handshake(stream, *state.local_ip()).await?;
 
-        // Send the first `Ping` message to the peer.
-        let message = Message::Ping(E::MESSAGE_VERSION, ALEO_MAXIMUM_FORK_DEPTH, E::NODE_TYPE, E::status().get());
-        trace!("Sending '{}' to {}", message.name(), peer_ip);
-        outbound_socket.send(message).await?;
+        // Initialize an MPSC channel for sending requests to the `Peer` struct.
+        let (peer_router, peer_handler) = mpsc::channel(1024);
 
-        // Create a channel for this peer.
-        let (outbound_router, outbound_handler) = mpsc::channel(1024);
+        // Construct the peer.
+        let peer = Peer {
+            state: state.clone(),
+            peer_router,
+            listener_ip: Arc::new(peer_ip),
+            version: Arc::new(RwLock::new(0)),
+            node_type: Arc::new(RwLock::new(node_type)),
+            status: Arc::new(RwLock::new(status)),
+            block_height: Arc::new(RwLock::new(0)),
+            last_seen: Arc::new(RwLock::new(Instant::now())),
+            seen_inbound_blocks: Default::default(),
+            seen_inbound_transactions: Default::default(),
+            seen_outbound_blocks: Default::default(),
+            seen_outbound_transactions: Default::default(),
+        };
+
+        // Initialize the peer handler.
+        peer.clone().handler(outbound_socket, peer_handler).await;
 
         // Add an entry for this `Peer` in the connected peers.
         state
             .peers()
             .router()
-            .send(PeersRequest::PeerConnected(peer_ip, outbound_router))
+            .send(PeersRequest::PeerConnected(*peer.ip(), peer.clone()))
             .await?;
 
-        Ok(Peer {
-            listener_ip: peer_ip,
-            version: 0,
-            node_type,
-            status,
-            block_height: 0,
-            last_seen: Instant::now(),
-            outbound_socket,
-            outbound_handler,
-            seen_inbound_blocks: Default::default(),
-            seen_inbound_transactions: Default::default(),
-            seen_outbound_blocks: Default::default(),
-            seen_outbound_transactions: Default::default(),
-        })
+        Ok(peer)
     }
 
     /// Performs the handshake protocol, returning the listener IP of the peer upon success.
-    async fn handshake<E: Environment>(
-        outbound_socket: &mut Framed<TcpStream, MessageCodec<N>>,
+    async fn perform_handshake(
+        stream: TcpStream,
         local_ip: SocketAddr,
-    ) -> Result<(SocketAddr, NodeType, Status)> {
+    ) -> Result<(Framed<TcpStream, MessageCodec<N>>, SocketAddr, NodeType, Status)> {
+        // Construct the socket.
+        let mut outbound_socket = Framed::<TcpStream, MessageCodec<N>>::new(stream, Default::default());
+
         // Get the IP address of the peer.
         let mut peer_ip = outbound_socket.get_ref().peer_addr()?;
 
@@ -105,7 +132,7 @@ impl<N: Network> Peer<N> {
 
                             bail!("Dropping {peer_ip} for an incorrect maximum fork depth of {fork_depth}");
                         }
-                        // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
+                        // If this node is not a beacon node and is syncing, the peer is a beacon node, and this node is ahead, proceed to disconnect.
                         if E::NODE_TYPE != NodeType::Beacon && E::status().is_syncing() && node_type == NodeType::Beacon {
                             // Send the disconnect message.
                             outbound_socket
@@ -114,7 +141,7 @@ impl<N: Network> Peer<N> {
 
                             bail!("Dropping {peer_ip} as this node is ahead");
                         }
-                        // If this node is a sync node, the peer is not a sync node and is syncing, and the peer is ahead, proceed to disconnect.
+                        // If this node is a beacon node, the peer is not a beacon node and is syncing, and the peer is ahead, proceed to disconnect.
                         if E::NODE_TYPE == NodeType::Beacon && node_type != NodeType::Beacon && peer_status == Status::Syncing {
                             // Send the disconnect message.
                             outbound_socket
@@ -170,20 +197,27 @@ impl<N: Network> Peer<N> {
                         // Perform the deferred non-blocking deserialization of the block header.
                         let block_header = block_header.deserialize().await?;
                         match block_header == genesis_header {
-                            true => Ok((peer_ip, node_type, status)),
-                            false => Err(anyhow!("Challenge response from {peer_ip} failed, received '{block_header}'")),
+                            true => {
+                                // Send the first `Ping` message to the peer.
+                                let message = Message::Ping(E::MESSAGE_VERSION, ALEO_MAXIMUM_FORK_DEPTH, E::NODE_TYPE, E::status().get());
+                                trace!("Sending '{}' to {}", message.name(), peer_ip);
+                                outbound_socket.send(message).await?;
+
+                                Ok((outbound_socket, peer_ip, node_type, status))
+                            }
+                            false => bail!("Challenge response from {peer_ip} failed, received '{block_header}'"),
                         }
                     }
                     Message::Disconnect(reason) => {
-                        bail!("Peer {peer_ip} disconnected for the following reason: {:?}", reason);
+                        bail!("Peer {peer_ip} disconnected for the following reason: {:?}", reason)
                     }
-                    message => Err(anyhow!("Expected challenge response, received '{}' from {peer_ip}", message.name(),)),
+                    message => bail!("Expected challenge response, received '{}' from {peer_ip}", message.name()),
                 }
             }
             // An error occurred.
-            Some(Err(error)) => Err(anyhow!("Failed to get challenge response from {peer_ip}: {:?}", error)),
+            Some(Err(error)) => bail!("Failed to get challenge response from {peer_ip}: {:?}", error),
             // Did not receive anything.
-            None => Err(anyhow!("Failed to get challenge response from {peer_ip}, peer has disconnected")),
+            None => bail!("Failed to get challenge response from {peer_ip}, peer has disconnected"),
         }
     }
 }
