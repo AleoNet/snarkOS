@@ -23,8 +23,7 @@ pub struct Round<N: Network> {
     id: u64,
     /// The status of the round.
     status: Status,
-
-    // The leader of the round, may not be the same as qc.author after view-change
+    /// The leader of the round.
     leader: Address<N>,
 }
 

@@ -27,6 +27,7 @@ extern crate tracing;
 mod account;
 pub(crate) use account::*;
 
+pub(crate) mod ledger;
 pub(crate) mod message;
 pub(crate) mod peer;
 pub(crate) mod peers;

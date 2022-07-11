@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    ledger::Ledger,
     message::DisconnectReason,
     peers::{Peers, PeersHandler, PeersRequest},
     Account,
@@ -81,6 +82,8 @@ pub struct State<N: Network, E: Environment> {
     account: Arc<Account<N>>,
     /// The list of peers for the node.
     peers: Arc<OnceBox<Peers<N, E>>>,
+    /// The ledger for the node.
+    ledger: Arc<Ledger<snarkvm::prelude::Testnet3>>,
 }
 
 impl<N: Network, E: Environment> State<N, E> {
@@ -92,11 +95,15 @@ impl<N: Network, E: Environment> State<N, E> {
             Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
         };
 
+        // Initialize the ledger.
+        let ledger = Ledger::<snarkvm::prelude::Testnet3>::genesis::<snarkvm::circuit::AleoV0>()?;
+
         // Construct the state.
         let state = Self {
             local_ip: Arc::new(local_ip),
             account: Arc::new(account),
             peers: Default::default(),
+            ledger: Arc::new(ledger),
         };
 
         // Initialize a new peers module.

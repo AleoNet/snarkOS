@@ -19,7 +19,6 @@
 mod block;
 pub use block::*;
 
-mod message;
 mod round;
 mod validator;
 mod validators;

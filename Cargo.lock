@@ -2371,6 +2371,7 @@ dependencies = [
  "rusty-hook",
  "self_update",
  "serde",
+ "serde_json",
  "snarkos",
  "snarkos-consensus",
  "snarkos-environment",
