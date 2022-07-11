@@ -44,7 +44,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
     }
 
     /// Initializes a new instance of `Peer`.
-    pub(super) async fn initialize(state: &State<N, E>, stream: TcpStream) -> Result<Self> {
+    async fn initialize(state: &State<N, E>, stream: TcpStream) -> Result<Self> {
         // Perform the handshake before proceeding.
         let (mut outbound_socket, peer_ip, node_type, status) = Self::perform_handshake(stream, *state.local_ip()).await?;
 

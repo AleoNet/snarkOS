@@ -33,6 +33,14 @@ pub struct CLI {
     /// Specify the account private key of this node.
     #[clap(long = "private_key")]
     pub private_key: Option<String>,
+    /// Specify this as a prover node, with the given prover address.
+    #[clap(long = "prover")]
+    pub prover: Option<String>,
+    /// Specify this as a validator node, with the given validator address.
+    #[clap(long = "validator")]
+    pub validator: Option<String>,
+    #[clap(hide = true, long)]
+    pub beacon: bool,
 
     /// Specify the IP address and port for the node server.
     #[clap(parse(try_from_str), default_value = "0.0.0.0:4133", long = "node")]
@@ -53,15 +61,6 @@ pub struct CLI {
     /// If the flag is set, the node will not initialize the RPC server.
     #[clap(long)]
     pub norpc: bool,
-
-    /// Specify this as a prover node, with the given prover address.
-    #[clap(long = "prover")]
-    pub prover: Option<String>,
-    /// Specify this as a validator node, with the given validator address.
-    #[clap(long = "validator")]
-    pub validator: Option<String>,
-    #[clap(hide = true, long)]
-    pub beacon: bool,
 
     /// Specify the verbosity of the node [options: 0, 1, 2, 3]
     #[clap(default_value = "2", long = "verbosity")]
