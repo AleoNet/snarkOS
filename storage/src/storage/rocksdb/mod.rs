@@ -27,7 +27,7 @@ mod values;
 use values::*;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 use crate::storage::{DataID, MapRead, MapReadWrite, ReadOnly, ReadWrite, Storage, StorageAccess};
 

@@ -16,11 +16,11 @@
 
 use crate::storage::{rocksdb::RocksDB, DataID, MapRead, MapReadWrite, ReadWrite, Storage};
 
-fn temp_dir() -> std::path::PathBuf {
+pub(crate) fn temp_dir() -> std::path::PathBuf {
     tempfile::tempdir().expect("Failed to open temporary directory").into_path()
 }
 
-fn temp_file() -> std::path::PathBuf {
+pub(crate) fn temp_file() -> std::path::PathBuf {
     tempfile::NamedTempFile::new()
         .expect("Failed to open temporary file")
         .path()

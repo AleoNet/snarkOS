@@ -224,10 +224,7 @@ impl<N: Network, A: StorageReadWrite> TransactionState<N, A> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::{
-        rocksdb::tests::{temp_dir, temp_file},
-        ReadWrite, Storage,
-    };
+    use crate::storage::{rocksdb::tests::temp_dir, ReadWrite, Storage};
     use snarkvm::prelude::Testnet3;
 
     type CurrentNetwork = Testnet3;
