@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 pub mod block_state;
-// pub mod ledger_state;
+pub mod ledger_state;
 pub mod transaction_state;
 
 use snarkvm::prelude::*;

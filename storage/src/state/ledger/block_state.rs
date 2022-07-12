@@ -26,7 +26,7 @@ use rayon::prelude::*;
 use std::{collections::HashSet, marker::PhantomData};
 
 #[derive(Clone, Debug)]
-struct BlockState<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> {
+pub(crate) struct BlockState<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> {
     block_heights: DataMap<u32, N::BlockHash, SA>,
     block_headers: DataMap<N::BlockHash, BlockHeader<N>, SA>,
     block_transactions: DataMap<N::BlockHash, Vec<N::TransactionID>, SA>,
@@ -302,8 +302,7 @@ mod tests {
     use super::*;
     use crate::storage::{
         rocksdb::{tests::temp_dir, RocksDB},
-        ReadWrite,
-        Storage,
+        ReadWrite, Storage,
     };
     use snarkvm::prelude::Testnet3;
 
