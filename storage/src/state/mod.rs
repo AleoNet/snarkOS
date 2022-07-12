@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-// pub(crate) mod ledger;
+pub(crate) mod ledger;
 // pub use ledger::{LedgerState, Metadata};
-//
+
 // pub(crate) mod operator;
 // pub use operator::OperatorState;
 //

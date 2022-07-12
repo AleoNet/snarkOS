@@ -14,34 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#[cfg(any(test, feature = "test"))]
-use crate::storage::rocksdb::RocksDB;
 use crate::{
     state::ledger::Metadata,
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
 use snarkos::ledger::*;
-use snarkos_environment::helpers::Resource;
 use snarkvm::{
     compiler::Transition,
     console::types::field::{Field, Zero},
     prelude::*,
 };
 
-use crate::state::ledger;
 use anyhow::{anyhow, Result};
-use circular_queue::CircularQueue;
-use itertools::Itertools;
-use parking_lot::RwLock;
-use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
-use std::{
-    collections::{BTreeMap, HashSet},
-    path::Path,
-    sync::{atomic::AtomicBool, Arc},
-    thread,
-};
-use tokio::sync::oneshot::{self, error::TryRecvError};
 
 #[derive(Clone, Debug)]
 #[allow(clippy::type_complexity)]
@@ -224,7 +208,10 @@ impl<N: Network, A: StorageReadWrite> TransactionState<N, A> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::{rocksdb::tests::temp_dir, ReadWrite, Storage};
+    use crate::storage::{
+        rocksdb::{tests::temp_dir, RocksDB},
+        ReadWrite, Storage,
+    };
     use snarkvm::prelude::Testnet3;
 
     type CurrentNetwork = Testnet3;
