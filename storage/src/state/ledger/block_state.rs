@@ -27,16 +27,16 @@ use std::{collections::HashSet, marker::PhantomData};
 
 #[derive(Clone, Debug)]
 pub(crate) struct BlockState<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> {
-    block_heights: DataMap<u32, N::BlockHash, SA>,
-    block_headers: DataMap<N::BlockHash, BlockHeader<N>, SA>,
-    block_transactions: DataMap<N::BlockHash, Vec<N::TransactionID>, SA>,
-    transactions: TransactionState<N, SA>,
+    pub(crate) block_heights: DataMap<u32, N::BlockHash, SA>,
+    pub(crate) block_headers: DataMap<N::BlockHash, BlockHeader<N>, SA>,
+    pub(crate) block_transactions: DataMap<N::BlockHash, Vec<N::TransactionID>, SA>,
+    pub(crate) transactions: TransactionState<N, SA>,
     _aleo: PhantomData<A>,
 }
 
 impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> BlockState<N, SA, A> {
     /// Initializes a new instance of `BlockState`.
-    fn open<S: Storage<Access = SA>>(storage: S) -> Result<Self> {
+    pub(crate) fn open<S: Storage<Access = SA>>(storage: S) -> Result<Self> {
         Ok(Self {
             block_heights: storage.open_map(DataID::BlockHeights)?,
             block_headers: storage.open_map(DataID::BlockHeaders)?,
@@ -47,27 +47,27 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     }
 
     /// Returns `true` if the given block height exists in storage.
-    fn contains_block_height(&self, block_height: u32) -> Result<bool> {
+    pub(crate) fn contains_block_height(&self, block_height: u32) -> Result<bool> {
         self.block_heights.contains_key(&block_height)
     }
 
     /// Returns `true` if the given block hash exists in storage.
-    fn contains_block_hash(&self, block_hash: &N::BlockHash) -> Result<bool> {
+    pub(crate) fn contains_block_hash(&self, block_hash: &N::BlockHash) -> Result<bool> {
         self.block_headers.contains_key(block_hash)
     }
 
     /// Returns `true` if the given transaction ID exists in storage.
-    fn contains_transaction(&self, transaction_id: &N::TransactionID) -> Result<bool> {
+    pub(crate) fn contains_transaction(&self, transaction_id: &N::TransactionID) -> Result<bool> {
         self.transactions.contains_transaction(transaction_id)
     }
 
     /// Returns `true` if the given serial number exists in storage.
-    fn contains_serial_number(&self, serial_number: &Field<N>) -> Result<bool> {
+    pub(crate) fn contains_serial_number(&self, serial_number: &Field<N>) -> Result<bool> {
         self.transactions.contains_serial_number(serial_number)
     }
 
     /// Returns `true` if the given commitment exists in storage.
-    fn contains_commitment(&self, commitment: &Field<N>) -> Result<bool> {
+    pub(crate) fn contains_commitment(&self, commitment: &Field<N>) -> Result<bool> {
         self.transactions.contains_commitment(commitment)
     }
 
@@ -77,17 +77,17 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     // }
 
     /// Returns the transition for a given transition ID.
-    fn get_transition(&self, transition_id: &Field<N>) -> Result<Transition<N>> {
+    pub(crate) fn get_transition(&self, transition_id: &Field<N>) -> Result<Transition<N>> {
         self.transactions.get_transition(transition_id)
     }
 
     /// Returns the transaction for a given transaction ID.
-    fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
+    pub(crate) fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
         self.transactions.get_transaction(transaction_id)
     }
 
     /// Returns the transaction metadata for a given transaction ID.
-    fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
+    pub(crate) fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
         self.transactions.get_transaction_metadata(transaction_id)
     }
 
@@ -97,7 +97,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     // }
 
     /// Returns the block height for the given block hash.
-    fn get_block_height(&self, block_hash: &N::BlockHash) -> Result<u32> {
+    pub(crate) fn get_block_height(&self, block_hash: &N::BlockHash) -> Result<u32> {
         match self.block_headers.get(block_hash)? {
             Some(block_header) => Ok(block_header.height()),
             None => Err(anyhow!("Block {} missing from block headers map", block_hash)),
@@ -105,12 +105,12 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     }
 
     /// Returns the block hash for the given block height.
-    fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
+    pub(crate) fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
         self.get_previous_block_hash(block_height + 1)
     }
 
     /// Returns the block hashes from the given `start_block_height` to `end_block_height` (inclusive).
-    fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>> {
+    pub(crate) fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>> {
         // Ensure the starting block height is less than the ending block height.
         if start_block_height > end_block_height {
             return Err(anyhow!("Invalid starting and ending block heights"));
@@ -124,7 +124,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     }
 
     /// Returns the previous block hash for the given block height.
-    fn get_previous_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
+    pub(crate) fn get_previous_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
         match block_height == 0 {
             true => Ok(Block::<N>::genesis::<A>()?.previous_hash()),
             false => match self.block_heights.get(&(block_height - 1))? {
@@ -135,7 +135,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     }
 
     /// Returns the block header for the given block height.
-    fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>> {
+    pub(crate) fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>> {
         // Retrieve the block hash.
         let block_hash = self.get_block_hash(block_height)?;
 
@@ -146,7 +146,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     }
 
     /// Returns the block headers from the given `start_block_height` to `end_block_height` (inclusive).
-    fn get_block_headers(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<BlockHeader<N>>> {
+    pub(crate) fn get_block_headers(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<BlockHeader<N>>> {
         // Ensure the starting block height is less than the ending block height.
         if start_block_height > end_block_height {
             return Err(anyhow!("Invalid starting and ending block heights"));
@@ -160,14 +160,14 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     }
 
     /// Returns the number of all block headers belonging to canonical blocks.
-    fn get_block_header_count(&self) -> Result<u32> {
+    pub(crate) fn get_block_header_count(&self) -> Result<u32> {
         let block_hashes = self.block_heights.values().collect::<HashSet<_>>();
         let count = self.block_headers.keys().filter(|hash| block_hashes.contains(hash)).count();
         Ok(count as u32)
     }
 
     /// Returns the transactions from the block of the given block height.
-    fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>> {
+    pub(crate) fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>> {
         // Retrieve the block hash.
         let block_hash = self.get_block_hash(block_height)?;
 
@@ -190,7 +190,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     }
 
     /// Returns the block for a given block height.
-    fn get_block(&self, block_height: u32) -> Result<Block<N>> {
+    pub(crate) fn get_block(&self, block_height: u32) -> Result<Block<N>> {
         // Retrieve the previous block hash.
         let previous_block_hash = self.get_previous_block_hash(block_height)?;
         // Retrieve the block header.
@@ -202,7 +202,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     }
 
     /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
-    fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
+    pub(crate) fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
         // Ensure the starting block height is less than the ending block height.
         if start_block_height > end_block_height {
             return Err(anyhow!("Invalid starting and ending block heights"));
@@ -216,7 +216,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     }
 
     /// Returns the ledger root in the block header of the given block height.
-    fn get_previous_ledger_root(&self, block_height: u32) -> Result<Field<N>> {
+    pub(crate) fn get_previous_ledger_root(&self, block_height: u32) -> Result<Field<N>> {
         // Retrieve the block header.
         let block_header = self.get_block_header(block_height)?;
         // Return the ledger root in the block header.
@@ -226,7 +226,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
 
 impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field>> BlockState<N, SA, A> {
     /// Adds the given block to storage.
-    fn add_block(&self, block: &Block<N>, batch: Option<usize>) -> Result<()> {
+    pub(crate) fn add_block(&self, block: &Block<N>, batch: Option<usize>) -> Result<()> {
         // Ensure the block does not exist.
         let block_height = block.header().height();
         if self.block_heights.contains_key(&block_height)? {
@@ -254,7 +254,7 @@ impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field
     }
 
     /// Removes the given block height from storage.
-    fn remove_block(&self, block_height: u32, batch: Option<usize>) -> Result<()> {
+    pub(crate) fn remove_block(&self, block_height: u32, batch: Option<usize>) -> Result<()> {
         // Ensure the block height is not the genesis block.
         if block_height == 0 {
             Err(anyhow!("Block {} cannot be removed from storage", block_height))
