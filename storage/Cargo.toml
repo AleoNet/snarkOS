@@ -63,6 +63,11 @@ version = "1"
 path = "../environment"
 version = "2.0.2"
 
+# TODO (raychu86): Use snarkos for now to access objects. Need to remove cyclic dependency.
+[dependencies.snarkos]
+path = "../"
+version = "2.0.2"
+
 [dependencies.snarkvm]
 path = "../../snarkVM"
 #git = "https://github.com/AleoHQ/snarkVM.git"

@@ -16,7 +16,7 @@
 
 use crate::{display::Display, Account, Node, Updater};
 use snarkos_environment::{helpers::NodeType, Beacon, Client, Environment, Prover, Validator};
-use snarkos_storage::storage::{rocksdb::RocksDB, ReadOnly};
+// use snarkos_storage::storage::{rocksdb::RocksDB, ReadOnly};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, ensure, Result};

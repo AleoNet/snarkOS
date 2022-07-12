@@ -27,7 +27,7 @@ extern crate tracing;
 mod account;
 pub(crate) use account::*;
 
-pub(crate) mod ledger;
+pub mod ledger;
 pub(crate) mod message;
 pub(crate) mod peer;
 pub(crate) mod peers;
@@ -47,7 +47,7 @@ pub use updater::*;
 mod tests;
 
 pub use snarkos_environment as environment;
-pub use snarkos_storage as storage;
+// pub use snarkos_storage as storage;
 
 #[cfg(feature = "rpc")]
 pub use snarkos_rpc as rpc;
@@ -55,7 +55,7 @@ pub use snarkos_rpc as rpc;
 pub use snarkvm::prelude::{Address, Network};
 
 pub mod prelude {
-    pub use crate::{environment::*, storage::*};
+    pub use crate::environment::*;
 
     #[cfg(feature = "rpc")]
     pub use crate::rpc::*;
