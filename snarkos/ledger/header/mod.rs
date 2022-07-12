@@ -104,6 +104,7 @@ impl<N: Network> BlockHeader<N> {
 
     /// Initializes a new instance of a genesis block header metadata.
     pub fn genesis() -> Self {
+        // TODO (raychu86): Use a real root of an empty tree.
         Self {
             previous_ledger_root: Field::zero(),
             transactions_root: Field::zero(),
@@ -360,85 +361,68 @@ impl<'de, N: Network> Deserialize<'de> for BlockHeader<N> {
 mod tests {
     use super::*;
 
-    // /// Returns the expected block header size by summing its expected subcomponents.
-    // /// Update this method if the contents of a block header have changed.
-    // fn get_expected_size<N: Network>() -> usize {
-    //     32 // LedgerRoot
-    //         + 32 // TransactionsRoot
-    //         + BlockHeaderMetadata::size()
-    //         + 32 // N::InnerScalarField
-    //         + N::HEADER_PROOF_SIZE_IN_BYTES
-    // }
-    //
-    // #[test]
-    // fn test_block_header_size() {
-    //     assert_eq!(get_expected_size::<Testnet1>(), Testnet1::HEADER_SIZE_IN_BYTES);
-    //     assert_eq!(get_expected_size::<Testnet1>(), Testnet1::HEADER_SIZE_IN_BYTES);
-    //
-    //     assert_eq!(get_expected_size::<Testnet2>(), Testnet2::HEADER_SIZE_IN_BYTES);
-    //     assert_eq!(get_expected_size::<Testnet2>(), Testnet2::HEADER_SIZE_IN_BYTES);
-    // }
-    //
-    // #[test]
-    // fn test_block_header_genesis_size() {
-    //     let block_header = Testnet2::genesis_block().header();
-    //     assert_eq!(block_header.to_bytes_le().unwrap().len(), Testnet2::HEADER_SIZE_IN_BYTES);
-    //     assert_eq!(bincode::serialize(&block_header).unwrap().len(), Testnet2::HEADER_SIZE_IN_BYTES);
-    // }
+    use snarkvm::prelude::Testnet3;
 
-    // #[test]
-    // fn test_block_header_serialization() {
-    //     let block_header = Testnet2::genesis_block().header().to_owned();
-    //
-    //     // Serialize
-    //     let serialized = block_header.to_bytes_le().unwrap();
-    //     assert_eq!(&serialized[..], &bincode::serialize(&block_header).unwrap()[..]);
-    //
-    //     // Deserialize
-    //     let deserialized = BlockHeader::read_le(&serialized[..]).unwrap();
-    //     assert_eq!(deserialized, block_header);
-    // }
-    //
-    // #[test]
-    // fn test_block_header_serde_json() {
-    //     let block_header = Testnet2::genesis_block().header().to_owned();
-    //
-    //     // Serialize
-    //     let expected_string = block_header.to_string();
-    //     let candidate_string = serde_json::to_string(&block_header).unwrap();
-    //     assert_eq!(1669, candidate_string.len(), "Update me if serialization has changed");
-    //     assert_eq!(expected_string, candidate_string);
-    //
-    //     // Deserialize
-    //     assert_eq!(block_header, BlockHeader::from_str(&candidate_string).unwrap());
-    //     assert_eq!(block_header, serde_json::from_str(&candidate_string).unwrap());
-    // }
-    //
-    // #[test]
-    // fn test_block_header_bincode() {
-    //     let block_header = Testnet2::genesis_block().header().to_owned();
-    //
-    //     let expected_bytes = block_header.to_bytes_le().unwrap();
-    //     assert_eq!(&expected_bytes[..], &bincode::serialize(&block_header).unwrap()[..]);
-    //
-    //     assert_eq!(block_header, BlockHeader::read_le(&expected_bytes[..]).unwrap());
-    //     assert_eq!(block_header, bincode::deserialize(&expected_bytes[..]).unwrap());
-    // }
-    //
-    // #[test]
-    // fn test_block_header_genesis() {
-    //     let block_header = Testnet2::genesis_block().header();
-    //     assert!(block_header.is_genesis());
-    //
-    //     // Ensure the genesis block contains the following.
-    //     assert_eq!(block_header.height, 0);
-    //     assert_eq!(block_header.timestamp, 0);
-    //     assert_eq!(block_header.coinbase_target, u64::MAX);
-    //     assert_eq!(block_header.proof_target, u64::MAX);
-    //     assert_eq!(block_header.cumulative_weight, 0);
-    //
-    //     // Ensure the genesis block does *not* contain the following.
-    //     assert_ne!(block_header.previous_ledger_root, Default::default());
-    //     assert_ne!(block_header.transactions_root, Default::default());
-    // }
+    type CurrentNetwork = Testnet3;
+
+    /// Returns the expected block header size by summing its expected subcomponents.
+    /// Update this method if the contents of a block header have changed.
+    fn get_expected_size<N: Network>() -> usize {
+        2 + 4 + 8 + 8 + 8 + 8 + ((N::Field::size_in_bits() + <N::Field as PrimeField>::Parameters::REPR_SHAVE_BITS as usize) / 8) * 2
+    }
+
+    #[test]
+    fn test_block_header_genesis_size() {
+        let expected_block_header_size = get_expected_size::<CurrentNetwork>();
+        let block_header = BlockHeader::<CurrentNetwork>::genesis();
+        assert_eq!(block_header.to_bytes_le().unwrap().len(), expected_block_header_size);
+    }
+
+    #[test]
+    fn test_block_header_serde_json() {
+        let block_header = BlockHeader::<CurrentNetwork>::genesis();
+
+        // Serialize
+        let expected_string = block_header.to_string();
+        let candidate_string = serde_json::to_string(&block_header).unwrap();
+        assert_eq!(184, candidate_string.len(), "Update me if serialization has changed");
+        assert_eq!(expected_string, candidate_string);
+
+        // Deserialize
+        assert_eq!(block_header, BlockHeader::from_str(&candidate_string).unwrap());
+        assert_eq!(block_header, serde_json::from_str(&candidate_string).unwrap());
+    }
+
+    #[test]
+    fn test_block_header_bincode() {
+        let block_header = BlockHeader::<CurrentNetwork>::genesis();
+
+        // Serialize
+        let expected_bytes = block_header.to_bytes_le().unwrap();
+        let candidate_bytes = bincode::serialize(&block_header).unwrap();
+        assert_eq!(102, expected_bytes.len(), "Update me if serialization has changed");
+        // TODO (howardwu): Serialization - Handle the inconsistency between ToBytes and Serialize (off by a length encoding).
+        assert_eq!(&expected_bytes[..], &candidate_bytes[8..]);
+
+        // Deserialize
+        assert_eq!(block_header, BlockHeader::read_le(&expected_bytes[..]).unwrap());
+        assert_eq!(block_header, bincode::deserialize(&candidate_bytes[..]).unwrap());
+    }
+
+    #[test]
+    fn test_block_header_genesis() {
+        let block_header = BlockHeader::<CurrentNetwork>::genesis();
+        assert!(block_header.is_genesis());
+
+        // Ensure the genesis block contains the following.
+        assert_eq!(block_header.height, 0);
+        assert_eq!(block_header.round, 0);
+        assert_eq!(block_header.timestamp, 0);
+        assert_eq!(block_header.coinbase_target, u64::MAX);
+        assert_eq!(block_header.proof_target, u64::MAX);
+
+        // Ensure the genesis block does *not* contain the following.
+        // assert_ne!(block_header.previous_ledger_root, Default::default());
+        // assert_ne!(block_header.transactions_root, Default::default());
+    }
 }
