@@ -29,8 +29,8 @@ use anyhow::{anyhow, Result};
 
 #[derive(Clone, Debug)]
 #[allow(clippy::type_complexity)]
-struct TransactionState<N: Network, A: StorageAccess> {
-    // TODO (raychu86): Add deploy transactions.
+pub(crate) struct TransactionState<N: Network, A: StorageAccess> {
+    // TODO (raychu86): Add support for deploy transactions.
     /// Map of transaction_id to (ledger_root, transition ids, metadata)
     transactions: DataMap<N::TransactionID, (Field<N>, Vec<Field<N>>, Metadata<N>), A>,
     /// Map of transition_id to (transaction_id, index, transition)
@@ -43,7 +43,7 @@ struct TransactionState<N: Network, A: StorageAccess> {
 
 impl<N: Network, A: StorageAccess> TransactionState<N, A> {
     /// Initializes a new instance of `TransactionState`.
-    fn open<S: Storage<Access = A>>(storage: S) -> Result<Self> {
+    pub(crate) fn open<S: Storage<Access = A>>(storage: S) -> Result<Self> {
         Ok(Self {
             transactions: storage.open_map(DataID::Transactions)?,
             transitions: storage.open_map(DataID::Transitions)?,
@@ -53,17 +53,17 @@ impl<N: Network, A: StorageAccess> TransactionState<N, A> {
     }
 
     /// Returns `true` if the given transaction ID exists in storage.
-    fn contains_transaction(&self, transaction_id: &N::TransactionID) -> Result<bool> {
+    pub(crate) fn contains_transaction(&self, transaction_id: &N::TransactionID) -> Result<bool> {
         self.transactions.contains_key(transaction_id)
     }
 
     /// Returns `true` if the given serial number exists in storage.
-    fn contains_serial_number(&self, serial_number: &Field<N>) -> Result<bool> {
+    pub(crate) fn contains_serial_number(&self, serial_number: &Field<N>) -> Result<bool> {
         self.serial_numbers.contains_key(serial_number)
     }
 
     /// Returns `true` if the given commitment exists in storage.
-    fn contains_commitment(&self, commitment: &Field<N>) -> Result<bool> {
+    pub(crate) fn contains_commitment(&self, commitment: &Field<N>) -> Result<bool> {
         self.commitments.contains_key(commitment)
     }
 
@@ -92,7 +92,7 @@ impl<N: Network, A: StorageAccess> TransactionState<N, A> {
     // }
 
     /// Returns the transition for a given transition ID.
-    fn get_transition(&self, transition_id: &Field<N>) -> Result<Transition<N>> {
+    pub(crate) fn get_transition(&self, transition_id: &Field<N>) -> Result<Transition<N>> {
         match self.transitions.get(transition_id)? {
             Some((_, _, transition)) => Ok(transition),
             None => Err(anyhow!("Transition {} does not exist in storage", transition_id)),
@@ -100,7 +100,7 @@ impl<N: Network, A: StorageAccess> TransactionState<N, A> {
     }
 
     /// Returns the transaction for a given transaction ID.
-    fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
+    pub(crate) fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
         // Retrieve the transition IDs.
         let (_ledger_root, transition_ids) = match self.transactions.get(transaction_id)? {
             Some((ledger_root, transition_ids, _)) => (ledger_root, transition_ids),
@@ -120,7 +120,7 @@ impl<N: Network, A: StorageAccess> TransactionState<N, A> {
     }
 
     /// Returns the transaction metadata for a given transaction ID.
-    fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
+    pub(crate) fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
         // Retrieve the metadata from the transactions map.
         match self.transactions.get(transaction_id)? {
             Some((_, _, metadata)) => Ok(metadata),
@@ -131,9 +131,8 @@ impl<N: Network, A: StorageAccess> TransactionState<N, A> {
 
 impl<N: Network, A: StorageReadWrite> TransactionState<N, A> {
     /// Adds the given transaction to storage.
-    fn add_transaction(&self, transaction: &Transaction<N>, metadata: Metadata<N>, batch: Option<usize>) -> Result<()> {
+    pub(crate) fn add_transaction(&self, transaction: &Transaction<N>, metadata: Metadata<N>, batch: Option<usize>) -> Result<()> {
         // TODO (raychu86): Add support for deploy transactions.
-
         let (transaction_id, transitions) = match transaction {
             Transaction::Deploy(_transaction_id, _, _) => unimplemented!(),
             Transaction::Execute(transaction_id, transitions) => (transaction_id, transitions),
@@ -172,7 +171,7 @@ impl<N: Network, A: StorageReadWrite> TransactionState<N, A> {
     }
 
     /// Removes the given transaction ID from storage.
-    fn remove_transaction(&self, transaction_id: &N::TransactionID, batch: Option<usize>) -> Result<()> {
+    pub(crate) fn remove_transaction(&self, transaction_id: &N::TransactionID, batch: Option<usize>) -> Result<()> {
         // Retrieve the transition IDs from the transaction.
         let transition_ids = match self.transactions.get(transaction_id)? {
             Some((_, transition_ids, _)) => transition_ids,
@@ -210,7 +209,8 @@ mod tests {
     use super::*;
     use crate::storage::{
         rocksdb::{tests::temp_dir, RocksDB},
-        ReadWrite, Storage,
+        ReadWrite,
+        Storage,
     };
     use snarkvm::prelude::Testnet3;
 
@@ -218,25 +218,17 @@ mod tests {
     type A = snarkvm::circuit::AleoV0;
 
     #[test]
-    fn test_open() {
+    fn test_open_transaction_state() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-
         let _transaction_state = TransactionState::<Testnet3, ReadWrite>::open(storage).expect("Failed to open transaction state");
     }
 
     #[test]
     fn test_insert_and_contains_transaction() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-
         let transaction_state = TransactionState::<Testnet3, ReadWrite>::open(storage).expect("Failed to open transaction state");
 
-        let transaction = Block::<CurrentNetwork>::genesis::<A>()
-            .unwrap()
-            .transactions()
-            .to_transactions()
-            .next()
-            .unwrap()
-            .clone();
+        let transaction = (*Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions())[0].clone();
 
         // Insert the transaction
         let metadata = Metadata::<CurrentNetwork>::new(0, Default::default(), 0, 0);
@@ -261,16 +253,9 @@ mod tests {
     #[test]
     fn test_insert_and_get_transaction() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-
         let transaction_state = TransactionState::<Testnet3, ReadWrite>::open(storage).expect("Failed to open transaction state");
 
-        let transaction = Block::<CurrentNetwork>::genesis::<A>()
-            .unwrap()
-            .transactions()
-            .to_transactions()
-            .next()
-            .unwrap()
-            .clone();
+        let transaction = (*Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions())[0].clone();
 
         // Insert the transaction
         let metadata = Metadata::<CurrentNetwork>::new(0, Default::default(), 0, 0);
@@ -286,16 +271,9 @@ mod tests {
     #[test]
     fn test_insert_and_remove_transaction() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-
         let transaction_state = TransactionState::<Testnet3, ReadWrite>::open(storage).expect("Failed to open transaction state");
 
-        let transaction = Block::<CurrentNetwork>::genesis::<A>()
-            .unwrap()
-            .transactions()
-            .to_transactions()
-            .next()
-            .unwrap()
-            .clone();
+        let transaction = (*Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions())[0].clone();
 
         let transaction_id = transaction.id();
 
@@ -309,7 +287,7 @@ mod tests {
         // Remove the transaction.
         transaction_state
             .remove_transaction(&transaction_id, None)
-            .expect("Failed to add transaction");
+            .expect("Failed to remove transaction");
         assert!(!transaction_state.contains_transaction(&transaction_id).unwrap());
     }
 }
