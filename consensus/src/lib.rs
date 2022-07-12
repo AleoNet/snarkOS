@@ -19,6 +19,8 @@
 mod block;
 pub use block::*;
 
+mod rewards;
+
 mod round;
 mod validator;
 mod validators;
