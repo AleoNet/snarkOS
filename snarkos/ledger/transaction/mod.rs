@@ -306,3 +306,63 @@ impl<'de, N: Network> Deserialize<'de> for Transaction<N> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ledger::Block;
+
+    use snarkvm::prelude::Testnet3;
+
+    type CurrentNetwork = Testnet3;
+    type A = snarkvm::circuit::AleoV0;
+
+    #[test]
+    fn test_transaction_serde_json() {
+        let expected_transaction = Block::<CurrentNetwork>::genesis::<A>()
+            .unwrap()
+            .transactions()
+            .to_transactions()
+            .next()
+            .unwrap()
+            .clone();
+
+        // Serialize
+        let expected_string = expected_transaction.to_string();
+        let candidate_string = serde_json::to_string(&expected_transaction).unwrap();
+        assert_eq!(2670, candidate_string.len(), "Update me if serialization has changed");
+        assert_eq!(expected_string, candidate_string);
+
+        // Deserialize
+        assert_eq!(
+            expected_transaction,
+            Transaction::<CurrentNetwork>::from_str(&candidate_string).unwrap()
+        );
+        assert_eq!(expected_transaction, serde_json::from_str(&candidate_string).unwrap());
+    }
+
+    #[test]
+    fn test_transaction_bincode() {
+        let expected_transaction = Block::<CurrentNetwork>::genesis::<A>()
+            .unwrap()
+            .transactions()
+            .to_transactions()
+            .next()
+            .unwrap()
+            .clone();
+
+        // Serialize
+        let expected_bytes = expected_transaction.to_bytes_le().unwrap();
+        let candidate_bytes = bincode::serialize(&expected_transaction).unwrap();
+        assert_eq!(1362, expected_bytes.len(), "Update me if serialization has changed");
+        // TODO (howardwu): Serialization - Handle the inconsistency between ToBytes and Serialize (off by a length encoding).
+        assert_eq!(&expected_bytes[..], &candidate_bytes[8..]);
+
+        // Deserialize
+        assert_eq!(
+            expected_transaction,
+            Transaction::<CurrentNetwork>::read_le(&expected_bytes[..]).unwrap()
+        );
+        assert_eq!(expected_transaction, bincode::deserialize(&candidate_bytes[..]).unwrap());
+    }
+}

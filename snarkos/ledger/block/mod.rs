@@ -24,7 +24,7 @@ use snarkvm::{
 use core::fmt;
 use serde::ser::SerializeStruct;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Block<N: Network> {
     /// The hash of this block.
     block_hash: N::BlockHash,
@@ -293,5 +293,52 @@ impl<'de, N: Network> Deserialize<'de> for Block<N> {
             }
             false => FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "block"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use snarkvm::prelude::Testnet3;
+
+    type CurrentNetwork = Testnet3;
+    type A = snarkvm::circuit::AleoV0;
+
+    #[test]
+    fn test_block_serde_json() {
+        let block = Block::<CurrentNetwork>::genesis::<A>().unwrap();
+
+        // Serialize
+        let expected_string = block.to_string();
+        let candidate_string = serde_json::to_string(&block).unwrap();
+        assert_eq!(3057, candidate_string.len(), "Update me if serialization has changed");
+        assert_eq!(expected_string, candidate_string);
+
+        // Deserialize
+        assert_eq!(block, Block::from_str(&candidate_string).unwrap());
+        assert_eq!(block, serde_json::from_str(&candidate_string).unwrap());
+    }
+
+    #[test]
+    fn test_block_bincode() {
+        let block = Block::<CurrentNetwork>::genesis::<A>().unwrap();
+
+        // Serialize
+        let expected_bytes = block.to_bytes_le().unwrap();
+        let candidate_bytes = bincode::serialize(&block).unwrap();
+        assert_eq!(1532, expected_bytes.len(), "Update me if serialization has changed");
+        // TODO (howardwu): Serialization - Handle the inconsistency between ToBytes and Serialize (off by a length encoding).
+        assert_eq!(&expected_bytes[..], &candidate_bytes[8..]);
+
+        // Deserialize
+        assert_eq!(block, Block::read_le(&expected_bytes[..]).unwrap());
+        assert_eq!(block, bincode::deserialize(&candidate_bytes[..]).unwrap());
+    }
+
+    #[test]
+    fn test_block_genesis() {
+        let block = Block::<CurrentNetwork>::genesis::<A>().unwrap();
+        assert!(block.is_genesis());
     }
 }
