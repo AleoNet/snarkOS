@@ -116,9 +116,8 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
             return Err(anyhow!("Invalid starting and ending block heights"));
         }
 
-        // TODO (raychu86): Use a parallel iterator.
         (start_block_height..=end_block_height)
-            .into_iter()
+            .into_par_iter()
             .map(|height| self.get_block_hash(height))
             .collect()
     }
@@ -152,9 +151,8 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
             return Err(anyhow!("Invalid starting and ending block heights"));
         }
 
-        // TODO (raychu86): Use a parallel iterator.
         (start_block_height..=end_block_height)
-            .into_iter()
+            .into_par_iter()
             .map(|height| self.get_block_header(height))
             .collect()
     }
@@ -208,9 +206,8 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
             return Err(anyhow!("Invalid starting and ending block heights"));
         }
 
-        // TODO (raychu86): Use a parallel iterator.
         (start_block_height..=end_block_height)
-            .into_iter()
+            .into_par_iter()
             .map(|height| self.get_block(height))
             .collect()
     }
