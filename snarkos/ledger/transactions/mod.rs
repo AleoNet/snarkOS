@@ -171,11 +171,6 @@ impl<N: Network> Transactions<N> {
     //     }
     // }
 
-    /// Returns an iterator over the transactions.
-    pub fn to_transactions(&self) -> impl '_ + Iterator<Item = &Transaction<N>> {
-        self.transactions.iter()
-    }
-
     /// Returns the transactions root, by computing the root for a Merkle tree of the transaction IDs.
     pub fn to_root(&self) -> Result<Field<N>> {
         Ok((*self.to_tree()?.root()).into())

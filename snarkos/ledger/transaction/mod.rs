@@ -319,13 +319,7 @@ mod tests {
 
     #[test]
     fn test_transaction_serde_json() {
-        let expected_transaction = Block::<CurrentNetwork>::genesis::<A>()
-            .unwrap()
-            .transactions()
-            .to_transactions()
-            .next()
-            .unwrap()
-            .clone();
+        let expected_transaction = (*Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions())[0].clone();
 
         // Serialize
         let expected_string = expected_transaction.to_string();
@@ -343,13 +337,7 @@ mod tests {
 
     #[test]
     fn test_transaction_bincode() {
-        let expected_transaction = Block::<CurrentNetwork>::genesis::<A>()
-            .unwrap()
-            .transactions()
-            .to_transactions()
-            .next()
-            .unwrap()
-            .clone();
+        let expected_transaction = (*Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions())[0].clone();
 
         // Serialize
         let expected_bytes = expected_transaction.to_bytes_le().unwrap();
