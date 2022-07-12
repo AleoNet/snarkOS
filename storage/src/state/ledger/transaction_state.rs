@@ -29,21 +29,21 @@ use anyhow::{anyhow, Result};
 
 #[derive(Clone, Debug)]
 #[allow(clippy::type_complexity)]
-pub(crate) struct TransactionState<N: Network, A: StorageAccess> {
+pub(crate) struct TransactionState<N: Network, SA: StorageAccess> {
     // TODO (raychu86): Add support for deploy transactions.
     /// Map of transaction_id to (ledger_root, transition ids, metadata)
-    transactions: DataMap<N::TransactionID, (Field<N>, Vec<Field<N>>, Metadata<N>), A>,
+    transactions: DataMap<N::TransactionID, (Field<N>, Vec<Field<N>>, Metadata<N>), SA>,
     /// Map of transition_id to (transaction_id, index, transition)
-    transitions: DataMap<Field<N>, (N::TransactionID, u8, Transition<N>), A>,
+    transitions: DataMap<Field<N>, (N::TransactionID, u8, Transition<N>), SA>,
     /// Map of serial_number to transition_id
-    serial_numbers: DataMap<Field<N>, Field<N>, A>,
+    serial_numbers: DataMap<Field<N>, Field<N>, SA>,
     /// Map of commitment to transition_id
-    commitments: DataMap<Field<N>, Field<N>, A>,
+    commitments: DataMap<Field<N>, Field<N>, SA>,
 }
 
-impl<N: Network, A: StorageAccess> TransactionState<N, A> {
+impl<N: Network, SA: StorageAccess> TransactionState<N, SA> {
     /// Initializes a new instance of `TransactionState`.
-    pub(crate) fn open<S: Storage<Access = A>>(storage: S) -> Result<Self> {
+    pub(crate) fn open<S: Storage<Access = SA>>(storage: S) -> Result<Self> {
         Ok(Self {
             transactions: storage.open_map(DataID::Transactions)?,
             transitions: storage.open_map(DataID::Transitions)?,
@@ -129,7 +129,7 @@ impl<N: Network, A: StorageAccess> TransactionState<N, A> {
     }
 }
 
-impl<N: Network, A: StorageReadWrite> TransactionState<N, A> {
+impl<N: Network, SA: StorageReadWrite> TransactionState<N, SA> {
     /// Adds the given transaction to storage.
     pub(crate) fn add_transaction(&self, transaction: &Transaction<N>, metadata: Metadata<N>, batch: Option<usize>) -> Result<()> {
         // TODO (raychu86): Add support for deploy transactions.

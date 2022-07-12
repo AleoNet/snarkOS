@@ -26,17 +26,17 @@ use rayon::prelude::*;
 use std::{collections::HashSet, marker::PhantomData};
 
 #[derive(Clone, Debug)]
-struct BlockState<N: Network, A: StorageAccess, AL: Aleo<Network = N, BaseField = N::Field>> {
-    block_heights: DataMap<u32, N::BlockHash, A>,
-    block_headers: DataMap<N::BlockHash, BlockHeader<N>, A>,
-    block_transactions: DataMap<N::BlockHash, Vec<N::TransactionID>, A>,
-    transactions: TransactionState<N, A>,
-    _aleo: PhantomData<AL>,
+struct BlockState<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> {
+    block_heights: DataMap<u32, N::BlockHash, SA>,
+    block_headers: DataMap<N::BlockHash, BlockHeader<N>, SA>,
+    block_transactions: DataMap<N::BlockHash, Vec<N::TransactionID>, SA>,
+    transactions: TransactionState<N, SA>,
+    _aleo: PhantomData<A>,
 }
 
-impl<N: Network, A: StorageAccess, AL: Aleo<Network = N, BaseField = N::Field>> BlockState<N, A, AL> {
+impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> BlockState<N, SA, A> {
     /// Initializes a new instance of `BlockState`.
-    fn open<S: Storage<Access = A>>(storage: S) -> Result<Self> {
+    fn open<S: Storage<Access = SA>>(storage: S) -> Result<Self> {
         Ok(Self {
             block_heights: storage.open_map(DataID::BlockHeights)?,
             block_headers: storage.open_map(DataID::BlockHeaders)?,
@@ -126,7 +126,7 @@ impl<N: Network, A: StorageAccess, AL: Aleo<Network = N, BaseField = N::Field>> 
     /// Returns the previous block hash for the given block height.
     fn get_previous_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
         match block_height == 0 {
-            true => Ok(Block::<N>::genesis::<AL>()?.previous_hash()),
+            true => Ok(Block::<N>::genesis::<A>()?.previous_hash()),
             false => match self.block_heights.get(&(block_height - 1))? {
                 Some(block_hash) => Ok(block_hash),
                 None => Err(anyhow!("Block {} missing in block heights map", block_height - 1)),
@@ -224,7 +224,7 @@ impl<N: Network, A: StorageAccess, AL: Aleo<Network = N, BaseField = N::Field>> 
     }
 }
 
-impl<N: Network, A: StorageReadWrite, AL: Aleo<Network = N, BaseField = N::Field>> BlockState<N, A, AL> {
+impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field>> BlockState<N, SA, A> {
     /// Adds the given block to storage.
     fn add_block(&self, block: &Block<N>, batch: Option<usize>) -> Result<()> {
         // Ensure the block does not exist.
@@ -332,7 +332,7 @@ mod tests {
 
         // Check that each transaction is accounted for.
         for transaction in (*block.transactions()).iter() {
-            assert!(block_state.contains_commitment(commitment).unwrap());
+            assert!(block_state.contains_transaction(&transaction.id()).unwrap());
         }
 
         // Check that each commitment is accounted for.
