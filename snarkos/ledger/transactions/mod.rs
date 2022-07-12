@@ -35,7 +35,7 @@ type TransactionTree<N> = BHPMerkleTree<N, BLOCK_DEPTH>;
 /// The Merkle path for transaction in a block.
 type TransactionPath<N> = MerklePath<N, BLOCK_DEPTH>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Transactions<N: Network> {
     /// The list of transactions included in a block.
     transactions: Vec<Transaction<N>>,
@@ -50,6 +50,24 @@ impl<N: Network> Transactions<N> {
         let transactions = Self {
             transactions: transactions.to_vec(),
         };
+        // Ensure there are no duplicate transactions.
+        ensure!(
+            !has_duplicates(transactions.iter().map(Transaction::id)),
+            "Attempted to create a list with duplicate transactions"
+        );
+
+        // Ensure there are no duplicate serial numbers.
+        ensure!(
+            !has_duplicates(transactions.iter().flat_map(Transaction::serial_numbers)),
+            "Attempted to create a list with duplicate serial numbers"
+        );
+
+        // Ensure there are no duplicate commitments.
+        ensure!(
+            !has_duplicates(transactions.iter().flat_map(Transaction::commitments)),
+            "Attempted to create a list with duplicate commitments"
+        );
+
         // Return the transactions.
         Ok(transactions)
     }
@@ -270,74 +288,82 @@ impl<N: Network> Deref for Transactions<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{testnet2::Testnet2, Account};
-    use rand::thread_rng;
+    use crate::ledger::Block;
 
-    #[test]
-    fn test_to_decrypted_records() {
-        let rng = &mut thread_rng();
-        let account = Account::<Testnet2>::new(rng);
+    use snarkvm::prelude::Testnet3;
 
-        // Craft a transaction with 1 coinbase record.
-        let (transaction, expected_record) = Transaction::new_coinbase(account.address(), AleoAmount(1234), true, rng).unwrap();
+    type CurrentNetwork = Testnet3;
+    type A = snarkvm::circuit::AleoV0;
 
-        // Craft a Transactions struct with 1 coinbase record.
-        let transactions = Transactions::from(&[transaction]).unwrap();
-        let decrypted_records = transactions
-            .to_decrypted_records(&account.view_key().into())
-            .collect::<Vec<Record<Testnet2>>>();
-        assert_eq!(decrypted_records.len(), 1); // Excludes dummy records upon decryption.
+    // TODO (raychu86): Make the genesis block static, so we don't have to regenerate one for every test.
 
-        let candidate_record = decrypted_records.first().unwrap();
-        assert_eq!(&expected_record, candidate_record);
-        assert_eq!(expected_record.owner(), candidate_record.owner());
-        assert_eq!(expected_record.value(), candidate_record.value());
-        // TODO (howardwu): Reenable this after fixing how payloads are handled.
-        // assert_eq!(expected_record.payload(), candidate_record.payload());
-        assert_eq!(expected_record.program_id(), candidate_record.program_id());
-    }
+    // #[test]
+    // fn test_to_decrypted_records() {
+    //     let rng = &mut thread_rng();
+    //     let account = Account::<CurrentNetwork>::new(rng);
+    //
+    //     // Craft a transaction with 1 coinbase record.
+    //     let genesis_block = Block::<Testnet2>::genesis();
+    //     let (transaction, expected_record) = Transaction::new_coinbase(account.address(), AleoAmount(1234), true, rng).unwrap();
+    //
+    //     // Craft a Transactions struct with 1 coinbase record.
+    //     let transactions = Transactions::from(&[transaction]).unwrap();
+    //     let decrypted_records = transactions
+    //         .to_decrypted_records(&account.view_key().into())
+    //         .collect::<Vec<Record<CurrentNetwork>>>();
+    //     assert_eq!(decrypted_records.len(), 1); // Excludes dummy records upon decryption.
+    //
+    //     let candidate_record = decrypted_records.first().unwrap();
+    //     assert_eq!(&expected_record, candidate_record);
+    //     assert_eq!(expected_record.owner(), candidate_record.owner());
+    //     assert_eq!(expected_record.value(), candidate_record.value());
+    //     // TODO (howardwu): Reenable this after fixing how payloads are handled.
+    //     // assert_eq!(expected_record.payload(), candidate_record.payload());
+    //     assert_eq!(expected_record.program_id(), candidate_record.program_id());
+    // }
 
     #[test]
     fn test_duplicate_transactions() {
         // Fetch any transaction.
-        let transaction = Testnet2::genesis_block().to_coinbase_transaction().unwrap();
-        // Duplicate the transaction, and ensure it errors.
+        let transaction = Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions().transactions[0].clone();
+
+        // Duplicate the transaction, and ensure it is invalid
         assert!(Transactions::from(&[transaction.clone(), transaction]).is_err());
     }
 
     #[test]
     fn test_transactions_serde_json() {
-        let expected_transactions = Testnet2::genesis_block().transactions().clone();
+        let expected_transactions = Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions().clone();
 
         // Serialize
         let expected_string = expected_transactions.to_string();
         let candidate_string = serde_json::to_string(&expected_transactions).unwrap();
-        assert_eq!(3078, candidate_string.len(), "Update me if serialization has changed");
+        assert_eq!(2689, candidate_string.len(), "Update me if serialization has changed");
         assert_eq!(expected_string, candidate_string);
 
         // Deserialize
         assert_eq!(
             expected_transactions,
-            Transactions::<Testnet2>::from_str(&candidate_string).unwrap()
+            Transactions::<CurrentNetwork>::from_str(&candidate_string).unwrap()
         );
         assert_eq!(expected_transactions, serde_json::from_str(&candidate_string).unwrap());
     }
 
     #[test]
     fn test_transactions_bincode() {
-        let expected_transactions = Testnet2::genesis_block().transactions().clone();
+        let expected_transactions = Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions().clone();
 
         // Serialize
         let expected_bytes = expected_transactions.to_bytes_le().unwrap();
         let candidate_bytes = bincode::serialize(&expected_transactions).unwrap();
-        assert_eq!(1519, expected_bytes.len(), "Update me if serialization has changed");
+        assert_eq!(1364, expected_bytes.len(), "Update me if serialization has changed");
         // TODO (howardwu): Serialization - Handle the inconsistency between ToBytes and Serialize (off by a length encoding).
         assert_eq!(&expected_bytes[..], &candidate_bytes[8..]);
 
         // Deserialize
         assert_eq!(
             expected_transactions,
-            Transactions::<Testnet2>::read_le(&expected_bytes[..]).unwrap()
+            Transactions::<CurrentNetwork>::read_le(&expected_bytes[..]).unwrap()
         );
         assert_eq!(expected_transactions, bincode::deserialize(&candidate_bytes[..]).unwrap());
     }
