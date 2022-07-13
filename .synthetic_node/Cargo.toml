@@ -28,7 +28,7 @@ version = "0.3"
 version = "0.12"
 
 [dependencies.pea2pea]
-version = "0.39"
+version = "0.40"
 
 [dependencies.rand]
 version = "0.8"
