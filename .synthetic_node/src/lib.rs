@@ -247,7 +247,7 @@ impl Disconnect for SynthNode {
     async fn handle_disconnect(&self, disconnecting_addr: SocketAddr) {
         // Send a disconnect message before breaking the connection.
         let disconnect_msg = ClientMessage::Disconnect(DisconnectReason::NoReasonGiven);
-        if let Ok(rx) = self.send_direct_message(disconnecting_addr, disconnect_msg) {
+        if let Ok(rx) = self.unicast(disconnecting_addr, disconnect_msg) {
             let _ = rx.await;
         }
 

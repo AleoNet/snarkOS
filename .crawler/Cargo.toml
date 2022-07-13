@@ -49,7 +49,7 @@ optional = true
 version = "0.12"
 
 [dependencies.pea2pea]
-version = "0.39"
+version = "0.40"
 
 [dependencies.postgres-native-tls]
 version = "0.5"

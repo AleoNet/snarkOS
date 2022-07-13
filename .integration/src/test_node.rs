@@ -74,7 +74,7 @@ impl TestNode {
             ..Default::default()
         };
 
-        let pea2pea_node = Pea2PeaNode::new(Some(config)).await.unwrap();
+        let pea2pea_node = Pea2PeaNode::new(config).await.unwrap();
         let client_state = Default::default();
         let node = TestNode::new(pea2pea_node, client_state);
         node.enable_disconnect().await;
@@ -106,7 +106,7 @@ impl TestNode {
             loop {
                 if node.node().num_connected() != 0 {
                     info!(parent: node.node().span(), "sending out Pings");
-                    node.send_broadcast(ping_msg.clone()).unwrap();
+                    node.broadcast(ping_msg.clone()).unwrap();
                 }
                 tokio::time::sleep(Duration::from_secs(PING_INTERVAL_SECS)).await;
             }
@@ -121,7 +121,7 @@ impl TestNode {
                 let num_connections = node.node().num_connected() + node.node().num_connecting();
                 if num_connections < DESIRED_CONNECTIONS && node.node().num_connected() != 0 {
                     info!(parent: node.node().span(), "I'd like to have {} more peers; asking peers for their peers", DESIRED_CONNECTIONS - num_connections);
-                    node.send_broadcast(ClientMessage::PeerRequest).unwrap();
+                    node.broadcast(ClientMessage::PeerRequest).unwrap();
                 }
                 tokio::time::sleep(Duration::from_secs(PEER_INTERVAL_SECS)).await;
             }
@@ -179,7 +179,7 @@ impl TestNode {
         let msg = ClientMessage::PeerResponse(peers, None);
         info!(parent: self.node().span(), "sending a PeerResponse to {}", source);
 
-        self.send_direct_message(source, msg)?;
+        self.unicast(source, msg)?;
 
         Ok(())
     }
@@ -222,7 +222,7 @@ impl TestNode {
 
         info!(parent: self.node().span(), "sending a Pong to {}", source);
 
-        self.send_direct_message(source, msg)?;
+        self.unicast(source, msg)?;
 
         Ok(())
     }

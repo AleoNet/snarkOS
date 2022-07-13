@@ -51,7 +51,7 @@ pub async fn spawn_test_node_with_nonce(local_nonce: ClientNonce) -> TestNode {
         ..Default::default()
     };
 
-    let pea2pea_node = pea2pea::Node::new(Some(config)).await.unwrap();
+    let pea2pea_node = pea2pea::Node::new(config).await.unwrap();
     let client_state = ClientState {
         local_nonce,
         ..Default::default()
