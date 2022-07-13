@@ -220,13 +220,13 @@ mod tests {
     #[test]
     fn test_open_transaction_state() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-        let _transaction_state = TransactionState::<Testnet3, ReadWrite>::open(storage).expect("Failed to open transaction state");
+        let _transaction_state = TransactionState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open transaction state");
     }
 
     #[test]
     fn test_insert_and_contains_transaction() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-        let transaction_state = TransactionState::<Testnet3, ReadWrite>::open(storage).expect("Failed to open transaction state");
+        let transaction_state = TransactionState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open transaction state");
 
         let transaction = (*Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions())[0].clone();
 
@@ -253,7 +253,7 @@ mod tests {
     #[test]
     fn test_insert_and_get_transaction() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-        let transaction_state = TransactionState::<Testnet3, ReadWrite>::open(storage).expect("Failed to open transaction state");
+        let transaction_state = TransactionState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open transaction state");
 
         let transaction = (*Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions())[0].clone();
 
@@ -271,7 +271,7 @@ mod tests {
     #[test]
     fn test_insert_and_remove_transaction() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-        let transaction_state = TransactionState::<Testnet3, ReadWrite>::open(storage).expect("Failed to open transaction state");
+        let transaction_state = TransactionState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open transaction state");
 
         let transaction = (*Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions())[0].clone();
 

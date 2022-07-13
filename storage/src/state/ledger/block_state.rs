@@ -299,7 +299,8 @@ mod tests {
     use super::*;
     use crate::storage::{
         rocksdb::{tests::temp_dir, RocksDB},
-        ReadWrite, Storage,
+        ReadWrite,
+        Storage,
     };
     use snarkvm::prelude::Testnet3;
 
@@ -309,13 +310,13 @@ mod tests {
     #[test]
     fn test_open_block_state() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-        let _block_state = BlockState::<Testnet3, ReadWrite, A>::open(storage).expect("Failed to open block state");
+        let _block_state = BlockState::<CurrentNetwork, ReadWrite, A>::open(storage).expect("Failed to open block state");
     }
 
     #[test]
     fn test_insert_and_contains_block() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-        let block_state = BlockState::<Testnet3, ReadWrite, A>::open(storage).expect("Failed to open block state");
+        let block_state = BlockState::<CurrentNetwork, ReadWrite, A>::open(storage).expect("Failed to open block state");
 
         let block = Block::<CurrentNetwork>::genesis::<A>().unwrap();
 
@@ -345,7 +346,7 @@ mod tests {
     #[test]
     fn test_insert_and_get_block() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-        let block_state = BlockState::<Testnet3, ReadWrite, A>::open(storage).expect("Failed to open block state");
+        let block_state = BlockState::<CurrentNetwork, ReadWrite, A>::open(storage).expect("Failed to open block state");
 
         let block = Block::<CurrentNetwork>::genesis::<A>().unwrap();
 
@@ -369,7 +370,7 @@ mod tests {
     #[test]
     fn test_insert_and_remove_block() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-        let block_state = BlockState::<Testnet3, ReadWrite, A>::open(storage).expect("Failed to open block state");
+        let block_state = BlockState::<CurrentNetwork, ReadWrite, A>::open(storage).expect("Failed to open block state");
 
         let block = Block::<CurrentNetwork>::genesis::<A>().unwrap();
 

@@ -78,7 +78,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
             latest_block_hashes_and_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
             // latest_block_locators: Default::default(),
             ledger_roots: storage.open_map(DataID::LedgerRoots)?,
-            blocks: BlockState::open(storage)?,
+            blocks: BlockState::<_, _, A>::open(storage)?,
         });
 
         // Determine the latest block height.
@@ -748,143 +748,144 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     }
 
     #[cfg(any(test, feature = "test"))]
-    pub fn storage(&self) -> &RocksDB<A> {
+    pub fn storage(&self) -> &RocksDB<SA> {
         self.ledger_roots.storage()
     }
 }
 
 impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field>> LedgerState<N, SA, A> {
-    // ///
-    // /// Opens a new writable instance of `LedgerState` from the given storage path.
-    // /// For a read-only instance of `LedgerState`, use `LedgerState::open_reader`.
-    // ///
-    // /// A writable instance of `LedgerState` possesses full functionality, whereas
-    // /// a read-only instance of `LedgerState` may only call immutable methods.
-    // ///
-    // pub fn open_writer<S: Storage<Access = SA>, P: AsRef<Path>>(path: P) -> Result<Self> {
-    //     Self::open_writer_with_increment::<S, P>(path, 10_000)
-    // }
-    //
-    // /// This function is hidden, as it's intended to be used directly in tests only.
-    // /// The `validation_increment` parameter determines the number of blocks to be
-    // /// handled during the incremental validation process.
-    // #[doc(hidden)]
-    // pub fn open_writer_with_increment<S: Storage<Access = A>, P: AsRef<Path>>(path: P, validation_increment: u32) -> Result<Self> {
-    //     // Open storage.
-    //     let context = N::ID;
-    //     let storage = S::open(path, context)?;
-    //
-    //     // Initialize the ledger.
-    //     let ledger = Self {
-    //         // ledger_tree: RwLock::new(LedgerTree::<N>::new()?),
-    //         latest_block: RwLock::new(N::genesis_block().clone()),
-    //         latest_block_hashes_and_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
-    //         // latest_block_locators: Default::default(),
-    //         ledger_roots: storage.open_map(DataID::LedgerRoots)?,
-    //         blocks: BlockState::open(storage)?,
-    //     };
-    //
-    //     // Determine the latest block height.
-    //     let mut latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
-    //         (Some(latest_block_height_0), Some(latest_block_height_1)) => match latest_block_height_0 == latest_block_height_1 {
-    //             true => latest_block_height_0,
-    //             false => match ledger.try_fixing_inconsistent_state(None) {
-    //                 Ok(current_block_height) => current_block_height,
-    //                 Err(error) => return Err(error),
-    //             },
-    //         },
-    //         (None, None) => 0u32,
-    //         _ => return Err(anyhow!("Ledger storage state is inconsistent")),
-    //     };
-    //
-    //     // If this is new storage, initialize it with the genesis block.
-    //     if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
-    //         let genesis = Block::<N>::genesis::<A>()?;
-    //
-    //         // Perform all the associated storage operations as an atomic batch.
-    //         let batch = ledger.ledger_roots.prepare_batch();
-    //
-    //         ledger
-    //             .ledger_roots
-    //             .insert(&genesis.header().previous_ledger_root(), &genesis.header().height(), Some(batch))?;
-    //         ledger.blocks.add_block(&genesis, Some(batch))?;
-    //
-    //         // Execute the pending storage batch.
-    //         ledger.ledger_roots.execute_batch(batch)?;
-    //     }
-    //
-    //     // Check that all canonical block headers exist in storage.
-    //     let count = ledger.blocks.get_block_header_count()?;
-    //     assert_eq!(count, latest_block_height.saturating_add(1));
-    //
-    //     // Iterate and append each block hash from genesis to tip to validate ledger state.
-    //     let mut start_block_height = 0u32;
-    //     while start_block_height <= latest_block_height {
-    //         // Compute the end block height (inclusive) for this iteration.
-    //         let end_block_height = std::cmp::min(start_block_height.saturating_add(validation_increment), latest_block_height);
-    //
-    //         // Retrieve the block hashes.
-    //         let block_hashes = ledger.get_block_hashes(start_block_height, end_block_height)?;
-    //
-    //         // Split the block hashes into (last_block_hash, [start_block_hash, ..., penultimate_block_hash]).
-    //         if let Some((last_block_hash, block_hashes_excluding_last)) = block_hashes.split_last() {
-    //             // It's possible that the batch only contains one block.
-    //             if !block_hashes_excluding_last.is_empty() {
-    //                 // Add the block hashes (up to penultimate) to the ledger tree.
-    //                 ledger.ledger_tree.write().add_all(block_hashes_excluding_last)?;
-    //             }
-    //
-    //             // Check 1 - Ensure the root of the ledger tree matches the one saved in the ledger roots map.
-    //             let ledger_root = ledger.get_previous_ledger_root(end_block_height)?;
-    //             if ledger_root != ledger.ledger_tree.read().root() {
-    //                 return Err(anyhow!("Ledger has incorrect ledger tree state at block {}", end_block_height));
-    //             }
-    //
-    //             // Check 2 - Ensure the saved block height corresponding to this ledger root matches the expected block height.
-    //             let candidate_height = match ledger.ledger_roots.get(&ledger_root)? {
-    //                 Some(candidate_height) => candidate_height,
-    //                 None => return Err(anyhow!("Ledger is missing ledger root for block {}", end_block_height)),
-    //             };
-    //             if end_block_height != candidate_height {
-    //                 return Err(anyhow!(
-    //                     "Ledger expected block {}, found block {}",
-    //                     end_block_height,
-    //                     candidate_height
-    //                 ));
-    //             }
-    //
-    //             // Add the last block hash to the ledger tree.
-    //             ledger.ledger_tree.write().add(last_block_hash)?;
-    //         }
-    //
-    //         // Log the progress of the validation procedure.
-    //         let progress = (end_block_height as f64 / latest_block_height as f64 * 100f64) as u8;
-    //         debug!("Validating the ledger up to block {} ({}%)", end_block_height, progress);
-    //
-    //         // Update the starting block height for the next iteration.
-    //         start_block_height = end_block_height.saturating_add(1);
-    //     }
-    //
-    //     // If this is new storage, the while loop above did not execute,
-    //     // and proceed to add the genesis block hash into the ledger tree.
-    //     if start_block_height == 0u32 {
-    //         // Add the genesis block hash to the ledger tree.
-    //         ledger.ledger_tree.write().add(&N::genesis_block().hash())?;
-    //     }
-    //
-    //     // Update the latest ledger state.
-    //     *ledger.latest_block.write() = ledger.get_block(latest_block_height)?;
-    //     ledger.regenerate_latest_ledger_state()?;
-    //
-    //     // TODO (raychu86): Reintroduce ledger tree
-    //     // Validate the ledger root one final time.
-    //     // let latest_ledger_root = ledger.ledger_tree.read().root();
-    //     // ledger.regenerate_ledger_tree()?;
-    //     // assert_eq!(ledger.ledger_tree.read().root(), latest_ledger_root);
-    //
-    //     info!("Ledger successfully loaded at block {}", ledger.latest_block_height());
-    //     Ok(ledger)
-    // }
+    ///
+    /// Opens a new writable instance of `LedgerState` from the given storage path.
+    /// For a read-only instance of `LedgerState`, use `LedgerState::open_reader`.
+    ///
+    /// A writable instance of `LedgerState` possesses full functionality, whereas
+    /// a read-only instance of `LedgerState` may only call immutable methods.
+    ///
+    pub fn open_writer<S: Storage<Access = SA>, P: AsRef<Path>>(path: P) -> Result<Self> {
+        Self::open_writer_with_increment::<S, P>(path, 10_000)
+    }
+
+    /// This function is hidden, as it's intended to be used directly in tests only.
+    /// The `validation_increment` parameter determines the number of blocks to be
+    /// handled during the incremental validation process.
+    #[doc(hidden)]
+    pub fn open_writer_with_increment<S: Storage<Access = SA>, P: AsRef<Path>>(path: P, validation_increment: u32) -> Result<Self> {
+        // Open storage.
+        let context = N::ID;
+        let storage = S::open(path, context)?;
+
+        // Initialize the ledger.
+        let ledger = Self {
+            // ledger_tree: RwLock::new(LedgerTree::<N>::new()?),
+            latest_block: RwLock::new(Block::<N>::genesis::<A>()?.clone()),
+            latest_block_hashes_and_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
+            // latest_block_locators: Default::default(),
+            ledger_roots: storage.open_map(DataID::LedgerRoots)?,
+            blocks: BlockState::<_, _, A>::open(storage)?,
+        };
+
+        // Determine the latest block height.
+        let mut latest_block_height = match (ledger.ledger_roots.values().max(), ledger.blocks.block_heights.keys().max()) {
+            (Some(latest_block_height_0), Some(latest_block_height_1)) => match latest_block_height_0 == latest_block_height_1 {
+                true => latest_block_height_0,
+                false => match ledger.try_fixing_inconsistent_state(None) {
+                    Ok(current_block_height) => current_block_height,
+                    Err(error) => return Err(error),
+                },
+            },
+            (None, None) => 0u32,
+            _ => return Err(anyhow!("Ledger storage state is inconsistent")),
+        };
+
+        // If this is new storage, initialize it with the genesis block.
+        if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
+            let genesis = Block::<N>::genesis::<A>()?;
+
+            // Perform all the associated storage operations as an atomic batch.
+            let batch = ledger.ledger_roots.prepare_batch();
+
+            ledger
+                .ledger_roots
+                .insert(&genesis.header().previous_ledger_root(), &genesis.header().height(), Some(batch))?;
+            ledger.blocks.add_block(&genesis, Some(batch))?;
+
+            // Execute the pending storage batch.
+            ledger.ledger_roots.execute_batch(batch)?;
+        }
+
+        // Check that all canonical block headers exist in storage.
+        let count = ledger.blocks.get_block_header_count()?;
+        assert_eq!(count, latest_block_height.saturating_add(1));
+
+        // Iterate and append each block hash from genesis to tip to validate ledger state.
+        let mut start_block_height = 0u32;
+        while start_block_height <= latest_block_height {
+            // Compute the end block height (inclusive) for this iteration.
+            let end_block_height = std::cmp::min(start_block_height.saturating_add(validation_increment), latest_block_height);
+
+            // Retrieve the block hashes.
+            let block_hashes = ledger.get_block_hashes(start_block_height, end_block_height)?;
+
+            // TODO (raychu86): Reintroduce ledger tree.
+            // // Split the block hashes into (last_block_hash, [start_block_hash, ..., penultimate_block_hash]).
+            // if let Some((last_block_hash, block_hashes_excluding_last)) = block_hashes.split_last() {
+            //     // It's possible that the batch only contains one block.
+            //     if !block_hashes_excluding_last.is_empty() {
+            //         // Add the block hashes (up to penultimate) to the ledger tree.
+            //         ledger.ledger_tree.write().add_all(block_hashes_excluding_last)?;
+            //     }
+            //
+            //     // Check 1 - Ensure the root of the ledger tree matches the one saved in the ledger roots map.
+            //     let ledger_root = ledger.get_previous_ledger_root(end_block_height)?;
+            //     if ledger_root != ledger.ledger_tree.read().root() {
+            //         return Err(anyhow!("Ledger has incorrect ledger tree state at block {}", end_block_height));
+            //     }
+            //
+            //     // Check 2 - Ensure the saved block height corresponding to this ledger root matches the expected block height.
+            //     let candidate_height = match ledger.ledger_roots.get(&ledger_root)? {
+            //         Some(candidate_height) => candidate_height,
+            //         None => return Err(anyhow!("Ledger is missing ledger root for block {}", end_block_height)),
+            //     };
+            //     if end_block_height != candidate_height {
+            //         return Err(anyhow!(
+            //             "Ledger expected block {}, found block {}",
+            //             end_block_height,
+            //             candidate_height
+            //         ));
+            //     }
+            //
+            //     // Add the last block hash to the ledger tree.
+            //     ledger.ledger_tree.write().add(last_block_hash)?;
+            // }
+
+            // Log the progress of the validation procedure.
+            let progress = (end_block_height as f64 / latest_block_height as f64 * 100f64) as u8;
+            debug!("Validating the ledger up to block {} ({}%)", end_block_height, progress);
+
+            // Update the starting block height for the next iteration.
+            start_block_height = end_block_height.saturating_add(1);
+        }
+
+        // // If this is new storage, the while loop above did not execute,
+        // // and proceed to add the genesis block hash into the ledger tree.
+        // if start_block_height == 0u32 {
+        //     // Add the genesis block hash to the ledger tree.
+        //     ledger.ledger_tree.write().add(&Block::<N>::genesis::<A>()?.hash())?;
+        // }
+
+        // Update the latest ledger state.
+        *ledger.latest_block.write() = ledger.get_block(latest_block_height)?;
+        ledger.regenerate_latest_ledger_state()?;
+
+        // TODO (raychu86): Reintroduce ledger tree
+        // Validate the ledger root one final time.
+        // let latest_ledger_root = ledger.ledger_tree.read().root();
+        // ledger.regenerate_ledger_tree()?;
+        // assert_eq!(ledger.ledger_tree.read().root(), latest_ledger_root);
+
+        info!("Ledger successfully loaded at block {}", ledger.latest_block_height());
+        Ok(ledger)
+    }
 
     // /// Adds the given block as the next block in the ledger to storage.
     // pub fn add_next_block(&self, block: &Block<N>) -> Result<()> {
@@ -1226,5 +1227,38 @@ impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field
         self.ledger_roots.execute_batch(batch)?;
 
         Ok(current_block_height)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::storage::{
+        rocksdb::{tests::temp_dir, RocksDB},
+        ReadOnly,
+        ReadWrite,
+        Storage,
+    };
+    use snarkvm::prelude::Testnet3;
+
+    type CurrentNetwork = Testnet3;
+    type A = snarkvm::circuit::AleoV0;
+
+    #[test]
+    fn test_open_ledger_state_reader() {
+        let dir = temp_dir();
+        {
+            let _block_state =
+                LedgerState::<CurrentNetwork, ReadWrite, A>::open_writer::<RocksDB, _>(&dir).expect("Failed to open ledger state");
+        }
+
+        let _block_state =
+            LedgerState::<CurrentNetwork, ReadWrite, A>::open_reader::<RocksDB, _>(dir).expect("Failed to open ledger state");
+    }
+
+    #[test]
+    fn test_open_ledger_state_writer() {
+        let _block_state =
+            LedgerState::<CurrentNetwork, ReadWrite, A>::open_writer::<RocksDB, _>(temp_dir()).expect("Failed to open ledger state");
     }
 }
