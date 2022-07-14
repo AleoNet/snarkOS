@@ -14,10 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#[macro_use]
+extern crate tracing;
+
 // pub mod reference;
 
-mod block;
-pub use block::*;
+// TODO (raychu86): Moved from snarkOS. This will be moved to snarkVM and networking respectively.
+pub mod ledger;
 
 mod rewards;
 

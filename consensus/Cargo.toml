@@ -25,14 +25,24 @@ path = "../../snarkVM"
 #branch = "testnet3"
 features = ["console", "utilities", "fields"]
 
+[dependencies.snarkos-environment]
+path = "../environment"
+version = "2.0.2"
+
 [dependencies.anyhow]
 version = "1"
+
+[dependencies.bytes]
+version = "1.0"
 
 [dependencies.fixed]
 version = "1.15"
 
 [dependencies.indexmap]
 version = "1.8"
+
+[dependencies.rand]
+version = "0.8"
 
 [dependencies.rayon]
 version = "1"

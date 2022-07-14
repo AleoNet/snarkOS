@@ -15,7 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkvm::{
-    compiler::{Program, Transition, VerifyingKey},
+    circuit::Aleo,
+    compiler::{Execution, Process, Program, Transition, VerifyingKey},
+    console::types::Field,
     prelude::*,
 };
 
@@ -36,30 +38,83 @@ impl<N: Network> Transaction<N> {
         // Compute the transaction ID.
         let id = N::hash_bhp1024(&program.to_bytes_le()?.to_bits_le())?.into();
         // Construct the deploy transaction.
-        let transaction = Self::Deploy(id, program, verifying_key);
-        // Ensure the transaction is valid.
-        match transaction.is_valid() {
-            true => Ok(transaction),
-            false => bail!("Invalid deploy transaction."),
-        }
+        Ok(Self::Deploy(id, program, verifying_key))
     }
 
     /// Initializes a new execution transaction.
     pub fn execute(transitions: Vec<Transition<N>>) -> Result<Self> {
+        // Ensure the transaction is not empty.
+        ensure!(!transitions.is_empty(), "Attempted to create an empty transaction execution");
         // Compute the transaction ID.
-        let id = N::hash_bhp1024(
-            &transitions
-                .iter()
-                .flat_map(|transition| transition.id().to_bits_le())
-                .collect::<Vec<_>>(),
-        )?
-        .into();
+        let id_bits: Vec<_> = transitions.iter().flat_map(|transition| transition.id().to_bits_le()).collect();
+        let id = N::hash_bhp1024(&id_bits)?.into();
         // Construct the execute transaction.
-        let transaction = Self::Execute(id, transitions);
-        // Ensure the transaction is valid.
-        match transaction.is_valid() {
-            true => Ok(transaction),
-            false => bail!("Invalid execute transaction."),
+        Ok(Self::Execute(id, transitions))
+    }
+
+    /// Returns `true` if the transaction is valid.
+    pub fn is_valid<A: Aleo<Network = N, BaseField = N::Field>>(&self, process: &Process<N, A>) -> bool {
+        match self {
+            Transaction::Deploy(id, program, _verifying_key) => {
+                // Convert the program into bytes.
+                let program_bytes = match program.to_bytes_le() {
+                    Ok(bytes) => bytes,
+                    Err(error) => {
+                        warn!("Unable to convert program into bytes for transaction (deploy, {id}): {error}");
+                        return false;
+                    }
+                };
+
+                // Check the transaction ID.
+                match N::hash_bhp1024(&program_bytes.to_bits_le()) {
+                    Ok(candidate_id) => {
+                        // Ensure the transaction ID matches the one in the transaction.
+                        if candidate_id != **id {
+                            warn!("Transaction ({id}) has an incorrect transaction ID.");
+                            return false;
+                        }
+                    }
+                    Err(error) => {
+                        warn!("Unable to compute transaction ID for transaction (deploy, {id}): {error}");
+                        return false;
+                    }
+                };
+
+                /// TODO (howardwu): Check the program (1. ensure the program ID does not exist already, 2. check it is well-formed).
+                /// TODO (howardwu): Check the verifying key.
+                true
+            }
+            Transaction::Execute(id, transitions) => {
+                // Ensure there is at least 1 transition.
+                if transitions.is_empty() {
+                    warn!("Transaction ({id}) has no transitions.");
+                    return false;
+                }
+
+                // Check the transaction ID.
+                let id_bits: Vec<_> = transitions.iter().flat_map(|transition| transition.id().to_bits_le()).collect();
+                match N::hash_bhp1024(&id_bits) {
+                    Ok(candidate_id) => {
+                        // Ensure the transaction ID matches the one in the transaction.
+                        if candidate_id != **id {
+                            warn!("Transaction ({id}) has an incorrect transaction ID.");
+                            return false;
+                        }
+                    }
+                    Err(error) => {
+                        warn!("Unable to compute transaction ID for transaction (execute, {id}): {error}");
+                        return false;
+                    }
+                };
+
+                // Ensure each transition is valid.
+                if let Err(error) = process.verify(Execution::from(transitions)) {
+                    warn!("Transaction ({id}) is invalid: {error}\n{:#?}", transitions);
+                    return false;
+                }
+
+                true
+            }
         }
     }
 
@@ -71,12 +126,19 @@ impl<N: Network> Transaction<N> {
         }
     }
 
-    /// TODO (howardwu): Implement me.
-    /// Returns `true` if the transaction is valid.
-    pub fn is_valid(&self) -> bool {
+    /// Returns an iterator over the serial numbers, for all executed transition inputs that are records.
+    pub fn serial_numbers(&self) -> impl '_ + Iterator<Item = &Field<N>> {
         match self {
-            Transaction::Deploy(..) => true,
-            Transaction::Execute(..) => true,
+            Transaction::Deploy(..) => [].iter().flat_map(Transition::serial_numbers),
+            Transaction::Execute(.., transitions) => transitions.iter().flat_map(Transition::serial_numbers),
+        }
+    }
+
+    /// Returns an iterator over the commitments, for all executed transition outputs that are records.
+    pub fn commitments(&self) -> impl '_ + Iterator<Item = &Field<N>> {
+        match self {
+            Transaction::Deploy(..) => [].iter().flat_map(Transition::commitments),
+            Transaction::Execute(.., transitions) => transitions.iter().flat_map(Transition::commitments),
         }
     }
 }
@@ -93,11 +155,7 @@ impl<N: Network> FromStr for Transaction<N> {
 impl<N: Network> Display for Transaction<N> {
     /// Displays the transaction as a JSON-string.
     fn fmt(&self, f: &mut Formatter) -> fmt::Result {
-        write!(
-            f,
-            "{}",
-            serde_json::to_string(self).map_err::<fmt::Error, _>(serde::ser::Error::custom)?
-        )
+        write!(f, "{}", serde_json::to_string(self).map_err::<fmt::Error, _>(ser::Error::custom)?)
     }
 }
 
@@ -105,6 +163,13 @@ impl<N: Network> FromBytes for Transaction<N> {
     /// Reads the transaction from the buffer.
     #[inline]
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        // Read the version.
+        let version = u16::read_le(&mut reader)?;
+        // Ensure the version is valid.
+        if version != 0 {
+            return Err(error("Invalid transaction version"));
+        }
+
         // Read the variant.
         let variant = u8::read_le(&mut reader)?;
         // Match the variant.
@@ -124,6 +189,11 @@ impl<N: Network> FromBytes for Transaction<N> {
                 let id = N::TransactionID::read_le(&mut reader)?;
                 // Read the number of transitions.
                 let num_transitions = u16::read_le(&mut reader)?;
+                // Ensure the number of transitions is nonzero.
+                if num_transitions == 0 {
+                    warn!("Transaction (from 'read_le') has no transitions");
+                    return Err(error("Transaction (from 'read_le') has no transitions"));
+                }
                 // Read the transitions.
                 let transitions = (0..num_transitions)
                     .map(|_| Transition::read_le(&mut reader))
@@ -133,11 +203,8 @@ impl<N: Network> FromBytes for Transaction<N> {
             }
             _ => return Err(error("Invalid transaction variant")),
         };
-        // Ensure the transaction is valid.
-        match transaction.is_valid() {
-            true => Ok(transaction),
-            false => Err(error("Invalid transaction")),
-        }
+        // Return the transaction.
+        Ok(transaction)
     }
 }
 
@@ -145,6 +212,10 @@ impl<N: Network> ToBytes for Transaction<N> {
     /// Writes the transaction to the buffer.
     #[inline]
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        // Write the version.
+        0u16.write_le(&mut writer)?;
+
+        // Write the transaction.
         match self {
             Self::Deploy(id, program, verifying_key) => {
                 // Write the variant.
@@ -233,5 +304,53 @@ impl<'de, N: Network> Deserialize<'de> for Transaction<N> {
             }
             false => FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "transaction"),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ledger::Block;
+
+    use snarkvm::prelude::Testnet3;
+
+    type CurrentNetwork = Testnet3;
+    type A = snarkvm::circuit::AleoV0;
+
+    #[test]
+    fn test_transaction_serde_json() {
+        let expected_transaction = (*Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions())[0].clone();
+
+        // Serialize
+        let expected_string = expected_transaction.to_string();
+        let candidate_string = serde_json::to_string(&expected_transaction).unwrap();
+        assert_eq!(2670, candidate_string.len(), "Update me if serialization has changed");
+        assert_eq!(expected_string, candidate_string);
+
+        // Deserialize
+        assert_eq!(
+            expected_transaction,
+            Transaction::<CurrentNetwork>::from_str(&candidate_string).unwrap()
+        );
+        assert_eq!(expected_transaction, serde_json::from_str(&candidate_string).unwrap());
+    }
+
+    #[test]
+    fn test_transaction_bincode() {
+        let expected_transaction = (*Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions())[0].clone();
+
+        // Serialize
+        let expected_bytes = expected_transaction.to_bytes_le().unwrap();
+        let candidate_bytes = bincode::serialize(&expected_transaction).unwrap();
+        assert_eq!(1362, expected_bytes.len(), "Update me if serialization has changed");
+        // TODO (howardwu): Serialization - Handle the inconsistency between ToBytes and Serialize (off by a length encoding).
+        assert_eq!(&expected_bytes[..], &candidate_bytes[8..]);
+
+        // Deserialize
+        assert_eq!(
+            expected_transaction,
+            Transaction::<CurrentNetwork>::read_le(&expected_bytes[..]).unwrap()
+        );
+        assert_eq!(expected_transaction, bincode::deserialize(&candidate_bytes[..]).unwrap());
     }
 }

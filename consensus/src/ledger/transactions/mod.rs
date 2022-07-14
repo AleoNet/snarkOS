@@ -14,10 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::block::Transaction;
+use crate::ledger::Transaction;
 use snarkvm::{
+    circuit::Aleo,
+    compiler::Process,
     console::{collections::merkle_tree::MerklePath, network::BHPMerkleTree, types::Field},
-    prelude::*,
+    prelude::{bits::ToBits, *},
 };
 
 use core::fmt;
@@ -33,7 +35,7 @@ type TransactionTree<N> = BHPMerkleTree<N, BLOCK_DEPTH>;
 /// The Merkle path for transaction in a block.
 type TransactionPath<N> = MerklePath<N, BLOCK_DEPTH>;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Transactions<N: Network> {
     /// The list of transactions included in a block.
     transactions: Vec<Transaction<N>>,
@@ -42,19 +44,36 @@ pub struct Transactions<N: Network> {
 impl<N: Network> Transactions<N> {
     /// Initializes from a given transactions list.
     pub fn from(transactions: &[Transaction<N>]) -> Result<Self> {
+        // Ensure the transactions are not empty.
+        ensure!(!transactions.is_empty(), "Attempted to create an empty list of transactions");
         // Construct the transactions struct.
         let transactions = Self {
             transactions: transactions.to_vec(),
         };
-        // Ensure the list of transactions are valid.
-        match transactions.is_valid() {
-            true => Ok(transactions),
-            false => bail!("Failed to initialize the block transactions"),
-        }
+        // Ensure there are no duplicate transactions.
+        ensure!(
+            !has_duplicates(transactions.iter().map(Transaction::id)),
+            "Attempted to create a list with duplicate transactions"
+        );
+
+        // Ensure there are no duplicate serial numbers.
+        ensure!(
+            !has_duplicates(transactions.iter().flat_map(Transaction::serial_numbers)),
+            "Attempted to create a list with duplicate serial numbers"
+        );
+
+        // Ensure there are no duplicate commitments.
+        ensure!(
+            !has_duplicates(transactions.iter().flat_map(Transaction::commitments)),
+            "Attempted to create a list with duplicate commitments"
+        );
+
+        // Return the transactions.
+        Ok(transactions)
     }
 
     /// Returns `true` if the transactions are well-formed.
-    pub fn is_valid(&self) -> bool {
+    pub fn is_valid<A: Aleo<Network = N, BaseField = N::Field>>(&self, process: &Process<N, A>) -> bool {
         // Ensure the transactions list is not empty.
         if self.transactions.is_empty() {
             eprintln!("Cannot validate an empty transactions list");
@@ -62,7 +81,9 @@ impl<N: Network> Transactions<N> {
         }
 
         // Ensure each transaction is well-formed.
-        if !self.transactions.as_parallel_slice().par_iter().all(Transaction::is_valid) {
+        // TODO (howardwu): Update the `Process` and `Stack` abstractions -- move trait `A` down to the methods that require it.
+        // if !self.transactions.as_parallel_slice().par_iter().all(|transaction| transaction.is_valid(process)) {
+        if !self.transactions.iter().all(|transaction| transaction.is_valid(process)) {
             eprintln!("Invalid transaction found in the transactions list");
             return false;
         }
@@ -73,17 +94,17 @@ impl<N: Network> Transactions<N> {
             return false;
         }
 
-        // // Ensure there are no duplicate serial numbers.
-        // if has_duplicates(self.transactions.iter().flat_map(Transaction::serial_numbers)) {
-        //     eprintln!("Found duplicate serial numbers in the transactions list");
-        //     return false;
-        // }
-        //
-        // // Ensure there are no duplicate commitments.
-        // if has_duplicates(self.transactions.iter().flat_map(Transaction::commitments)) {
-        //     eprintln!("Found duplicate commitments in the transactions list");
-        //     return false;
-        // }
+        // Ensure there are no duplicate serial numbers.
+        if has_duplicates(self.transactions.iter().flat_map(Transaction::serial_numbers)) {
+            eprintln!("Found duplicate serial numbers in the transactions list");
+            return false;
+        }
+
+        // Ensure there are no duplicate commitments.
+        if has_duplicates(self.transactions.iter().flat_map(Transaction::commitments)) {
+            eprintln!("Found duplicate commitments in the transactions list");
+            return false;
+        }
 
         // // Ensure there is 1 coinbase transaction.
         // let num_coinbase = self.transactions.iter().filter(|t| t.value_balance().is_negative()).count();
@@ -109,17 +130,17 @@ impl<N: Network> Transactions<N> {
     // pub fn ledger_roots(&self) -> impl Iterator<Item = N::LedgerRoot> + '_ {
     //     self.transactions.iter().map(Transaction::ledger_root)
     // }
-    //
-    // /// Returns the serial numbers, by constructing a flattened list of serial numbers from all transactions.
-    // pub fn serial_numbers(&self) -> impl Iterator<Item = &N::SerialNumber> + '_ {
-    //     self.transactions.iter().flat_map(Transaction::serial_numbers)
-    // }
-    //
-    // /// Returns the commitments, by constructing a flattened list of commitments from all transactions.
-    // pub fn commitments(&self) -> impl Iterator<Item = &N::Commitment> + '_ {
-    //     self.transactions.iter().flat_map(Transaction::commitments)
-    // }
-    //
+
+    /// Returns an iterator over the serial numbers, for all executed transition inputs that are records.
+    pub fn serial_numbers(&self) -> impl '_ + Iterator<Item = &Field<N>> {
+        self.transactions.iter().flat_map(Transaction::serial_numbers)
+    }
+
+    /// Returns an iterator over the commitments, for all executed transition outputs that are records.
+    pub fn commitments(&self) -> impl '_ + Iterator<Item = &Field<N>> {
+        self.transactions.iter().flat_map(Transaction::commitments)
+    }
+
     // /// Returns the net value balance, by summing the value balance from all transactions.
     // pub fn net_value_balance(&self) -> AleoAmount {
     //     self.transactions.iter().map(Transaction::value_balance).fold(AleoAmount::ZERO, |a, b| a.add(b))
@@ -151,13 +172,13 @@ impl<N: Network> Transactions<N> {
     // }
 
     /// Returns the transactions root, by computing the root for a Merkle tree of the transaction IDs.
-    pub fn transactions_root(&self) -> Result<Field<N>> {
+    pub fn to_root(&self) -> Result<Field<N>> {
         Ok((*self.to_tree()?.root()).into())
     }
 
     /// Returns an inclusion proof for the transactions tree.
-    pub fn to_transactions_inclusion_proof(&self, index: usize, leaf: &Vec<bool>) -> Result<TransactionPath<N>> {
-        Ok(self.to_tree()?.prove(index, leaf)?)
+    pub fn to_inclusion_proof(&self, index: usize, leaf: impl ToBits) -> Result<TransactionPath<N>> {
+        self.to_tree()?.prove(index, &leaf.to_bits_le())
     }
 
     /// The Merkle tree of transaction IDs for the block.
@@ -206,11 +227,13 @@ impl<N: Network> FromBytes for Transactions<N> {
     /// Reads the transactions from buffer.
     #[inline]
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
-        let num_transactions: u16 = FromBytes::read_le(&mut reader)?;
-        let mut transactions = Vec::with_capacity(num_transactions as usize);
-        for _ in 0..num_transactions {
-            transactions.push(FromBytes::read_le(&mut reader)?);
-        }
+        // Read the number of transactions.
+        let num_txs: u16 = FromBytes::read_le(&mut reader)?;
+        // Read the transactions.
+        let transactions = (0..num_txs)
+            .map(|_| FromBytes::read_le(&mut reader))
+            .collect::<Result<Vec<_>, _>>()?;
+        // Return the transactions.
         Self::from(&transactions).map_err(|e| error(e.to_string()))
     }
 }
@@ -219,13 +242,10 @@ impl<N: Network> ToBytes for Transactions<N> {
     /// Writes the transactions to a buffer.
     #[inline]
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        match self.is_valid() {
-            true => {
-                (self.transactions.len() as u16).write_le(&mut writer)?;
-                self.transactions.write_le(&mut writer)
-            }
-            false => Err(error("Invalid transactions list")),
-        }
+        // Write the number of transactions.
+        (self.transactions.len() as u16).write_le(&mut writer)?;
+        // Write the transactions.
+        self.transactions.write_le(&mut writer)
     }
 }
 
@@ -268,74 +288,82 @@ impl<N: Network> Deref for Transactions<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{testnet2::Testnet2, Account};
-    use rand::thread_rng;
+    use crate::ledger::Block;
 
-    #[test]
-    fn test_to_decrypted_records() {
-        let rng = &mut thread_rng();
-        let account = Account::<Testnet2>::new(rng);
+    use snarkvm::prelude::Testnet3;
 
-        // Craft a transaction with 1 coinbase record.
-        let (transaction, expected_record) = Transaction::new_coinbase(account.address(), AleoAmount(1234), true, rng).unwrap();
+    type CurrentNetwork = Testnet3;
+    type A = snarkvm::circuit::AleoV0;
 
-        // Craft a Transactions struct with 1 coinbase record.
-        let transactions = Transactions::from(&[transaction]).unwrap();
-        let decrypted_records = transactions
-            .to_decrypted_records(&account.view_key().into())
-            .collect::<Vec<Record<Testnet2>>>();
-        assert_eq!(decrypted_records.len(), 1); // Excludes dummy records upon decryption.
+    // TODO (raychu86): Make the genesis block static, so we don't have to regenerate one for every test.
 
-        let candidate_record = decrypted_records.first().unwrap();
-        assert_eq!(&expected_record, candidate_record);
-        assert_eq!(expected_record.owner(), candidate_record.owner());
-        assert_eq!(expected_record.value(), candidate_record.value());
-        // TODO (howardwu): Reenable this after fixing how payloads are handled.
-        // assert_eq!(expected_record.payload(), candidate_record.payload());
-        assert_eq!(expected_record.program_id(), candidate_record.program_id());
-    }
+    // #[test]
+    // fn test_to_decrypted_records() {
+    //     let rng = &mut thread_rng();
+    //     let account = Account::<CurrentNetwork>::new(rng);
+    //
+    //     // Craft a transaction with 1 coinbase record.
+    //     let genesis_block = Block::<Testnet2>::genesis();
+    //     let (transaction, expected_record) = Transaction::new_coinbase(account.address(), AleoAmount(1234), true, rng).unwrap();
+    //
+    //     // Craft a Transactions struct with 1 coinbase record.
+    //     let transactions = Transactions::from(&[transaction]).unwrap();
+    //     let decrypted_records = transactions
+    //         .to_decrypted_records(&account.view_key().into())
+    //         .collect::<Vec<Record<CurrentNetwork>>>();
+    //     assert_eq!(decrypted_records.len(), 1); // Excludes dummy records upon decryption.
+    //
+    //     let candidate_record = decrypted_records.first().unwrap();
+    //     assert_eq!(&expected_record, candidate_record);
+    //     assert_eq!(expected_record.owner(), candidate_record.owner());
+    //     assert_eq!(expected_record.value(), candidate_record.value());
+    //     // TODO (howardwu): Reenable this after fixing how payloads are handled.
+    //     // assert_eq!(expected_record.payload(), candidate_record.payload());
+    //     assert_eq!(expected_record.program_id(), candidate_record.program_id());
+    // }
 
     #[test]
     fn test_duplicate_transactions() {
         // Fetch any transaction.
-        let transaction = Testnet2::genesis_block().to_coinbase_transaction().unwrap();
-        // Duplicate the transaction, and ensure it errors.
+        let transaction = Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions().transactions[0].clone();
+
+        // Duplicate the transaction, and ensure it is invalid
         assert!(Transactions::from(&[transaction.clone(), transaction]).is_err());
     }
 
     #[test]
     fn test_transactions_serde_json() {
-        let expected_transactions = Testnet2::genesis_block().transactions().clone();
+        let expected_transactions = Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions().clone();
 
         // Serialize
         let expected_string = expected_transactions.to_string();
         let candidate_string = serde_json::to_string(&expected_transactions).unwrap();
-        assert_eq!(3078, candidate_string.len(), "Update me if serialization has changed");
+        assert_eq!(2689, candidate_string.len(), "Update me if serialization has changed");
         assert_eq!(expected_string, candidate_string);
 
         // Deserialize
         assert_eq!(
             expected_transactions,
-            Transactions::<Testnet2>::from_str(&candidate_string).unwrap()
+            Transactions::<CurrentNetwork>::from_str(&candidate_string).unwrap()
         );
         assert_eq!(expected_transactions, serde_json::from_str(&candidate_string).unwrap());
     }
 
     #[test]
     fn test_transactions_bincode() {
-        let expected_transactions = Testnet2::genesis_block().transactions().clone();
+        let expected_transactions = Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions().clone();
 
         // Serialize
         let expected_bytes = expected_transactions.to_bytes_le().unwrap();
         let candidate_bytes = bincode::serialize(&expected_transactions).unwrap();
-        assert_eq!(1519, expected_bytes.len(), "Update me if serialization has changed");
+        assert_eq!(1364, expected_bytes.len(), "Update me if serialization has changed");
         // TODO (howardwu): Serialization - Handle the inconsistency between ToBytes and Serialize (off by a length encoding).
         assert_eq!(&expected_bytes[..], &candidate_bytes[8..]);
 
         // Deserialize
         assert_eq!(
             expected_transactions,
-            Transactions::<Testnet2>::read_le(&expected_bytes[..]).unwrap()
+            Transactions::<CurrentNetwork>::read_le(&expected_bytes[..]).unwrap()
         );
         assert_eq!(expected_transactions, bincode::deserialize(&candidate_bytes[..]).unwrap());
     }
