@@ -26,9 +26,8 @@ use snarkos_rpc::{initialize_rpc_node, RpcContext};
 use snarkos_metrics as metrics;
 
 use anyhow::Result;
-use once_cell::race::OnceBox;
-use std::{net::SocketAddr, sync::Arc, time::Duration};
-use tokio::{net::TcpListener, sync::oneshot};
+use std::net::SocketAddr;
+use tokio::sync::oneshot;
 
 #[derive(Clone)]
 pub struct Node<N: Network, E: Environment> {

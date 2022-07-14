@@ -17,7 +17,7 @@
 use crate::peers::{Peers, PeersHandler, PeersRequest};
 
 use snarkos_consensus::ledger::{Account, Ledger};
-use snarkos_environment::{helpers::Status, Environment};
+use snarkos_environment::Environment;
 use snarkvm::prelude::*;
 
 use anyhow::Result;

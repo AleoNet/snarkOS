@@ -18,7 +18,7 @@ use crate::{
     state::ledger::{transaction_state::TransactionState, Metadata},
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
-use snarkos::ledger::*;
+use snarkos_consensus::ledger::*;
 use snarkvm::{circuit::Aleo, compiler::Transition, console::types::field::Field, prelude::*};
 
 use anyhow::{anyhow, Result};
@@ -299,8 +299,7 @@ mod tests {
     use super::*;
     use crate::storage::{
         rocksdb::{tests::temp_dir, RocksDB},
-        ReadWrite,
-        Storage,
+        ReadWrite, Storage,
     };
     use snarkvm::prelude::Testnet3;
 

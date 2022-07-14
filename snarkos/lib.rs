@@ -24,9 +24,6 @@ extern crate thiserror;
 #[macro_use]
 extern crate tracing;
 
-mod account;
-pub(crate) use account::*;
-
 pub mod display;
 
 pub mod cli;

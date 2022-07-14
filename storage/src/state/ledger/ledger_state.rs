@@ -20,7 +20,7 @@ use crate::{
     state::ledger::{block_state::BlockState, Metadata},
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
-use snarkos::ledger::*;
+use snarkos_consensus::ledger::*;
 use snarkos_environment::helpers::Resource;
 use snarkvm::{circuit::Aleo, compiler::Transition, console::types::field::Field, prelude::Network};
 // use snarkos_network::helpers::block_locators::*;
@@ -1235,9 +1235,7 @@ mod tests {
     use super::*;
     use crate::storage::{
         rocksdb::{tests::temp_dir, RocksDB},
-        ReadOnly,
-        ReadWrite,
-        Storage,
+        ReadOnly, ReadWrite, Storage,
     };
     use snarkvm::prelude::Testnet3;
 

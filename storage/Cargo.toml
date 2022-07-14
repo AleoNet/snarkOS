@@ -59,17 +59,16 @@ features = [ "lz4" ]
 [dependencies.serde]
 version = "1"
 
+[dependencies.snarkos-consensus]
+path = "../consensus"
+version = "2.0.2"
+
 [dependencies.snarkos-environment]
 path = "../environment"
 version = "2.0.2"
 
-# TODO (raychu86): Use snarkos for now to access objects. Need to remove cyclic dependency.
-[dependencies.snarkos]
-path = "../"
-version = "2.0.2"
-
 [dependencies.snarkvm]
-path = "../../snarkVM"
+path = "../../snarkVM" #48c921c
 #git = "https://github.com/AleoHQ/snarkVM.git"
 #branch = "testnet3"
 features = ["console"]
