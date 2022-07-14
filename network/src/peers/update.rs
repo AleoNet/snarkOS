@@ -14,222 +14,20 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Data, DisconnectReason, Message, OutboundRouter, Peer, State};
-use snarkos_environment::Environment;
-use snarkvm::prelude::Network;
-
-#[cfg(any(feature = "test", feature = "prometheus"))]
-use snarkos_metrics as metrics;
-
-use anyhow::Result;
-use rand::{prelude::IteratorRandom, rngs::OsRng, thread_rng, Rng};
-use std::{
-    collections::{HashMap, HashSet},
-    net::SocketAddr,
-    sync::Arc,
-    time::{Duration, Instant, SystemTime},
-};
-use tokio::{
-    net::TcpStream,
-    sync::{mpsc, oneshot, RwLock},
-    task,
-    time::timeout,
-};
-
-/// Shorthand for the parent half of the `Peers` message channel.
-pub type PeersRouter<N> = mpsc::Sender<PeersRequest<N>>;
-/// Shorthand for the child half of the `Peers` message channel.
-pub type PeersHandler<N> = mpsc::Receiver<PeersRequest<N>>;
-
-/// Shorthand for the parent half of the connection result channel.
-pub(crate) type ConnectionResult = oneshot::Sender<Result<()>>;
-
-///
-/// An enum of requests that the `Peers` struct processes.
-///
-#[derive(Debug)]
-pub enum PeersRequest<N: Network> {
-    /// Connect := (peer_ip, connection_result)
-    Connect(SocketAddr, ConnectionResult),
-    /// Heartbeat
-    Heartbeat,
-    /// MessagePropagate := (peer_ip, message)
-    MessagePropagate(SocketAddr, Message<N>),
-    /// MessageSend := (peer_ip, message)
-    MessageSend(SocketAddr, Message<N>),
-    /// PeerConnecting := (stream, peer_ip)
-    PeerConnecting(TcpStream, SocketAddr),
-    /// PeerConnected := (peer_ip, peer_nonce, outbound_router)
-    PeerConnected(SocketAddr, u64, OutboundRouter<N>),
-    /// PeerDisconnected := (peer_ip)
-    PeerDisconnected(SocketAddr),
-    /// PeerRestricted := (peer_ip)
-    PeerRestricted(SocketAddr),
-    /// SendPeerResponse := (peer_ip, rtt_start)
-    /// Note: rtt_start is for the request/response cycle for sharing peers.
-    SendPeerResponse(SocketAddr, Option<Instant>),
-    /// ReceivePeerResponse := (\[peer_ip\])
-    ReceivePeerResponse(Vec<SocketAddr>),
-}
-
-///
-/// A list of peers connected to the node server.
-///
-pub struct Peers<N: Network, E: Environment> {
-    /// The peers router of the node.
-    peers_router: PeersRouter<N>,
-    /// The local nonce for this node session.
-    local_nonce: u64,
-    /// The map connected peer IPs to their nonce and outbound message router.
-    connected_peers: RwLock<HashMap<SocketAddr, (u64, OutboundRouter<N>)>>,
-    /// The set of candidate peer IPs.
-    candidate_peers: RwLock<HashSet<SocketAddr>>,
-    /// The set of restricted peer IPs.
-    restricted_peers: RwLock<HashMap<SocketAddr, Instant>>,
-    /// The map of peers to their first-seen port number, number of attempts, and timestamp of the last inbound connection request.
-    seen_inbound_connections: RwLock<HashMap<SocketAddr, ((u16, u32), SystemTime)>>,
-    /// The map of peers to the timestamp of their last outbound connection request.
-    seen_outbound_connections: RwLock<HashMap<SocketAddr, SystemTime>>,
-    /// The shared state of the owning node.
-    state: Arc<State<N, E>>,
-}
+use super::*;
 
 impl<N: Network, E: Environment> Peers<N, E> {
-    ///
-    /// Initializes a new instance of `Peers` and its corresponding handler.
-    ///
-    pub async fn new(local_nonce: Option<u64>, state: Arc<State<N, E>>) -> (Self, mpsc::Receiver<PeersRequest<N>>) {
-        // Initialize an mpsc channel for sending requests to the `Peers` struct.
-        let (peers_router, peers_handler) = mpsc::channel(1024);
-
-        // Sample the nonce.
-        let local_nonce = match local_nonce {
-            Some(nonce) => nonce,
-            None => thread_rng().gen(),
-        };
-
-        // Initialize the peers.
-        let peers = Self {
-            peers_router,
-            local_nonce,
-            connected_peers: Default::default(),
-            candidate_peers: Default::default(),
-            restricted_peers: Default::default(),
-            seen_inbound_connections: Default::default(),
-            seen_outbound_connections: Default::default(),
-            state,
-        };
-
-        (peers, peers_handler)
-    }
-
-    /// Returns an instance of the peers router.
-    pub fn router(&self) -> &PeersRouter<N> {
-        &self.peers_router
-    }
-
-    ///
-    /// Returns `true` if the node is connected to the given IP.
-    ///
-    pub async fn is_connected_to(&self, ip: SocketAddr) -> bool {
-        self.connected_peers.read().await.contains_key(&ip)
-    }
-
-    ///
-    /// Returns `true` if the given IP is restricted.
-    ///
-    pub async fn is_restricted(&self, ip: SocketAddr) -> bool {
-        match self.restricted_peers.read().await.get(&ip) {
-            Some(timestamp) => timestamp.elapsed().as_secs() < E::RADIO_SILENCE_IN_SECS,
-            None => false,
-        }
-    }
-
-    ///
-    /// Returns the list of connected peers.
-    ///
-    pub async fn connected_peers(&self) -> Vec<SocketAddr> {
-        self.connected_peers.read().await.keys().copied().collect()
-    }
-
-    ///
-    /// Returns the list of candidate peers.
-    ///
-    pub async fn candidate_peers(&self) -> HashSet<SocketAddr> {
-        self.candidate_peers.read().await.clone()
-    }
-
-    ///
-    /// Returns the set of connected sync nodes.
-    ///
-    pub async fn connected_beacon_nodes(&self) -> HashSet<SocketAddr> {
-        let beacon_nodes = E::beacon_nodes();
-        self.connected_peers
-            .read()
-            .await
-            .keys()
-            .filter(|addr| beacon_nodes.contains(addr))
-            .copied()
-            .collect()
-    }
-
-    ///
-    /// Returns the number of connected sync nodes.
-    ///
-    pub async fn number_of_connected_beacon_nodes(&self) -> usize {
-        let beacon_nodes = E::beacon_nodes();
-        self.connected_peers
-            .read()
-            .await
-            .keys()
-            .filter(|addr| beacon_nodes.contains(addr))
-            .count()
-    }
-
-    ///
-    /// Returns the number of connected peers.
-    ///
-    pub async fn number_of_connected_peers(&self) -> usize {
-        self.connected_peers.read().await.len()
-    }
-
-    ///
-    /// Returns the number of candidate peers.
-    ///
-    pub async fn number_of_candidate_peers(&self) -> usize {
-        self.candidate_peers.read().await.len()
-    }
-
-    ///
-    /// Returns the number of restricted peers.
-    ///
-    pub async fn number_of_restricted_peers(&self) -> usize {
-        self.restricted_peers.read().await.len()
-    }
-
-    ///
-    /// Returns the list of nonces for the connected peers.
-    ///
-    pub(crate) async fn connected_nonces(&self) -> Vec<u64> {
-        self.connected_peers
-            .read()
-            .await
-            .values()
-            .map(|(peer_nonce, _)| *peer_nonce)
-            .collect()
-    }
-
     ///
     /// Performs the given `request` to the peers.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub async fn update(&self, request: PeersRequest<N>) {
+    pub(crate) async fn update(&self, request: PeersRequest<N, E>) {
+        debug!("Peers: {:?}", self.connected_peers().await);
+
         match request {
             PeersRequest::Connect(peer_ip, connection_result) => {
                 // Ensure the peer IP is not this node.
-                if peer_ip == self.state.local_ip
-                    || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.state.local_ip.port()
-                {
+                if self.state.is_local_ip(&peer_ip) {
                     debug!("Skipping connection request to {} (attempted to self-connect)", peer_ip);
                 }
                 // Ensure the node does not surpass the maximum number of peer connections.
@@ -262,19 +60,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         // Release the lock over seen_outbound_connections.
                         drop(seen_outbound_connections);
 
-                        // Initialize the peer handler.
+                        // Initialize the peer.
                         match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await {
                             Ok(stream) => match stream {
-                                Ok(stream) => {
-                                    Peer::handler(
-                                        stream,
-                                        self.local_nonce,
-                                        self.connected_nonces().await,
-                                        Some(connection_result),
-                                        self.state.clone(),
-                                    )
-                                    .await
-                                }
+                                Ok(stream) => Peer::handshake(self.state.clone(), stream, Some(connection_result)).await,
                                 Err(error) => {
                                     trace!("Failed to connect to '{}': '{:?}'", peer_ip, error);
                                     self.candidate_peers.write().await.remove(&peer_ip);
@@ -301,10 +90,10 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         .connected_peers
                         .read()
                         .await
-                        .iter()
-                        .filter(|(peer_ip, _)| !E::beacon_nodes().contains(peer_ip) && !E::trusted_nodes().contains(peer_ip))
+                        .keys()
+                        .filter(|peer_ip| !E::beacon_nodes().contains(peer_ip) && !E::trusted_nodes().contains(peer_ip))
                         .take(num_excess_peers)
-                        .map(|(&peer_ip, _)| peer_ip)
+                        .copied()
                         .collect::<Vec<SocketAddr>>();
 
                     // Proceed to send disconnect requests to these peers.
@@ -421,17 +210,11 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
             }
-            PeersRequest::MessagePropagate(sender, message) => {
-                self.propagate(sender, message).await;
-            }
-            PeersRequest::MessageSend(sender, message) => {
-                self.send(sender, message).await;
-            }
+            PeersRequest::MessagePropagate(sender, message) => self.propagate(sender, message).await,
+            PeersRequest::MessageSend(sender, message) => self.send(sender, message).await,
             PeersRequest::PeerConnecting(stream, peer_ip) => {
                 // Ensure the peer IP is not this node.
-                if peer_ip == self.state.local_ip
-                    || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.state.local_ip.port()
-                {
+                if self.state.is_local_ip(&peer_ip) {
                     debug!("Skipping connection request to {} (attempted to self-connect)", peer_ip);
                 }
                 // Ensure the node does not surpass the maximum number of peer connections.
@@ -489,13 +272,13 @@ impl<N: Network, E: Environment> Peers<N, E> {
                         drop(seen_inbound_connections);
 
                         // Initialize the peer handler.
-                        Peer::handler(stream, self.local_nonce, self.connected_nonces().await, None, self.state.clone()).await;
+                        Peer::handshake(self.state.clone(), stream, None).await;
                     }
                 }
             }
-            PeersRequest::PeerConnected(peer_ip, peer_nonce, outbound) => {
+            PeersRequest::PeerConnected(peer_ip, peer) => {
                 // Add an entry for this `Peer` in the connected peers.
-                self.connected_peers.write().await.insert(peer_ip, (peer_nonce, outbound));
+                self.connected_peers.write().await.insert(peer_ip, peer);
                 // Remove an entry for this `Peer` in the candidate peers, if it exists.
                 self.candidate_peers.write().await.remove(&peer_ip);
 
@@ -552,37 +335,31 @@ impl<N: Network, E: Environment> Peers<N, E> {
         }
     }
 
-    ///
     /// Adds the given peer IPs to the set of candidate peers.
     ///
     /// This method skips adding any given peers if the combined size exceeds the threshold,
     /// as the peer providing this list could be subverting the protocol.
-    ///
     async fn add_candidate_peers<'a, T: ExactSizeIterator<Item = &'a SocketAddr> + IntoIterator>(&self, peers: T) {
         // Acquire the candidate peers write lock.
         let mut candidate_peers = self.candidate_peers.write().await;
         // Ensure the combined number of peers does not surpass the threshold.
         for peer_ip in peers.take(E::MAXIMUM_CANDIDATE_PEERS.saturating_sub(candidate_peers.len())) {
-            // Ensure the peer is not self and is a new candidate peer.
-            let is_self = *peer_ip == self.state.local_ip
-                || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.state.local_ip.port();
-            if !is_self && !self.is_connected_to(*peer_ip).await {
+            // Ensure the peer is not itself and is a new candidate peer.
+            if !self.state.is_local_ip(peer_ip) && !self.is_connected_to(*peer_ip).await {
                 // Proceed to insert each new candidate peer IP.
                 candidate_peers.insert(*peer_ip);
             }
         }
     }
 
-    ///
     /// Sends the given message to specified peer.
-    ///
-    async fn send(&self, peer: SocketAddr, message: Message<N>) {
-        let target_peer = self.connected_peers.read().await.get(&peer).cloned();
+    async fn send(&self, peer_ip: SocketAddr, message: Message<N>) {
+        let target_peer = self.connected_peers.read().await.get(&peer_ip).cloned();
         match target_peer {
-            Some((_, outbound)) => {
-                if let Err(error) = outbound.send(message).await {
+            Some(peer) => {
+                if let Err(error) = peer.send(message).await {
                     trace!("Outbound channel failed: {}", error);
-                    self.connected_peers.write().await.remove(&peer);
+                    self.connected_peers.write().await.remove(&peer_ip);
 
                     #[cfg(any(feature = "test", feature = "prometheus"))]
                     {
@@ -591,13 +368,11 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     }
                 }
             }
-            None => warn!("Attempted to send to a non-connected peer {}", peer),
+            None => warn!("Attempted to send to a non-connected peer {peer_ip}"),
         }
     }
 
-    ///
     /// Sends the given message to every connected peer, excluding the sender.
-    ///
     async fn propagate(&self, sender: SocketAddr, mut message: Message<N>) {
         // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         if let Message::UnconfirmedBlock(_, _, ref mut data) = message {
@@ -605,22 +380,18 @@ impl<N: Network, E: Environment> Peers<N, E> {
             let _ = std::mem::replace(data, Data::Buffer(serialized_block));
         }
 
-        // Iterate through all peers that are not the sender, sync node, or beacon node.
+        // Iterate through all peers that are not the sender or a beacon node.
         for peer in self
             .connected_peers()
             .await
             .iter()
             .filter(|peer_ip| *peer_ip != &sender && !E::beacon_nodes().contains(peer_ip))
-            .copied()
-            .collect::<Vec<_>>()
         {
-            self.send(peer, message.clone()).await;
+            self.send(*peer, message.clone()).await;
         }
     }
 
-    ///
     /// Removes the addresses of all known peers.
-    ///
     #[cfg(feature = "test")]
     pub async fn reset_known_peers(&self) {
         self.candidate_peers.write().await.clear();

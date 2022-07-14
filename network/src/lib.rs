@@ -15,32 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 #![forbid(unsafe_code)]
-#![allow(clippy::module_inception)]
-#![allow(clippy::suspicious_else_formatting)]
-#![allow(clippy::type_complexity)]
 
 #[macro_use]
 extern crate tracing;
 
-pub mod helpers;
-
-// pub mod ledger;
-// pub use ledger::*;
-
-mod message;
-pub use message::*;
-
-pub(crate) mod peer;
-pub(crate) use peer::*;
-
+pub mod message;
+pub mod peer;
 pub mod peers;
-pub use peers::*;
-
-// pub mod prover;
-// pub use prover::*;
-
 pub mod state;
-pub use state::*;
-
-// pub mod validator;
-// pub use validator::*;

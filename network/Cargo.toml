@@ -41,22 +41,18 @@ version = "0.8"
 [dependencies.serde]
 version = "1"
 
-[dependencies.snarkos-consensus]
-path = "../consensus"
-version = "2.0.2"
-
 [dependencies.snarkos-environment]
 path = "../environment"
+version = "2.0.2"
+
+[dependencies.snarkos-consensus]
+path = "../consensus"
 version = "2.0.2"
 
 [dependencies.snarkos-metrics]
 path = "../metrics"
 version = "2.0.2"
 optional = true
-
-[dependencies.snarkos-storage]
-path = "../storage"
-version = "2.0.2"
 
 [dependencies.snarkvm]
 path = "../../snarkVM"
