@@ -117,9 +117,8 @@ version = "2.0.2"
 #version = "2.0.2"
 
 [dependencies.snarkvm]
-path = "../snarkVM"
+path = "../snarkVM" #rev = "48c921c"
 #git = "https://github.com/AleoHQ/snarkVM.git"
-#rev = "48c921c"
 #branch = "testnet3"
 features = ["console"]
 
