@@ -2376,6 +2376,7 @@ dependencies = [
  "snarkos-consensus",
  "snarkos-environment",
  "snarkos-metrics",
+ "snarkos-network",
  "snarkvm",
  "thiserror",
  "tokio",
@@ -2391,9 +2392,10 @@ name = "snarkos-consensus"
 version = "2.0.2"
 dependencies = [
  "anyhow",
+ "bytes",
  "fixed",
  "indexmap",
- "once_cell",
+ "rand",
  "rayon",
  "serde",
  "serde_json",
@@ -2430,6 +2432,29 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-network"
+version = "2.0.2"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "bytes",
+ "circular-queue",
+ "futures",
+ "once_cell",
+ "rand",
+ "serde",
+ "snarkos-consensus",
+ "snarkos-environment",
+ "snarkos-metrics",
+ "snarkvm",
+ "time",
+ "tokio",
+ "tokio-stream",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
 name = "snarkos-storage"
 version = "2.0.2"
 dependencies = [
@@ -2445,7 +2470,7 @@ dependencies = [
  "rayon",
  "rocksdb",
  "serde",
- "snarkos",
+ "snarkos-consensus",
  "snarkos-environment",
  "snarkos-storage",
  "snarkvm",
@@ -2463,6 +2488,7 @@ dependencies = [
  "clap 3.1.18",
  "colored",
  "rand",
+ "rayon",
  "self_update",
  "serde_json",
  "snarkvm-algorithms",
@@ -2691,6 +2717,7 @@ dependencies = [
  "parking_lot 0.12.1",
  "paste",
  "rand",
+ "rayon",
  "serde_json",
  "snarkvm-algorithms",
  "snarkvm-circuit",

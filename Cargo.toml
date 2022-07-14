@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2021"
 
 [workspace]
-members = [ "consensus", "environment", "metrics", "storage" ]
+members = [ "consensus", "environment", "metrics", "network", "storage" ]
 
 [lib]
 path = "snarkos/lib.rs"
@@ -103,9 +103,9 @@ path = "./metrics"
 version = "2.0.2"
 optional = true
 
-#[dependencies.snarkos-network]
-#path = "./network"
-#version = "2.0.2"
+[dependencies.snarkos-network]
+path = "./network"
+version = "2.0.2"
 
 #[dependencies.snarkos-rpc]
 #path = "./rpc"
@@ -119,6 +119,7 @@ optional = true
 [dependencies.snarkvm]
 path = "../snarkVM"
 #git = "https://github.com/AleoHQ/snarkVM.git"
+#rev = "48c921c"
 #branch = "testnet3"
 features = ["console"]
 
