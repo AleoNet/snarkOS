@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2021"
 
 [workspace]
-members = [ "consensus", "environment", "metrics", "network", "storage" ]
+members = [ "consensus", "environment", "metrics", "network", "rpc", "storage" ]
 
 [lib]
 path = "snarkos/lib.rs"
@@ -33,7 +33,7 @@ default = [ "console" ]
 console = [ "crossterm", "tui" ]
 cuda = [ "snarkvm/cuda" ]
 prometheus = [ "snarkos-metrics/prometheus" ]
-#rpc = [ "snarkos-rpc" ]
+rpc = [ "snarkos-rpc" ]
 test = [ "snarkos-metrics/test" ]
 
 [dependencies.aleo-std]
@@ -107,10 +107,10 @@ optional = true
 path = "./network"
 version = "2.0.2"
 
-#[dependencies.snarkos-rpc]
-#path = "./rpc"
-#version = "2.0.2"
-#optional = true
+[dependencies.snarkos-rpc]
+path = "./rpc"
+version = "2.0.2"
+optional = true
 
 #[dependencies.snarkos-storage]
 #path = "./storage"

@@ -18,8 +18,8 @@
 
 use crate::RpcFunctions;
 use snarkos_environment::Environment;
-use snarkos_network::{LedgerReader, State};
-use snarkvm::dpc::{Address, Network};
+use snarkos_network::{ledger::LedgerReader, state::State};
+use snarkvm::prelude::{Address, Network};
 
 use futures::TryFutureExt;
 use jsonrpsee::{
@@ -73,8 +73,10 @@ impl<N: Network, E: Environment> RpcContext<N, E> {
         }))
     }
 
-    pub(crate) fn ledger(&self) -> &LedgerReader<N> {
-        self.state.ledger().reader()
+    // TODO (raychu86): Integrate the ledger reader.
+    pub(crate) fn ledger<A: snarkvm::circuit::Aleo<Network = N, BaseField = N::Field>>(&self) -> &LedgerReader<N, A> {
+        unimplemented!()
+        // self.state.ledger().reader()
     }
 }
 
@@ -154,122 +156,122 @@ fn create_rpc_module<N: Network, E: Environment>(rpc_context: RpcContext<N, E>) 
     let mut module = RpcModule::new(rpc_context);
 
     // Public methods.
-
-    module.register_async_method("latestblock", |_rpc_params, rpc_context| async move {
-        rpc_context.latest_block().map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("latestblockheight", |_rpc_params, rpc_context| async move {
-        rpc_context.latest_block_height().map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("latestcumulativeweight", |_rpc_params, rpc_context| async move {
-        rpc_context.latest_cumulative_weight().map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("latestblockhash", |_rpc_params, rpc_context| async move {
-        rpc_context.latest_block_hash().map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("latestblockheader", |_rpc_params, rpc_context| async move {
-        rpc_context.latest_block_header().map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("latestblocktransactions", |_rpc_params, rpc_context| async move {
-        rpc_context.latest_block_transactions().map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("latestledgerroot", |_rpc_params, rpc_context| async move {
-        rpc_context.latest_ledger_root().map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("getblock", |rpc_params, rpc_context| async move {
-        let height = rpc_params.parse::<[u32; 1]>()?[0];
-        rpc_context.get_block(height).map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("getblocks", |rpc_params, rpc_context| async move {
-        let [start_height, end_height]: [u32; 2] = rpc_params.parse()?;
-        rpc_context
-            .get_blocks(start_height, end_height)
-            .map_err(JsonrpseeError::to_call_error)
-            .await
-    })?;
-
-    module.register_async_method("getblockheight", |rpc_params, rpc_context| async move {
-        let hash = rpc_params.parse::<[N::BlockHash; 1]>()?[0];
-        rpc_context.get_block_height(hash).map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("getblockhash", |rpc_params, rpc_context| async move {
-        let height = rpc_params.parse::<[u32; 1]>()?[0];
-        rpc_context.get_block_hash(height).map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("getblockhashes", |rpc_params, rpc_context| async move {
-        let [start_height, end_height]: [u32; 2] = rpc_params.parse()?;
-        rpc_context
-            .get_block_hashes(start_height, end_height)
-            .map_err(JsonrpseeError::to_call_error)
-            .await
-    })?;
-
-    module.register_async_method("getblockheader", |rpc_params, rpc_context| async move {
-        let height = rpc_params.parse::<[u32; 1]>()?[0];
-        rpc_context.get_block_header(height).map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("getblocktemplate", |_rpc_params, rpc_context| async move {
-        rpc_context.get_block_template().map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("getblocktransactions", |rpc_params, rpc_context| async move {
-        let height = rpc_params.parse::<[u32; 1]>()?[0];
-        rpc_context
-            .get_block_transactions(height)
-            .map_err(JsonrpseeError::to_call_error)
-            .await
-    })?;
-
-    module.register_async_method("getciphertext", |rpc_params, rpc_context| async move {
-        let commitment = rpc_params.parse::<[N::Commitment; 1]>()?[0];
-        rpc_context.get_ciphertext(commitment).map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("getledgerproof", |rpc_params, rpc_context| async move {
-        let commitment = rpc_params.parse::<[N::Commitment; 1]>()?[0];
-        rpc_context
-            .get_ledger_proof(commitment)
-            .map_err(JsonrpseeError::to_call_error)
-            .await
-    })?;
-
-    module.register_async_method("getmemorypool", |_rpc_params, rpc_context| async move {
-        rpc_context.get_memory_pool().map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("gettransaction", |rpc_params, rpc_context| async move {
-        let id = rpc_params.parse::<[N::TransactionID; 1]>()?[0];
-        rpc_context.get_transaction(id).map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("gettransition", |rpc_params, rpc_context| async move {
-        let id = rpc_params.parse::<[N::TransitionID; 1]>()?[0];
-        rpc_context.get_transition(id).map_err(JsonrpseeError::to_call_error).await
-    })?;
+    //
+    // module.register_async_method("latestblock", |_rpc_params, rpc_context| async move {
+    //     rpc_context.latest_block().map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("latestblockheight", |_rpc_params, rpc_context| async move {
+    //     rpc_context.latest_block_height().map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("latestcumulativeweight", |_rpc_params, rpc_context| async move {
+    //     rpc_context.latest_cumulative_weight().map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("latestblockhash", |_rpc_params, rpc_context| async move {
+    //     rpc_context.latest_block_hash().map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("latestblockheader", |_rpc_params, rpc_context| async move {
+    //     rpc_context.latest_block_header().map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("latestblocktransactions", |_rpc_params, rpc_context| async move {
+    //     rpc_context.latest_block_transactions().map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("latestledgerroot", |_rpc_params, rpc_context| async move {
+    //     rpc_context.latest_ledger_root().map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("getblock", |rpc_params, rpc_context| async move {
+    //     let height = rpc_params.parse::<[u32; 1]>()?[0];
+    //     rpc_context.get_block(height).map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("getblocks", |rpc_params, rpc_context| async move {
+    //     let [start_height, end_height]: [u32; 2] = rpc_params.parse()?;
+    //     rpc_context
+    //         .get_blocks(start_height, end_height)
+    //         .map_err(JsonrpseeError::to_call_error)
+    //         .await
+    // })?;
+    //
+    // module.register_async_method("getblockheight", |rpc_params, rpc_context| async move {
+    //     let hash = rpc_params.parse::<[N::BlockHash; 1]>()?[0];
+    //     rpc_context.get_block_height(hash).map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("getblockhash", |rpc_params, rpc_context| async move {
+    //     let height = rpc_params.parse::<[u32; 1]>()?[0];
+    //     rpc_context.get_block_hash(height).map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("getblockhashes", |rpc_params, rpc_context| async move {
+    //     let [start_height, end_height]: [u32; 2] = rpc_params.parse()?;
+    //     rpc_context
+    //         .get_block_hashes(start_height, end_height)
+    //         .map_err(JsonrpseeError::to_call_error)
+    //         .await
+    // })?;
+    //
+    // module.register_async_method("getblockheader", |rpc_params, rpc_context| async move {
+    //     let height = rpc_params.parse::<[u32; 1]>()?[0];
+    //     rpc_context.get_block_header(height).map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("getblocktemplate", |_rpc_params, rpc_context| async move {
+    //     rpc_context.get_block_template().map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("getblocktransactions", |rpc_params, rpc_context| async move {
+    //     let height = rpc_params.parse::<[u32; 1]>()?[0];
+    //     rpc_context
+    //         .get_block_transactions(height)
+    //         .map_err(JsonrpseeError::to_call_error)
+    //         .await
+    // })?;
+    //
+    // module.register_async_method("getciphertext", |rpc_params, rpc_context| async move {
+    //     let commitment = rpc_params.parse::<[N::Commitment; 1]>()?[0];
+    //     rpc_context.get_ciphertext(commitment).map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("getledgerproof", |rpc_params, rpc_context| async move {
+    //     let commitment = rpc_params.parse::<[N::Commitment; 1]>()?[0];
+    //     rpc_context
+    //         .get_ledger_proof(commitment)
+    //         .map_err(JsonrpseeError::to_call_error)
+    //         .await
+    // })?;
+    //
+    // module.register_async_method("getmemorypool", |_rpc_params, rpc_context| async move {
+    //     rpc_context.get_memory_pool().map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("gettransaction", |rpc_params, rpc_context| async move {
+    //     let id = rpc_params.parse::<[N::TransactionID; 1]>()?[0];
+    //     rpc_context.get_transaction(id).map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("gettransition", |rpc_params, rpc_context| async move {
+    //     let id = rpc_params.parse::<[N::TransitionID; 1]>()?[0];
+    //     rpc_context.get_transition(id).map_err(JsonrpseeError::to_call_error).await
+    // })?;
 
     module.register_async_method("getconnectedpeers", |_rpc_params, rpc_context| async move {
         rpc_context.get_connected_peers().map_err(JsonrpseeError::to_call_error).await
     })?;
 
-    module.register_async_method("getnodestate", |_rpc_params, rpc_context| async move {
-        rpc_context.get_node_state().map_err(JsonrpseeError::to_call_error).await
-    })?;
-
-    module.register_async_method("sendtransaction", |rpc_params, rpc_context| async move {
-        let string = std::mem::take(&mut rpc_params.parse::<[String; 1]>()?[0]);
-        rpc_context.send_transaction(string).map_err(JsonrpseeError::to_call_error).await
-    })?;
+    // module.register_async_method("getnodestate", |_rpc_params, rpc_context| async move {
+    //     rpc_context.get_node_state().map_err(JsonrpseeError::to_call_error).await
+    // })?;
+    //
+    // module.register_async_method("sendtransaction", |rpc_params, rpc_context| async move {
+    //     let string = std::mem::take(&mut rpc_params.parse::<[String; 1]>()?[0]);
+    //     rpc_context.send_transaction(string).map_err(JsonrpseeError::to_call_error).await
+    // })?;
 
     // Private methods.
 
@@ -308,24 +310,24 @@ fn create_rpc_module<N: Network, E: Environment>(rpc_context: RpcContext<N, E>) 
     //         .map_err(convert_core_err);
     //     result_to_response(&req, result)
     // }
-
-    module.register_async_method("getsharesforprover", |rpc_params, rpc_context| async move {
-        let prover = rpc_params.parse::<[Address<N>; 1]>()?[0];
-        rpc_context
-            .get_shares_for_prover(prover)
-            .map_err(JsonrpseeError::to_call_error)
-            .await
-    })?;
-
-    module.register_async_method("getshares", |_rpc_params, rpc_context| async move {
-        let shares = rpc_context.get_shares().await;
-        Ok(shares)
-    })?;
-
-    module.register_async_method("getprovers", |_rpc_params, rpc_context| async move {
-        let provers = rpc_context.get_provers().await;
-        Ok(provers)
-    })?;
+    //
+    // module.register_async_method("getsharesforprover", |rpc_params, rpc_context| async move {
+    //     let prover = rpc_params.parse::<[Address<N>; 1]>()?[0];
+    //     rpc_context
+    //         .get_shares_for_prover(prover)
+    //         .map_err(JsonrpseeError::to_call_error)
+    //         .await
+    // })?;
+    //
+    // module.register_async_method("getshares", |_rpc_params, rpc_context| async move {
+    //     let shares = rpc_context.get_shares().await;
+    //     Ok(shares)
+    // })?;
+    //
+    // module.register_async_method("getprovers", |_rpc_params, rpc_context| async move {
+    //     let provers = rpc_context.get_provers().await;
+    //     Ok(provers)
+    // })?;
 
     Ok(module)
 }

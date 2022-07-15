@@ -53,7 +53,7 @@ path = "../storage"
 version = "2.0.2"
 
 [dependencies.snarkvm]
-path = "../snarkVM"
+path = "../../snarkVM"
 #git = "https://github.com/AleoHQ/snarkVM.git"
 #branch = "testnet3"
 features = ["console"]
