@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_consensus::ledger::Account;
+use snarkos_consensus::account::Account;
 use snarkos_environment::{helpers::Status, Environment};
 use snarkos_network::{message::*, peers::*, state::State};
 use snarkvm::prelude::*;

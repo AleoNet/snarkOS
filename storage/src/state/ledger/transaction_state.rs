@@ -18,9 +18,8 @@ use crate::{
     state::ledger::Metadata,
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
-use snarkos_consensus::ledger::*;
 use snarkvm::{
-    compiler::Transition,
+    compiler::{Transaction, Transition},
     console::types::field::{Field, Zero},
     prelude::*,
 };
@@ -211,6 +210,7 @@ mod tests {
         rocksdb::{tests::temp_dir, RocksDB},
         ReadWrite, Storage,
     };
+    use snarkos_consensus::genesis_block;
     use snarkvm::prelude::Testnet3;
 
     type CurrentNetwork = Testnet3;
@@ -227,7 +227,7 @@ mod tests {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
         let transaction_state = TransactionState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open transaction state");
 
-        let transaction = (*Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions())[0].clone();
+        let transaction = (*genesis_block::<CurrentNetwork, A>().unwrap().transactions())[0].clone();
 
         // Insert the transaction
         let metadata = Metadata::<CurrentNetwork>::new(0, Default::default(), 0, 0);
@@ -254,7 +254,7 @@ mod tests {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
         let transaction_state = TransactionState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open transaction state");
 
-        let transaction = (*Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions())[0].clone();
+        let transaction = (*genesis_block::<CurrentNetwork, A>().unwrap().transactions())[0].clone();
 
         // Insert the transaction
         let metadata = Metadata::<CurrentNetwork>::new(0, Default::default(), 0, 0);
@@ -272,7 +272,7 @@ mod tests {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
         let transaction_state = TransactionState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open transaction state");
 
-        let transaction = (*Block::<CurrentNetwork>::genesis::<A>().unwrap().transactions())[0].clone();
+        let transaction = (*genesis_block::<CurrentNetwork, A>().unwrap().transactions())[0].clone();
 
         let transaction_id = transaction.id();
 

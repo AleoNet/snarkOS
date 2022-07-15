@@ -20,15 +20,21 @@ use crate::{
     state::ledger::{block_state::BlockState, Metadata},
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
-use snarkos_consensus::ledger::*;
+use snarkos_consensus::genesis_block;
 use snarkos_environment::helpers::Resource;
-use snarkvm::{circuit::Aleo, compiler::Transition, console::types::field::Field, prelude::Network};
+use snarkvm::{
+    circuit::Aleo,
+    compiler::{Block, BlockHeader, Transaction, Transactions, Transition},
+    console::types::field::Field,
+    prelude::{Address, Network, Record, Visibility},
+};
 // use snarkos_network::helpers::block_locators::*;
 
 use anyhow::{anyhow, Result};
 use circular_queue::CircularQueue;
 use itertools::Itertools;
 use parking_lot::RwLock;
+use rand::{CryptoRng, Rng};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::{BTreeMap, HashSet},
@@ -74,7 +80,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
         // Initialize the ledger.
         let ledger = Arc::new(Self {
             // ledger_tree: RwLock::new(LedgerTree::<N>::new()?),
-            latest_block: RwLock::new(Block::<N>::genesis::<A>()?.clone()),
+            latest_block: RwLock::new(genesis_block::<N, A>()?.clone()),
             latest_block_hashes_and_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
             // latest_block_locators: Default::default(),
             ledger_roots: storage.open_map(DataID::LedgerRoots)?,
@@ -704,17 +710,18 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
         Ok(Resource::Thread(thread_handle, abort_sender))
     }
 
-    // /// Mines a new block using the latest state of the given ledger.
-    // pub fn mine_next_block<R: Rng + CryptoRng>(
+    // /// Proposes a new block to the ledger.
+    // pub fn propose_new_block<R: Rng + CryptoRng, Private: Visibility>(
     //     &self,
     //     recipient: Address<N>,
     //     is_public: bool,
     //     transactions: &[Transaction<N>],
-    //     terminator: &AtomicBool,
     //     rng: &mut R,
-    // ) -> Result<(Block<N>, Record<N>)> {
-    //     let template = self.get_block_template(recipient, is_public, transactions, rng)?;
-    //     let coinbase_record = template.coinbase_record().clone();
+    // ) -> Result<(Block<N>, Record<N, Private>)> {
+    //     let latest_block_header = self.latest_block().header();
+    //
+    //     // let template = self.get_block_template(recipient, is_public, transactions, rng)?;
+    //     // let coinbase_record = template.coinbase_record().clone();
     //
     //     // Mine the next block.
     //     match Block::mine(&template, terminator, rng) {
@@ -777,7 +784,7 @@ impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field
         // Initialize the ledger.
         let ledger = Self {
             // ledger_tree: RwLock::new(LedgerTree::<N>::new()?),
-            latest_block: RwLock::new(Block::<N>::genesis::<A>()?.clone()),
+            latest_block: RwLock::new(genesis_block::<N, A>()?.clone()),
             latest_block_hashes_and_headers: RwLock::new(CircularQueue::with_capacity(MAXIMUM_LINEAR_BLOCK_LOCATORS as usize)),
             // latest_block_locators: Default::default(),
             ledger_roots: storage.open_map(DataID::LedgerRoots)?,
@@ -799,7 +806,7 @@ impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field
 
         // If this is new storage, initialize it with the genesis block.
         if latest_block_height == 0u32 && !ledger.blocks.contains_block_height(0u32)? {
-            let genesis = Block::<N>::genesis::<A>()?;
+            let genesis = genesis_block::<N, A>()?;
 
             // Perform all the associated storage operations as an atomic batch.
             let batch = ledger.ledger_roots.prepare_batch();
@@ -870,7 +877,7 @@ impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field
         // // and proceed to add the genesis block hash into the ledger tree.
         // if start_block_height == 0u32 {
         //     // Add the genesis block hash to the ledger tree.
-        //     ledger.ledger_tree.write().add(&Block::<N>::genesis::<A>()?.hash())?;
+        //     ledger.ledger_tree.write().add(&genesis_block::<N, A>()?.hash())?;
         // }
 
         // Update the latest ledger state.

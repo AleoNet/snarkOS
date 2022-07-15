@@ -16,9 +16,9 @@
 
 use crate::peers::{Peers, PeersHandler, PeersRequest};
 
-use snarkos_consensus::ledger::{Account, Ledger};
+use snarkos_consensus::account::Account;
 use snarkos_environment::Environment;
-use snarkvm::prelude::*;
+use snarkvm::{compiler::Ledger, prelude::*};
 
 use anyhow::Result;
 use once_cell::race::OnceBox;
@@ -90,7 +90,7 @@ impl<N: Network, E: Environment> State<N, E> {
         };
 
         // Initialize the ledger.
-        let ledger = Ledger::<snarkvm::prelude::Testnet3>::genesis::<snarkvm::circuit::AleoV0>()?;
+        let ledger = Ledger::<snarkvm::prelude::Testnet3>::new();
 
         // Construct the state.
         let state = Self {

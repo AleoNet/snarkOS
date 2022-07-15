@@ -18,8 +18,13 @@ use crate::{
     state::ledger::{transaction_state::TransactionState, Metadata},
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
-use snarkos_consensus::ledger::*;
-use snarkvm::{circuit::Aleo, compiler::Transition, console::types::field::Field, prelude::*};
+use snarkos_consensus::genesis_block;
+use snarkvm::{
+    circuit::Aleo,
+    compiler::{Block, BlockHeader, Transaction, Transactions, Transition},
+    console::types::field::Field,
+    prelude::*,
+};
 
 use anyhow::{anyhow, Result};
 use rayon::prelude::*;
@@ -125,7 +130,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     /// Returns the previous block hash for the given block height.
     pub(crate) fn get_previous_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
         match block_height == 0 {
-            true => Ok(Block::<N>::genesis::<A>()?.previous_hash()),
+            true => Ok(genesis_block::<N, A>()?.previous_hash()),
             false => match self.block_heights.get(&(block_height - 1))? {
                 Some(block_hash) => Ok(block_hash),
                 None => Err(anyhow!("Block {} missing in block heights map", block_height - 1)),
@@ -317,7 +322,7 @@ mod tests {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
         let block_state = BlockState::<CurrentNetwork, ReadWrite, A>::open(storage).expect("Failed to open block state");
 
-        let block = Block::<CurrentNetwork>::genesis::<A>().unwrap();
+        let block = genesis_block::<CurrentNetwork, A>().unwrap();
 
         // Insert the block.
         block_state.add_block(&block, None).expect("Failed to add block");
@@ -347,7 +352,7 @@ mod tests {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
         let block_state = BlockState::<CurrentNetwork, ReadWrite, A>::open(storage).expect("Failed to open block state");
 
-        let block = Block::<CurrentNetwork>::genesis::<A>().unwrap();
+        let block = genesis_block::<CurrentNetwork, A>().unwrap();
 
         // Insert the block.
         block_state.add_block(&block, None).expect("Failed to add block");
@@ -371,7 +376,7 @@ mod tests {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
         let block_state = BlockState::<CurrentNetwork, ReadWrite, A>::open(storage).expect("Failed to open block state");
 
-        let block = Block::<CurrentNetwork>::genesis::<A>().unwrap();
+        let block = genesis_block::<CurrentNetwork, A>().unwrap();
 
         // Insert the block.
         block_state.add_block(&block, None).expect("Failed to add block");
