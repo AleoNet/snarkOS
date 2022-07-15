@@ -38,8 +38,14 @@ version = "1"
 [dependencies.rand]
 version = "0.8"
 
+[dependencies.rayon]
+version = "1"
+
 [dependencies.serde]
 version = "1"
+
+[dependencies.serde_json]
+version = "1.0"
 
 [dependencies.snarkos-environment]
 path = "../environment"
@@ -53,6 +59,10 @@ version = "2.0.2"
 path = "../metrics"
 version = "2.0.2"
 optional = true
+
+[dependencies.snarkos-storage]
+path = "../storage"
+version = "2.0.2"
 
 [dependencies.snarkvm]
 path = "../../snarkVM"

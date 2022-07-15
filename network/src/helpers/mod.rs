@@ -14,17 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#![forbid(unsafe_code)]
+mod block_locators;
+pub use block_locators::*;
 
-#[macro_use]
-extern crate tracing;
+mod block_request;
+pub use block_request::*;
 
-pub mod helpers;
+// mod block_requests;
+// pub use block_requests::*;
 
-pub mod ledger;
-pub use ledger::*;
-
-pub mod message;
-pub mod peer;
-pub mod peers;
-pub mod state;
+mod circular_map;
+pub use circular_map::*;
