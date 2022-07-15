@@ -28,8 +28,7 @@ path = "snarkos/main.rs"
 required-features = ["console"]
 
 [features]
-#default = [ "console", "rpc" ]
-default = [ "console" ]
+default = [ "console", "rpc" ]
 console = [ "crossterm", "tui" ]
 cuda = [ "snarkvm/cuda" ]
 prometheus = [ "snarkos-metrics/prometheus" ]

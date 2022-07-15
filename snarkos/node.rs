@@ -14,13 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::CLI;
+
 use snarkos_consensus::account::Account;
 use snarkos_environment::{helpers::Status, Environment};
 use snarkos_network::{message::*, peers::*, state::State};
 use snarkvm::prelude::*;
 
 #[cfg(feature = "rpc")]
-use snarkos_rpc::{initialize_rpc_node, RpcContext};
+use snarkos_rpc::{initialize_rpc_server, RpcContext};
 
 #[cfg(any(feature = "test", feature = "prometheus"))]
 use snarkos_metrics as metrics;
@@ -37,9 +39,11 @@ pub struct Node<N: Network, E: Environment> {
 
 impl<N: Network, E: Environment> Node<N, E> {
     /// Initializes a new instance of the node.
-    pub async fn new(node_ip: SocketAddr, account: Account<N>) -> Result<Self> {
+    pub async fn new(cli: &CLI, account: Account<N>) -> Result<Self> {
+        let address = account.address().clone();
+
         // Initialize the state.
-        let state = State::new(node_ip, account).await?;
+        let state = State::new(cli.node, account).await?;
 
         let node = Self { state };
 
@@ -104,7 +108,9 @@ impl<N: Network, E: Environment> Node<N, E> {
         // node.state.validator().initialize().await;
 
         // node.initialize_notification(address).await;
-        // node.initialize_rpc(node, address).await;
+
+        #[cfg(feature = "rpc")]
+        node.initialize_rpc(&cli, Some(address.clone())).await;
 
         Ok(node)
     }
@@ -151,7 +157,7 @@ impl<N: Network, E: Environment> Node<N, E> {
         if !cli.norpc {
             // Initialize a new instance of the RPC node.
             let rpc_context = RpcContext::new(cli.rpc_username.clone(), cli.rpc_password.clone(), address, self.state.clone());
-            let (rpc_node_addr, rpc_node_handle) = initialize_rpc_node::<N, E>(cli.rpc, rpc_context).await;
+            let (rpc_node_addr, rpc_node_handle) = initialize_rpc_server::<N, E>(cli.rpc, rpc_context).await;
 
             debug!("JSON-RPC node listening on {}", rpc_node_addr);
 

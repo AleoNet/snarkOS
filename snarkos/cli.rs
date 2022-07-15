@@ -144,7 +144,7 @@ impl CLI {
         println!("Starting {} on {}.\n", E::NODE_TYPE.description(), N::NAME);
 
         // Initialize the node.
-        let node = Node::<N, E>::new(self.node, account).await?;
+        let node = Node::<N, E>::new(&self, account).await?;
 
         // Initialize signal handling and maintain ownership of the node - to keep it in scope.
         Self::handle_signals(node.clone());
