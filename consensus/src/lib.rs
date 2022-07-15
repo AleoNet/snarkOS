@@ -19,8 +19,8 @@ extern crate tracing;
 
 // pub mod reference;
 
-// TODO (raychu86): Moved from snarkOS. This will be moved to snarkVM and networking respectively.
-pub mod ledger;
+// TODO (raychu86): Move this declaration of account.
+pub mod account;
 
 mod rewards;
 
@@ -69,4 +69,71 @@ impl<N: Network> Consensus<N> {
     pub const fn validators(&self) -> &Validators<N> {
         &self.validators
     }
+}
+
+// TODO (raychu86): Remove this use of genesis block generation.
+use snarkvm::{
+    circuit::Aleo,
+    compiler::{Block, BlockHeader, Process, Program, Transaction, Transactions, Transition},
+    console::{
+        account::{Address, PrivateKey, ViewKey},
+        program::{Identifier, Value},
+    },
+};
+use std::str::FromStr;
+
+pub fn genesis_block<N: Network, A: Aleo<Network = N, BaseField = N::Field>>() -> anyhow::Result<Block<N>> {
+    // Initialize a new program.
+    let program = Program::<N>::from_str(
+        r"program stake.aleo;
+
+  record stake:
+    owner as address.private;
+    gates as u64.private;
+
+  function initialize:
+    input r0 as address.private;
+    input r1 as u64.private;
+    cast r0 r1 into r2 as stake.record;
+    output r2 as stake.record;",
+    )?;
+
+    // Declare the function name.
+    let function_name = Identifier::from_str("initialize")?;
+
+    // TODO (howardwu): Switch this to a remotely loaded SRS.
+    let rng = &mut snarkvm::utilities::test_crypto_rng_fixed();
+
+    // Initialize a new caller account.
+    let caller_private_key = PrivateKey::<N>::new(rng)?;
+    let _caller_view_key = ViewKey::try_from(&caller_private_key)?;
+    let caller = Address::try_from(&caller_private_key)?;
+
+    // Declare the input value.
+    let r0 = Value::<N>::from_str(&format!("{caller}"))?;
+    let r1 = Value::<N>::from_str("1_000_000_000_000_000_u64")?;
+
+    // Construct the process.
+    let mut process = Process::<N, A>::new()?;
+    // Add the program to the process.
+    process.add_program(&program)?;
+
+    // Authorize the function call.
+    let authorization = process.authorize(&caller_private_key, program.id(), function_name, &[r0.clone(), r1.clone()], rng)?;
+
+    // Execute the request.
+    let (_response, execution) = process.execute(authorization, rng)?;
+
+    let transitions = execution.to_vec();
+    let transaction = Transaction::execute(transitions)?;
+
+    // Prepare the components.
+    let header = BlockHeader::<N>::genesis();
+    let transactions = Transactions::from(&[transaction])?;
+    let previous_hash = N::BlockHash::default();
+
+    // Construct the block.
+    let block = Block::from(previous_hash, header, transactions)?;
+
+    Ok(block)
 }
