@@ -16,7 +16,7 @@
 
 use super::*;
 
-use snarkvm::compiler::BlockHeader;
+use snarkvm::BlockHeader;
 
 impl<N: Network, E: Environment> Peer<N, E> {
     /// Initializes a handshake to connect with a peer.

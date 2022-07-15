@@ -74,11 +74,12 @@ impl<N: Network> Consensus<N> {
 // TODO (raychu86): Remove this use of genesis block generation.
 use snarkvm::{
     circuit::Aleo,
-    compiler::{Block, BlockHeader, Process, Program, Transaction, Transactions, Transition},
+    compiler::{Process, Program, Transition},
     console::{
         account::{Address, PrivateKey, ViewKey},
         program::{Identifier, Value},
     },
+    {Block, BlockHeader, Transaction, Transactions},
 };
 use std::str::FromStr;
 

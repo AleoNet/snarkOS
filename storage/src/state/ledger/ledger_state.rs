@@ -24,9 +24,10 @@ use snarkos_consensus::genesis_block;
 use snarkos_environment::helpers::Resource;
 use snarkvm::{
     circuit::Aleo,
-    compiler::{Block, BlockHeader, Transaction, Transactions, Transition},
+    compiler::Transition,
     console::types::field::Field,
     prelude::{Address, Network, Record, Visibility},
+    {Block, BlockHeader, Transaction, Transactions},
 };
 // use snarkos_network::helpers::block_locators::*;
 

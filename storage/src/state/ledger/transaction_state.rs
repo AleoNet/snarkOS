@@ -19,9 +19,10 @@ use crate::{
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
 use snarkvm::{
-    compiler::{Transaction, Transition},
+    compiler::Transition,
     console::types::field::{Field, Zero},
     prelude::*,
+    Transaction,
 };
 
 use anyhow::{anyhow, Result};

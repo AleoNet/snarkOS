@@ -68,7 +68,7 @@ path = "../environment"
 version = "2.0.2"
 
 [dependencies.snarkvm]
-path = "../../snarkVM" #48c921c
+path = "../../snarkVM" #rev = "5657881642460fe105c4640556de536e8cb20ab8"
 #git = "https://github.com/AleoHQ/snarkVM.git"
 #branch = "testnet3"
 features = ["console"]

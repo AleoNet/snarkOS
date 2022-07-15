@@ -18,7 +18,7 @@ use crate::peers::{Peers, PeersHandler, PeersRequest};
 
 use snarkos_consensus::account::Account;
 use snarkos_environment::Environment;
-use snarkvm::{compiler::Ledger, prelude::*};
+use snarkvm::{prelude::*, Ledger};
 
 use anyhow::Result;
 use once_cell::race::OnceBox;

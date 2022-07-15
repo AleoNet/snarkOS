@@ -21,9 +21,10 @@ use crate::{
 use snarkos_consensus::genesis_block;
 use snarkvm::{
     circuit::Aleo,
-    compiler::{Block, BlockHeader, Transaction, Transactions, Transition},
+    compiler::Transition,
     console::types::field::Field,
     prelude::*,
+    {Block, BlockHeader, Transaction, Transactions},
 };
 
 use anyhow::{anyhow, Result};
