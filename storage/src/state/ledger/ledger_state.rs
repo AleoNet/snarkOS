@@ -20,7 +20,6 @@ use crate::{
     state::ledger::{block_state::BlockState, Metadata},
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
-use snarkos_consensus::genesis_block;
 use snarkos_environment::helpers::Resource;
 use snarkvm::{
     circuit::Aleo,
@@ -50,7 +49,7 @@ use tokio::sync::oneshot::{self, error::TryRecvError};
 const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 64;
 
 #[derive(Debug)]
-pub struct LedgerState<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> {
+pub struct LedgerState<N: Network, SA: StorageAccess> {
     // /// The current ledger tree of block hashes.
     // ledger_tree: RwLock<LedgerTree<N>>,
     /// The latest block of the ledger.
@@ -62,10 +61,10 @@ pub struct LedgerState<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseF
     /// The ledger root corresponding to each block height.
     ledger_roots: DataMap<Field<N>, u32, SA>,
     /// The blocks of the ledger in storage.
-    blocks: BlockState<N, SA, A>,
+    blocks: BlockState<N, SA>,
 }
 
-impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> LedgerState<N, SA, A> {
+impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
     ///
     /// Opens a read-only instance of `LedgerState` from the given storage path.
     /// For a writable instance of `LedgerState`, use `LedgerState::open_writer`.
@@ -761,7 +760,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     }
 }
 
-impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field>> LedgerState<N, SA, A> {
+impl<N: Network, SA: StorageReadWrite> LedgerState<N, SA> {
     ///
     /// Opens a new writable instance of `LedgerState` from the given storage path.
     /// For a read-only instance of `LedgerState`, use `LedgerState::open_reader`.
@@ -1062,7 +1061,7 @@ impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field
                 Some(block) => {
                     // Update the internal storage state of the ledger.
                     self.blocks.remove_block(current_block_height, Some(batch))?;
-                    self.ledger_roots.remove(&block.header().previous_ledger_root(), Some(batch))?;
+                    self.ledger_roots.remove(&block.header().previous_state_root(), Some(batch))?;
                     // Decrement the current block height, and update the current block.
                     current_block_height = current_block_height.saturating_sub(1);
                     current_block = blocks.get(&current_block_height);

@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 pub(super) mod block_state;
-pub(super) mod ledger_state;
+// pub(super) mod ledger_state;
 pub(super) mod transaction_state;
 
 use snarkvm::prelude::*;
@@ -43,5 +43,34 @@ impl<N: Network> Metadata<N> {
             block_timestamp,
             transaction_index,
         }
+    }
+}
+
+#[cfg(test)]
+pub(crate) mod test_helpers {
+    use snarkvm::{
+        console::{account::PrivateKey, network::Testnet3},
+        utilities::test_crypto_rng_fixed,
+        Block, VM,
+    };
+
+    use once_cell::sync::OnceCell;
+
+    pub(crate) type CurrentNetwork = Testnet3;
+
+    pub(crate) fn sample_genesis_block() -> Block<CurrentNetwork> {
+        static INSTANCE: OnceCell<Block<CurrentNetwork>> = OnceCell::new();
+        INSTANCE
+            .get_or_init(|| {
+                // Initialize the VM.
+                let mut vm = VM::<CurrentNetwork>::new().unwrap();
+                // Initialize the RNG.
+                let rng = &mut test_crypto_rng_fixed();
+                // Initialize a new caller.
+                let caller_private_key = PrivateKey::<CurrentNetwork>::new(rng).unwrap();
+                // Return the block.
+                Block::genesis(&mut vm, &caller_private_key, rng).unwrap()
+            })
+            .clone()
     }
 }

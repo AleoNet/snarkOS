@@ -89,6 +89,9 @@ version = "0.1.14"
 [dev-dependencies.criterion]
 version = "0.3"
 
+[dev-dependencies.once_cell]
+version = "1"
+
 [dev-dependencies.rand_xorshift]
 version = "0.3"
 

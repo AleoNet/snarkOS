@@ -19,7 +19,7 @@ use crate::{
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
 use snarkvm::{
-    compiler::Transition,
+    compiler::{Execution, Transition},
     console::types::field::{Field, Zero},
     prelude::*,
     Transaction,
@@ -32,13 +32,14 @@ use anyhow::{anyhow, Result};
 pub(crate) struct TransactionState<N: Network, SA: StorageAccess> {
     // TODO (raychu86): Add support for deploy transactions.
     /// Map of transaction_id to (ledger_root, transition ids, metadata)
-    transactions: DataMap<N::TransactionID, (Field<N>, Vec<Field<N>>, Metadata<N>), SA>,
+    transactions: DataMap<N::TransactionID, (Field<N>, Vec<N::TransitionID>, Metadata<N>), SA>,
     /// Map of transition_id to (transaction_id, index, transition)
     transitions: DataMap<Field<N>, (N::TransactionID, u8, Transition<N>), SA>,
     /// Map of serial_number to transition_id
-    serial_numbers: DataMap<Field<N>, Field<N>, SA>,
+    serial_numbers: DataMap<Field<N>, N::TransitionID, SA>,
     /// Map of commitment to transition_id
-    commitments: DataMap<Field<N>, Field<N>, SA>,
+    commitments: DataMap<Field<N>, N::TransitionID, SA>,
+    // deployments: DataMap<N::TransactionID, Deployment<N>, SA>,
 }
 
 impl<N: Network, SA: StorageAccess> TransactionState<N, SA> {
@@ -108,15 +109,15 @@ impl<N: Network, SA: StorageAccess> TransactionState<N, SA> {
         };
 
         // Retrieve the transitions.
-        let mut transitions = Vec::with_capacity(transition_ids.len());
+        let mut execution = Execution::new();
         for transition_id in transition_ids.iter() {
             match self.transitions.get(transition_id)? {
-                Some((_, _, transition)) => transitions.push(transition),
+                Some((_, _, transition)) => execution.push(transition),
                 None => return Err(anyhow!("Transition {} missing in storage", transition_id)),
             };
         }
 
-        Transaction::execute(transitions)
+        Transaction::execute(execution)
     }
 
     /// Returns the transaction metadata for a given transaction ID.
@@ -134,7 +135,7 @@ impl<N: Network, SA: StorageReadWrite> TransactionState<N, SA> {
     pub(crate) fn add_transaction(&self, transaction: &Transaction<N>, metadata: Metadata<N>, batch: Option<usize>) -> Result<()> {
         // TODO (raychu86): Add support for deploy transactions.
         let (transaction_id, transitions) = match transaction {
-            Transaction::Deploy(_transaction_id, _, _) => unimplemented!(),
+            Transaction::Deploy(_transaction_id, _) => unimplemented!(),
             Transaction::Execute(transaction_id, transitions) => (transaction_id, transitions),
         };
 
@@ -207,15 +208,13 @@ impl<N: Network, SA: StorageReadWrite> TransactionState<N, SA> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::{
-        rocksdb::{tests::temp_dir, RocksDB},
-        ReadWrite, Storage,
+    use crate::{
+        state::ledger::test_helpers::{sample_genesis_block, CurrentNetwork},
+        storage::{
+            rocksdb::{tests::temp_dir, RocksDB},
+            ReadWrite, Storage,
+        },
     };
-    use snarkos_consensus::genesis_block;
-    use snarkvm::prelude::Testnet3;
-
-    type CurrentNetwork = Testnet3;
-    type A = snarkvm::circuit::AleoV0;
 
     #[test]
     fn test_open_transaction_state() {
@@ -228,7 +227,7 @@ mod tests {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
         let transaction_state = TransactionState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open transaction state");
 
-        let transaction = (*genesis_block::<CurrentNetwork, A>().unwrap().transactions())[0].clone();
+        let transaction = (*sample_genesis_block().transactions())[0].clone();
 
         // Insert the transaction
         let metadata = Metadata::<CurrentNetwork>::new(0, Default::default(), 0, 0);
@@ -255,7 +254,7 @@ mod tests {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
         let transaction_state = TransactionState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open transaction state");
 
-        let transaction = (*genesis_block::<CurrentNetwork, A>().unwrap().transactions())[0].clone();
+        let transaction = (*sample_genesis_block().transactions())[0].clone();
 
         // Insert the transaction
         let metadata = Metadata::<CurrentNetwork>::new(0, Default::default(), 0, 0);
@@ -273,7 +272,7 @@ mod tests {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
         let transaction_state = TransactionState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open transaction state");
 
-        let transaction = (*genesis_block::<CurrentNetwork, A>().unwrap().transactions())[0].clone();
+        let transaction = (*sample_genesis_block().transactions())[0].clone();
 
         let transaction_id = transaction.id();
 

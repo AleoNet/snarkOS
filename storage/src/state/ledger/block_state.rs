@@ -18,13 +18,12 @@ use crate::{
     state::ledger::{transaction_state::TransactionState, Metadata},
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
-use snarkos_consensus::genesis_block;
 use snarkvm::{
     circuit::Aleo,
     compiler::Transition,
     console::types::field::Field,
     prelude::*,
-    {Block, BlockHeader, Transaction, Transactions},
+    {Block, Header, Transaction, Transactions},
 };
 
 use anyhow::{anyhow, Result};
@@ -32,15 +31,14 @@ use rayon::prelude::*;
 use std::{collections::HashSet, marker::PhantomData};
 
 #[derive(Clone, Debug)]
-pub(crate) struct BlockState<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> {
+pub(crate) struct BlockState<N: Network, SA: StorageAccess> {
     pub(crate) block_heights: DataMap<u32, N::BlockHash, SA>,
-    pub(crate) block_headers: DataMap<N::BlockHash, BlockHeader<N>, SA>,
+    pub(crate) block_headers: DataMap<N::BlockHash, Header<N>, SA>,
     pub(crate) block_transactions: DataMap<N::BlockHash, Vec<N::TransactionID>, SA>,
     pub(crate) transactions: TransactionState<N, SA>,
-    _aleo: PhantomData<A>,
 }
 
-impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> BlockState<N, SA, A> {
+impl<N: Network, SA: StorageAccess> BlockState<N, SA> {
     /// Initializes a new instance of `BlockState`.
     pub(crate) fn open<S: Storage<Access = SA>>(storage: S) -> Result<Self> {
         Ok(Self {
@@ -48,7 +46,6 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
             block_headers: storage.open_map(DataID::BlockHeaders)?,
             block_transactions: storage.open_map(DataID::BlockTransactions)?,
             transactions: TransactionState::open(storage)?,
-            _aleo: PhantomData,
         })
     }
 
@@ -131,7 +128,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     /// Returns the previous block hash for the given block height.
     pub(crate) fn get_previous_block_hash(&self, block_height: u32) -> Result<N::BlockHash> {
         match block_height == 0 {
-            true => Ok(genesis_block::<N, A>()?.previous_hash()),
+            true => Ok(N::BlockHash::default()), // Previous block hash of the genesis block.
             false => match self.block_heights.get(&(block_height - 1))? {
                 Some(block_hash) => Ok(block_hash),
                 None => Err(anyhow!("Block {} missing in block heights map", block_height - 1)),
@@ -140,7 +137,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     }
 
     /// Returns the block header for the given block height.
-    pub(crate) fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>> {
+    pub(crate) fn get_block_header(&self, block_height: u32) -> Result<Header<N>> {
         // Retrieve the block hash.
         let block_hash = self.get_block_hash(block_height)?;
 
@@ -151,7 +148,7 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
     }
 
     /// Returns the block headers from the given `start_block_height` to `end_block_height` (inclusive).
-    pub(crate) fn get_block_headers(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<BlockHeader<N>>> {
+    pub(crate) fn get_block_headers(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Header<N>>> {
         // Ensure the starting block height is less than the ending block height.
         if start_block_height > end_block_height {
             return Err(anyhow!("Invalid starting and ending block heights"));
@@ -218,16 +215,16 @@ impl<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>> 
             .collect()
     }
 
-    /// Returns the ledger root in the block header of the given block height.
-    pub(crate) fn get_previous_ledger_root(&self, block_height: u32) -> Result<Field<N>> {
+    /// Returns the state root in the block header of the given block height.
+    pub(crate) fn get_previous_state_root(&self, block_height: u32) -> Result<Field<N>> {
         // Retrieve the block header.
         let block_header = self.get_block_header(block_height)?;
-        // Return the ledger root in the block header.
-        Ok(*block_header.previous_ledger_root())
+        // Return the state root in the block header.
+        Ok(*block_header.previous_state_root())
     }
 }
 
-impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field>> BlockState<N, SA, A> {
+impl<N: Network, SA: StorageReadWrite> BlockState<N, SA> {
     /// Adds the given block to storage.
     pub(crate) fn add_block(&self, block: &Block<N>, batch: Option<usize>) -> Result<()> {
         // Ensure the block does not exist.
@@ -238,7 +235,7 @@ impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field
             let block_hash = block.hash();
             let block_header = block.header();
             let transactions = block.transactions();
-            let transaction_ids = transactions.transaction_ids().collect::<Vec<_>>();
+            let transaction_ids = transactions.transaction_ids().cloned().collect::<Vec<_>>();
 
             // Insert the block height.
             self.block_heights.insert(&block_height, &block_hash, batch)?;
@@ -247,7 +244,7 @@ impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field
             // Insert the block transactions.
             self.block_transactions.insert(&block_hash, &transaction_ids, batch)?;
             // Insert the transactions.
-            for (index, transaction) in transactions.iter().enumerate() {
+            for (index, (_transaction_id, transaction)) in (*transactions).iter().enumerate() {
                 let metadata = Metadata::<N>::new(block_height, block_hash, block.header().timestamp(), index as u16);
                 self.transactions.add_transaction(transaction, metadata, batch)?;
             }
@@ -303,27 +300,26 @@ impl<N: Network, SA: StorageReadWrite, A: Aleo<Network = N, BaseField = N::Field
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::storage::{
-        rocksdb::{tests::temp_dir, RocksDB},
-        ReadWrite, Storage,
+    use crate::{
+        state::ledger::test_helpers::{sample_genesis_block, CurrentNetwork},
+        storage::{
+            rocksdb::{tests::temp_dir, RocksDB},
+            ReadWrite, Storage,
+        },
     };
-    use snarkvm::prelude::Testnet3;
-
-    type CurrentNetwork = Testnet3;
-    type A = snarkvm::circuit::AleoV0;
 
     #[test]
     fn test_open_block_state() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-        let _block_state = BlockState::<CurrentNetwork, ReadWrite, A>::open(storage).expect("Failed to open block state");
+        let _block_state = BlockState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open block state");
     }
 
     #[test]
     fn test_insert_and_contains_block() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-        let block_state = BlockState::<CurrentNetwork, ReadWrite, A>::open(storage).expect("Failed to open block state");
+        let block_state = BlockState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open block state");
 
-        let block = genesis_block::<CurrentNetwork, A>().unwrap();
+        let block = sample_genesis_block();
 
         // Insert the block.
         block_state.add_block(&block, None).expect("Failed to add block");
@@ -351,9 +347,9 @@ mod tests {
     #[test]
     fn test_insert_and_get_block() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-        let block_state = BlockState::<CurrentNetwork, ReadWrite, A>::open(storage).expect("Failed to open block state");
+        let block_state = BlockState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open block state");
 
-        let block = genesis_block::<CurrentNetwork, A>().unwrap();
+        let block = sample_genesis_block();
 
         // Insert the block.
         block_state.add_block(&block, None).expect("Failed to add block");
@@ -375,16 +371,16 @@ mod tests {
     #[test]
     fn test_insert_and_remove_block() {
         let storage = RocksDB::<ReadWrite>::open(temp_dir(), 0).expect("Failed to open storage");
-        let block_state = BlockState::<CurrentNetwork, ReadWrite, A>::open(storage).expect("Failed to open block state");
+        let block_state = BlockState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open block state");
 
-        let block = genesis_block::<CurrentNetwork, A>().unwrap();
+        let block = sample_genesis_block();
 
         // Insert the block.
         block_state.add_block(&block, None).expect("Failed to add block");
         assert!(block_state.contains_block_hash(&block.hash()).unwrap());
         assert!(block_state.contains_block_height(block.header().height()).unwrap());
 
-        // TODO (raychu86): Remove a non-genesis block.
+        // TODO (raychu86): Insert and remove a non-genesis block.
         // Remove the block.
         // block_state
         //     .remove_block(block.header().height(), None)
