@@ -16,7 +16,7 @@
 
 use super::*;
 
-use snarkvm::BlockHeader;
+use snarkvm::Header;
 
 impl<N: Network, E: Environment> Peer<N, E> {
     /// Initializes a handshake to connect with a peer.
@@ -93,8 +93,8 @@ impl<N: Network, E: Environment> Peer<N, E> {
         // Get the IP address of the peer.
         let mut peer_ip = outbound_socket.get_ref().peer_addr()?;
 
-        // Retrieve the genesis block header.
-        let genesis_header = BlockHeader::<N>::genesis();
+        // Retrieve the genesis block header. // TODO (raychu86): Ensure that the genesis header has no transactions.
+        let genesis_header = Header::<N>::genesis(&vec![]);
 
         // Send a challenge request to the peer.
         let message = Message::<N>::ChallengeRequest(

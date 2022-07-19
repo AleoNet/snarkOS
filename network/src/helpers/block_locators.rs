@@ -31,7 +31,7 @@ use snarkvm::{
         str::FromStr,
         FromBytes, FromBytesDeserializer, ToBytes, ToBytesSerializer,
     },
-    BlockHeader,
+    Header,
 };
 
 use anyhow::{bail, Result};
@@ -51,12 +51,12 @@ use std::{
 ///
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct BlockLocators<N: Network> {
-    block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)>,
+    block_locators: BTreeMap<u32, (N::BlockHash, Option<Header<N>>)>,
 }
 
 impl<N: Network> BlockLocators<N> {
     #[inline]
-    pub fn from(block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)>) -> Result<Self> {
+    pub fn from(block_locators: BTreeMap<u32, (N::BlockHash, Option<Header<N>>)>) -> Result<Self> {
         // Check that the number of block_locators is greater than 0 and less than the MAXIMUM_BLOCK_LOCATORS.
         let num_locators = block_locators.len();
         match num_locators > 0 && num_locators <= MAXIMUM_BLOCK_LOCATORS as usize {
@@ -119,7 +119,7 @@ impl<N: Network> FromBytes for BlockLocators<N> {
 
             if header_exists {
                 // TODO (raychu86): Reintroduce formal block header size.
-                // let mut buffer = vec![0u8; BlockHeader::<N>::size_in_bytes()];
+                // let mut buffer = vec![0u8; Header::<N>::size_in_bytes()];
                 let mut buffer = vec![0u8; 102];
                 reader.read_exact(&mut buffer)?;
                 block_headers_bytes.push((height, hash, Some(buffer)));
@@ -130,7 +130,7 @@ impl<N: Network> FromBytes for BlockLocators<N> {
 
         let block_locators = block_headers_bytes
             .into_par_iter()
-            .map(|(height, hash, bytes)| (height, (hash, bytes.map(|bytes| BlockHeader::<N>::read_le(&bytes[..]).unwrap()))))
+            .map(|(height, hash, bytes)| (height, (hash, bytes.map(|bytes| Header::<N>::read_le(&bytes[..]).unwrap()))))
             .collect::<BTreeMap<_, (_, _)>>();
 
         Self::from(block_locators).map_err(|error| Error::new(ErrorKind::Other, error))
@@ -189,7 +189,7 @@ impl<'de, N: Network> Deserialize<'de> for BlockLocators<N> {
         match deserializer.is_human_readable() {
             true => {
                 let block_locators = serde_json::Value::deserialize(deserializer)?;
-                let block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> =
+                let block_locators: BTreeMap<u32, (N::BlockHash, Option<Header<N>>)> =
                     serde_json::from_value(block_locators["block_locators"].clone()).map_err(de::Error::custom)?;
                 Self::from(block_locators).map_err(de::Error::custom)
             }
@@ -202,7 +202,7 @@ impl<N: Network> Default for BlockLocators<N> {
     #[inline]
     fn default() -> Self {
         // Initialize the list of block locators.
-        let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> = Default::default();
+        let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<Header<N>>)> = Default::default();
         // Add the genesis locator.
         // TODO (raychu86): Insert the genesis block hash.
         block_locators.insert(0, (N::BlockHash::default(), None));
@@ -213,7 +213,7 @@ impl<N: Network> Default for BlockLocators<N> {
 }
 
 impl<N: Network> Deref for BlockLocators<N> {
-    type Target = BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)>;
+    type Target = BTreeMap<u32, (N::BlockHash, Option<Header<N>>)>;
 
     fn deref(&self) -> &Self::Target {
         &self.block_locators

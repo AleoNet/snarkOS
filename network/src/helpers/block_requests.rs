@@ -66,7 +66,7 @@ pub fn find_maximal_peer<N: Network, E: Environment>(
 
 /// Returns the common ancestor and the first deviating locator (if it exists),
 /// given the block locators of a peer. If the peer has invalid block locators, returns an error.
-pub fn find_common_ancestor<N: Network, SA: StorageAccess, A: Aleo<Network = N, BaseField = N::Field>>(
+pub fn find_common_ancestor<N: Network, SA: StorageAccess>(
     canon: &LedgerState<N, SA, A>,
     block_locators: &BlockLocators<N>,
 ) -> Result<(u32, Option<u32>), String> {

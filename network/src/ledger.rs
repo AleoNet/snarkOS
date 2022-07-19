@@ -28,7 +28,7 @@ use snarkos_storage::{
     storage::{rocksdb::RocksDB, ReadOnly, ReadWrite},
     LedgerState,
 };
-use snarkvm::{circuit::Aleo, prelude::*, Block};
+use snarkvm::{prelude::*, Block};
 
 #[cfg(any(feature = "test", feature = "prometheus"))]
 use snarkos_metrics as metrics;
@@ -47,7 +47,7 @@ use tokio::sync::{mpsc, Mutex, RwLock};
 /// The maximum number of unconfirmed blocks that can be held by the ledger.
 const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 250;
 
-pub type LedgerReader<N, A> = std::sync::Arc<snarkos_storage::LedgerState<N, ReadOnly, A>>;
+pub type LedgerReader<N> = std::sync::Arc<snarkos_storage::LedgerState<N, ReadOnly>>;
 
 /// Shorthand for the parent half of the `Ledger` message channel.
 pub type LedgerRouter<N> = mpsc::Sender<LedgerRequest<N>>;
@@ -79,13 +79,13 @@ pub type PeersState<N> = HashMap<SocketAddr, Option<(NodeType, Status, Option<bo
 /// A ledger for a specific network on the node server.
 ///
 #[allow(clippy::type_complexity)]
-pub struct Ledger<N: Network, E: Environment, A: Aleo<Network = N, BaseField = N::Field>> {
+pub struct Ledger<N: Network, E: Environment> {
     /// The ledger router of the node.
     ledger_router: LedgerRouter<N>,
     /// The canonical chain of blocks.
-    canon: LedgerState<N, ReadWrite, A>,
+    canon: LedgerState<N, ReadWrite>,
     /// The canonical chain of blocks in read-only mode.
-    canon_reader: LedgerReader<N, A>,
+    canon_reader: LedgerReader<N>,
     /// A lock to ensure methods that need to be mutually-exclusive are enforced.
     /// In this context, `add_block`, and `revert_to_block_height` must be mutually-exclusive.
     canon_lock: Mutex<()>,
@@ -106,7 +106,7 @@ pub struct Ledger<N: Network, E: Environment, A: Aleo<Network = N, BaseField = N
     state: Arc<State<N, E>>,
 }
 
-impl<N: Network, E: Environment, A: Aleo<Network = N, BaseField = N::Field>> Ledger<N, E, A> {
+impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger, paired with its handler.
     pub async fn open<P: AsRef<Path> + Copy>(path: P, state: Arc<State<N, E>>) -> Result<(Self, mpsc::Receiver<LedgerRequest<N>>)> {
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
@@ -136,7 +136,7 @@ impl<N: Network, E: Environment, A: Aleo<Network = N, BaseField = N::Field>> Led
     }
 
     /// Returns an instance of the ledger reader.
-    pub fn reader(&self) -> &LedgerReader<N, A> {
+    pub fn reader(&self) -> &LedgerReader<N> {
         &self.canon_reader
     }
 

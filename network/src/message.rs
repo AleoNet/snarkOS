@@ -21,7 +21,7 @@ use snarkos_environment::{
 use snarkvm::{
     prelude::Network,
     utilities::{to_bytes_le, ToBytes},
-    {Block, BlockHeader, Transaction},
+    {Block, Header, Transaction},
 };
 
 use ::bytes::{Buf, BufMut, Bytes, BytesMut};
@@ -119,7 +119,7 @@ pub enum Message<N: Network> {
     /// ChallengeRequest := (version, fork_depth, node_type, status, listener_port)
     ChallengeRequest(u32, u32, NodeType, Status, u16),
     /// ChallengeResponse := (block_header)
-    ChallengeResponse(Data<BlockHeader<N>>),
+    ChallengeResponse(Data<Header<N>>),
     /// Disconnect := ()
     Disconnect(DisconnectReason),
     /// PeerRequest := ()

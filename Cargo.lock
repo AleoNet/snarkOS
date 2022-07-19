@@ -375,6 +375,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "chunked_transfer"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fff857943da45f546682664a79488be82e69e43c1a7a2307679ab9afb3a66d2e"
+
+[[package]]
 name = "ci_info"
 version = "0.10.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1248,6 +1254,8 @@ checksum = "e6012d540c5baa3589337a98ce73408de9b5a25ec9fc2c6fd6be8f0d39e0ca5a"
 dependencies = [
  "autocfg",
  "hashbrown 0.11.2",
+ "rayon",
+ "serde",
 ]
 
 [[package]]
@@ -2688,6 +2696,7 @@ dependencies = [
  "circular-queue",
  "criterion",
  "itertools",
+ "once_cell",
  "parking_lot 0.12.1",
  "rand",
  "rand_xorshift",
@@ -2712,6 +2721,8 @@ dependencies = [
  "clap 3.1.18",
  "colored",
  "indexmap",
+ "once_cell",
+ "parking_lot 0.12.1",
  "rand",
  "rayon",
  "self_update",
@@ -2724,6 +2735,7 @@ dependencies = [
  "snarkvm-utilities",
  "thiserror",
  "tracing",
+ "ureq",
  "walkdir",
 ]
 
@@ -2950,6 +2962,7 @@ dependencies = [
  "snarkvm-console",
  "snarkvm-curves",
  "snarkvm-fields",
+ "snarkvm-parameters",
  "snarkvm-utilities",
  "tracing",
 ]
@@ -3040,6 +3053,7 @@ dependencies = [
  "num-derive",
  "num-traits",
  "once_cell",
+ "serde_json",
  "snarkvm-console-account",
  "snarkvm-console-network",
  "snarkvm-console-types",
@@ -3644,6 +3658,25 @@ name = "untrusted"
 version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a156c684c91ea7d62626509bce3cb4e1d9ed5c4d978f7b4352658f96a4c26b4a"
+
+[[package]]
+name = "ureq"
+version = "2.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b97acb4c28a254fd7a4aeec976c46a7fa404eac4d7c134b30c75144846d7cb8f"
+dependencies = [
+ "base64",
+ "chunked_transfer",
+ "flate2",
+ "log",
+ "once_cell",
+ "rustls",
+ "serde",
+ "serde_json",
+ "url",
+ "webpki",
+ "webpki-roots",
+]
 
 [[package]]
 name = "url"
