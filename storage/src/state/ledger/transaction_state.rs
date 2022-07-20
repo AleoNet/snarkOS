@@ -19,8 +19,11 @@ use crate::{
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
 use snarkvm::{
-    compiler::{Execution, Transition},
-    console::types::field::{Field, Zero},
+    compiler::{Deployment, Execution, Transition},
+    console::{
+        program::ProgramID,
+        types::field::{Field, Zero},
+    },
     prelude::*,
     Transaction,
 };
@@ -31,15 +34,18 @@ use anyhow::{anyhow, Result};
 #[allow(clippy::type_complexity)]
 pub(crate) struct TransactionState<N: Network, SA: StorageAccess> {
     // TODO (raychu86): Add support for deploy transactions.
-    /// Map of transaction_id to (ledger_root, transition ids, metadata)
-    transactions: DataMap<N::TransactionID, (Field<N>, Vec<N::TransitionID>, Metadata<N>), SA>,
+    /// Map of transaction_id to (ledger_root, transition ids, edition, metadata)
+    transactions: DataMap<N::TransactionID, (Field<N>, Vec<N::TransitionID>, u16, Metadata<N>), SA>,
     /// Map of transition_id to (transaction_id, index, transition)
-    transitions: DataMap<Field<N>, (N::TransactionID, u8, Transition<N>), SA>,
+    transitions: DataMap<N::TransitionID, (N::TransactionID, u8, Transition<N>), SA>,
     /// Map of serial_number to transition_id
     serial_numbers: DataMap<Field<N>, N::TransitionID, SA>,
     /// Map of commitment to transition_id
     commitments: DataMap<Field<N>, N::TransitionID, SA>,
-    // deployments: DataMap<N::TransactionID, Deployment<N>, SA>,
+    /// Map of the transaction_id to (program_id, edition, metadata)
+    deployments: DataMap<N::TransactionID, (ProgramID<N>, u16, Metadata<N>), SA>,
+    /// Map of the program id to the deployed programs.
+    programs: DataMap<ProgramID<N>, Deployment<N>, SA>,
 }
 
 impl<N: Network, SA: StorageAccess> TransactionState<N, SA> {
@@ -50,12 +56,14 @@ impl<N: Network, SA: StorageAccess> TransactionState<N, SA> {
             transitions: storage.open_map(DataID::Transitions)?,
             serial_numbers: storage.open_map(DataID::SerialNumbers)?,
             commitments: storage.open_map(DataID::Commitments)?,
+            deployments: storage.open_map(DataID::Deployments)?,
+            programs: storage.open_map(DataID::Programs)?,
         })
     }
 
     /// Returns `true` if the given transaction ID exists in storage.
     pub(crate) fn contains_transaction(&self, transaction_id: &N::TransactionID) -> Result<bool> {
-        self.transactions.contains_key(transaction_id)
+        Ok(self.transactions.contains_key(transaction_id)? || self.deployments.contains_key(transaction_id)?)
     }
 
     /// Returns `true` if the given serial number exists in storage.
@@ -102,30 +110,38 @@ impl<N: Network, SA: StorageAccess> TransactionState<N, SA> {
 
     /// Returns the transaction for a given transaction ID.
     pub(crate) fn get_transaction(&self, transaction_id: &N::TransactionID) -> Result<Transaction<N>> {
-        // Retrieve the transition IDs.
-        let (_ledger_root, transition_ids) = match self.transactions.get(transaction_id)? {
-            Some((ledger_root, transition_ids, _)) => (ledger_root, transition_ids),
-            None => return Err(anyhow!("Transaction {} does not exist in storage", transaction_id)),
-        };
+        if let Some((_ledger_root, transition_ids, _, _)) = self.transactions.get(transaction_id)? {
+            // Retrieve the transitions.
+            let mut execution = Execution::new();
+            for transition_id in transition_ids.iter() {
+                match self.transitions.get(transition_id)? {
+                    Some((_, _, transition)) => execution.push(transition),
+                    None => return Err(anyhow!("Transition {} missing in storage", transition_id)),
+                };
+            }
 
-        // Retrieve the transitions.
-        let mut execution = Execution::new();
-        for transition_id in transition_ids.iter() {
-            match self.transitions.get(transition_id)? {
-                Some((_, _, transition)) => execution.push(transition),
-                None => return Err(anyhow!("Transition {} missing in storage", transition_id)),
+            Transaction::execute(execution)
+        } else if let Some((program_id, edition, _)) = self.deployments.get(transaction_id)? {
+            // Retrieve the program
+            let program = match self.programs.get(&program_id)? {
+                Some(program) => program,
+                None => return Err(anyhow!("Program {} missing in storage", program_id)),
             };
-        }
 
-        Transaction::execute(execution)
+            Transaction::deploy(program)
+        } else {
+            Err(anyhow!("Transaction {} does not exist in storage", transaction_id))
+        }
     }
 
     /// Returns the transaction metadata for a given transaction ID.
     pub(crate) fn get_transaction_metadata(&self, transaction_id: &N::TransactionID) -> Result<Metadata<N>> {
-        // Retrieve the metadata from the transactions map.
-        match self.transactions.get(transaction_id)? {
-            Some((_, _, metadata)) => Ok(metadata),
-            None => Err(anyhow!("Transaction {} does not exist in storage", transaction_id)),
+        if let Some((_, _, _, metadata)) = self.transactions.get(transaction_id)? {
+            Ok(metadata)
+        } else if let Some((_, _, metadata)) = self.deployments.get(transaction_id)? {
+            Ok(metadata)
+        } else {
+            Err(anyhow!("Transaction {} does not exist in storage", transaction_id))
         }
     }
 }
@@ -133,38 +149,47 @@ impl<N: Network, SA: StorageAccess> TransactionState<N, SA> {
 impl<N: Network, SA: StorageReadWrite> TransactionState<N, SA> {
     /// Adds the given transaction to storage.
     pub(crate) fn add_transaction(&self, transaction: &Transaction<N>, metadata: Metadata<N>, batch: Option<usize>) -> Result<()> {
-        // TODO (raychu86): Add support for deploy transactions.
-        let (transaction_id, transitions) = match transaction {
-            Transaction::Deploy(_transaction_id, _) => unimplemented!(),
-            Transaction::Execute(transaction_id, transitions) => (transaction_id, transitions),
-        };
+        let transaction_id = transaction.id();
 
         if self.transactions.contains_key(&transaction_id)? {
             Err(anyhow!("Transaction {} already exists in storage", transaction_id))
         } else {
-            let transition_ids = transitions.iter().map(|transition| transition.id()).cloned().collect::<Vec<_>>();
-
-            // TODO (raychu86) Use a real ledger root.
-            let ledger_root = Field::<N>::zero();
-
-            // Insert the transaction ID.
-            self.transactions
-                .insert(&transaction_id, &(ledger_root, transition_ids, metadata), batch)?;
-
-            for (i, transition) in transitions.iter().enumerate() {
-                let transition_id = transition.id();
-
-                // Insert the transition.
-                self.transitions
-                    .insert(&transition_id, &(*transaction_id, i as u8, transition.clone()), batch)?;
-
-                // Insert the serial numbers.
-                for serial_number in transition.serial_numbers() {
-                    self.serial_numbers.insert(serial_number, &transition_id, batch)?;
+            match transaction {
+                Transaction::Deploy(_, deployment) => {
+                    let program_id = deployment.program().id();
+                    self.deployments
+                        .insert(&transaction_id, &(*program_id, deployment.edition(), metadata), batch)?;
+                    self.programs.insert(program_id, deployment, batch)?;
                 }
-                // Insert the commitments.
-                for commitment in transition.commitments() {
-                    self.commitments.insert(commitment, &transition_id, batch)?;
+                Transaction::Execute(_, execution) => {
+                    let transition_ids = execution.iter().map(|transition| transition.id()).cloned().collect::<Vec<_>>();
+
+                    // TODO (raychu86) Use a real ledger root.
+                    let ledger_root = Field::<N>::zero();
+
+                    // Insert the transaction ID.
+                    self.transactions.insert(
+                        &transaction_id,
+                        &(ledger_root, transition_ids, execution.edition(), metadata),
+                        batch,
+                    )?;
+
+                    for (i, transition) in execution.iter().enumerate() {
+                        let transition_id = transition.id();
+
+                        // Insert the transition.
+                        self.transitions
+                            .insert(&transition_id, &(transaction_id, i as u8, transition.clone()), batch)?;
+
+                        // Insert the serial numbers.
+                        for serial_number in transition.serial_numbers() {
+                            self.serial_numbers.insert(serial_number, &transition_id, batch)?;
+                        }
+                        // Insert the commitments.
+                        for commitment in transition.commitments() {
+                            self.commitments.insert(commitment, &transition_id, batch)?;
+                        }
+                    }
                 }
             }
             Ok(())
@@ -173,34 +198,41 @@ impl<N: Network, SA: StorageReadWrite> TransactionState<N, SA> {
 
     /// Removes the given transaction ID from storage.
     pub(crate) fn remove_transaction(&self, transaction_id: &N::TransactionID, batch: Option<usize>) -> Result<()> {
-        // Retrieve the transition IDs from the transaction.
-        let transition_ids = match self.transactions.get(transaction_id)? {
-            Some((_, transition_ids, _)) => transition_ids,
-            None => return Err(anyhow!("Transaction {} does not exist in storage", transaction_id)),
-        };
+        // Remove an execute transaction.
+        if let Some((_, transition_ids, _, _)) = self.transactions.get(transaction_id)? {
+            // Remove the transaction entry.
+            self.transactions.remove(transaction_id, batch)?;
 
-        // Remove the transaction entry.
-        self.transactions.remove(transaction_id, batch)?;
+            for transition_id in transition_ids.iter() {
+                // Retrieve the transition from the transition ID.
+                let transition = match self.transitions.get(transition_id)? {
+                    Some((_, _, transition)) => transition,
+                    None => return Err(anyhow!("Transition {} missing from transitions map", transition_id)),
+                };
 
-        for (_, transition_id) in transition_ids.iter().enumerate() {
-            // Retrieve the transition from the transition ID.
-            let transition = match self.transitions.get(transition_id)? {
-                Some((_, _, transition)) => transition,
-                None => return Err(anyhow!("Transition {} missing from transitions map", transition_id)),
-            };
+                // Remove the transition.
+                self.transitions.remove(transition_id, batch)?;
 
-            // Remove the transition.
-            self.transitions.remove(transition_id, batch)?;
-
-            // Remove the serial numbers.
-            for serial_number in transition.serial_numbers() {
-                self.serial_numbers.remove(serial_number, batch)?;
+                // Remove the serial numbers.
+                for serial_number in transition.serial_numbers() {
+                    self.serial_numbers.remove(serial_number, batch)?;
+                }
+                // Remove the commitments.
+                for commitment in transition.commitments() {
+                    self.commitments.remove(commitment, batch)?;
+                }
             }
-            // Remove the commitments.
-            for commitment in transition.commitments() {
-                self.commitments.remove(commitment, batch)?;
-            }
+        // Remove a deployment transaction
+        } else if let Some((program_id, _, _)) = self.deployments.get(transaction_id)? {
+            // Remove the deployment entry.
+            self.deployments.remove(transaction_id, batch)?;
+
+            // Remove the program.
+            self.programs.remove(&program_id, batch)?;
+        } else {
+            return Err(anyhow!("Transaction {} does not exist in storage", transaction_id));
         }
+
         Ok(())
     }
 }
@@ -212,7 +244,8 @@ mod tests {
         state::ledger::test_helpers::{sample_genesis_block, CurrentNetwork},
         storage::{
             rocksdb::{tests::temp_dir, RocksDB},
-            ReadWrite, Storage,
+            ReadWrite,
+            Storage,
         },
     };
 
@@ -273,7 +306,6 @@ mod tests {
         let transaction_state = TransactionState::<CurrentNetwork, ReadWrite>::open(storage).expect("Failed to open transaction state");
 
         let transaction = (*sample_genesis_block().transactions())[0].clone();
-
         let transaction_id = transaction.id();
 
         // Insert the transaction

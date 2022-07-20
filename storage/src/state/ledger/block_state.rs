@@ -18,13 +18,7 @@ use crate::{
     state::ledger::{transaction_state::TransactionState, Metadata},
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
-use snarkvm::{
-    circuit::Aleo,
-    compiler::Transition,
-    console::types::field::Field,
-    prelude::*,
-    {Block, Header, Transaction, Transactions},
-};
+use snarkvm::{circuit::Aleo, compiler::Transition, console::types::field::Field, prelude::*, Block, Header, Transaction, Transactions};
 
 use anyhow::{anyhow, Result};
 use rayon::prelude::*;
@@ -304,7 +298,8 @@ mod tests {
         state::ledger::test_helpers::{sample_genesis_block, CurrentNetwork},
         storage::{
             rocksdb::{tests::temp_dir, RocksDB},
-            ReadWrite, Storage,
+            ReadWrite,
+            Storage,
         },
     };
 
@@ -329,8 +324,8 @@ mod tests {
         assert!(block_state.contains_block_height(block.header().height()).unwrap());
 
         // Check that each transaction is accounted for.
-        for transaction in (*block.transactions()).iter() {
-            assert!(block_state.contains_transaction(&transaction.id()).unwrap());
+        for (transaction_id, _transaction) in (*block.transactions()).iter() {
+            assert!(block_state.contains_transaction(&transaction_id).unwrap());
         }
 
         // Check that each commitment is accounted for.

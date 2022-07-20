@@ -34,6 +34,8 @@ pub enum DataID {
     SerialNumbers,
     Transactions,
     Transitions,
+    Deployments,
+    Programs,
     Shares,
     #[cfg(test)]
     Test,
@@ -52,7 +54,9 @@ impl From<u16> for DataID {
             6 => Self::SerialNumbers,
             7 => Self::Transactions,
             8 => Self::Transitions,
-            9 => Self::Shares,
+            9 => Self::Deployments,
+            10 => Self::Programs,
+            11 => Self::Shares,
             x => panic!("Unexpected map id: {}", x),
         }
     }

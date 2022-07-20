@@ -51,7 +51,8 @@ pub(crate) mod test_helpers {
     use snarkvm::{
         console::{account::PrivateKey, network::Testnet3},
         utilities::test_crypto_rng_fixed,
-        Block, VM,
+        Block,
+        VM,
     };
 
     use once_cell::sync::OnceCell;
