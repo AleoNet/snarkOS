@@ -25,7 +25,7 @@ test = []
 version = "0.19"
 
 [dependencies.metrics-util]
-version = "0.13"
+version = "0.14"
 
 [dependencies.metrics-exporter-prometheus]
 version = "0.10"
