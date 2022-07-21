@@ -25,7 +25,7 @@ use snarkvm::{
     console::types::Field,
     prelude::{Address, Network},
     utilities::{FromBytes, ToBytes},
-    {Block, BlockHeader, Transaction, Transactions},
+    Block, Header, Transaction, Transactions,
 };
 
 use serde_json::Value;
@@ -35,73 +35,73 @@ use std::{cmp::max, net::SocketAddr};
 
 #[async_trait::async_trait]
 impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
-    // /// Returns the latest block from the canonical chain.
-    // async fn latest_block(&self) -> Result<Block<N>, RpcError> {
-    //     Ok(self.ledger().latest_block())
-    // }
-    //
-    // /// Returns the latest block height from the canonical chain.
-    // async fn latest_block_height(&self) -> Result<u32, RpcError> {
-    //     Ok(self.ledger().latest_block_height())
-    // }
-    //
+    /// Returns the latest block from the canonical chain.
+    async fn latest_block(&self) -> Result<Block<N>, RpcError> {
+        Ok(self.ledger().latest_block())
+    }
+
+    /// Returns the latest block height from the canonical chain.
+    async fn latest_block_height(&self) -> Result<u32, RpcError> {
+        Ok(self.ledger().latest_block_height())
+    }
+
     // /// Returns the latest cumulative weight from the canonical chain.
     // async fn latest_cumulative_weight(&self) -> Result<u128, RpcError> {
     //     Ok(self.ledger().latest_cumulative_weight())
     // }
-    //
-    // /// Returns the latest block hash from the canonical chain.
-    // async fn latest_block_hash(&self) -> Result<N::BlockHash, RpcError> {
-    //     Ok(self.ledger().latest_block_hash())
-    // }
-    //
-    // /// Returns the latest block header from the canonical chain.
-    // async fn latest_block_header(&self) -> Result<BlockHeader<N>, RpcError> {
-    //     Ok(self.ledger().latest_block_header())
-    // }
-    //
-    // /// Returns the latest block transactions from the canonical chain.
-    // async fn latest_block_transactions(&self) -> Result<Transactions<N>, RpcError> {
-    //     Ok(self.ledger().latest_block_transactions())
-    // }
-    //
+
+    /// Returns the latest block hash from the canonical chain.
+    async fn latest_block_hash(&self) -> Result<N::BlockHash, RpcError> {
+        Ok(self.ledger().latest_block_hash())
+    }
+
+    /// Returns the latest block header from the canonical chain.
+    async fn latest_block_header(&self) -> Result<Header<N>, RpcError> {
+        Ok(self.ledger().latest_block_header())
+    }
+
+    /// Returns the latest block transactions from the canonical chain.
+    async fn latest_block_transactions(&self) -> Result<Transactions<N>, RpcError> {
+        Ok(self.ledger().latest_block_transactions())
+    }
+
     // /// Returns the latest ledger root from the canonical chain.
     // async fn latest_ledger_root(&self) -> Result<N::LedgerRoot, RpcError> {
     //     Ok(self.ledger().latest_ledger_root())
     // }
-    //
-    // /// Returns the block given the block height.
-    // async fn get_block(&self, block_height: u32) -> Result<Block<N>, RpcError> {
-    //     Ok(self.ledger().get_block(block_height)?)
-    // }
-    //
-    // /// Returns up to `MAXIMUM_BLOCK_REQUEST` blocks from the given `start_block_height` to `end_block_height` (inclusive).
-    // async fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>, RpcError> {
-    //     let safe_start_height = max(start_block_height, end_block_height.saturating_sub(E::MAXIMUM_BLOCK_REQUEST - 1));
-    //     Ok(self.ledger().get_blocks(safe_start_height, end_block_height)?)
-    // }
-    //
-    // /// Returns the block height for the given the block hash.
-    // async fn get_block_height(&self, block_hash: N::BlockHash) -> Result<u32, RpcError> {
-    //     Ok(self.ledger().get_block_height(&block_hash)?)
-    // }
-    //
-    // /// Returns the block hash for the given block height, if it exists in the canonical chain.
-    // async fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash, RpcError> {
-    //     Ok(self.ledger().get_block_hash(block_height)?)
-    // }
-    //
-    // /// Returns up to `MAXIMUM_BLOCK_REQUEST` block hashes from the given `start_block_height` to `end_block_height` (inclusive).
-    // async fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>, RpcError> {
-    //     let safe_start_height = max(start_block_height, end_block_height.saturating_sub(E::MAXIMUM_BLOCK_REQUEST - 1));
-    //     Ok(self.ledger().get_block_hashes(safe_start_height, end_block_height)?)
-    // }
-    //
-    // /// Returns the block header for the given the block height.
-    // async fn get_block_header(&self, block_height: u32) -> Result<BlockHeader<N>, RpcError> {
-    //     Ok(self.ledger().get_block_header(block_height)?)
-    // }
-    //
+
+    /// Returns the block given the block height.
+    async fn get_block(&self, block_height: u32) -> Result<Block<N>, RpcError> {
+        Ok(self.ledger().get_block(block_height)?)
+    }
+
+    /// Returns up to `MAXIMUM_BLOCK_REQUEST` blocks from the given `start_block_height` to `end_block_height` (inclusive).
+    async fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>, RpcError> {
+        let safe_start_height = max(start_block_height, end_block_height.saturating_sub(E::MAXIMUM_BLOCK_REQUEST - 1));
+        Ok(self.ledger().get_blocks(safe_start_height, end_block_height)?)
+    }
+
+    /// Returns the block height for the given the block hash.
+    async fn get_block_height(&self, block_hash: N::BlockHash) -> Result<u32, RpcError> {
+        Ok(self.ledger().get_block_height(&block_hash)?)
+    }
+
+    /// Returns the block hash for the given block height, if it exists in the canonical chain.
+    async fn get_block_hash(&self, block_height: u32) -> Result<N::BlockHash, RpcError> {
+        Ok(self.ledger().get_block_hash(block_height)?)
+    }
+
+    /// Returns up to `MAXIMUM_BLOCK_REQUEST` block hashes from the given `start_block_height` to `end_block_height` (inclusive).
+    async fn get_block_hashes(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<N::BlockHash>, RpcError> {
+        let safe_start_height = max(start_block_height, end_block_height.saturating_sub(E::MAXIMUM_BLOCK_REQUEST - 1));
+        Ok(self.ledger().get_block_hashes(safe_start_height, end_block_height)?)
+    }
+
+    /// Returns the block header for the given the block height.
+    async fn get_block_header(&self, block_height: u32) -> Result<Header<N>, RpcError> {
+        Ok(self.ledger().get_block_header(block_height)?)
+    }
+
     // /// Returns the block template for the next mined block
     // async fn get_block_template(&self) -> Result<Value, RpcError> {
     //     // Fetch the latest state from the ledger.
@@ -179,12 +179,12 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
     //         "coinbase_reward": coinbase_reward,
     //     }))
     // }
-    //
-    // /// Returns the transactions from the block of the given block height.
-    // async fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>, RpcError> {
-    //     Ok(self.ledger().get_block_transactions(block_height)?)
-    // }
-    //
+
+    /// Returns the transactions from the block of the given block height.
+    async fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>, RpcError> {
+        Ok(self.ledger().get_block_transactions(block_height)?)
+    }
+
     // /// Returns the ciphertext given the commitment.
     // async fn get_ciphertext(&self, commitment: Field<N>) -> Result<N::RecordCiphertext, RpcError> {
     //     Ok(self.ledger().get_ciphertext(&commitment)?)
@@ -200,54 +200,56 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
     // async fn get_memory_pool(&self) -> Result<Vec<Transaction<N>>, RpcError> {
     //     Ok(self.state.prover().memory_pool().read().await.transactions())
     // }
-    //
-    // /// Returns a transaction with metadata and decrypted records given the transaction ID.
-    // async fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Value, RpcError> {
-    //     let transaction: Transaction<N> = self.ledger().get_transaction(&transaction_id)?;
-    //     let metadata = self.ledger().get_transaction_metadata(&transaction_id)?;
-    //     let decrypted_records: Vec<Record<N>> = transaction.to_records().collect();
-    //     Ok(serde_json::json!({ "transaction": transaction, "metadata": metadata, "decrypted_records": decrypted_records }))
-    // }
 
-    // /// Returns a transition given the transition ID.
-    // async fn get_transition(&self, transition_id: Field<N>) -> Result<Transition<N>, RpcError> {
-    //     Ok(self.ledger().get_transition(&transition_id)?)
-    // }
+    /// Returns a transaction with metadata and decrypted records given the transaction ID.
+    async fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Value, RpcError> {
+        let transaction: Transaction<N> = self.ledger().get_transaction(&transaction_id)?;
+        let metadata = self.ledger().get_transaction_metadata(&transaction_id)?;
+        Ok(serde_json::json!({ "transaction": transaction, "metadata": metadata }))
+
+        // let decrypted_records: Vec<Record<N>> = transaction.to_records().collect();
+        // Ok(serde_json::json!({ "transaction": transaction, "metadata": metadata, "decrypted_records": decrypted_records }))
+    }
+
+    /// Returns a transition given the transition ID.
+    async fn get_transition(&self, transition_id: Field<N>) -> Result<Transition<N>, RpcError> {
+        Ok(self.ledger().get_transition(&transition_id)?)
+    }
 
     /// Returns the peers currently connected to this node.
     async fn get_connected_peers(&self) -> Result<Vec<SocketAddr>, RpcError> {
         Ok(self.state.peers().connected_peers().await)
     }
 
-    // /// Returns the current state of this node.
-    // async fn get_node_state(&self) -> Result<Value, RpcError> {
-    //     let candidate_peers = self.state.peers().candidate_peers().await;
-    //     let connected_peers = self.state.peers().connected_peers().await;
-    //     let number_of_candidate_peers = candidate_peers.len();
-    //     let number_of_connected_peers = connected_peers.len();
-    //     let number_of_connected_beacon_nodes = self.state.peers().number_of_connected_beacon_nodes().await;
-    //
-    //     let latest_block_hash = self.ledger().latest_block_hash();
-    //     let latest_block_height = self.ledger().latest_block_height();
-    //     // let latest_cumulative_weight = self.ledger().latest_cumulative_weight();
-    //
-    //     Ok(serde_json::json!({
-    //         "address": self.address,
-    //         "candidate_peers": candidate_peers,
-    //         "connected_peers": connected_peers,
-    //         "latest_block_hash": latest_block_hash,
-    //         "latest_block_height": latest_block_height,
-    //         // "latest_cumulative_weight": latest_cumulative_weight,
-    //         "launched": format!("{} minutes ago", self.launched.elapsed().as_secs() / 60),
-    //         "number_of_candidate_peers": number_of_candidate_peers,
-    //         "number_of_connected_peers": number_of_connected_peers,
-    //         "number_of_connected_beacon_nodes": number_of_connected_beacon_nodes,
-    //         "software": format!("snarkOS {}", env!("CARGO_PKG_VERSION")),
-    //         "status": E::status().to_string(),
-    //         "type": E::NODE_TYPE,
-    //         "version": E::MESSAGE_VERSION,
-    //     }))
-    // }
+    /// Returns the current state of this node.
+    async fn get_node_state(&self) -> Result<Value, RpcError> {
+        let candidate_peers = self.state.peers().candidate_peers().await;
+        let connected_peers = self.state.peers().connected_peers().await;
+        let number_of_candidate_peers = candidate_peers.len();
+        let number_of_connected_peers = connected_peers.len();
+        let number_of_connected_beacon_nodes = self.state.peers().number_of_connected_beacon_nodes().await;
+
+        let latest_block_hash = self.ledger().latest_block_hash();
+        let latest_block_height = self.ledger().latest_block_height();
+        // let latest_cumulative_weight = self.ledger().latest_cumulative_weight();
+
+        Ok(serde_json::json!({
+            "address": self.address,
+            "candidate_peers": candidate_peers,
+            "connected_peers": connected_peers,
+            "latest_block_hash": latest_block_hash,
+            "latest_block_height": latest_block_height,
+            // "latest_cumulative_weight": latest_cumulative_weight,
+            "launched": format!("{} minutes ago", self.launched.elapsed().as_secs() / 60),
+            "number_of_candidate_peers": number_of_candidate_peers,
+            "number_of_connected_peers": number_of_connected_peers,
+            "number_of_connected_beacon_nodes": number_of_connected_beacon_nodes,
+            "software": format!("snarkOS {}", env!("CARGO_PKG_VERSION")),
+            "status": E::status().to_string(),
+            "type": E::NODE_TYPE,
+            "version": E::MESSAGE_VERSION,
+        }))
+    }
     //
     // /// Returns the transaction ID. If the given transaction is valid, it is added to the memory pool and propagated to all peers.
     // async fn send_transaction(&self, transaction_hex: String) -> Result<N::TransactionID, RpcError> {

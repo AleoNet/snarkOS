@@ -73,10 +73,8 @@ impl<N: Network, E: Environment> RpcContext<N, E> {
         }))
     }
 
-    // TODO (raychu86): Integrate the ledger reader.
-    pub(crate) fn ledger<A: snarkvm::circuit::Aleo<Network = N, BaseField = N::Field>>(&self) -> &LedgerReader<N, A> {
-        unimplemented!()
-        // self.state.ledger().reader()
+    pub(crate) fn ledger(&self) -> &LedgerReader<N> {
+        self.state.ledger().reader()
     }
 }
 

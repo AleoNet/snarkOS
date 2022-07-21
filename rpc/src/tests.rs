@@ -21,12 +21,16 @@ use snarkos_storage::{
     storage::{rocksdb::RocksDB, ReadWrite, Storage},
     LedgerState,
 };
-use snarkvm::dpc::Record;
 use snarkvm::{
     compiler::Transition,
+    dpc::Record,
     prelude::{Address, Network},
     utilities::ToBytes,
-    {Account, Block, BlockHeader, Transaction, Transactions},
+    Account,
+    Block,
+    BlockHeader,
+    Transaction,
+    Transactions,
 };
 
 use jsonrpsee::{
@@ -414,12 +418,14 @@ async fn test_get_ciphertext() {
         rpc_client.request("getciphertext", params).await.expect("Invalid response");
 
     // Check the ciphertext.
-    assert!(CurrentNetwork::genesis_block()
-        .transactions()
-        .first()
-        .unwrap()
-        .ciphertexts()
-        .any(|expected| response == *expected));
+    assert!(
+        CurrentNetwork::genesis_block()
+            .transactions()
+            .first()
+            .unwrap()
+            .ciphertexts()
+            .any(|expected| response == *expected)
+    );
 }
 
 #[tokio::test]
@@ -565,13 +571,15 @@ async fn test_get_transition() {
     let response: Transition<CurrentNetwork> = rpc_client.request("gettransition", params).await.expect("Invalid response");
 
     // Check the transition.
-    assert!(CurrentNetwork::genesis_block()
-        .transactions()
-        .first()
-        .unwrap()
-        .transitions()
-        .iter()
-        .any(|expected| response == *expected));
+    assert!(
+        CurrentNetwork::genesis_block()
+            .transactions()
+            .first()
+            .unwrap()
+            .transitions()
+            .iter()
+            .any(|expected| response == *expected)
+    );
 }
 
 #[tokio::test]
