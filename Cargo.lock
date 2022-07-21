@@ -2615,10 +2615,12 @@ dependencies = [
 name = "snarkos-environment"
 version = "2.0.2"
 dependencies = [
+ "anyhow",
  "num_cpus",
  "once_cell",
  "rayon",
  "serde",
+ "serde_json",
  "snarkvm",
  "tokio",
  "tracing",
