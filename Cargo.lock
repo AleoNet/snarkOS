@@ -1523,6 +1523,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "metrics"
+version = "0.20.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "94a70dc6c8179c4e889928dffb92336b821462c7b7613de91304fe80040fec12"
+dependencies = [
+ "ahash",
+ "metrics-macros",
+ "portable-atomic",
+]
+
+[[package]]
 name = "metrics-exporter-prometheus"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1531,7 +1542,7 @@ dependencies = [
  "hyper",
  "indexmap",
  "ipnet",
- "metrics",
+ "metrics 0.19.0",
  "metrics-util",
  "parking_lot 0.11.2",
  "quanta",
@@ -1563,7 +1574,7 @@ dependencies = [
  "crossbeam-utils",
  "hashbrown 0.11.2",
  "indexmap",
- "metrics",
+ "metrics 0.19.0",
  "num_cpus",
  "ordered-float",
  "parking_lot 0.11.2",
@@ -1992,6 +2003,12 @@ checksum = "e0918736323d1baff32ee0eade54984f6f201ad7e97d5cfb5d6ab4a358529615"
 dependencies = [
  "plotters-backend",
 ]
+
+[[package]]
+name = "portable-atomic"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "763095e04dcbeb889b2ab35296ecb18a20fe16b4e9877ce64aab73d8fd05a8c3"
 
 [[package]]
 name = "postgres-native-tls"
@@ -2782,7 +2799,7 @@ dependencies = [
 name = "snarkos-metrics"
 version = "2.0.2"
 dependencies = [
- "metrics",
+ "metrics 0.20.0",
  "metrics-exporter-prometheus",
  "metrics-util",
  "tokio",
