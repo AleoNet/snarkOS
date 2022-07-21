@@ -21,7 +21,7 @@ use crate::{
     state::State,
 };
 use snarkos_environment::{
-    helpers::{NodeType, Status},
+    helpers::{BlockLocators, NodeType, Status, MAXIMUM_LINEAR_BLOCK_LOCATORS},
     Environment,
 };
 use snarkos_storage::{
@@ -145,413 +145,404 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         &self.ledger_router
     }
 
-    // pub async fn shut_down(&self) {
-    //     debug!("Ledger is shutting down...");
-    //
-    //     // Set the terminator bit to `true` to ensure it stops mining.
-    //     E::terminator().store(true, Ordering::SeqCst);
-    //     trace!("[ShuttingDown] Terminator bit has been enabled");
-    //
-    //     // Clear the unconfirmed blocks.
-    //     self.unconfirmed_blocks.write().await.clear();
-    //     trace!("[ShuttingDown] Pending queue has been cleared");
-    //
-    //     // Disconnect all connected peers.
-    //     let connected_peers = self.peers_state.read().await.keys().copied().collect::<Vec<_>>();
-    //     for peer_ip in connected_peers {
-    //         self.disconnect(peer_ip, DisconnectReason::ShuttingDown).await;
-    //     }
-    //     trace!("[ShuttingDown] Disconnect message has been sent to all connected peers");
-    // }
+    pub async fn shut_down(&self) {
+        debug!("Ledger is shutting down...");
 
-    // ///
-    // /// Performs the given `request` to the ledger.
-    // /// All requests must go through this `update`, so that a unified view is preserved.
-    // ///
-    // pub(super) async fn update(&self, request: LedgerRequest<N>) {
-    //     match request {
-    //         LedgerRequest::BlockResponse(peer_ip, block) => {
-    //             // Remove the block request from the ledger.
-    //             if self.remove_block_request(peer_ip, block.header().height()).await {
-    //                 // On success, process the block response.
-    //                 self.add_block(block).await;
-    //                 // Check if syncing with this peer is complete.
-    //                 if self
-    //                     .block_requests
-    //                     .read()
-    //                     .await
-    //                     .get(&peer_ip)
-    //                     .map(|requests| requests.is_empty())
-    //                     .unwrap_or(false)
-    //                 {
-    //                     trace!("All block requests with {} have been processed", peer_ip);
-    //                     self.update_block_requests().await;
-    //                 }
-    //             }
-    //         }
-    //         LedgerRequest::Disconnect(peer_ip, reason) => {
-    //             self.disconnect(peer_ip, reason).await;
-    //         }
-    //         LedgerRequest::Failure(peer_ip, failure) => {
-    //             self.add_failure(peer_ip, failure).await;
-    //         }
-    //         LedgerRequest::Heartbeat => {
-    //             // Update for sync nodes.
-    //             self.update_beacon_nodes().await;
-    //             // Update the ledger.
-    //             self.update_ledger().await;
-    //             // Update the status of the ledger.
-    //             self.update_status().await;
-    //             // Remove expired block requests.
-    //             self.remove_expired_block_requests().await;
-    //             // Remove expired failures.
-    //             self.remove_expired_failures().await;
-    //             // Disconnect from peers with frequent failures.
-    //             self.disconnect_from_failing_peers().await;
-    //             // Update the block requests.
-    //             self.update_block_requests().await;
-    //
-    //             let block_requests = self.number_of_block_requests().await;
-    //             let connected_peers = self.peers_state.read().await.len();
-    //
-    //             debug!(
-    //                 "Status Report (type = {}, status = {}, block_height = {}, cumulative_weight = {}, block_requests = {}, connected_peers = {})",
-    //                 E::NODE_TYPE,
-    //                 E::status(),
-    //                 self.canon.latest_block_height(),
-    //                 self.canon.latest_cumulative_weight(),
-    //                 block_requests,
-    //                 connected_peers,
-    //             );
-    //         }
-    //         LedgerRequest::Pong(peer_ip, node_type, status, is_fork, block_locators, _rtt_start) => {
-    //             // Ensure the peer has been initialized in the ledger.
-    //             self.initialize_peer(peer_ip).await;
-    //             // Process the pong.
-    //             self.update_peer(peer_ip, node_type, status, is_fork, block_locators).await;
-    //
-    //             // Stop the clock on internal RTT.
-    //             #[cfg(any(feature = "test", feature = "prometheus"))]
-    //             metrics::histogram!(
-    //                 metrics::internal_rtt::PONG,
-    //                 _rtt_start.expect("rtt should be present with metrics enabled").elapsed()
-    //             );
-    //         }
-    //         LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
-    //             // Ensure the node is not peering.
-    //             if !E::status().is_peering() {
-    //                 // Process the unconfirmed block.
-    //                 self.add_block(block.clone()).await;
-    //                 // Propagate the unconfirmed block to the connected peers.
-    //                 let message = Message::UnconfirmedBlock(block.header().height(), block.hash(), Data::Object(block));
-    //                 let request = PeersRequest::MessagePropagate(peer_ip, message);
-    //                 if let Err(error) = self.state.peers().router().send(request).await {
-    //                     warn!("[UnconfirmedBlock] {}", error);
-    //                 }
-    //             }
-    //         }
-    //     }
-    // }
+        // Set the terminator bit to `true` to ensure it stops mining.
+        E::terminator().store(true, Ordering::SeqCst);
+        trace!("[ShuttingDown] Terminator bit has been enabled");
 
-    // ///
-    // /// Disconnects the given peer from the ledger.
-    // ///
-    // pub async fn disconnect(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
-    //     info!("Disconnecting from {} ({:?})", peer_ip, reason);
-    //     // Remove all entries of the peer from the ledger.
-    //     self.remove_peer(&peer_ip).await;
-    //     // Update the status of the ledger.
-    //     self.update_status().await;
-    //     // Send a `Disconnect` message to the peer.
-    //     if let Err(error) = self
-    //         .state
-    //         .peers()
-    //         .router()
-    //         .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect(reason)))
-    //         .await
-    //     {
-    //         warn!("[Disconnect] {}", error);
-    //     }
-    //     // Route a `PeerDisconnected` to the peers.
-    //     if let Err(error) = self.state.peers().router().send(PeersRequest::PeerDisconnected(peer_ip)).await {
-    //         warn!("[PeerDisconnected] {}", error);
-    //     }
-    // }
+        // Clear the unconfirmed blocks.
+        self.unconfirmed_blocks.write().await.clear();
+        trace!("[ShuttingDown] Pending queue has been cleared");
 
-    // ///
-    // /// Disconnects and restricts the given peer from the ledger.
-    // ///
-    // async fn disconnect_and_restrict(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
-    //     info!("Disconnecting and restricting {} ({:?})", peer_ip, reason);
-    //     // Remove all entries of the peer from the ledger.
-    //     self.remove_peer(&peer_ip).await;
-    //     // Update the status of the ledger.
-    //     self.update_status().await;
-    //     // Send a `Disconnect` message to the peer.
-    //     if let Err(error) = self
-    //         .state
-    //         .peers()
-    //         .router()
-    //         .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect(reason)))
-    //         .await
-    //     {
-    //         warn!("[Disconnect] {}", error);
-    //     }
-    //     // Route a `PeerRestricted` to the peers.
-    //     if let Err(error) = self.state.peers().router().send(PeersRequest::PeerRestricted(peer_ip)).await {
-    //         warn!("[PeerRestricted] {}", error);
-    //     }
-    // }
+        // Disconnect all connected peers.
+        let connected_peers = self.peers_state.read().await.keys().copied().collect::<Vec<_>>();
+        for peer_ip in connected_peers {
+            self.disconnect(peer_ip, DisconnectReason::ShuttingDown).await;
+        }
+        trace!("[ShuttingDown] Disconnect message has been sent to all connected peers");
+    }
 
-    // ///
-    // /// Performs a heartbeat update for the sync nodes.
-    // ///
-    // async fn update_beacon_nodes(&self) {
-    //     if E::NODE_TYPE == NodeType::Beacon {
-    //         // Lock peers_state for further processing.
-    //         let peers_state = self.peers_state.read().await;
-    //
-    //         // Retrieve the latest cumulative weight of this ledger.
-    //         let latest_cumulative_weight = self.canon.latest_cumulative_weight();
-    //
-    //         // Initialize a list of peers to disconnect from.
-    //         let mut peer_ips_to_disconnect = Vec::with_capacity(peers_state.len());
-    //
-    //         // Check if any of the peers are ahead and have a larger block height.
-    //         for (peer_ip, peer_state) in peers_state.iter() {
-    //             if let Some((node_type, status, Some(_), block_height, block_locators)) = peer_state {
-    //                 // Retrieve the cumulative weight, defaulting to the block height if it does not exist.
-    //                 let cumulative_weight = match block_locators.get_cumulative_weight(*block_height) {
-    //                     Some(cumulative_weight) => cumulative_weight,
-    //                     None => *block_height as u128,
-    //                 };
-    //
-    //                 // If the peer is not a sync node and is syncing, and the peer is ahead, proceed to disconnect.
-    //                 if *node_type != NodeType::Beacon && *status == Status::Syncing && cumulative_weight > latest_cumulative_weight {
-    //                     // Append the peer to the list of disconnects.
-    //                     peer_ips_to_disconnect.push(*peer_ip);
-    //                 }
-    //             }
-    //         }
-    //
-    //         // Release the lock over peers_state.
-    //         drop(peers_state);
-    //
-    //         trace!("Found {} peers to disconnect", peer_ips_to_disconnect.len());
-    //
-    //         // Proceed to disconnect and restrict these peers.
-    //         for peer_ip in peer_ips_to_disconnect {
-    //             self.disconnect_and_restrict(peer_ip, DisconnectReason::SyncComplete).await;
-    //         }
-    //     }
-    // }
+    ///
+    /// Performs the given `request` to the ledger.
+    /// All requests must go through this `update`, so that a unified view is preserved.
+    ///
+    pub(super) async fn update(&self, request: LedgerRequest<N>) {
+        match request {
+            LedgerRequest::BlockResponse(peer_ip, block) => {
+                // Remove the block request from the ledger.
+                if self.remove_block_request(peer_ip, block.header().height()).await {
+                    // On success, process the block response.
+                    self.add_block(block).await;
+                    // Check if syncing with this peer is complete.
+                    if self
+                        .block_requests
+                        .read()
+                        .await
+                        .get(&peer_ip)
+                        .map(|requests| requests.is_empty())
+                        .unwrap_or(false)
+                    {
+                        trace!("All block requests with {} have been processed", peer_ip);
+                        // TODO (raychu86): Reintroduce block requests.
+                        // self.update_block_requests().await;
+                    }
+                }
+            }
+            LedgerRequest::Disconnect(peer_ip, reason) => {
+                self.disconnect(peer_ip, reason).await;
+            }
+            LedgerRequest::Failure(peer_ip, failure) => {
+                self.add_failure(peer_ip, failure).await;
+            }
+            LedgerRequest::Heartbeat => {
+                // Update for sync nodes.
+                self.update_beacon_nodes().await;
+                // Update the ledger.
+                self.update_ledger().await;
+                // Update the status of the ledger.
+                self.update_status().await;
+                // Remove expired block requests.
+                self.remove_expired_block_requests().await;
+                // Remove expired failures.
+                self.remove_expired_failures().await;
+                // Disconnect from peers with frequent failures.
+                self.disconnect_from_failing_peers().await;
+                // Update the block requests.
+                // TODO (raychu86): Reintroduce block requests.
+                // self.update_block_requests().await;
 
-    // ///
-    // /// Attempt to fast-forward the ledger with unconfirmed blocks.
-    // ///
-    // async fn update_ledger(&self) {
-    //     // Check for candidate blocks to fast forward the ledger.
-    //     let mut block_hash = self.canon.latest_block_hash();
-    //     let unconfirmed_blocks_snapshot = self.unconfirmed_blocks.read().await.clone();
-    //     while let Some(unconfirmed_block) = unconfirmed_blocks_snapshot.get(&block_hash) {
-    //         // Attempt to add the unconfirmed block.
-    //         match self.add_block(unconfirmed_block.clone()).await {
-    //             // Upon success, update the block hash iterator.
-    //             true => block_hash = unconfirmed_block.hash(),
-    //             false => break,
-    //         }
-    //     }
-    //
-    //     // If the timestamp of the last block increment has surpassed the preset limit,
-    //     // the ledger is likely syncing from invalid state, and should revert by one block.
-    //     if E::status().is_syncing()
-    //         && self.last_block_update_timestamp.read().await.elapsed() > 2 * Duration::from_secs(E::RADIO_SILENCE_IN_SECS)
-    //     {
-    //         // Acquire the lock for block requests.
-    //         let _block_request_lock = self.block_requests_lock.lock().await;
-    //
-    //         trace!("Ledger state has become stale, clearing queue and reverting by one block");
-    //         self.unconfirmed_blocks.write().await.clear();
-    //
-    //         // // Reset the memory pool of its transactions.
-    //         // if let Err(error) = self.state.prover().router().send(ProverRequest::MemoryPoolClear(None)).await {
-    //         //     error!("[MemoryPoolClear]: {}", error);
-    //         // }
-    //
-    //         self.block_requests
-    //             .write()
-    //             .await
-    //             .values_mut()
-    //             .for_each(|requests| *requests = Default::default());
-    //         self.revert_to_block_height(self.canon.latest_block_height().saturating_sub(1))
-    //             .await;
-    //     }
-    // }
+                let block_requests = self.number_of_block_requests().await;
+                let connected_peers = self.peers_state.read().await.len();
 
-    // ///
-    // /// Updates the status of the ledger.
-    // ///
-    // async fn update_status(&self) {
-    //     // Retrieve the status variable.
-    //     let mut status = E::status().get();
-    //
-    //     // If the node is shutting down, skip the update.
-    //     if status == Status::ShuttingDown {
-    //         trace!("Ledger is shutting down");
-    //         // Set the terminator bit to `true` to ensure it stops mining.
-    //         E::terminator().store(true, Ordering::SeqCst);
-    //         return;
-    //     }
-    //     // If there is an insufficient number of connected peers, set the status to `Peering`.
-    //     else if self.peers_state.read().await.len() < E::MINIMUM_NUMBER_OF_PEERS {
-    //         status = Status::Peering;
-    //     }
-    //     // If the ledger is out of date, set the status to `Syncing`.
-    //     else {
-    //         // Update the status to `Ready` or `Mining`.
-    //         status = match status {
-    //             Status::Mining => Status::Mining,
-    //             _ => Status::Ready,
-    //         };
-    //
-    //         // Retrieve the latest cumulative weight of this node.
-    //         let latest_cumulative_weight = self.canon.latest_cumulative_weight();
-    //         // Iterate through the connected peers, to determine if the ledger state is out of date.
-    //         for (_, peer_state) in self.peers_state.read().await.iter() {
-    //             if let Some((_, _, Some(_), block_height, block_locators)) = peer_state {
-    //                 // Retrieve the cumulative weight, defaulting to the block height if it does not exist.
-    //                 let cumulative_weight = match block_locators.get_cumulative_weight(*block_height) {
-    //                     Some(cumulative_weight) => cumulative_weight,
-    //                     None => *block_height as u128,
-    //                 };
-    //                 // If the cumulative weight is greater than MAXIMUM_LINEAR_BLOCK_LOCATORS, set the status to `Syncing`.
-    //                 if cumulative_weight.saturating_sub(latest_cumulative_weight) > MAXIMUM_LINEAR_BLOCK_LOCATORS as u128 {
-    //                     // Set the status to `Syncing`.
-    //                     status = Status::Syncing;
-    //                     break;
-    //                 }
-    //             }
-    //         }
-    //     }
-    //
-    //     // If the node is `Peering` or `Syncing`, it should not be mining.
-    //     if status == Status::Peering || status == Status::Syncing {
-    //         // Set the terminator bit to `true` to ensure it does not mine.
-    //         E::terminator().store(true, Ordering::SeqCst);
-    //     } else {
-    //         // Set the terminator bit to `false` to ensure it is allowed to mine.
-    //         E::terminator().store(false, Ordering::SeqCst);
-    //     }
-    //
-    //     // Update the ledger to the determined status.
-    //     E::status().update(status);
-    // }
+                debug!(
+                    "Status Report (type = {}, status = {}, block_height = {}, block_requests = {}, connected_peers = {})",
+                    E::NODE_TYPE,
+                    E::status(),
+                    self.canon.latest_block_height(),
+                    block_requests,
+                    connected_peers,
+                );
+            }
+            LedgerRequest::Pong(peer_ip, node_type, status, is_fork, block_locators, _rtt_start) => {
+                // Ensure the peer has been initialized in the ledger.
+                self.initialize_peer(peer_ip).await;
+                // Process the pong.
+                self.update_peer(peer_ip, node_type, status, is_fork, block_locators).await;
 
-    // ///
-    // /// Adds the given block:
-    // ///     1) as the next block in the ledger if the block height increments by one, or
-    // ///     2) to the pending queue for later use.
-    // ///
-    // /// Returns `true` if the given block is successfully added to the *canon* chain.
-    // ///
-    // async fn add_block(&self, unconfirmed_block: Block<N>) -> bool {
-    //     // Retrieve the unconfirmed block height.
-    //     let unconfirmed_block_height = unconfirmed_block.header().height();
-    //     // Retrieve the unconfirmed block hash.
-    //     let unconfirmed_block_hash = unconfirmed_block.hash();
-    //     // Retrieve the unconfirmed previous block hash.
-    //     let unconfirmed_previous_block_hash = unconfirmed_block.header().previous_block_hash();
-    //
-    //     // Ensure the given block is new.
-    //     if let Ok(true) = self.canon.contains_block_hash(&unconfirmed_block_hash) {
-    //         trace!(
-    //             "Canonical chain already contains block {} ({})",
-    //             unconfirmed_block_height,
-    //             unconfirmed_block_hash
-    //         );
-    //     } else if unconfirmed_block_height == self.canon.latest_block_height() + 1
-    //         && unconfirmed_previous_block_hash == self.canon.latest_block_hash()
-    //     {
-    //         // Acquire the lock for block requests.
-    //         let _block_requests_lock = self.block_requests_lock.lock().await;
-    //         // Acquire the lock for the canon chain.
-    //         let _canon_lock = self.canon_lock.lock().await;
-    //
-    //         // Ensure the block height is not part of a block request on a fork.
-    //         let mut is_block_on_fork = false;
-    //         'outer: for requests in self.block_requests.read().await.values() {
-    //             for request in requests.keys() {
-    //                 // If the unconfirmed block conflicts with a requested block on a fork, skip.
-    //                 if request.block_height() == unconfirmed_block_height {
-    //                     if let Some(requested_block_hash) = request.block_hash() {
-    //                         if unconfirmed_block.hash() != requested_block_hash {
-    //                             is_block_on_fork = true;
-    //                             break 'outer;
-    //                         }
-    //                     }
-    //                 }
-    //             }
-    //         }
-    //
-    //         // If the unconfirmed block is not on a fork, attempt to add it as the next block.
-    //         match is_block_on_fork {
-    //             // Filter out the undesirable unconfirmed blocks, if it exists.
-    //             true => self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash),
-    //             // Attempt to add the unconfirmed block as the next block in the canonical chain.
-    //             false => match self.canon.add_next_block(&unconfirmed_block) {
-    //                 Ok(()) => {
-    //                     let latest_block_height = self.canon.latest_block_height();
-    //                     info!(
-    //                         "Ledger successfully advanced to block {} ({})",
-    //                         latest_block_height,
-    //                         self.canon.latest_block_hash()
-    //                     );
-    //
-    //                     #[cfg(any(feature = "test", feature = "prometheus"))]
-    //                     metrics::gauge!(metrics::blocks::HEIGHT, latest_block_height as f64);
-    //
-    //                     // Update the timestamp of the last block increment.
-    //                     *self.last_block_update_timestamp.write().await = Instant::now();
-    //                     // Set the terminator bit to `true` to ensure the miner updates state.
-    //                     E::terminator().store(true, Ordering::SeqCst);
-    //                     // On success, filter the unconfirmed blocks of this block, if it exists.
-    //                     self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash);
-    //
-    //                     // On success, filter the memory pool of its transactions, if they exist.
-    //                     if let Err(error) = self
-    //                         .state
-    //                         .prover()
-    //                         .router()
-    //                         .send(ProverRequest::MemoryPoolClear(Some(unconfirmed_block)))
-    //                         .await
-    //                     {
-    //                         error!("[MemoryPoolClear]: {}", error);
-    //                     }
-    //
-    //                     return true;
-    //                 }
-    //                 Err(error) => warn!("{}", error),
-    //             },
-    //         }
-    //     } else {
-    //         // Add the block to the unconfirmed blocks.
-    //         if self
-    //             .unconfirmed_blocks
-    //             .write()
-    //             .await
-    //             .insert(unconfirmed_previous_block_hash, unconfirmed_block)
-    //         {
-    //             trace!("Added unconfirmed block {} to the pending queue", unconfirmed_block_height);
-    //         } else {
-    //             trace!(
-    //                 "Pending queue already contains unconfirmed block {} ({})",
-    //                 unconfirmed_block_height,
-    //                 unconfirmed_block_hash
-    //             );
-    //         }
-    //     }
-    //     false
-    // }
+                // Stop the clock on internal RTT.
+                #[cfg(any(feature = "test", feature = "prometheus"))]
+                metrics::histogram!(
+                    metrics::internal_rtt::PONG,
+                    _rtt_start.expect("rtt should be present with metrics enabled").elapsed()
+                );
+            }
+            LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
+                // Ensure the node is not peering.
+                if !E::status().is_peering() {
+                    // Process the unconfirmed block.
+                    self.add_block(block.clone()).await;
+                    // Propagate the unconfirmed block to the connected peers.
+                    let message = Message::UnconfirmedBlock(block.header().height(), block.hash(), Data::Object(block));
+                    let request = PeersRequest::MessagePropagate(peer_ip, message);
+                    if let Err(error) = self.state.peers().router().send(request).await {
+                        warn!("[UnconfirmedBlock] {}", error);
+                    }
+                }
+            }
+        }
+    }
+
+    ///
+    /// Disconnects the given peer from the ledger.
+    ///
+    pub async fn disconnect(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
+        info!("Disconnecting from {} ({:?})", peer_ip, reason);
+        // Remove all entries of the peer from the ledger.
+        self.remove_peer(&peer_ip).await;
+        // Update the status of the ledger.
+        self.update_status().await;
+        // Send a `Disconnect` message to the peer.
+        if let Err(error) = self
+            .state
+            .peers()
+            .router()
+            .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect(reason)))
+            .await
+        {
+            warn!("[Disconnect] {}", error);
+        }
+        // Route a `PeerDisconnected` to the peers.
+        if let Err(error) = self.state.peers().router().send(PeersRequest::PeerDisconnected(peer_ip)).await {
+            warn!("[PeerDisconnected] {}", error);
+        }
+    }
+
+    ///
+    /// Disconnects and restricts the given peer from the ledger.
+    ///
+    async fn disconnect_and_restrict(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
+        info!("Disconnecting and restricting {} ({:?})", peer_ip, reason);
+        // Remove all entries of the peer from the ledger.
+        self.remove_peer(&peer_ip).await;
+        // Update the status of the ledger.
+        self.update_status().await;
+        // Send a `Disconnect` message to the peer.
+        if let Err(error) = self
+            .state
+            .peers()
+            .router()
+            .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect(reason)))
+            .await
+        {
+            warn!("[Disconnect] {}", error);
+        }
+        // Route a `PeerRestricted` to the peers.
+        if let Err(error) = self.state.peers().router().send(PeersRequest::PeerRestricted(peer_ip)).await {
+            warn!("[PeerRestricted] {}", error);
+        }
+    }
+
+    ///
+    /// Performs a heartbeat update for the sync nodes.
+    ///
+    async fn update_beacon_nodes(&self) {
+        if E::NODE_TYPE == NodeType::Beacon {
+            // Lock peers_state for further processing.
+            let peers_state = self.peers_state.read().await;
+
+            // Retrieve the latest block height of this ledger.
+            let latest_block_height = self.canon.latest_block_height();
+
+            // Initialize a list of peers to disconnect from.
+            let mut peer_ips_to_disconnect = Vec::with_capacity(peers_state.len());
+
+            // Check if any of the peers are ahead and have a larger block height.
+            for (peer_ip, peer_state) in peers_state.iter() {
+                if let Some((node_type, status, Some(_), block_height, block_locators)) = peer_state {
+                    // If the peer is not a sync node and is syncing, and the peer is ahead, proceed to disconnect.
+                    if *node_type != NodeType::Beacon && *status == Status::Syncing && block_height > &latest_block_height {
+                        // Append the peer to the list of disconnects.
+                        peer_ips_to_disconnect.push(*peer_ip);
+                    }
+                }
+            }
+
+            // Release the lock over peers_state.
+            drop(peers_state);
+
+            trace!("Found {} peers to disconnect", peer_ips_to_disconnect.len());
+
+            // Proceed to disconnect and restrict these peers.
+            for peer_ip in peer_ips_to_disconnect {
+                self.disconnect_and_restrict(peer_ip, DisconnectReason::SyncComplete).await;
+            }
+        }
+    }
+
+    ///
+    /// Attempt to fast-forward the ledger with unconfirmed blocks.
+    ///
+    async fn update_ledger(&self) {
+        // Check for candidate blocks to fast forward the ledger.
+        let mut block_hash = self.canon.latest_block_hash();
+        let unconfirmed_blocks_snapshot = self.unconfirmed_blocks.read().await.clone();
+        while let Some(unconfirmed_block) = unconfirmed_blocks_snapshot.get(&block_hash) {
+            // Attempt to add the unconfirmed block.
+            match self.add_block(unconfirmed_block.clone()).await {
+                // Upon success, update the block hash iterator.
+                true => block_hash = unconfirmed_block.hash(),
+                false => break,
+            }
+        }
+
+        // If the timestamp of the last block increment has surpassed the preset limit,
+        // the ledger is likely syncing from invalid state, and should revert by one block.
+        if E::status().is_syncing()
+            && self.last_block_update_timestamp.read().await.elapsed() > 2 * Duration::from_secs(E::RADIO_SILENCE_IN_SECS)
+        {
+            // Acquire the lock for block requests.
+            let _block_request_lock = self.block_requests_lock.lock().await;
+
+            trace!("Ledger state has become stale, clearing queue and reverting by one block");
+            self.unconfirmed_blocks.write().await.clear();
+
+            // // Reset the memory pool of its transactions.
+            // if let Err(error) = self.state.prover().router().send(ProverRequest::MemoryPoolClear(None)).await {
+            //     error!("[MemoryPoolClear]: {}", error);
+            // }
+
+            self.block_requests
+                .write()
+                .await
+                .values_mut()
+                .for_each(|requests| *requests = Default::default());
+            self.revert_to_block_height(self.canon.latest_block_height().saturating_sub(1))
+                .await;
+        }
+    }
+
+    ///
+    /// Updates the status of the ledger.
+    ///
+    async fn update_status(&self) {
+        // Retrieve the status variable.
+        let mut status = E::status().get();
+
+        // If the node is shutting down, skip the update.
+        if status == Status::ShuttingDown {
+            trace!("Ledger is shutting down");
+            // Set the terminator bit to `true` to ensure it stops mining.
+            E::terminator().store(true, Ordering::SeqCst);
+            return;
+        }
+        // If there is an insufficient number of connected peers, set the status to `Peering`.
+        else if self.peers_state.read().await.len() < E::MINIMUM_NUMBER_OF_PEERS {
+            status = Status::Peering;
+        }
+        // If the ledger is out of date, set the status to `Syncing`.
+        else {
+            // Update the status to `Ready` or `Mining`.
+            status = match status {
+                Status::Mining => Status::Mining,
+                _ => Status::Ready,
+            };
+
+            // Retrieve the latest block height of this node.
+            let latest_block_height = self.canon.latest_block_height();
+            // Iterate through the connected peers, to determine if the ledger state is out of date.
+            for (_, peer_state) in self.peers_state.read().await.iter() {
+                if let Some((_, _, Some(_), block_height, block_locators)) = peer_state {
+                    // If the block height is greater than MAXIMUM_LINEAR_BLOCK_LOCATORS, set the status to `Syncing`.
+                    if block_height.saturating_sub(latest_block_height) > MAXIMUM_LINEAR_BLOCK_LOCATORS {
+                        // Set the status to `Syncing`.
+                        status = Status::Syncing;
+                        break;
+                    }
+                }
+            }
+        }
+
+        // If the node is `Peering` or `Syncing`, it should not be mining.
+        if status == Status::Peering || status == Status::Syncing {
+            // Set the terminator bit to `true` to ensure it does not mine.
+            E::terminator().store(true, Ordering::SeqCst);
+        } else {
+            // Set the terminator bit to `false` to ensure it is allowed to mine.
+            E::terminator().store(false, Ordering::SeqCst);
+        }
+
+        // Update the ledger to the determined status.
+        E::status().update(status);
+    }
+
+    ///
+    /// Adds the given block:
+    ///     1) as the next block in the ledger if the block height increments by one, or
+    ///     2) to the pending queue for later use.
+    ///
+    /// Returns `true` if the given block is successfully added to the *canon* chain.
+    ///
+    async fn add_block(&self, unconfirmed_block: Block<N>) -> bool {
+        // Retrieve the unconfirmed block height.
+        let unconfirmed_block_height = unconfirmed_block.header().height();
+        // Retrieve the unconfirmed block hash.
+        let unconfirmed_block_hash = unconfirmed_block.hash();
+        // Retrieve the unconfirmed previous block hash.
+        let unconfirmed_previous_block_hash = unconfirmed_block.previous_hash();
+
+        // Ensure the given block is new.
+        if let Ok(true) = self.canon.contains_block_hash(&unconfirmed_block_hash) {
+            trace!(
+                "Canonical chain already contains block {} ({})",
+                unconfirmed_block_height,
+                unconfirmed_block_hash
+            );
+        } else if unconfirmed_block_height == self.canon.latest_block_height() + 1
+            && unconfirmed_previous_block_hash == self.canon.latest_block_hash()
+        {
+            // Acquire the lock for block requests.
+            let _block_requests_lock = self.block_requests_lock.lock().await;
+            // Acquire the lock for the canon chain.
+            let _canon_lock = self.canon_lock.lock().await;
+
+            // Ensure the block height is not part of a block request on a fork.
+            let mut is_block_on_fork = false;
+            'outer: for requests in self.block_requests.read().await.values() {
+                for request in requests.keys() {
+                    // If the unconfirmed block conflicts with a requested block on a fork, skip.
+                    if request.block_height() == unconfirmed_block_height {
+                        if let Some(requested_block_hash) = request.block_hash() {
+                            if unconfirmed_block.hash() != requested_block_hash {
+                                is_block_on_fork = true;
+                                break 'outer;
+                            }
+                        }
+                    }
+                }
+            }
+
+            // If the unconfirmed block is not on a fork, attempt to add it as the next block.
+            match is_block_on_fork {
+                // Filter out the undesirable unconfirmed blocks, if it exists.
+                true => self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash),
+                // Attempt to add the unconfirmed block as the next block in the canonical chain.
+                false => match self.canon.add_next_block(&unconfirmed_block) {
+                    Ok(()) => {
+                        let latest_block_height = self.canon.latest_block_height();
+                        info!(
+                            "Ledger successfully advanced to block {} ({})",
+                            latest_block_height,
+                            self.canon.latest_block_hash()
+                        );
+
+                        #[cfg(any(feature = "test", feature = "prometheus"))]
+                        metrics::gauge!(metrics::blocks::HEIGHT, latest_block_height as f64);
+
+                        // Update the timestamp of the last block increment.
+                        *self.last_block_update_timestamp.write().await = Instant::now();
+                        // Set the terminator bit to `true` to ensure the miner updates state.
+                        E::terminator().store(true, Ordering::SeqCst);
+                        // On success, filter the unconfirmed blocks of this block, if it exists.
+                        self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash);
+
+                        // TODO (raychu86): Reintroduce this once provers are implemented.
+                        // // On success, filter the memory pool of its transactions, if they exist.
+                        // if let Err(error) = self
+                        //     .state
+                        //     .prover()
+                        //     .router()
+                        //     .send(ProverRequest::MemoryPoolClear(Some(unconfirmed_block)))
+                        //     .await
+                        // {
+                        //     error!("[MemoryPoolClear]: {}", error);
+                        // }
+
+                        return true;
+                    }
+                    Err(error) => warn!("{}", error),
+                },
+            }
+        } else {
+            // Add the block to the unconfirmed blocks.
+            if self
+                .unconfirmed_blocks
+                .write()
+                .await
+                .insert(unconfirmed_previous_block_hash, unconfirmed_block)
+            {
+                trace!("Added unconfirmed block {} to the pending queue", unconfirmed_block_height);
+            } else {
+                trace!(
+                    "Pending queue already contains unconfirmed block {} ({})",
+                    unconfirmed_block_height,
+                    unconfirmed_block_hash
+                );
+            }
+        }
+        false
+    }
 
     ///
     /// Reverts the ledger state back to height `block_height`, returning `true` on success.
@@ -619,92 +610,89 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         self.failures.write().await.remove(peer_ip);
     }
 
-    // ///
-    // /// Updates the state of the given peer.
-    // ///
-    // async fn update_peer(
-    //     &self,
-    //     peer_ip: SocketAddr,
-    //     node_type: NodeType,
-    //     status: Status,
-    //     is_fork: Option<bool>,
-    //     block_locators: BlockLocators<N>,
-    // ) {
-    //     // Ensure the list of block locators is not empty.
-    //     if block_locators.is_empty() {
-    //         self.add_failure(peer_ip, "Received a sync response with no block locators".to_string())
-    //             .await;
-    //     } else {
-    //         // Ensure the peer provided well-formed block locators.
-    //         match self.canon.check_block_locators(&block_locators) {
-    //             Ok(is_valid) => {
-    //                 if !is_valid {
-    //                     warn!("Invalid block locators from {}", peer_ip);
-    //                     self.add_failure(peer_ip, "Invalid block locators".to_string()).await;
-    //                     return;
-    //                 }
-    //             }
-    //             Err(error) => warn!("Error checking block locators: {}", error),
-    //         };
-    //
-    //         // Determine the common ancestor block height between this ledger and the peer.
-    //         let mut common_ancestor = 0;
-    //         // Determine the latest block height of the peer.
-    //         let mut latest_block_height_of_peer = 0;
-    //
-    //         // Verify the integrity of the block hashes sent by the peer.
-    //         for (block_height, (block_hash, _)) in block_locators.iter() {
-    //             // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
-    //             if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
-    //                 if expected_block_height != *block_height {
-    //                     let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
-    //                     trace!("{}", error);
-    //                     self.add_failure(peer_ip, error).await;
-    //                     return;
-    //                 } else {
-    //                     // Update the common ancestor, as this block hash exists in this ledger.
-    //                     if expected_block_height > common_ancestor {
-    //                         common_ancestor = expected_block_height
-    //                     }
-    //                 }
-    //             }
-    //
-    //             // Update the latest block height of the peer.
-    //             if *block_height > latest_block_height_of_peer {
-    //                 latest_block_height_of_peer = *block_height;
-    //             }
-    //         }
-    //
-    //         // If the given fork status is None, check if it can be updated.
-    //         let is_fork = match is_fork {
-    //             Some(is_fork) => Some(is_fork),
-    //             None => match common_ancestor == latest_block_height_of_peer || common_ancestor == self.canon.latest_block_height() {
-    //                 // If the common ancestor matches the latest block height of (the peer || this node),
-    //                 // the peer (is clearly || is likely) on the same canonical chain as this node.
-    //                 true => Some(false),
-    //                 false => None,
-    //             },
-    //         };
-    //
-    //         let fork_status = match is_fork {
-    //             Some(boolean) => format!("{}", boolean),
-    //             None => "undecided".to_string(),
-    //         };
-    //         let cumulative_weight = match block_locators.get_cumulative_weight(latest_block_height_of_peer) {
-    //             Some(weight) => format!("{}", weight),
-    //             _ => "unknown".to_string(),
-    //         };
-    //         debug!(
-    //             "Peer {} is at block {} (type = {}, status = {}, is_fork = {}, cumulative_weight = {}, common_ancestor = {})",
-    //             peer_ip, latest_block_height_of_peer, node_type, status, fork_status, cumulative_weight, common_ancestor,
-    //         );
-    //
-    //         match self.peers_state.write().await.get_mut(&peer_ip) {
-    //             Some(peer_state) => *peer_state = Some((node_type, status, is_fork, latest_block_height_of_peer, block_locators)),
-    //             None => self.add_failure(peer_ip, format!("Missing ledger state for {}", peer_ip)).await,
-    //         };
-    //     }
-    // }
+    ///
+    /// Updates the state of the given peer.
+    ///
+    async fn update_peer(
+        &self,
+        peer_ip: SocketAddr,
+        node_type: NodeType,
+        status: Status,
+        is_fork: Option<bool>,
+        block_locators: BlockLocators<N>,
+    ) {
+        // Ensure the list of block locators is not empty.
+        if block_locators.is_empty() {
+            self.add_failure(peer_ip, "Received a sync response with no block locators".to_string())
+                .await;
+        } else {
+            // Ensure the peer provided well-formed block locators.
+            match self.canon.check_block_locators(&block_locators) {
+                Ok(is_valid) => {
+                    if !is_valid {
+                        warn!("Invalid block locators from {}", peer_ip);
+                        self.add_failure(peer_ip, "Invalid block locators".to_string()).await;
+                        return;
+                    }
+                }
+                Err(error) => warn!("Error checking block locators: {}", error),
+            };
+
+            // Determine the common ancestor block height between this ledger and the peer.
+            let mut common_ancestor = 0;
+            // Determine the latest block height of the peer.
+            let mut latest_block_height_of_peer = 0;
+
+            // Verify the integrity of the block hashes sent by the peer.
+            for (block_height, (block_hash, _)) in block_locators.iter() {
+                // Ensure the block hash corresponds with the block height, if the block hash exists in this ledger.
+                if let Ok(expected_block_height) = self.canon.get_block_height(block_hash) {
+                    if expected_block_height != *block_height {
+                        let error = format!("Invalid block height {} for block hash {}", expected_block_height, block_hash);
+                        trace!("{}", error);
+                        self.add_failure(peer_ip, error).await;
+                        return;
+                    } else {
+                        // Update the common ancestor, as this block hash exists in this ledger.
+                        if expected_block_height > common_ancestor {
+                            common_ancestor = expected_block_height
+                        }
+                    }
+                }
+
+                // Update the latest block height of the peer.
+                if *block_height > latest_block_height_of_peer {
+                    latest_block_height_of_peer = *block_height;
+                }
+            }
+
+            // If the given fork status is None, check if it can be updated.
+            let is_fork = match is_fork {
+                Some(is_fork) => Some(is_fork),
+                None => match common_ancestor == latest_block_height_of_peer || common_ancestor == self.canon.latest_block_height() {
+                    // If the common ancestor matches the latest block height of (the peer || this node),
+                    // the peer (is clearly || is likely) on the same canonical chain as this node.
+                    true => Some(false),
+                    false => None,
+                },
+            };
+
+            let fork_status = match is_fork {
+                Some(boolean) => format!("{}", boolean),
+                None => "undecided".to_string(),
+            };
+
+            debug!(
+                "Peer {} is at block {} (type = {}, status = {}, is_fork = {}, common_ancestor = {})",
+                peer_ip, latest_block_height_of_peer, node_type, status, fork_status, common_ancestor,
+            );
+
+            match self.peers_state.write().await.get_mut(&peer_ip) {
+                Some(peer_state) => *peer_state = Some((node_type, status, is_fork, latest_block_height_of_peer, block_locators)),
+                None => self.add_failure(peer_ip, format!("Missing ledger state for {}", peer_ip)).await,
+            };
+        }
+    }
 
     // ///
     // /// Proceeds to send block requests to a connected peer, if the ledger is out of date.
@@ -920,21 +908,21 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         });
     }
 
-    // ///
-    // /// Disconnects from connected peers who exhibit frequent failures.
-    // ///
-    // async fn disconnect_from_failing_peers(&self) {
-    //     let peers_to_disconnect = self
-    //         .failures
-    //         .read()
-    //         .await
-    //         .iter()
-    //         .filter(|(_, failures)| failures.len() > E::MAXIMUM_NUMBER_OF_FAILURES)
-    //         .map(|(peer_ip, _)| *peer_ip)
-    //         .collect::<Vec<_>>();
-    //
-    //     for peer_ip in peers_to_disconnect {
-    //         self.disconnect(peer_ip, DisconnectReason::TooManyFailures).await;
-    //     }
-    // }
+    ///
+    /// Disconnects from connected peers who exhibit frequent failures.
+    ///
+    async fn disconnect_from_failing_peers(&self) {
+        let peers_to_disconnect = self
+            .failures
+            .read()
+            .await
+            .iter()
+            .filter(|(_, failures)| failures.len() > E::MAXIMUM_NUMBER_OF_FAILURES)
+            .map(|(peer_ip, _)| *peer_ip)
+            .collect::<Vec<_>>();
+
+        for peer_ip in peers_to_disconnect {
+            self.disconnect(peer_ip, DisconnectReason::TooManyFailures).await;
+        }
+    }
 }

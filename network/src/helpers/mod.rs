@@ -14,9 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod block_locators;
-pub use block_locators::*;
-
 mod block_request;
 pub use block_request::*;
 

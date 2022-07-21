@@ -14,11 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::peers::{Peers, PeersHandler, PeersRequest};
+use crate::{
+    ledger::{Ledger, LedgerHandler},
+    peers::{Peers, PeersHandler, PeersRequest},
+};
 
 use snarkos_consensus::account::Account;
 use snarkos_environment::Environment;
-use snarkvm::{prelude::*, Ledger};
+use snarkvm::prelude::*;
 
 use anyhow::Result;
 use once_cell::race::OnceBox;
@@ -45,9 +48,7 @@ macro_rules! spawn_task {
     }};
 
     // Spawns a new task, without a task ID.
-    ($logic:expr) => {{
-        $crate::spawn_task!(None, { $logic })
-    }};
+    ($logic:expr) => {{ $crate::spawn_task!(None, { $logic }) }};
 
     // Spawns a new task, with a task ID.
     ($id:expr, $logic:block) => {{
@@ -63,9 +64,7 @@ macro_rules! spawn_task {
     }};
 
     // Spawns a new task, with a task ID.
-    ($id:expr, $logic:expr) => {{
-        $crate::spawn_task!($id, { $logic })
-    }};
+    ($id:expr, $logic:expr) => {{ $crate::spawn_task!($id, { $logic }) }};
 }
 
 #[derive(Clone, Debug)]
@@ -77,7 +76,7 @@ pub struct State<N: Network, E: Environment> {
     /// The list of peers for the node.
     peers: Arc<OnceBox<Peers<N, E>>>,
     /// The ledger for the node.
-    ledger: Arc<Ledger<snarkvm::prelude::Testnet3>>,
+    ledger: Arc<OnceBox<Ledger<N, E>>>,
 }
 
 impl<N: Network, E: Environment> State<N, E> {
@@ -89,15 +88,12 @@ impl<N: Network, E: Environment> State<N, E> {
             Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
         };
 
-        // Initialize the ledger.
-        let ledger = Ledger::<snarkvm::prelude::Testnet3>::new();
-
         // Construct the state.
         let state = Self {
             local_ip: Arc::new(local_ip),
             account: Arc::new(account),
-            peers: Default::default(),
-            ledger: Arc::new(ledger),
+            peers: Arc::new(Default::default()),
+            ledger: Arc::new(Default::default()),
         };
 
         // Initialize a new peers module.
@@ -131,6 +127,10 @@ impl<N: Network, E: Environment> State<N, E> {
     /// Returns the peers module of this node.
     pub fn peers(&self) -> &Peers<N, E> {
         &self.peers.get().unwrap()
+    }
+
+    pub fn ledger(&self) -> &Ledger<N, E> {
+        self.ledger.get().unwrap()
     }
 
     /// Returns `true` if the given IP is this node.
@@ -194,6 +194,34 @@ impl<N: Network, E: Environment> State<N, E> {
                 }
             }
         });
+    }
+
+    ///
+    /// Initialize a new instance of the ledger.
+    ///
+    pub async fn initialize_ledger(self: &Arc<Self>, ledger: Ledger<N, E>, mut ledger_handler: LedgerHandler<N>) {
+        self.ledger.set(ledger.into()).map_err(|_| ()).unwrap();
+
+        let state = self.clone();
+        let (router, handler) = oneshot::channel();
+        E::resources().register_task(
+            None, // No need to provide an id, as the task will run indefinitely.
+            tokio::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                // Asynchronously wait for a ledger request.
+                while let Some(request) = ledger_handler.recv().await {
+                    // Update the state of the ledger.
+                    // Note: Do not wrap this call in a `tokio::spawn` as `BlockResponse` messages
+                    // will end up being processed out of order.
+
+                    state.ledger().update(request).await;
+                }
+            }),
+        );
+
+        // Wait until the ledger handler is ready.
+        let _ = handler.await;
     }
 
     ///

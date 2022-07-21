@@ -21,7 +21,9 @@ use snarkos_environment::{
 use snarkvm::{
     prelude::Network,
     utilities::{to_bytes_le, ToBytes},
-    {Block, Header, Transaction},
+    Block,
+    Header,
+    Transaction,
 };
 
 use ::bytes::{Buf, BufMut, Bytes, BytesMut};
