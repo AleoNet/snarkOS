@@ -25,7 +25,10 @@ use snarkvm::{
     console::types::Field,
     prelude::{Address, Network},
     utilities::{FromBytes, ToBytes},
-    Block, Header, Transaction, Transactions,
+    Block,
+    Header,
+    Transaction,
+    Transactions,
 };
 
 use serde_json::Value;

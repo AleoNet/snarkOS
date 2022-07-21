@@ -103,12 +103,12 @@ pub struct Ledger<N: Network, E: Environment> {
     /// The map of each peer to their failure messages := (failure_message, timestamp).
     failures: RwLock<HashMap<SocketAddr, Vec<(String, i64)>>>,
     /// The shared state of the owning node.
-    state: Arc<State<N, E>>,
+    state: State<N, E>,
 }
 
 impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger, paired with its handler.
-    pub async fn open<P: AsRef<Path> + Copy>(path: P, state: Arc<State<N, E>>) -> Result<(Self, mpsc::Receiver<LedgerRequest<N>>)> {
+    pub async fn open<P: AsRef<Path> + Copy>(path: P, state: State<N, E>) -> Result<(Self, mpsc::Receiver<LedgerRequest<N>>)> {
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
         let (ledger_router, ledger_handler) = mpsc::channel(1024);
 

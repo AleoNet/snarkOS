@@ -21,7 +21,10 @@ use snarkvm::{
     compiler::Transition,
     console::types::Field,
     prelude::{Address, Network},
-    Block, Header, Transaction, Transactions,
+    Block,
+    Header,
+    Transaction,
+    Transactions,
 };
 
 use std::net::SocketAddr;

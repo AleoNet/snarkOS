@@ -48,7 +48,9 @@ macro_rules! spawn_task {
     }};
 
     // Spawns a new task, without a task ID.
-    ($logic:expr) => {{ $crate::spawn_task!(None, { $logic }) }};
+    ($logic:expr) => {{
+        $crate::spawn_task!(None, { $logic })
+    }};
 
     // Spawns a new task, with a task ID.
     ($id:expr, $logic:block) => {{
@@ -64,7 +66,9 @@ macro_rules! spawn_task {
     }};
 
     // Spawns a new task, with a task ID.
-    ($id:expr, $logic:expr) => {{ $crate::spawn_task!($id, { $logic }) }};
+    ($id:expr, $logic:expr) => {{
+        $crate::spawn_task!($id, { $logic })
+    }};
 }
 
 #[derive(Clone, Debug)]
@@ -199,7 +203,7 @@ impl<N: Network, E: Environment> State<N, E> {
     ///
     /// Initialize a new instance of the ledger.
     ///
-    pub async fn initialize_ledger(self: &Arc<Self>, ledger: Ledger<N, E>, mut ledger_handler: LedgerHandler<N>) {
+    pub async fn initialize_ledger(&self, ledger: Ledger<N, E>, mut ledger_handler: LedgerHandler<N>) {
         self.ledger.set(ledger.into()).map_err(|_| ()).unwrap();
 
         let state = self.clone();
