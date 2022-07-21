@@ -18,7 +18,7 @@ use crate::CLI;
 
 use snarkos_consensus::account::Account;
 use snarkos_environment::{helpers::Status, Environment};
-use snarkos_network::{message::*, peers::*, state::State};
+use snarkos_network::{ledger::*, message::*, peers::*, state::State};
 use snarkvm::prelude::*;
 
 #[cfg(feature = "rpc")]
@@ -28,7 +28,7 @@ use snarkos_rpc::{initialize_rpc_server, RpcContext};
 use snarkos_metrics as metrics;
 
 use anyhow::Result;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, path::PathBuf};
 use tokio::sync::oneshot;
 
 #[derive(Clone)]
@@ -45,19 +45,19 @@ impl<N: Network, E: Environment> Node<N, E> {
         // Initialize the state.
         let state = State::new(cli.node, account).await?;
 
-        let node = Self { state };
+        let node = Self { state: state.clone() };
 
-        // /// Returns the storage path of the ledger.
-        // pub(crate) fn ledger_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
-        //     if cfg!(feature = "test") {
-        //         // Tests may use any available ports, and removes the storage artifacts afterwards,
-        //         // so that there is no need to adhere to a specific number assignment logic.
-        //         PathBuf::from(format!("/tmp/snarkos-test-ledger-{}", _local_ip.port()))
-        //     } else {
-        //         aleo_std::aleo_ledger_dir(self.network, self.dev)
-        //     }
-        // }
-        //
+        /// Returns the storage path of the ledger.
+        pub(crate) fn ledger_storage_path(cli: &CLI, _local_ip: SocketAddr) -> PathBuf {
+            if cfg!(feature = "test") {
+                // Tests may use any available ports, and removes the storage artifacts afterwards,
+                // so that there is no need to adhere to a specific number assignment logic.
+                PathBuf::from(format!("/tmp/snarkos-test-ledger-{}", _local_ip.port()))
+            } else {
+                aleo_std::aleo_ledger_dir(cli.network, cli.dev)
+            }
+        }
+
         // /// Returns the storage path of the validator.
         // pub(crate) fn validator_storage_path(&self, _local_ip: SocketAddr) -> PathBuf {
         //     if cfg!(feature = "test") {
@@ -80,28 +80,28 @@ impl<N: Network, E: Environment> Node<N, E> {
         //         aleo_std::aleo_prover_dir(self.network, self.dev)
         //     }
         // }
-        //
-        // // Initialize the ledger storage path.
-        // let ledger_storage_path = node.ledger_storage_path(local_ip);
+
+        // Initialize the ledger storage path.
+        let ledger_storage_path = ledger_storage_path(cli, *node.local_ip());
         // // Initialize the prover storage path.
         // let prover_storage_path = node.prover_storage_path(local_ip);
         // // Initialize the validator storage path.
         // let validator_storage_path = node.validator_storage_path(local_ip);
 
-        // // Initialize a new instance for managing the ledger.
-        // let (ledger, ledger_handler) = Ledger::<N, E>::open::<_>(&ledger_storage_path, state.clone()).await?;
-        //
+        // Initialize a new instance for managing the ledger.
+        let (ledger, ledger_handler) = Ledger::<N, E>::open::<_>(&ledger_storage_path, state.clone()).await?;
+
         // // Initialize a new instance for managing the prover.
         // let (prover, prover_handler) = Prover::open::<_>(&prover_storage_path, state.clone()).await?;
         //
         // // Initialize a new instance for managing the validator.
         // let (validator, validator_handler) = Operator::open::<_>(&validator_storage_path, state.clone()).await?;
 
-        // // Initialise the metrics exporter.
-        // #[cfg(any(feature = "test", feature = "prometheus"))]
-        // Self::initialize_metrics(ledger.reader().clone());
+        // Initialise the metrics exporter.
+        #[cfg(any(feature = "test", feature = "prometheus"))]
+        Self::initialize_metrics(ledger.reader().clone());
 
-        // node.state.initialize_ledger(ledger, ledger_handler).await;
+        node.state.initialize_ledger(ledger, ledger_handler).await;
         // node.state.initialize_prover(prover, prover_handler).await;
         // node.state.initialize_validator(validator, validator_handler).await;
 
@@ -166,17 +166,17 @@ impl<N: Network, E: Environment> Node<N, E> {
         }
     }
 
-    // #[cfg(any(feature = "test", feature = "prometheus"))]
-    // fn initialize_metrics(ledger: LedgerReader<N>) {
-    //     #[cfg(not(feature = "test"))]
-    //     if let Some(handler) = snarkos_metrics::initialize() {
-    //         // No need to provide an id, as the task will run indefinitely.
-    //         E::resources().register_task(None, handler);
-    //     }
-    //
-    //     // Set the block height as it could already be non-zero.
-    //     metrics::gauge!(metrics::blocks::HEIGHT, ledger.latest_block_height() as f64);
-    // }
+    #[cfg(any(feature = "test", feature = "prometheus"))]
+    fn initialize_metrics(ledger: LedgerReader<N>) {
+        #[cfg(not(feature = "test"))]
+        if let Some(handler) = snarkos_metrics::initialize() {
+            // No need to provide an id, as the task will run indefinitely.
+            E::resources().register_task(None, handler);
+        }
+
+        // Set the block height as it could already be non-zero.
+        metrics::gauge!(metrics::blocks::HEIGHT, ledger.latest_block_height() as f64);
+    }
 
     ///
     /// Disconnects from peers and proceeds to shut down the node.
