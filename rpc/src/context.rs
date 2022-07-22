@@ -23,7 +23,10 @@ use snarkvm::dpc::{Address, Network};
 
 use futures::TryFutureExt;
 use jsonrpsee::{
-    core::{middleware::Middleware, Error as JsonrpseeError},
+    core::{
+        middleware::{Headers, HttpMiddleware, MethodKind, Params},
+        Error as JsonrpseeError,
+    },
     http_server::{AccessControlBuilder, HttpServerBuilder, RpcModule},
 };
 use serde::{Deserialize, Serialize};
@@ -98,21 +101,23 @@ pub struct Meta {
 #[derive(Clone)]
 struct RpcMiddleware;
 
-impl Middleware for RpcMiddleware {
+impl HttpMiddleware for RpcMiddleware {
     type Instant = Instant;
 
-    fn on_request(&self) -> Instant {
+    fn on_request(&self, _remote_addr: SocketAddr, _headers: &Headers) -> Instant {
         Instant::now()
     }
 
-    fn on_call(&self, name: &str) {
-        debug!("Received a '{}' RPC request", name);
+    fn on_call(&self, method_name: &str, _params: Params<'_>, _kind: MethodKind) {
+        debug!("Received a '{}' RPC request", method_name);
     }
 
-    fn on_result(&self, name: &str, success: bool, started_at: Instant) {
+    fn on_result(&self, method_name: &str, success: bool, started_at: Instant) {
         let result = if success { "succeeded" } else { "failed" };
-        trace!("Call to '{}' {} in {:?}", name, result, started_at.elapsed());
+        trace!("Call to '{}' {} in {:?}", method_name, result, started_at.elapsed());
     }
+
+    fn on_response(&self, _result: &str, _started_at: Self::Instant) {}
 }
 
 /// Starts a local RPC HTTP server at `rpc_port` in a dedicated `tokio` task.
