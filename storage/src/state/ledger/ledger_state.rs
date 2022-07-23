@@ -20,17 +20,13 @@ use crate::{
     state::ledger::{block_state::BlockState, genesis_block, Metadata},
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
-use snarkos_environment::helpers::{BlockLocators, Resource};
+use snarkos_environment::helpers::{BlockLocators, Resource, MAXIMUM_LINEAR_BLOCK_LOCATORS, MAXIMUM_QUADRATIC_BLOCK_LOCATORS};
 use snarkvm::{
     circuit::Aleo,
     compiler::Transition,
     console::types::field::Field,
     prelude::{Address, Network, Record, Visibility},
-    Block,
-    Header,
-    Transaction,
-    Transactions,
-    VM,
+    Block, Header, Transaction, Transactions, VM,
 };
 // use snarkos_network::helpers::block_locators::*;
 
@@ -49,9 +45,6 @@ use std::{
 use time::OffsetDateTime;
 use tokio::sync::oneshot::{self, error::TryRecvError};
 
-// TODO (raychu86): Fetch MAXIMUM_LINEAR_BLOCK_LOCATORS from config.
-const MAXIMUM_LINEAR_BLOCK_LOCATORS: u32 = 64;
-
 #[derive(Debug)]
 pub struct LedgerState<N: Network, SA: StorageAccess> {
     // /// The current ledger tree of block hashes.
@@ -60,8 +53,8 @@ pub struct LedgerState<N: Network, SA: StorageAccess> {
     latest_block: RwLock<Block<N>>,
     /// The latest block hashes and headers in the ledger.
     latest_block_hashes_and_headers: RwLock<CircularQueue<(N::BlockHash, Header<N>)>>,
-    // /// The block locators from the latest block of the ledger.
-    // latest_block_locators: RwLock<BlockLocators<N>>,
+    /// The block locators from the latest block of the ledger.
+    latest_block_locators: RwLock<BlockLocators<N>>,
     /// The state root corresponding to each block height.
     state_roots: DataMap<Field<N>, u32, SA>,
     /// The blocks of the ledger in storage.
@@ -88,7 +81,7 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
             latest_block_hashes_and_headers: RwLock::new(CircularQueue::<(N::BlockHash, Header<N>)>::with_capacity(
                 MAXIMUM_LINEAR_BLOCK_LOCATORS as usize,
             )),
-            // latest_block_locators: Default::default(),
+            latest_block_locators: Default::default(),
             state_roots: storage.open_map(DataID::LedgerRoots)?,
             blocks: BlockState::<_, _>::open(storage)?,
         });
@@ -167,10 +160,10 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
         self.latest_block.read().transactions().clone()
     }
 
-    // /// Returns the latest block locators.
-    // pub fn latest_block_locators(&self) -> BlockLocators<N> {
-    //     self.latest_block_locators.read().clone()
-    // }
+    /// Returns the latest block locators.
+    pub fn latest_block_locators(&self) -> BlockLocators<N> {
+        self.latest_block_locators.read().clone()
+    }
 
     // /// Returns the latest ledger root.
     // pub fn latest_ledger_root(&self) -> Field<N> {
@@ -282,61 +275,61 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
         self.blocks.get_previous_state_root(block_height)
     }
 
-    // /// Returns the block locators of the current ledger, from the given block height.
-    // pub fn get_block_locators(&self, block_height: u32) -> Result<BlockLocators<N>> {
-    //     // Initialize the current block height that a block locator is obtained from.
-    //     let mut block_locator_height = block_height;
-    //
-    //     // Determine the number of latest block headers to include as block locators (linear).
-    //     let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS, block_locator_height);
-    //
-    //     // Construct the list of block locator headers.
-    //     let block_locator_headers = self
-    //         .latest_block_hashes_and_headers
-    //         .read()
-    //         .asc_iter()
-    //         .filter(|(_, header)| header.height() != 0) // Skip the genesis block.
-    //         .take(num_block_headers as usize)
-    //         .cloned()
-    //         .map(|(hash, header)| (header.height(), (hash, Some(header))))
-    //         .collect::<Vec<_>>();
-    //
-    //     // Decrement the block locator height by the number of block headers.
-    //     block_locator_height -= num_block_headers;
-    //
-    //     // Return the block locators if the locator has run out of blocks.
-    //     if block_locator_height == 0 {
-    //         // Initialize the list of block locators.
-    //         let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> = block_locator_headers.into_iter().collect();
-    //         // Add the genesis locator.
-    //         block_locators.insert(0, (self.get_block_hash(0)?, None));
-    //
-    //         return BlockLocators::<N>::from(block_locators);
-    //     }
-    //
-    //     // Determine the number of latest block hashes to include as block locators (power of two).
-    //     let num_block_hashes = std::cmp::min(MAXIMUM_QUADRATIC_BLOCK_LOCATORS, block_locator_height);
-    //
-    //     // Initialize list of block locator hashes.
-    //     let mut block_locator_hashes = Vec::with_capacity(num_block_hashes as usize);
-    //     let mut accumulator = 1;
-    //     // Add the block locator hashes.
-    //     while block_locator_height > 0 && block_locator_hashes.len() < num_block_hashes as usize {
-    //         block_locator_hashes.push((block_locator_height, (self.get_block_hash(block_locator_height)?, None)));
-    //
-    //         // Decrement the block locator height by a power of two.
-    //         block_locator_height = block_locator_height.saturating_sub(accumulator);
-    //         accumulator *= 2;
-    //     }
-    //
-    //     // Initialize the list of block locators.
-    //     let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<BlockHeader<N>>)> =
-    //         block_locator_headers.into_iter().chain(block_locator_hashes).collect();
-    //     // Add the genesis locator.
-    //     block_locators.insert(0, (self.get_block_hash(0)?, None));
-    //
-    //     BlockLocators::<N>::from(block_locators)
-    // }
+    /// Returns the block locators of the current ledger, from the given block height.
+    pub fn get_block_locators(&self, block_height: u32) -> Result<BlockLocators<N>> {
+        // Initialize the current block height that a block locator is obtained from.
+        let mut block_locator_height = block_height;
+
+        // Determine the number of latest block headers to include as block locators (linear).
+        let num_block_headers = std::cmp::min(MAXIMUM_LINEAR_BLOCK_LOCATORS, block_locator_height);
+
+        // Construct the list of block locator headers.
+        let block_locator_headers = self
+            .latest_block_hashes_and_headers
+            .read()
+            .asc_iter()
+            .filter(|(_, header)| header.height() != 0) // Skip the genesis block.
+            .take(num_block_headers as usize)
+            .cloned()
+            .map(|(hash, header)| (header.height(), (hash, Some(header))))
+            .collect::<Vec<_>>();
+
+        // Decrement the block locator height by the number of block headers.
+        block_locator_height -= num_block_headers;
+
+        // Return the block locators if the locator has run out of blocks.
+        if block_locator_height == 0 {
+            // Initialize the list of block locators.
+            let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<Header<N>>)> = block_locator_headers.into_iter().collect();
+            // Add the genesis locator.
+            block_locators.insert(0, (self.get_block_hash(0)?, None));
+
+            return BlockLocators::<N>::from(block_locators);
+        }
+
+        // Determine the number of latest block hashes to include as block locators (power of two).
+        let num_block_hashes = std::cmp::min(MAXIMUM_QUADRATIC_BLOCK_LOCATORS, block_locator_height);
+
+        // Initialize list of block locator hashes.
+        let mut block_locator_hashes = Vec::with_capacity(num_block_hashes as usize);
+        let mut accumulator = 1;
+        // Add the block locator hashes.
+        while block_locator_height > 0 && block_locator_hashes.len() < num_block_hashes as usize {
+            block_locator_hashes.push((block_locator_height, (self.get_block_hash(block_locator_height)?, None)));
+
+            // Decrement the block locator height by a power of two.
+            block_locator_height = block_locator_height.saturating_sub(accumulator);
+            accumulator *= 2;
+        }
+
+        // Initialize the list of block locators.
+        let mut block_locators: BTreeMap<u32, (N::BlockHash, Option<Header<N>>)> =
+            block_locator_headers.into_iter().chain(block_locator_hashes).collect();
+        // Add the genesis locator.
+        block_locators.insert(0, (self.get_block_hash(0)?, None));
+
+        BlockLocators::<N>::from(block_locators)
+    }
 
     /// Check that the block locators are well formed.
     pub fn check_block_locators(&self, block_locators: &BlockLocators<N>) -> Result<bool> {
@@ -596,8 +589,7 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
             }
         }
 
-        // TODO (raychu86): Reintroduce block locators
-        // *self.latest_block_locators.write() = self.get_block_locators(end_block_height)?;
+        *self.latest_block_locators.write() = self.get_block_locators(end_block_height)?;
 
         Ok(())
     }
@@ -794,7 +786,8 @@ impl<N: Network, SA: StorageReadWrite> LedgerState<N, SA> {
             latest_block: RwLock::new(genesis_block::<N>()),
             latest_block_hashes_and_headers: RwLock::new(CircularQueue::<(N::BlockHash, Header<N>)>::with_capacity(
                 MAXIMUM_LINEAR_BLOCK_LOCATORS as usize,
-            )), // latest_block_locators: Default::default(),
+            )),
+            latest_block_locators: Default::default(),
             state_roots: storage.open_map(DataID::LedgerRoots)?,
             blocks: BlockState::<_, _>::open(storage)?,
         };
@@ -904,7 +897,7 @@ impl<N: Network, SA: StorageReadWrite> LedgerState<N, SA> {
 
     /// Adds the given block as the next block in the ledger to storage.
     pub fn add_next_block(&self, block: &Block<N>) -> Result<()> {
-        // TODO (raychu86): Reinstate block verification with VM.
+        // TODO (raychu86): Reintroduce block verification with VM.
         // Ensure the block itself is valid.
         if !block.verify(&VM::new()?) {
             return Err(anyhow!("Block {} is invalid", block.header().height()));
@@ -1031,8 +1024,7 @@ impl<N: Network, SA: StorageReadWrite> LedgerState<N, SA> {
         self.latest_block_hashes_and_headers
             .write()
             .push((block.hash(), block.header().clone()));
-        // TODO (raychu86): Reintroduce block locators.
-        // *self.latest_block_locators.write() = self.get_block_locators(block.height())?;
+        *self.latest_block_locators.write() = self.get_block_locators(block.header().height())?;
         *self.latest_block.write() = block.clone();
 
         Ok(())
@@ -1252,9 +1244,7 @@ mod tests {
     use super::*;
     use crate::storage::{
         rocksdb::{tests::temp_dir, RocksDB},
-        ReadOnly,
-        ReadWrite,
-        Storage,
+        ReadOnly, ReadWrite, Storage,
     };
     use snarkvm::prelude::Testnet3;
 
