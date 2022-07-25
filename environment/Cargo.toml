@@ -38,7 +38,7 @@ version = "1"
 path = "../../snarkVM"
 #git = "https://github.com/AleoHQ/snarkVM.git"
 #branch = "testnet3"
-features = ["console"]
+features = ["console", "utilities"]
 
 [dependencies.tokio]
 version = "1"

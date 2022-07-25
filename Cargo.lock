@@ -2705,7 +2705,6 @@ dependencies = [
  "rayon",
  "rocksdb",
  "serde",
- "snarkos-consensus",
  "snarkos-environment",
  "snarkos-storage",
  "snarkvm",

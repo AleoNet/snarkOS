@@ -28,7 +28,6 @@ use snarkvm::{
     prelude::{Address, Network, Record, Visibility},
     Block, Header, Transaction, Transactions, VM,
 };
-// use snarkos_network::helpers::block_locators::*;
 
 use anyhow::{anyhow, Result};
 use circular_queue::CircularQueue;
