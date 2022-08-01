@@ -23,10 +23,9 @@ use crate::{
 use snarkos_environment::helpers::{BlockLocators, Resource, MAXIMUM_LINEAR_BLOCK_LOCATORS, MAXIMUM_QUADRATIC_BLOCK_LOCATORS};
 use snarkvm::{
     circuit::Aleo,
-    compiler::Transition,
+    compiler::{Block, Header, Transaction, Transactions, Transition, VM},
     console::types::field::Field,
     prelude::{Address, Network, Record, Visibility},
-    Block, Header, Transaction, Transactions, VM,
 };
 
 use anyhow::{anyhow, Result};
@@ -1243,7 +1242,9 @@ mod tests {
     use super::*;
     use crate::storage::{
         rocksdb::{tests::temp_dir, RocksDB},
-        ReadOnly, ReadWrite, Storage,
+        ReadOnly,
+        ReadWrite,
+        Storage,
     };
     use snarkvm::prelude::Testnet3;
 

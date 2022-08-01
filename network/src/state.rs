@@ -48,9 +48,7 @@ macro_rules! spawn_task {
     }};
 
     // Spawns a new task, without a task ID.
-    ($logic:expr) => {{
-        $crate::spawn_task!(None, { $logic })
-    }};
+    ($logic:expr) => {{ $crate::spawn_task!(None, { $logic }) }};
 
     // Spawns a new task, with a task ID.
     ($id:expr, $logic:block) => {{
@@ -66,9 +64,7 @@ macro_rules! spawn_task {
     }};
 
     // Spawns a new task, with a task ID.
-    ($id:expr, $logic:expr) => {{
-        $crate::spawn_task!($id, { $logic })
-    }};
+    ($id:expr, $logic:expr) => {{ $crate::spawn_task!($id, { $logic }) }};
 }
 
 #[derive(Clone, Debug)]

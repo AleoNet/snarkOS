@@ -18,7 +18,12 @@ use crate::{
     state::ledger::{transaction_state::TransactionState, Metadata},
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
-use snarkvm::{circuit::Aleo, compiler::Transition, console::types::field::Field, prelude::*, Block, Header, Transaction, Transactions};
+use snarkvm::{
+    circuit::Aleo,
+    compiler::{Block, Header, Transaction, Transactions, Transition},
+    console::types::field::Field,
+    prelude::*,
+};
 
 use anyhow::{anyhow, Result};
 use rayon::prelude::*;
@@ -178,7 +183,7 @@ impl<N: Network, SA: StorageAccess> BlockState<N, SA> {
             for transaction_id in transaction_ids.iter() {
                 transactions.push(self.transactions.get_transaction(transaction_id)?)
             }
-            Transactions::from(&transactions)?
+            Transactions::from(&transactions)
         };
 
         Ok(transactions)
@@ -193,7 +198,10 @@ impl<N: Network, SA: StorageAccess> BlockState<N, SA> {
         // Retrieve the block transactions.
         let transactions = self.get_block_transactions(block_height)?;
 
-        Ok(Block::from(previous_block_hash, block_header, transactions)?)
+        // TODO (raychu86): Add support for signatures.
+        // Ok(Block::from(previous_block_hash, block_header, transactions)?)
+
+        Err(anyhow!("Can't get block {block_height}, signatures are not yet supported"))
     }
 
     /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).

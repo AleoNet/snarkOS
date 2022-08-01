@@ -21,14 +21,10 @@
 use crate::{RpcContext, RpcError, RpcFunctions};
 use snarkos_environment::Environment;
 use snarkvm::{
-    compiler::Transition,
+    compiler::{Block, Header, Transaction, Transactions, Transition},
     console::types::Field,
     prelude::{Address, Network},
     utilities::{FromBytes, ToBytes},
-    Block,
-    Header,
-    Transaction,
-    Transactions,
 };
 
 use serde_json::Value;

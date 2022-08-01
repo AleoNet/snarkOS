@@ -28,7 +28,7 @@ use snarkos_storage::{
     storage::{rocksdb::RocksDB, ReadOnly, ReadWrite},
     LedgerState,
 };
-use snarkvm::{prelude::*, Block};
+use snarkvm::{compiler::Block, prelude::*};
 
 #[cfg(any(feature = "test", feature = "prometheus"))]
 use snarkos_metrics as metrics;

@@ -14,8 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{message::DisconnectReason, Account, Node};
+use crate::Node;
+use snarkos_consensus::account::Account;
 use snarkos_environment::TestEnvironment;
+use snarkos_network::message::DisconnectReason;
 
 use clap::Parser;
 use std::net::SocketAddr;
@@ -76,7 +78,7 @@ impl TestNode {
         let permanent_args = &["snarkos", "--norpc"];
         let combined_args = permanent_args.iter().chain(extra_args.iter());
         let config = crate::CLI::parse_from(combined_args);
-        let node = Node::<CurrentNetwork, TestEnvironment<CurrentNetwork>>::new(config.node, Account::sample().unwrap())
+        let node = Node::<CurrentNetwork, TestEnvironment<CurrentNetwork>>::new(&config, Account::sample().unwrap())
             .await
             .unwrap();
 

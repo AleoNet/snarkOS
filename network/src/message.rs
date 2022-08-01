@@ -19,11 +19,9 @@ use snarkos_environment::{
     Environment,
 };
 use snarkvm::{
+    compiler::{Block, Header, Transaction},
     prelude::Network,
     utilities::{to_bytes_le, ToBytes},
-    Block,
-    Header,
-    Transaction,
 };
 
 use ::bytes::{Buf, BufMut, Bytes, BytesMut};

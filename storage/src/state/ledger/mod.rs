@@ -19,11 +19,10 @@ pub(super) mod ledger_state;
 pub(super) mod transaction_state;
 
 use snarkvm::{
+    compiler::{Block, VM},
     console::{account::PrivateKey, network::Testnet3},
     prelude::*,
     utilities::test_crypto_rng_fixed,
-    Block,
-    VM,
 };
 
 ///

@@ -392,7 +392,6 @@ impl<N: Network, E: Environment> Peers<N, E> {
     }
 
     /// Removes the addresses of all known peers.
-    #[cfg(feature = "test")]
     pub async fn reset_known_peers(&self) {
         self.candidate_peers.write().await.clear();
         self.restricted_peers.write().await.clear();

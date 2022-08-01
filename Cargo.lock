@@ -2733,9 +2733,9 @@ dependencies = [
  "snarkvm-compiler",
  "snarkvm-console",
  "snarkvm-fields",
+ "snarkvm-parameters",
  "snarkvm-utilities",
  "thiserror",
- "tracing",
  "ureq",
  "walkdir",
 ]
@@ -2747,7 +2747,6 @@ dependencies = [
  "aleo-std",
  "anyhow",
  "bincode",
- "blake2s_simd",
  "crossbeam-channel",
  "curl",
  "derivative",
@@ -2965,6 +2964,7 @@ dependencies = [
  "snarkvm-fields",
  "snarkvm-parameters",
  "snarkvm-utilities",
+ "time",
  "tracing",
 ]
 

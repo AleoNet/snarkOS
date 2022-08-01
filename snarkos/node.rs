@@ -89,7 +89,7 @@ impl<N: Network, E: Environment> Node<N, E> {
         // let validator_storage_path = node.validator_storage_path(local_ip);
 
         // Initialize a new instance for managing the ledger.
-        let (ledger, ledger_handler) = Ledger::<N, E>::open::<_>(&ledger_storage_path, state.clone()).await?;
+        let (ledger, ledger_handler) = snarkos_network::Ledger::<N, E>::open::<_>(&ledger_storage_path, state.clone()).await?;
 
         // // Initialize a new instance for managing the prover.
         // let (prover, prover_handler) = Prover::open::<_>(&prover_storage_path, state.clone()).await?;

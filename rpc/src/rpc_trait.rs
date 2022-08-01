@@ -18,13 +18,9 @@
 
 use crate::RpcError;
 use snarkvm::{
-    compiler::Transition,
+    compiler::{Block, Header, Transactions, Transition},
     console::types::Field,
     prelude::{Address, Network},
-    Block,
-    Header,
-    Transaction,
-    Transactions,
 };
 
 use std::net::SocketAddr;

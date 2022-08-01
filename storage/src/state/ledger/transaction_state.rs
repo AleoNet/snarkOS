@@ -19,13 +19,12 @@ use crate::{
     storage::{DataID, DataMap, MapRead, MapReadWrite, Storage, StorageAccess, StorageReadWrite},
 };
 use snarkvm::{
-    compiler::{Deployment, Execution, Transition},
+    compiler::{Deployment, Execution, Transaction, Transition},
     console::{
         program::ProgramID,
         types::field::{Field, Zero},
     },
     prelude::*,
-    Transaction,
 };
 
 use anyhow::{anyhow, Result};
@@ -120,15 +119,20 @@ impl<N: Network, SA: StorageAccess> TransactionState<N, SA> {
                 };
             }
 
-            Transaction::execute(execution)
+            Transaction::from_execution(execution, None)
         } else if let Some((program_id, edition, _)) = self.deployments.get(transaction_id)? {
             // Retrieve the program
-            let program = match self.programs.get(&program_id)? {
+            let deployment = match self.programs.get(&program_id)? {
                 Some(program) => program,
                 None => return Err(anyhow!("Program {} missing in storage", program_id)),
             };
 
-            Transaction::deploy(program)
+            // TODO (raychu86): Include the fees.
+            // Transaction::from_deployment(deployment)
+
+            Err(anyhow!(
+                "Deployment transaction {transaction_id} not currently supported in storage"
+            ))
         } else {
             Err(anyhow!("Transaction {} does not exist in storage", transaction_id))
         }
@@ -155,13 +159,13 @@ impl<N: Network, SA: StorageReadWrite> TransactionState<N, SA> {
             Err(anyhow!("Transaction {} already exists in storage", transaction_id))
         } else {
             match transaction {
-                Transaction::Deploy(_, deployment) => {
+                Transaction::Deploy(_, deployment, _) => {
                     let program_id = deployment.program().id();
                     self.deployments
                         .insert(&transaction_id, &(*program_id, deployment.edition(), metadata), batch)?;
                     self.programs.insert(program_id, deployment, batch)?;
                 }
-                Transaction::Execute(_, execution) => {
+                Transaction::Execute(_, execution, _) => {
                     let transition_ids = execution.iter().map(|transition| transition.id()).cloned().collect::<Vec<_>>();
 
                     // TODO (raychu86) Use a real ledger root.

@@ -16,7 +16,7 @@
 
 use super::*;
 
-use snarkvm::{Header, Transactions};
+use snarkvm::compiler::{Header, Transactions};
 
 impl<N: Network, E: Environment> Peer<N, E> {
     /// Initializes a handshake to connect with a peer.
@@ -94,7 +94,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let mut peer_ip = outbound_socket.get_ref().peer_addr()?;
 
         // Retrieve the genesis block header. // TODO (raychu86): Ensure that the genesis header has no transactions.
-        let genesis_header = Header::<N>::genesis(&Transactions::from(&vec![])?)?;
+        let genesis_header = Header::<N>::genesis(&Transactions::from(&vec![]))?;
 
         // Send a challenge request to the peer.
         let message = Message::<N>::ChallengeRequest(
