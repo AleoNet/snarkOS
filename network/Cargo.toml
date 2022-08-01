@@ -38,6 +38,9 @@ version = "1"
 [dependencies.rand]
 version = "0.8"
 
+[dependencies.rayon]
+version = "1"
+
 [dependencies.serde]
 version = "1"
 

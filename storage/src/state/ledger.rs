@@ -20,7 +20,7 @@ use crate::storage::{DataMap, MapId, MapRead, MapReadWrite, Storage, StorageAcce
 use snarkos_environment::helpers::{block_locators::*, Resource};
 use snarkvm::dpc::prelude::*;
 
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, ensure, Result};
 use circular_queue::CircularQueue;
 use itertools::Itertools;
 use parking_lot::RwLock;
@@ -274,7 +274,11 @@ impl<N: Network, A: StorageAccess> LedgerState<N, A> {
     }
 
     /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
-    pub fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
+    pub fn get_blocks(
+        &self,
+        start_block_height: u32,
+        end_block_height: u32,
+    ) -> Result<impl ParallelIterator<Item = Result<Block<N>>> + '_> {
         self.blocks.get_blocks(start_block_height, end_block_height)
     }
 
@@ -1066,11 +1070,10 @@ impl<N: Network, A: StorageReadWrite> LedgerState<N, A> {
         // Fetch the blocks to be removed. This ensures the blocks to be removed exist in the ledger,
         // and is used during the removal process to expedite the procedure.
         let start_block_height = latest_block_height.saturating_sub(number_of_blocks);
-        let blocks: BTreeMap<u32, Block<N>> = self
+        let blocks = self
             .get_blocks(start_block_height, latest_block_height)?
-            .iter()
-            .map(|block| (block.height(), block.clone()))
-            .collect();
+            .map(|block| block.map(|block| (block.height(), block)))
+            .collect::<Result<BTreeMap<u32, Block<N>>>>()?;
 
         // Perform all the associated storage operations as an atomic batch.
         let batch = self.ledger_roots.prepare_batch();
@@ -1430,16 +1433,13 @@ impl<N: Network, A: StorageAccess> BlockState<N, A> {
     }
 
     /// Returns the blocks from the given `start_block_height` to `end_block_height` (inclusive).
-    fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<Vec<Block<N>>> {
+    fn get_blocks(&self, start_block_height: u32, end_block_height: u32) -> Result<impl ParallelIterator<Item = Result<Block<N>>> + '_> {
         // Ensure the starting block height is less than the ending block height.
-        if start_block_height > end_block_height {
-            return Err(anyhow!("Invalid starting and ending block heights"));
-        }
+        ensure!(start_block_height <= end_block_height, "Invalid starting and ending block heights");
 
-        (start_block_height..=end_block_height)
+        Ok((start_block_height..=end_block_height)
             .into_par_iter()
-            .map(|height| self.get_block(height))
-            .collect()
+            .map(|height| self.get_block(height)))
     }
 
     /// Returns the ledger root in the block header of the given block height.

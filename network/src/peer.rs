@@ -27,6 +27,7 @@ use snarkos_metrics as metrics;
 
 use anyhow::{anyhow, bail, Result};
 use futures::SinkExt;
+use rayon::iter::ParallelIterator;
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -467,15 +468,14 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         continue;
                                     }
                                     // Retrieve the requested blocks.
-                                    let blocks = match state.ledger().reader().get_blocks(start_block_height, end_block_height) {
-                                        Ok(blocks) => blocks,
-                                        Err(error) => {
-                                            // Route a `Failure` to the ledger.
-                                            if let Err(error) = state.ledger().router().send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
-                                                warn!("[Failure] {}", error);
-                                            }
-                                            continue;
-                                        }
+                                    let blocks: Vec<Block<N>> = match state.ledger().reader().get_blocks(start_block_height, end_block_height).and_then(|blocks| blocks.collect()) {
+                                            Ok(blocks) => blocks,
+                                            Err(error) => {
+                                                if let Err(error) = state.ledger().router().send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
+                                                    warn!("[Failure] {}", error);
+                                                }
+                                                continue;
+                                            },
                                     };
                                     // Send a `BlockResponse` message for each block to the peer.
                                     for block in blocks {
