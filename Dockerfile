@@ -1,4 +1,4 @@
-FROM ubuntu:18.04 AS builder
+FROM ubuntu:20.04 AS builder
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH \
@@ -41,7 +41,7 @@ RUN set -eux ; \
 WORKDIR /usr/src/snarkOS
 COPY . .
 RUN cargo build --release
-FROM ubuntu:18.04
+FROM ubuntu:20.04
 SHELL ["/bin/bash", "-c"]
 VOLUME ["/aleo/data"]
 RUN set -ex && \
