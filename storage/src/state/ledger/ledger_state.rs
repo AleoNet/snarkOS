@@ -97,7 +97,7 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
         });
 
         // Determine the latest block height.
-        let latest_block_height = match (ledger.state_roots.read().values().max(), ledger.ledger.read().get_current_height()) {
+        let latest_block_height = match (ledger.state_roots.read().values().max(), ledger.ledger.read().latest_height()) {
             (Some(latest_block_height_0), latest_block_height_1) => match *latest_block_height_0 == latest_block_height_1 {
                 true => *latest_block_height_0,
                 false => {
@@ -453,7 +453,7 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
                     // let latest_block_height = ledger.ledger.read().previous_hashes.keys().len() as u32;
                     let latest_block_height = match ledger.state_roots.read().values().max() {
                         Some(height) => *height,
-                        None => ledger.ledger.read().get_current_height(),
+                        None => ledger.ledger.read().latest_height(),
                     };
 
                     let current_block_height = current_block.header().height();
@@ -590,7 +590,7 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
         };
 
         // Determine the latest block height.
-        let latest_block_height = match (ledger.state_roots.read().values().max(), ledger.ledger.read().get_current_height()) {
+        let latest_block_height = match (ledger.state_roots.read().values().max(), ledger.ledger.read().latest_height()) {
             (Some(latest_block_height_0), latest_block_height_1) => match *latest_block_height_0 == latest_block_height_1 {
                 true => *latest_block_height_0,
                 // TODO (raychu86): Try to fix inconsistent state.
