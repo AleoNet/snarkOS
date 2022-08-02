@@ -18,7 +18,7 @@ mod update;
 
 use crate::{
     message::{Data, DisconnectReason, Message},
-    peer::{Peer, PeerRouter},
+    peer::Peer,
     spawn_task,
     state::State,
 };

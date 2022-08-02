@@ -16,10 +16,6 @@
 
 use super::*;
 
-use snarkos_storage::genesis_block;
-
-use snarkvm::compiler::{Header, Transactions};
-
 impl<N: Network, E: Environment> Peer<N, E> {
     /// Initializes a handshake to connect with a peer.
     pub(crate) async fn handshake(state: State<N, E>, stream: TcpStream, connection_result: Option<ConnectionResult>) {
@@ -96,7 +92,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
         let mut peer_ip = outbound_socket.get_ref().peer_addr()?;
 
         // Retrieve the genesis block header.
-        let genesis_header = *genesis_block::<N>().header();
+        let genesis_header = *snarkos_storage::genesis_block::<N>().header();
 
         // Send a challenge request to the peer.
         let message = Message::<N>::ChallengeRequest(

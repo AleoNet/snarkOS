@@ -23,12 +23,10 @@ use snarkos_environment::Environment;
 use snarkvm::{
     compiler::{Block, Header, Transaction, Transactions, Transition},
     console::types::Field,
-    prelude::{Address, Network},
-    utilities::{FromBytes, ToBytes},
+    prelude::Network,
 };
 
 use serde_json::Value;
-use time::OffsetDateTime;
 
 use std::{cmp::max, net::SocketAddr};
 
@@ -101,94 +99,11 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
         Ok(self.ledger().get_block_header(block_height)?)
     }
 
-    // /// Returns the block template for the next mined block
-    // async fn get_block_template(&self) -> Result<Value, RpcError> {
-    //     // Fetch the latest state from the ledger.
-    //     let latest_block = self.ledger().latest_block();
-    //     let ledger_root = self.ledger().latest_ledger_root();
-    //
-    //     // Prepare the new block.
-    //     let previous_block_hash = latest_block.hash();
-    //     let block_height = self.ledger().latest_block_height() + 1;
-    //     let block_timestamp = OffsetDateTime::now_utc().unix_timestamp();
-    //
-    //     // Compute the block difficulty target.
-    //     let difficulty_target = if N::ID == 3 && block_height <= snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT {
-    //         Blocks::<N>::compute_difficulty_target(latest_block.header(), block_timestamp, block_height)
-    //     } else if N::ID == 3 {
-    //         let anchor_block_header = self.ledger().get_block_header(snarkvm::dpc::testnet2::V12_UPGRADE_BLOCK_HEIGHT)?;
-    //         Blocks::<N>::compute_difficulty_target(&anchor_block_header, block_timestamp, block_height)
-    //     } else {
-    //         Blocks::<N>::compute_difficulty_target(N::genesis_block().header(), block_timestamp, block_height)
-    //     };
-    //
-    //     // Compute the cumulative weight.
-    //     let cumulative_weight = latest_block
-    //         .cumulative_weight()
-    //         .saturating_add((u64::MAX / difficulty_target) as u128);
-    //
-    //     // Compute the coinbase reward (not including the transaction fees).
-    //     let mut coinbase_reward = Block::<N>::block_reward(block_height);
-    //     let mut transaction_fees = AleoAmount::ZERO;
-    //
-    //     // Get and filter the transactions from the mempool.
-    //     let transactions: Vec<String> = self
-    //         .state
-    //         .prover()
-    //         .memory_pool()
-    //         .read()
-    //         .await
-    //         .transactions()
-    //         .iter()
-    //         .filter(|transaction| {
-    //             for serial_number in transaction.serial_numbers() {
-    //                 if let Ok(true) = self.ledger().contains_serial_number(serial_number) {
-    //                     return false;
-    //                 }
-    //             }
-    //
-    //             for commitment in transaction.commitments() {
-    //                 if let Ok(true) = self.ledger().contains_commitment(commitment) {
-    //                     return false;
-    //                 }
-    //             }
-    //
-    //             transaction_fees = transaction_fees.add(transaction.value_balance());
-    //             true
-    //         })
-    //         .map(|tx| tx.to_string())
-    //         .collect();
-    //
-    //     // Enforce that the transaction fee is positive or zero.
-    //     if transaction_fees.is_negative() {
-    //         return Err(RpcError::Message("Invalid transaction fees".to_string()));
-    //     }
-    //
-    //     // Calculate the final coinbase reward (including the transaction fees).
-    //     coinbase_reward = coinbase_reward.add(transaction_fees);
-    //
-    //     Ok(serde_json::json!({
-    //         "previous_block_hash": previous_block_hash,
-    //         "block_height": block_height,
-    //         "time": block_timestamp,
-    //         "difficulty_target": difficulty_target,
-    //         "cumulative_weight": cumulative_weight,
-    //         "ledger_root": ledger_root,
-    //         "transactions": transactions,
-    //         "coinbase_reward": coinbase_reward,
-    //     }))
-    // }
-
     /// Returns the transactions from the block of the given block height.
     async fn get_block_transactions(&self, block_height: u32) -> Result<Transactions<N>, RpcError> {
         Ok(self.ledger().get_block_transactions(block_height)?)
     }
 
-    // /// Returns the ciphertext given the commitment.
-    // async fn get_ciphertext(&self, commitment: Field<N>) -> Result<N::RecordCiphertext, RpcError> {
-    //     Ok(self.ledger().get_ciphertext(&commitment)?)
-    // }
-    //
     // /// Returns the ledger proof for a given record commitment.
     // async fn get_ledger_proof(&self, record_commitment: Field<N>) -> Result<String, RpcError> {
     //     let ledger_proof = self.ledger().get_ledger_inclusion_proof(record_commitment)?;
@@ -259,22 +174,5 @@ impl<N: Network, E: Environment> RpcFunctions<N> for RpcContext<N, E> {
     //         warn!("[UnconfirmedTransaction] {}", error);
     //     }
     //     Ok(transaction.transaction_id())
-    // }
-    //
-    // /// Returns the amount of shares submitted by a given prover.
-    // async fn get_shares_for_prover(&self, prover: Address<N>) -> Result<u64, RpcError> {
-    //     Ok(self.state.operator().get_shares_for_prover(&prover))
-    // }
-    //
-    // /// Returns the amount of shares submitted to the operator in total.
-    // async fn get_shares(&self) -> u64 {
-    //     let shares = self.state.operator().to_shares();
-    //     shares.iter().map(|(_, share)| share.values().sum::<u64>()).sum()
-    // }
-    //
-    // /// Returns a list of all provers that have submitted shares to the operator.
-    // async fn get_provers(&self) -> Value {
-    //     let provers = self.state.operator().get_provers();
-    //     serde_json::json!(provers)
     // }
 }

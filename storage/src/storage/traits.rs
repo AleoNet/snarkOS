@@ -18,7 +18,6 @@ use super::{DataID, DataMap};
 
 use anyhow::Result;
 use serde::{de::DeserializeOwned, Serialize};
-use std::{borrow::Borrow, path::Path};
 
 /// A trait applicable to all access modes of database operations.
 pub trait StorageAccess: Send + Sync + 'static {}

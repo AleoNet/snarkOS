@@ -14,10 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_environment::{
-    helpers::{NodeType, Status},
-    Environment,
-};
+use snarkos_environment::helpers::{NodeType, Status};
 use snarkvm::{
     compiler::{Block, Header, Transaction},
     prelude::Network,

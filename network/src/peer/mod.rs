@@ -33,7 +33,7 @@ use snarkvm::prelude::*;
 use anyhow::Result;
 use futures::SinkExt;
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant, SystemTime},

@@ -420,7 +420,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         break;
                                     }
 
-                                    // Perform the deferred non-blocking deserialisation of the
+                                    // Perform the deferred non-blocking deserialization of the
                                     // transaction.
                                     match transaction.deserialize().await {
                                         Ok(transaction) => {
