@@ -140,6 +140,11 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         &self.canon_reader
     }
 
+    /// Returns an instance of the canon ledger..
+    pub fn canon(&self) -> &LedgerState<N, ReadWrite> {
+        &self.canon
+    }
+
     /// Returns an instance of the ledger router.
     pub fn router(&self) -> &LedgerRouter<N> {
         &self.ledger_router
@@ -444,7 +449,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Returns `true` if the given block is successfully added to the *canon* chain.
     ///
-    async fn add_block(&self, unconfirmed_block: Block<N>) -> bool {
+    pub async fn add_block(&self, unconfirmed_block: Block<N>) -> bool {
         // Retrieve the unconfirmed block height.
         let unconfirmed_block_height = unconfirmed_block.header().height();
         // Retrieve the unconfirmed block hash.
@@ -467,62 +472,40 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             // Acquire the lock for the canon chain.
             let _canon_lock = self.canon_lock.lock().await;
 
-            // Ensure the block height is not part of a block request on a fork.
-            let mut is_block_on_fork = false;
-            'outer: for requests in self.block_requests.read().await.values() {
-                for request in requests.keys() {
-                    // If the unconfirmed block conflicts with a requested block on a fork, skip.
-                    if request.block_height() == unconfirmed_block_height {
-                        if let Some(requested_block_hash) = request.block_hash() {
-                            if unconfirmed_block.hash() != requested_block_hash {
-                                is_block_on_fork = true;
-                                break 'outer;
-                            }
-                        }
-                    }
+            match self.canon.add_next_block(&unconfirmed_block) {
+                Ok(()) => {
+                    let latest_block_height = self.canon.latest_block_height();
+                    info!(
+                        "Ledger successfully advanced to block {} ({})",
+                        latest_block_height,
+                        self.canon.latest_block_hash()
+                    );
+
+                    #[cfg(any(feature = "test", feature = "prometheus"))]
+                    metrics::gauge!(metrics::blocks::HEIGHT, latest_block_height as f64);
+
+                    // Update the timestamp of the last block increment.
+                    *self.last_block_update_timestamp.write().await = Instant::now();
+                    // Set the terminator bit to `true` to ensure the miner updates state.
+                    E::terminator().store(true, Ordering::SeqCst);
+                    // On success, filter the unconfirmed blocks of this block, if it exists.
+                    self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash);
+
+                    // TODO (raychu86): Reintroduce this once provers are implemented.
+                    // // On success, filter the memory pool of its transactions, if they exist.
+                    // if let Err(error) = self
+                    //     .state
+                    //     .prover()
+                    //     .router()
+                    //     .send(ProverRequest::MemoryPoolClear(Some(unconfirmed_block)))
+                    //     .await
+                    // {
+                    //     error!("[MemoryPoolClear]: {}", error);
+                    // }
+
+                    return true;
                 }
-            }
-
-            // If the unconfirmed block is not on a fork, attempt to add it as the next block.
-            match is_block_on_fork {
-                // Filter out the undesirable unconfirmed blocks, if it exists.
-                true => self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash),
-                // Attempt to add the unconfirmed block as the next block in the canonical chain.
-                false => match self.canon.add_next_block(&unconfirmed_block) {
-                    Ok(()) => {
-                        let latest_block_height = self.canon.latest_block_height();
-                        info!(
-                            "Ledger successfully advanced to block {} ({})",
-                            latest_block_height,
-                            self.canon.latest_block_hash()
-                        );
-
-                        #[cfg(any(feature = "test", feature = "prometheus"))]
-                        metrics::gauge!(metrics::blocks::HEIGHT, latest_block_height as f64);
-
-                        // Update the timestamp of the last block increment.
-                        *self.last_block_update_timestamp.write().await = Instant::now();
-                        // Set the terminator bit to `true` to ensure the miner updates state.
-                        E::terminator().store(true, Ordering::SeqCst);
-                        // On success, filter the unconfirmed blocks of this block, if it exists.
-                        self.unconfirmed_blocks.write().await.remove(&unconfirmed_previous_block_hash);
-
-                        // TODO (raychu86): Reintroduce this once provers are implemented.
-                        // // On success, filter the memory pool of its transactions, if they exist.
-                        // if let Err(error) = self
-                        //     .state
-                        //     .prover()
-                        //     .router()
-                        //     .send(ProverRequest::MemoryPoolClear(Some(unconfirmed_block)))
-                        //     .await
-                        // {
-                        //     error!("[MemoryPoolClear]: {}", error);
-                        // }
-
-                        return true;
-                    }
-                    Err(error) => warn!("{}", error),
-                },
+                Err(error) => warn!("{}", error),
             }
         } else {
             // Add the block to the unconfirmed blocks.

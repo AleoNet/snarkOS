@@ -21,7 +21,7 @@ use crate::{
 
 use snarkos_consensus::account::Account;
 use snarkos_environment::Environment;
-use snarkvm::prelude::*;
+use snarkvm::{console::types::boolean::Zero, prelude::*};
 
 use anyhow::Result;
 use once_cell::race::OnceBox;
@@ -216,6 +216,63 @@ impl<N: Network, E: Environment> State<N, E> {
                     // will end up being processed out of order.
 
                     state.ledger().update(request).await;
+                }
+            }),
+        );
+
+        // TODO (raychu86): THIS IS FOR TESTING. GENERATE A NEW BLOCK EVERY 10 SECONDS.
+        // Generate a new block and update the ledger.
+        let state = self.clone();
+        E::resources().register_task(
+            None, // No need to provide an id, as the task will run indefinitely.
+            tokio::spawn(async move {
+                let private_key =
+                    PrivateKey::<N>::from_str(&env::var("VALIDATOR_PRIVATE_KEY").expect("VALIDATOR_PRIVATE_KEY must be set")).unwrap();
+                let view_key = ViewKey::try_from(private_key).unwrap();
+                let address = Address::try_from(private_key).unwrap();
+                let vm = snarkvm::compiler::VM::<N>::new().unwrap();
+
+                loop {
+                    let internal_ledger = state.ledger().canon().internal_ledger();
+
+                    // Creates a transfer transaction.
+                    // Fetch the unspent records.
+                    let records = internal_ledger
+                        .read()
+                        .get_output_records(&view_key, OutputRecordsFilter::Unspent(private_key))
+                        .filter(|(_, record)| !record.gates().is_zero())
+                        .collect::<std::collections::HashMap<_, _>>();
+                    trace!("Unspent Records:\n{:#?}", records);
+
+                    // Initialize an RNG.
+                    let rng = &mut ::rand::rngs::OsRng;
+
+                    // Create a new transaction.
+                    let transaction = Transaction::execute(
+                        &vm,
+                        &private_key,
+                        &ProgramID::from_str("credits.aleo").unwrap(),
+                        Identifier::from_str("transfer").unwrap(),
+                        &[
+                            Value::Record(records.values().next().unwrap().clone()),
+                            Value::from_str(&format!("{address}")).unwrap(),
+                            Value::from_str(&format!("1u64")).unwrap(),
+                        ],
+                        None,
+                        rng,
+                    )
+                    .unwrap();
+
+                    // Write to the ledger.
+                    internal_ledger.write().add_to_memory_pool(transaction).unwrap();
+
+                    // Propose the next block
+                    let block = internal_ledger.read().propose_next_block(&private_key, rng).unwrap();
+
+                    //Insert the new block
+                    trace!("New block has been added - {}", state.ledger().add_block(block).await);
+
+                    tokio::time::sleep(Duration::from_secs(10)).await;
                 }
             }),
         );
