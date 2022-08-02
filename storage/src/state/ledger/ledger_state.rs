@@ -76,7 +76,7 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
     pub fn open_reader<P: AsRef<Path>>(path: P) -> Result<(Arc<Self>, Resource)> {
         // Open storage.
         let context = N::ID;
-        let storage = RocksDB::open(path, context)?;
+        let storage = RocksDB::open_read_only(path, context)?;
 
         // Initialize the ledger.
         let ledger = Arc::new(Self {
@@ -534,8 +534,8 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
     }
 
     #[cfg(any(test, feature = "test"))]
-    pub fn storage(&self) -> &RocksDB {
-        self.state_roots.read().storage()
+    pub fn storage(&self) -> RocksDB {
+        self.state_roots.read().storage().clone()
     }
 }
 
@@ -798,7 +798,6 @@ mod tests {
         rocksdb::{tests::temp_dir, RocksDB},
         ReadOnly,
         ReadWrite,
-        Storage,
     };
     use snarkvm::prelude::Testnet3;
 

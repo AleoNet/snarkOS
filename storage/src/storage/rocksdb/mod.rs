@@ -78,6 +78,36 @@ impl RocksDB {
     }
 
     ///
+    /// Opens a read only storage at the given `path` and `context`.
+    ///
+    pub(crate) fn open_read_only<P: AsRef<Path>>(path: P, context: u16) -> Result<Self> {
+        let context = context.to_le_bytes().to_vec();
+
+        // Customize database options.
+        let mut options = rocksdb::Options::default();
+        options.set_compression_type(rocksdb::DBCompressionType::Lz4);
+
+        // Register the prefix length.
+        let prefix_extractor = rocksdb::SliceTransform::create_fixed_prefix(PREFIX_LEN);
+        options.set_prefix_extractor(prefix_extractor);
+
+        let primary = path.as_ref().to_path_buf();
+        let rocksdb = {
+            // Construct the directory paths.
+            let reader = path.as_ref().join("reader");
+            // Open a secondary reader for the primary rocksdb.
+            let rocksdb = rocksdb::DB::open_as_secondary(&options, &primary, &reader)?;
+            Arc::new(rocksdb)
+        };
+
+        Ok(RocksDB {
+            rocksdb,
+            context,
+            batches: Default::default(),
+        })
+    }
+
+    ///
     /// Opens a map with the given `context` from storage.
     ///
     pub(crate) fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(
