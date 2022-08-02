@@ -25,7 +25,7 @@ use snarkos_environment::{
     Environment,
 };
 use snarkos_storage::{
-    storage::{rocksdb::RocksDB, ReadOnly, ReadWrite},
+    storage::{old_rocksdb::RocksDB, ReadOnly, ReadWrite},
     LedgerState,
 };
 use snarkvm::{compiler::Block, prelude::*};
@@ -320,7 +320,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
 
             // Check if any of the peers are ahead and have a larger block height.
             for (peer_ip, peer_state) in peers_state.iter() {
-                if let Some((node_type, status, Some(_), block_height, block_locators)) = peer_state {
+                if let Some((node_type, status, Some(_), block_height, _block_locators)) = peer_state {
                     // If the peer is not a sync node and is syncing, and the peer is ahead, proceed to disconnect.
                     if *node_type != NodeType::Beacon && *status == Status::Syncing && block_height > &latest_block_height {
                         // Append the peer to the list of disconnects.
