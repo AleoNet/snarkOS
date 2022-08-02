@@ -35,5 +35,5 @@ pub(crate) mod rpc_impl;
 pub(crate) mod rpc_trait;
 pub(crate) use rpc_trait::*;
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;

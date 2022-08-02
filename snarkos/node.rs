@@ -18,7 +18,7 @@ use crate::CLI;
 
 use snarkos_consensus::account::Account;
 use snarkos_environment::{helpers::Status, Environment};
-use snarkos_network::{ledger::*, message::*, peers::*, state::State};
+use snarkos_network::{message::*, peers::*, state::State};
 use snarkvm::prelude::*;
 
 #[cfg(feature = "rpc")]

@@ -120,7 +120,7 @@ impl CLI {
                 let account = Account::from_str(private_key)?;
                 // Ensure the account address matches the declared address.
                 ensure!(
-                    account.address() == &Address::from_str(&address)?,
+                    account.address() == &Address::from_str(address)?,
                     "Mismatching private key and address"
                 );
                 // Return the account.
@@ -144,7 +144,7 @@ impl CLI {
         println!("Starting {} on {}.\n", E::NODE_TYPE.description(), N::NAME);
 
         // Initialize the node.
-        let node = Node::<N, E>::new(&self, account).await?;
+        let node = Node::<N, E>::new(self, account).await?;
 
         // Initialize signal handling and maintain ownership of the node - to keep it in scope.
         Self::handle_signals(node.clone());

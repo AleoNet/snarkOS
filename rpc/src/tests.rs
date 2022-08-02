@@ -26,11 +26,7 @@ use snarkvm::{
     dpc::Record,
     prelude::{Address, Network},
     utilities::ToBytes,
-    Account,
-    Block,
-    BlockHeader,
-    Transaction,
-    Transactions,
+    Account, Block, BlockHeader, Transaction, Transactions,
 };
 
 use jsonrpsee::{
@@ -57,10 +53,10 @@ fn temp_dir() -> std::path::PathBuf {
 }
 
 /// Initializes a new instance of the ledger state.
-fn new_ledger_state<N: Network, S: Storage<Access = ReadWrite>, P: AsRef<Path>>(path: Option<P>) -> LedgerState<N, ReadWrite> {
+fn new_ledger_state<N: Network, S: Storage<Access = ReadWrite>, P: AsRef<Path>>(path: Option<P>) -> LedgerState<N> {
     match path {
-        Some(path) => LedgerState::<N, _>::open_writer::<S, _>(path).expect("Failed to initialize ledger"),
-        None => LedgerState::<N, _>::open_writer::<S, _>(temp_dir()).expect("Failed to initialize ledger"),
+        Some(path) => LedgerState::<N>::open_writer::<S, _>(path).expect("Failed to initialize ledger"),
+        None => LedgerState::<N>::open_writer::<S, _>(temp_dir()).expect("Failed to initialize ledger"),
     }
 }
 
@@ -418,14 +414,12 @@ async fn test_get_ciphertext() {
         rpc_client.request("getciphertext", params).await.expect("Invalid response");
 
     // Check the ciphertext.
-    assert!(
-        CurrentNetwork::genesis_block()
-            .transactions()
-            .first()
-            .unwrap()
-            .ciphertexts()
-            .any(|expected| response == *expected)
-    );
+    assert!(CurrentNetwork::genesis_block()
+        .transactions()
+        .first()
+        .unwrap()
+        .ciphertexts()
+        .any(|expected| response == *expected));
 }
 
 #[tokio::test]
@@ -571,15 +565,13 @@ async fn test_get_transition() {
     let response: Transition<CurrentNetwork> = rpc_client.request("gettransition", params).await.expect("Invalid response");
 
     // Check the transition.
-    assert!(
-        CurrentNetwork::genesis_block()
-            .transactions()
-            .first()
-            .unwrap()
-            .transitions()
-            .iter()
-            .any(|expected| response == *expected)
-    );
+    assert!(CurrentNetwork::genesis_block()
+        .transactions()
+        .first()
+        .unwrap()
+        .transitions()
+        .iter()
+        .any(|expected| response == *expected));
 }
 
 #[tokio::test]
