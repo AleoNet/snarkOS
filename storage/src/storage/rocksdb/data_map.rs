@@ -2,10 +2,12 @@ use super::*;
 
 use snarkvm::compiler::{Map, MapReader};
 
+use anyhow::bail;
 use core::{
     fmt::{self, Debug},
     hash::Hash,
 };
+use rand::{thread_rng, Rng};
 use std::borrow::Cow;
 
 #[derive(Clone)]
@@ -144,6 +146,59 @@ impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> DataMap<K
 
     pub fn storage(&self) -> &RocksDB {
         &self.storage
+    }
+
+    ///
+    /// Performs a refresh operation for implementations of `Map` that perform periodic operations.
+    /// This method is implemented here for RocksDB to catch up a reader (secondary) database.
+    /// Returns `true` if the sequence number of the database has increased.
+    ///
+    pub fn refresh(&self) -> bool {
+        // If the storage is in read-only mode, catch it up to its writable storage.
+        let original_sequence_number = self.storage.rocksdb.latest_sequence_number();
+        if self.storage.rocksdb.try_catch_up_with_primary().is_ok() {
+            let new_sequence_number = self.storage.rocksdb.latest_sequence_number();
+            new_sequence_number > original_sequence_number
+        } else {
+            false
+        }
+    }
+
+    ///
+    /// Prepares an atomic batch of writes and returns its numeric id which can later be used to include
+    /// operations within it. `execute_batch` has to be called in order for any of the writes to actually
+    /// take place.
+    ///
+    fn prepare_batch(&self) -> usize {
+        let mut id = thread_rng().gen();
+
+        while self.storage.batches.lock().contains_key(&id) {
+            id = thread_rng().gen();
+        }
+
+        id
+    }
+
+    ///
+    /// Atomically executes a write batch with the given id.
+    ///
+    fn execute_batch(&self, batch: usize) -> Result<()> {
+        if let Some(batch) = self.storage.batches.lock().remove(&batch) {
+            Ok(self.storage.rocksdb.write(batch)?)
+        } else {
+            bail!("There is no pending storage batch with id = {}", batch);
+        }
+    }
+
+    ///
+    /// Discards a write batch with the given id.
+    ///
+    fn discard_batch(&self, batch: usize) -> Result<()> {
+        if self.storage.batches.lock().remove(&batch).is_none() {
+            bail!("Attempted to discard a non-existent storage batch (id = {})", batch)
+        } else {
+            Ok(())
+        }
     }
 }
 

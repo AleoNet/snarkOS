@@ -17,10 +17,10 @@
 #[cfg(feature = "rocks")]
 pub mod rocksdb;
 
+// #[cfg(feature = "rocks")]
+// pub mod old_rocksdb;
 #[cfg(feature = "rocks")]
-pub mod old_rocksdb;
-#[cfg(feature = "rocks")]
-pub type DataMap<K, V, A> = crate::storage::old_rocksdb::DataMap<K, V, A>;
+pub type DataMap<K, V> = crate::storage::rocksdb::DataMap<K, V>;
 
 pub mod traits;
 pub use traits::*;
@@ -29,7 +29,7 @@ pub use traits::*;
 #[repr(u16)]
 pub enum DataID {
     BlockHeaders = 0,
-    BlockHeights,
+    BlockHashes,
     BlockTransactions,
     Commitments,
     LedgerRoots,
@@ -39,6 +39,7 @@ pub enum DataID {
     Transitions,
     Deployments,
     Programs,
+    Signatures,
     Shares,
     #[cfg(test)]
     Test,
@@ -49,7 +50,7 @@ impl From<u16> for DataID {
     fn from(id: u16) -> Self {
         match id {
             0 => Self::BlockHeaders,
-            1 => Self::BlockHeights,
+            1 => Self::BlockHashes,
             2 => Self::BlockTransactions,
             3 => Self::Commitments,
             4 => Self::LedgerRoots,
@@ -59,7 +60,8 @@ impl From<u16> for DataID {
             8 => Self::Transitions,
             9 => Self::Deployments,
             10 => Self::Programs,
-            11 => Self::Shares,
+            11 => Self::Signatures,
+            12 => Self::Shares,
             x => panic!("Unexpected map id: {}", x),
         }
     }

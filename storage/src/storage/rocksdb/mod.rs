@@ -13,13 +13,15 @@ use values::*;
 use crate::storage::DataID;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;
 
 use anyhow::Result;
 use core::{fmt::Debug, hash::Hash};
+use parking_lot::Mutex;
 use serde::{de::DeserializeOwned, Serialize};
 use std::{
     borrow::Borrow,
+    collections::HashMap,
     convert::TryInto,
     fs::File,
     io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
@@ -36,6 +38,7 @@ pub const PREFIX_LEN: usize = 4; // N::ID (u16) + DataID (u16)
 #[derive(Clone)]
 pub struct RocksDB {
     rocksdb: Arc<rocksdb::DB>,
+    batches: Arc<Mutex<HashMap<usize, rocksdb::WriteBatch>>>,
     context: Vec<u8>,
 }
 
@@ -49,7 +52,7 @@ impl RocksDB {
     ///
     /// Opens storage at the given `path` and `context`.
     ///
-    fn open<P: AsRef<Path>>(path: P, context: u16) -> Result<Self> {
+    pub(crate) fn open<P: AsRef<Path>>(path: P, context: u16) -> Result<Self> {
         let context = context.to_le_bytes().to_vec();
 
         // Customize database options.
@@ -67,13 +70,20 @@ impl RocksDB {
             Arc::new(rocksdb::DB::open(&options, &primary)?)
         };
 
-        Ok(RocksDB { rocksdb, context })
+        Ok(RocksDB {
+            rocksdb,
+            batches: Default::default(),
+            context,
+        })
     }
 
     ///
     /// Opens a map with the given `context` from storage.
     ///
-    fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(&self, data_id: DataID) -> Result<DataMap<K, V>> {
+    pub(crate) fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(
+        &self,
+        data_id: DataID,
+    ) -> Result<DataMap<K, V>> {
         // Convert the new context into bytes.
         let new_context = (data_id as u16).to_le_bytes();
 
