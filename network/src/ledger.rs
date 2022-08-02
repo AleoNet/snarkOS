@@ -25,7 +25,7 @@ use snarkos_environment::{
     Environment,
 };
 use snarkos_storage::{
-    storage::{old_rocksdb::RocksDB, ReadOnly, ReadWrite},
+    storage::{ReadOnly, ReadWrite},
     LedgerState,
 };
 use snarkvm::{compiler::Block, prelude::*};
@@ -112,8 +112,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Initialize an mpsc channel for sending requests to the `Ledger` struct.
         let (ledger_router, ledger_handler) = mpsc::channel(1024);
 
-        let canon = LedgerState::open_writer::<RocksDB, P>(path)?;
-        let (canon_reader, reader_resource) = LedgerState::open_reader::<RocksDB<ReadOnly>, P>(path)?;
+        let canon = LedgerState::open_writer::<P>(path)?;
+        let (canon_reader, reader_resource) = LedgerState::open_reader::<P>(path)?;
         // Register the thread; no need to provide an id, as it will run indefinitely.
         E::resources().register(reader_resource, None);
 
@@ -378,8 +378,8 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 .await
                 .values_mut()
                 .for_each(|requests| *requests = Default::default());
-            self.revert_to_block_height(self.canon.latest_block_height().saturating_sub(1))
-                .await;
+            // self.revert_to_block_height(self.canon.latest_block_height().saturating_sub(1))
+            //     .await;
         }
     }
 
@@ -413,7 +413,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
             let latest_block_height = self.canon.latest_block_height();
             // Iterate through the connected peers, to determine if the ledger state is out of date.
             for (_, peer_state) in self.peers_state.read().await.iter() {
-                if let Some((_, _, Some(_), block_height, block_locators)) = peer_state {
+                if let Some((_, _, Some(_), block_height, _block_locators)) = peer_state {
                     // If the block height is greater than MAXIMUM_LINEAR_BLOCK_LOCATORS, set the status to `Syncing`.
                     if block_height.saturating_sub(latest_block_height) > MAXIMUM_LINEAR_BLOCK_LOCATORS {
                         // Set the status to `Syncing`.
@@ -544,47 +544,47 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         false
     }
 
-    ///
-    /// Reverts the ledger state back to height `block_height`, returning `true` on success.
-    ///
-    async fn revert_to_block_height(&self, block_height: u32) -> bool {
-        // Acquire the lock for the canon chain.
-        let _canon_lock = self.canon_lock.lock().await;
-
-        match self.canon.revert_to_block_height(block_height) {
-            Ok(removed_blocks) => {
-                let latest_block_height = self.canon.latest_block_height();
-                info!("Ledger successfully reverted to block {}", latest_block_height);
-
-                #[cfg(any(feature = "test", feature = "prometheus"))]
-                metrics::gauge!(metrics::blocks::HEIGHT, latest_block_height as f64);
-
-                // Update the last block update timestamp.
-                *self.last_block_update_timestamp.write().await = Instant::now();
-                // Set the terminator bit to `true` to ensure the miner resets state.
-                E::terminator().store(true, Ordering::SeqCst);
-
-                // Lock unconfirmed_blocks for further processing.
-                let mut unconfirmed_blocks = self.unconfirmed_blocks.write().await;
-
-                // Ensure the removed blocks are not in the unconfirmed blocks.
-                for removed_block in removed_blocks {
-                    unconfirmed_blocks.remove(&removed_block.previous_hash());
-                }
-                true
-            }
-            Err(error) => {
-                warn!("{}", error);
-
-                // Set the terminator bit to `true` to ensure the miner resets state.
-                E::terminator().store(true, Ordering::SeqCst);
-                // Reset the unconfirmed blocks.
-                self.unconfirmed_blocks.write().await.clear();
-
-                false
-            }
-        }
-    }
+    // ///
+    // /// Reverts the ledger state back to height `block_height`, returning `true` on success.
+    // ///
+    // async fn revert_to_block_height(&self, block_height: u32) -> bool {
+    //     // Acquire the lock for the canon chain.
+    //     let _canon_lock = self.canon_lock.lock().await;
+    //
+    //     match self.canon.revert_to_block_height(block_height) {
+    //         Ok(removed_blocks) => {
+    //             let latest_block_height = self.canon.latest_block_height();
+    //             info!("Ledger successfully reverted to block {}", latest_block_height);
+    //
+    //             #[cfg(any(feature = "test", feature = "prometheus"))]
+    //             metrics::gauge!(metrics::blocks::HEIGHT, latest_block_height as f64);
+    //
+    //             // Update the last block update timestamp.
+    //             *self.last_block_update_timestamp.write().await = Instant::now();
+    //             // Set the terminator bit to `true` to ensure the miner resets state.
+    //             E::terminator().store(true, Ordering::SeqCst);
+    //
+    //             // Lock unconfirmed_blocks for further processing.
+    //             let mut unconfirmed_blocks = self.unconfirmed_blocks.write().await;
+    //
+    //             // Ensure the removed blocks are not in the unconfirmed blocks.
+    //             for removed_block in removed_blocks {
+    //                 unconfirmed_blocks.remove(&removed_block.previous_hash());
+    //             }
+    //             true
+    //         }
+    //         Err(error) => {
+    //             warn!("{}", error);
+    //
+    //             // Set the terminator bit to `true` to ensure the miner resets state.
+    //             E::terminator().store(true, Ordering::SeqCst);
+    //             // Reset the unconfirmed blocks.
+    //             self.unconfirmed_blocks.write().await.clear();
+    //
+    //             false
+    //         }
+    //     }
+    // }
 
     ///
     /// Adds an entry for the given peer IP to every data structure in `State`.
