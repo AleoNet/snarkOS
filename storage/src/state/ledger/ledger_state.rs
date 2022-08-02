@@ -449,7 +449,13 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
                 if ledger.state_roots.write().refresh() {
                     // After catching up the reader, determine the latest block height.
 
-                    let latest_block_height = ledger.ledger.read().get_current_height();
+                    // TODO (raychu86): Fix the reader.
+                    // let latest_block_height = ledger.ledger.read().previous_hashes.keys().len() as u32;
+                    let latest_block_height = match ledger.state_roots.read().values().max() {
+                        Some(height) => *height,
+                        None => ledger.ledger.read().get_current_height(),
+                    };
+
                     let current_block_height = current_block.header().height();
                     let current_block_hash = current_block.hash();
                     trace!(
@@ -531,6 +537,10 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
         bincode::serialize_into(&mut file, &blocks)?;
 
         Ok(())
+    }
+
+    pub fn internal_ledger(&self) -> &RwLock<InternalLedger<N>> {
+        &self.ledger
     }
 
     #[cfg(any(test, feature = "test"))]
