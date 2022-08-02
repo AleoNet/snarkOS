@@ -47,7 +47,7 @@ use tokio::sync::{mpsc, Mutex, RwLock};
 /// The maximum number of unconfirmed blocks that can be held by the ledger.
 const MAXIMUM_UNCONFIRMED_BLOCKS: u32 = 250;
 
-pub type LedgerReader<N> = std::sync::Arc<snarkos_storage::LedgerState<N, ReadOnly>>;
+pub type LedgerReader<N> = Arc<LedgerState<N, ReadOnly>>;
 
 /// Shorthand for the parent half of the `Ledger` message channel.
 pub type LedgerRouter<N> = mpsc::Sender<LedgerRequest<N>>;

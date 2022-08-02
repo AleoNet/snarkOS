@@ -126,7 +126,7 @@ impl<N: Network, E: Environment> State<N, E> {
 
     /// Returns the peers module of this node.
     pub fn peers(&self) -> &Peers<N, E> {
-        &self.peers.get().unwrap()
+        self.peers.get().unwrap()
     }
 
     pub fn ledger(&self) -> &Ledger<N, E> {

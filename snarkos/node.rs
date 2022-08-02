@@ -40,7 +40,7 @@ pub struct Node<N: Network, E: Environment> {
 impl<N: Network, E: Environment> Node<N, E> {
     /// Initializes a new instance of the node.
     pub async fn new(cli: &CLI, account: Account<N>) -> Result<Self> {
-        let address = account.address().clone();
+        let address = *account.address();
 
         // Initialize the state.
         let state = State::new(cli.node, account).await?;
@@ -110,7 +110,7 @@ impl<N: Network, E: Environment> Node<N, E> {
         // node.initialize_notification(address).await;
 
         #[cfg(feature = "rpc")]
-        node.initialize_rpc(&cli, Some(address.clone())).await;
+        node.initialize_rpc(cli, Some(address)).await;
 
         Ok(node)
     }
