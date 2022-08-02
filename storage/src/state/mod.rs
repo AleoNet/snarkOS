@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 pub(crate) mod ledger;
-pub use ledger::{ledger_state::LedgerState, Metadata};
+pub use ledger::{genesis_block, ledger_state::LedgerState, Metadata};
 
 // pub(crate) mod operator;
 // pub use operator::OperatorState;

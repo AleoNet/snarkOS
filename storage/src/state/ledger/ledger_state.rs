@@ -97,7 +97,7 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
         });
 
         // Determine the latest block height.
-        let mut latest_block_height = match (ledger.state_roots.read().values().max(), ledger.ledger.read().get_current_height()) {
+        let latest_block_height = match (ledger.state_roots.read().values().max(), ledger.ledger.read().get_current_height()) {
             (Some(latest_block_height_0), latest_block_height_1) => match *latest_block_height_0 == latest_block_height_1 {
                 true => *latest_block_height_0,
                 false => {
@@ -561,7 +561,7 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
         let storage = RocksDB::open(path, context)?;
 
         // Initialize the ledger.
-        let mut ledger = Self {
+        let ledger = Self {
             // ledger_tree: RwLock::new(LedgerTree::<N>::new()?),
             latest_block: RwLock::new(genesis_block::<N>()),
             latest_block_hashes_and_headers: RwLock::new(CircularQueue::<(N::BlockHash, Header<N>)>::with_capacity(
@@ -580,7 +580,7 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
         };
 
         // Determine the latest block height.
-        let mut latest_block_height = match (ledger.state_roots.read().values().max(), ledger.ledger.read().get_current_height()) {
+        let latest_block_height = match (ledger.state_roots.read().values().max(), ledger.ledger.read().get_current_height()) {
             (Some(latest_block_height_0), latest_block_height_1) => match *latest_block_height_0 == latest_block_height_1 {
                 true => *latest_block_height_0,
                 // TODO (raychu86): Try to fix inconsistent state.
