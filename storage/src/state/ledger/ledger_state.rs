@@ -39,7 +39,6 @@ pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<
     DataMap<u32, Header<N>>,
     DataMap<u32, Transactions<N>>,
     DataMap<u32, Signature<N>>,
-    DataMap<ProgramID<N>, Deployment<N>>,
 >;
 
 pub struct LedgerState<N: Network, SA: StorageAccess> {
@@ -82,7 +81,6 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
                 storage.open_map(DataID::BlockHeaders)?,
                 storage.open_map(DataID::Transactions)?,
                 storage.open_map(DataID::Signatures)?,
-                storage.open_map(DataID::Programs)?,
             )?),
             _storage_access: PhantomData,
         });
@@ -546,7 +544,6 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
                 storage.open_map(DataID::BlockHeaders)?,
                 storage.open_map(DataID::Transactions)?,
                 storage.open_map(DataID::Signatures)?,
-                storage.open_map(DataID::Programs)?,
             )?),
             _storage_access: PhantomData,
         };
