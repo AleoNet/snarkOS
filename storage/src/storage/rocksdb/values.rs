@@ -3,12 +3,12 @@ use super::*;
 use std::borrow::Cow;
 
 /// An iterator over the values of a prefix.
-pub struct Values<'a, V: 'a + PartialEq + Eq + Serialize + DeserializeOwned> {
+pub struct Values<'a, V: 'a + PartialEq + Eq + Serialize + DeserializeOwned + Sync> {
     db_iter: rocksdb::DBIterator<'a>,
     _phantom: PhantomData<V>,
 }
 
-impl<'a, V: 'a + PartialEq + Eq + Serialize + DeserializeOwned> Values<'a, V> {
+impl<'a, V: 'a + PartialEq + Eq + Serialize + DeserializeOwned + Sync> Values<'a, V> {
     pub(crate) fn new(db_iter: rocksdb::DBIterator<'a>) -> Self {
         Self {
             db_iter,
@@ -17,7 +17,7 @@ impl<'a, V: 'a + PartialEq + Eq + Serialize + DeserializeOwned> Values<'a, V> {
     }
 }
 
-impl<'a, V: 'a + Clone + PartialEq + Eq + Serialize + DeserializeOwned> Iterator for Values<'a, V> {
+impl<'a, V: 'a + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Sync> Iterator for Values<'a, V> {
     type Item = Cow<'a, V>;
 
     fn next(&mut self) -> Option<Self::Item> {

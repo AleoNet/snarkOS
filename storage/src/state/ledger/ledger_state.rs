@@ -76,7 +76,7 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
             )),
             latest_block_locators: Default::default(),
             state_roots: RwLock::new(storage.open_map(DataID::LedgerRoots)?),
-            ledger: RwLock::new(InternalLedger::load(
+            ledger: RwLock::new(InternalLedger::from_maps(
                 storage.open_map(DataID::BlockHashes)?,
                 storage.open_map(DataID::BlockHeaders)?,
                 storage.open_map(DataID::Transactions)?,
@@ -539,7 +539,7 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
             )),
             latest_block_locators: Default::default(),
             state_roots: RwLock::new(storage.open_map(DataID::LedgerRoots)?),
-            ledger: RwLock::new(InternalLedger::load(
+            ledger: RwLock::new(InternalLedger::from_maps(
                 storage.open_map(DataID::BlockHashes)?,
                 storage.open_map(DataID::BlockHeaders)?,
                 storage.open_map(DataID::Transactions)?,

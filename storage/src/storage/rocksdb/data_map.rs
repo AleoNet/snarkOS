@@ -19,8 +19,8 @@ pub struct DataMap<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOw
 
 impl<
     'a,
-    K: 'a + Clone + Debug + PartialEq + Eq + Hash + Serialize + DeserializeOwned,
-    V: 'a + Clone + PartialEq + Eq + Serialize + DeserializeOwned,
+    K: 'a + Clone + Debug + PartialEq + Eq + Hash + Serialize + DeserializeOwned + Sync,
+    V: 'a + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Sync,
 > Map<'a, K, V> for DataMap<K, V>
 {
     ///
@@ -51,8 +51,8 @@ impl<
 
 impl<
     'a,
-    K: 'a + Clone + Debug + PartialEq + Eq + Hash + Serialize + DeserializeOwned,
-    V: 'a + Clone + PartialEq + Eq + Serialize + DeserializeOwned,
+    K: 'a + Clone + Debug + PartialEq + Eq + Hash + Serialize + DeserializeOwned + Sync,
+    V: 'a + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Sync,
 > MapReader<'a, K, V> for DataMap<K, V>
 {
     type Iterator = Iter<'a, K, V>;
@@ -109,8 +109,8 @@ impl<
 
 impl<
     'a,
-    K: 'a + Clone + PartialEq + Eq + Hash + Serialize + DeserializeOwned,
-    V: 'a + Clone + PartialEq + Eq + Serialize + DeserializeOwned,
+    K: 'a + Clone + PartialEq + Eq + Hash + Serialize + DeserializeOwned + Sync,
+    V: 'a + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Sync,
 > FromIterator<(K, V)> for DataMap<K, V>
 {
     /// Initializes a new `DataMap` from the given iterator.

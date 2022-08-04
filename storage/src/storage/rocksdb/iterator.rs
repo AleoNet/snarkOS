@@ -5,15 +5,18 @@ use std::borrow::Cow;
 /// An iterator over all key-value pairs in a data map.
 pub struct Iter<
     'a,
-    K: 'a + Debug + PartialEq + Eq + Hash + Serialize + DeserializeOwned,
-    V: 'a + PartialEq + Eq + Serialize + DeserializeOwned,
+    K: 'a + Debug + PartialEq + Eq + Hash + Serialize + DeserializeOwned + Sync,
+    V: 'a + PartialEq + Eq + Serialize + DeserializeOwned + Sync,
 > {
     db_iter: rocksdb::DBIterator<'a>,
     _phantom: PhantomData<(K, V)>,
 }
 
-impl<'a, K: 'a + Debug + PartialEq + Eq + Hash + Serialize + DeserializeOwned, V: 'a + PartialEq + Eq + Serialize + DeserializeOwned>
-    Iter<'a, K, V>
+impl<
+    'a,
+    K: 'a + Debug + PartialEq + Eq + Hash + Serialize + DeserializeOwned + Sync,
+    V: 'a + PartialEq + Eq + Serialize + DeserializeOwned + Sync,
+> Iter<'a, K, V>
 {
     pub(super) fn new(db_iter: rocksdb::DBIterator<'a>) -> Self {
         Self {
@@ -25,8 +28,8 @@ impl<'a, K: 'a + Debug + PartialEq + Eq + Hash + Serialize + DeserializeOwned, V
 
 impl<
     'a,
-    K: 'a + Clone + Debug + PartialEq + Eq + Hash + Serialize + DeserializeOwned,
-    V: 'a + Clone + PartialEq + Eq + Serialize + DeserializeOwned,
+    K: 'a + Clone + Debug + PartialEq + Eq + Hash + Serialize + DeserializeOwned + Sync,
+    V: 'a + Clone + PartialEq + Eq + Serialize + DeserializeOwned + Sync,
 > Iterator for Iter<'a, K, V>
 {
     type Item = (Cow<'a, K>, Cow<'a, V>);
