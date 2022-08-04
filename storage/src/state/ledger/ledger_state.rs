@@ -142,7 +142,7 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
 
     /// Returns the latest block header.
     pub fn latest_block_header(&self) -> Header<N> {
-        self.latest_block.read().header().clone()
+        *self.latest_block.read().header()
     }
 
     /// Returns the transactions from the latest block.
@@ -609,9 +609,7 @@ impl<N: Network, SA: StorageAccess> LedgerState<N, SA> {
             .insert(*block.header().previous_state_root(), block.header().height())?;
 
         // Update the in-memory objects.
-        self.latest_block_hashes_and_headers
-            .write()
-            .push((block.hash(), block.header().clone()));
+        self.latest_block_hashes_and_headers.write().push((block.hash(), *block.header()));
         *self.latest_block_locators.write() = self.get_block_locators(block.header().height())?;
         *self.latest_block.write() = block.clone();
 

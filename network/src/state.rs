@@ -256,7 +256,7 @@ impl<N: Network, E: Environment> State<N, E> {
                         &[
                             Value::Record(records.values().next().unwrap().clone()),
                             Value::from_str(&format!("{address}")).unwrap(),
-                            Value::from_str(&format!("1u64")).unwrap(),
+                            Value::from_str("1u64").unwrap(),
                         ],
                         None,
                         rng,
