@@ -51,7 +51,7 @@ version = "0.8"
 version = "1"
 
 [dependencies.rocksdb]
-version = "0.18"
+version = "0.19"
 optional = true
 default-features = false
 features = [ "lz4" ]
