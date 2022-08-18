@@ -1,0 +1,23 @@
+name: Codecov
+
+on:
+  push:
+    branches: [ testnet3 ]
+  pull_request:
+    branches: [ '*' ]
+
+jobs:
+  check:
+    name: snarkos
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: coverage
+        run: docker run --security-opt seccomp=unconfined -v "${PWD}:/volume" xd009642/tarpaulin cargo tarpaulin -t 1800
+
+      - name: Upload coverage to codecov.io
+        uses: codecov/codecov-action@v2
+        with:
+          fail_ci_if_error:     true
