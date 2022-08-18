@@ -2,7 +2,7 @@ name: Codecov
 
 on:
   push:
-    branches: [ testnet3 ]
+    branches: [ testnet2-2022 ]
   pull_request:
     branches: [ '*' ]
 
