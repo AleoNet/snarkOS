@@ -14,11 +14,8 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Install dependencies
-        run: sudo apt-get install libclang-dev
-
       - name: coverage
-        run: docker run --security-opt seccomp=unconfined -v "${PWD}:/volume" xd009642/tarpaulin cargo tarpaulin -t 1800
+        run: docker run --security-opt seccomp=unconfined -v "${PWD}:/volume" xd009642/tarpaulin /bin/bash -c "apt-get update; apt-get install -y libclang-dev; cargo tarpaulin -t 1800"
 
       - name: Upload coverage to codecov.io
         uses: codecov/codecov-action@v2
