@@ -52,11 +52,9 @@ impl<N: Network, E: Environment> Node<N, E> {
 
         // Connect to the leader node and listen for new blocks.
         let leader_addr = cli.beacon_addr;
+        debug!("Connecting to '{}'...", leader_addr);
         let _ = connect_to_leader::<N>(leader_addr, ledger.clone()).await;
 
-        debug!("Connecting to '{}'...", leader_addr);
-
-        // This will prevent the node from generating blocks and will maintain a connection with the leader.
         // Send pings to all peers every 10 seconds.
         let _pings = send_pings::<N>(ledger.clone()).await;
 
