@@ -208,7 +208,7 @@ impl Command {
 #[derive(Debug, Parser)]
 pub struct Clean {
     /// Specify the network of the ledger to remove from storage.
-    #[clap(default_value = "2", long = "network")]
+    #[clap(default_value = "3", long = "network")]
     pub network: u16,
     /// Enables development mode, specify the unique ID of the local node to clean.
     #[clap(long)]
