@@ -14,185 +14,158 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::storage::{rocksdb::RocksDB, DataID, DataMap};
 
-use snarkvm::{
-    compiler::{Map, MapRead},
-    console::{
-        network::{Network, Testnet3},
-        types::Scalar,
-    },
-    utilities::{test_crypto_rng, Uniform},
-};
+use crate::{store::rocksdb::{Database, DataMap, RocksDB}, DataID};
+use snarkvm::compiler::{Map, MapRead};
 
-// use snarkvm::compiler::{Map, MapRead};
+use std::fs;
 
-pub(crate) fn temp_dir() -> std::path::PathBuf {
-    tempfile::tempdir().expect("Failed to open temporary directory").into_path()
+fn remove_test_dir(network_id: u16) {
+    let _ = fs::remove_dir_all(format!("~/.aleo/storage/.ledger-{}", network_id));
 }
 
-pub(crate) fn temp_file() -> std::path::PathBuf {
-    tempfile::NamedTempFile::new()
-        .expect("Failed to open temporary file")
-        .path()
-        .to_owned()
-}
-
-#[test]
-fn test_open() {
-    let _storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-}
-
-#[test]
-fn test_open_map() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
+fn setup_test_map(network_id: u16) -> TestMap {
+    remove_test_dir(network_id);
+    RocksDB::open_map(network_id, DataID::Test).expect("Failed to open data map")
 }
 
 type TestMap = DataMap<u32, String>;
 
 #[test]
-fn test_insert_and_contains_key() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map: TestMap = storage.open_map(DataID::Test).expect("Failed to open data map");
-
-    map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
-    assert!(map.contains_key(&123456789).expect("Failed to call contains key"));
-    assert!(!map.contains_key(&000000000).expect("Failed to call contains key"));
+fn test_open() {
+    remove_test_dir(0);
+    assert!(RocksDB::open(0).is_ok());
 }
 
 #[test]
-fn test_insert_and_get() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
+fn test_open_map_opens_a_datamap_for_a_given_dataid() {
+    remove_test_dir(1);
+    assert!(RocksDB::open_map::<i32, String>(1, DataID::Test).is_ok());
+}
 
-    map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
+#[test]
+fn test_a_key_is_contained_after_a_value_was_inserted_with_it() {
+    let test_map = setup_test_map(2);
+
+    test_map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
+    let expected_result = test_map.contains_key(&123456789);
+
+    assert!(expected_result.is_ok());
+}
+
+#[test]
+fn test_a_key_is_not_contained_if_no_value_was_inserted_with_it() {
+    let test_map = setup_test_map(3);
+
+    assert!(!test_map.contains_key(&000000000).expect("Failed to call contains key"));
+}
+
+#[test]
+fn test_a_value_that_was_inserted_can_be_retrieved_with_its_associated_key() {
+    let test_map = setup_test_map(4);
+
+    test_map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
+
     assert_eq!(
         Some("123456789".to_string()),
-        map.get(&123456789).expect("Failed to get").map(|v| v.to_string())
+        test_map.get(&123456789).expect("Failed to get").map(|v| v.to_string())
     );
-
-    assert_eq!(None, map.get(&000000000).expect("Failed to get"));
 }
 
 #[test]
-fn test_insert_and_remove() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
+fn test_trying_to_get_a_value_associated_to_a_non_existent_key_returns_none() {    
+    let test_map = setup_test_map(5);
 
-    map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
-    assert_eq!(
-        map.get(&123456789).expect("Failed to get").map(|v| v.to_string()),
-        Some("123456789".to_string())
-    );
-
-    map.remove(&123456789).expect("Failed to remove");
-    assert!(map.get(&123456789).expect("Failed to get").is_none());
+    let expected_result = test_map.get(&000000000).expect("Failed to get");
+    
+    assert!(expected_result.is_none());
 }
 
 #[test]
-fn test_insert_and_iter() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
-    map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
+fn test_a_value_that_was_inserted_can_be_removed_with_its_associated_key() {
+    let test_map = setup_test_map(6);
+    test_map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
 
-    let mut iter = map.iter();
+    test_map.remove(&123456789).expect("Failed to remove");
+    let expected_result = test_map.get(&123456789).expect("Failed to get");
+
+    assert!(expected_result.is_none());
+}
+
+#[test]
+#[ignore = "Removing a key that does not exist does not result in an error"]
+fn test_a_value_that_was_not_inserted_cannot_be_removed() {
+    let test_map = setup_test_map(7);
+
+    let expected_result = test_map.remove(&123456789);
+
+    assert!(expected_result.is_err());
+}
+
+#[test]
+#[ignore = "Removing a key that does not exist does not result in an error"]
+fn test_a_value_cannot_be_removed_twice() {
+    let test_map = setup_test_map(8);
+    test_map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
+    test_map.remove(&123456789).expect("Failed to remove");
+
+    let expected_result = test_map.remove(&123456789);
+    
+    assert!(expected_result.is_err());
+}
+
+#[test]
+fn test_can_iter_on_pairs_after_inserting() {
+    let test_map = setup_test_map(9);
+    
+    test_map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
+    let expected_result = test_map.iter().next().map(|(k, v)| (*k, v.to_string()));
+    
     assert_eq!(
         Some((123456789, "123456789".to_string())),
-        iter.next().map(|(k, v)| (*k, v.to_string()))
+        expected_result
     );
-    assert_eq!(None, iter.next());
 }
 
 #[test]
-fn test_insert_and_keys() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
-    map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
+fn test_can_iter_on_keys_after_inserting() {
+    let test_map = setup_test_map(11);
 
-    let mut keys = map.keys();
-    assert_eq!(Some(123456789), keys.next().map(|k| *k));
-    assert_eq!(None, keys.next());
+    test_map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
+    let mut keys = test_map.keys();
+    let expected_result = keys.next().map(|k| *k);
+    let expected_none = keys.next();
+    
+    assert_eq!(Some(123456789), expected_result);
+    assert!(expected_none.is_none());
 }
 
 #[test]
-fn test_insert_and_values() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
-    map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
+fn test_can_iter_on_values_after_inserting() {
+    let test_map = setup_test_map(12);
 
-    let mut values = map.values();
-    assert_eq!(Some("123456789".to_string()), values.next().map(|v| v.to_string()));
-    assert_eq!(None, values.next());
+    test_map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
+    let mut values = test_map.values();
+    let expected_result = values.next().map(|v| v.to_string());
+    let expected_none = values.next();
+    
+    assert_eq!(Some("123456789".to_string()), expected_result);
+    assert!(expected_none.is_none());
 }
 
 #[test]
 fn test_reopen() {
-    let directory = temp_dir();
     {
-        let storage = RocksDB::open(directory.clone(), 0).expect("Failed to open storage");
-        let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
-        map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
+        let test_map = setup_test_map(13);
+        test_map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
     }
     {
-        let storage = RocksDB::open(directory, 0).expect("Failed to open storage");
-        let map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
-        assert_eq!(
-            Some("123456789".to_string()),
-            map.get(&123456789).expect("Failed to get").map(|v| v.to_string())
-        );
+        let test_map: TestMap = RocksDB::open_map(13, DataID::Test).expect("Failed to open data map");
+        let expected_result = test_map.get(&123456789).expect("Failed to get").map(|v| v.to_string());
+        
+        remove_test_dir(13);
+        
+        assert_eq!(Some("123456789".to_string()), expected_result);
     }
-}
-
-#[test]
-fn test_export_import() {
-    let file = temp_file();
-
-    {
-        let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-        let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
-
-        for i in 0..100 {
-            map.insert(i, i.to_string()).expect("Failed to insert");
-        }
-
-        storage.export(&file).expect("Failed to export storage");
-    }
-
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    storage.import(&file).expect("Failed to import storage");
-
-    let map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
-
-    for i in 0..100 {
-        assert_eq!(map.get(&i).expect("Failed to get").map(|v| v.to_string()), Some(i.to_string()));
-    }
-}
-
-#[test]
-fn test_scalar_mul() {
-    type CurrentNetwork = Testnet3;
-
-    let rng = &mut test_crypto_rng();
-
-    const ITERATIONS: u32 = 1_000_000u32;
-
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map = storage.open_map(DataID::Test).expect("Failed to open data map");
-
-    // Sample `ITERATION` random field elements to store.
-    for i in 0..ITERATIONS {
-        let value = Scalar::<CurrentNetwork>::rand(rng);
-        map.insert(i, value).expect("Failed to insert");
-    }
-
-    let timer = std::time::Instant::now();
-
-    // Execute scalar multiplication for each stored element.
-    for value in map.values() {
-        let _group = CurrentNetwork::g_scalar_multiply(&*value);
-    }
-
-    let elapsed = timer.elapsed().as_secs();
-    println!("{}", format!(" {ITERATIONS} Scalar Muls : {} s", elapsed));
+ 
 }

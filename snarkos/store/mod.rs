@@ -68,6 +68,8 @@ pub enum DataID {
     OutputRecordMap,
     OutputRecordNonceMap,
     OutputExternalRecordMap,
+    // Test
+    Test,
     // Transaction
     TransactionIDMap,
     // Transition
