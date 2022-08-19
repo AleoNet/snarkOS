@@ -48,7 +48,7 @@ impl<N: Network, E: Environment> Node<N, E> {
         let leader_addr = SocketAddr::from_str(&LEADER_IP)?;
         let _ = connect_to_leader::<N>(leader_addr, ledger.clone()).await;
 
-        info!("Running a client node... attempting connection with leader: {}", leader_addr);
+        debug!("Connecting to '{}'...", leader_addr);
 
         // This will prevent the node from generating blocks and will maintain a connection with the leader.
         // Send pings to all peers every 10 seconds.

@@ -115,17 +115,13 @@ async fn handle_peer<N: Network>(stream: TcpStream, peer_ip: SocketAddr, ledger:
 
                             // Attempt to add the block to the ledger.
                             match ledger.ledger().write().add_next_block(&block) {
-                            Ok(_) => {
-                                info!("Advanced to block height: {}", block.header().height());
-                            },
-                             Err(err) => {
-                                error!(
+                            Ok(_) => info!("Advanced to block {} ({})", block.height(), block.hash()),
+                             Err(err) => warn!(
                                     "Failed to process block {} (height: {}): {:?}",
                                     block.hash(),
                                     block.header().height(),
                                     err
-                                );
-                                }
+                                )
                             };
 
                             // Send a ping.
@@ -162,7 +158,7 @@ async fn handle_peer<N: Network>(stream: TcpStream, peer_ip: SocketAddr, ledger:
                             // Attempt to add the block to the ledger.
                             match ledger.ledger().write().add_next_block(&block) {
                                 Ok(_) => {
-                                    info!("Advanced to block height: {}", block.header().height());
+                                    info!("Advanced to block {} ({})", block.height(), block.hash());
 
                                     // Broadcast block to all peers except the sender.
                                     let peers = ledger.peers().read().clone();
