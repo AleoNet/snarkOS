@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos::{display::initialize_logger, CLI};
+use snarkos::{logger::initialize_logger, CLI};
 
 use anyhow::Result;
 use clap::Parser;
@@ -28,10 +28,8 @@ fn main() -> Result<()> {
     // Parse the provided arguments.
     let cli = CLI::parse();
 
-    // Start logging, if enabled.
-    if !cli.display {
-        initialize_logger(cli.verbosity, None);
-    }
+    // Start logging.
+    initialize_logger(cli.verbosity);
 
     let (num_tokio_worker_threads, max_tokio_blocking_threads) = if !cli.beacon {
         ((num_cpus::get() / 8 * 2).max(1), num_cpus::get())

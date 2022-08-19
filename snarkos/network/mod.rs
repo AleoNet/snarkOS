@@ -203,9 +203,7 @@ async fn handle_peer<N: Network>(stream: TcpStream, peer_ip: SocketAddr, ledger:
     }
 }
 
-///
 /// Handle connection listener for new peers.
-///
 pub async fn handle_listener<N: Network>(listener: TcpListener, ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
     info!("Listening to connections at: {}", listener.local_addr().unwrap());
 
@@ -245,9 +243,7 @@ pub async fn send_pings<N: Network>(ledger: Arc<Ledger<N>>) -> Result<(), Box<dy
     }
 }
 
-///
-/// Handle connection listener for new peers.
-///
+/// Handle connection listener to the leader.
 pub async fn connect_to_leader<N: Network>(initial_peer: SocketAddr, ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
     // TODO (raychu86): Make this attempt to multiple peers.
     tokio::spawn(async move {

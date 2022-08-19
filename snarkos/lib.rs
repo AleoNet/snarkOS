@@ -24,19 +24,28 @@ extern crate thiserror;
 #[macro_use]
 extern crate tracing;
 
-pub mod display;
+pub mod logger;
 
-pub mod cli;
+mod account;
+pub use account::*;
+
+mod cli;
 pub use cli::*;
 
-pub mod node;
+mod ledger;
+pub use ledger::*;
+
+mod network;
+pub use network::*;
+
+mod node;
 pub use node::*;
 
-pub mod updater;
-pub use updater::*;
+mod store;
+pub use store::*;
 
-#[cfg(test)]
-mod tests;
+mod updater;
+pub use updater::*;
 
 pub use snarkos_environment as environment;
 
@@ -52,4 +61,34 @@ pub mod prelude {
     pub use crate::rpc::*;
 
     pub use snarkvm::prelude::{Address, Network};
+}
+
+use backoff::{future::retry, ExponentialBackoff};
+use futures::Future;
+use std::time::Duration;
+
+pub(crate) async fn handle_dispatch_error<'a, T, F>(func: impl Fn() -> F + 'a) -> reqwest::Result<T>
+where
+    F: Future<Output = Result<T, reqwest::Error>>,
+{
+    fn default_backoff() -> ExponentialBackoff {
+        ExponentialBackoff {
+            max_interval: Duration::from_secs(10),
+            max_elapsed_time: Some(Duration::from_secs(45)),
+            ..Default::default()
+        }
+    }
+
+    fn from_reqwest_err(err: reqwest::Error) -> backoff::Error<reqwest::Error> {
+        use backoff::Error;
+
+        if err.is_timeout() {
+            debug!("Retrying server timeout error");
+            Error::Transient { err, retry_after: None }
+        } else {
+            Error::Permanent(err)
+        }
+    }
+
+    retry(default_backoff(), || async { func().await.map_err(from_reqwest_err) }).await
 }

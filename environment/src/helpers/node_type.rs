@@ -20,13 +20,13 @@ use std::fmt;
 #[derive(Copy, Clone, Debug, Eq, PartialEq, Serialize, Deserialize, Hash)]
 #[repr(u8)]
 pub enum NodeType {
-    /// A client node is a full node, capable of sending and receiving blocks.
+    /// A client node is a full node, capable of syncing with the network.
     Client = 0,
     /// A prover is a full node, capable of producing proofs for consensus.
     Prover,
-    /// A validator is a full node, capable of producing blocks with provers.
+    /// A validator is a full node, capable of validating blocks.
     Validator,
-    /// A beacon is a discovery node, capable of syncing nodes on the network.
+    /// A beacon is a full node, capable of producing blocks.
     Beacon,
 }
 

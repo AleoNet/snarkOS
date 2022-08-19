@@ -16,9 +16,19 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
+[workspace]
+members = [ "environment" ]
+
+[lib]
+path = "snarkos/lib.rs"
+
 [[bin]]
-name = "main"
-path = "src/main.rs"
+name = "snarkos"
+path = "snarkos/main.rs"
+
+#[[bin]]
+#name = "main"
+#path = "src/main.rs"
 
 [dependencies]
 backoff = { version = "0.4", features = ["tokio"] }
@@ -95,6 +105,9 @@ version = "1"
 
 [dependencies.serde_json]
 version = "1"
+
+[dependencies.thiserror]
+version = "1.0"
 
 [dependencies.tokio]
 version = "1"

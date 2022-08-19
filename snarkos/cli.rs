@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{display::Display, Node, Updater};
-use snarkos_consensus::account::Account;
+use crate::{Account, Node, Updater};
 use snarkos_environment::{helpers::NodeType, Beacon, Client, Environment, Prover, Validator};
 // use snarkos_storage::storage::{rocksdb::RocksDB, ReadOnly};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
@@ -69,9 +68,6 @@ pub struct CLI {
     /// Enables development mode, specify a unique ID for the local node.
     #[clap(long)]
     pub dev: Option<u16>,
-    /// If the flag is set, the node will render a read-only display.
-    #[clap(long)]
-    pub display: bool,
 
     /// Specify an optional subcommand.
     #[clap(subcommand)]
@@ -92,9 +88,9 @@ impl CLI {
             }
             None => match (self.network, self.node_type()?) {
                 (3, NodeType::Client) => self.start_node::<Testnet3, Client<Testnet3>>(&None).await,
-                (3, NodeType::Prover) => self.start_node::<Testnet3, Prover<Testnet3>>(&self.prover).await,
-                (3, NodeType::Validator) => self.start_node::<Testnet3, Validator<Testnet3>>(&self.validator).await,
-                (3, NodeType::Beacon) => self.start_node::<Testnet3, Beacon<Testnet3>>(&None).await,
+                (3, NodeType::Prover) => bail!("Provers will be available in Phase 2"),
+                (3, NodeType::Validator) => bail!("Validators will be available in Phase 3"),
+                (3, NodeType::Beacon) => bail!("Beacons will be available in Phase 3"),
                 _ => bail!("Unsupported network"),
             },
         }
@@ -137,7 +133,7 @@ impl CLI {
         };
 
         // Print the welcome.
-        println!("{}", crate::display::welcome_message());
+        println!("{}", crate::logger::welcome_message());
         // Print the Aleo address.
         println!("Your Aleo address is {}.\n", account.address());
         // Print the node type and network.
@@ -149,27 +145,21 @@ impl CLI {
         // Initialize signal handling and maintain ownership of the node - to keep it in scope.
         Self::handle_signals(node.clone());
 
-        // Initialize the display, if enabled.
-        if self.display {
-            println!("\nThe snarkOS console is initializing...\n");
-            Display::<N, E>::start(node.clone(), self.verbosity)?;
-        };
-
-        // Connect to peer(s) if given as an argument.
-        if let Some(peer_ips) = &self.connect {
-            // Separate the IP addresses.
-            for peer_ip in peer_ips.split(',') {
-                // Parse each IP address.
-                node.connect_to(match peer_ip.parse() {
-                    Ok(ip) => ip,
-                    Err(e) => {
-                        error!("The IP supplied to --connect ('{peer_ip}') is malformed: {e}");
-                        continue;
-                    }
-                })
-                .await?;
-            }
-        }
+        // // Connect to peer(s) if given as an argument.
+        // if let Some(peer_ips) = &self.connect {
+        //     // Separate the IP addresses.
+        //     for peer_ip in peer_ips.split(',') {
+        //         // Parse each IP address.
+        //         node.connect_to(match peer_ip.parse() {
+        //             Ok(ip) => ip,
+        //             Err(e) => {
+        //                 error!("The IP supplied to --connect ('{peer_ip}') is malformed: {e}");
+        //                 continue;
+        //             }
+        //         })
+        //         .await?;
+        //     }
+        // }
 
         // Note: Do not move this. The pending await must be here otherwise
         // other snarkOS commands will not exit.

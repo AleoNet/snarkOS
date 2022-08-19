@@ -63,6 +63,16 @@ impl<N: Network> Account<N> {
         signature.verify(&self.address, message)
     }
 
+    /// Returns the account private key.
+    pub const fn private_key(&self) -> &PrivateKey<N> {
+        &self.private_key
+    }
+
+    /// Returns the account view key.
+    pub const fn view_key(&self) -> &ViewKey<N> {
+        &self.view_key
+    }
+
     /// Returns the account address.
     pub const fn address(&self) -> &Address<N> {
         &self.address
