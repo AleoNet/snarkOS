@@ -18,12 +18,11 @@ use crate::CLI;
 
 use crate::{connect_to_leader, handle_listener, send_pings, Account, Ledger};
 use snarkos_environment::{helpers::Status, Environment};
-use snarkvm::prelude::{Address, Network, PrivateKey};
+use snarkvm::prelude::{Network};
 
 use anyhow::Result;
 use core::marker::PhantomData;
-use std::{env, net::SocketAddr, path::PathBuf, str::FromStr};
-use tokio::sync::oneshot;
+use std::{net::SocketAddr, str::FromStr};
 
 // The IP of the leader node to connect to.
 const LEADER_IP: &str = "159.203.77.113:4000";

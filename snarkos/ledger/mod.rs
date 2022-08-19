@@ -31,6 +31,7 @@ use tokio::task;
 pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockDB<N>, ProgramDB<N>>;
 // pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockMemory<N>, ProgramMemory<N>>;
 
+#[allow(dead_code)]
 pub struct Ledger<N: Network> {
     /// The internal ledger.
     ledger: RwLock<InternalLedger<N>>,

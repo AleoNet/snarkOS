@@ -17,9 +17,7 @@
 use snarkvm::prelude::*;
 
 use colored::*;
-use std::{fmt::Write, io};
-use tokio::sync::mpsc;
-use tracing_subscriber::EnvFilter;
+use std::{fmt::Write};
 
 pub fn initialize_logger(verbosity: u8) {
     match verbosity {

@@ -17,8 +17,6 @@
 use crate::store::{
     rocksdb::{self, DataMap, Database},
     DataID,
-    TransactionDB,
-    TransitionDB,
 };
 use snarkvm::prelude::*;
 

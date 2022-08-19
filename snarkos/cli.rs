@@ -15,8 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Account, Node, Updater};
-use snarkos_environment::{helpers::NodeType, Beacon, Client, Environment, Prover, Validator};
-// use snarkos_storage::storage::{rocksdb::RocksDB, ReadOnly};
+use snarkos_environment::{helpers::NodeType, Client, Environment};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, ensure, Result};

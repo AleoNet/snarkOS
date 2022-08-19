@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Ledger;
-use snarkvm::prelude::{Field, GraphKey, Network, RecordsFilter, Transaction, ViewKey};
+use snarkvm::prelude::{Field, Network, RecordsFilter, Transaction, ViewKey};
 
 use anyhow::Result;
 use core::marker::PhantomData;
@@ -62,6 +62,7 @@ pub enum LedgerRequest<N: Network> {
 }
 
 /// A server for the ledger.
+#[allow(dead_code)]
 pub struct Server<N: Network> {
     /// The ledger.
     ledger: Arc<Ledger<N>>,
@@ -124,7 +125,6 @@ impl<N: Network> Server<N> {
             .and(warp::path!("testnet3" / "records" / "spent"))
             .and(warp::body::content_length_limit(128))
             .and(warp::body::json())
-            .and(warp::body::json())
             .and(with(ledger.clone()))
             .and_then(Self::records_spent);
 
@@ -132,7 +132,6 @@ impl<N: Network> Server<N> {
         let records_unspent = warp::get()
             .and(warp::path!("testnet3" / "records" / "unspent"))
             .and(warp::body::content_length_limit(128))
-            .and(warp::body::json())
             .and(warp::body::json())
             .and(with(ledger.clone()))
             .and_then(Self::records_unspent);
@@ -236,7 +235,7 @@ impl<N: Network> Server<N> {
     }
 
     /// Returns the spent records for the given view key.
-    async fn records_spent(view_key: ViewKey<N>, graph_key: GraphKey<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+    async fn records_spent(view_key: ViewKey<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
         // Fetch the records using the view key.
         let records = ledger
             .ledger
@@ -250,7 +249,7 @@ impl<N: Network> Server<N> {
     }
 
     /// Returns the unspent records for the given view key.
-    async fn records_unspent(view_key: ViewKey<N>, graph_key: GraphKey<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+    async fn records_unspent(view_key: ViewKey<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
         // Fetch the records using the view key.
         let records = ledger
             .ledger

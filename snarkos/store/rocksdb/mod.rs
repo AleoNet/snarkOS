@@ -29,15 +29,11 @@ use anyhow::Result;
 use core::{fmt::Debug, hash::Hash};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
-use serde::{de::DeserializeOwned, Deserialize, Serialize};
+use serde::{de::DeserializeOwned, Serialize};
 use std::{
     borrow::Borrow,
-    convert::TryInto,
-    fs::File,
-    io::{BufReader, BufWriter, Read, Seek, SeekFrom, Write},
     marker::PhantomData,
     ops::Deref,
-    path::Path,
     sync::{atomic::AtomicBool, Arc},
 };
 
