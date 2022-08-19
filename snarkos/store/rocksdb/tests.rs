@@ -18,6 +18,7 @@ use crate::{
     store::rocksdb::{DataMap, Database, RocksDB},
     DataID,
 };
+use serial_test::serial;
 use snarkvm::compiler::{Map, MapRead};
 
 use std::fs;
@@ -34,18 +35,21 @@ fn setup_test_map(network_id: u16) -> TestMap {
 type TestMap = DataMap<u32, String>;
 
 #[test]
+#[serial]
 fn test_open() {
     remove_test_dir(0);
     assert!(RocksDB::open(0).is_ok());
 }
 
 #[test]
+#[serial]
 fn test_open_map_opens_a_datamap_for_a_given_dataid() {
     remove_test_dir(1);
     assert!(RocksDB::open_map::<i32, String>(1, DataID::Test).is_ok());
 }
 
 #[test]
+#[serial]
 fn test_a_key_is_contained_after_a_value_was_inserted_with_it() {
     let test_map = setup_test_map(2);
 
@@ -56,6 +60,7 @@ fn test_a_key_is_contained_after_a_value_was_inserted_with_it() {
 }
 
 #[test]
+#[serial]
 fn test_a_key_is_not_contained_if_no_value_was_inserted_with_it() {
     let test_map = setup_test_map(3);
 
@@ -63,6 +68,7 @@ fn test_a_key_is_not_contained_if_no_value_was_inserted_with_it() {
 }
 
 #[test]
+#[serial]
 fn test_a_value_that_was_inserted_can_be_retrieved_with_its_associated_key() {
     let test_map = setup_test_map(4);
 
@@ -75,6 +81,7 @@ fn test_a_value_that_was_inserted_can_be_retrieved_with_its_associated_key() {
 }
 
 #[test]
+#[serial]
 fn test_trying_to_get_a_value_associated_to_a_non_existent_key_returns_none() {
     let test_map = setup_test_map(5);
 
@@ -84,6 +91,7 @@ fn test_trying_to_get_a_value_associated_to_a_non_existent_key_returns_none() {
 }
 
 #[test]
+#[serial]
 fn test_a_value_that_was_inserted_can_be_removed_with_its_associated_key() {
     let test_map = setup_test_map(6);
     test_map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
@@ -95,6 +103,7 @@ fn test_a_value_that_was_inserted_can_be_removed_with_its_associated_key() {
 }
 
 #[test]
+#[serial]
 #[ignore = "Removing a key that does not exist does not result in an error"]
 fn test_a_value_that_was_not_inserted_cannot_be_removed() {
     let test_map = setup_test_map(7);
@@ -105,6 +114,7 @@ fn test_a_value_that_was_not_inserted_cannot_be_removed() {
 }
 
 #[test]
+#[serial]
 #[ignore = "Removing a key that does not exist does not result in an error"]
 fn test_a_value_cannot_be_removed_twice() {
     let test_map = setup_test_map(8);
@@ -117,6 +127,7 @@ fn test_a_value_cannot_be_removed_twice() {
 }
 
 #[test]
+#[serial]
 fn test_can_iter_on_pairs_after_inserting() {
     let test_map = setup_test_map(9);
 
@@ -127,6 +138,7 @@ fn test_can_iter_on_pairs_after_inserting() {
 }
 
 #[test]
+#[serial]
 fn test_can_iter_on_keys_after_inserting() {
     let test_map = setup_test_map(11);
 
@@ -140,6 +152,7 @@ fn test_can_iter_on_keys_after_inserting() {
 }
 
 #[test]
+#[serial]
 fn test_can_iter_on_values_after_inserting() {
     let test_map = setup_test_map(12);
 
@@ -153,6 +166,7 @@ fn test_can_iter_on_values_after_inserting() {
 }
 
 #[test]
+#[serial]
 fn test_reopen() {
     {
         let test_map = setup_test_map(13);
