@@ -71,8 +71,6 @@ impl<N: Network> Ledger<N> {
             .set(Box::new(server))
             .map_err(|_| anyhow!("Failed to save the server"))?;
 
-        // Sync the ledger with the network.
-        ledger.initial_sync_with_network().await?;
         // Return the ledger.
         Ok(ledger)
     }
@@ -207,20 +205,17 @@ impl<N: Network> Ledger<N> {
 // Internal operations.
 impl<N: Network> Ledger<N> {
     /// Syncs the ledger with the network.
-    async fn initial_sync_with_network(self: &Arc<Self>) -> Result<()> {
+    pub(crate) async fn initial_sync_with_network(self: &Arc<Self>, leader_ip: &str) -> Result<()> {
         /// The number of concurrent requests with the network.
         const CONCURRENT_REQUESTS: usize = 100;
         /// Url to fetch the blocks from.
         const TARGET_URL: &str = "https://vm.aleo.org/testnet3/block/testnet3/";
-        // TODO (raychu86): Move this declaration out.
-        /// The IP of the leader node.
-        const LEADER_IP: &str = "http://159.203.77.113";
 
         // Fetch the ledger height.
         let ledger_height = self.ledger.read().latest_height();
 
         // Fetch the latest height.
-        let latest_height = reqwest::get(format!("{LEADER_IP}/testnet3/latest/height"))
+        let latest_height = reqwest::get(format!("http://{leader_ip}/testnet3/latest/height"))
             .await?
             .text()
             .await?
