@@ -44,6 +44,14 @@ pub struct CLI {
     /// Specify the IP address and port for the node server.
     #[clap(parse(try_from_str), default_value = "0.0.0.0:4133", long = "node")]
     pub node: SocketAddr,
+    /// Specify the IP address and port of a beacon node to connect to.
+    #[clap(
+        hide = true,
+        parse(try_from_str),
+        default_value = "159.203.77.113:4130",
+        long = "connect_to_beacon"
+    )]
+    pub beacon_addr: SocketAddr,
     /// Specify the IP address and port of a peer to connect to.
     #[clap(long = "connect")]
     pub connect: Option<String>,
