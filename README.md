@@ -39,7 +39,7 @@ The following are **minimum** requirements to run an Aleo node:
  - **Storage**: 128GB of disk space
  - **Network**: 50 Mbps of upload **and** download bandwidth
 
-Please note to run an Aleo mining node that is **competitive**, the machine will require more than these requirements.
+Please note to run an Aleo proving node that is **competitive**, the machine will require more than these requirements.
 
 ### 2.2 Installation
 
@@ -69,11 +69,13 @@ Next, to start a client node, from the snarkOS directory, run:
 ./run-client.sh
 ```
 
-## 3b. Run an Aleo Mining Node
+## 3b. Run an Aleo Prover Node
+
+**Note:** The Aleo prover node will be available in Phase 2.
 
 Start by following the instructions in the [Build Guide](#2-build-guide).
 
-Next, to generate an Aleo miner address, run:
+Next, to generate an Aleo prover address, run:
 ```
 snarkos experimental new_account 
 ```
@@ -92,25 +94,15 @@ This will output a new Aleo account in the terminal.
       Address  aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Use Me For The Next Step
 ```
 
-Next, to start a mining node, from the snarkOS directory, run:
+Next, to start a proving node, from the snarkOS directory, run:
 ```
-./run-miner.sh
+./run-prover.sh
 ```
-When prompted, enter your Aleo miner address:
+When prompted, enter your Aleo prover address:
 ```
-Enter your Aleo miner address:
+Enter your Aleo prover address:
 aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
-
-### Mining Report
-
-After the mining node has booted up, a periodic report is provided with the status of mined blocks:
-```
-INFO Mining Report (confirmed_blocks = 1, pending_blocks = 5, miner_address = aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx)
-```
-This report can also be queried after the mining node has already ran,
-by running `cargo run --release -- miner stats aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
-in the snarkOS directory, or `snarkos miner stats aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`.
 
 ## 4. FAQs
 
@@ -118,23 +110,17 @@ in the snarkOS directory, or `snarkos miner stats aleo1xxxxxxxxxxxxxxxxxxxxxxxxx
 
 - Ensure your machine has `Rust v1.62+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 - If large errors appear during compilation, try running `cargo clean`.
-- Ensure snarkOS is started using `./run-client.sh` or `./run-miner.sh`.
+- Ensure snarkOS is started using `./run-client.sh` or `./run-prover.sh`.
 
 ### 2. My node is unable to connect to peers on the network.
 
-- Ensure ports `4132/tcp` and `3032/tcp` are open on your router and OS firewall.
-- Ensure snarkOS is started using `./run-client.sh` or `./run-miner.sh`.
+- Ensure ports `4130/tcp` and `4180/tcp` are open on your router and OS firewall.
+- Ensure snarkOS is started using `./run-client.sh` or `./run-prover.sh`.
 
 ### 3. I can't generate a new address ### 
 
 - Before running the command above (`snarkos experimental new_account`) try `source ~/.bashrc` 
 - Also double check the spelling of `snarkos`. Note the directory is `/snarkOS`, the command is `snarkos`
-
-### 4. Can I coordinate mining across multiple machines/instances of snarkOS? ### 
- 
-- Yes. Just spin up multiple instances of snarkOS across multiple machines (not the same machine) and input
-  the same miner address. At the moment, Aleo does not integrate with any other mining pool protocols (like
-  [stratum](https://braiins.com/stratum-v2)). But if anyone wants to implement, please apply for a grant!
 
 ## 5. Command Line Interface
 
@@ -157,11 +143,8 @@ FLAGS:
 OPTIONS:
         --connect <connect>          Specify the IP address and port of a peer to connect to
         --dev <dev>                  Enables development mode, specify a unique ID for the local node
-        --miner <miner>              Specify this as a mining node, with the given miner address
         --network <network>          Specify the network of this node [default: 2]
         --node <node>                Specify the IP address and port for the node server [default: 0.0.0.0:4132]
-        --operator <operator>        Specify this as an operating node, with the given operator address
-        --pool <pool>                Specify the pool that a prover node is contributing to
         --prover <prover>            Specify this as a prover node, with the given prover address
         --rpc <rpc>                  Specify the IP address and port for the RPC server [default: 0.0.0.0:3032]
         --password <rpc-password>    Specify the password for the RPC server [default: pass]
@@ -172,21 +155,27 @@ SUBCOMMANDS:
     clean           Removes the ledger files from storage
     experimental    Experimental features
     help            Prints this message or the help of the given subcommand(s)
-    miner           Miner commands and settings
     update          Updates snarkOS to the latest version
 ```
 
-## 6. Development Guide
+## 6. Development
 
-In one terminal, start the first node by running:
-```
-cargo run --release -- --dev 1 --node 0.0.0.0:4135 --rpc 0.0.0.0:3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah
-```
+[//]: # (In one terminal, start the first node by running:)
 
-After the first node starts, in a second terminal, run:
-```
-cargo run --release -- --dev 2
-```
+[//]: # (```)
+
+[//]: # (cargo run --release -- --dev 1 --node 0.0.0.0:4135 --rpc 0.0.0.0:3035 --prover aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah)
+
+[//]: # (```)
+
+[//]: # ()
+[//]: # (After the first node starts, in a second terminal, run:)
+
+[//]: # (```)
+
+[//]: # (cargo run --release -- --dev 2)
+
+[//]: # (```)
 
 We welcome all contributions to snarkOS. Please refer to the [license](#7-license) for the terms of contributions.
 

@@ -68,21 +68,6 @@ commands:
 
 jobs:
 
-  integration:
-    docker:
-      - image: cimg/rust:1.59
-    resource_class: xlarge
-    parallelism: 5
-    steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-integration-cache
-      - run_parallel:
-          workspace_member: .integration
-          features: test
-      - clear_environment:
-          cache_key: snarkos-integration-cache
-
   environment:
     docker:
       - image: cimg/rust:1.59
@@ -98,51 +83,6 @@ jobs:
       - clear_environment:
           cache_key: snarkos-environment-cache
 
-  metrics:
-    docker:
-      - image: cimg/rust:1.59
-    resource_class: xlarge
-    parallelism: 1
-    steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-metrics-cache
-      - run_parallel:
-          workspace_member: metrics
-          features: test
-      - clear_environment:
-          cache_key: snarkos-metrics-cache
-
-  network:
-    docker:
-      - image: cimg/rust:1.59
-    resource_class: xlarge
-    parallelism: 20
-    steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-network-cache
-      - run_parallel:
-          workspace_member: network
-          features: test
-      - clear_environment:
-          cache_key: snarkos-network-cache
-
-  rpc:
-    docker:
-      - image: cimg/rust:1.59
-    resource_class: xlarge
-    parallelism: 20
-    steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-rpc-cache
-      - run_parallel:
-          workspace_member: rpc
-          features: ""
-      - clear_environment:
-          cache_key: snarkos-rpc-cache
-
   snarkos:
     docker:
       - image: cimg/rust:1.59
@@ -157,21 +97,6 @@ jobs:
           features: test
       - clear_environment:
           cache_key: snarkos-stable-cache
-
-  storage:
-    docker:
-      - image: cimg/rust:1.59
-    resource_class: xlarge
-    parallelism: 10
-    steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-storage-cache
-      - run_parallel:
-          workspace_member: storage
-          features: test
-      - clear_environment:
-          cache_key: snarkos-storage-cache
 
   # codecov:
   #   machine:
@@ -325,13 +250,8 @@ jobs:
 workflows:
   main-workflow:
     jobs:
-      - integration
       - environment
-      - metrics
-      - network
-      - rpc
       - snarkos
-      - storage
       # - codecov:
       #     requires:
       #       - rust-stable
