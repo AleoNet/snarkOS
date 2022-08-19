@@ -21,11 +21,8 @@ name = "main"
 path = "src/main.rs"
 
 [dependencies]
-aleo-std = { version = "0.1.14", default-features = false }
-anyhow = { version = "1.0" }
 backoff = { version = "0.4", features = ["tokio"] }
 bytes = { version = "1" }
-colored = { version = "2.0" }
 dotenv = { version = "0.15" }
 futures = { version = "0.3" }
 hyper = { version = "0.14" }
@@ -33,31 +30,48 @@ hyper-tls = { version = "0.5" }
 indexmap = { version = "1.9", features = ["rayon"] }
 once_cell = { version = "1.13.0" }
 parking_lot = { version = "0.12" }
-rand = { version = "0.8" }
-rayon = { version = "1.5" }
 rusoto_core = { version = "0.48" }
-rusoto_s3 = { version = "0.48" }
-serde_json = { version = "1.0" }
-tokio = { version = "1.5.0", features = ["full"] }
 tokio-util = { version = "0.7.3" }
-tracing = { version = "0.1" }
 warp = { version = "0.3" }
 
-[dependencies.clap]
-version = "3.1"
-features = [ "derive" ]
-
-[dependencies.tracing-subscriber]
-version = "0.3"
-features = [ "env-filter", "parking_lot" ]
+[dependencies.snarkos-environment]
+path = "./environment"
+version = "2.0.2"
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
 rev = "7555dc0"
 features = ["circuit", "console", "parallel", "utilities"]
 
+[dependencies.aleo-std]
+version = "0.1.14"
+default-features = false
+
+[dependencies.anyhow]
+version = "1"
+
 [dependencies.bincode]
 version = "1.0"
+
+[dependencies.clap]
+version = "3.2"
+features = [ "derive" ]
+
+[dependencies.colored]
+version = "2.0"
+
+[dependencies.crossterm]
+version = "0.24"
+optional = true
+
+[dependencies.num_cpus]
+version = "1"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.rayon]
+version = "1"
 
 [dependencies.reqwest]
 version = "0.11.11"
@@ -67,8 +81,35 @@ version = "0.19"
 default-features = false
 features = [ "lz4" ]
 
+[dependencies.self_update]
+version = "0.30"
+features = [
+  "archive-zip",
+  "compression-zip-bzip2",
+  "compression-zip-deflate",
+  "compression-flate2"
+]
+
 [dependencies.serde]
 version = "1"
+
+[dependencies.serde_json]
+version = "1"
+
+[dependencies.tokio]
+version = "1"
+features = [ "full" ]
+
+[dependencies.tracing]
+version = "0.1"
+
+[dependencies.tracing-subscriber]
+version = "0.3"
+features = [ "env-filter", "parking_lot" ]
+
+[dependencies.tui]
+version = "0.18"
+optional = true
 
 [dev-dependencies.rusty-hook]
 version = "0.11.2"

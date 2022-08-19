@@ -39,7 +39,6 @@ pub use updater::*;
 mod tests;
 
 pub use snarkos_environment as environment;
-// pub use snarkos_storage as storage;
 
 #[cfg(feature = "rpc")]
 pub use snarkos_rpc as rpc;

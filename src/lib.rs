@@ -37,24 +37,24 @@ pub(crate) async fn handle_dispatch_error<'a, T, F>(func: impl Fn() -> F + 'a) -
 where
     F: Future<Output = Result<T, reqwest::Error>>,
 {
+    fn default_backoff() -> ExponentialBackoff {
+        ExponentialBackoff {
+            max_interval: Duration::from_secs(10),
+            max_elapsed_time: Some(Duration::from_secs(45)),
+            ..Default::default()
+        }
+    }
+
+    fn from_reqwest_err(err: reqwest::Error) -> backoff::Error<reqwest::Error> {
+        use backoff::Error;
+
+        if err.is_timeout() {
+            debug!("Retrying server timeout error");
+            Error::Transient { err, retry_after: None }
+        } else {
+            Error::Permanent(err)
+        }
+    }
+
     retry(default_backoff(), || async { func().await.map_err(from_reqwest_err) }).await
-}
-
-fn from_reqwest_err(err: reqwest::Error) -> backoff::Error<reqwest::Error> {
-    use backoff::Error;
-
-    if err.is_timeout() {
-        debug!("Retrying server timeout error");
-        Error::Transient { err, retry_after: None }
-    } else {
-        Error::Permanent(err)
-    }
-}
-
-fn default_backoff() -> ExponentialBackoff {
-    ExponentialBackoff {
-        max_interval: Duration::from_secs(10),
-        max_elapsed_time: Some(Duration::from_secs(45)),
-        ..Default::default()
-    }
 }
