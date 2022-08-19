@@ -71,13 +71,13 @@ impl<N: Network, E: Environment> Node<N, E> {
                 let ledger = self.ledger.clone();
                 tokio::spawn(async move {
                     if let Err(err) = handle_peer::<N>(stream, peer_ip, ledger).await {
-                        error!("Error handling peer {}: {:?}", peer_ip, err);
+                        warn!("Failed to handle connection with peer {}: {:?}", peer_ip, err);
                     }
                 });
                 Ok(())
             }
             Err(error) => {
-                error!("Failed to connect to peer {}: {}", peer_ip, error);
+                warn!("Failed to connect to peer {}: {}", peer_ip, error);
                 bail!("{error}")
             }
         }

@@ -48,7 +48,7 @@ impl<N: Network> Peer<N> {
 
         // Send initial ping.
         if let Err(err) = outbound_sender.send(Message::<N>::Ping).await {
-            error!("Error sending ping {} to {}", err, addr);
+            warn!("Failed to send ping {} to {}", err, addr);
         }
 
         // Store the new peer.
@@ -149,7 +149,7 @@ pub(crate) async fn handle_peer<N: Network>(
 
                                     },
                                     Err(err) => {
-                                        error!(
+                                        warn!(
                                             "Failed to add transaction {} to mempool: {:?}",
                                             transaction_id,
                                             err
@@ -186,7 +186,7 @@ pub(crate) async fn handle_peer<N: Network>(
                 }
                 // An error occurred.
                 Some(Err(e)) => {
-                    error!(
+                    warn!(
                         "an error occurred while processing messages for {}; error = {:?}",
                         peer.ip,
                         e
@@ -216,11 +216,11 @@ pub async fn handle_listener<N: Network>(listener: TcpListener, ledger: Arc<Ledg
                 Ok((stream, peer_ip)) => {
                     tokio::spawn(async move {
                         if let Err(err) = handle_peer::<N>(stream, peer_ip, ledger_clone.clone()).await {
-                            error!("Error handling peer {}: {:?}", peer_ip, err);
+                            warn!("Error handling peer {}: {:?}", peer_ip, err);
                         }
                     });
                 }
-                Err(error) => error!("Failed to accept a connection: {}", error),
+                Err(error) => warn!("Failed to accept a connection: {}", error),
             }
         }
     });
@@ -238,7 +238,7 @@ pub async fn send_pings<N: Network>(ledger: Arc<Ledger<N>>) -> Result<(), Box<dy
 
             for (addr, outbound) in peers.iter() {
                 if let Err(err) = outbound.send(Message::<N>::Ping).await {
-                    error!("Error sending ping {} to {}", err, addr);
+                    warn!("Error sending ping {} to {}", err, addr);
                 }
             }
         }
@@ -260,11 +260,11 @@ pub async fn connect_to_leader<N: Network>(initial_peer: SocketAddr, ledger: Arc
                     Ok(stream) => {
                         tokio::spawn(async move {
                             if let Err(err) = handle_peer::<N>(stream, initial_peer.clone(), ledger_clone.clone()).await {
-                                error!("Error handling peer {}: {:?}", initial_peer, err);
+                                warn!("Error handling peer {}: {:?}", initial_peer, err);
                             }
                         });
                     }
-                    Err(error) => error!("Failed to connect to peer {}: {}", initial_peer, error),
+                    Err(error) => warn!("Failed to connect to peer {}: {}", initial_peer, error),
                 }
             }
             std::thread::sleep(time::Duration::from_secs(10));

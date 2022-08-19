@@ -113,7 +113,7 @@ impl<N: Network> Ledger<N> {
         let next_block_clone = next_block.clone();
         if let Err(error) = task::spawn_blocking(move || self_clone.ledger.write().add_next_block(&next_block_clone)).await? {
             // Log the error.
-            error!("{error}");
+            warn!("{error}");
         }
 
         // Broadcast the block to all peers.

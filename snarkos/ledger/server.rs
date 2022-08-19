@@ -184,7 +184,7 @@ impl<N: Network> Server<N> {
                         match ledger.add_to_memory_pool(transaction) {
                             Ok(()) => debug!("✉️ Added transaction '{transaction_id}' to the memory pool"),
                             Err(error) => {
-                                error!("⚠️ Failed to add transaction '{transaction_id}' to the memory pool: {error}")
+                                warn!("⚠️ Failed to add transaction '{transaction_id}' to the memory pool: {error}")
                             }
                         }
                     }

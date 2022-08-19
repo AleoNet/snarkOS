@@ -212,7 +212,7 @@ impl<N: Network> Decoder for MessageCodec<N> {
         match Message::deserialize(bytes.into()) {
             Ok(message) => Ok(Some(message)),
             Err(error) => {
-                error!("Failed to deserialize a message: {}", error);
+                warn!("Failed to deserialize a message: {}", error);
                 Err(std::io::ErrorKind::InvalidData.into())
             }
         }
