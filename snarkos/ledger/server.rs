@@ -20,7 +20,7 @@ use snarkvm::prelude::{Field, Network, RecordsFilter, Transaction, ViewKey};
 use anyhow::Result;
 use core::marker::PhantomData;
 use indexmap::IndexMap;
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 use tokio::{sync::mpsc, task::JoinHandle};
 use warp::{http::StatusCode, reject, reply, Filter, Rejection, Reply};
 
@@ -76,7 +76,7 @@ pub struct Server<N: Network> {
 
 impl<N: Network> Server<N> {
     /// Initializes a new instance of the server.
-    pub fn start(ledger: Arc<Ledger<N>>) -> Result<Self> {
+    pub fn start(ledger: Arc<Ledger<N>>, server_addr: SocketAddr) -> Result<Self> {
         // Initialize a channel to send requests to the ledger.
         let (ledger_sender, ledger_receiver) = mpsc::channel(64);
 
@@ -160,7 +160,7 @@ impl<N: Network> Server<N> {
                 .or(records_unspent)
                 .or(transaction_broadcast);
             // Start the server.
-            warp::serve(routes).run(([0, 0, 0, 0], 80)).await;
+            warp::serve(routes).run(server_addr).await;
         }));
 
         // Spawn the ledger handler.

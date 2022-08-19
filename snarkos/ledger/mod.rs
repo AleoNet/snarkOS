@@ -17,7 +17,7 @@
 mod server;
 pub use server::*;
 
-use crate::{handle_dispatch_error, BlockDB, ProgramDB};
+use crate::{handle_dispatch_error, BlockDB, ProgramDB, CLI};
 use snarkvm::prelude::*;
 
 use colored::Colorize;
@@ -52,7 +52,7 @@ pub struct Ledger<N: Network> {
 
 impl<N: Network> Ledger<N> {
     /// Initializes a new instance of the ledger.
-    pub fn load(private_key: PrivateKey<N>) -> Result<Arc<Self>> {
+    pub fn load(private_key: PrivateKey<N>, cli: &CLI) -> Result<Arc<Self>> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
@@ -67,19 +67,21 @@ impl<N: Network> Ledger<N> {
             address,
         });
 
-        // Initialize the server.
-        let server = Server::<N>::start(ledger.clone())?;
-        ledger
-            .server
-            .set(Box::new(server))
-            .map_err(|_| anyhow!("Failed to save the server"))?;
+        if !cli.norest {
+            // Initialize the server.
+            let server = Server::<N>::start(ledger.clone(), cli.rest)?;
+            ledger
+                .server
+                .set(Box::new(server))
+                .map_err(|_| anyhow!("Failed to save the server"))?;
+        }
 
         // Return the ledger.
         Ok(ledger)
     }
 
     /// Initializes a new instance of the ledger.
-    pub(super) fn new_with_genesis(private_key: PrivateKey<N>, genesis_block: Block<N>) -> Result<Arc<Self>> {
+    pub(super) fn new_with_genesis(private_key: PrivateKey<N>, genesis_block: Block<N>, cli: &CLI) -> Result<Arc<Self>> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
@@ -109,12 +111,14 @@ impl<N: Network> Ledger<N> {
             address,
         });
 
-        // Initialize the server.
-        let server = Server::<N>::start(ledger.clone())?;
-        ledger
-            .server
-            .set(Box::new(server))
-            .map_err(|_| anyhow!("Failed to save the server"))?;
+        if !cli.norest {
+            // Initialize the server.
+            let server = Server::<N>::start(ledger.clone(), cli.rest)?;
+            ledger
+                .server
+                .set(Box::new(server))
+                .map_err(|_| anyhow!("Failed to save the server"))?;
+        }
 
         // Return the ledger.
         Ok(ledger)
