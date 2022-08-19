@@ -71,7 +71,7 @@ features = [ "derive" ]
 version = "2.0"
 
 [dependencies.crossterm]
-version = "0.24"
+version = "0.25"
 optional = true
 
 [dependencies.num_cpus]
@@ -121,7 +121,7 @@ version = "0.3"
 features = [ "env-filter", "parking_lot" ]
 
 [dependencies.tui]
-version = "0.18"
+version = "0.19"
 optional = true
 
 [dev-dependencies.rusty-hook]
