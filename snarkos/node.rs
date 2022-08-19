@@ -22,13 +22,16 @@ use snarkvm::prelude::{Network};
 
 use anyhow::Result;
 use core::marker::PhantomData;
-use std::{net::SocketAddr, str::FromStr};
+use std::{net::SocketAddr, sync::Arc, str::FromStr};
 
 // The IP of the leader node to connect to.
 const LEADER_IP: &str = "159.203.77.113:4000";
 
 #[derive(Clone)]
 pub struct Node<N: Network, E: Environment> {
+    /// The ledger.
+    ledger: Arc<Ledger<N>>,
+    /// PhantomData.
     _phantom: PhantomData<(N, E)>,
 }
 
@@ -54,7 +57,7 @@ impl<N: Network, E: Environment> Node<N, E> {
         // Send pings to all peers every 10 seconds.
         let _pings = send_pings::<N>(ledger.clone()).await;
 
-        Ok(Self { _phantom: PhantomData })
+        Ok(Self { ledger: ledger.clone(), _phantom: PhantomData })
     }
 
     // /// Returns the peers module of this node.
