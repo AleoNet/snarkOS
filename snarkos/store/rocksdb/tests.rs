@@ -14,8 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-
-use crate::{store::rocksdb::{Database, DataMap, RocksDB}, DataID};
+use crate::{
+    store::rocksdb::{DataMap, Database, RocksDB},
+    DataID,
+};
 use snarkvm::compiler::{Map, MapRead};
 
 use std::fs;
@@ -73,11 +75,11 @@ fn test_a_value_that_was_inserted_can_be_retrieved_with_its_associated_key() {
 }
 
 #[test]
-fn test_trying_to_get_a_value_associated_to_a_non_existent_key_returns_none() {    
+fn test_trying_to_get_a_value_associated_to_a_non_existent_key_returns_none() {
     let test_map = setup_test_map(5);
 
     let expected_result = test_map.get(&000000000).expect("Failed to get");
-    
+
     assert!(expected_result.is_none());
 }
 
@@ -110,21 +112,18 @@ fn test_a_value_cannot_be_removed_twice() {
     test_map.remove(&123456789).expect("Failed to remove");
 
     let expected_result = test_map.remove(&123456789);
-    
+
     assert!(expected_result.is_err());
 }
 
 #[test]
 fn test_can_iter_on_pairs_after_inserting() {
     let test_map = setup_test_map(9);
-    
+
     test_map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
     let expected_result = test_map.iter().next().map(|(k, v)| (*k, v.to_string()));
-    
-    assert_eq!(
-        Some((123456789, "123456789".to_string())),
-        expected_result
-    );
+
+    assert_eq!(Some((123456789, "123456789".to_string())), expected_result);
 }
 
 #[test]
@@ -135,7 +134,7 @@ fn test_can_iter_on_keys_after_inserting() {
     let mut keys = test_map.keys();
     let expected_result = keys.next().map(|k| *k);
     let expected_none = keys.next();
-    
+
     assert_eq!(Some(123456789), expected_result);
     assert!(expected_none.is_none());
 }
@@ -148,7 +147,7 @@ fn test_can_iter_on_values_after_inserting() {
     let mut values = test_map.values();
     let expected_result = values.next().map(|v| v.to_string());
     let expected_none = values.next();
-    
+
     assert_eq!(Some("123456789".to_string()), expected_result);
     assert!(expected_none.is_none());
 }
@@ -162,10 +161,9 @@ fn test_reopen() {
     {
         let test_map: TestMap = RocksDB::open_map(13, DataID::Test).expect("Failed to open data map");
         let expected_result = test_map.get(&123456789).expect("Failed to get").map(|v| v.to_string());
-        
+
         remove_test_dir(13);
-        
+
         assert_eq!(Some("123456789".to_string()), expected_result);
     }
- 
 }
