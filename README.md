@@ -110,12 +110,12 @@ aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 - Ensure your machine has `Rust v1.62+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 - If large errors appear during compilation, try running `cargo clean`.
-- Ensure snarkOS is started using `./run-client.sh` or `./run-miner.sh`.
+- Ensure snarkOS is started using `./run-client.sh` or `./run-prover.sh`.
 
 ### 2. My node is unable to connect to peers on the network.
 
-- Ensure ports `4132/tcp` and `3032/tcp` are open on your router and OS firewall.
-- Ensure snarkOS is started using `./run-client.sh` or `./run-miner.sh`.
+- Ensure ports `4130/tcp` and `4180/tcp` are open on your router and OS firewall.
+- Ensure snarkOS is started using `./run-client.sh` or `./run-prover.sh`.
 
 ### 3. I can't generate a new address ### 
 
@@ -164,7 +164,7 @@ SUBCOMMANDS:
 
 [//]: # (```)
 
-[//]: # (cargo run --release -- --dev 1 --node 0.0.0.0:4135 --rpc 0.0.0.0:3035 --miner aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah)
+[//]: # (cargo run --release -- --dev 1 --node 0.0.0.0:4135 --rpc 0.0.0.0:3035 --prover aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah)
 
 [//]: # (```)
 
