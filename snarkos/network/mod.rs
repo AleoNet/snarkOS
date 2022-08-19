@@ -116,20 +116,19 @@ pub(crate) async fn handle_peer<N: Network>(
                             }
                         },
                         Message::BlockResponse(block) => {
+                            // Check if the block can be added to the ledger.
+                            if block.height() == ledger.ledger().read().latest_height() + 1 {
+                                // Attempt to add the block to the ledger.
+                                match ledger.ledger().write().add_next_block(&block) {
+                                    Ok(_) => info!("Advanced to block {} ({})", block.height(), block.hash()),
+                                    Err(err) => warn!("Failed to process block {} (height: {}): {:?}",block.hash(),block.header().height(), err)
+                                };
 
-                            // Attempt to add the block to the ledger.
-                            match ledger.ledger().write().add_next_block(&block) {
-                            Ok(_) => info!("Advanced to block {} ({})", block.height(), block.hash()),
-                             Err(err) => warn!(
-                                    "Failed to process block {} (height: {}): {:?}",
-                                    block.hash(),
-                                    block.header().height(),
-                                    err
-                                )
-                            };
-
-                            // Send a ping.
-                            peer.outbound.send(Message::<N>::Ping).await?;
+                                // Send a ping.
+                                peer.outbound.send(Message::<N>::Ping).await?;
+                            } else {
+                                trace!("Skipping block {} (height: {})", block.hash(), block.height());
+                            }
                         },
                         Message::TransactionBroadcast(transaction) => {
                             let transaction_id = transaction.id();
@@ -149,7 +148,7 @@ pub(crate) async fn handle_peer<N: Network>(
 
                                     },
                                     Err(err) => {
-                                        warn!(
+                                        trace!(
                                             "Failed to add transaction {} to mempool: {:?}",
                                             transaction_id,
                                             err
@@ -159,28 +158,33 @@ pub(crate) async fn handle_peer<N: Network>(
                             }
                         },
                         Message::BlockBroadcast(block) => {
-                            // Attempt to add the block to the ledger.
-                            match ledger.ledger().write().add_next_block(&block) {
-                                Ok(_) => {
-                                    info!("Advanced to block {} ({})", block.height(), block.hash());
+                            // Check if the block can be added to the ledger.
+                            if block.height() == ledger.ledger().read().latest_height() + 1 {
+                                // Attempt to add the block to the ledger.
+                                match ledger.ledger().write().add_next_block(&block) {
+                                    Ok(_) => {
+                                        info!("Advanced to block {} ({})", block.height(), block.hash());
 
-                                    // Broadcast block to all peers except the sender.
-                                    let peers = ledger.peers().read().clone();
-                                    tokio::spawn(async move {
-                                        for (_, sender) in peers.iter().filter(|(ip, _)| *ip != &peer.ip) {
-                                            let _ = sender.send(Message::<N>::BlockBroadcast(block.clone())).await;
-                                        }
-                                    });
-                                },
-                                 Err(err) => {
-                                    trace!(
-                                        "Failed to process block {} (height: {}): {:?}",
-                                        block.hash(),
-                                        block.header().height(),
-                                        err
-                                    );
-                                }
-                            };
+                                        // Broadcast block to all peers except the sender.
+                                        let peers = ledger.peers().read().clone();
+                                        tokio::spawn(async move {
+                                            for (_, sender) in peers.iter().filter(|(ip, _)| *ip != &peer.ip) {
+                                                let _ = sender.send(Message::<N>::BlockBroadcast(block.clone())).await;
+                                            }
+                                        });
+                                    },
+                                     Err(err) => {
+                                        trace!(
+                                            "Failed to process block {} (height: {}): {:?}",
+                                            block.hash(),
+                                            block.header().height(),
+                                            err
+                                        );
+                                    }
+                                };
+                            } else {
+                                trace!("Skipping block {} (height: {})", block.hash(), block.height());
+                            }
                         }
                     }
                 }
@@ -230,21 +234,17 @@ pub async fn handle_listener<N: Network>(listener: TcpListener, ledger: Arc<Ledg
 
 /// Send a ping to all peers every 10 seconds.
 pub async fn send_pings<N: Network>(ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
-    tokio::spawn(async move {
-        loop {
-            thread::sleep(time::Duration::from_secs(10));
+    loop {
+        thread::sleep(time::Duration::from_secs(10));
 
-            let peers = ledger.peers().read().clone();
+        let peers = ledger.peers().read().clone();
 
-            for (addr, outbound) in peers.iter() {
-                if let Err(err) = outbound.send(Message::<N>::Ping).await {
-                    warn!("Error sending ping {} to {}", err, addr);
-                }
+        for (addr, outbound) in peers.iter() {
+            if let Err(err) = outbound.send(Message::<N>::Ping).await {
+                warn!("Error sending ping {} to {}", err, addr);
             }
         }
-    });
-
-    Ok(())
+    }
 }
 
 /// Handle connection listener to the leader.
