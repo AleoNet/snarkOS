@@ -209,7 +209,7 @@ impl<N: Network> Decoder for MessageCodec<N> {
         };
 
         // Convert the bytes to a message, or fail if it is not valid.
-        match Message::deserialize(bytes.into()) {
+        match Message::deserialize(bytes) {
             Ok(message) => Ok(Some(message)),
             Err(error) => {
                 warn!("Failed to deserialize a message: {}", error);

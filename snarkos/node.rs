@@ -48,7 +48,7 @@ impl<N: Network, E: Environment> Node<N, E> {
         let _handle_listener = handle_listener::<N>(listener, ledger.clone()).await;
 
         // Connect to the leader node and listen for new blocks.
-        let leader_addr = SocketAddr::from_str(&LEADER_IP)?;
+        let leader_addr = SocketAddr::from_str(LEADER_IP)?;
         let _ = connect_to_leader::<N>(leader_addr, ledger.clone()).await;
 
         debug!("Connecting to '{}'...", leader_addr);

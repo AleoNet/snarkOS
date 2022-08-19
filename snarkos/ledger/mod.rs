@@ -59,7 +59,7 @@ impl<N: Network> Ledger<N> {
             ledger: RwLock::new(InternalLedger::open()?),
             peers: RwLock::new(IndexMap::new()),
             server: OnceBox::new(),
-            private_key: private_key.clone(),
+            private_key: *private_key,
             view_key,
             address,
         });
@@ -171,7 +171,7 @@ impl<N: Network> Ledger<N> {
         // Initialize an RNG.
         let rng = &mut ::rand::thread_rng();
         // Deploy.
-        let transaction = Transaction::deploy(&self.ledger.read().vm(), &self.private_key, program, (credits, additional_fee), rng)?;
+        let transaction = Transaction::deploy(self.ledger.read().vm(), &self.private_key, program, (credits, additional_fee), rng)?;
         // Verify.
         assert!(self.ledger.read().vm().verify(&transaction));
         // Return the transaction.
@@ -189,7 +189,7 @@ impl<N: Network> Ledger<N> {
 
         // Create a new transaction.
         Transaction::execute(
-            &self.ledger.read().vm(),
+            self.ledger.read().vm(),
             &self.private_key,
             &ProgramID::from_str("credits.aleo")?,
             Identifier::from_str("transfer")?,

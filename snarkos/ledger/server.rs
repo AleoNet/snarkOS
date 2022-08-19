@@ -41,7 +41,7 @@ pub trait OrReject<T> {
 impl<T> OrReject<T> for anyhow::Result<T> {
     /// Returns the result if it is successful, otherwise returns a rejection.
     fn or_reject(self) -> Result<T, Rejection> {
-        Ok(self.map_err(|e| reject::custom(ServerError::Request(e.to_string())))?)
+        self.map_err(|e| reject::custom(ServerError::Request(e.to_string())))
     }
 }
 
