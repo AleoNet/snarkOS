@@ -25,7 +25,7 @@ use core::marker::PhantomData;
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
 // The IP of the leader node to connect to.
-const LEADER_IP: &str = "159.203.77.113:4000";
+const LEADER_IP: &str = "159.203.77.113:4130";
 
 #[derive(Clone)]
 pub struct Node<N: Network, E: Environment> {
