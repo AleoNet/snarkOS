@@ -26,6 +26,7 @@ use std::{net::SocketAddr, sync::Arc};
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::mpsc,
+    task,
 };
 use tokio_util::codec::Framed;
 
@@ -119,7 +120,9 @@ pub(crate) async fn handle_peer<N: Network>(
                             // Check if the block can be added to the ledger.
                             if block.height() == ledger.ledger().read().latest_height() + 1 {
                                 // Attempt to add the block to the ledger.
-                                match ledger.ledger().write().add_next_block(&block) {
+                                let ledger_clone = ledger.clone();
+                                let block_clone = block.clone();
+                                match task::spawn_blocking(move || ledger_clone.ledger().write().add_next_block(&block_clone)).await? {
                                     Ok(_) => info!("Advanced to block {} ({})", block.height(), block.hash()),
                                     Err(err) => warn!("Failed to process block {} (height: {}): {:?}",block.hash(),block.header().height(), err)
                                 };
@@ -161,7 +164,9 @@ pub(crate) async fn handle_peer<N: Network>(
                             // Check if the block can be added to the ledger.
                             if block.height() == ledger.ledger().read().latest_height() + 1 {
                                 // Attempt to add the block to the ledger.
-                                match ledger.ledger().write().add_next_block(&block) {
+                                let ledger_clone = ledger.clone();
+                                let block_clone = block.clone();
+                                match task::spawn_blocking(move || ledger_clone.ledger().write().add_next_block(&block_clone)).await? {
                                     Ok(_) => {
                                         info!("Advanced to block {} ({})", block.height(), block.hash());
 
