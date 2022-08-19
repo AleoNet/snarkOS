@@ -224,9 +224,9 @@ impl<N: Network> Deref for BlockLocators<N> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    // use super::*;
 
-    pub type CurrentNetwork = snarkvm::prelude::Testnet3;
+    // pub type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     #[test]
     fn test_block_locators_serde_json() {

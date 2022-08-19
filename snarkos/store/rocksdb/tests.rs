@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::storage::{rocksdb::RocksDB, DataID, DataMap};
+use crate::store::{rocksdb::RocksDB, DataID, DataMap};
 
 use snarkvm::{
     compiler::{Map, MapRead},
