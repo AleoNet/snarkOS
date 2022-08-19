@@ -103,16 +103,8 @@ impl<N: Network> Ledger<N> {
         })
         .await??;
 
-        // Ensure the given block is a valid next block.
-        self.ledger.read().check_next_block(&next_block)?;
-
         // Add the next block to the ledger.
-        let self_clone = self.clone();
-        let next_block_clone = next_block.clone();
-        if let Err(error) = task::spawn_blocking(move || self_clone.ledger.write().add_next_block(&next_block_clone)).await? {
-            // Log the error.
-            warn!("{error}");
-        }
+        self.add_next_block(&next_block).await?;
 
         // Broadcast the block to all peers.
         let peers = self.peers().read().clone();
@@ -122,6 +114,22 @@ impl<N: Network> Ledger<N> {
 
         // Return the next block.
         Ok(next_block)
+    }
+
+    /// Attempts to add the given block to the ledger.
+    pub(crate) async fn add_next_block(self: &Arc<Self>, next_block: &Block<N>) -> Result<()> {
+        // Ensure the given block is a valid next block.
+        self.ledger.read().check_next_block(next_block)?;
+
+        // Add the next block to the ledger.
+        let self_clone = self.clone();
+        let next_block_clone = next_block.clone();
+        if let Err(error) = task::spawn_blocking(move || self_clone.ledger.write().add_next_block(&next_block_clone)).await? {
+            // Log the error.
+            warn!("{error}");
+        }
+
+        Ok(())
     }
 }
 

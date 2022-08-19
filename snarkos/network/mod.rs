@@ -119,7 +119,7 @@ pub(crate) async fn handle_peer<N: Network>(
                             // Check if the block can be added to the ledger.
                             if block.height() == ledger.ledger().read().latest_height() + 1 {
                                 // Attempt to add the block to the ledger.
-                                match ledger.ledger().write().add_next_block(&block) {
+                                match ledger.add_next_block(&block).await {
                                     Ok(_) => info!("Advanced to block {} ({})", block.height(), block.hash()),
                                     Err(err) => warn!("Failed to process block {} (height: {}): {:?}",block.hash(),block.header().height(), err)
                                 };
@@ -161,7 +161,7 @@ pub(crate) async fn handle_peer<N: Network>(
                             // Check if the block can be added to the ledger.
                             if block.height() == ledger.ledger().read().latest_height() + 1 {
                                 // Attempt to add the block to the ledger.
-                                match ledger.ledger().write().add_next_block(&block) {
+                                match ledger.add_next_block(&block).await {
                                     Ok(_) => {
                                         info!("Advanced to block {} ({})", block.height(), block.hash());
 
