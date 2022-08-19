@@ -79,7 +79,7 @@ jobs:
           cache_key: snarkos-environment-cache
       - run_parallel:
           workspace_member: environment
-          features: network
+          features: "" # network
       - clear_environment:
           cache_key: snarkos-environment-cache
 
@@ -94,7 +94,7 @@ jobs:
           cache_key: snarkos-stable-cache
       - run_parallel:
           workspace_member: .
-          features: test
+          features: "" # test
       - clear_environment:
           cache_key: snarkos-stable-cache
 
