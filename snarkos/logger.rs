@@ -17,7 +17,7 @@
 use snarkvm::prelude::*;
 
 use colored::*;
-use std::{fmt::Write};
+use std::fmt::Write;
 
 pub fn initialize_logger(verbosity: u8) {
     match verbosity {
