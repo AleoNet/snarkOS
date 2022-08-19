@@ -16,13 +16,13 @@
 
 use crate::CLI;
 
-use crate::{connect_to_leader, handle_listener, send_pings, Account, Ledger};
+use crate::{connect_to_leader, handle_listener, handle_peer, send_pings, Account, Ledger};
 use snarkos_environment::{helpers::Status, Environment};
-use snarkvm::prelude::{Network};
+use snarkvm::prelude::Network;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use core::marker::PhantomData;
-use std::{net::SocketAddr, sync::Arc, str::FromStr};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
 
 // The IP of the leader node to connect to.
 const LEADER_IP: &str = "159.203.77.113:4000";
@@ -57,25 +57,31 @@ impl<N: Network, E: Environment> Node<N, E> {
         // Send pings to all peers every 10 seconds.
         let _pings = send_pings::<N>(ledger.clone()).await;
 
-        Ok(Self { ledger: ledger.clone(), _phantom: PhantomData })
+        Ok(Self {
+            ledger: ledger.clone(),
+            _phantom: PhantomData,
+        })
     }
 
-    // /// Returns the peers module of this node.
-    // pub fn peers(&self) -> &Peers<N, E> {
-    //     self.state.peers()
-    // }
-    //
-    // /// Sends a connection request to the given IP address.
-    // pub async fn connect_to(&self, peer_ip: SocketAddr) -> Result<()> {
-    //     // Initialize the connection process.
-    //     let (router, handler) = oneshot::channel();
-    //
-    //     // Route a `Connect` request to the peer manager.
-    //     self.peers().router().send(PeersRequest::Connect(peer_ip, router)).await?;
-    //
-    //     // Wait until the connection task is initialized.
-    //     handler.await.map(|_| ()).map_err(|e| e.into())
-    // }
+    /// Sends a connection request to the given IP address.
+    pub async fn connect_to(&self, peer_ip: SocketAddr) -> Result<()> {
+        debug!("Attempting to connect to peer {}", peer_ip);
+        match tokio::net::TcpStream::connect(peer_ip).await {
+            Ok(stream) => {
+                let ledger = self.ledger.clone();
+                tokio::spawn(async move {
+                    if let Err(err) = handle_peer::<N>(stream, peer_ip, ledger).await {
+                        error!("Error handling peer {}: {:?}", peer_ip, err);
+                    }
+                });
+                Ok(())
+            }
+            Err(error) => {
+                error!("Failed to connect to peer {}: {}", peer_ip, error);
+                bail!("{error}")
+            }
+        }
+    }
 
     ///
     /// Disconnects from peers and proceeds to shut down the node.

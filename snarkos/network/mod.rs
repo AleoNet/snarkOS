@@ -67,7 +67,11 @@ impl<N: Network> Peer<N> {
 }
 
 /// Create a message handler for each peer.
-async fn handle_peer<N: Network>(stream: TcpStream, peer_ip: SocketAddr, ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
+pub(crate) async fn handle_peer<N: Network>(
+    stream: TcpStream,
+    peer_ip: SocketAddr,
+    ledger: Arc<Ledger<N>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     let mut peer = Peer::<N>::new(stream, ledger.clone()).await?;
 
     info!("Connected to peer: {:?}", peer_ip);
@@ -226,17 +230,21 @@ pub async fn handle_listener<N: Network>(listener: TcpListener, ledger: Arc<Ledg
 
 /// Send a ping to all peers every 10 seconds.
 pub async fn send_pings<N: Network>(ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
-    loop {
-        thread::sleep(time::Duration::from_secs(10));
+    tokio::spawn(async move {
+        loop {
+            thread::sleep(time::Duration::from_secs(10));
 
-        let peers = ledger.peers().read();
+            let peers = ledger.peers().read().clone();
 
-        for (addr, outbound) in peers.iter() {
-            if let Err(err) = outbound.send(Message::<N>::Ping).await {
-                error!("Error sending ping {} to {}", err, addr);
+            for (addr, outbound) in peers.iter() {
+                if let Err(err) = outbound.send(Message::<N>::Ping).await {
+                    error!("Error sending ping {} to {}", err, addr);
+                }
             }
         }
-    }
+    });
+
+    Ok(())
 }
 
 /// Handle connection listener to the leader.

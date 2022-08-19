@@ -144,21 +144,21 @@ impl CLI {
         // Initialize signal handling and maintain ownership of the node - to keep it in scope.
         Self::handle_signals(node.clone());
 
-        // // Connect to peer(s) if given as an argument.
-        // if let Some(peer_ips) = &self.connect {
-        //     // Separate the IP addresses.
-        //     for peer_ip in peer_ips.split(',') {
-        //         // Parse each IP address.
-        //         node.connect_to(match peer_ip.parse() {
-        //             Ok(ip) => ip,
-        //             Err(e) => {
-        //                 error!("The IP supplied to --connect ('{peer_ip}') is malformed: {e}");
-        //                 continue;
-        //             }
-        //         })
-        //         .await?;
-        //     }
-        // }
+        // Connect to peer(s) if given as an argument.
+        if let Some(peer_ips) = &self.connect {
+            // Separate the IP addresses.
+            for peer_ip in peer_ips.split(',') {
+                // Parse each IP address.
+                node.connect_to(match peer_ip.parse() {
+                    Ok(ip) => ip,
+                    Err(e) => {
+                        error!("The IP supplied to --connect ('{peer_ip}') is malformed: {e}");
+                        continue;
+                    }
+                })
+                .await?;
+            }
+        }
 
         // Note: Do not move this. The pending await must be here otherwise
         // other snarkOS commands will not exit.
