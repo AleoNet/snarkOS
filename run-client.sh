@@ -3,7 +3,7 @@
 # USAGE examples: 
   # CLI :  ./run-client.sh
 
-COMMAND='cargo run --release -- --trial --verbosity 2'
+COMMAND='cargo run --release -- --verbosity 2'
 
 for word in $*;
 do
