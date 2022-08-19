@@ -16,109 +16,65 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
-[workspace]
-members = [ ".crawler", ".integration", ".synthetic_node", "environment", "metrics", "network", "rpc", "storage" ]
-
-[lib]
-path = "snarkos/lib.rs"
-
 [[bin]]
-name = "snarkos"
-path = "snarkos/main.rs"
-required-features = ["console"]
+name = "main"
+path = "src/main.rs"
 
-[features]
-default = [ "console", "rpc" ]
-console = [ "crossterm", "tui" ]
-cuda = [ "snarkvm/cuda" ]
-prometheus = [ "snarkos-metrics/prometheus", "snarkos-network/prometheus" ]
-rpc = [ "snarkos-rpc" ]
-task-metrics = [ "snarkos-environment/task-metrics" ]
-test = [ "snarkos-metrics/test", "snarkos-network/test" ]
-
-[dependencies.aleo-std]
-version = "0.1.14"
-
-[dependencies.anyhow]
-version = "1"
-
-[dependencies.colored]
-version = "2.0"
-
-[dependencies.crossterm]
-version = "0.24"
-optional = true
-
-[dependencies.num_cpus]
-version = "1"
-
-[dependencies.rand]
-version = "0.8"
-
-[dependencies.rayon]
-version = "1"
-
-[dependencies.self_update]
-version = "0.30"
-features = [
-  "archive-zip",
-  "compression-zip-bzip2",
-  "compression-zip-deflate",
-  "compression-flate2"
-]
-
-[dependencies.snarkos-environment]
-path = "./environment"
-version = "2.0.2"
-
-[dependencies.snarkos-metrics]
-path = "./metrics"
-version = "2.0.2"
-optional = true
-
-[dependencies.snarkos-network]
-path = "./network"
-version = "2.0.2"
-
-[dependencies.snarkos-rpc]
-path = "./rpc"
-version = "2.0.2"
-optional = true
-
-[dependencies.snarkos-storage]
-path = "./storage"
-version = "2.0.2"
-
-[dependencies.snarkvm]
-version = "0.8.0"
+[dependencies]
+aleo-std = { version = "0.1.14", default-features = false }
+anyhow = { version = "1.0" }
+backoff = { version = "0.4", features = ["tokio"] }
+bytes = { version = "1" }
+colored = { version = "2.0" }
+dotenv = { version = "0.15" }
+futures = { version = "0.3" }
+hyper = { version = "0.14" }
+hyper-tls = { version = "0.5" }
+indexmap = { version = "1.9", features = ["rayon"] }
+once_cell = { version = "1.13.0" }
+parking_lot = { version = "0.12" }
+rand = { version = "0.8" }
+rayon = { version = "1.5" }
+rusoto_core = { version = "0.48" }
+rusoto_s3 = { version = "0.48" }
+serde_json = { version = "1.0" }
+tokio = { version = "1.5.0", features = ["full"] }
+tokio-util = { version = "0.7.3" }
+tracing = { version = "0.1" }
+warp = { version = "0.3" }
 
 [dependencies.clap]
-version = "3.2"
+version = "3.1"
 features = [ "derive" ]
-
-[dependencies.thiserror]
-version = "1.0"
-
-[dependencies.tokio]
-version = "1"
-
-[dependencies.tracing]
-version = "0.1"
 
 [dependencies.tracing-subscriber]
 version = "0.3"
 features = [ "env-filter", "parking_lot" ]
 
-[dependencies.tui]
-version = "0.18"
-optional = true
+[dependencies.snarkvm]
+git = "https://github.com/AleoHQ/snarkVM.git"
+rev = "7555dc0"
+features = ["circuit", "console", "parallel", "utilities"]
+
+[dependencies.bincode]
+version = "1.0"
+
+[dependencies.reqwest]
+version = "0.11.11"
+
+[dependencies.rocksdb]
+version = "0.19"
+default-features = false
+features = [ "lz4" ]
+
+[dependencies.serde]
+version = "1"
 
 [dev-dependencies.rusty-hook]
-version = "0.11"
+version = "0.11.2"
 
-[dev-dependencies.snarkos]
-path = "."
-features = [ "test" ] # a workaround to use the `test` feature in tests by default
+[dev-dependencies.tempfile]
+version = "3.2"
 
 [build-dependencies.walkdir]
 version = "2"
@@ -140,7 +96,6 @@ debug-assertions = false
 opt-level = 3
 lto = "thin"
 incremental = true
-debug-assertions = false
 
 [profile.test]
 opt-level = 3
