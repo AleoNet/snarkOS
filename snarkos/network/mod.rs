@@ -234,23 +234,28 @@ pub async fn handle_listener<N: Network>(listener: TcpListener, ledger: Arc<Ledg
 
 /// Send a ping to all peers every 10 seconds.
 pub async fn send_pings<N: Network>(ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
-    loop {
-        thread::sleep(time::Duration::from_secs(10));
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(time::Duration::from_secs(10));
+        loop {
+            interval.tick().await;
 
-        let peers = ledger.peers().read().clone();
+            let peers = ledger.peers().read().clone();
 
-        for (addr, outbound) in peers.iter() {
-            if let Err(err) = outbound.send(Message::<N>::Ping).await {
-                warn!("Error sending ping {} to {}", err, addr);
+            for (addr, outbound) in peers.iter() {
+                if let Err(err) = outbound.send(Message::<N>::Ping).await {
+                    warn!("Error sending ping {} to {}", err, addr);
+                }
             }
         }
-    }
+    });
+
+    Ok(())
 }
 
-/// Handle connection listener to the leader.
+/// Handle connection with the leader.
 pub async fn connect_to_leader<N: Network>(initial_peer: SocketAddr, ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
-    // TODO (raychu86): Make this attempt to multiple peers.
     tokio::spawn(async move {
+        let mut interval = tokio::time::interval(time::Duration::from_secs(10));
         loop {
             let ledger_clone = ledger.clone();
 
@@ -267,7 +272,7 @@ pub async fn connect_to_leader<N: Network>(initial_peer: SocketAddr, ledger: Arc
                     Err(error) => warn!("Failed to connect to peer {}: {}", initial_peer, error),
                 }
             }
-            std::thread::sleep(time::Duration::from_secs(10));
+            interval.tick().await;
         }
     });
 
