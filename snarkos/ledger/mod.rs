@@ -25,7 +25,10 @@ use futures::StreamExt;
 use indexmap::IndexMap;
 use once_cell::race::OnceBox;
 use parking_lot::RwLock;
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 use tokio::task;
 
 pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockDB<N>, ProgramDB<N>>;
@@ -213,7 +216,7 @@ impl<N: Network> Ledger<N> {
 // Internal operations.
 impl<N: Network> Ledger<N> {
     /// Syncs the ledger with the network.
-    pub(crate) async fn initial_sync_with_network(self: &Arc<Self>, leader_ip: &str) -> Result<()> {
+    pub(crate) async fn initial_sync_with_network(self: &Arc<Self>, leader_ip: &IpAddr) -> Result<()> {
         /// The number of concurrent requests with the network.
         const CONCURRENT_REQUESTS: usize = 100;
         /// Url to fetch the blocks from.
