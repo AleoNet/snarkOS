@@ -56,7 +56,7 @@ impl<N: Network, E: Environment> Node<N, E> {
         let _ = connect_to_leader::<N>(leader_addr, ledger.clone()).await;
 
         // Send pings to all peers every 10 seconds.
-        let _pings = send_pings::<N>(ledger.clone()).await;
+        let _pings = send_pings::<N>(ledger.clone());
 
         Ok(Self {
             ledger: ledger.clone(),

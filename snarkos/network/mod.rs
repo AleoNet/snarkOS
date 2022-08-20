@@ -233,7 +233,7 @@ pub async fn handle_listener<N: Network>(listener: TcpListener, ledger: Arc<Ledg
 }
 
 /// Send a ping to all peers every 10 seconds.
-pub async fn send_pings<N: Network>(ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
+pub fn send_pings<N: Network>(ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(time::Duration::from_secs(10));
         loop {
@@ -242,7 +242,7 @@ pub async fn send_pings<N: Network>(ledger: Arc<Ledger<N>>) -> Result<(), Box<dy
             let peers = ledger.peers().read().clone();
 
             for (addr, outbound) in peers.iter() {
-                if let Err(err) = outbound.send(Message::<N>::Ping).await {
+                if let Err(err) = outbound.try_send(Message::<N>::Ping) {
                     warn!("Error sending ping {} to {}", err, addr);
                 }
             }
