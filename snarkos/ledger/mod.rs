@@ -121,15 +121,13 @@ impl<N: Network> Ledger<N> {
 
     /// Attempts to add the given block to the ledger.
     pub(crate) async fn add_next_block(self: &Arc<Self>, next_block: &Block<N>) -> Result<()> {
-        // Ensure the given block is a valid next block.
-        self.ledger.read().check_next_block(next_block)?;
-
         // Add the next block to the ledger.
         let self_clone = self.clone();
         let next_block_clone = next_block.clone();
         if let Err(error) = task::spawn_blocking(move || self_clone.ledger.write().add_next_block(&next_block_clone)).await? {
             // Log the error.
             warn!("{error}");
+            return Err(error);
         }
 
         Ok(())
