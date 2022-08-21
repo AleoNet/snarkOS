@@ -265,10 +265,15 @@ impl<N: Network> Ledger<N> {
                         let height = block.height();
                         // Compute the percentage completed.
                         let percentage = height * 100 / latest_height;
-                        // Compute the time remaining (in seconds).
-                        let time_remaining = (timer.elapsed().as_secs() + 1) * (latest_height - height) as u64 / height as u64;
-                        // Prepare the estimate message.
-                        let estimate = format!("(est. {} minutes remaining)", time_remaining / 60u64);
+                        // Compute the time remaining (in millis).
+                        let millis_per_block = (timer.elapsed().as_millis()) / (height - ledger_height) as u128;
+                        let time_remaining = (latest_height - height) as u128 * millis_per_block;
+                        // Prepare the estimate message (in secs).
+                        let estimate = format!(
+                            "(est. {} minutes remaining, avg. {} ms/block)",
+                            time_remaining / (60 * 1000),
+                            millis_per_block
+                        );
                         // Log the progress.
                         info!(
                             "Synced up to block {height} of {latest_height} - {percentage}% complete {}",
