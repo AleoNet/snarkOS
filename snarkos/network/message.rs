@@ -72,9 +72,8 @@ impl<N: Network> Message<N> {
             Self::Ping => Ok(()),
             Self::Pong(block_height) => Ok(writer.write_all(&block_height.to_le_bytes())?),
             Self::BlockRequest(block_height) => Ok(writer.write_all(&block_height.to_le_bytes())?),
-            Self::BlockResponse(block) => Ok(writer.write_all(&block.to_bytes_le()?)?),
+            Self::BlockResponse(block) | Self::BlockBroadcast(block) => Ok(writer.write_all(&block.to_bytes_le()?)?),
             Self::TransactionBroadcast(transaction) => Ok(writer.write_all(&transaction.to_bytes_le()?)?),
-            Self::BlockBroadcast(block) => Ok(writer.write_all(&block.to_bytes_le()?)?),
         }
     }
 
