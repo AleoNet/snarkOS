@@ -237,9 +237,9 @@ pub async fn handle_listener<N: Network>(listener: TcpListener, ledger: Arc<Ledg
 /// Request the genesis block from the leader.
 pub(super) async fn request_genesis_block<N: Network>(leader_ip: &SocketAddr) -> Result<Block<N>> {
     let ip = leader_ip.ip();
-    let bytes = reqwest::get(format!("http://{ip}/testnet3/block/0")).await?.bytes().await?;
+    let block_string = reqwest::get(format!("http://{ip}/testnet3/block/0")).await?.text().await?;
 
-    Block::from_bytes_le(&bytes)
+    Block::from_str(&block_string)
 }
 
 /// Send a ping to all peers every 10 seconds.
