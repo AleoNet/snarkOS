@@ -17,7 +17,7 @@
 mod server;
 pub use server::*;
 
-use crate::{handle_dispatch_error, BlockDB, Data, ProgramDB};
+use crate::{handle_dispatch_error, BlockDB, ProgramDB};
 use snarkvm::prelude::*;
 
 use colored::Colorize;
@@ -137,38 +137,11 @@ impl<N: Network> Ledger<N> {
         self.ledger.write().add_to_memory_pool(transaction)
     }
 
-    /// Advances the ledger to the next block.
-    pub async fn advance_to_next_block(self: &Arc<Self>) -> Result<Block<N>> {
-        let self_clone = self.clone();
-        let next_block = task::spawn_blocking(move || {
-            // Initialize an RNG.
-            let rng = &mut ::rand::thread_rng();
-            // Propose the next block.
-            self_clone.ledger.read().propose_next_block(&self_clone.private_key, rng)
-        })
-        .await??;
-
-        // Add the next block to the ledger.
-        self.add_next_block(&next_block).await?;
-
-        // Broadcast the block to all peers.
-        let peers = self.peers().read().clone();
-        for (_, sender) in peers.iter() {
-            let _ = sender
-                .send(crate::Message::<N>::BlockBroadcast(Data::Object(next_block.clone())))
-                .await;
-        }
-
-        // Return the next block.
-        Ok(next_block)
-    }
-
     /// Attempts to add the given block to the ledger.
-    pub(crate) async fn add_next_block(self: &Arc<Self>, next_block: &Block<N>) -> Result<()> {
+    pub(crate) async fn add_next_block(self: &Arc<Self>, next_block: Block<N>) -> Result<()> {
         // Add the next block to the ledger.
         let self_clone = self.clone();
-        let next_block_clone = next_block.clone();
-        if let Err(error) = task::spawn_blocking(move || self_clone.ledger.write().add_next_block(&next_block_clone)).await? {
+        if let Err(error) = task::spawn_blocking(move || self_clone.ledger.write().add_next_block(&next_block)).await? {
             // Log the error.
             warn!("{error}");
             return Err(error);

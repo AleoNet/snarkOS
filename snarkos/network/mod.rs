@@ -123,18 +123,21 @@ pub(crate) async fn handle_peer<N: Network>(
                             // Perform deferred deserialization.
                             let block = block_bytes.deserialize().await?;
 
+                            let block_height = block.height();
+                            let block_hash = block.hash();
+
                             // Check if the block can be added to the ledger.
-                            if block.height() == ledger.ledger().read().latest_height() + 1 {
+                            if block_height == ledger.ledger().read().latest_height() + 1 {
                                 // Attempt to add the block to the ledger.
-                                match ledger.add_next_block(&block).await {
-                                    Ok(_) => info!("Advanced to block {} ({})", block.height(), block.hash()),
-                                    Err(err) => warn!("Failed to process block {} (height: {}): {:?}",block.hash(),block.header().height(), err)
+                                match ledger.add_next_block(block).await {
+                                    Ok(_) => info!("Advanced to block {} ({})", block_height, block_hash),
+                                    Err(err) => warn!("Failed to process block {} (height: {}): {:?}", block_hash, block_height, err)
                                 };
 
                                 // Send a ping.
                                 peer.outbound.send(Message::<N>::Ping).await?;
                             } else {
-                                trace!("Skipping block {} (height: {})", block.hash(), block.height());
+                                trace!("Skipping block {} (height: {})", block_hash, block_height);
                             }
                         },
                         Message::TransactionBroadcast(transaction_bytes) => {
@@ -169,34 +172,37 @@ pub(crate) async fn handle_peer<N: Network>(
                         },
                         Message::BlockBroadcast(block_bytes) => {
                             // Perform deferred deserialization.
-                            let block = block_bytes.deserialize().await?;
+                            let block = block_bytes.clone().deserialize().await?;
+
+                            let block_height = block.height();
+                            let block_hash = block.hash();
 
                             // Check if the block can be added to the ledger.
-                            if block.height() == ledger.ledger().read().latest_height() + 1 {
+                            if block_height == ledger.ledger().read().latest_height() + 1 {
                                 // Attempt to add the block to the ledger.
-                                match ledger.add_next_block(&block).await {
+                                match ledger.add_next_block(block).await {
                                     Ok(_) => {
-                                        info!("Advanced to block {} ({})", block.height(), block.hash());
+                                        info!("Advanced to block {} ({})", block_height, block_hash);
 
                                         // Broadcast block to all peers except the sender.
                                         let peers = ledger.peers().read().clone();
                                         tokio::spawn(async move {
                                             for (_, sender) in peers.iter().filter(|(ip, _)| *ip != &peer.ip) {
-                                                let _ = sender.send(Message::<N>::BlockBroadcast(Data::Object(block.clone()))).await;
+                                                let _ = sender.send(Message::<N>::BlockBroadcast(block_bytes.clone())).await;
                                             }
                                         });
                                     },
                                      Err(err) => {
                                         trace!(
                                             "Failed to process block {} (height: {}): {:?}",
-                                            block.hash(),
-                                            block.header().height(),
+                                            block_hash,
+                                            block_height,
                                             err
                                         );
                                     }
                                 };
                             } else {
-                                trace!("Skipping block {} (height: {})", block.hash(), block.height());
+                                trace!("Skipping block {} (height: {})", block_hash, block_height);
                             }
                         }
                     }
