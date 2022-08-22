@@ -258,7 +258,7 @@ impl<N: Network> Ledger<N> {
 // Internal operations.
 impl<N: Network> Ledger<N> {
     /// Syncs the ledger with the network.
-    pub(crate) async fn initial_sync_with_network(self: &Arc<Self>, leader_ip: &IpAddr) -> Result<()> {
+    pub(crate) async fn initial_sync_with_network(self: &Arc<Self>, leader_ip: IpAddr) -> Result<()> {
         /// The number of concurrent requests with the network.
         const CONCURRENT_REQUESTS: usize = 100;
         /// Url to fetch the blocks from.
