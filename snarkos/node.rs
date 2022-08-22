@@ -52,7 +52,7 @@ impl<N: Network, E: Environment> Node<N, E> {
                 let genesis_block = request_genesis_block::<N>(&cli.beacon_addr).await?;
 
                 // Initialize the ledger from the provided genesis block.
-                Ledger::<N>::new_from_genesis(account.private_key(), genesis_block).await?
+                Ledger::<N>::new_with_genesis(account.private_key(), genesis_block).await?
             }
         };
 
