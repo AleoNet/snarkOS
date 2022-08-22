@@ -160,41 +160,6 @@ impl<N: Network> Message<N> {
     }
 }
 
-impl<N: Network> FromBytes for Message<N> {
-    /// Reads the message from a buffer.
-    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
-        let id = u16::read_le(&mut reader)?;
-
-        let message = match id {
-            0 => Self::Ping,
-            1 => Self::Pong(u32::read_le(&mut reader)?),
-            2 => Self::BlockRequest(u32::read_le(&mut reader)?),
-            3 => Self::BlockResponse(Block::read_le(&mut reader)?),
-            4 => Self::TransactionBroadcast(Transaction::read_le(&mut reader)?),
-            5 => Self::BlockBroadcast(Block::read_le(&mut reader)?),
-            6.. => return Err(error(format!("Failed to decode message id {id}"))),
-        };
-
-        Ok(message)
-    }
-}
-
-impl<N: Network> ToBytes for Message<N> {
-    /// Writes the message to a buffer.
-    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.id().write_le(&mut writer)?;
-
-        match self {
-            Message::Ping => Ok(()),
-            Message::Pong(height) => height.write_le(&mut writer),
-            Message::BlockRequest(height) => height.write_le(&mut writer),
-            Message::BlockResponse(block) => block.write_le(&mut writer),
-            Message::TransactionBroadcast(transaction) => transaction.write_le(&mut writer),
-            Message::BlockBroadcast(block) => block.write_le(&mut writer),
-        }
-    }
-}
-
 /// The maximum size of a message that can be transmitted in the network.
 const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
 
