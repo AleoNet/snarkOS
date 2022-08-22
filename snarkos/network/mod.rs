@@ -232,6 +232,16 @@ pub async fn handle_listener<N: Network>(listener: TcpListener, ledger: Arc<Ledg
     Ok(())
 }
 
+// TODO (raychu86): Handle this request via `Message::BlockRequest`. This is currently not done,
+//  because the node has not established the leader as a peer.
+/// Request the genesis block from the leader.
+pub(super) async fn request_genesis_block<N: Network>(leader_ip: &SocketAddr) -> Result<Block<N>> {
+    let ip = leader_ip.ip();
+    let bytes = reqwest::get(format!("http://{ip}/testnet3/block/0")).await?.bytes().await?;
+
+    Block::from_bytes_le(&bytes)
+}
+
 /// Send a ping to all peers every 10 seconds.
 pub fn send_pings<N: Network>(ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(async move {
