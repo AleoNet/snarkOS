@@ -142,20 +142,20 @@ pub(crate) async fn handle_peer<N: Network>(
                         },
                         Message::TransactionBroadcast(transaction_bytes) => {
                             // Perform deferred deserialization.
-                            let transaction = transaction_bytes.deserialize().await?;
+                            let transaction = transaction_bytes.clone().deserialize().await?;
 
                             let transaction_id = transaction.id();
 
                             // Check that the transaction doesn't already exist in the ledger or mempool.
                             if let Ok(true) = ledger.ledger().read().contains_transaction_id(&transaction_id) {
                                 // Attempt to insert the transaction into the mempool.
-                                match ledger.add_to_memory_pool(transaction.clone()) {
+                                match ledger.add_to_memory_pool(transaction) {
                                     Ok(_) => {
                                         // Broadcast transaction to all peers except the sender.
                                         let peers = ledger.peers().read().clone();
                                         tokio::spawn(async move {
                                             for (_, sender) in peers.iter().filter(|(ip, _)| *ip != &peer.ip) {
-                                                let _ = sender.send(Message::<N>::TransactionBroadcast(Data::Object(transaction.clone()))).await;
+                                                let _ = sender.send(Message::<N>::TransactionBroadcast(transaction_bytes.clone())).await;
                                             }
                                         });
 
