@@ -270,14 +270,13 @@ pub async fn connect_to_leader<N: Network>(initial_peer: SocketAddr, ledger: Arc
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(time::Duration::from_secs(10));
         loop {
-            let ledger_clone = ledger.clone();
-
-            if !ledger_clone.peers().read().contains_key(&initial_peer) {
+            if !ledger.peers().read().contains_key(&initial_peer) {
                 trace!("Attempting to connect to peer {}", initial_peer);
                 match TcpStream::connect(initial_peer).await {
                     Ok(stream) => {
+                        let ledger_clone = ledger.clone();
                         tokio::spawn(async move {
-                            if let Err(err) = handle_peer::<N>(stream, initial_peer, ledger_clone.clone()).await {
+                            if let Err(err) = handle_peer::<N>(stream, initial_peer, ledger_clone).await {
                                 warn!("Error handling peer {}: {:?}", initial_peer, err);
                             }
                         });
