@@ -78,6 +78,36 @@ impl<N: Network> Ledger<N> {
         Ok(ledger)
     }
 
+    /// Initializes a new instance of the ledger.
+    pub(super) async fn new_from_genesis(private_key: &PrivateKey<N>, genesis_block: Block<N>) -> Result<Arc<Self>> {
+        // Derive the view key and address.
+        let view_key = ViewKey::try_from(private_key)?;
+        let address = Address::try_from(&view_key)?;
+
+        // Initialize the ledger.
+        let ledger = Arc::new(Self {
+            ledger: RwLock::new(InternalLedger::new_with_genesis(
+                &genesis_block,
+                genesis_block.signature().to_address(),
+            )?),
+            peers: RwLock::new(IndexMap::new()),
+            server: OnceBox::new(),
+            private_key: *private_key,
+            view_key,
+            address,
+        });
+
+        // Initialize the server.
+        let server = Server::<N>::start(ledger.clone())?;
+        ledger
+            .server
+            .set(Box::new(server))
+            .map_err(|_| anyhow!("Failed to save the server"))?;
+
+        // Return the ledger.
+        Ok(ledger)
+    }
+
     /// Returns the ledger.
     pub(super) const fn ledger(&self) -> &RwLock<InternalLedger<N>> {
         &self.ledger
