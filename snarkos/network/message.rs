@@ -20,6 +20,7 @@ use ::bytes::{Buf, BufMut, BytesMut};
 use std::marker::PhantomData;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
+#[derive(Clone)]
 pub enum Message<N: Network> {
     /// Ping with the current block height.
     Ping,
