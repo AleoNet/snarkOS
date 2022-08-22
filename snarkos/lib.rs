@@ -52,7 +52,7 @@ pub use snarkos_environment as environment;
 #[cfg(feature = "rpc")]
 pub use snarkos_rpc as rpc;
 
-pub use snarkvm::prelude::{Address, Network};
+pub use snarkvm::prelude::{Address, Network, Testnet3};
 
 pub mod prelude {
     pub use crate::environment::*;
@@ -60,7 +60,7 @@ pub mod prelude {
     #[cfg(feature = "rpc")]
     pub use crate::rpc::*;
 
-    pub use snarkvm::prelude::{Address, Network};
+    pub use snarkvm::prelude::{Address, Network, Testnet3};
 }
 
 use backoff::{future::retry, ExponentialBackoff};
