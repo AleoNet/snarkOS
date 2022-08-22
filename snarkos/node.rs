@@ -16,7 +16,7 @@
 
 use crate::CLI;
 
-use crate::{connect_to_leader, handle_listener, handle_peer, send_pings, Account, Ledger};
+use crate::{connect_to_leader, handle_listener, handle_peer, request_genesis_block, send_pings, Account, Ledger};
 use snarkos_environment::{helpers::Status, Environment};
 use snarkvm::prelude::Network;
 
@@ -36,13 +36,25 @@ impl<N: Network, E: Environment> Node<N, E> {
     /// Initializes a new instance of the node.
     pub async fn new(cli: &CLI, account: Account<N>) -> Result<Self> {
         // Initialize the ledger.
-        let ledger = Ledger::<N>::load(account.private_key()).await?;
+        let ledger = match cli.dev {
+            None => {
+                // Initialize the ledger.
+                let ledger = Ledger::<N>::load(account.private_key()).await?;
+                // Sync the ledger with the network.
+                ledger.initial_sync_with_network(&cli.beacon_addr.ip()).await?;
 
-        // If the node is not in development mode, perform fast sync with the network.
-        if cli.dev.is_none() {
-            // Sync the ledger with the network.
-            ledger.initial_sync_with_network(&cli.beacon_addr.ip()).await?;
-        }
+                ledger
+            }
+            Some(_) => {
+                // TODO (raychu86): Formalize this process via network messages.
+                //  Currently this operations pulls from the leader's server.
+                // Request genesis block from the beacon leader.
+                let genesis_block = request_genesis_block::<N>(&cli.beacon_addr).await?;
+
+                // Initialize the ledger from the provided genesis block.
+                Ledger::<N>::new_from_genesis(account.private_key(), genesis_block).await?
+            }
+        };
 
         // Initialize the listener.
         let listener = tokio::net::TcpListener::bind(cli.node).await?;
