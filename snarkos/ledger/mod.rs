@@ -17,7 +17,7 @@
 mod server;
 pub use server::*;
 
-use crate::{handle_dispatch_error, BlockDB, ProgramDB};
+use crate::{handle_dispatch_error, BlockDB, Data, ProgramDB};
 use snarkvm::prelude::*;
 
 use colored::Colorize;
@@ -154,7 +154,9 @@ impl<N: Network> Ledger<N> {
         // Broadcast the block to all peers.
         let peers = self.peers().read().clone();
         for (_, sender) in peers.iter() {
-            let _ = sender.send(crate::Message::<N>::BlockBroadcast(next_block.clone())).await;
+            let _ = sender
+                .send(crate::Message::<N>::BlockBroadcast(Data::Object(next_block.clone())))
+                .await;
         }
 
         // Return the next block.
