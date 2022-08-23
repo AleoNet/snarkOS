@@ -16,7 +16,7 @@
 
 use crate::CLI;
 
-use crate::{connect_to_leader, handle_listener, handle_peer, send_pings, Account, Ledger};
+use crate::{connect_to_leader, environment::helpers::NodeType, handle_listener, handle_peer, send_pings, Account, Ledger};
 use snarkos_environment::{helpers::Status, Environment};
 use snarkvm::prelude::Network;
 
@@ -44,6 +44,8 @@ impl<N: Network, E: Environment> Node<N, E> {
             ledger.initial_sync_with_network(&cli.beacon_addr.ip()).await?;
         }
 
+        // TODO (raychu86): Make `handle_listener`, `connect_to_leader` and `send_pings` dedicated `Node` methods.
+
         // Initialize the listener.
         let listener = tokio::net::TcpListener::bind(cli.node).await?;
 
@@ -58,10 +60,14 @@ impl<N: Network, E: Environment> Node<N, E> {
         // Send pings to all peers every 10 seconds.
         let _pings = send_pings::<N>(ledger.clone());
 
-        Ok(Self {
-            ledger: ledger.clone(),
+        let node = Self {
+            ledger,
             _phantom: PhantomData,
-        })
+        };
+
+        node.initialize_prover().await;
+
+        Ok(node)
     }
 
     /// Sends a connection request to the given IP address.
@@ -99,5 +105,10 @@ impl<N: Network, E: Environment> Node<N, E> {
         // Flush the tasks.
         E::resources().shut_down();
         trace!("Node has shut down.");
+    }
+
+    pub async fn initialize_prover(&self) {
+        // Initialize the prover, if the node type is a prover.
+        if E::NODE_TYPE == NodeType::Prover {}
     }
 }

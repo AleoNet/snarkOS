@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Account, Node, Updater};
-use snarkos_environment::{helpers::NodeType, Client, Environment};
+use snarkos_environment::{helpers::NodeType, Client, Environment, Prover};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, ensure, Result};
@@ -95,7 +95,7 @@ impl CLI {
             }
             None => match (self.network, self.node_type()?) {
                 (3, NodeType::Client) => self.start_node::<Testnet3, Client<Testnet3>>(&None).await,
-                (3, NodeType::Prover) => bail!("Provers will be available in Phase 2"),
+                (3, NodeType::Prover) => self.start_node::<Testnet3, Prover<Testnet3>>(&self.prover).await,
                 (3, NodeType::Validator) => bail!("Validators will be available in Phase 3"),
                 (3, NodeType::Beacon) => bail!("Beacons will be available in Phase 3"),
                 _ => bail!("Unsupported network"),
@@ -117,8 +117,8 @@ impl CLI {
     /// Starts the node server.
     async fn start_node<N: Network, E: Environment>(&self, address: &Option<String>) -> Result<()> {
         // Construct the Aleo account.
-        let account = match (&self.private_key, address) {
-            (Some(private_key), Some(address)) => {
+        let account = match (E::NODE_TYPE, &self.private_key, address) {
+            (_, Some(private_key), Some(address)) => {
                 // Construct the account from the private key string.
                 let account = Account::from_str(private_key)?;
                 // Ensure the account address matches the declared address.
@@ -130,13 +130,16 @@ impl CLI {
                 account
             }
             // Construct the account from the private key string.
-            (Some(private_key), None) => Account::from_str(private_key)?,
+            (_, Some(private_key), None) => Account::from_str(private_key)?,
             // Throw an error, if no private key is provided but an address is given.
-            (None, Some(address)) => {
+            (_, None, Some(address)) => {
                 bail!("Missing a private key (use '--private_key {{PRIVATE_KEY}}') for address {address}")
             }
+            (NodeType::Prover, None, None) => {
+                bail!("Missing a private key (use '--private_key {{PRIVATE_KEY}}') for a prover node")
+            }
             // Sample a new account.
-            (None, None) => Account::sample()?,
+            (_, None, None) => Account::sample()?,
         };
 
         // Print the welcome.
