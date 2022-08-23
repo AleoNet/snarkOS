@@ -87,7 +87,7 @@ pub(crate) async fn handle_peer<N: Network>(
                 // A message was received from the current user, we should
                 // broadcast this message to the other users.
                 Some(Ok(message)) => {
-                    debug!("Received message {} from peer {:?}", message.name(), peer.ip);
+                    trace!("Received '{}' from {}", message.name(), peer.ip);
 
                     match message {
                         Message::Ping => {
@@ -107,7 +107,7 @@ pub(crate) async fn handle_peer<N: Network>(
                         Message::BlockRequest(height) => {
                             let latest_height = ledger.ledger().read().latest_height();
                             if height > latest_height {
-                                debug!("Peer requested block {height}, which is greater than the current height {latest_height}");
+                                trace!("Peer requested block {height}, which is greater than the current height {latest_height}");
                             } else {
                                 let block = ledger.ledger().read().get_block(height)?;
                                 let response = Message::BlockResponse(block);
@@ -119,7 +119,7 @@ pub(crate) async fn handle_peer<N: Network>(
                             // Check if the block can be added to the ledger.
                             if block.height() == ledger.ledger().read().latest_height() + 1 {
                                 // Attempt to add the block to the ledger.
-                                match ledger.ledger().write().add_next_block(&block) {
+                                match ledger.add_next_block(&block).await {
                                     Ok(_) => info!("Advanced to block {} ({})", block.height(), block.hash()),
                                     Err(err) => warn!("Failed to process block {} (height: {}): {:?}",block.hash(),block.header().height(), err)
                                 };
@@ -161,7 +161,7 @@ pub(crate) async fn handle_peer<N: Network>(
                             // Check if the block can be added to the ledger.
                             if block.height() == ledger.ledger().read().latest_height() + 1 {
                                 // Attempt to add the block to the ledger.
-                                match ledger.ledger().write().add_next_block(&block) {
+                                match ledger.add_next_block(&block).await {
                                     Ok(_) => {
                                         info!("Advanced to block {} ({})", block.height(), block.hash());
 
@@ -233,29 +233,34 @@ pub async fn handle_listener<N: Network>(listener: TcpListener, ledger: Arc<Ledg
 }
 
 /// Send a ping to all peers every 10 seconds.
-pub async fn send_pings<N: Network>(ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
-    loop {
-        thread::sleep(time::Duration::from_secs(10));
+pub fn send_pings<N: Network>(ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
+    tokio::spawn(async move {
+        let mut interval = tokio::time::interval(time::Duration::from_secs(10));
+        loop {
+            interval.tick().await;
 
-        let peers = ledger.peers().read().clone();
+            let peers = ledger.peers().read().clone();
 
-        for (addr, outbound) in peers.iter() {
-            if let Err(err) = outbound.send(Message::<N>::Ping).await {
-                warn!("Error sending ping {} to {}", err, addr);
+            for (addr, outbound) in peers.iter() {
+                if let Err(err) = outbound.try_send(Message::<N>::Ping) {
+                    warn!("Error sending ping {} to {}", err, addr);
+                }
             }
         }
-    }
+    });
+
+    Ok(())
 }
 
-/// Handle connection listener to the leader.
+/// Handle connection with the leader.
 pub async fn connect_to_leader<N: Network>(initial_peer: SocketAddr, ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
-    // TODO (raychu86): Make this attempt to multiple peers.
     tokio::spawn(async move {
+        let mut interval = tokio::time::interval(time::Duration::from_secs(10));
         loop {
             let ledger_clone = ledger.clone();
 
             if !ledger_clone.peers().read().contains_key(&initial_peer) {
-                debug!("Attempting to connect to peer {}", initial_peer);
+                trace!("Attempting to connect to peer {}", initial_peer);
                 match TcpStream::connect(initial_peer).await {
                     Ok(stream) => {
                         tokio::spawn(async move {
@@ -267,7 +272,7 @@ pub async fn connect_to_leader<N: Network>(initial_peer: SocketAddr, ledger: Arc
                     Err(error) => warn!("Failed to connect to peer {}: {}", initial_peer, error),
                 }
             }
-            std::thread::sleep(time::Duration::from_secs(10));
+            interval.tick().await;
         }
     });
 

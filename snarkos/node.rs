@@ -22,10 +22,7 @@ use snarkvm::prelude::Network;
 
 use anyhow::{bail, Result};
 use core::marker::PhantomData;
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
-
-// The IP of the leader node to connect to.
-const LEADER_IP: &str = "159.203.77.113:4130";
+use std::{net::SocketAddr, sync::Arc};
 
 #[derive(Clone)]
 pub struct Node<N: Network, E: Environment> {
@@ -41,6 +38,12 @@ impl<N: Network, E: Environment> Node<N, E> {
         // Initialize the ledger.
         let ledger = Ledger::<N>::load(account.private_key()).await?;
 
+        // If the node is not in development mode, perform fast sync with the network.
+        if cli.dev.is_none() {
+            // Sync the ledger with the network.
+            ledger.initial_sync_with_network(&cli.beacon_addr.ip()).await?;
+        }
+
         // Initialize the listener.
         let listener = tokio::net::TcpListener::bind(cli.node).await?;
 
@@ -48,14 +51,12 @@ impl<N: Network, E: Environment> Node<N, E> {
         let _handle_listener = handle_listener::<N>(listener, ledger.clone()).await;
 
         // Connect to the leader node and listen for new blocks.
-        let leader_addr = SocketAddr::from_str(LEADER_IP)?;
+        let leader_addr = cli.beacon_addr;
+        trace!("Connecting to '{}'...", leader_addr);
         let _ = connect_to_leader::<N>(leader_addr, ledger.clone()).await;
 
-        debug!("Connecting to '{}'...", leader_addr);
-
-        // This will prevent the node from generating blocks and will maintain a connection with the leader.
         // Send pings to all peers every 10 seconds.
-        let _pings = send_pings::<N>(ledger.clone()).await;
+        let _pings = send_pings::<N>(ledger.clone());
 
         Ok(Self {
             ledger: ledger.clone(),
@@ -65,7 +66,7 @@ impl<N: Network, E: Environment> Node<N, E> {
 
     /// Sends a connection request to the given IP address.
     pub async fn connect_to(&self, peer_ip: SocketAddr) -> Result<()> {
-        debug!("Attempting to connect to peer {}", peer_ip);
+        trace!("Attempting to connect to peer {}", peer_ip);
         match tokio::net::TcpStream::connect(peer_ip).await {
             Ok(stream) => {
                 let ledger = self.ledger.clone();

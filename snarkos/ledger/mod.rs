@@ -25,7 +25,10 @@ use futures::StreamExt;
 use indexmap::IndexMap;
 use once_cell::race::OnceBox;
 use parking_lot::RwLock;
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 use tokio::task;
 
 pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockDB<N>, ProgramDB<N>>;
@@ -71,8 +74,6 @@ impl<N: Network> Ledger<N> {
             .set(Box::new(server))
             .map_err(|_| anyhow!("Failed to save the server"))?;
 
-        // Sync the ledger with the network.
-        ledger.initial_sync_with_network().await?;
         // Return the ledger.
         Ok(ledger)
     }
@@ -105,16 +106,8 @@ impl<N: Network> Ledger<N> {
         })
         .await??;
 
-        // Ensure the given block is a valid next block.
-        self.ledger.read().check_next_block(&next_block)?;
-
         // Add the next block to the ledger.
-        let self_clone = self.clone();
-        let next_block_clone = next_block.clone();
-        if let Err(error) = task::spawn_blocking(move || self_clone.ledger.write().add_next_block(&next_block_clone)).await? {
-            // Log the error.
-            warn!("{error}");
-        }
+        self.add_next_block(&next_block).await?;
 
         // Broadcast the block to all peers.
         let peers = self.peers().read().clone();
@@ -124,6 +117,20 @@ impl<N: Network> Ledger<N> {
 
         // Return the next block.
         Ok(next_block)
+    }
+
+    /// Attempts to add the given block to the ledger.
+    pub(crate) async fn add_next_block(self: &Arc<Self>, next_block: &Block<N>) -> Result<()> {
+        // Add the next block to the ledger.
+        let self_clone = self.clone();
+        let next_block_clone = next_block.clone();
+        if let Err(error) = task::spawn_blocking(move || self_clone.ledger.write().add_next_block(&next_block_clone)).await? {
+            // Log the error.
+            warn!("{error}");
+            return Err(error);
+        }
+
+        Ok(())
     }
 }
 
@@ -207,20 +214,17 @@ impl<N: Network> Ledger<N> {
 // Internal operations.
 impl<N: Network> Ledger<N> {
     /// Syncs the ledger with the network.
-    async fn initial_sync_with_network(self: &Arc<Self>) -> Result<()> {
+    pub(crate) async fn initial_sync_with_network(self: &Arc<Self>, leader_ip: &IpAddr) -> Result<()> {
         /// The number of concurrent requests with the network.
         const CONCURRENT_REQUESTS: usize = 100;
         /// Url to fetch the blocks from.
         const TARGET_URL: &str = "https://vm.aleo.org/testnet3/block/testnet3/";
-        // TODO (raychu86): Move this declaration out.
-        /// The IP of the leader node.
-        const LEADER_IP: &str = "http://159.203.77.113";
 
         // Fetch the ledger height.
         let ledger_height = self.ledger.read().latest_height();
 
         // Fetch the latest height.
-        let latest_height = reqwest::get(format!("{LEADER_IP}/testnet3/latest/height"))
+        let latest_height = reqwest::get(format!("http://{leader_ip}/testnet3/latest/height"))
             .await?
             .text()
             .await?

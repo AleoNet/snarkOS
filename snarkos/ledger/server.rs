@@ -182,7 +182,7 @@ impl<N: Network> Server<N> {
                     LedgerRequest::TransactionBroadcast(transaction) => {
                         let transaction_id = transaction.id();
                         match ledger.add_to_memory_pool(transaction) {
-                            Ok(()) => debug!("✉️ Added transaction '{transaction_id}' to the memory pool"),
+                            Ok(()) => trace!("✉️ Added transaction '{transaction_id}' to the memory pool"),
                             Err(error) => {
                                 warn!("⚠️ Failed to add transaction '{transaction_id}' to the memory pool: {error}")
                             }
