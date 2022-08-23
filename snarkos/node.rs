@@ -52,7 +52,7 @@ impl<N: Network, E: Environment> Node<N, E> {
 
         // Connect to the leader node and listen for new blocks.
         let leader_addr = cli.beacon_addr;
-        debug!("Connecting to '{}'...", leader_addr);
+        trace!("Connecting to '{}'...", leader_addr);
         let _ = connect_to_leader::<N>(leader_addr, ledger.clone()).await;
 
         // Send pings to all peers every 10 seconds.
@@ -66,7 +66,7 @@ impl<N: Network, E: Environment> Node<N, E> {
 
     /// Sends a connection request to the given IP address.
     pub async fn connect_to(&self, peer_ip: SocketAddr) -> Result<()> {
-        debug!("Attempting to connect to peer {}", peer_ip);
+        trace!("Attempting to connect to peer {}", peer_ip);
         match tokio::net::TcpStream::connect(peer_ip).await {
             Ok(stream) => {
                 let ledger = self.ledger.clone();

@@ -87,7 +87,7 @@ pub(crate) async fn handle_peer<N: Network>(
                 // A message was received from the current user, we should
                 // broadcast this message to the other users.
                 Some(Ok(message)) => {
-                    debug!("Received message {} from peer {:?}", message.name(), peer.ip);
+                    trace!("Received '{}' from {}", message.name(), peer.ip);
 
                     match message {
                         Message::Ping => {
@@ -107,7 +107,7 @@ pub(crate) async fn handle_peer<N: Network>(
                         Message::BlockRequest(height) => {
                             let latest_height = ledger.ledger().read().latest_height();
                             if height > latest_height {
-                                debug!("Peer requested block {height}, which is greater than the current height {latest_height}");
+                                trace!("Peer requested block {height}, which is greater than the current height {latest_height}");
                             } else {
                                 let block = ledger.ledger().read().get_block(height)?;
                                 let response = Message::BlockResponse(block);
@@ -260,7 +260,7 @@ pub async fn connect_to_leader<N: Network>(initial_peer: SocketAddr, ledger: Arc
             let ledger_clone = ledger.clone();
 
             if !ledger_clone.peers().read().contains_key(&initial_peer) {
-                debug!("Attempting to connect to peer {}", initial_peer);
+                trace!("Attempting to connect to peer {}", initial_peer);
                 match TcpStream::connect(initial_peer).await {
                     Ok(stream) => {
                         tokio::spawn(async move {
