@@ -22,7 +22,10 @@ use crate::Ledger;
 use snarkvm::prelude::*;
 
 use futures::{SinkExt, StreamExt};
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
 use tokio::{
     net::{TcpListener, TcpStream},
     sync::mpsc,
@@ -235,10 +238,9 @@ pub async fn handle_listener<N: Network>(listener: TcpListener, ledger: Arc<Ledg
 // TODO (raychu86): Handle this request via `Message::BlockRequest`. This is currently not done,
 //  because the node has not established the leader as a peer.
 /// Request the genesis block from the leader.
-pub(super) async fn request_genesis_block<N: Network>(leader_ip: &SocketAddr) -> Result<Block<N>> {
+pub(super) async fn request_genesis_block<N: Network>(leader_ip: IpAddr) -> Result<Block<N>> {
     info!("Requesting genesis block from {}", leader_ip);
-    let ip = leader_ip.ip();
-    let block_string = reqwest::get(format!("http://{ip}/testnet3/block/0")).await?.text().await?;
+    let block_string = reqwest::get(format!("http://{leader_ip}/testnet3/block/0")).await?.text().await?;
 
     Block::from_str(&block_string)
 }

@@ -49,7 +49,7 @@ impl<N: Network, E: Environment> Node<N, E> {
                 // TODO (raychu86): Formalize this process via network messages.
                 //  Currently this operations pulls from the leader's server.
                 // Request genesis block from the beacon leader.
-                let genesis_block = request_genesis_block::<N>(&cli.beacon_addr).await?;
+                let genesis_block = request_genesis_block::<N>(cli.beacon_addr.ip()).await?;
 
                 // Initialize the ledger from the provided genesis block.
                 Ledger::<N>::new_with_genesis(account.private_key(), genesis_block).await?
