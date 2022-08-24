@@ -52,7 +52,7 @@ pub struct Ledger<N: Network> {
 
 impl<N: Network> Ledger<N> {
     /// Initializes a new instance of the ledger.
-    pub async fn load(private_key: &PrivateKey<N>) -> Result<Arc<Self>> {
+    pub fn load(private_key: PrivateKey<N>) -> Result<Arc<Self>> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
@@ -62,7 +62,7 @@ impl<N: Network> Ledger<N> {
             ledger: RwLock::new(InternalLedger::open()?),
             peers: Default::default(),
             server: OnceBox::new(),
-            private_key: *private_key,
+            private_key,
             view_key,
             address,
         });
@@ -79,7 +79,7 @@ impl<N: Network> Ledger<N> {
     }
 
     /// Initializes a new instance of the ledger.
-    pub(super) async fn new_with_genesis(private_key: &PrivateKey<N>, genesis_block: Block<N>) -> Result<Arc<Self>> {
+    pub(super) fn new_with_genesis(private_key: PrivateKey<N>, genesis_block: Block<N>) -> Result<Arc<Self>> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
@@ -104,7 +104,7 @@ impl<N: Network> Ledger<N> {
             ledger: RwLock::new(internal_ledger),
             peers: Default::default(),
             server: OnceBox::new(),
-            private_key: *private_key,
+            private_key,
             view_key,
             address,
         });
