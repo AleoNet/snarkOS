@@ -41,6 +41,9 @@ pub use network::*;
 mod node;
 pub use node::*;
 
+mod prover;
+pub use prover::*;
+
 mod store;
 pub use store::*;
 
