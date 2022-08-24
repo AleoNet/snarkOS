@@ -60,7 +60,7 @@ impl<N: Network> Ledger<N> {
         // Initialize the ledger.
         let ledger = Arc::new(Self {
             ledger: RwLock::new(InternalLedger::open()?),
-            peers: RwLock::new(IndexMap::new()),
+            peers: Default::default(),
             server: OnceBox::new(),
             private_key: *private_key,
             view_key,
@@ -102,7 +102,7 @@ impl<N: Network> Ledger<N> {
         // Initialize the ledger.
         let ledger = Arc::new(Self {
             ledger: RwLock::new(internal_ledger),
-            peers: RwLock::new(IndexMap::new()),
+            peers: Default::default(),
             server: OnceBox::new(),
             private_key: *private_key,
             view_key,
