@@ -30,6 +30,8 @@ pub enum Status {
     Ready = 0,
     /// The ledger is mining the next block.
     Mining,
+    /// The ledger is generating a coinbase proof.
+    Proving,
     /// The ledger is connecting to the minimum number of required peers.
     Peering,
     /// The ledger is syncing blocks with a connected peer.
@@ -63,9 +65,10 @@ impl RawStatus {
         match self.0.load(Ordering::SeqCst) {
             0 => Status::Ready,
             1 => Status::Mining,
-            2 => Status::Peering,
-            3 => Status::Syncing,
-            4 => Status::ShuttingDown,
+            2 => Status::Proving,
+            3 => Status::Peering,
+            4 => Status::Syncing,
+            5 => Status::ShuttingDown,
             _ => unreachable!("Invalid status code"),
         }
     }
@@ -78,6 +81,11 @@ impl RawStatus {
     /// Returns `true` if the node is currently mining.
     pub fn is_mining(&self) -> bool {
         self.get() == Status::Mining
+    }
+
+    /// Returns `true` if the node is currently proving.
+    pub fn is_proving(&self) -> bool {
+        self.get() == Status::Proving
     }
 
     /// Returns `true` if the node is currently peering.
