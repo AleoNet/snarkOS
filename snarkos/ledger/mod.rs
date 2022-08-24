@@ -84,12 +84,24 @@ impl<N: Network> Ledger<N> {
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
 
+        // Initialize the internal ledger.
+        let internal_ledger = match InternalLedger::new_with_genesis(&genesis_block, genesis_block.signature().to_address()) {
+            Ok(ledger) => ledger,
+            Err(_) => {
+                let ledger = InternalLedger::open()?;
+
+                // Check if the ledger contains the correct genesis block.
+                if !ledger.contains_block_hash(&genesis_block.hash())? {
+                    bail!("Genesis block mismatch (please remove the existing ledger and try again)")
+                }
+
+                ledger
+            }
+        };
+
         // Initialize the ledger.
         let ledger = Arc::new(Self {
-            ledger: RwLock::new(InternalLedger::new_with_genesis(
-                &genesis_block,
-                genesis_block.signature().to_address(),
-            )?),
+            ledger: RwLock::new(internal_ledger),
             peers: RwLock::new(IndexMap::new()),
             server: OnceBox::new(),
             private_key: *private_key,

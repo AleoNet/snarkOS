@@ -16,7 +16,7 @@
 
 use crate::CLI;
 
-use crate::{connect_to_leader, handle_listener, handle_peer, request_genesis_block, send_pings, Account, Clean, Ledger};
+use crate::{connect_to_leader, handle_listener, handle_peer, request_genesis_block, send_pings, Account, Ledger};
 use snarkos_environment::{helpers::Status, Environment};
 use snarkvm::prelude::Network;
 
@@ -51,24 +51,8 @@ impl<N: Network, E: Environment> Node<N, E> {
                 // Request genesis block from the beacon leader.
                 let genesis_block = request_genesis_block::<N>(&cli.beacon_addr).await?;
 
-                // Initialize the development ledger. This will clear the existing ledger if the
-                // genesis block does not match the one in the existing ledger.
-                // Initialize the ledger.
-                let existing_ledger = Ledger::<N>::load(account.private_key()).await?;
-
-                // Check if the existing ledger shares the same genesis block as the beacon node.
-                let genesis_block_exists = existing_ledger.ledger().read().contains_block_hash(&genesis_block.hash())?;
-                match genesis_block_exists {
-                    true => existing_ledger.clone(),
-                    false => {
-                        // Remove the existing ledger if the genesis block is not found.
-                        drop(existing_ledger);
-                        Clean::remove_ledger(N::ID, cli.dev)?;
-
-                        // Initialize a new ledger from the provided genesis block.
-                        Ledger::<N>::new_with_genesis(account.private_key(), genesis_block).await?
-                    }
-                }
+                // Initialize the ledger from the provided genesis block.
+                Ledger::<N>::new_with_genesis(account.private_key(), genesis_block).await?
             }
         };
 
