@@ -33,6 +33,9 @@ pub enum Message<N: Network> {
     TransactionBroadcast(Transaction<N>),
     /// A message containing a new block to be broadcast.
     BlockBroadcast(Block<N>),
+    // TODO (raychu86): Send an actual coinbase puzzle object.
+    /// A message containing a coinbase puzzle for the given block height.
+    CoinbasePuzzle(u32),
 }
 
 impl<N: Network> Message<N> {
@@ -46,6 +49,7 @@ impl<N: Network> Message<N> {
             Self::BlockResponse(..) => "BlockResponse",
             Self::TransactionBroadcast(..) => "TransactionBroadcast",
             Self::BlockBroadcast(..) => "BlockBroadcast",
+            Self::CoinbasePuzzle(..) => "BlockBroadcast",
         }
     }
 
@@ -59,6 +63,7 @@ impl<N: Network> Message<N> {
             Self::BlockResponse(..) => 3,
             Self::TransactionBroadcast(..) => 4,
             Self::BlockBroadcast(..) => 5,
+            Self::CoinbasePuzzle(..) => 5,
         }
     }
 
@@ -74,6 +79,7 @@ impl<N: Network> Message<N> {
             Self::BlockResponse(block) => Ok(writer.write_all(&block.to_bytes_le()?)?),
             Self::TransactionBroadcast(transaction) => Ok(writer.write_all(&transaction.to_bytes_le()?)?),
             Self::BlockBroadcast(block) => Ok(writer.write_all(&block.to_bytes_le()?)?),
+            Self::CoinbasePuzzle(block_height) => Ok(writer.write_all(&block_height.to_bytes_le()?)?),
         }
     }
 
@@ -120,6 +126,11 @@ impl<N: Network> Message<N> {
                 let message = Message::<N>::BlockBroadcast(Block::read_le(&mut reader)?);
                 Ok(message)
             }
+            6 => {
+                let mut reader = bytes.reader();
+                let message = Message::<N>::CoinbasePuzzle(bincode::deserialize_from(&mut reader)?);
+                Ok(message)
+            }
             _ => bail!("Unknown message ID"),
         }
     }
@@ -137,7 +148,8 @@ impl<N: Network> FromBytes for Message<N> {
             3 => Self::BlockResponse(Block::read_le(&mut reader)?),
             4 => Self::TransactionBroadcast(Transaction::read_le(&mut reader)?),
             5 => Self::BlockBroadcast(Block::read_le(&mut reader)?),
-            6.. => return Err(error(format!("Failed to decode message id {id}"))),
+            6 => Self::CoinbasePuzzle(u32::read_le(&mut reader)?),
+            7.. => return Err(error(format!("Failed to decode message id {id}"))),
         };
 
         Ok(message)
@@ -156,6 +168,7 @@ impl<N: Network> ToBytes for Message<N> {
             Message::BlockResponse(block) => block.write_le(&mut writer),
             Message::TransactionBroadcast(transaction) => transaction.write_le(&mut writer),
             Message::BlockBroadcast(block) => block.write_le(&mut writer),
+            Message::CoinbasePuzzle(block_height) => block_height.write_le(&mut writer),
         }
     }
 }

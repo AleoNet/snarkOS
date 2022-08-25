@@ -17,7 +17,10 @@
 mod message;
 pub use message::*;
 
-use crate::Ledger;
+use crate::{
+    environment::{helpers::NodeType, Environment},
+    Ledger,
+};
 
 use snarkvm::prelude::*;
 
@@ -67,7 +70,7 @@ impl<N: Network> Peer<N> {
 }
 
 /// Create a message handler for each peer.
-pub(crate) async fn handle_peer<N: Network>(
+pub(crate) async fn handle_peer<N: Network, E: Environment>(
     stream: TcpStream,
     peer_ip: SocketAddr,
     ledger: Arc<Ledger<N>>,
@@ -185,6 +188,13 @@ pub(crate) async fn handle_peer<N: Network>(
                             } else {
                                 trace!("Skipping block {} (height: {})", block.hash(), block.height());
                             }
+                        },
+                        Message::CoinbasePuzzle(_) => {
+                            if E::NODE_TYPE == NodeType::Validator || E::NODE_TYPE == NodeType::Beacon {
+                                // TODO (raychu86): Verify the coinbase puzzle proof.
+
+                                // TODO (raychu86): Add the coinbase puzzle to a mempool.
+                            }
                         }
                     }
                 }
@@ -208,7 +218,10 @@ pub(crate) async fn handle_peer<N: Network>(
 }
 
 /// Handle connection listener for new peers.
-pub async fn handle_listener<N: Network>(listener: TcpListener, ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn handle_listener<N: Network, E: Environment>(
+    listener: TcpListener,
+    ledger: Arc<Ledger<N>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     info!("Listening to connections at: {}", listener.local_addr().unwrap());
 
     tokio::spawn(async move {
@@ -219,7 +232,7 @@ pub async fn handle_listener<N: Network>(listener: TcpListener, ledger: Arc<Ledg
                 // Process the inbound connection request.
                 Ok((stream, peer_ip)) => {
                     tokio::spawn(async move {
-                        if let Err(err) = handle_peer::<N>(stream, peer_ip, ledger_clone.clone()).await {
+                        if let Err(err) = handle_peer::<N, E>(stream, peer_ip, ledger_clone.clone()).await {
                             warn!("Error handling peer {}: {:?}", peer_ip, err);
                         }
                     });
@@ -253,23 +266,29 @@ pub fn send_pings<N: Network>(ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std:
 }
 
 /// Handle connection with the leader.
-pub async fn connect_to_leader<N: Network>(initial_peer: SocketAddr, ledger: Arc<Ledger<N>>) -> Result<(), Box<dyn std::error::Error>> {
+pub async fn connect_to_leader<N: Network, E: Environment>(
+    leader_addr: SocketAddr,
+    ledger: Arc<Ledger<N>>,
+) -> Result<(), Box<dyn std::error::Error>> {
     tokio::spawn(async move {
         let mut interval = tokio::time::interval(time::Duration::from_secs(10));
         loop {
             let ledger_clone = ledger.clone();
 
-            if !ledger_clone.peers().read().contains_key(&initial_peer) {
-                trace!("Attempting to connect to peer {}", initial_peer);
-                match TcpStream::connect(initial_peer).await {
+            if !ledger_clone.peers().read().contains_key(&leader_addr) {
+                trace!("Attempting to connect to peer {}", leader_addr);
+                match TcpStream::connect(leader_addr).await {
                     Ok(stream) => {
                         tokio::spawn(async move {
-                            if let Err(err) = handle_peer::<N>(stream, initial_peer, ledger_clone.clone()).await {
-                                warn!("Error handling peer {}: {:?}", initial_peer, err);
+                            if let Err(err) = handle_peer::<N, E>(stream, leader_addr, ledger_clone.clone()).await {
+                                warn!("Error handling peer {}: {:?}", leader_addr, err);
+                            } else {
+                                // TODO (raychu86): Dynamically update validators. Currently only the beacon acts as a validator.
+                                ledger_clone.validators().write().insert(leader_addr);
                             }
                         });
                     }
-                    Err(error) => warn!("Failed to connect to peer {}: {}", initial_peer, error),
+                    Err(error) => warn!("Failed to connect to peer {}: {}", leader_addr, error),
                 }
             }
             interval.tick().await;
