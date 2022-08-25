@@ -52,7 +52,7 @@ pub struct Ledger<N: Network> {
 
 impl<N: Network> Ledger<N> {
     /// Initializes a new instance of the ledger.
-    pub async fn load(private_key: &PrivateKey<N>) -> Result<Arc<Self>> {
+    pub fn load(private_key: PrivateKey<N>) -> Result<Arc<Self>> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
@@ -60,9 +60,51 @@ impl<N: Network> Ledger<N> {
         // Initialize the ledger.
         let ledger = Arc::new(Self {
             ledger: RwLock::new(InternalLedger::open()?),
-            peers: RwLock::new(IndexMap::new()),
+            peers: Default::default(),
             server: OnceBox::new(),
-            private_key: *private_key,
+            private_key,
+            view_key,
+            address,
+        });
+
+        // Initialize the server.
+        let server = Server::<N>::start(ledger.clone())?;
+        ledger
+            .server
+            .set(Box::new(server))
+            .map_err(|_| anyhow!("Failed to save the server"))?;
+
+        // Return the ledger.
+        Ok(ledger)
+    }
+
+    /// Initializes a new instance of the ledger.
+    pub(super) fn new_with_genesis(private_key: PrivateKey<N>, genesis_block: Block<N>) -> Result<Arc<Self>> {
+        // Derive the view key and address.
+        let view_key = ViewKey::try_from(private_key)?;
+        let address = Address::try_from(&view_key)?;
+
+        // Initialize the internal ledger.
+        let internal_ledger = match InternalLedger::new_with_genesis(&genesis_block, genesis_block.signature().to_address()) {
+            Ok(ledger) => ledger,
+            Err(_) => {
+                let ledger = InternalLedger::open()?;
+
+                // Check if the ledger contains the correct genesis block.
+                if !ledger.contains_block_hash(&genesis_block.hash())? {
+                    bail!("Genesis block mismatch (please remove the existing ledger and try again)")
+                }
+
+                ledger
+            }
+        };
+
+        // Initialize the ledger.
+        let ledger = Arc::new(Self {
+            ledger: RwLock::new(internal_ledger),
+            peers: Default::default(),
+            server: OnceBox::new(),
+            private_key,
             view_key,
             address,
         });
