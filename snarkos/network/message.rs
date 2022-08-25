@@ -21,7 +21,7 @@ use std::marker::PhantomData;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
 /// A mock Coinbase puzzle object (address, block height, round number).
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CoinbasePuzzle<N: Network> {
     /// The address of the prover.
     pub address: Address<N>,

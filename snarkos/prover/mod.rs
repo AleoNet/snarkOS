@@ -115,7 +115,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                     for socket_addr in validators.iter() {
                                         match peers.get(socket_addr) {
                                             Some(sender) => {
-                                                let _ = sender.send(Message::<N>::CoinbasePuzzle(coinbase_puzzle.clone())).await;
+                                                let _ = sender.send(Message::<N>::CoinbasePuzzle(coinbase_puzzle)).await;
                                             }
                                             None => {
                                                 warn!("Error finding validator '{}' in peers list", socket_addr);
