@@ -16,20 +16,31 @@
 
 use crate::CLI;
 
-use crate::{connect_to_leader, environment::helpers::NodeType, handle_listener, handle_peer, send_pings, Account, Ledger};
+use crate::{
+    connect_to_leader,
+    environment::helpers::NodeType,
+    handle_listener,
+    handle_peer,
+    send_pings,
+    Account,
+    Ledger,
+    Prover,
+    ProverHandler,
+};
 use snarkos_environment::{helpers::Status, Environment};
 use snarkvm::prelude::Network;
 
 use anyhow::{bail, Result};
-use core::marker::PhantomData;
+use once_cell::race::OnceBox;
 use std::{net::SocketAddr, sync::Arc};
+use tokio::sync::oneshot;
 
 #[derive(Clone)]
 pub struct Node<N: Network, E: Environment> {
     /// The ledger.
     ledger: Arc<Ledger<N>>,
-    /// PhantomData.
-    _phantom: PhantomData<(N, E)>,
+    /// The prover.
+    prover: Arc<OnceBox<Prover<N, E>>>,
 }
 
 impl<N: Network, E: Environment> Node<N, E> {
@@ -50,22 +61,20 @@ impl<N: Network, E: Environment> Node<N, E> {
         let listener = tokio::net::TcpListener::bind(cli.node).await?;
 
         // Handle incoming connections.
-        let _handle_listener = handle_listener::<N>(listener, ledger.clone()).await;
+        let _handle_listener = handle_listener::<N, E>(listener, ledger.clone()).await;
 
         // Connect to the leader node and listen for new blocks.
         let leader_addr = cli.beacon_addr;
         trace!("Connecting to '{}'...", leader_addr);
-        let _ = connect_to_leader::<N>(leader_addr, ledger.clone()).await;
+        let _ = connect_to_leader::<N, E>(leader_addr, ledger.clone()).await;
 
         // Send pings to all peers every 10 seconds.
         let _pings = send_pings::<N>(ledger.clone());
 
         let node = Self {
             ledger,
-            _phantom: PhantomData,
+            prover: Arc::new(OnceBox::new()),
         };
-
-        node.initialize_prover().await;
 
         Ok(node)
     }
@@ -77,7 +86,7 @@ impl<N: Network, E: Environment> Node<N, E> {
             Ok(stream) => {
                 let ledger = self.ledger.clone();
                 tokio::spawn(async move {
-                    if let Err(err) = handle_peer::<N>(stream, peer_ip, ledger).await {
+                    if let Err(err) = handle_peer::<N, E>(stream, peer_ip, ledger).await {
                         warn!("Failed to handle connection with peer {}: {:?}", peer_ip, err);
                     }
                 });
@@ -107,8 +116,41 @@ impl<N: Network, E: Environment> Node<N, E> {
         trace!("Node has shut down.");
     }
 
-    pub async fn initialize_prover(&self) {
+    /// Initializes a new prover.
+    pub async fn initialize_prover(self: &Arc<Self>, prover: Prover<N, E>, mut prover_handler: ProverHandler) {
+        self.prover.set(prover.into()).map_err(|_| ()).unwrap();
+
         // Initialize the prover, if the node type is a prover.
-        if E::NODE_TYPE == NodeType::Prover {}
+        if E::NODE_TYPE == NodeType::Prover {
+            let node = self.clone();
+            let (router, handler) = oneshot::channel();
+
+            E::resources().register_task(
+                None, // No need to provide an id, as the task will run indefinitely.
+                tokio::spawn(async move {
+                    // Notify the outer function that the task is ready.
+                    let _ = router.send(());
+
+                    // Asynchronously wait for a prover request.
+                    while let Some(request) = prover_handler.recv().await {
+                        // Update the state of the prover.
+                        node.prover().update(request).await;
+                    }
+                }),
+            );
+
+            // Wait until the prover handler is ready.
+            let _ = handler.await;
+        }
+    }
+
+    /// Returns the nodes ledger.
+    pub(crate) fn ledger(&self) -> &Arc<Ledger<N>> {
+        &self.ledger
+    }
+
+    /// Returns the nodes prover.
+    pub(crate) fn prover(&self) -> &Prover<N, E> {
+        self.prover.get().unwrap()
     }
 }
