@@ -49,7 +49,7 @@ impl<N: Network> Message<N> {
             Self::BlockResponse(..) => "BlockResponse",
             Self::TransactionBroadcast(..) => "TransactionBroadcast",
             Self::BlockBroadcast(..) => "BlockBroadcast",
-            Self::CoinbasePuzzle(..) => "BlockBroadcast",
+            Self::CoinbasePuzzle(..) => "CoinbasePuzzle",
         }
     }
 
@@ -63,7 +63,7 @@ impl<N: Network> Message<N> {
             Self::BlockResponse(..) => 3,
             Self::TransactionBroadcast(..) => 4,
             Self::BlockBroadcast(..) => 5,
-            Self::CoinbasePuzzle(..) => 5,
+            Self::CoinbasePuzzle(..) => 6,
         }
     }
 
