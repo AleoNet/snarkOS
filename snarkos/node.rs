@@ -76,6 +76,15 @@ impl<N: Network, E: Environment> Node<N, E> {
             prover: Arc::new(OnceBox::new()),
         };
 
+        // Initialize a new instance for managing the prover.
+        let (prover, prover_handler) = Prover::new(node.ledger().clone());
+
+        // Initialize the prover.
+        node.initialize_prover(prover, prover_handler).await;
+
+        // Run the prover.
+        node.prover().start_prover().await;
+
         Ok(node)
     }
 
@@ -117,7 +126,7 @@ impl<N: Network, E: Environment> Node<N, E> {
     }
 
     /// Initializes a new prover.
-    pub async fn initialize_prover(self: &Arc<Self>, prover: Prover<N, E>, mut prover_handler: ProverHandler) {
+    pub async fn initialize_prover(&self, prover: Prover<N, E>, mut prover_handler: ProverHandler) {
         self.prover.set(prover.into()).map_err(|_| ()).unwrap();
 
         // Initialize the prover, if the node type is a prover.

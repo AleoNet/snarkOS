@@ -22,10 +22,11 @@ use crate::{
         Environment,
     },
     network::Message,
-    Node,
+    Ledger,
 };
 
 use std::{
+    marker::PhantomData,
     sync::{atomic::Ordering, Arc},
     time::Duration,
 };
@@ -46,20 +47,26 @@ const PROVER_HEARTBEAT_IN_SECONDS: Duration = Duration::from_secs(1);
 pub struct Prover<N: Network, E: Environment> {
     /// The prover router of the node.
     router: ProverRouter,
-    /// The shared node state of the owned node.
-    node: Arc<Node<N, E>>,
+    /// The shared ledger state of the owned node.
+    ledger: Arc<Ledger<N>>,
+    /// PhantomData.
+    _phantom: PhantomData<(N, E)>,
 }
 
 impl<N: Network, E: Environment> Prover<N, E> {
     /// Initialize a new instance of hte prover, paired with its handler.
-    pub async fn new(node: Arc<Node<N, E>>) -> Result<(Self, mpsc::Receiver<ProverRequest>)> {
+    pub fn new(ledger: Arc<Ledger<N>>) -> (Self, ProverHandler) {
         // Initialize an mpsc channel for sending requests to the `Prover` struct.
-        let (router, sender) = mpsc::channel(1024);
+        let (router, handler) = mpsc::channel(1024);
 
         // Initialize the prover.
-        let prover = Self { router, node };
+        let prover = Self {
+            router,
+            ledger,
+            _phantom: PhantomData,
+        };
 
-        Ok((prover, sender))
+        (prover, handler)
     }
 
     // TODO (raychu86): This operation is done independently. Need to evaluate if the provers should be
@@ -69,7 +76,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
         if E::NODE_TYPE == NodeType::Prover {
             // Initialize the prover process.
             let (router, handler) = oneshot::channel();
-            let node = self.node.clone();
+            let ledger = self.ledger.clone();
             E::resources().register_task(
                 None,
                 tokio::spawn(async move {
@@ -83,15 +90,13 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             // Set the status to `Proving`.
                             E::status().update(Status::Proving);
 
-                            let node = node.clone();
+                            let ledger = ledger.clone();
 
                             // Craft a coinbase proof.
                             let proving_task_id = E::resources().procure_id();
                             E::resources().register_task(
                                 Some(proving_task_id),
                                 tokio::spawn(async move {
-                                    let ledger = node.ledger();
-
                                     // TODO (raychu86): Use an actual coinbase proof.
                                     // Construct a coinbase proof.
                                     let coinbase_proof = ledger.ledger().read().latest_height() + 1;
