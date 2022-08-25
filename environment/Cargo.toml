@@ -29,14 +29,14 @@ version = "1"
 version = "1"
 
 [dependencies.serde]
-version = "1"
+version = "1.0.144"
 
 [dependencies.serde_json]
 version = "1"
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "a6c838a"
+rev = "e866f2d"
 features = ["console", "utilities"]
 
 [dependencies.tokio]
