@@ -21,6 +21,7 @@ use crate::{
         helpers::{NodeType, Status},
         Environment,
     },
+    network::Message,
     Node,
 };
 
@@ -35,6 +36,7 @@ pub type ProverRouter = mpsc::Sender<ProverRequest>;
 /// Shorthand for the child half of the `Prover` message channel.
 pub type ProverHandler = mpsc::Receiver<ProverRequest>;
 
+// TODO (raychu86): Add prover functionality.
 /// An enum of requests that the `Prover` struct processes.
 pub enum ProverRequest {}
 
@@ -44,13 +46,13 @@ const PROVER_HEARTBEAT_IN_SECONDS: Duration = Duration::from_secs(1);
 pub struct Prover<N: Network, E: Environment> {
     /// The prover router of the node.
     router: ProverRouter,
-    /// The shared ledger state of the owned node.
+    /// The shared node state of the owned node.
     node: Arc<Node<N, E>>,
 }
 
 impl<N: Network, E: Environment> Prover<N, E> {
     /// Initialize a new instance of hte prover, paired with its handler.
-    async fn new(node: Arc<Node<N, E>>) -> Result<(Self, mpsc::Receiver<ProverRequest>)> {
+    pub async fn new(node: Arc<Node<N, E>>) -> Result<(Self, mpsc::Receiver<ProverRequest>)> {
         // Initialize an mpsc channel for sending requests to the `Prover` struct.
         let (router, sender) = mpsc::channel(1024);
 
@@ -62,8 +64,8 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
     // TODO (raychu86): This operation is done independently. Need to evaluate if the provers should be
     //  requesting epoch state from the validators, or continue with the latest prover state.
-    /// Start the prover operations.
-    async fn start_prover(&self) {
+    /// Starts the prover and sends coinbase proofs to the validators.
+    pub async fn start_prover(&self) {
         if E::NODE_TYPE == NodeType::Prover {
             // Initialize the prover process.
             let (router, handler) = oneshot::channel();
@@ -81,18 +83,33 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             // Set the status to `Proving`.
                             E::status().update(Status::Proving);
 
-                            let _node = node.clone();
+                            let node = node.clone();
 
                             // Craft a coinbase proof.
                             let proving_task_id = E::resources().procure_id();
                             E::resources().register_task(
                                 Some(proving_task_id),
                                 tokio::spawn(async move {
+                                    let ledger = node.ledger();
+
+                                    // TODO (raychu86): Use an actual coinbase proof.
                                     // Construct a coinbase proof.
-                                    let coinbase_proof = ();
+                                    let coinbase_proof = ledger.ledger().read().latest_height() + 1;
 
                                     // Send the coinbase proof to the validators.
-                                    // TODO (raychu86): Implement this.
+                                    let validators = ledger.validators().read().clone();
+                                    let peers = ledger.peers().read().clone();
+
+                                    for socket_addr in validators.iter() {
+                                        match peers.get(socket_addr) {
+                                            Some(sender) => {
+                                                let _ = sender.send(Message::<N>::CoinbasePuzzle(coinbase_proof)).await;
+                                            }
+                                            None => {
+                                                warn!("Error finding validator '{}' in peers list", socket_addr);
+                                            }
+                                        }
+                                    }
 
                                     // Set the status to `Ready`.
                                     E::status().update(Status::Ready);
@@ -118,8 +135,8 @@ impl<N: Network, E: Environment> Prover<N, E> {
     /// Performs the given `request` to the prover.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    async fn update(&self, _request: ProverRequest) -> Result<()> {
-        Ok(())
+    pub async fn update(&self, request: ProverRequest) {
+        match request {}
     }
 
     /// Returns an instance of the prover router.
