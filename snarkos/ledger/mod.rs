@@ -22,7 +22,7 @@ use snarkvm::prelude::*;
 
 use colored::Colorize;
 use futures::StreamExt;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use once_cell::race::OnceBox;
 use parking_lot::RwLock;
 use std::{
@@ -40,6 +40,8 @@ pub struct Ledger<N: Network> {
     ledger: RwLock<InternalLedger<N>>,
     /// The current peers.
     peers: RwLock<IndexMap<SocketAddr, crate::Sender<N>>>,
+    /// The current list of validators.
+    validators: RwLock<IndexSet<SocketAddr>>,
     /// The server.
     server: OnceBox<Server<N>>,
     /// The account private key.
@@ -61,6 +63,7 @@ impl<N: Network> Ledger<N> {
         let ledger = Arc::new(Self {
             ledger: RwLock::new(InternalLedger::open()?),
             peers: RwLock::new(IndexMap::new()),
+            validators: RwLock::new(IndexSet::new()),
             server: OnceBox::new(),
             private_key: *private_key,
             view_key,
@@ -86,6 +89,11 @@ impl<N: Network> Ledger<N> {
     /// Returns the connected peers.
     pub(super) const fn peers(&self) -> &RwLock<IndexMap<SocketAddr, crate::Sender<N>>> {
         &self.peers
+    }
+
+    /// Returns the validators.
+    pub(super) const fn validators(&self) -> &RwLock<IndexSet<SocketAddr>> {
+        &self.validators
     }
 }
 
