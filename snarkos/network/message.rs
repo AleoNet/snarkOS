@@ -22,7 +22,14 @@ use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
 /// A mock Coinbase puzzle object (address, block height, round number).
 #[derive(Clone)]
-pub struct CoinbasePuzzle<N: Network>(pub Address<N>, pub u32, pub u64);
+pub struct CoinbasePuzzle<N: Network> {
+    /// The address of the prover.
+    pub address: Address<N>,
+    /// The height of the block where the puzzle will be included.
+    pub height: u32,
+    /// The current round number.
+    pub round: u64,
+}
 
 impl<N: Network> FromBytes for CoinbasePuzzle<N> {
     /// Reads the message from a buffer.
@@ -31,16 +38,16 @@ impl<N: Network> FromBytes for CoinbasePuzzle<N> {
         let height = u32::read_le(&mut reader)?;
         let round = u64::read_le(&mut reader)?;
 
-        Ok(Self(address, height, round))
+        Ok(Self { address, height, round })
     }
 }
 
 impl<N: Network> ToBytes for CoinbasePuzzle<N> {
     /// Writes the message to a buffer.
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.0.write_le(&mut writer)?;
-        self.1.write_le(&mut writer)?;
-        self.2.write_le(&mut writer)
+        self.address.write_le(&mut writer)?;
+        self.height.write_le(&mut writer)?;
+        self.round.write_le(&mut writer)
     }
 }
 

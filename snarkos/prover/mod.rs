@@ -102,7 +102,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                     let height = ledger.ledger().read().latest_height() + 1;
                                     let round = ledger.ledger().read().latest_round() + 1;
                                     let address = ledger.address();
-                                    let coinbase_puzzle = crate::CoinbasePuzzle(*address, height, round);
+                                    let coinbase_puzzle = crate::CoinbasePuzzle {
+                                        address: *address,
+                                        height,
+                                        round,
+                                    };
 
                                     // Send the coinbase proof to the validators.
                                     let validators = ledger.validators().read().clone();
