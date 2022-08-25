@@ -99,7 +99,10 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                 tokio::spawn(async move {
                                     // TODO (raychu86): Use an actual coinbase proof.
                                     // Construct a coinbase proof.
-                                    let coinbase_proof = ledger.ledger().read().latest_height() + 1;
+                                    let height = ledger.ledger().read().latest_height() + 1;
+                                    let round = ledger.ledger().read().latest_round() + 1;
+                                    let address = ledger.address();
+                                    let coinbase_puzzle = crate::CoinbasePuzzle(*address, height, round);
 
                                     // Send the coinbase proof to the validators.
                                     let validators = ledger.validators().read().clone();
@@ -108,7 +111,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                     for socket_addr in validators.iter() {
                                         match peers.get(socket_addr) {
                                             Some(sender) => {
-                                                let _ = sender.send(Message::<N>::CoinbasePuzzle(coinbase_proof)).await;
+                                                let _ = sender.send(Message::<N>::CoinbasePuzzle(coinbase_puzzle.clone())).await;
                                             }
                                             None => {
                                                 warn!("Error finding validator '{}' in peers list", socket_addr);

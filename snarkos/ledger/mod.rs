@@ -95,6 +95,11 @@ impl<N: Network> Ledger<N> {
     pub(super) const fn validators(&self) -> &RwLock<IndexSet<SocketAddr>> {
         &self.validators
     }
+
+    /// Returns the address.
+    pub(super) const fn address(&self) -> &Address<N> {
+        &self.address
+    }
 }
 
 impl<N: Network> Ledger<N> {
