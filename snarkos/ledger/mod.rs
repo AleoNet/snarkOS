@@ -17,7 +17,7 @@
 mod server;
 pub use server::*;
 
-use crate::{handle_dispatch_error, BlockDB, ProgramDB};
+use crate::{handle_dispatch_error, BlockDB, Data, ProgramDB};
 use snarkvm::prelude::*;
 
 use colored::Colorize;
@@ -135,6 +135,35 @@ impl<N: Network> Ledger<N> {
     /// Adds the given transaction to the memory pool.
     pub fn add_to_memory_pool(&self, transaction: Transaction<N>) -> Result<()> {
         self.ledger.write().add_to_memory_pool(transaction)
+    }
+
+    /// Advances the ledger to the next block.
+    pub async fn advance_to_next_block(self: &Arc<Self>) -> Result<Block<N>> {
+        let self_clone = self.clone();
+        let next_block = task::spawn_blocking(move || {
+            // Initialize an RNG.
+            let rng = &mut ::rand::thread_rng();
+            // Propose the next block.
+            self_clone.ledger.read().propose_next_block(&self_clone.private_key, rng)
+        })
+        .await??;
+
+        // Add the next block to the ledger.
+        self.add_next_block(next_block.clone()).await?;
+
+        // Serialize the block ahead of time to not do it for each peer.
+        let serialized_block = Data::Object(next_block.clone()).serialize().await?;
+
+        // Broadcast the block to all peers.
+        let peers = self.peers().read().clone();
+        for (_, sender) in peers.iter() {
+            let _ = sender
+                .send(crate::Message::<N>::BlockBroadcast(Data::Buffer(serialized_block.clone())))
+                .await;
+        }
+
+        // Return the next block.
+        Ok(next_block)
     }
 
     /// Attempts to add the given block to the ledger.
