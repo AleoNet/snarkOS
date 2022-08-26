@@ -121,12 +121,12 @@ impl<N: Network> Ledger<N> {
     }
 
     /// Returns the ledger.
-    pub(super) const fn ledger(&self) -> &RwLock<InternalLedger<N>> {
+    pub const fn ledger(&self) -> &RwLock<InternalLedger<N>> {
         &self.ledger
     }
 
     /// Returns the connected peers.
-    pub(super) const fn peers(&self) -> &RwLock<IndexMap<SocketAddr, crate::Sender<N>>> {
+    pub const fn peers(&self) -> &RwLock<IndexMap<SocketAddr, crate::Sender<N>>> {
         &self.peers
     }
 }
