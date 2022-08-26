@@ -80,6 +80,31 @@ impl<N: Network> Server<N> {
         // Initialize a channel to send requests to the ledger.
         let (ledger_sender, ledger_receiver) = mpsc::channel(64);
 
+        // Initialize a vector for the server handles.
+        let mut handles = Vec::new();
+
+        // Initialize the routes.
+        let routes = Self::routes(ledger.clone(), ledger_sender.clone());
+
+        // Spawn the server.
+        handles.push(tokio::spawn(async move {
+            // Start the server.
+            warp::serve(routes).run(([0, 0, 0, 0], 80)).await;
+        }));
+
+        // Spawn the ledger handler.
+        handles.push(Self::start_handler(ledger.clone(), ledger_receiver));
+
+        Ok(Self {
+            ledger,
+            ledger_sender,
+            handles,
+            _phantom: PhantomData,
+        })
+    }
+
+    /// Initializes the routes, given the ledger and ledger sender.
+    fn routes(ledger: Arc<Ledger<N>>, ledger_sender: LedgerSender<N>) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
         // GET /testnet3/latest/height
         let latest_height = warp::get()
             .and(warp::path!("testnet3" / "latest" / "height"))
@@ -136,42 +161,54 @@ impl<N: Network> Server<N> {
             .and(with(ledger.clone()))
             .and_then(Self::records_unspent);
 
+        // GET /testnet3/peers/count
+        let peers_count = warp::get()
+            .and(warp::path!("testnet3" / "peers" / "count"))
+            .and(with(ledger.clone()))
+            .and_then(Self::peers_count);
+
+        // GET /testnet3/peers/all
+        let peers_all = warp::get()
+            .and(warp::path!("testnet3" / "peers" / "all"))
+            .and(with(ledger.clone()))
+            .and_then(Self::peers_all);
+
+        // GET /testnet3/transactions/{height}
+        let get_transactions = warp::get()
+            .and(warp::path!("testnet3" / "transactions" / u32))
+            .and(with(ledger.clone()))
+            .and_then(Self::get_transactions);
+
+        // GET /testnet3/transaction/{id}
+        let get_transaction = warp::get()
+            .and(warp::path!("testnet3" / "transaction" / ..))
+            .and(warp::path::param::<N::TransactionID>())
+            .and(warp::path::end())
+            .and(with(ledger))
+            .and_then(Self::get_transaction);
+
         // POST /testnet3/transaction/broadcast
         let transaction_broadcast = warp::post()
             .and(warp::path!("testnet3" / "transaction" / "broadcast"))
             .and(warp::body::content_length_limit(10 * 1024 * 1024))
             .and(warp::body::json())
-            .and(with(ledger_sender.clone()))
+            .and(with(ledger_sender))
             .and_then(Self::transaction_broadcast);
 
-        // Initialize a vector for the server handles.
-        let mut handles = Vec::new();
-
-        // Spawn the server.
-        handles.push(tokio::spawn(async move {
-            // Prepare the list of routes.
-            let routes = latest_height
-                .or(latest_hash)
-                .or(latest_block)
-                .or(get_block)
-                .or(state_path)
-                .or(records_all)
-                .or(records_spent)
-                .or(records_unspent)
-                .or(transaction_broadcast);
-            // Start the server.
-            warp::serve(routes).run(([0, 0, 0, 0], 80)).await;
-        }));
-
-        // Spawn the ledger handler.
-        handles.push(Self::start_handler(ledger.clone(), ledger_receiver));
-
-        Ok(Self {
-            ledger,
-            ledger_sender,
-            handles,
-            _phantom: PhantomData,
-        })
+        // Return the list of routes.
+        latest_height
+            .or(latest_hash)
+            .or(latest_block)
+            .or(get_block)
+            .or(state_path)
+            .or(records_all)
+            .or(records_spent)
+            .or(records_unspent)
+            .or(peers_count)
+            .or(peers_all)
+            .or(get_transactions)
+            .or(get_transaction)
+            .or(transaction_broadcast)
     }
 
     /// Initializes a ledger handler.
@@ -260,6 +297,28 @@ impl<N: Network> Server<N> {
         println!("Records:\n{:#?}", records);
         // Return the records.
         Ok(reply::with_status(reply::json(&records), StatusCode::OK))
+    }
+
+    /// Returns the number of peers connected to the node.
+    async fn peers_count(ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.peers.read().len()))
+    }
+
+    /// Returns the peers connected to the node.
+    async fn peers_all(ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(
+            &ledger.peers.read().keys().map(|addr| addr.ip()).collect::<Vec<std::net::IpAddr>>(),
+        ))
+    }
+
+    /// Returns the transactions for the given block height.
+    async fn get_transactions(height: u32, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.ledger.read().get_transactions(height).or_reject()?))
+    }
+
+    /// Returns the transaction for the given transaction ID.
+    async fn get_transaction(transaction_id: N::TransactionID, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.ledger.read().get_transaction(transaction_id).or_reject()?))
     }
 
     /// Broadcasts the transaction to the ledger.
