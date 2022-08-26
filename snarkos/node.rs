@@ -41,7 +41,7 @@ impl<N: Network, E: Environment> Node<N, E> {
                 // Initialize the ledger.
                 let ledger = Ledger::<N>::load(*account.private_key())?;
                 // Sync the ledger with the network.
-                ledger.initial_sync_with_network(&cli.beacon_addr.ip()).await?;
+                ledger.initial_sync_with_network(cli.beacon_addr.ip()).await?;
 
                 ledger
             }
