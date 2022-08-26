@@ -50,7 +50,7 @@ version = "2.0.2"
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "e866f2d"
+rev = "1db1f75"
 features = ["circuit", "console", "parallel", "utilities"]
 
 [dependencies.aleo-std]
@@ -108,6 +108,9 @@ version = "1"
 
 [dependencies.thiserror]
 version = "1.0"
+
+[dependencies.time]
+version = "0.3.14"
 
 [dependencies.tokio]
 version = "1"
