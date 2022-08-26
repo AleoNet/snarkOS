@@ -57,7 +57,7 @@ pub struct CLI {
     pub connect: Option<String>,
 
     /// Specify the IP address and port for the HTTP server.
-    #[clap(parse(try_from_str), default_value = "127.0.0.1:3033")]
+    #[clap(parse(try_from_str), default_value = "0.0.0.0:3033")]
     pub rest: SocketAddr,
     /// If the flag is set, the node will not initialize the HTTP server.
     #[clap(long)]
