@@ -307,7 +307,7 @@ impl<N: Network> Server<N> {
     /// Returns the peers connected to the node.
     async fn peers_all(ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(
-            &ledger.peers.read().keys().map(|addr| addr.ip()).collect::<Vec<std::net::IpAddr>>(),
+            &ledger.peers.read().keys().cloned().collect::<Vec<std::net::SocketAddr>>(),
         ))
     }
 
