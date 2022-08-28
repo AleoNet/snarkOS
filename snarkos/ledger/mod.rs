@@ -120,6 +120,11 @@ impl<N: Network> Ledger<N> {
         Ok(ledger)
     }
 
+    /// Returns the account address.
+    pub const fn address(&self) -> &Address<N> {
+        &self.address
+    }
+
     /// Returns the ledger.
     pub const fn ledger(&self) -> &RwLock<InternalLedger<N>> {
         &self.ledger
