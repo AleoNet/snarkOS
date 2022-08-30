@@ -378,10 +378,7 @@ impl<N: Network> Server<N> {
         ledger_sender: LedgerSender<N>,
     ) -> Result<impl Reply, Rejection> {
         let additional_fee = Self::execute_additional_fee(ledger)?;
-
-        // Create the transaction.
         let transaction = Transaction::from_execution(execution.clone(), Some(additional_fee)).or_reject()?;
-        // Send the transaction to the ledger.
         match ledger_sender.send(LedgerRequest::TransactionBroadcast(transaction)).await {
             Ok(()) => Ok(reply::with_status(
                 reply::json(&json!({ "execution": execution })),
