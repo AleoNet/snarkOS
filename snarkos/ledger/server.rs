@@ -382,8 +382,7 @@ impl<N: Network> Server<N> {
         }
     }
 
-    /// Spends the record with the smallest value with at least `1 gate` as the fee
-    /// for the execution of a transaction.
+    /// Spends the record with the smallest value with at least `1 gate` as a transaction fee.
     fn execute_additional_fee(ledger: Arc<Ledger<N>>) -> Result<AdditionalFee<N>, Rejection> {
         let records = ledger.find_unspent_records().or_reject()?;
 
