@@ -351,7 +351,7 @@ impl<N: Network> Server<N> {
         let records = ledger.find_unspent_records().or_reject()?;
 
         // Prepare the additional fee.
-        // Spends the record with the smallest value larger than `1 gate`.
+        // Spends the record with the smallest value with at least `1 gate`.
         let one_gate = U64::new(1u64);
         let credits = records
             .values()
