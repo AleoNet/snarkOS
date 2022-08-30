@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Ledger;
-use snarkvm::prelude::{Deployment, Field, Network, RecordsFilter, Transaction, ViewKey, U64};
+use snarkvm::prelude::{Deployment, Field, Network, RecordsFilter, Transaction, ViewKey, U64, AdditionalFee};
 
 use anyhow::Result;
 use core::marker::PhantomData;
@@ -347,28 +347,8 @@ impl<N: Network> Server<N> {
         ledger: Arc<Ledger<N>>,
         ledger_sender: LedgerSender<N>,
     ) -> Result<impl Reply, Rejection> {
-        // Fetch the unspent records.
-        let records = ledger.find_unspent_records().or_reject()?;
+        let additional_fee = Self::execute_additional_fee(ledger)?;
 
-        // Prepare the additional fee.
-        // Spends the record with the smallest value with at least `1 gate`.
-        let one_gate = U64::new(1u64);
-        let credits = records
-            .values()
-            .filter(|record| **record.gates() >= one_gate)
-            .min_by(|a, b| (**a.gates()).cmp(&**b.gates()))
-            .unwrap()
-            .clone();
-
-        // Get the additional fee in gates.
-        let additional_fee_in_gates = credits.gates().clone();
-        // Create the additional fee.
-        let (_, additional_fee) = ledger
-            .ledger
-            .read()
-            .vm()
-            .execute_additional_fee(&ledger.private_key, credits, **additional_fee_in_gates, &mut rand::thread_rng())
-            .or_reject()?;
         // Create the transaction.
         let transaction = Transaction::from_deployment(deployment.clone(), additional_fee).or_reject()?;
         // Send the transaction to the ledger.
@@ -380,4 +360,31 @@ impl<N: Network> Server<N> {
             Err(error) => Err(reject::custom(ServerError::Request(format!("{error}")))),
         }
     }
+
+    /// Spends the record with the smallest value with at least `1 gate` as the fee
+    /// for the execution of a transaction.
+    fn execute_additional_fee(ledger: Arc<Ledger<N>>) -> Result<AdditionalFee<N>, Rejection> {
+        let records = ledger.find_unspent_records().or_reject()?;
+
+        // Get smallest record with at least 1 gate
+        let one_gate = U64::new(1u64);
+        let credits = records
+            .values()
+            .filter(|record| **record.gates() >= one_gate)
+            .min_by(|a, b| (**a.gates()).cmp(&**b.gates()))
+            .unwrap()
+            .clone();
+
+        let additional_fee_in_gates = credits.gates().clone();
+
+        // Create the additional fee
+        ledger
+            .ledger
+            .read()
+            .vm()
+            .execute_additional_fee(&ledger.private_key, credits, **additional_fee_in_gates, &mut rand::thread_rng())
+            .map(|(_, additional_fee)| additional_fee)
+            .or_reject()
+    }
+
 }
