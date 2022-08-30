@@ -79,7 +79,7 @@ impl<N: Network> Ledger<N> {
     }
 
     /// Initializes a new instance of the ledger.
-    pub(super) fn new_with_genesis(private_key: PrivateKey<N>, genesis_block: Block<N>) -> Result<Arc<Self>> {
+    pub fn new_with_genesis(private_key: PrivateKey<N>, genesis_block: Block<N>) -> Result<Arc<Self>> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
