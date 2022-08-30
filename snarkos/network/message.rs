@@ -16,8 +16,9 @@
 
 use snarkvm::prelude::*;
 
-use ::bytes::{Buf, BufMut, BytesMut};
+use ::bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::marker::PhantomData;
+use tokio::task;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
 /// A mock Coinbase puzzle object (address, block height, round number).
@@ -51,6 +52,54 @@ impl<N: Network> ToBytes for CoinbasePuzzle<N> {
     }
 }
 
+/// This object enables deferred deserialization / ahead-of-time serialization for objects that
+/// take a while to deserialize / serialize, in order to allow these operations to be non-blocking.
+#[derive(Clone, Debug)]
+pub enum Data<T: FromBytes + ToBytes + Send + 'static> {
+    Object(T),
+    Buffer(Bytes),
+}
+
+impl<T: FromBytes + ToBytes + Send + 'static> Data<T> {
+    pub fn deserialize_blocking(self) -> Result<T> {
+        match self {
+            Self::Object(x) => Ok(x),
+            Self::Buffer(bytes) => T::from_bytes_le(&bytes),
+        }
+    }
+
+    pub async fn deserialize(self) -> Result<T> {
+        match self {
+            Self::Object(x) => Ok(x),
+            Self::Buffer(bytes) => match task::spawn_blocking(move || T::from_bytes_le(&bytes)).await {
+                Ok(x) => x,
+                Err(err) => Err(err.into()),
+            },
+        }
+    }
+
+    pub fn serialize_blocking_into<W: Write>(&self, writer: &mut W) -> Result<()> {
+        match self {
+            Self::Object(x) => {
+                let bytes = x.to_bytes_le()?;
+                Ok(writer.write_all(&bytes)?)
+            }
+            Self::Buffer(bytes) => Ok(writer.write_all(bytes)?),
+        }
+    }
+
+    pub async fn serialize(self) -> Result<Bytes> {
+        match self {
+            Self::Object(x) => match task::spawn_blocking(move || x.to_bytes_le()).await {
+                Ok(bytes) => bytes.map(|vec| vec.into()),
+                Err(err) => Err(err.into()),
+            },
+            Self::Buffer(bytes) => Ok(bytes),
+        }
+    }
+}
+
+#[derive(Clone)]
 pub enum Message<N: Network> {
     /// Ping with the current block height.
     Ping,
@@ -59,11 +108,12 @@ pub enum Message<N: Network> {
     /// Request a block for a given height.
     BlockRequest(u32),
     /// A response to a `BlockRequest`.
-    BlockResponse(Block<N>),
+    BlockResponse(Data<Block<N>>),
     /// A message containing a transaction to be broadcast.
-    TransactionBroadcast(Transaction<N>),
+    TransactionBroadcast(Data<Transaction<N>>),
     /// A message containing a new block to be broadcast.
-    BlockBroadcast(Block<N>),
+    BlockBroadcast(Data<Block<N>>),
+
     // TODO (raychu86): Send an actual coinbase puzzle object.
     /// A message containing a coinbase puzzle for the given block height.
     CoinbasePuzzle(CoinbasePuzzle<N>),
@@ -107,16 +157,15 @@ impl<N: Network> Message<N> {
             Self::Ping => Ok(()),
             Self::Pong(block_height) => Ok(writer.write_all(&block_height.to_le_bytes())?),
             Self::BlockRequest(block_height) => Ok(writer.write_all(&block_height.to_le_bytes())?),
-            Self::BlockResponse(block) => Ok(writer.write_all(&block.to_bytes_le()?)?),
-            Self::TransactionBroadcast(transaction) => Ok(writer.write_all(&transaction.to_bytes_le()?)?),
-            Self::BlockBroadcast(block) => Ok(writer.write_all(&block.to_bytes_le()?)?),
+            Self::BlockResponse(block) | Self::BlockBroadcast(block) => block.serialize_blocking_into(writer),
+            Self::TransactionBroadcast(transaction) => transaction.serialize_blocking_into(writer),
             Self::CoinbasePuzzle(coinbase_puzzle) => Ok(writer.write_all(&coinbase_puzzle.to_bytes_le()?)?),
         }
     }
 
     /// Deserialize the given buffer into a message.
     fn deserialize(mut bytes: BytesMut) -> Result<Self> {
-        if bytes.remaining() < 1 {
+        if bytes.remaining() < 2 {
             bail!("Missing message ID");
         }
 
@@ -124,83 +173,32 @@ impl<N: Network> Message<N> {
         let id: u16 = bytes.get_u16_le();
 
         // Deserialize the data field.
-
-        match id {
+        let message = match id {
             0 => {
                 if bytes.remaining() != 0 {
                     bail!("Unexpected data for Ping");
                 }
-                Ok(Message::<N>::Ping)
+                Message::<N>::Ping
             }
             1 => {
                 let mut reader = bytes.reader();
-                let message = Message::<N>::Pong(bincode::deserialize_from(&mut reader)?);
-                Ok(message)
+                Message::<N>::Pong(bincode::deserialize_from(&mut reader)?)
             }
             2 => {
                 let mut reader = bytes.reader();
-                let message = Message::<N>::BlockRequest(bincode::deserialize_from(&mut reader)?);
-                Ok(message)
+                Message::<N>::BlockRequest(bincode::deserialize_from(&mut reader)?)
             }
-            3 => {
-                let mut reader = bytes.reader();
-                let message = Message::<N>::BlockResponse(Block::read_le(&mut reader)?);
-                Ok(message)
-            }
-            4 => {
-                let mut reader = bytes.reader();
-                let message = Message::<N>::TransactionBroadcast(Transaction::read_le(&mut reader)?);
-                Ok(message)
-            }
-            5 => {
-                let mut reader = bytes.reader();
-                let message = Message::<N>::BlockBroadcast(Block::read_le(&mut reader)?);
-                Ok(message)
-            }
+            3 => Message::<N>::BlockResponse(Data::Buffer(bytes.freeze())),
+            4 => Message::<N>::TransactionBroadcast(Data::Buffer(bytes.freeze())),
+            5 => Message::<N>::BlockBroadcast(Data::Buffer(bytes.freeze())),
             6 => {
                 let mut reader = bytes.reader();
-                let message = Message::<N>::CoinbasePuzzle(CoinbasePuzzle::read_le(&mut reader)?);
-                Ok(message)
+                Message::<N>::CoinbasePuzzle(CoinbasePuzzle::read_le(&mut reader)?)
             }
             _ => bail!("Unknown message ID"),
-        }
-    }
-}
-
-impl<N: Network> FromBytes for Message<N> {
-    /// Reads the message from a buffer.
-    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
-        let id = u16::read_le(&mut reader)?;
-
-        let message = match id {
-            0 => Self::Ping,
-            1 => Self::Pong(u32::read_le(&mut reader)?),
-            2 => Self::BlockRequest(u32::read_le(&mut reader)?),
-            3 => Self::BlockResponse(Block::read_le(&mut reader)?),
-            4 => Self::TransactionBroadcast(Transaction::read_le(&mut reader)?),
-            5 => Self::BlockBroadcast(Block::read_le(&mut reader)?),
-            6 => Self::CoinbasePuzzle(CoinbasePuzzle::read_le(&mut reader)?),
-            7.. => return Err(error(format!("Failed to decode message id {id}"))),
         };
 
         Ok(message)
-    }
-}
-
-impl<N: Network> ToBytes for Message<N> {
-    /// Writes the message to a buffer.
-    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.id().write_le(&mut writer)?;
-
-        match self {
-            Message::Ping => Ok(()),
-            Message::Pong(height) => height.write_le(&mut writer),
-            Message::BlockRequest(height) => height.write_le(&mut writer),
-            Message::BlockResponse(block) => block.write_le(&mut writer),
-            Message::TransactionBroadcast(transaction) => transaction.write_le(&mut writer),
-            Message::BlockBroadcast(block) => block.write_le(&mut writer),
-            Message::CoinbasePuzzle(coinbase_puzzle) => coinbase_puzzle.write_le(&mut writer),
-        }
     }
 }
 

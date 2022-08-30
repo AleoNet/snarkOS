@@ -21,6 +21,7 @@ use crate::{
     environment::helpers::NodeType,
     handle_listener,
     handle_peer,
+    request_genesis_block,
     send_pings,
     Account,
     Ledger,
@@ -47,13 +48,25 @@ impl<N: Network, E: Environment> Node<N, E> {
     /// Initializes a new instance of the node.
     pub async fn new(cli: &CLI, account: Account<N>) -> Result<Self> {
         // Initialize the ledger.
-        let ledger = Ledger::<N>::load(account.private_key()).await?;
+        let ledger = match cli.dev {
+            None => {
+                // Initialize the ledger.
+                let ledger = Ledger::<N>::load(*account.private_key())?;
+                // Sync the ledger with the network.
+                ledger.initial_sync_with_network(cli.beacon_addr.ip()).await?;
 
-        // If the node is not in development mode, perform fast sync with the network.
-        if cli.dev.is_none() {
-            // Sync the ledger with the network.
-            ledger.initial_sync_with_network(&cli.beacon_addr.ip()).await?;
-        }
+                ledger
+            }
+            Some(_) => {
+                // TODO (raychu86): Formalize this process via network messages.
+                //  Currently this operations pulls from the leader's server.
+                // Request genesis block from the beacon leader.
+                let genesis_block = request_genesis_block::<N>(cli.beacon_addr.ip()).await?;
+
+                // Initialize the ledger from the provided genesis block.
+                Ledger::<N>::new_with_genesis(*account.private_key(), genesis_block)?
+            }
+        };
 
         // TODO (raychu86): Make `handle_listener`, `connect_to_leader` and `send_pings` dedicated `Node` methods.
 
@@ -61,12 +74,12 @@ impl<N: Network, E: Environment> Node<N, E> {
         let listener = tokio::net::TcpListener::bind(cli.node).await?;
 
         // Handle incoming connections.
-        let _handle_listener = handle_listener::<N, E>(listener, ledger.clone()).await;
+        let _handle_listener = handle_listener::<N, E>(listener, ledger.clone());
 
         // Connect to the leader node and listen for new blocks.
         let leader_addr = cli.beacon_addr;
         trace!("Connecting to '{}'...", leader_addr);
-        let _ = connect_to_leader::<N, E>(leader_addr, ledger.clone()).await;
+        let _leader_conn_task = connect_to_leader::<N, E>(leader_addr, ledger.clone());
 
         // Send pings to all peers every 10 seconds.
         let _pings = send_pings::<N>(ledger.clone());

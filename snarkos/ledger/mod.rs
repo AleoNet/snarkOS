@@ -17,7 +17,7 @@
 mod server;
 pub use server::*;
 
-use crate::{handle_dispatch_error, BlockDB, ProgramDB};
+use crate::{handle_dispatch_error, BlockDB, Data, ProgramDB};
 use snarkvm::prelude::*;
 
 use colored::Colorize;
@@ -54,7 +54,7 @@ pub struct Ledger<N: Network> {
 
 impl<N: Network> Ledger<N> {
     /// Initializes a new instance of the ledger.
-    pub async fn load(private_key: &PrivateKey<N>) -> Result<Arc<Self>> {
+    pub fn load(private_key: PrivateKey<N>) -> Result<Arc<Self>> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
@@ -65,7 +65,50 @@ impl<N: Network> Ledger<N> {
             peers: RwLock::new(IndexMap::new()),
             validators: RwLock::new(IndexSet::new()),
             server: OnceBox::new(),
-            private_key: *private_key,
+            private_key,
+            view_key,
+            address,
+        });
+
+        // Initialize the server.
+        let server = Server::<N>::start(ledger.clone())?;
+        ledger
+            .server
+            .set(Box::new(server))
+            .map_err(|_| anyhow!("Failed to save the server"))?;
+
+        // Return the ledger.
+        Ok(ledger)
+    }
+
+    /// Initializes a new instance of the ledger.
+    pub(super) fn new_with_genesis(private_key: PrivateKey<N>, genesis_block: Block<N>) -> Result<Arc<Self>> {
+        // Derive the view key and address.
+        let view_key = ViewKey::try_from(private_key)?;
+        let address = Address::try_from(&view_key)?;
+
+        // Initialize the internal ledger.
+        let internal_ledger = match InternalLedger::new_with_genesis(&genesis_block, genesis_block.signature().to_address()) {
+            Ok(ledger) => ledger,
+            Err(_) => {
+                let ledger = InternalLedger::open()?;
+
+                // Check if the ledger contains the correct genesis block.
+                if !ledger.contains_block_hash(&genesis_block.hash())? {
+                    bail!("Genesis block mismatch (please remove the existing ledger and try again)")
+                }
+
+                ledger
+            }
+        };
+
+        // Initialize the ledger.
+        let ledger = Arc::new(Self {
+            ledger: RwLock::new(internal_ledger),
+            peers: Default::default(),
+            validators: Default::default(),
+            server: OnceBox::new(),
+            private_key,
             view_key,
             address,
         });
@@ -120,12 +163,17 @@ impl<N: Network> Ledger<N> {
         .await??;
 
         // Add the next block to the ledger.
-        self.add_next_block(&next_block).await?;
+        self.add_next_block(next_block.clone()).await?;
+
+        // Serialize the block ahead of time to not do it for each peer.
+        let serialized_block = Data::Object(next_block.clone()).serialize().await?;
 
         // Broadcast the block to all peers.
         let peers = self.peers().read().clone();
         for (_, sender) in peers.iter() {
-            let _ = sender.send(crate::Message::<N>::BlockBroadcast(next_block.clone())).await;
+            let _ = sender
+                .send(crate::Message::<N>::BlockBroadcast(Data::Buffer(serialized_block.clone())))
+                .await;
         }
 
         // Return the next block.
@@ -133,11 +181,10 @@ impl<N: Network> Ledger<N> {
     }
 
     /// Attempts to add the given block to the ledger.
-    pub(crate) async fn add_next_block(self: &Arc<Self>, next_block: &Block<N>) -> Result<()> {
+    pub(crate) async fn add_next_block(self: &Arc<Self>, next_block: Block<N>) -> Result<()> {
         // Add the next block to the ledger.
         let self_clone = self.clone();
-        let next_block_clone = next_block.clone();
-        if let Err(error) = task::spawn_blocking(move || self_clone.ledger.write().add_next_block(&next_block_clone)).await? {
+        if let Err(error) = task::spawn_blocking(move || self_clone.ledger.write().add_next_block(&next_block)).await? {
             // Log the error.
             warn!("{error}");
             return Err(error);
@@ -227,7 +274,7 @@ impl<N: Network> Ledger<N> {
 // Internal operations.
 impl<N: Network> Ledger<N> {
     /// Syncs the ledger with the network.
-    pub(crate) async fn initial_sync_with_network(self: &Arc<Self>, leader_ip: &IpAddr) -> Result<()> {
+    pub(crate) async fn initial_sync_with_network(self: &Arc<Self>, leader_ip: IpAddr) -> Result<()> {
         /// The number of concurrent requests with the network.
         const CONCURRENT_REQUESTS: usize = 100;
         /// Url to fetch the blocks from.
