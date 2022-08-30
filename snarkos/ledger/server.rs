@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Ledger;
-use snarkvm::prelude::{Deployment, Field, Network, RecordsFilter, Transaction, ViewKey, U64, AdditionalFee};
+use snarkvm::prelude::{Deployment, Field, Network, RecordsFilter, Transaction, ViewKey, U64, AdditionalFee, Execution};
 
 use anyhow::Result;
 use core::marker::PhantomData;
@@ -196,14 +196,23 @@ impl<N: Network> Server<N> {
             .and(with(ledger_sender.clone()))
             .and_then(Self::transaction_broadcast);
 
-        // POST /testnet3/program/deploy
+        // POST /testnet3/deploy
         let deploy_program = warp::post()
             .and(warp::path!("testnet3" / "deploy"))
             .and(warp::body::content_length_limit(10 * 1024 * 1024))
             .and(warp::body::json())
+            .and(with(ledger.clone()))
+            .and(with(ledger_sender.clone()))
+            .and_then(Self::deploy_program);
+
+        // POST /testnet3/execute
+        let execute_program = warp::post()
+            .and(warp::path!("testnet3" / "execute"))
+            .and(warp::body::content_length_limit(10 * 1024 * 1024))
+            .and(warp::body::json())
             .and(with(ledger))
             .and(with(ledger_sender))
-            .and_then(Self::deploy_program);
+            .and_then(Self::execute_program);
 
         // Return the list of routes.
         latest_height
@@ -220,6 +229,7 @@ impl<N: Network> Server<N> {
             .or(get_transaction)
             .or(transaction_broadcast)
             .or(deploy_program)
+            .or(execute_program)
     }
 
     /// Initializes a ledger handler.
@@ -355,6 +365,26 @@ impl<N: Network> Server<N> {
         match ledger_sender.send(LedgerRequest::TransactionBroadcast(transaction)).await {
             Ok(()) => Ok(reply::with_status(
                 reply::json(&json!({ "deployment": deployment })),
+                StatusCode::OK,
+            )),
+            Err(error) => Err(reject::custom(ServerError::Request(format!("{error}")))),
+        }
+    }
+
+    /// Send a program execution transaction to the ledger
+    async fn execute_program(
+        execution: Execution<N>,
+        ledger: Arc<Ledger<N>>,
+        ledger_sender: LedgerSender<N>,
+    ) -> Result<impl Reply, Rejection> {
+        let additional_fee = Self::execute_additional_fee(ledger)?;
+
+        // Create the transaction.
+        let transaction = Transaction::from_execution(execution.clone(), Some(additional_fee)).or_reject()?;
+        // Send the transaction to the ledger.
+        match ledger_sender.send(LedgerRequest::TransactionBroadcast(transaction)).await {
+            Ok(()) => Ok(reply::with_status(
+                reply::json(&json!({ "execution": execution })),
                 StatusCode::OK,
             )),
             Err(error) => Err(reject::custom(ServerError::Request(format!("{error}")))),
