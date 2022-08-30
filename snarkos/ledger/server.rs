@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Ledger;
-use snarkvm::prelude::{Deployment, Field, Network, RecordsFilter, Transaction, ViewKey, U64, AdditionalFee, Execution};
+use snarkvm::prelude::{AdditionalFee, Deployment, Execution, Field, Network, RecordsFilter, Transaction, ViewKey, U64};
 
 use anyhow::Result;
 use core::marker::PhantomData;
@@ -377,10 +377,7 @@ impl<N: Network> Server<N> {
         let additional_fee = Self::execute_additional_fee(ledger)?;
         let transaction = Transaction::from_execution(execution.clone(), Some(additional_fee)).or_reject()?;
         match ledger_sender.send(LedgerRequest::TransactionBroadcast(transaction)).await {
-            Ok(()) => Ok(reply::with_status(
-                reply::json(&json!({ "execution": execution })),
-                StatusCode::OK,
-            )),
+            Ok(()) => Ok(reply::with_status(reply::json(&json!({ "execution": execution })), StatusCode::OK)),
             Err(error) => Err(reject::custom(ServerError::Request(format!("{error}")))),
         }
     }
@@ -410,5 +407,4 @@ impl<N: Network> Server<N> {
             .map(|(_, additional_fee)| additional_fee)
             .or_reject()
     }
-
 }
