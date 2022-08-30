@@ -196,7 +196,7 @@ impl<N: Network> Server<N> {
             .and(with(ledger_sender.clone()))
             .and_then(Self::transaction_broadcast);
 
-        // POST /testnet3/program/deploy
+        // POST /testnet3/deploy
         let deploy_program = warp::post()
             .and(warp::path!("testnet3" / "deploy"))
             .and(warp::body::content_length_limit(10 * 1024 * 1024))
@@ -341,7 +341,7 @@ impl<N: Network> Server<N> {
         }
     }
 
-    /// Broadcasts the transaction to the ledger.
+    /// Creates a deployment transaction and broadcasts the transaction to the ledger.
     async fn deploy_program(
         deployment: Deployment<N>,
         ledger: Arc<Ledger<N>>,
