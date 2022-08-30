@@ -41,7 +41,7 @@ impl<N: Network, E: Environment> Node<N, E> {
                 // Initialize the ledger.
                 let ledger = Ledger::<N>::load(*account.private_key())?;
                 // Sync the ledger with the network.
-                ledger.initial_sync_with_network(&cli.beacon_addr.ip()).await?;
+                ledger.initial_sync_with_network(cli.beacon_addr.ip()).await?;
 
                 ledger
             }
@@ -60,12 +60,12 @@ impl<N: Network, E: Environment> Node<N, E> {
         let listener = tokio::net::TcpListener::bind(cli.node).await?;
 
         // Handle incoming connections.
-        let _handle_listener = handle_listener::<N>(listener, ledger.clone()).await;
+        let _handle_listener = handle_listener::<N>(listener, ledger.clone());
 
         // Connect to the leader node and listen for new blocks.
         let leader_addr = cli.beacon_addr;
         trace!("Connecting to '{}'...", leader_addr);
-        let _ = connect_to_leader::<N>(leader_addr, ledger.clone()).await;
+        let _leader_conn_task = connect_to_leader::<N>(leader_addr, ledger.clone());
 
         // Send pings to all peers every 10 seconds.
         let _pings = send_pings::<N>(ledger.clone());
