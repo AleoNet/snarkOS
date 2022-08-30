@@ -351,17 +351,14 @@ impl<N: Network> Server<N> {
         }
     }
 
-    /// Broadcasts the transaction to the ledger.
+    /// Send a program deployment transaction to the ledger
     async fn deploy_program(
         deployment: Deployment<N>,
         ledger: Arc<Ledger<N>>,
         ledger_sender: LedgerSender<N>,
     ) -> Result<impl Reply, Rejection> {
         let additional_fee = Self::execute_additional_fee(ledger)?;
-
-        // Create the transaction.
         let transaction = Transaction::from_deployment(deployment.clone(), additional_fee).or_reject()?;
-        // Send the transaction to the ledger.
         match ledger_sender.send(LedgerRequest::TransactionBroadcast(transaction)).await {
             Ok(()) => Ok(reply::with_status(
                 reply::json(&json!({ "deployment": deployment })),
