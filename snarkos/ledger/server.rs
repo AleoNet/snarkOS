@@ -197,7 +197,7 @@ impl<N: Network> Server<N> {
 
         // GET /testnet3/program/program_id
         let get_program = warp::get()
-            .and(warp::path!("testnet3" / "program" / String))
+            .and(warp::path!("testnet3" / "program" / u32))
             .and(warp::body::content_length_limit(128))
             .and(with(ledger.clone()))
             .and_then(Self::get_program);
@@ -281,7 +281,7 @@ impl<N: Network> Server<N> {
     }
 
     /// Returns the program with the given id
-    async fn get_program(program_id: String, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+    async fn get_program(program_id: u32, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.ledger.read().get_program(program_id).or_reject()?))
     }
 
