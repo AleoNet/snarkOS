@@ -198,7 +198,6 @@ impl<N: Network> Server<N> {
         // GET /testnet3/program/program_id
         let get_program = warp::get()
             .and(warp::path!("testnet3" / "program" / u32))
-            .and(warp::body::content_length_limit(128))
             .and(with(ledger.clone()))
             .and_then(Self::get_program);
 
