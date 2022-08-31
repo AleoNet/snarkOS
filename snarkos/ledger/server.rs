@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Ledger;
-use snarkvm::prelude::{Field, Network, RecordsFilter, Transaction, ViewKey};
+use snarkvm::prelude::{Field, Network, RecordsFilter, Transaction, ViewKey, ProgramID};
 
 use anyhow::Result;
 use core::marker::PhantomData;
@@ -184,7 +184,7 @@ impl<N: Network> Server<N> {
             .and(warp::path!("testnet3" / "transaction" / ..))
             .and(warp::path::param::<N::TransactionID>())
             .and(warp::path::end())
-            .and(with(ledger))
+            .and(with(ledger.clone()))
             .and_then(Self::get_transaction);
 
         // POST /testnet3/transaction/broadcast
@@ -194,6 +194,14 @@ impl<N: Network> Server<N> {
             .and(warp::body::json())
             .and(with(ledger_sender))
             .and_then(Self::transaction_broadcast);
+        
+        // GET /testnet3/program/{id}
+        let get_program = warp::get()
+            // TODO: can I receive a ProgramID<N> here?
+            .and(warp::path!("testnet3" / "program" / String))
+            .and(warp::path::end())
+            .and(with(ledger))
+            .and_then(Self::get_program);
 
         // Return the list of routes.
         latest_height
@@ -209,6 +217,7 @@ impl<N: Network> Server<N> {
             .or(get_transactions)
             .or(get_transaction)
             .or(transaction_broadcast)
+            .or(get_program)
     }
 
     /// Initializes a ledger handler.
@@ -328,5 +337,10 @@ impl<N: Network> Server<N> {
             Ok(()) => Ok("OK"),
             Err(error) => Err(reject::custom(ServerError::Request(format!("{error}")))),
         }
+    }
+
+    /// Returns the program for the given program ID.
+    async fn get_program(program_id: String, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.ledger.read().get_program(program_id).or_reject()?))
     }
 }
