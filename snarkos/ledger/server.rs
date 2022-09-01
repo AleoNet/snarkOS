@@ -195,7 +195,7 @@ impl<N: Network> Server<N> {
             .and(with(ledger_sender.clone()))
             .and_then(Self::transaction_broadcast);
 
-        // GET /testnet3/program/program_id
+        // GET /testnet3/program/{id}
         let get_program = warp::get()
             .and(warp::path!("testnet3" / "program" / u32))
             .and(with(ledger.clone()))
