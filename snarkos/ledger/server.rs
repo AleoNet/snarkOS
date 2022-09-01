@@ -195,13 +195,13 @@ impl<N: Network> Server<N> {
             .and(with(ledger_sender.clone()))
             .and_then(Self::transaction_broadcast);
 
-        // GET /testnet3/program/{id}
-        let get_program = warp::get()
-            .and(warp::path!("testnet3" / "program" / ..))
-            .and(warp::path::param::<ProgramID<N>>())
-            .and(warp::path::end())
-            .and(with(ledger.clone()))
-            .and_then(Self::get_program);
+        // // GET /testnet3/program/{id}
+        // let get_program = warp::get()
+        //     .and(warp::path!("testnet3" / "program" / ..))
+        //     .and(warp::path::param::<ProgramID<N>>())
+        //     .and(warp::path::end())
+        //     .and(with(ledger.clone()))
+        //     .and_then(Self::get_program);
 
         // POST /testnet3/deploy
         let deploy_program = warp::post()
@@ -237,7 +237,7 @@ impl<N: Network> Server<N> {
             .or(transaction_broadcast)
             .or(deploy_program)
             .or(execute_program)
-            .or(get_program)
+            //.or(get_program)
     }
 
     /// Initializes a ledger handler.
@@ -281,10 +281,10 @@ impl<N: Network> Server<N> {
         Ok(reply::json(&ledger.ledger.read().get_block(height).or_reject()?))
     }
 
-    /// Returns the program with the given id
-    async fn get_program(program_id: ProgramID<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.ledger.read().get_program(program_id).or_reject()?))
-    }
+    // /// Returns the program with the given id
+    // async fn get_program(program_id: ProgramID<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+    //     Ok(reply::json(&ledger.ledger.read().get_program(program_id).or_reject()?))
+    // }
 
     /// Returns the state path for the given commitment.
     async fn state_path(commitment: Field<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
