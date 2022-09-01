@@ -162,6 +162,15 @@ impl<N: Network> Server<N> {
             .and(with(ledger.clone()))
             .and_then(Self::records_unspent);
 
+        let ciphertext_unspent = warp::get()
+            .and(warp::path!("testnet3" / "ciphertext" / ..))
+            .and(warp::path::param::<Field<N>>())
+            .and(warp::path::end())
+            .and(warp::body::content_length_limit(128))
+            .and(warp::body::json())
+            .and(with(ledger.clone()))
+            .and_then(Self::get_unspent_ciphertext);
+
         // GET /testnet3/peers/count
         let peers_count = warp::get()
             .and(warp::path!("testnet3" / "peers" / "count"))
