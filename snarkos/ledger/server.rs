@@ -19,7 +19,8 @@ use anyhow::Result;
 use core::marker::PhantomData;
 use indexmap::IndexMap;
 use serde_json::json;
-use snarkvm::prelude::{AdditionalFee, Deployment, Execution, Field, Network, ProgramID, RecordsFilter, Transaction, ViewKey, U64};use std::sync::Arc;
+use snarkvm::prelude::{AdditionalFee, Deployment, Execution, Field, Network, ProgramID, RecordsFilter, Transaction, ViewKey, U64};
+use std::sync::Arc;
 use tokio::{sync::mpsc, task::JoinHandle};
 use warp::{http::StatusCode, reject, reply, Filter, Rejection, Reply};
 
@@ -194,10 +195,11 @@ impl<N: Network> Server<N> {
             .and(with(ledger_sender.clone()))
             .and_then(Self::transaction_broadcast);
 
-        // GET /testnet3/program/program_id
+        // GET /testnet3/program/{id}
         let get_program = warp::get()
-            .and(warp::path!("testnet3" / "program" / String))
-            .and(warp::body::content_length_limit(128))
+            .and(warp::path!("testnet3" / "program" / ..))
+            .and(warp::path::param::<ProgramID<N>>())
+            .and(warp::path::end())
             .and(with(ledger.clone()))
             .and_then(Self::get_program);
 
