@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Ledger;
-use snarkvm::prelude::{AdditionalFee, Deployment, Execution, Field, Network, RecordsFilter, Transaction, ViewKey, U64};
+use snarkvm::prelude::{AdditionalFee, Deployment, Execution, Field, Network, ProgramID, RecordsFilter, Transaction, ViewKey, U64};
 
 use anyhow::Result;
 use core::marker::PhantomData;
@@ -196,6 +196,14 @@ impl<N: Network> Server<N> {
             .and(with(ledger_sender.clone()))
             .and_then(Self::transaction_broadcast);
 
+        // GET /testnet3/program/{id}
+        let get_program = warp::get()
+            .and(warp::path!("testnet3" / "program" / ..))
+            .and(warp::path::param::<ProgramID<N>>())
+            .and(warp::path::end())
+            .and(with(ledger.clone()))
+            .and_then(Self::get_program);
+
         // POST /testnet3/program/deploy
         let deploy_program = warp::post()
             .and(warp::path!("testnet3" / "program" / "deploy"))
@@ -230,6 +238,7 @@ impl<N: Network> Server<N> {
             .or(transaction_broadcast)
             .or(deploy_program)
             .or(execute_program)
+            .or(get_program)
     }
 
     /// Initializes a ledger handler.
@@ -271,6 +280,11 @@ impl<N: Network> Server<N> {
     /// Returns the block for the given block height.
     async fn get_block(height: u32, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.ledger.read().get_block(height).or_reject()?))
+    }
+
+    /// Returns the program with the given id
+    async fn get_program(program_id: ProgramID<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.ledger.read().get_program(program_id).or_reject()?))
     }
 
     /// Returns the state path for the given commitment.
