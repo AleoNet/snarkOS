@@ -365,7 +365,7 @@ impl<N: Network> Server<N> {
         }
     }
 
-    /// Send a program deployment transaction to the ledger
+    /// Creates a deployment transaction and broadcasts the transaction to the ledger.
     async fn deploy_program(
         deployment: Deployment<N>,
         ledger: Arc<Ledger<N>>,
