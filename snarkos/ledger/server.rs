@@ -204,18 +204,18 @@ impl<N: Network> Server<N> {
             .and(with(ledger.clone()))
             .and_then(Self::get_program);
 
-        // POST /testnet3/deploy
+        // POST /testnet3/program/deploy
         let deploy_program = warp::post()
-            .and(warp::path!("testnet3" / "deploy"))
+            .and(warp::path!("testnet3" / "program" / "deploy"))
             .and(warp::body::content_length_limit(10 * 1024 * 1024))
             .and(warp::body::json())
             .and(with(ledger.clone()))
             .and(with(ledger_sender.clone()))
             .and_then(Self::deploy_program);
 
-        // POST /testnet3/execute
+        // POST /testnet3/program/execute
         let execute_program = warp::post()
-            .and(warp::path!("testnet3" / "execute"))
+            .and(warp::path!("testnet3" / "program" / "execute"))
             .and(warp::body::content_length_limit(10 * 1024 * 1024))
             .and(warp::body::json())
             .and(with(ledger))
