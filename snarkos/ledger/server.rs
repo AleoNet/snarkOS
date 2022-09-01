@@ -19,7 +19,7 @@ use anyhow::Result;
 use core::marker::PhantomData;
 use indexmap::IndexMap;
 use serde_json::json;
-use snarkvm::prelude::{AdditionalFee, Deployment, Execution, Field, Network, RecordsFilter, Transaction, ViewKey, U64};
+use snarkvm::prelude::{AdditionalFee, Deployment, Execution, Field, Network, ProgramID, RecordsFilter, Transaction, ViewKey, U64};
 use std::sync::Arc;
 use tokio::{sync::mpsc, task::JoinHandle};
 use warp::{http::StatusCode, reject, reply, Filter, Rejection, Reply};
@@ -197,7 +197,9 @@ impl<N: Network> Server<N> {
 
         // GET /testnet3/program/{id}
         let get_program = warp::get()
-            .and(warp::path!("testnet3" / "program" / u32))
+            .and(warp::path!("testnet3" / "program" / ..))
+            .and(warp::path::param::<ProgramID<N>>())
+            .and(warp::path::end())
             .and(with(ledger.clone()))
             .and_then(Self::get_program);
 
@@ -280,7 +282,7 @@ impl<N: Network> Server<N> {
     }
 
     /// Returns the program with the given id
-    async fn get_program(program_id: u32, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+    async fn get_program(program_id: ProgramID<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.ledger.read().get_program(program_id).or_reject()?))
     }
 
