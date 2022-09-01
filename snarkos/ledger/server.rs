@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Ledger;
-use snarkvm::prelude::{Deployment, Field, Network, RecordsFilter, Transaction, ViewKey, U64};
+use snarkvm::prelude::{AdditionalFee, Deployment, Execution, Field, Network, ProgramID, RecordsFilter, Transaction, ViewKey, U64};
 
 use anyhow::Result;
 use core::marker::PhantomData;
@@ -196,14 +196,31 @@ impl<N: Network> Server<N> {
             .and(with(ledger_sender.clone()))
             .and_then(Self::transaction_broadcast);
 
-        // POST /testnet3/deploy
+        // GET /testnet3/program/{id}
+        let get_program = warp::get()
+            .and(warp::path!("testnet3" / "program" / ..))
+            .and(warp::path::param::<ProgramID<N>>())
+            .and(warp::path::end())
+            .and(with(ledger.clone()))
+            .and_then(Self::get_program);
+
+        // POST /testnet3/program/deploy
         let deploy_program = warp::post()
-            .and(warp::path!("testnet3" / "deploy"))
+            .and(warp::path!("testnet3" / "program" / "deploy"))
+            .and(warp::body::content_length_limit(10 * 1024 * 1024))
+            .and(warp::body::json())
+            .and(with(ledger.clone()))
+            .and(with(ledger_sender.clone()))
+            .and_then(Self::deploy_program);
+
+        // POST /testnet3/program/execute
+        let execute_program = warp::post()
+            .and(warp::path!("testnet3" / "program" / "execute"))
             .and(warp::body::content_length_limit(10 * 1024 * 1024))
             .and(warp::body::json())
             .and(with(ledger))
             .and(with(ledger_sender))
-            .and_then(Self::deploy_program);
+            .and_then(Self::execute_program);
 
         // Return the list of routes.
         latest_height
@@ -220,6 +237,8 @@ impl<N: Network> Server<N> {
             .or(get_transaction)
             .or(transaction_broadcast)
             .or(deploy_program)
+            .or(execute_program)
+            .or(get_program)
     }
 
     /// Initializes a ledger handler.
@@ -261,6 +280,11 @@ impl<N: Network> Server<N> {
     /// Returns the block for the given block height.
     async fn get_block(height: u32, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.ledger.read().get_block(height).or_reject()?))
+    }
+
+    /// Returns the program with the given id
+    async fn get_program(program_id: ProgramID<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.ledger.read().get_program(program_id).or_reject()?))
     }
 
     /// Returns the state path for the given commitment.
@@ -347,11 +371,36 @@ impl<N: Network> Server<N> {
         ledger: Arc<Ledger<N>>,
         ledger_sender: LedgerSender<N>,
     ) -> Result<impl Reply, Rejection> {
-        // Fetch the unspent records.
+        let additional_fee = Self::execute_additional_fee(ledger)?;
+        let transaction = Transaction::from_deployment(deployment.clone(), additional_fee).or_reject()?;
+        match ledger_sender.send(LedgerRequest::TransactionBroadcast(transaction)).await {
+            Ok(()) => Ok(reply::with_status(
+                reply::json(&json!({ "deployment": deployment })),
+                StatusCode::OK,
+            )),
+            Err(error) => Err(reject::custom(ServerError::Request(format!("{error}")))),
+        }
+    }
+
+    /// Send a program execution transaction to the ledger
+    async fn execute_program(
+        execution: Execution<N>,
+        ledger: Arc<Ledger<N>>,
+        ledger_sender: LedgerSender<N>,
+    ) -> Result<impl Reply, Rejection> {
+        let additional_fee = Self::execute_additional_fee(ledger)?;
+        let transaction = Transaction::from_execution(execution.clone(), Some(additional_fee)).or_reject()?;
+        match ledger_sender.send(LedgerRequest::TransactionBroadcast(transaction)).await {
+            Ok(()) => Ok(reply::with_status(reply::json(&json!({ "execution": execution })), StatusCode::OK)),
+            Err(error) => Err(reject::custom(ServerError::Request(format!("{error}")))),
+        }
+    }
+
+    /// Spends the record with the smallest value with at least `1 gate` as a transaction fee.
+    fn execute_additional_fee(ledger: Arc<Ledger<N>>) -> Result<AdditionalFee<N>, Rejection> {
         let records = ledger.find_unspent_records().or_reject()?;
 
-        // Prepare the additional fee.
-        // Spends the record with the smallest value with at least `1 gate`.
+        // Get smallest record with at least 1 gate
         let one_gate = U64::new(1u64);
         let credits = records
             .values()
@@ -360,24 +409,15 @@ impl<N: Network> Server<N> {
             .unwrap()
             .clone();
 
-        // Get the additional fee in gates.
         let additional_fee_in_gates = credits.gates().clone();
-        // Create the additional fee.
-        let (_, additional_fee) = ledger
+
+        // Create the additional fee
+        ledger
             .ledger
             .read()
             .vm()
             .execute_additional_fee(&ledger.private_key, credits, **additional_fee_in_gates, &mut rand::thread_rng())
-            .or_reject()?;
-        // Create the transaction.
-        let transaction = Transaction::from_deployment(deployment.clone(), additional_fee).or_reject()?;
-        // Send the transaction to the ledger.
-        match ledger_sender.send(LedgerRequest::TransactionBroadcast(transaction)).await {
-            Ok(()) => Ok(reply::with_status(
-                reply::json(&json!({ "deployment": deployment })),
-                StatusCode::OK,
-            )),
-            Err(error) => Err(reject::custom(ServerError::Request(format!("{error}")))),
-        }
+            .map(|(_, additional_fee)| additional_fee)
+            .or_reject()
     }
 }
