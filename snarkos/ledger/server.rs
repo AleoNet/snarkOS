@@ -353,7 +353,8 @@ impl<N: Network> Server<N> {
             .read()
             .find_record_ciphertexts(&view_key, RecordsFilter::Unspent)
             .or_reject()?
-            .find(|(record_commitment, _)| *record_commitment == commitment) {
+            .find(|(record_commitment, _)| *record_commitment == commitment)
+        {
             Ok(reply::with_status(reply::json(&*record_ciphertext), StatusCode::OK))
         } else {
             Err(warp::reject::not_found())
