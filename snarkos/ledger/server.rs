@@ -164,7 +164,7 @@ impl<N: Network> Server<N> {
 
         // GET /testnet3/ciphertext/unspent/{commitment}
         let get_unspent_ciphertext = warp::get()
-            .and(warp::path!("testnet3" / "ciphertext" / ..))
+            .and(warp::path!("testnet3" / "ciphertext" / "unspent" / ..))
             .and(warp::path::param::<Field<N>>())
             .and(warp::path::end())
             .and(warp::body::content_length_limit(128))
