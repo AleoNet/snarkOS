@@ -373,9 +373,10 @@ impl<N: Network> Server<N> {
     ) -> Result<impl Reply, Rejection> {
         let additional_fee = Self::execute_additional_fee(ledger)?;
         let transaction = Transaction::from_deployment(deployment.clone(), additional_fee).or_reject()?;
+        let transaction_id = transaction.id().to_string();
         match ledger_sender.send(LedgerRequest::TransactionBroadcast(transaction)).await {
             Ok(()) => Ok(reply::with_status(
-                reply::json(&json!({ "deployment": deployment })),
+                reply::json(&json!({ "deployment": deployment , "transaction_id": transaction_id})),
                 StatusCode::OK,
             )),
             Err(error) => Err(reject::custom(ServerError::Request(format!("{error}")))),
