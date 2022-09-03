@@ -82,7 +82,7 @@ impl<N: Network> Ledger<N> {
     }
 
     /// Initializes a new instance of the ledger.
-    pub(super) fn new_with_genesis(private_key: PrivateKey<N>, genesis_block: Block<N>) -> Result<Arc<Self>> {
+    pub fn new_with_genesis(private_key: PrivateKey<N>, genesis_block: Block<N>) -> Result<Arc<Self>> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
@@ -125,22 +125,22 @@ impl<N: Network> Ledger<N> {
     }
 
     /// Returns the ledger.
-    pub(super) const fn ledger(&self) -> &RwLock<InternalLedger<N>> {
+    pub const fn ledger(&self) -> &RwLock<InternalLedger<N>> {
         &self.ledger
     }
 
     /// Returns the connected peers.
-    pub(super) const fn peers(&self) -> &RwLock<IndexMap<SocketAddr, crate::Sender<N>>> {
+    pub const fn peers(&self) -> &RwLock<IndexMap<SocketAddr, crate::Sender<N>>> {
         &self.peers
     }
 
     /// Returns the validators.
-    pub(super) const fn validators(&self) -> &RwLock<IndexSet<SocketAddr>> {
+    pub const fn validators(&self) -> &RwLock<IndexSet<SocketAddr>> {
         &self.validators
     }
 
     /// Returns the address.
-    pub(super) const fn address(&self) -> &Address<N> {
+    pub const fn address(&self) -> &Address<N> {
         &self.address
     }
 }
