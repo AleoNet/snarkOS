@@ -90,7 +90,7 @@ impl<N: Network, E: Environment> Node<N, E> {
         };
 
         // Initialize a new instance for managing the prover.
-        let (prover, prover_handler) = Prover::new(node.ledger().clone());
+        let (prover, prover_handler) = Prover::new(node.ledger().clone())?;
 
         // Initialize the prover.
         node.initialize_prover(prover, prover_handler).await;

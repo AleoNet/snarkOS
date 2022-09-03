@@ -14,7 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm::prelude::*;
+use snarkvm::{
+    compiler::{CoinbasePuzzle, CoinbasePuzzleProvingKey, CoinbasePuzzleVerifyingKey},
+    prelude::*,
+};
 
 use crate::{
     environment::{
@@ -22,6 +25,7 @@ use crate::{
         Environment,
     },
     network::Message,
+    Data,
     Ledger,
 };
 
@@ -49,24 +53,35 @@ pub struct Prover<N: Network, E: Environment> {
     router: ProverRouter,
     /// The shared ledger state of the owned node.
     ledger: Arc<Ledger<N>>,
+    // TODO (raych86): Use a OnceBox and do not load if the node is not a prover.
+    /// The coinbase puzzle proving key.
+    coinbase_puzzle_proving_key: Arc<CoinbasePuzzleProvingKey<N>>,
+    /// The coinbase puzzle verifying key.
+    coinbase_puzzle_verifying_key: Arc<CoinbasePuzzleVerifyingKey<N>>,
     /// PhantomData.
     _phantom: PhantomData<(N, E)>,
 }
 
 impl<N: Network, E: Environment> Prover<N, E> {
     /// Initialize a new instance of hte prover, paired with its handler.
-    pub fn new(ledger: Arc<Ledger<N>>) -> (Self, ProverHandler) {
+    pub fn new(ledger: Arc<Ledger<N>>) -> Result<(Self, ProverHandler)> {
         // Initialize an mpsc channel for sending requests to the `Prover` struct.
         let (router, handler) = mpsc::channel(1024);
+
+        // Load the coinbase puzzle proving and verifying key.
+        let (coinbase_puzzle_proving_key, coinbase_puzzle_verifying_key) =
+            CoinbasePuzzle::<N>::load().map(|(proving_key, verifying_key)| (Arc::new(proving_key), Arc::new(verifying_key)))?;
 
         // Initialize the prover.
         let prover = Self {
             router,
             ledger,
+            coinbase_puzzle_proving_key,
+            coinbase_puzzle_verifying_key,
             _phantom: PhantomData,
         };
 
-        (prover, handler)
+        Ok((prover, handler))
     }
 
     // TODO (raychu86): This operation is done independently. Need to evaluate if the provers should be
@@ -77,6 +92,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
             // Initialize the prover process.
             let (router, handler) = oneshot::channel();
             let ledger = self.ledger.clone();
+            let proving_key = self.coinbase_puzzle_proving_key.clone();
             E::resources().register_task(
                 None,
                 tokio::spawn(async move {
@@ -91,21 +107,37 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             E::status().update(Status::Proving);
 
                             let ledger = ledger.clone();
+                            let proving_key = proving_key.clone();
 
                             // Craft a coinbase proof.
                             let proving_task_id = E::resources().procure_id();
                             E::resources().register_task(
                                 Some(proving_task_id),
                                 tokio::spawn(async move {
-                                    // TODO (raychu86): Use an actual coinbase proof.
                                     // Construct a coinbase proof.
-                                    let height = ledger.ledger().read().latest_height() + 1;
-                                    let round = ledger.ledger().read().latest_round() + 1;
-                                    let address = ledger.address();
-                                    let coinbase_puzzle = crate::CoinbasePuzzle {
-                                        address: *address,
-                                        height,
-                                        round,
+                                    let epoch_info = ledger.ledger().read().get_epoch_info();
+                                    let epoch_challenge = match ledger.ledger().read().get_epoch_challenge() {
+                                        Ok(challenge) => challenge,
+                                        Err(error) => {
+                                            warn!("Failed to get epoch challenge: {}", error);
+                                            return;
+                                        }
+                                    };
+
+                                    let nonce = u64::rand(&mut ::rand::thread_rng());
+
+                                    let coinbase_proof = match CoinbasePuzzle::<N>::prove(
+                                        &proving_key,
+                                        &epoch_info,
+                                        &epoch_challenge,
+                                        ledger.address(),
+                                        nonce,
+                                    ) {
+                                        Ok(proof) => proof,
+                                        Err(error) => {
+                                            warn!("Failed to generate coinbase proof: {}", error);
+                                            return;
+                                        }
                                     };
 
                                     // Send the coinbase proof to the validators.
@@ -115,7 +147,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                     for socket_addr in validators.iter() {
                                         match peers.get(socket_addr) {
                                             Some(sender) => {
-                                                let _ = sender.send(Message::<N>::CoinbasePuzzle(coinbase_puzzle)).await;
+                                                let _ = sender.send(Message::<N>::ProverSolution(Data::Object(coinbase_proof))).await;
                                             }
                                             None => {
                                                 warn!("Error finding validator '{}' in peers list", socket_addr);
