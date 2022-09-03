@@ -17,7 +17,10 @@
 mod message;
 pub use message::*;
 
-use crate::{environment::Environment, Ledger};
+use crate::{
+    environment::{helpers::NodeType, Environment},
+    Ledger,
+};
 
 use snarkvm::prelude::*;
 
@@ -206,16 +209,18 @@ pub(crate) async fn handle_peer<N: Network, E: Environment>(
                             }
                         },
                         Message::ProverSolution(prover_solution_bytes) => {
-                            // Perform deferred deserialization.
-                            let prover_solution = prover_solution_bytes.clone().deserialize().await?;
+                            if E::NODE_TYPE == NodeType::Beacon || E::NODE_TYPE == NodeType::Validator {
+                                // Perform deferred deserialization.
+                                let prover_solution = prover_solution_bytes.clone().deserialize().await?;
 
-                            // Attempt to insert the prover puzzle solution into the mempool.
-                            if let Err(err) = ledger.add_to_prover_puzzle_memory_pool(prover_solution) {
-                                trace!(
-                                    "Failed to add prover solution {} to mempool: {:?}",
-                                    prover_solution.commitment().0,
-                                    err
-                                );
+                                // Attempt to insert the prover puzzle solution into the mempool.
+                                if let Err(err) = ledger.add_to_prover_puzzle_memory_pool(prover_solution) {
+                                    trace!(
+                                        "Failed to add prover solution {} to mempool: {:?}",
+                                        prover_solution.commitment().0,
+                                        err
+                                    );
+                                }
                             }
                         }
                     }
