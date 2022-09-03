@@ -14,43 +14,12 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm::prelude::*;
+use snarkvm::{compiler::ProverPuzzleSolution, prelude::*};
 
 use ::bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::marker::PhantomData;
 use tokio::task;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
-
-/// A mock Coinbase puzzle object (address, block height, round number).
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct CoinbasePuzzle<N: Network> {
-    /// The address of the prover.
-    pub address: Address<N>,
-    /// The height of the block where the puzzle will be included.
-    pub height: u32,
-    /// The current round number.
-    pub round: u64,
-}
-
-impl<N: Network> FromBytes for CoinbasePuzzle<N> {
-    /// Reads the message from a buffer.
-    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
-        let address = Address::<N>::read_le(&mut reader)?;
-        let height = u32::read_le(&mut reader)?;
-        let round = u64::read_le(&mut reader)?;
-
-        Ok(Self { address, height, round })
-    }
-}
-
-impl<N: Network> ToBytes for CoinbasePuzzle<N> {
-    /// Writes the message to a buffer.
-    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        self.address.write_le(&mut writer)?;
-        self.height.write_le(&mut writer)?;
-        self.round.write_le(&mut writer)
-    }
-}
 
 /// This object enables deferred deserialization / ahead-of-time serialization for objects that
 /// take a while to deserialize / serialize, in order to allow these operations to be non-blocking.
@@ -113,10 +82,8 @@ pub enum Message<N: Network> {
     TransactionBroadcast(Data<Transaction<N>>),
     /// A message containing a new block to be broadcast.
     BlockBroadcast(Data<Block<N>>),
-
-    // TODO (raychu86): Send an actual coinbase puzzle object.
-    /// A message containing a coinbase puzzle for the given block height.
-    CoinbasePuzzle(CoinbasePuzzle<N>),
+    /// A message containing a prover solution the current epoch.
+    ProverSolution(Data<ProverPuzzleSolution<N>>),
 }
 
 impl<N: Network> Message<N> {
@@ -130,7 +97,7 @@ impl<N: Network> Message<N> {
             Self::BlockResponse(..) => "BlockResponse",
             Self::TransactionBroadcast(..) => "TransactionBroadcast",
             Self::BlockBroadcast(..) => "BlockBroadcast",
-            Self::CoinbasePuzzle(..) => "CoinbasePuzzle",
+            Self::ProverSolution(..) => "ProverSolution",
         }
     }
 
@@ -144,7 +111,7 @@ impl<N: Network> Message<N> {
             Self::BlockResponse(..) => 3,
             Self::TransactionBroadcast(..) => 4,
             Self::BlockBroadcast(..) => 5,
-            Self::CoinbasePuzzle(..) => 6,
+            Self::ProverSolution(..) => 6,
         }
     }
 
@@ -159,7 +126,7 @@ impl<N: Network> Message<N> {
             Self::BlockRequest(block_height) => Ok(writer.write_all(&block_height.to_le_bytes())?),
             Self::BlockResponse(block) | Self::BlockBroadcast(block) => block.serialize_blocking_into(writer),
             Self::TransactionBroadcast(transaction) => transaction.serialize_blocking_into(writer),
-            Self::CoinbasePuzzle(coinbase_puzzle) => Ok(writer.write_all(&coinbase_puzzle.to_bytes_le()?)?),
+            Self::ProverSolution(prover_solution) => prover_solution.serialize_blocking_into(writer),
         }
     }
 
@@ -191,10 +158,7 @@ impl<N: Network> Message<N> {
             3 => Message::<N>::BlockResponse(Data::Buffer(bytes.freeze())),
             4 => Message::<N>::TransactionBroadcast(Data::Buffer(bytes.freeze())),
             5 => Message::<N>::BlockBroadcast(Data::Buffer(bytes.freeze())),
-            6 => {
-                let mut reader = bytes.reader();
-                Message::<N>::CoinbasePuzzle(CoinbasePuzzle::read_le(&mut reader)?)
-            }
+            6 => Message::<N>::ProverSolution(Data::Buffer(bytes.freeze())),
             _ => bail!("Unknown message ID"),
         };
 
