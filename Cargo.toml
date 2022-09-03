@@ -50,7 +50,7 @@ version = "2.0.2"
 
 [dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "1db1f75"
+rev = "61bd6d0"
 features = ["circuit", "console", "parallel", "utilities"]
 
 [dependencies.aleo-std]
@@ -58,7 +58,7 @@ version = "0.1.14"
 default-features = false
 
 [dependencies.anyhow]
-version = "1"
+version = "1.0.63"
 
 [dependencies.bincode]
 version = "1.0"
