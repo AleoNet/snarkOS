@@ -39,6 +39,8 @@ pub struct BlockDB<N: Network> {
     transaction_store: TransactionStore<N, TransactionDB<N>>,
     /// The signature map.
     signature_map: DataMap<N::BlockHash, Signature<N>>,
+    /// The coinbase proof map.
+    coinbase_proof_map: DataMap<N::BlockHash, CombinedPuzzleSolution<N>>,
 }
 
 #[rustfmt::skip]
@@ -51,6 +53,7 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
     type TransactionStorage = TransactionDB<N>;
     type TransitionStorage = TransitionDB<N>;
     type SignatureMap = DataMap<N::BlockHash, Signature<N>>;
+    type CoinbaseProofMap = DataMap<N::BlockHash, CombinedPuzzleSolution<N>>;
 
     /// Initializes the block storage.
     fn open() -> Result<Self> {
@@ -67,6 +70,7 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
             reverse_transactions_map: rocksdb::RocksDB::open_map(N::ID, DataID::BlockReverseTransactionsMap)?,
             transaction_store,
             signature_map: rocksdb::RocksDB::open_map(N::ID, DataID::BlockSignatureMap)?,
+            coinbase_proof_map: rocksdb::RocksDB::open_map(N::ID, DataID::BlockCoinbaseProofMap)?,
         })
     }
 
@@ -103,5 +107,10 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
     /// Returns the signature map.
     fn signature_map(&self) -> &Self::SignatureMap {
         &self.signature_map
+    }
+
+    /// Returns the coinbase proof map.
+    fn coinbase_proof_map(&self) -> &Self::CoinbaseProofMap {
+        &self.coinbase_proof_map
     }
 }
