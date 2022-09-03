@@ -151,6 +151,11 @@ impl<N: Network> Ledger<N> {
         self.ledger.write().add_to_memory_pool(transaction)
     }
 
+    /// Adds the given transaction to the memory pool.
+    pub fn add_to_prover_puzzle_memory_pool(&self, prover_puzzle_solution: ProverPuzzleSolution<N>) -> Result<()> {
+        self.ledger.write().add_to_prover_puzzle_memory_pool(prover_puzzle_solution)
+    }
+
     /// Advances the ledger to the next block.
     pub async fn advance_to_next_block(self: &Arc<Self>) -> Result<Block<N>> {
         let self_clone = self.clone();

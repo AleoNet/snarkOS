@@ -17,10 +17,7 @@
 mod message;
 pub use message::*;
 
-use crate::{
-    environment::{helpers::NodeType, Environment},
-    Ledger,
-};
+use crate::{environment::Environment, Ledger};
 
 use snarkvm::prelude::*;
 
@@ -208,11 +205,17 @@ pub(crate) async fn handle_peer<N: Network, E: Environment>(
                                 trace!("Skipping block {} (height: {})", block_hash, block_height);
                             }
                         },
-                        Message::CoinbasePuzzle(_) => {
-                            if E::NODE_TYPE == NodeType::Validator || E::NODE_TYPE == NodeType::Beacon {
-                                // TODO (raychu86): Verify the coinbase puzzle proof.
+                        Message::ProverSolution(prover_solution_bytes) => {
+                            // Perform deferred deserialization.
+                            let prover_solution = prover_solution_bytes.clone().deserialize().await?;
 
-                                // TODO (raychu86): Add the coinbase puzzle to a mempool.
+                            // Attempt to insert the prover puzzle solution into the mempool.
+                            if let Err(err) = ledger.add_to_prover_puzzle_memory_pool(prover_solution) {
+                                trace!(
+                                    "Failed to add prover solution {} to mempool: {:?}",
+                                    prover_solution.commitment().0,
+                                    err
+                                );
                             }
                         }
                     }
