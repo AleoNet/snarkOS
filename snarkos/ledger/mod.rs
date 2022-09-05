@@ -26,13 +26,15 @@ use std::{
     sync::Arc,
 };
 use tokio::task;
-use warp::{reply, Filter, Rejection};
+use warp::{reply, Filter, Rejection, Reply};
 
 pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockDB<N>, ProgramDB<N>>;
 // pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockMemory<N>, ProgramMemory<N>>;
 
 pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockDB<N>, ProgramDB<N>>;
 // pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockMemory<N>, ProgramMemory<N>>;
+
+pub(crate) type Peers<N> = Arc<RwLock<IndexMap<SocketAddr, crate::Sender<N>>>>;
 
 #[allow(dead_code)]
 pub struct Ledger<N: Network> {
@@ -41,7 +43,7 @@ pub struct Ledger<N: Network> {
     /// The server.
     server: InternalServer<N>,
     /// The peers.
-    peers: RwLock<IndexMap<SocketAddr, crate::Sender<N>>>,
+    peers: Peers<N>,
     /// The account private key.
     private_key: PrivateKey<N>,
     /// The account view key.
@@ -85,16 +87,41 @@ impl<N: Network> Ledger<N> {
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
 
+        // Initialize the peers.
+        let peers: Peers<N> = Default::default();
+
         // Initialize the additional routes.
         #[allow(clippy::let_and_return)]
         let additional_routes = {
             // GET /testnet3/node/address
             let get_node_address = warp::get()
                 .and(warp::path!("testnet3" / "node" / "address"))
-                .and(snarkvm::rest::with(address))
+                .and(with(address))
                 .and_then(|address: Address<N>| async move { Ok::<_, Rejection>(reply::json(&address.to_string())) });
 
-            get_node_address
+            // GET /testnet3/peers/count
+            let get_peers_count = warp::get()
+                .and(warp::path!("testnet3" / "peers" / "count"))
+                .and(with(peers.clone()))
+                .and_then(get_peers_count);
+
+            // GET /testnet3/peers/all
+            let get_peers_all = warp::get()
+                .and(warp::path!("testnet3" / "peers" / "all"))
+                .and(with(peers.clone()))
+                .and_then(get_peers_all);
+
+            /// Returns the number of peers connected to the node.
+            async fn get_peers_count<N: Network>(peers: Peers<N>) -> Result<impl Reply, Rejection> {
+                Ok(reply::json(&peers.read().len()))
+            }
+
+            /// Returns the peers connected to the node.
+            async fn get_peers_all<N: Network>(peers: Peers<N>) -> Result<impl Reply, Rejection> {
+                Ok(reply::json(&peers.read().keys().map(|addr| addr.ip()).collect::<Vec<IpAddr>>()))
+            }
+
+            get_node_address.or(get_peers_count).or(get_peers_all)
         };
 
         // Initialize the server.
@@ -104,7 +131,7 @@ impl<N: Network> Ledger<N> {
         Ok(Arc::new(Self {
             ledger,
             server,
-            peers: Default::default(),
+            peers,
             private_key,
             view_key,
             address,
@@ -117,7 +144,7 @@ impl<N: Network> Ledger<N> {
     }
 
     /// Returns the connected peers.
-    pub(super) const fn peers(&self) -> &RwLock<IndexMap<SocketAddr, crate::Sender<N>>> {
+    pub(super) const fn peers(&self) -> &Peers<N> {
         &self.peers
     }
 }
