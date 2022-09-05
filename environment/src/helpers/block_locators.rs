@@ -224,10 +224,6 @@ impl<N: Network> Deref for BlockLocators<N> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-
-    pub type CurrentNetwork = snarkvm::prelude::Testnet3;
-
     #[test]
     fn test_block_locators_serde_json() {
         // let expected_block_height = CurrentNetwork::genesis_block().height();
