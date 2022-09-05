@@ -164,11 +164,9 @@ impl<N: Network> Server<N> {
 
         // GET /testnet3/ciphertext/unspent/{commitment}
         let get_unspent_ciphertext = warp::get()
-            .and(warp::path!("testnet3" / "ciphertext" / "unspent" / ..))
+            .and(warp::path!("testnet3" / "ciphertext" / ..))
             .and(warp::path::param::<Field<N>>())
             .and(warp::path::end())
-            .and(warp::body::content_length_limit(128))
-            .and(warp::body::json())
             .and(with(ledger.clone()))
             .and_then(Self::get_unspent_ciphertext);
 
@@ -346,16 +344,9 @@ impl<N: Network> Server<N> {
     }
 
     /// Returns the record ciphertext for the given view key.
-    async fn get_unspent_ciphertext(commitment: Field<N>, view_key: ViewKey<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
-        // TODO: this should just find the wanted record ciphertext instead of filtering from all the already filtered unspent ones.
-        if let Some((_, record_ciphertext)) = ledger
-            .ledger
-            .read()
-            .find_record_ciphertexts(&view_key, RecordsFilter::Unspent)
-            .or_reject()?
-            .find(|(record_commitment, _)| *record_commitment == commitment)
-        {
-            Ok(reply::with_status(reply::json(&*record_ciphertext), StatusCode::OK))
+    async fn get_unspent_ciphertext(commitment: Field<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+        if let Some(record_ciphertext) = ledger.ledger.read().get_record(commitment).or_reject()? {
+            Ok(reply::with_status(reply::json(&record_ciphertext), StatusCode::OK))
         } else {
             Err(warp::reject::not_found())
         }
