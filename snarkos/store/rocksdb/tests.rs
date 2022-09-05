@@ -14,18 +14,23 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::storage::{rocksdb::RocksDB, DataID, DataMap};
-
+use crate::store::{
+    rocksdb::{DataMap, RocksDB},
+    DataID,
+};
 use snarkvm::{
     compiler::{Map, MapRead},
     console::{
         network::{Network, Testnet3},
         types::Scalar,
     },
-    utilities::{test_crypto_rng, Uniform},
+    utilities::{TestRng, Uniform},
 };
 
-// use snarkvm::compiler::{Map, MapRead};
+use serial_test::serial;
+use std::borrow::Cow;
+
+type TestMap = DataMap<u32, String>;
 
 pub(crate) fn temp_dir() -> std::path::PathBuf {
     tempfile::tempdir().expect("Failed to open temporary directory").into_path()
@@ -39,22 +44,21 @@ pub(crate) fn temp_file() -> std::path::PathBuf {
 }
 
 #[test]
+#[serial]
 fn test_open() {
-    let _storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
+    let _storage = RocksDB::open_testing(temp_dir(), None).expect("Failed to open storage");
 }
 
 #[test]
+#[serial]
 fn test_open_map() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
+    let _map = RocksDB::open_map_testing::<u32, String>(temp_dir(), None, DataID::Test).expect("Failed to open data map");
 }
 
-type TestMap = DataMap<u32, String>;
-
 #[test]
+#[serial]
 fn test_insert_and_contains_key() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map: TestMap = storage.open_map(DataID::Test).expect("Failed to open data map");
+    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
 
     map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
     assert!(map.contains_key(&123456789).expect("Failed to call contains key"));
@@ -62,9 +66,9 @@ fn test_insert_and_contains_key() {
 }
 
 #[test]
+#[serial]
 fn test_insert_and_get() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
+    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
 
     map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
     assert_eq!(
@@ -76,9 +80,9 @@ fn test_insert_and_get() {
 }
 
 #[test]
+#[serial]
 fn test_insert_and_remove() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
+    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
 
     map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
     assert_eq!(
@@ -91,9 +95,10 @@ fn test_insert_and_remove() {
 }
 
 #[test]
+#[serial]
 fn test_insert_and_iter() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
+    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+
     map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
 
     let mut iter = map.iter();
@@ -105,9 +110,10 @@ fn test_insert_and_iter() {
 }
 
 #[test]
+#[serial]
 fn test_insert_and_keys() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
+    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+
     map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
 
     let mut keys = map.keys();
@@ -116,9 +122,10 @@ fn test_insert_and_keys() {
 }
 
 #[test]
+#[serial]
 fn test_insert_and_values() {
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
+    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+
     map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
 
     let mut values = map.values();
@@ -127,58 +134,57 @@ fn test_insert_and_values() {
 }
 
 #[test]
+#[serial]
 fn test_reopen() {
     let directory = temp_dir();
     {
-        let storage = RocksDB::open(directory.clone(), 0).expect("Failed to open storage");
-        let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
+        let map = RocksDB::open_map_testing(directory.clone(), None, DataID::Test).expect("Failed to open data map");
         map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
     }
     {
-        let storage = RocksDB::open(directory, 0).expect("Failed to open storage");
-        let map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
-        assert_eq!(
-            Some("123456789".to_string()),
-            map.get(&123456789).expect("Failed to get").map(|v| v.to_string())
-        );
-    }
-}
-
-#[test]
-fn test_export_import() {
-    let file = temp_file();
-
-    {
-        let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-        let mut map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
-
-        for i in 0..100 {
-            map.insert(i, i.to_string()).expect("Failed to insert");
+        let map: TestMap = RocksDB::open_map_testing(directory, None, DataID::Test).expect("Failed to open data map");
+        match map.get(&123456789).expect("Failed to get") {
+            Some(Cow::Borrowed(value)) => assert_eq!(value.to_string(), "123456789".to_string()),
+            Some(Cow::Owned(value)) => assert_eq!(value, "123456789".to_string()),
+            None => panic!("Failed to get value"),
         }
-
-        storage.export(&file).expect("Failed to export storage");
-    }
-
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    storage.import(&file).expect("Failed to import storage");
-
-    let map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
-
-    for i in 0..100 {
-        assert_eq!(map.get(&i).expect("Failed to get").map(|v| v.to_string()), Some(i.to_string()));
     }
 }
 
+// #[test]
+// #[serial]
+// fn test_export_import() {
+//     let file = temp_file();
+//     {
+//         let mut map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+//
+//         for i in 0..100 {
+//             map.insert(i, i.to_string()).expect("Failed to insert");
+//         }
+//
+//         storage.export(&file).expect("Failed to export storage");
+//     }
+//
+//     let storage = RocksDB::open_temporary(temp_dir(), None).expect("Failed to open storage");
+//     storage.import(&file).expect("Failed to import storage");
+//
+//     let map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
+//
+//     for i in 0..100 {
+//         assert_eq!(map.get(&i).expect("Failed to get").map(|v| v.to_string()), Some(i.to_string()));
+//     }
+// }
+
 #[test]
+#[serial]
 fn test_scalar_mul() {
     type CurrentNetwork = Testnet3;
 
-    let rng = &mut test_crypto_rng();
+    let rng = &mut TestRng::default();
 
     const ITERATIONS: u32 = 1_000_000u32;
 
-    let storage = RocksDB::open(temp_dir(), 0).expect("Failed to open storage");
-    let mut map = storage.open_map(DataID::Test).expect("Failed to open data map");
+    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
 
     // Sample `ITERATION` random field elements to store.
     for i in 0..ITERATIONS {

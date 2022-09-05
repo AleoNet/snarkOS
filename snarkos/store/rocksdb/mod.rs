@@ -25,7 +25,7 @@ mod tests;
 
 use crate::store::DataID;
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use core::{fmt::Debug, hash::Hash};
 use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
@@ -41,11 +41,14 @@ pub const PREFIX_LEN: usize = 4; // N::ID (u16) + DataID (u16)
 
 pub trait Database {
     /// Opens the database.
-    fn open(network_id: u16) -> Result<&'static Self>;
+    fn open(network_id: u16, dev: Option<u16>) -> Result<Self>
+    where
+        Self: Sized;
 
-    /// Opens the map with the given `network_id` and `data_id` from storage.
+    /// Opens the map with the given `network_id`, `(optional) development ID`, and `data_id` from storage.
     fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(
         network_id: u16,
+        dev: Option<u16>,
         data_id: DataID,
     ) -> Result<DataMap<K, V>>;
 }
@@ -53,9 +56,15 @@ pub trait Database {
 /// An instance of a RocksDB database.
 #[derive(Clone)]
 pub struct RocksDB {
+    /// The RocksDB instance.
     rocksdb: Arc<rocksdb::DB>,
+    /// The network ID.
     network_id: u16,
+    /// The optional development ID.
+    dev: Option<u16>,
+    /// The tracker for whether a database transaction is in progress.
     batch_in_progress: Arc<AtomicBool>,
+    /// The database transaction.
     atomic_batch: Arc<Mutex<rocksdb::WriteBatch>>,
 }
 
@@ -69,43 +78,55 @@ impl Deref for RocksDB {
 
 impl Database for RocksDB {
     /// Opens the database.
-    fn open(network_id: u16) -> Result<&'static Self> {
+    ///
+    /// In production mode, the database opens directory `~/.aleo/storage/ledger-{network}`.
+    /// In development mode, the database opens directory `/path/to/repo/.ledger-{network}-{id}`.
+    fn open(network_id: u16, dev: Option<u16>) -> Result<Self> {
         static DB: OnceCell<RocksDB> = OnceCell::new();
-        DB.get_or_try_init(|| {
-            // Customize database options.
-            let mut options = rocksdb::Options::default();
-            options.set_compression_type(rocksdb::DBCompressionType::Lz4);
 
-            // Register the prefix length.
-            let prefix_extractor = rocksdb::SliceTransform::create_fixed_prefix(PREFIX_LEN);
-            options.set_prefix_extractor(prefix_extractor);
+        // Retrieve the database.
+        let database = DB
+            .get_or_try_init(|| {
+                // Customize database options.
+                let mut options = rocksdb::Options::default();
+                options.set_compression_type(rocksdb::DBCompressionType::Lz4);
 
-            let primary = aleo_std::aleo_ledger_dir(network_id, None);
-            let rocksdb = {
-                options.increase_parallelism(2);
-                options.create_if_missing(true);
-                Arc::new(rocksdb::DB::open(&options, &primary)?)
-            };
+                // Register the prefix length.
+                let prefix_extractor = rocksdb::SliceTransform::create_fixed_prefix(PREFIX_LEN);
+                options.set_prefix_extractor(prefix_extractor);
 
-            Ok(RocksDB {
-                rocksdb,
-                network_id,
-                batch_in_progress: Default::default(),
-                atomic_batch: Default::default(),
-            })
-        })
+                let primary = aleo_std::aleo_ledger_dir(network_id, dev);
+                let rocksdb = {
+                    options.increase_parallelism(2);
+                    options.create_if_missing(true);
+                    Arc::new(rocksdb::DB::open(&options, &primary)?)
+                };
+
+                Ok::<_, anyhow::Error>(RocksDB {
+                    rocksdb,
+                    network_id,
+                    dev,
+                    batch_in_progress: Default::default(),
+                    atomic_batch: Default::default(),
+                })
+            })?
+            .clone();
+
+        // Ensure the database network ID and development ID match.
+        match database.network_id == network_id && database.dev == dev {
+            true => Ok(database),
+            false => bail!("Mismatching network ID or development ID in the database"),
+        }
     }
 
-    /// Opens the map with the given `network_id` and `data_id` from storage.
+    /// Opens the map with the given `network_id`, `(optional) development ID`, and `data_id` from storage.
     fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(
         network_id: u16,
+        dev: Option<u16>,
         data_id: DataID,
     ) -> Result<DataMap<K, V>> {
-        // Open the database.
-        let database = Self::open(network_id)?;
-
-        // Retrieve the RocksDB storage.
-        let storage = database.clone();
+        // Open the RocksDB database.
+        let database = Self::open(network_id, dev)?;
 
         // Combine contexts to create a new scope.
         let mut context = database.network_id.to_le_bytes().to_vec();
@@ -113,7 +134,76 @@ impl Database for RocksDB {
 
         // Return the DataMap.
         Ok(DataMap {
-            storage,
+            database,
+            context,
+            _phantom: PhantomData,
+        })
+    }
+}
+
+impl RocksDB {
+    /// Opens the test database.
+    #[cfg(test)]
+    fn open_testing(temp_dir: std::path::PathBuf, dev: Option<u16>) -> Result<Self> {
+        static DB: OnceCell<RocksDB> = OnceCell::new();
+
+        // Retrieve the database.
+        let database = DB
+            .get_or_try_init(|| {
+                // Customize database options.
+                let mut options = rocksdb::Options::default();
+                options.set_compression_type(rocksdb::DBCompressionType::Lz4);
+
+                // Register the prefix length.
+                let prefix_extractor = rocksdb::SliceTransform::create_fixed_prefix(PREFIX_LEN);
+                options.set_prefix_extractor(prefix_extractor);
+
+                // Construct the directory for the test database.
+                let primary = match dev {
+                    Some(dev) => temp_dir.join(dev.to_string()),
+                    None => temp_dir,
+                };
+
+                let rocksdb = {
+                    options.increase_parallelism(2);
+                    options.create_if_missing(true);
+                    Arc::new(rocksdb::DB::open(&options, &primary)?)
+                };
+
+                Ok::<_, anyhow::Error>(RocksDB {
+                    rocksdb,
+                    network_id: u16::MAX,
+                    dev,
+                    batch_in_progress: Default::default(),
+                    atomic_batch: Default::default(),
+                })
+            })?
+            .clone();
+
+        // Ensure the database development ID match.
+        match database.dev == dev {
+            true => Ok(database),
+            false => bail!("Mismatching development ID in the test database"),
+        }
+    }
+
+    /// Opens the test map.
+    #[cfg(test)]
+    fn open_map_testing<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(
+        temp_dir: std::path::PathBuf,
+        dev: Option<u16>,
+        data_id: DataID,
+    ) -> Result<DataMap<K, V>> {
+        // Open the RocksDB test database.
+        let database = Self::open_testing(temp_dir, dev)?;
+
+        // Combine contexts to create a new scope.
+        let mut context = database.network_id.to_le_bytes().to_vec();
+        context.extend_from_slice(&(data_id as u16).to_le_bytes());
+
+        // Return the DataMap.
+        Ok(DataMap {
+            database,
             context,
             _phantom: PhantomData,
         })

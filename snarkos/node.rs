@@ -39,7 +39,7 @@ impl<N: Network, E: Environment> Node<N, E> {
         let ledger = match cli.dev {
             None => {
                 // Initialize the ledger.
-                let ledger = Ledger::<N>::load(*account.private_key())?;
+                let ledger = Ledger::<N>::load(*account.private_key(), cli.dev)?;
                 // Sync the ledger with the network.
                 ledger.initial_sync_with_network(cli.beacon_addr.ip()).await?;
 
@@ -52,7 +52,7 @@ impl<N: Network, E: Environment> Node<N, E> {
                 let genesis_block = request_genesis_block::<N>(cli.beacon_addr.ip()).await?;
 
                 // Initialize the ledger from the provided genesis block.
-                Ledger::<N>::new_with_genesis(*account.private_key(), genesis_block)?
+                Ledger::<N>::new_with_genesis(*account.private_key(), genesis_block, cli.dev)?
             }
         };
 

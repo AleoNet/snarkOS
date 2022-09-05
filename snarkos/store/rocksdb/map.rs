@@ -23,7 +23,7 @@ use std::{borrow::Cow, sync::atomic::Ordering};
 
 #[derive(Clone)]
 pub struct DataMap<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> {
-    pub(super) storage: RocksDB,
+    pub(super) database: RocksDB,
     pub(super) context: Vec<u8>,
     pub(super) _phantom: PhantomData<(K, V)>,
 }
@@ -43,13 +43,13 @@ impl<
         let raw_value = bincode::serialize(&value)?;
 
         // Determine if an atomic batch is in progress.
-        let is_batch = self.storage.batch_in_progress.load(Ordering::SeqCst);
+        let is_batch = self.database.batch_in_progress.load(Ordering::SeqCst);
 
         match is_batch {
             // If a batch is in progress, add the key-value pair to the batch.
-            true => self.storage.atomic_batch.lock().put(raw_key, raw_value),
+            true => self.database.atomic_batch.lock().put(raw_key, raw_value),
             false => {
-                self.storage.put(&raw_key, &raw_value)?;
+                self.database.put(&raw_key, &raw_value)?;
             }
         }
 
@@ -64,13 +64,13 @@ impl<
         let raw_key = self.create_prefixed_key(key)?;
 
         // Determine if an atomic batch is in progress.
-        let is_batch = self.storage.batch_in_progress.load(Ordering::SeqCst);
+        let is_batch = self.database.batch_in_progress.load(Ordering::SeqCst);
 
         match is_batch {
             // If a batch is in progress, add the key to the batch.
-            true => self.storage.atomic_batch.lock().delete(raw_key),
+            true => self.database.atomic_batch.lock().delete(raw_key),
             false => {
-                self.storage.delete(&raw_key)?;
+                self.database.delete(&raw_key)?;
             }
         }
 
@@ -83,9 +83,9 @@ impl<
     ///
     fn start_atomic(&self) {
         // Set the atomic batch flag to `true`.
-        self.storage.batch_in_progress.store(true, Ordering::SeqCst);
+        self.database.batch_in_progress.store(true, Ordering::SeqCst);
         // Ensure that the atomic batch is empty.
-        assert!(self.storage.atomic_batch.lock().is_empty());
+        assert!(self.database.atomic_batch.lock().is_empty());
     }
 
     ///
@@ -94,7 +94,7 @@ impl<
     /// if they are already part of a larger one.
     ///
     fn is_atomic_in_progress(&self) -> bool {
-        self.storage.batch_in_progress.load(Ordering::SeqCst)
+        self.database.batch_in_progress.load(Ordering::SeqCst)
     }
 
     ///
@@ -102,9 +102,9 @@ impl<
     ///
     fn abort_atomic(&self) {
         // Clear the atomic batch.
-        self.storage.atomic_batch.lock().clear();
+        self.database.atomic_batch.lock().clear();
         // Set the atomic batch flag to `false`.
-        self.storage.batch_in_progress.store(false, Ordering::SeqCst);
+        self.database.batch_in_progress.store(false, Ordering::SeqCst);
     }
 
     ///
@@ -112,15 +112,15 @@ impl<
     ///
     fn finish_atomic(&self) -> Result<()> {
         // Retrieve the atomic batch.
-        let batch = core::mem::take(&mut *self.storage.atomic_batch.lock());
+        let batch = core::mem::take(&mut *self.database.atomic_batch.lock());
 
         if !batch.is_empty() {
             // Execute the batch of operations atomically.
-            self.storage.rocksdb.write(batch)?;
+            self.database.rocksdb.write(batch)?;
         }
 
         // Set the atomic batch flag to `false`.
-        self.storage.batch_in_progress.store(false, Ordering::SeqCst);
+        self.database.batch_in_progress.store(false, Ordering::SeqCst);
 
         Ok(())
     }
@@ -166,21 +166,21 @@ impl<
     /// Returns an iterator visiting each key-value pair in the map.
     ///
     fn iter(&'a self) -> Self::Iterator {
-        Iter::new(self.storage.prefix_iterator(&self.context))
+        Iter::new(self.database.prefix_iterator(&self.context))
     }
 
     ///
     /// Returns an iterator over each key in the map.
     ///
     fn keys(&'a self) -> Self::Keys {
-        Keys::new(self.storage.prefix_iterator(&self.context))
+        Keys::new(self.database.prefix_iterator(&self.context))
     }
 
     ///
     /// Returns an iterator over each value in the map.
     ///
     fn values(&'a self) -> Self::Values {
-        Values::new(self.storage.prefix_iterator(&self.context))
+        Values::new(self.database.prefix_iterator(&self.context))
     }
 }
 
@@ -202,7 +202,7 @@ impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> DataMap<K
         Q: Serialize + ?Sized,
     {
         let raw_key = self.create_prefixed_key(key)?;
-        match self.storage.get_pinned(&raw_key)? {
+        match self.database.get_pinned(&raw_key)? {
             Some(data) => Ok(Some(data)),
             None => Ok(None),
         }
