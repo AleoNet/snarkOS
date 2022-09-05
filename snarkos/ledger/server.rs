@@ -174,13 +174,13 @@ impl<N: Network> Server<N> {
             .and(with(ledger.clone()))
             .and_then(Self::records_unspent);
 
-        // GET /testnet3/ciphertext/unspent/{commitment}
-        let get_unspent_ciphertext = warp::get()
+        // GET /testnet3/ciphertext/{commitment}
+        let get_ciphertext = warp::get()
             .and(warp::path!("testnet3" / "ciphertext" / ..))
             .and(warp::path::param::<Field<N>>())
             .and(warp::path::end())
             .and(with(ledger.clone()))
-            .and_then(Self::get_unspent_ciphertext);
+            .and_then(Self::get_ciphertext);
 
         // GET /testnet3/peers/count
         let peers_count = warp::get()
@@ -259,7 +259,7 @@ impl<N: Network> Server<N> {
             .or(deploy_program)
             .or(execute_program)
             .or(get_program)
-            .or(get_unspent_ciphertext)
+            .or(get_ciphertext)
     }
 
     /// Initializes a ledger handler.
@@ -356,7 +356,7 @@ impl<N: Network> Server<N> {
     }
 
     /// Returns the record ciphertext for the given view key.
-    async fn get_unspent_ciphertext(commitment: Field<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
+    async fn get_ciphertext(commitment: Field<N>, ledger: Arc<Ledger<N>>) -> Result<impl Reply, Rejection> {
         if let Some(record_ciphertext) = ledger.ledger.read().get_record(commitment).or_reject()? {
             Ok(reply::with_status(reply::json(&record_ciphertext), StatusCode::OK))
         } else {
