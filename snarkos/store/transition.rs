@@ -59,18 +59,18 @@ impl<N: Network> TransitionStorage<N> for TransitionDB<N> {
     type FeeMap = DataMap<N::TransitionID, i64>;
 
     /// Initializes the transition storage.
-    fn open() -> Result<Self> {
+    fn open(dev: Option<u16>) -> Result<Self> {
         Ok(Self {
-            locator_map: rocksdb::RocksDB::open_map(N::ID, DataID::TransitionLocatorMap)?,
-            input_store: InputStore::open()?,
-            output_store: OutputStore::open()?,
-            finalize_map: rocksdb::RocksDB::open_map(N::ID, DataID::TransitionFinalizeMap)?,
-            proof_map: rocksdb::RocksDB::open_map(N::ID, DataID::TransitionProofMap)?,
-            tpk_map: rocksdb::RocksDB::open_map(N::ID, DataID::TransitionTPKMap)?,
-            reverse_tpk_map: rocksdb::RocksDB::open_map(N::ID, DataID::TransitionReverseTPKMap)?,
-            tcm_map: rocksdb::RocksDB::open_map(N::ID, DataID::TransitionTCMMap)?,
-            reverse_tcm_map: rocksdb::RocksDB::open_map(N::ID, DataID::TransitionReverseTCMMap)?,
-            fee_map: rocksdb::RocksDB::open_map(N::ID, DataID::TransitionFeeMap)?,
+            locator_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionLocatorMap)?,
+            input_store: InputStore::open(dev)?,
+            output_store: OutputStore::open(dev)?,
+            finalize_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionFinalizeMap)?,
+            proof_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionProofMap)?,
+            tpk_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionTPKMap)?,
+            reverse_tpk_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionReverseTPKMap)?,
+            tcm_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionTCMMap)?,
+            reverse_tcm_map: rocksdb::RocksDB::open_map(N::ID, dev,  DataID::TransitionReverseTCMMap)?,
+            fee_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionFeeMap)?,
         })
     }
 
@@ -144,6 +144,8 @@ pub struct InputDB<N: Network> {
     record_tag: DataMap<Field<N>, Field<N>>,
     /// The mapping of `external commitment` to `()`. Note: This is **not** the record commitment.
     external_record: DataMap<Field<N>, ()>,
+    /// The optional development ID.
+    dev: Option<u16>,
 }
 
 #[rustfmt::skip]
@@ -158,16 +160,17 @@ impl<N: Network> InputStorage<N> for InputDB<N> {
     type ExternalRecordMap = DataMap<Field<N>, ()>;
 
     /// Initializes the transition input storage.
-    fn open() -> Result<Self> {
+    fn open(dev: Option<u16>) -> Result<Self> {
         Ok(Self {
-            id_map: rocksdb::RocksDB::open_map(N::ID, DataID::InputIDMap)?,
-            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, DataID::InputReverseIDMap)?,
-            constant: rocksdb::RocksDB::open_map(N::ID, DataID::InputConstantMap)?,
-            public: rocksdb::RocksDB::open_map(N::ID, DataID::InputPublicMap)?,
-            private: rocksdb::RocksDB::open_map(N::ID, DataID::InputPrivateMap)?,
-            record: rocksdb::RocksDB::open_map(N::ID, DataID::InputRecordMap)?,
-            record_tag: rocksdb::RocksDB::open_map(N::ID, DataID::InputRecordTagMap)?,
-            external_record: rocksdb::RocksDB::open_map(N::ID, DataID::InputExternalRecordMap)?,
+            id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputIDMap)?,
+            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputReverseIDMap)?,
+            constant: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputConstantMap)?,
+            public: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputPublicMap)?,
+            private: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputPrivateMap)?,
+            record: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputRecordMap)?,
+            record_tag: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputRecordTagMap)?,
+            external_record: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputExternalRecordMap)?,
+            dev,
         })
     }
 
@@ -210,6 +213,11 @@ impl<N: Network> InputStorage<N> for InputDB<N> {
     fn external_record_map(&self) -> &Self::ExternalRecordMap {
         &self.external_record
     }
+
+    /// Returns the optional development ID.
+    fn dev(&self) -> Option<u16> {
+        self.dev
+    }
 }
 
 /// A database transition output storage.
@@ -232,6 +240,8 @@ pub struct OutputDB<N: Network> {
     record_nonce: DataMap<Group<N>, Field<N>>,
     /// The mapping of `external commitment` to `()`. Note: This is **not** the record commitment.
     external_record: DataMap<Field<N>, ()>,
+    /// The optional development ID.
+    dev: Option<u16>,
 }
 
 #[rustfmt::skip]
@@ -246,16 +256,17 @@ impl<N: Network> OutputStorage<N> for OutputDB<N> {
     type ExternalRecordMap = DataMap<Field<N>, ()>;
 
     /// Initializes the transition output storage.
-    fn open() -> Result<Self> {
+    fn open(dev: Option<u16>) -> Result<Self> {
         Ok(Self {
-            id_map: rocksdb::RocksDB::open_map(N::ID, DataID::OutputIDMap)?,
-            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, DataID::OutputReverseIDMap)?,
-            constant: rocksdb::RocksDB::open_map(N::ID, DataID::OutputConstantMap)?,
-            public: rocksdb::RocksDB::open_map(N::ID, DataID::OutputPublicMap)?,
-            private: rocksdb::RocksDB::open_map(N::ID, DataID::OutputPrivateMap)?,
-            record: rocksdb::RocksDB::open_map(N::ID, DataID::OutputRecordMap)?,
-            record_nonce: rocksdb::RocksDB::open_map(N::ID, DataID::OutputRecordNonceMap)?,
-            external_record: rocksdb::RocksDB::open_map(N::ID, DataID::OutputExternalRecordMap)?,
+            id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputIDMap)?,
+            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputReverseIDMap)?,
+            constant: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputConstantMap)?,
+            public: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputPublicMap)?,
+            private: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputPrivateMap)?,
+            record: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputRecordMap)?,
+            record_nonce: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputRecordNonceMap)?,
+            external_record: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputExternalRecordMap)?,
+            dev,
         })
     }
 
@@ -297,5 +308,10 @@ impl<N: Network> OutputStorage<N> for OutputDB<N> {
     /// Returns the external record map.
     fn external_record_map(&self) -> &Self::ExternalRecordMap {
         &self.external_record
+    }
+
+    /// Returns the optional development ID.
+    fn dev(&self) -> Option<u16> {
+        self.dev
     }
 }

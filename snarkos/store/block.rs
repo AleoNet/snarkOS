@@ -53,20 +53,20 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
     type SignatureMap = DataMap<N::BlockHash, Signature<N>>;
 
     /// Initializes the block storage.
-    fn open() -> Result<Self> {
+    fn open(dev: Option<u16>) -> Result<Self> {
         // Initialize the transition store.
-        let transition_store = TransitionStore::<N, TransitionDB<N>>::open()?;
+        let transition_store = TransitionStore::<N, TransitionDB<N>>::open(dev)?;
         // Initialize the transaction store.
         let transaction_store = TransactionStore::<N, TransactionDB<N>>::open(transition_store)?;
         // Return the block storage.
         Ok(Self {
-            id_map: rocksdb::RocksDB::open_map(N::ID, DataID::BlockIDMap)?,
-            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, DataID::BlockReverseIDMap)?,
-            header_map: rocksdb::RocksDB::open_map(N::ID, DataID::BlockHeaderMap)?,
-            transactions_map: rocksdb::RocksDB::open_map(N::ID, DataID::BlockTransactionsMap)?,
-            reverse_transactions_map: rocksdb::RocksDB::open_map(N::ID, DataID::BlockReverseTransactionsMap)?,
+            id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockIDMap)?,
+            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockReverseIDMap)?,
+            header_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockHeaderMap)?,
+            transactions_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockTransactionsMap)?,
+            reverse_transactions_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockReverseTransactionsMap)?,
             transaction_store,
-            signature_map: rocksdb::RocksDB::open_map(N::ID, DataID::BlockSignatureMap)?,
+            signature_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockSignatureMap)?,
         })
     }
 

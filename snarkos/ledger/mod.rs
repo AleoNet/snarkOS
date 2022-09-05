@@ -14,34 +14,34 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod server;
-pub use server::*;
-
 use crate::{handle_dispatch_error, BlockDB, Data, ProgramDB};
 use snarkvm::prelude::*;
 
 use colored::Colorize;
 use futures::StreamExt;
 use indexmap::IndexMap;
-use once_cell::race::OnceBox;
 use parking_lot::RwLock;
 use std::{
     net::{IpAddr, SocketAddr},
     sync::Arc,
 };
 use tokio::task;
+use warp::{reply, Filter, Rejection};
 
 pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockDB<N>, ProgramDB<N>>;
 // pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockMemory<N>, ProgramMemory<N>>;
 
+pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockDB<N>, ProgramDB<N>>;
+// pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockMemory<N>, ProgramMemory<N>>;
+
 #[allow(dead_code)]
 pub struct Ledger<N: Network> {
-    /// The internal ledger.
-    ledger: RwLock<InternalLedger<N>>,
-    /// The current peers.
-    peers: RwLock<IndexMap<SocketAddr, crate::Sender<N>>>,
+    /// The ledger.
+    ledger: Arc<RwLock<InternalLedger<N>>>,
     /// The server.
-    server: OnceBox<Server<N>>,
+    server: InternalServer<N>,
+    /// The peers.
+    peers: RwLock<IndexMap<SocketAddr, crate::Sender<N>>>,
     /// The account private key.
     private_key: PrivateKey<N>,
     /// The account view key.
@@ -52,76 +52,66 @@ pub struct Ledger<N: Network> {
 
 impl<N: Network> Ledger<N> {
     /// Initializes a new instance of the ledger.
-    pub fn load(private_key: PrivateKey<N>) -> Result<Arc<Self>> {
-        // Derive the view key and address.
-        let view_key = ViewKey::try_from(private_key)?;
-        let address = Address::try_from(&view_key)?;
-
+    pub(super) fn new_with_genesis(private_key: PrivateKey<N>, genesis_block: Block<N>, dev: Option<u16>) -> Result<Arc<Self>> {
         // Initialize the ledger.
-        let ledger = Arc::new(Self {
-            ledger: RwLock::new(InternalLedger::open()?),
-            peers: Default::default(),
-            server: OnceBox::new(),
-            private_key,
-            view_key,
-            address,
-        });
-
-        // Initialize the server.
-        let server = Server::<N>::start(ledger.clone())?;
-        ledger
-            .server
-            .set(Box::new(server))
-            .map_err(|_| anyhow!("Failed to save the server"))?;
-
-        // Return the ledger.
-        Ok(ledger)
-    }
-
-    /// Initializes a new instance of the ledger.
-    pub(super) fn new_with_genesis(private_key: PrivateKey<N>, genesis_block: Block<N>) -> Result<Arc<Self>> {
-        // Derive the view key and address.
-        let view_key = ViewKey::try_from(private_key)?;
-        let address = Address::try_from(&view_key)?;
-
-        // Initialize the internal ledger.
-        let internal_ledger = match InternalLedger::new_with_genesis(&genesis_block, genesis_block.signature().to_address()) {
-            Ok(ledger) => ledger,
+        let ledger = match InternalLedger::new_with_genesis(&genesis_block, genesis_block.signature().to_address(), dev) {
+            Ok(ledger) => Arc::new(RwLock::new(ledger)),
             Err(_) => {
-                let ledger = InternalLedger::open()?;
-
-                // Check if the ledger contains the correct genesis block.
-                if !ledger.contains_block_hash(&genesis_block.hash())? {
-                    bail!("Genesis block mismatch (please remove the existing ledger and try again)")
+                // Open the internal ledger.
+                let ledger = InternalLedger::open(dev)?;
+                // Ensure the ledger contains the correct genesis block.
+                match ledger.contains_block_hash(&genesis_block.hash())? {
+                    true => Arc::new(RwLock::new(ledger)),
+                    false => bail!("Incorrect genesis block (run 'snarkos clean' and try again)"),
                 }
-
-                ledger
             }
         };
 
+        // Return the ledger.
+        Self::from(ledger, private_key)
+    }
+
+    /// Opens an instance of the ledger.
+    pub fn load(private_key: PrivateKey<N>, dev: Option<u16>) -> Result<Arc<Self>> {
         // Initialize the ledger.
-        let ledger = Arc::new(Self {
-            ledger: RwLock::new(internal_ledger),
+        let ledger = Arc::new(RwLock::new(InternalLedger::open(dev)?));
+        // Return the ledger.
+        Self::from(ledger, private_key)
+    }
+
+    /// Initializes a new instance of the ledger.
+    pub fn from(ledger: Arc<RwLock<InternalLedger<N>>>, private_key: PrivateKey<N>) -> Result<Arc<Self>> {
+        // Derive the view key and address.
+        let view_key = ViewKey::try_from(private_key)?;
+        let address = Address::try_from(&view_key)?;
+
+        // Initialize the additional routes.
+        let additional_routes = {
+            // GET /testnet3/node/address
+            let get_node_address = warp::get()
+                .and(warp::path!("testnet3" / "node" / "address"))
+                .and(snarkvm::rest::with(address))
+                .and_then(|address: Address<N>| async move { Ok::<_, Rejection>(reply::json(&address.to_string())) });
+
+            get_node_address
+        };
+
+        // Initialize the server.
+        let server = InternalServer::<N>::start(ledger.clone(), Some(additional_routes), None)?;
+
+        // Return the ledger.
+        Ok(Arc::new(Self {
+            ledger,
+            server,
             peers: Default::default(),
-            server: OnceBox::new(),
             private_key,
             view_key,
             address,
-        });
-
-        // Initialize the server.
-        let server = Server::<N>::start(ledger.clone())?;
-        ledger
-            .server
-            .set(Box::new(server))
-            .map_err(|_| anyhow!("Failed to save the server"))?;
-
-        // Return the ledger.
-        Ok(ledger)
+        }))
     }
 
     /// Returns the ledger.
-    pub(super) const fn ledger(&self) -> &RwLock<InternalLedger<N>> {
+    pub(super) const fn ledger(&self) -> &Arc<RwLock<InternalLedger<N>>> {
         &self.ledger
     }
 
