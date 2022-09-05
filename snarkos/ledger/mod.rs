@@ -86,6 +86,7 @@ impl<N: Network> Ledger<N> {
         let address = Address::try_from(&view_key)?;
 
         // Initialize the additional routes.
+        #[allow(clippy::let_and_return)]
         let additional_routes = {
             // GET /testnet3/node/address
             let get_node_address = warp::get()
