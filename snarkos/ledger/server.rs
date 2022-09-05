@@ -15,7 +15,19 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Ledger;
-use snarkvm::prelude::{AdditionalFee, Deployment, Execution, Field, Network, ProgramID, RecordsFilter, Transaction, ViewKey, U64};
+use snarkvm::prelude::{
+    AdditionalFee,
+    Address,
+    Deployment,
+    Execution,
+    Field,
+    Network,
+    ProgramID,
+    RecordsFilter,
+    Transaction,
+    ViewKey,
+    U64,
+};
 
 use anyhow::Result;
 use core::marker::PhantomData;
