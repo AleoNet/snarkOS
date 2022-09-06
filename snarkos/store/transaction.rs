@@ -46,7 +46,7 @@ impl<N: Network> TransactionStorage<N> for TransactionDB<N> {
         // Initialize the execution store.
         let execution_store = ExecutionStore::<N, ExecutionDB<N>>::open(transition_store)?;
         // Return the transaction storage.
-        Ok(Self { id_map: rocksdb::RocksDB::open_map(N::ID, DataID::TransactionIDMap)?, deployment_store, execution_store })
+        Ok(Self { id_map: rocksdb::RocksDB::open_map(N::ID, execution_store.dev(), DataID::TransactionIDMap)?, deployment_store, execution_store })
     }
 
     /// Returns the ID map.
@@ -99,14 +99,16 @@ impl<N: Network> DeploymentStorage<N> for DeploymentDB<N> {
 
     /// Initializes the deployment storage.
     fn open(transition_store: TransitionStore<N, Self::TransitionStorage>) -> Result<Self> {
+        // Retrieve the optional development ID.
+        let dev = transition_store.dev();
         Ok(Self {
-            id_map: rocksdb::RocksDB::open_map(N::ID, DataID::DeploymentIDMap)?,
-            edition_map: rocksdb::RocksDB::open_map(N::ID, DataID::DeploymentEditionMap)?,
-            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, DataID::DeploymentReverseIDMap)?,
-            program_map: rocksdb::RocksDB::open_map(N::ID, DataID::DeploymentProgramMap)?,
-            verifying_key_map: rocksdb::RocksDB::open_map(N::ID, DataID::DeploymentVerifyingKeyMap)?,
-            certificate_map: rocksdb::RocksDB::open_map(N::ID, DataID::DeploymentCertificateMap)?,
-            additional_fee_map: rocksdb::RocksDB::open_map(N::ID, DataID::DeploymentAdditionalFeeMap)?,
+            id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentIDMap)?,
+            edition_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentEditionMap)?,
+            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentReverseIDMap)?,
+            program_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentProgramMap)?,
+            verifying_key_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentVerifyingKeyMap)?,
+            certificate_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentCertificateMap)?,
+            additional_fee_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentAdditionalFeeMap)?,
             transition_store,
         })
     }
@@ -175,10 +177,12 @@ impl<N: Network> ExecutionStorage<N> for ExecutionDB<N> {
 
     /// Initializes the execution storage.
     fn open(transition_store: TransitionStore<N, Self::TransitionStorage>) -> Result<Self> {
+        // Retrieve the optional development ID.
+        let dev = transition_store.dev();
         Ok(Self {
-            id_map: rocksdb::RocksDB::open_map(N::ID, DataID::ExecutionIDMap)?,
-            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, DataID::ExecutionReverseIDMap)?,
-            edition_map: rocksdb::RocksDB::open_map(N::ID, DataID::ExecutionEditionMap)?,
+            id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ExecutionIDMap)?,
+            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ExecutionReverseIDMap)?,
+            edition_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ExecutionEditionMap)?,
             transition_store,
         })
     }

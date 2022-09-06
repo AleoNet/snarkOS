@@ -86,4 +86,7 @@ pub enum DataID {
     KeyValueIDMap,
     KeyMap,
     ValueMap,
+    // Testing
+    #[cfg(test)]
+    Test,
 }

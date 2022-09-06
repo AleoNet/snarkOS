@@ -35,6 +35,8 @@ pub struct ProgramDB<N: Network> {
     key_map: DataMap<Field<N>, Plaintext<N>>,
     /// The value map.
     value_map: DataMap<Field<N>, Value<N>>,
+    /// The optional development ID.
+    dev: Option<u16>,
 }
 
 #[rustfmt::skip]
@@ -46,16 +48,17 @@ impl<N: Network> ProgramStorage<N> for ProgramDB<N> {
     type ValueMap = DataMap<Field<N>, Value<N>>;
 
     /// Initializes the program state storage.
-    fn open() -> Result<Self> {
-
+    fn open(dev: Option<u16>) -> Result<Self> {
         Ok(Self {
-            program_id_map: rocksdb::RocksDB::open_map(N::ID, DataID::ProgramIDMap)?,
-            mapping_id_map: rocksdb::RocksDB::open_map(N::ID, DataID::MappingIDMap)?,
-            key_value_id_map: rocksdb::RocksDB::open_map(N::ID, DataID::KeyValueIDMap)?,
-            key_map: rocksdb::RocksDB::open_map(N::ID, DataID::KeyMap)?,
-            value_map: rocksdb::RocksDB::open_map(N::ID, DataID::ValueMap)?,
+            program_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ProgramIDMap)?,
+            mapping_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::MappingIDMap)?,
+            key_value_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::KeyValueIDMap)?,
+            key_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::KeyMap)?,
+            value_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ValueMap)?,
+            dev,
         })
     }
+
     /// Returns the program ID map.
     fn program_id_map(&self) -> &Self::ProgramIDMap {
         &self.program_id_map
@@ -79,5 +82,10 @@ impl<N: Network> ProgramStorage<N> for ProgramDB<N> {
     /// Returns the value map.
     fn value_map(&self) -> &Self::ValueMap {
         &self.value_map
+    }
+
+    /// Returns the optional development ID.
+    fn dev(&self) -> Option<u16> {
+        self.dev
     }
 }

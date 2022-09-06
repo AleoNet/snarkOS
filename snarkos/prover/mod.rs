@@ -140,11 +140,10 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                         }
                                     };
 
-                                    // Send the coinbase proof to the validators.
-                                    let validators = ledger.validators().read().clone();
+                                    // Send the coinbase proof to the peers.
                                     let peers = ledger.peers().read().clone();
 
-                                    for socket_addr in validators.iter() {
+                                    for (socket_addr, _) in peers.iter() {
                                         match peers.get(socket_addr) {
                                             Some(sender) => {
                                                 let _ = sender.send(Message::<N>::ProverSolution(Data::Object(coinbase_proof))).await;

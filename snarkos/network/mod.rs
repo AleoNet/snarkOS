@@ -308,9 +308,6 @@ pub fn connect_to_leader<N: Network, E: Environment>(initial_peer: SocketAddr, l
                         tokio::spawn(async move {
                             if let Err(err) = handle_peer::<N, E>(stream, initial_peer, ledger_clone.clone()).await {
                                 warn!("Error handling peer {}: {:?}", initial_peer, err);
-                            } else {
-                                // TODO (raychu86): Dynamically update validators. Currently only the beacon acts as a validator.
-                                ledger_clone.validators().write().insert(initial_peer);
                             }
                         });
                     }
