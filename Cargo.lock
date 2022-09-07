@@ -431,6 +431,7 @@ dependencies = [
  "libc",
  "once_cell",
  "terminal_size",
+ "unicode-width",
  "winapi",
 ]
 
@@ -1139,6 +1140,17 @@ dependencies = [
  "lazy_static",
  "number_prefix",
  "regex",
+]
+
+[[package]]
+name = "indicatif"
+version = "0.17.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fcc42b206e70d86ec03285b123e65a5458c92027d1fb2ae3555878b8113b3ddf"
+dependencies = [
+ "console",
+ "number_prefix",
+ "unicode-width",
 ]
 
 [[package]]
@@ -2063,10 +2075,27 @@ version = "0.30.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "88c865d17fb512577be02a09fd2fd96c31c7e46fe649205d84feefd8b2a332da"
 dependencies = [
+ "hyper",
+ "indicatif 0.16.2",
+ "log",
+ "quick-xml",
+ "regex",
+ "reqwest",
+ "semver",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "self_update"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b05ab948d728a6439b9da58a94c9df77d421a8bf558145681f908e170232f120"
+dependencies = [
  "either",
  "flate2",
  "hyper",
- "indicatif",
+ "indicatif 0.17.0",
  "log",
  "quick-xml",
  "regex",
@@ -2286,7 +2315,7 @@ dependencies = [
  "rocksdb",
  "rusoto_core",
  "rusty-hook",
- "self_update",
+ "self_update 0.31.0",
  "serde",
  "serde_json",
  "serial_test",
@@ -2333,7 +2362,7 @@ dependencies = [
  "parking_lot",
  "rand",
  "rayon",
- "self_update",
+ "self_update 0.30.0",
  "serde_json",
  "snarkvm-circuit",
  "snarkvm-compiler",
