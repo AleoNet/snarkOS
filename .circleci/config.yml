@@ -214,7 +214,7 @@ jobs:
 
   publish_snarkos_manifest:
     machine:
-      image: ubuntu-2204:202101-01
+      image: ubuntu-2204:2022.07.1
       docker_layer_caching: true
     resource_class: medium
     steps:
