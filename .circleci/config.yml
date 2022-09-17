@@ -216,7 +216,7 @@ jobs:
     machine:
       image: ubuntu-2204:2022.07.1
       docker_layer_caching: true
-    resource_class: medium
+    resource_class: arm.2xlarge
     steps:
       - checkout
       - attach_workspace:
@@ -247,7 +247,6 @@ jobs:
             docker manifest create $DOCKER_REPO:${CIRCLE_BRANCH}-latest --amend $DOCKER_REPO:${ARM_TAG} --amend $DOCKER_REPO:${AMD_TAG}
             docker manifest inspect $DOCKER_REPO:${CIRCLE_BRANCH}-latest
             docker manifest push $DOCKER_REPO:${CIRCLE_BRANCH}-latest
-            docker manifest push $DOCKER_REPO:latest
             echo "Pushed $DOCKER_REPO:${CIRCLE_BRANCH}-latest"
 
 workflows:
