@@ -16,13 +16,15 @@ commands:
             export WORK_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
             export SCCACHE_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
             mkdir -p "$CIRCLE_WORKING_DIRECTORY/.bin"
-            wget https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
-            tar -C "$CIRCLE_WORKING_DIRECTORY/.bin" -xvf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
-            mv $CIRCLE_WORKING_DIRECTORY/.bin/sccache-0.2.13-x86_64-unknown-linux-musl/sccache $CIRCLE_WORKING_DIRECTORY/.bin/sccache
+            wget https://github.com/mozilla/sccache/releases/download/v0.3.0/sccache-v0.3.0-x86_64-unknown-linux-musl.tar.gz
+            tar -C "$CIRCLE_WORKING_DIRECTORY/.bin" -xvf sccache-v0.3.0-x86_64-unknown-linux-musl.tar.gz
+            mv $CIRCLE_WORKING_DIRECTORY/.bin/sccache-v0.3.0-x86_64-unknown-linux-musl/sccache $CIRCLE_WORKING_DIRECTORY/.bin/sccache
             export PATH="$PATH:$CIRCLE_WORKING_DIRECTORY/.bin"
             export RUSTC_WRAPPER="sccache"
             rm -rf "$CIRCLE_WORKING_DIRECTORY/.cargo/registry"
-            sudo apt-get update && sudo apt-get install -y clang llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev
+            DEBIAN_FRONTEND=noninteractive sudo apt-get update
+            DEBIAN_FRONTEND=noninteractive sudo apt-get dist-upgrade -y -o DPkg::Options::=--force-confold
+            DEBIAN_FRONTEND=noninteractive sudo apt-get install -y --no-install-recommends clang llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev
       - restore_cache:
           keys:
             - << parameters.cache_key >>
@@ -70,7 +72,7 @@ jobs:
 
   environment:
     docker:
-      - image: cimg/rust:1.59
+      - image: cimg/rust:1.63
     resource_class: xlarge
     parallelism: 1
     steps:
@@ -85,7 +87,7 @@ jobs:
 
   snarkos:
     docker:
-      - image: cimg/rust:1.59
+      - image: cimg/rust:1.63
     resource_class: xlarge
     parallelism: 20
     steps:
@@ -100,7 +102,7 @@ jobs:
 
   # codecov:
   #   machine:
-  #     image: ubuntu-1604:202004-01
+  #     image: ubuntu-2204:2022.07.1
   #     docker_layer_caching: true
   #   resource_class: xlarge
   #   steps:
@@ -116,7 +118,7 @@ jobs:
 
   fmt:
     docker:
-      - image: cimg/rust:1.59
+      - image: cimg/rust:1.63
     resource_class: xlarge
     steps:
       - checkout
@@ -132,7 +134,7 @@ jobs:
 
   clippy:
     docker:
-      - image: cimg/rust:1.59
+      - image: cimg/rust:1.63
     resource_class: xlarge
     steps:
       - checkout
@@ -149,20 +151,20 @@ jobs:
 
   build-and-publish-docker-arm:
     machine:
-      image: ubuntu-2004:202101-01
+      image: ubuntu-2204:2022.07.1
       docker_layer_caching: true
-    resource_class: arm.large
+    resource_class: arm.2xlarge
     steps:
       - checkout
       - run: mkdir -p my_workspace
       - run:
-          name: "Build snarkOS Docker Image ARM V8"
+          name: "Build snarkOS Docker image arm-v8"
           no_output_timeout: 2h
           command: |
             VERSION=$(git rev-parse --short HEAD)
             docker build -f Dockerfile -t $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64 .
       - run:
-          name: "Push snarkOS Docker Image ARM V8"
+          name: "Push snarkOS Docker image arm-v8"
           command: |
             VERSION=$(git rev-parse --short HEAD)
             echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
@@ -170,7 +172,7 @@ jobs:
             docker push $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64
             echo "Pushed $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64"
       - run:
-          name: "Save arm64 image tag"
+          name: "Save arm-v8 image tag"
           command: |
             VERSION=$(git rev-parse --short HEAD)
             echo "$CIRCLE_BRANCH-$VERSION-arm64" > my_workspace/docker_tag_arm
@@ -181,20 +183,20 @@ jobs:
 
   build-and-publish-docker-amd:
     machine:
-      image: ubuntu-2004:202101-01
+      image: ubuntu-2204:2022.07.1
       docker_layer_caching: true
-    resource_class: xlarge
+    resource_class: 2xlarge
     steps:
       - checkout
       - run: mkdir -p my_workspace
       - run:
-          name: "Build snarkOS Docker Image AMD"
+          name: "Build snarkOS Docker image amd64"
           no_output_timeout: 2h
           command: |
             VERSION=$(git rev-parse --short HEAD)
             docker build -f Dockerfile -t $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64 .
       - run:
-          name: "Push snarkOS Docker Image AMD"
+          name: "Push snarkOS Docker image amd64"
           command: |
             VERSION=$(git rev-parse --short HEAD)
             echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
@@ -212,7 +214,7 @@ jobs:
 
   publish_snarkos_manifest:
     machine:
-      image: ubuntu-2004:202101-01
+      image: ubuntu-2204:202101-01
       docker_layer_caching: true
     resource_class: medium
     steps:
@@ -245,6 +247,7 @@ jobs:
             docker manifest create $DOCKER_REPO:${CIRCLE_BRANCH}-latest --amend $DOCKER_REPO:${ARM_TAG} --amend $DOCKER_REPO:${AMD_TAG}
             docker manifest inspect $DOCKER_REPO:${CIRCLE_BRANCH}-latest
             docker manifest push $DOCKER_REPO:${CIRCLE_BRANCH}-latest
+            docker manifest push $DOCKER_REPO:latest
             echo "Pushed $DOCKER_REPO:${CIRCLE_BRANCH}-latest"
 
 workflows:
