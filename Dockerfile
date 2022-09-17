@@ -1,8 +1,10 @@
-FROM ubuntu:18.04 AS builder
+FROM ubuntu:22.04 AS builder
+
 ENV RUSTUP_HOME=/usr/local/rustup \
     CARGO_HOME=/usr/local/cargo \
     PATH=/usr/local/cargo/bin:$PATH \
     DEBIAN_FRONTEND=noninteractive
+
 RUN set -eux ; \
     apt-get update -y && \
     apt-get dist-upgrade -y && \
@@ -38,22 +40,30 @@ RUN set -eux ; \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*;
+
 WORKDIR /usr/src/snarkOS
+
 COPY . .
+
 RUN cargo build --release
-FROM ubuntu:18.04
-SHELL ["/bin/bash", "-c"]
+
+#---
+FROM ubuntu:22.04
+
 VOLUME ["/aleo/data"]
+
 RUN set -ex && \
     apt-get update && \
     DEBIAN_FRONTEND=noninteractive apt-get dist-upgrade -y -o DPkg::Options::=--force-confold && \
     DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-    ca-certificates curl jq && \
+    ca-certificates && \
     apt-get purge -y --auto-remove -o APT::AutoRemove::RecommendsImportant=false && \
     apt-get clean && \
+    ln -s /aleo/data /root/.aleo && \
     rm -rf /var/lib/apt/lists/* && \
-    mkdir -p /aleo/{bin,data} && \
-    mkdir /usr/local/cargo
+    mkdir -p /aleo/{bin,data}
+
 COPY --from=builder /usr/src/snarkOS/target/release/snarkos /aleo/bin/
-COPY --from=builder /usr/src/snarkOS/start /aleo/
-CMD ["/aleo/start"]
+COPY --from=builder /usr/src/snarkOS/entrypoint.sh /aleo/
+
+CMD ["/aleo/entrypoint.sh"]
