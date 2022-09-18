@@ -263,7 +263,6 @@ workflows:
     when:
       or:
         - equal: [ testnet3, << pipeline.git.branch >> ]
-        - equal: [ docker-builds, << pipeline.git.branch >> ]
     jobs:
       - build-and-publish-docker-arm
       - build-and-publish-docker-amd
