@@ -37,7 +37,7 @@ version = "1"
 [dependencies.snarkvm]
 #path = "../../snarkVM"
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "b2cee23"
+rev = "44b1802"
 features = ["console", "utilities"]
 
 [dependencies.tokio]
