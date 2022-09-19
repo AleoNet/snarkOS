@@ -144,14 +144,14 @@ impl<N: Network> Ledger<N> {
         &self.ledger
     }
 
-    /// Returns the connected peers.
-    pub(super) const fn peers(&self) -> &Peers<N> {
-        &self.peers
-    }
-
     /// Returns the ledger address.
     pub const fn address(&self) -> &Address<N> {
         &self.address
+    }
+
+    /// Returns the connected peers.
+    pub(super) const fn peers(&self) -> &Peers<N> {
+        &self.peers
     }
 }
 
