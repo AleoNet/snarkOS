@@ -235,7 +235,7 @@ jobs:
             echo $AMD_TAG
             docker pull $DOCKER_REPO:$AMD_TAG
       - run:
-          name: "Create and push Docker multi arch manifest"
+          name: "Create and push Docker multi-arch manifests"
           command: |
             ARM_TAG=$(cat my_workspace/docker_tag_arm)
             AMD_TAG=$(cat my_workspace/docker_tag_amd)
@@ -248,6 +248,10 @@ jobs:
             docker manifest inspect $DOCKER_REPO:${CIRCLE_BRANCH}-latest
             docker manifest push $DOCKER_REPO:${CIRCLE_BRANCH}-latest
             echo "Pushed $DOCKER_REPO:${CIRCLE_BRANCH}-latest"
+            docker manifest create $DOCKER_REPO:latest --amend $DOCKER_REPO:${ARM_TAG} --amend $DOCKER_REPO:${AMD_TAG}
+            docker manifest inspect $DOCKER_REPO:latest
+            docker manifest push $DOCKER_REPO:latest
+            echo "Pushed $DOCKER_REPO:latest"
 
 workflows:
   main-workflow:
