@@ -38,7 +38,7 @@ futures = { version = "0.3" }
 hyper = { version = "0.14" }
 hyper-tls = { version = "0.5" }
 indexmap = { version = "1.9", features = ["rayon"] }
-once_cell = { version = "1.13.0" }
+once_cell = { version = "1.15.0" }
 parking_lot = { version = "0.12" }
 rusoto_core = { version = "0.48" }
 tokio-util = { version = "0.7.3" }
