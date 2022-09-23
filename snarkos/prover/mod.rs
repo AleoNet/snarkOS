@@ -14,10 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm::{
-    compiler::{CoinbasePuzzle, CoinbasePuzzleProvingKey, CoinbasePuzzleVerifyingKey},
-    prelude::*,
-};
+use snarkvm::{compiler::CoinbasePuzzle, prelude::*};
 
 use crate::{
     environment::{
@@ -45,19 +42,14 @@ pub type ProverHandler = mpsc::Receiver<ProverRequest>;
 /// An enum of requests that the `Prover` struct processes.
 pub enum ProverRequest {}
 
-/// The prover heartbeat in seconds.
-const PROVER_HEARTBEAT_IN_SECONDS: Duration = Duration::from_secs(1);
+/// The prover heartbeat in milliseconds.
+const PROVER_HEARTBEAT_IN_MILLISECONDS: Duration = Duration::from_millis(500);
 
 pub struct Prover<N: Network, E: Environment> {
     /// The prover router of the node.
     router: ProverRouter,
     /// The shared ledger state of the owned node.
     ledger: Arc<Ledger<N>>,
-    // TODO (raych86): Use a OnceBox and do not load if the node is not a prover.
-    /// The coinbase puzzle proving key.
-    coinbase_puzzle_proving_key: Arc<CoinbasePuzzleProvingKey<N>>,
-    /// The coinbase puzzle verifying key.
-    coinbase_puzzle_verifying_key: Arc<CoinbasePuzzleVerifyingKey<N>>,
     /// PhantomData.
     _phantom: PhantomData<(N, E)>,
 }
@@ -68,16 +60,10 @@ impl<N: Network, E: Environment> Prover<N, E> {
         // Initialize an mpsc channel for sending requests to the `Prover` struct.
         let (router, handler) = mpsc::channel(1024);
 
-        // Load the coinbase puzzle proving and verifying key.
-        let (coinbase_puzzle_proving_key, coinbase_puzzle_verifying_key) =
-            CoinbasePuzzle::<N>::load().map(|(proving_key, verifying_key)| (Arc::new(proving_key), Arc::new(verifying_key)))?;
-
         // Initialize the prover.
         let prover = Self {
             router,
             ledger,
-            coinbase_puzzle_proving_key,
-            coinbase_puzzle_verifying_key,
             _phantom: PhantomData,
         };
 
@@ -92,7 +78,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
             // Initialize the prover process.
             let (router, handler) = oneshot::channel();
             let ledger = self.ledger.clone();
-            let proving_key = self.coinbase_puzzle_proving_key.clone();
             E::resources().register_task(
                 None,
                 tokio::spawn(async move {
@@ -102,12 +87,12 @@ impl<N: Network, E: Environment> Prover<N, E> {
                     loop {
                         // If `terminator` is `false` and the status is not `Peering` already,
                         // then generate a coinbase proof.
-                        if E::terminator().load(Ordering::SeqCst) & !E::status().is_peering() {
+
+                        if !E::terminator().load(Ordering::SeqCst) & E::status().is_ready() {
                             // Set the status to `Proving`.
                             E::status().update(Status::Proving);
 
                             let ledger = ledger.clone();
-                            let proving_key = proving_key.clone();
 
                             // Craft a coinbase proof.
                             let proving_task_id = E::resources().procure_id();
@@ -115,8 +100,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                 Some(proving_task_id),
                                 tokio::spawn(async move {
                                     // Construct a coinbase proof.
-                                    let epoch_info = ledger.ledger().read().get_epoch_info();
-                                    let epoch_challenge = match ledger.ledger().read().get_epoch_challenge() {
+                                    let epoch_info = ledger.ledger().read().latest_epoch_info();
+
+                                    trace!("Generating proof for round {}", epoch_info.epoch_number);
+
+                                    let epoch_challenge = match ledger.ledger().read().latest_epoch_challenge() {
                                         Ok(challenge) => challenge,
                                         Err(error) => {
                                             warn!("Failed to get epoch challenge: {}", error);
@@ -126,8 +114,8 @@ impl<N: Network, E: Environment> Prover<N, E> {
 
                                     let nonce = u64::rand(&mut ::rand::thread_rng());
 
-                                    let coinbase_proof = match CoinbasePuzzle::<N>::prove(
-                                        &proving_key,
+                                    let prover_solution = match CoinbasePuzzle::<N>::prove(
+                                        ledger.ledger().read().coinbase_puzzle_proving_key(),
                                         &epoch_info,
                                         &epoch_challenge,
                                         ledger.address(),
@@ -135,10 +123,34 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                     ) {
                                         Ok(proof) => proof,
                                         Err(error) => {
-                                            warn!("Failed to generate coinbase proof: {}", error);
+                                            warn!("Failed to generate prover solution: {}", error);
                                             return;
                                         }
                                     };
+
+                                    // Fetch the prover solution difficulty target.
+                                    let prover_solution_difficulty_target = match prover_solution.to_difficulty_target() {
+                                        Ok(difficulty_target) => difficulty_target,
+                                        Err(error) => {
+                                            warn!("Failed to fetch prover solution difficulty target: {}", error);
+                                            return;
+                                        }
+                                    };
+
+                                    // Fetch the latest proof target.
+                                    let proof_target = match ledger.ledger().read().latest_proof_target() {
+                                        Ok(target) => target,
+                                        Err(error) => {
+                                            warn!("Failed to get latest proof target: {}", error);
+                                            return;
+                                        }
+                                    };
+
+                                    // Ensure that the prover solution difficulty is sufficient.
+                                    if prover_solution_difficulty_target < proof_target {
+                                        warn!("Generated coinbase proof does not meet the target difficulty");
+                                        return;
+                                    }
 
                                     // Send the coinbase proof to the peers.
                                     let peers = ledger.peers().read().clone();
@@ -146,7 +158,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                     for (socket_addr, _) in peers.iter() {
                                         match peers.get(socket_addr) {
                                             Some(sender) => {
-                                                let _ = sender.send(Message::<N>::ProverSolution(Data::Object(coinbase_proof))).await;
+                                                let _ = sender.send(Message::<N>::ProverSolution(Data::Object(prover_solution))).await;
                                             }
                                             None => {
                                                 warn!("Error finding validator '{}' in peers list", socket_addr);
@@ -164,7 +176,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                         }
 
                         // Proceed to sleep for a preset amount of time
-                        tokio::time::sleep(PROVER_HEARTBEAT_IN_SECONDS).await;
+                        tokio::time::sleep(PROVER_HEARTBEAT_IN_MILLISECONDS).await;
                     }
                 }),
             );
