@@ -18,7 +18,10 @@ mod message;
 pub use message::*;
 
 use crate::{
-    environment::{helpers::NodeType, Environment},
+    environment::{
+        helpers::{NodeType, Status},
+        Environment,
+    },
     Ledger,
 };
 
@@ -46,7 +49,7 @@ pub struct Peer<N: Network> {
 }
 
 impl<N: Network> Peer<N> {
-    async fn new(stream: TcpStream, ledger: Arc<Ledger<N>>) -> io::Result<Self> {
+    async fn new<E: Environment>(stream: TcpStream, ledger: Arc<Ledger<N>>) -> io::Result<Self> {
         let outbound = Framed::new(stream, Default::default());
         let addr = outbound.get_ref().peer_addr()?;
 
@@ -63,6 +66,10 @@ impl<N: Network> Peer<N> {
             return Err(error(format!("Peer {} already exists", addr)));
         } else {
             ledger.peers().write().insert(addr, outbound_sender);
+
+            if ledger.peers().read().len() >= E::MINIMUM_NUMBER_OF_PEERS {
+                E::status().update(Status::Ready);
+            }
         }
 
         Ok(Self {
@@ -79,7 +86,7 @@ pub(crate) async fn handle_peer<N: Network, E: Environment>(
     peer_ip: SocketAddr,
     ledger: Arc<Ledger<N>>,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    let mut peer = Peer::<N>::new(stream, ledger.clone()).await?;
+    let mut peer = Peer::<N>::new::<E>(stream, ledger.clone()).await?;
 
     info!("Connected to peer: {:?}", peer_ip);
 
