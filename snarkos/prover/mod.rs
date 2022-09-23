@@ -147,10 +147,15 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                     };
 
                                     // Ensure that the prover solution difficulty is sufficient.
-                                    if prover_solution_difficulty_target < proof_target {
+                                    if prover_solution_difficulty_target > proof_target {
                                         warn!("Generated coinbase proof does not meet the target difficulty");
                                         return;
                                     }
+
+                                    trace!(
+                                        "Generated coinbase proof with target difficulty {}",
+                                        prover_solution_difficulty_target
+                                    );
 
                                     // Send the coinbase proof to the peers.
                                     let peers = ledger.peers().read().clone();

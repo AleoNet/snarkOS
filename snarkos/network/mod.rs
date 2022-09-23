@@ -223,10 +223,12 @@ pub(crate) async fn handle_peer<N: Network, E: Environment>(
                                 // Attempt to insert the prover puzzle solution into the mempool.
                                 if let Err(err) = ledger.add_to_prover_puzzle_memory_pool(prover_solution) {
                                     trace!(
-                                        "Failed to add prover solution {} to mempool: {:?}",
+                                        "Failed to add prover solution (from {}) to mempool: {:?}",
                                         prover_solution.commitment().0,
                                         err
                                     );
+                                } else {
+                                    trace!("Added prover solution from {} to mempool", prover_solution.address());
                                 }
                             }
                         }
