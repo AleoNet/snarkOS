@@ -88,7 +88,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                         // If `terminator` is `false` and the status is not `Peering` already,
                         // then generate a coinbase proof.
 
-                        if !E::terminator().load(Ordering::SeqCst) & E::status().is_ready() {
+                        if !E::terminator().load(Ordering::SeqCst) & !E::status().is_peering() {
                             // Set the status to `Proving`.
                             E::status().update(Status::Proving);
 
