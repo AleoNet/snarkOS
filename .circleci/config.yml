@@ -102,7 +102,7 @@ jobs:
 
   # codecov:
   #   machine:
-  #     image: ubuntu-2204:2022.07.1
+  #     image: ubuntu-2204:current
   #     docker_layer_caching: true
   #   resource_class: xlarge
   #   steps:
@@ -151,7 +151,7 @@ jobs:
 
   build-and-publish-docker-arm:
     machine:
-      image: ubuntu-2204:2022.07.1
+      image: ubuntu-2204:current
       docker_layer_caching: true
     resource_class: arm.2xlarge
     steps:
@@ -183,7 +183,7 @@ jobs:
 
   build-and-publish-docker-amd:
     machine:
-      image: ubuntu-2204:2022.07.1
+      image: ubuntu-2204:current
       docker_layer_caching: true
     resource_class: 2xlarge
     steps:
@@ -214,7 +214,7 @@ jobs:
 
   publish_snarkos_manifest:
     machine:
-      image: ubuntu-2204:2022.07.1
+      image: ubuntu-2204:current
       docker_layer_caching: true
     resource_class: arm.2xlarge
     steps:
