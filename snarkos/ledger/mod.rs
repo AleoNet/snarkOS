@@ -139,7 +139,7 @@ impl<N: Network> Ledger<N> {
     }
 
     /// Returns the ledger.
-    pub(super) const fn ledger(&self) -> &Arc<RwLock<InternalLedger<N>>> {
+    pub const fn ledger(&self) -> &Arc<RwLock<InternalLedger<N>>> {
         &self.ledger
     }
 
