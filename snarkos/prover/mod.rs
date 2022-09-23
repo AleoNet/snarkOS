@@ -152,11 +152,6 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                         return;
                                     }
 
-                                    trace!(
-                                        "Generated coinbase proof with target difficulty {}",
-                                        prover_solution_difficulty_target
-                                    );
-
                                     // Send the coinbase proof to the peers.
                                     let peers = ledger.peers().read().clone();
 
