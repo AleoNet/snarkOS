@@ -41,7 +41,7 @@ indexmap = { version = "1.9", features = ["rayon"] }
 once_cell = { version = "1.13.0" }
 parking_lot = { version = "0.12" }
 rusoto_core = { version = "0.48" }
-tokio-util = { version = "0.7.3" }
+tokio-util = { version = "0.7.4" }
 warp = { version = "0.3" }
 
 [dependencies.snarkos-environment]
