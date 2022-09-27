@@ -63,13 +63,14 @@ pub mod prelude {
     pub use snarkvm::prelude::{Address, Network};
 }
 
+use anyhow::anyhow;
 use backoff::{future::retry, ExponentialBackoff};
 use futures::Future;
 use std::time::Duration;
 
-pub(crate) async fn handle_dispatch_error<'a, T, F>(func: impl Fn() -> F + 'a) -> reqwest::Result<T>
+pub(crate) async fn handle_dispatch_error<'a, T, F>(func: impl Fn() -> F + 'a) -> anyhow::Result<T>
 where
-    F: Future<Output = Result<T, reqwest::Error>>,
+    F: Future<Output = Result<T, anyhow::Error>>,
 {
     fn default_backoff() -> ExponentialBackoff {
         ExponentialBackoff {
@@ -79,16 +80,26 @@ where
         }
     }
 
-    fn from_reqwest_err(err: reqwest::Error) -> backoff::Error<reqwest::Error> {
+    fn from_anyhow_err(err: anyhow::Error) -> backoff::Error<anyhow::Error> {
         use backoff::Error;
 
-        if err.is_timeout() {
-            debug!("Retrying server timeout error");
-            Error::Transient { err, retry_after: None }
+        if let Ok(err) = err.downcast::<reqwest::Error>() {
+            if err.is_timeout() {
+                debug!("Retrying server timeout error");
+                Error::Transient {
+                    err: err.into(),
+                    retry_after: None,
+                }
+            } else {
+                Error::Permanent(err.into())
+            }
         } else {
-            Error::Permanent(err)
+            Error::Transient {
+                err: anyhow!("Block parse error"),
+                retry_after: None,
+            }
         }
     }
 
-    retry(default_backoff(), || async { func().await.map_err(from_reqwest_err) }).await
+    retry(default_backoff(), || async { func().await.map_err(from_anyhow_err) }).await
 }
