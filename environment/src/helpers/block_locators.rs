@@ -248,7 +248,6 @@ mod tests {
         // assert_eq!(expected_block_locators, serde_json::from_str(&candidate_string).unwrap());
     }
 
-    #[cfg(feature = "network")]
     #[test]
     fn test_block_locators_bincode() {
         // let expected_block_height = CurrentNetwork::genesis_block().height();
