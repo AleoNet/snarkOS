@@ -138,9 +138,15 @@ impl<N: Network> Ledger<N> {
         }))
     }
 
+    // TODO (raychu86): Restrict visibility.
     /// Returns the ledger.
-    pub(super) const fn ledger(&self) -> &Arc<RwLock<InternalLedger<N>>> {
+    pub const fn ledger(&self) -> &Arc<RwLock<InternalLedger<N>>> {
         &self.ledger
+    }
+
+    /// Returns the ledger address.
+    pub const fn address(&self) -> &Address<N> {
+        &self.address
     }
 
     /// Returns the connected peers.
