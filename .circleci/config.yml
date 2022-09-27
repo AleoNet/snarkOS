@@ -70,7 +70,7 @@ jobs:
 
   environment:
     docker:
-      - image: cimg/rust:1.60
+      - image: cimg/rust:1.62
     resource_class: xlarge
     parallelism: 1
     steps:
@@ -85,7 +85,7 @@ jobs:
 
   snarkos:
     docker:
-      - image: cimg/rust:1.60
+      - image: cimg/rust:1.62
     resource_class: xlarge
     parallelism: 20
     steps:
@@ -116,7 +116,7 @@ jobs:
 
   fmt:
     docker:
-      - image: cimg/rust:1.60
+      - image: cimg/rust:1.62
     resource_class: xlarge
     steps:
       - checkout
@@ -132,7 +132,7 @@ jobs:
 
   clippy:
     docker:
-      - image: cimg/rust:1.60
+      - image: cimg/rust:1.62
     resource_class: xlarge
     steps:
       - checkout
