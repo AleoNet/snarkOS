@@ -79,7 +79,7 @@ jobs:
           cache_key: snarkos-environment-cache
       - run_parallel:
           workspace_member: environment
-          features: network
+          features: ""
       - clear_environment:
           cache_key: snarkos-environment-cache
 
