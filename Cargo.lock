@@ -2063,6 +2063,23 @@ version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b05ab948d728a6439b9da58a94c9df77d421a8bf558145681f908e170232f120"
 dependencies = [
+ "hyper",
+ "indicatif",
+ "log",
+ "quick-xml",
+ "regex",
+ "reqwest",
+ "semver",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "self_update"
+version = "0.32.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7e08f3ce73aed26096783c26570ba416ff8f4524c89a14bcdf068967dc80daef"
+dependencies = [
  "either",
  "flate2",
  "hyper",
@@ -2286,7 +2303,7 @@ dependencies = [
  "rocksdb",
  "rusoto_core",
  "rusty-hook",
- "self_update",
+ "self_update 0.32.0",
  "serde",
  "serde_json",
  "serial_test",
@@ -2333,7 +2350,7 @@ dependencies = [
  "parking_lot",
  "rand",
  "rayon",
- "self_update",
+ "self_update 0.31.0",
  "serde_json",
  "snarkvm-circuit",
  "snarkvm-compiler",

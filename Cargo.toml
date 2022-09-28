@@ -93,7 +93,7 @@ default-features = false
 features = [ "lz4" ]
 
 [dependencies.self_update]
-version = "0.31"
+version = "0.32"
 features = [
   "archive-zip",
   "compression-zip-bzip2",
