@@ -14,17 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{handle_dispatch_error, BlockDB, Data, ProgramDB};
+use crate::{environment::Environment, handle_dispatch_error, BlockDB, Data, Message, Peers, PeersRequest, ProgramDB};
 use snarkvm::prelude::*;
 
 use colored::Colorize;
 use futures::StreamExt;
 use indexmap::IndexMap;
 use parking_lot::RwLock;
-use std::{
-    net::{IpAddr, SocketAddr},
-    sync::Arc,
-};
+use std::{net::IpAddr, sync::Arc};
 use tokio::task;
 use warp::{reply, Filter, Rejection, Reply};
 
@@ -34,27 +31,32 @@ pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockDB<N>, Prog
 pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockDB<N>, ProgramDB<N>>;
 // pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockMemory<N>, ProgramMemory<N>>;
 
-pub(crate) type Peers<N> = Arc<RwLock<IndexMap<SocketAddr, crate::Sender<N>>>>;
-
 #[allow(dead_code)]
-pub struct Ledger<N: Network> {
+pub struct Ledger<N: Network, E: Environment> {
     /// The ledger.
     ledger: Arc<RwLock<InternalLedger<N>>>,
     /// The server.
     server: InternalServer<N>,
-    /// The peers.
-    peers: Peers<N>,
     /// The account private key.
     private_key: PrivateKey<N>,
     /// The account view key.
     view_key: ViewKey<N>,
     /// The account address.
     address: Address<N>,
+
+    // TODO (raychu86): Separate this out of the ledger and only store the peers router.
+    /// The peer state of the node.
+    peers: Arc<Peers<N, E>>,
 }
 
-impl<N: Network> Ledger<N> {
+impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger.
-    pub(super) fn new_with_genesis(private_key: PrivateKey<N>, genesis_block: Block<N>, dev: Option<u16>) -> Result<Arc<Self>> {
+    pub(super) fn new_with_genesis(
+        private_key: PrivateKey<N>,
+        genesis_block: Block<N>,
+        peers: Arc<Peers<N, E>>,
+        dev: Option<u16>,
+    ) -> Result<Arc<Self>> {
         // Initialize the ledger.
         let ledger = match InternalLedger::new_with_genesis(&genesis_block, genesis_block.signature().to_address(), dev) {
             Ok(ledger) => Arc::new(RwLock::new(ledger)),
@@ -70,25 +72,22 @@ impl<N: Network> Ledger<N> {
         };
 
         // Return the ledger.
-        Self::from(ledger, private_key)
+        Self::from(ledger, private_key, peers)
     }
 
     /// Opens an instance of the ledger.
-    pub fn load(private_key: PrivateKey<N>, dev: Option<u16>) -> Result<Arc<Self>> {
+    pub fn load(private_key: PrivateKey<N>, peers: Arc<Peers<N, E>>, dev: Option<u16>) -> Result<Arc<Self>> {
         // Initialize the ledger.
         let ledger = Arc::new(RwLock::new(InternalLedger::open(dev)?));
         // Return the ledger.
-        Self::from(ledger, private_key)
+        Self::from(ledger, private_key, peers)
     }
 
     /// Initializes a new instance of the ledger.
-    pub fn from(ledger: Arc<RwLock<InternalLedger<N>>>, private_key: PrivateKey<N>) -> Result<Arc<Self>> {
+    pub fn from(ledger: Arc<RwLock<InternalLedger<N>>>, private_key: PrivateKey<N>, peers: Arc<Peers<N, E>>) -> Result<Arc<Self>> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
-
-        // Initialize the peers.
-        let peers: Peers<N> = Default::default();
 
         // Initialize the additional routes.
         #[allow(clippy::let_and_return)]
@@ -112,13 +111,15 @@ impl<N: Network> Ledger<N> {
                 .and_then(get_peers_all);
 
             /// Returns the number of peers connected to the node.
-            async fn get_peers_count<N: Network>(peers: Peers<N>) -> Result<impl Reply, Rejection> {
-                Ok(reply::json(&peers.read().len()))
+            async fn get_peers_count<N: Network, E: Environment>(peers: Arc<Peers<N, E>>) -> Result<impl Reply, Rejection> {
+                Ok(reply::json(&peers.number_of_connected_peers().await))
             }
 
             /// Returns the peers connected to the node.
-            async fn get_peers_all<N: Network>(peers: Peers<N>) -> Result<impl Reply, Rejection> {
-                Ok(reply::json(&peers.read().keys().map(|addr| addr.ip()).collect::<Vec<IpAddr>>()))
+            async fn get_peers_all<N: Network, E: Environment>(peers: Arc<Peers<N, E>>) -> Result<impl Reply, Rejection> {
+                Ok(reply::json(
+                    &peers.connected_peers().await.iter().map(|addr| addr.ip()).collect::<Vec<IpAddr>>(),
+                ))
             }
 
             get_node_address.or(get_peers_count).or(get_peers_all)
@@ -131,10 +132,10 @@ impl<N: Network> Ledger<N> {
         Ok(Arc::new(Self {
             ledger,
             server,
-            peers,
             private_key,
             view_key,
             address,
+            peers,
         }))
     }
 
@@ -150,12 +151,12 @@ impl<N: Network> Ledger<N> {
     }
 
     /// Returns the connected peers.
-    pub(super) const fn peers(&self) -> &Peers<N> {
-        &self.peers
+    pub(super) fn peers(&self) -> Arc<Peers<N, E>> {
+        self.peers.clone()
     }
 }
 
-impl<N: Network> Ledger<N> {
+impl<N: Network, E: Environment> Ledger<N, E> {
     /// Adds the given transaction to the memory pool.
     pub fn add_to_memory_pool(&self, transaction: Transaction<N>) -> Result<()> {
         self.ledger.write().add_to_memory_pool(transaction)
@@ -179,11 +180,16 @@ impl<N: Network> Ledger<N> {
         let serialized_block = Data::Object(next_block.clone()).serialize().await?;
 
         // Broadcast the block to all peers.
-        let peers = self.peers().read().clone();
-        for (_, sender) in peers.iter() {
-            let _ = sender
-                .send(crate::Message::<N>::BlockBroadcast(Data::Buffer(serialized_block.clone())))
-                .await;
+        if let Err(err) = self
+            .peers()
+            .router()
+            .send(PeersRequest::MessagePropagate(
+                *self.peers().local_ip(),
+                Message::<N>::BlockBroadcast(Data::Buffer(serialized_block.clone())),
+            ))
+            .await
+        {
+            warn!("Error broadcasting BlockBroadcast to peers: {}", err);
         }
 
         // Return the next block.
@@ -205,7 +211,7 @@ impl<N: Network> Ledger<N> {
 }
 
 // Internal operations.
-impl<N: Network> Ledger<N> {
+impl<N: Network, E: Environment> Ledger<N, E> {
     /// Returns the unspent records.
     pub fn find_unspent_records(&self) -> Result<IndexMap<Field<N>, Record<N, Plaintext<N>>>> {
         // Fetch the unspent records.
@@ -282,7 +288,7 @@ impl<N: Network> Ledger<N> {
 }
 
 // Internal operations.
-impl<N: Network> Ledger<N> {
+impl<N: Network, E: Environment> Ledger<N, E> {
     /// Syncs the ledger with the network.
     pub(crate) async fn initial_sync_with_network(self: &Arc<Self>, leader_ip: IpAddr) -> Result<()> {
         /// The number of concurrent requests with the network.

@@ -14,9 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::CLI;
+use crate::{Peer, CLI};
 
-use crate::{connect_to_leader, handle_listener, handle_peer, request_genesis_block, send_pings, Account, Ledger};
+use crate::{connect_to_leader, handle_listener, request_genesis_block, send_pings, Account, Ledger, Peers};
 use snarkos_environment::{helpers::Status, Environment};
 use snarkvm::prelude::Network;
 
@@ -27,7 +27,7 @@ use std::{net::SocketAddr, sync::Arc};
 #[derive(Clone)]
 pub struct Node<N: Network, E: Environment> {
     /// The ledger.
-    ledger: Arc<Ledger<N>>,
+    ledger: Arc<Ledger<N, E>>,
     /// PhantomData.
     _phantom: PhantomData<(N, E)>,
 }
@@ -35,11 +35,17 @@ pub struct Node<N: Network, E: Environment> {
 impl<N: Network, E: Environment> Node<N, E> {
     /// Initializes a new instance of the node.
     pub async fn new(cli: &CLI, account: Account<N>) -> Result<Self> {
+        // Initialize the listener.
+        let listener = tokio::net::TcpListener::bind(cli.node).await?;
+
+        // Initialize a new instance for managing peers.
+        let peers = Peers::new(listener.local_addr()?).await;
+
         // Initialize the ledger.
         let ledger = match cli.dev {
             None => {
                 // Initialize the ledger.
-                let ledger = Ledger::<N>::load(*account.private_key(), cli.dev)?;
+                let ledger = Ledger::<N, E>::load(*account.private_key(), peers.clone(), cli.dev)?;
                 // Sync the ledger with the network.
                 ledger.initial_sync_with_network(cli.beacon_addr.ip()).await?;
 
@@ -52,26 +58,23 @@ impl<N: Network, E: Environment> Node<N, E> {
                 let genesis_block = request_genesis_block::<N>(cli.beacon_addr.ip()).await?;
 
                 // Initialize the ledger from the provided genesis block.
-                Ledger::<N>::new_with_genesis(*account.private_key(), genesis_block, cli.dev)?
+                Ledger::<N, E>::new_with_genesis(*account.private_key(), genesis_block, peers.clone(), cli.dev)?
             }
         };
 
-        // Initialize the listener.
-        let listener = tokio::net::TcpListener::bind(cli.node).await?;
-
         // Handle incoming connections.
-        let _handle_listener = handle_listener::<N>(listener, ledger.clone());
+        let _handle_listener = handle_listener::<N, E>(listener, ledger.clone());
 
         // Connect to the leader node and listen for new blocks.
         let leader_addr = cli.beacon_addr;
         trace!("Connecting to '{}'...", leader_addr);
-        let _leader_conn_task = connect_to_leader::<N>(leader_addr, ledger.clone());
+        let _leader_conn_task = connect_to_leader::<N, E>(leader_addr, ledger.clone());
 
         // Send pings to all peers every 10 seconds.
-        let _pings = send_pings::<N>(ledger.clone());
+        let _pings = send_pings::<N, E>(ledger.clone());
 
         Ok(Self {
-            ledger: ledger.clone(),
+            ledger,
             _phantom: PhantomData,
         })
     }
@@ -82,11 +85,13 @@ impl<N: Network, E: Environment> Node<N, E> {
         match tokio::net::TcpStream::connect(peer_ip).await {
             Ok(stream) => {
                 let ledger = self.ledger.clone();
-                tokio::spawn(async move {
-                    if let Err(err) = handle_peer::<N>(stream, peer_ip, ledger).await {
-                        warn!("Failed to handle connection with peer {}: {:?}", peer_ip, err);
-                    }
-                });
+                E::resources().register_task(
+                    None,
+                    tokio::spawn(async move {
+                        Peer::handler(stream, peer_ip, ledger.clone(), &ledger.peers().router()).await;
+                    }),
+                );
+
                 Ok(())
             }
             Err(error) => {
