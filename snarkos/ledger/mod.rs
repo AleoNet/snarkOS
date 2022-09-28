@@ -14,16 +14,65 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{environment::Environment, handle_dispatch_error, BlockDB, Data, Message, Peers, PeersRequest, ProgramDB};
+use crate::{
+    environment::{helpers::NodeType, Environment},
+    handle_dispatch_error,
+    BlockDB,
+    Data,
+    DisconnectReason,
+    Message,
+    Peers,
+    PeersRequest,
+    PeersRouter,
+    ProgramDB,
+};
 use snarkvm::prelude::*;
 
+use ::time::OffsetDateTime;
 use colored::Colorize;
 use futures::StreamExt;
 use indexmap::IndexMap;
 use parking_lot::RwLock;
-use std::{net::IpAddr, sync::Arc};
-use tokio::task;
+use std::{
+    net::{IpAddr, SocketAddr},
+    sync::Arc,
+};
+use tokio::{
+    sync::{mpsc, oneshot},
+    task,
+};
 use warp::{reply, Filter, Rejection, Reply};
+
+/// Shorthand for the parent half of the `Ledger` message channel.
+pub(crate) type LedgerRouter<N> = mpsc::Sender<LedgerRequest<N>>;
+#[allow(unused)]
+/// Shorthand for the child half of the `Ledger` message channel.
+type LedgerHandler<N> = mpsc::Receiver<LedgerRequest<N>>;
+
+///
+/// An enum of requests that the `Ledger` struct processes.
+///
+#[derive(Debug)]
+pub enum LedgerRequest<N: Network> {
+    /// BlockResponse := (peer_ip, block)
+    BlockResponse(SocketAddr, Block<N>),
+    /// BlockRequest := (peer_ip, block_height)
+    BlockRequest(SocketAddr, u32),
+    /// Disconnect := (peer_ip, reason)
+    Disconnect(SocketAddr, DisconnectReason),
+    /// Failure := (peer_ip, failure)
+    Failure(SocketAddr, String),
+    /// Heartbeat
+    Heartbeat,
+    /// Ping := (peer_ip)
+    Ping(SocketAddr),
+    /// Pong := (peer_ip, block_height, node_type)
+    Pong(SocketAddr, u32, Option<NodeType>),
+    /// UnconfirmedBlock := (peer_ip, block)
+    UnconfirmedBlock(SocketAddr, Block<N>),
+    /// UnconfirmedTransaction := (peer_ip, transaction)
+    UnconfirmedTransaction(SocketAddr, Transaction<N>),
+}
 
 pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockDB<N>, ProgramDB<N>>;
 // pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockMemory<N>, ProgramMemory<N>>;
@@ -31,10 +80,14 @@ pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockDB<N>, Prog
 pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockDB<N>, ProgramDB<N>>;
 // pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockMemory<N>, ProgramMemory<N>>;
 
+pub type PeersState = IndexMap<SocketAddr, Option<NodeType>>;
+
 #[allow(dead_code)]
 pub struct Ledger<N: Network, E: Environment> {
     /// The ledger.
     ledger: Arc<RwLock<InternalLedger<N>>>,
+    /// The ledger router of the node.
+    ledger_router: LedgerRouter<N>,
     /// The server.
     server: InternalServer<N>,
     /// The account private key.
@@ -43,15 +96,17 @@ pub struct Ledger<N: Network, E: Environment> {
     view_key: ViewKey<N>,
     /// The account address.
     address: Address<N>,
-
-    // TODO (raychu86): Separate this out of the ledger and only store the peers router.
-    /// The peer state of the node.
+    /// The map of each peer to their ledger state := node_type.
+    peers_state: RwLock<PeersState>,
+    /// The peers router of the node.
     peers: Arc<Peers<N, E>>,
+    /// The map of each peer to their failure messages := (failure_message, timestamp).
+    failures: RwLock<IndexMap<SocketAddr, Vec<(String, i64)>>>,
 }
 
 impl<N: Network, E: Environment> Ledger<N, E> {
     /// Initializes a new instance of the ledger.
-    pub(super) fn new_with_genesis(
+    pub(super) async fn new_with_genesis(
         private_key: PrivateKey<N>,
         genesis_block: Block<N>,
         peers: Arc<Peers<N, E>>,
@@ -72,19 +127,19 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         };
 
         // Return the ledger.
-        Self::from(ledger, private_key, peers)
+        Self::from(ledger, private_key, peers).await
     }
 
     /// Opens an instance of the ledger.
-    pub fn load(private_key: PrivateKey<N>, peers: Arc<Peers<N, E>>, dev: Option<u16>) -> Result<Arc<Self>> {
+    pub async fn load(private_key: PrivateKey<N>, peers: Arc<Peers<N, E>>, dev: Option<u16>) -> Result<Arc<Self>> {
         // Initialize the ledger.
         let ledger = Arc::new(RwLock::new(InternalLedger::open(dev)?));
         // Return the ledger.
-        Self::from(ledger, private_key, peers)
+        Self::from(ledger, private_key, peers).await
     }
 
     /// Initializes a new instance of the ledger.
-    pub fn from(ledger: Arc<RwLock<InternalLedger<N>>>, private_key: PrivateKey<N>, peers: Arc<Peers<N, E>>) -> Result<Arc<Self>> {
+    pub async fn from(ledger: Arc<RwLock<InternalLedger<N>>>, private_key: PrivateKey<N>, peers: Arc<Peers<N, E>>) -> Result<Arc<Self>> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
@@ -128,15 +183,46 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         // Initialize the server.
         let server = InternalServer::<N>::start(ledger.clone(), Some(additional_routes), None)?;
 
-        // Return the ledger.
-        Ok(Arc::new(Self {
+        // Initialize an mpsc channel for sending requests to the `Ledger` struct.
+        let (ledger_router, mut ledger_handler) = mpsc::channel(1024);
+
+        // Initialize the ledger.
+        let ledger = Arc::new(Self {
             ledger,
+            ledger_router,
             server,
             private_key,
             view_key,
             address,
+            peers_state: Default::default(),
+            failures: Default::default(),
             peers,
-        }))
+        });
+
+        // Initialize the handler for the ledger.
+        {
+            let ledger = ledger.clone();
+            let (router, handler) = oneshot::channel();
+            E::resources().register_task(
+                None,
+                task::spawn(async move {
+                    // Notify the outer function that the task is ready.
+                    let _ = router.send(());
+                    // Asynchronously wait for a ledger request.
+                    while let Some(request) = ledger_handler.recv().await {
+                        // Hold the ledger write lock briefly, to update the state of the ledger.
+                        // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
+                        // will end up being processed out of order.
+                        ledger.clone().update(request).await;
+                    }
+                }),
+            );
+            // Wait until the ledger handler is ready.
+            let _ = handler.await;
+        }
+
+        // Return the ledger.
+        Ok(ledger)
     }
 
     // TODO (raychu86): Restrict visibility.
@@ -153,6 +239,16 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Returns the connected peers.
     pub(super) fn peers(&self) -> Arc<Peers<N, E>> {
         self.peers.clone()
+    }
+
+    /// Returns the ledger router.
+    pub fn router(&self) -> LedgerRouter<N> {
+        self.ledger_router.clone()
+    }
+
+    /// Returns the peers router.
+    pub fn peers_router(&self) -> PeersRouter<N> {
+        self.peers.router()
     }
 }
 
@@ -207,6 +303,208 @@ impl<N: Network, E: Environment> Ledger<N, E> {
         }
 
         Ok(())
+    }
+}
+
+impl<N: Network, E: Environment> Ledger<N, E> {
+    ///
+    /// Performs the given `request` to the ledger.
+    /// All requests must go through this `update`, so that a unified view is preserved.
+    ///
+    pub(super) async fn update(self: Arc<Self>, request: LedgerRequest<N>) {
+        match request {
+            LedgerRequest::BlockResponse(peer_ip, block) => {
+                let block_height = block.height();
+                let block_hash = block.hash();
+
+                // Check if the block can be added to the ledger.
+                if block_height == self.ledger().read().latest_height() + 1 {
+                    // Attempt to add the block to the ledger.
+                    match self.add_next_block(block).await {
+                        Ok(_) => info!("Advanced to block {} ({})", block_height, block_hash),
+                        Err(err) => warn!("Failed to process block {} (height: {}): {:?}", block_hash, block_height, err),
+                    };
+
+                    // TODO (raychu86): Remove this. Currently used for naive sync.
+                    // Send a ping.
+                    if let Err(err) = self
+                        .peers_router()
+                        .send(PeersRequest::MessageSend(peer_ip, Message::<N>::Ping))
+                        .await
+                    {
+                        warn!("[Ping] {}", err);
+                    }
+                } else {
+                    trace!("Skipping block {} (height: {})", block_hash, block_height);
+                }
+            }
+            LedgerRequest::BlockRequest(peer_ip, height) => {
+                let latest_height = self.ledger().read().latest_height();
+                if height > latest_height {
+                    trace!("Peer requested block {height}, which is greater than the current height {latest_height}");
+                } else {
+                    let block = match self.ledger().read().get_block(height) {
+                        Ok(block) => block,
+                        Err(err) => {
+                            warn!("Failed to retrieve block {height} from the ledger: {err}");
+                            return;
+                        }
+                    };
+
+                    if let Err(err) = self
+                        .peers_router()
+                        .send(PeersRequest::MessageSend(peer_ip, Message::BlockResponse(Data::Object(block))))
+                        .await
+                    {
+                        warn!("[BlockResponse] {}", err);
+                    }
+                }
+            }
+            LedgerRequest::Disconnect(peer_ip, reason) => {
+                self.disconnect(peer_ip, reason).await;
+            }
+            LedgerRequest::Failure(peer_ip, failure) => {
+                self.add_failure(peer_ip, failure).await;
+            }
+            LedgerRequest::Heartbeat => {}
+            LedgerRequest::Ping(peer_ip) => {
+                // Send a `Pong` message to the peer.
+                let latest_height = self.ledger().read().latest_height();
+                if let Err(error) = self
+                    .peers_router()
+                    .send(PeersRequest::MessageSend(peer_ip, Message::<N>::Pong(latest_height)))
+                    .await
+                {
+                    warn!("[Ping] {}", error);
+                }
+            }
+            LedgerRequest::Pong(peer_ip, height, node_type) => {
+                // Ensure the peer has been initialized in the ledger.
+                self.initialize_peer(peer_ip, node_type).await;
+
+                // If the peer is ahead, ask for next block.
+                let latest_height = self.ledger().read().latest_height();
+                if height > latest_height {
+                    if let Err(err) = self
+                        .peers_router()
+                        .send(PeersRequest::MessageSend(peer_ip, Message::<N>::BlockRequest(latest_height + 1)))
+                        .await
+                    {
+                        warn!("[BlockRequest] {}", err);
+                    }
+                }
+            }
+            LedgerRequest::UnconfirmedBlock(peer_ip, block) => {
+                let block_height = block.height();
+                let block_hash = block.hash();
+
+                // Attempt to add the block to the ledger.
+                match self.add_next_block(block.clone()).await {
+                    Ok(_) => {
+                        info!("Advanced to block {} ({})", block_height, block_hash);
+
+                        // Broadcast block to all peers except the sender.
+                        let message = Message::BlockBroadcast(Data::Object(block));
+                        if let Err(error) = self.peers_router().send(PeersRequest::MessagePropagate(peer_ip, message)).await {
+                            warn!("[UnconfirmedBlock] {}", error);
+                        }
+                    }
+                    Err(err) => {
+                        trace!("Failed to process block {} (height: {}): {:?}", block_hash, block_height, err);
+                    }
+                }
+            }
+            LedgerRequest::UnconfirmedTransaction(peer_ip, transaction) => {
+                // Attempt to insert the transaction into the mempool.
+                match self.add_to_memory_pool(transaction.clone()) {
+                    Ok(_) => {
+                        // Broadcast transaction to all peers except the sender.
+                        let message = Message::TransactionBroadcast(Data::Object(transaction));
+                        if let Err(error) = self.peers_router().send(PeersRequest::MessagePropagate(peer_ip, message)).await {
+                            warn!("[UnconfirmedTransaction] {}", error);
+                        }
+                    }
+                    Err(err) => {
+                        trace!("Failed to add transaction {} to mempool: {:?}", transaction.id(), err);
+                    }
+                }
+            }
+        }
+    }
+
+    ///
+    /// Disconnects the given peer from the ledger.
+    ///
+    async fn disconnect(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
+        info!("Disconnecting from {} ({:?})", peer_ip, reason);
+        // Remove all entries of the peer from the ledger.
+        self.remove_peer(&peer_ip).await;
+        // Send a `Disconnect` message to the peer.
+        if let Err(error) = self
+            .peers_router()
+            .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect(reason)))
+            .await
+        {
+            warn!("[Disconnect] {}", error);
+        }
+        // Route a `PeerDisconnected` to the peers.
+        if let Err(error) = self.peers_router().send(PeersRequest::PeerDisconnected(peer_ip)).await {
+            warn!("[PeerDisconnected] {}", error);
+        }
+    }
+
+    ///
+    /// Disconnects and restricts the given peer from the ledger.
+    ///
+    async fn disconnect_and_restrict(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
+        info!("Disconnecting and restricting {} ({:?})", peer_ip, reason);
+        // Remove all entries of the peer from the ledger.
+        self.remove_peer(&peer_ip).await;
+        // Send a `Disconnect` message to the peer.
+        if let Err(error) = self
+            .peers_router()
+            .send(PeersRequest::MessageSend(peer_ip, Message::Disconnect(reason)))
+            .await
+        {
+            warn!("[Disconnect] {}", error);
+        }
+        // Route a `PeerRestricted` to the peers.
+        if let Err(error) = self.peers_router().send(PeersRequest::PeerRestricted(peer_ip)).await {
+            warn!("[PeerRestricted] {}", error);
+        }
+    }
+
+    ///
+    /// Adds an entry for the given peer IP to every data structure in `State`.
+    ///
+    async fn initialize_peer(&self, peer_ip: SocketAddr, node_type: Option<NodeType>) {
+        // Since the peer state already existing is the most probable scenario,
+        // use a read() first to avoid using write() if possible.
+        let peer_state_exists = self.peers_state.read().contains_key(&peer_ip);
+
+        if !peer_state_exists {
+            self.peers_state.write().entry(peer_ip).or_insert(node_type);
+            self.failures.write().entry(peer_ip).or_insert_with(Default::default);
+        }
+    }
+
+    ///
+    /// Removes the entry for the given peer IP from every data structure in `State`.
+    ///
+    async fn remove_peer(&self, peer_ip: &SocketAddr) {
+        self.peers_state.write().remove(peer_ip);
+        self.failures.write().remove(peer_ip);
+    }
+
+    ///
+    /// Adds the given failure message to the specified peer IP.
+    ///
+    async fn add_failure(&self, peer_ip: SocketAddr, failure: String) {
+        trace!("Adding failure for {}: {}", peer_ip, failure);
+        match self.failures.write().get_mut(&peer_ip) {
+            Some(failures) => failures.push((failure, OffsetDateTime::now_utc().unix_timestamp())),
+            None => error!("Missing failure entry for {}", peer_ip),
+        };
     }
 }
 
