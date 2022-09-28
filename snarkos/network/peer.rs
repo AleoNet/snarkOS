@@ -19,7 +19,6 @@ use crate::{
     Ledger,
     Message,
     MessageCodec,
-    OldPeer,
     PeersRequest,
     PeersRouter,
 };
@@ -28,8 +27,8 @@ use snarkvm::prelude::*;
 
 use anyhow::Result;
 use futures::{SinkExt, StreamExt};
+use indexmap::IndexMap;
 use std::{
-    collections::HashMap,
     marker::PhantomData,
     net::SocketAddr,
     sync::Arc,
@@ -39,9 +38,9 @@ use tokio::{net::TcpStream, sync::mpsc};
 use tokio_util::codec::Framed;
 
 /// Shorthand for the parent half of the `Peer` outbound message channel.
-pub(crate) type OutboundRouter<N> = mpsc::Sender<Message<N>>;
+pub type OutboundRouter<N> = mpsc::Sender<Message<N>>;
 /// Shorthand for the child half of the `Peer` outbound message channel.
-type OutboundHandler<N> = mpsc::Receiver<Message<N>>;
+pub type OutboundHandler<N> = mpsc::Receiver<Message<N>>;
 
 ///
 /// The state for each connected client.
@@ -49,8 +48,9 @@ type OutboundHandler<N> = mpsc::Receiver<Message<N>>;
 pub(crate) struct Peer<N: Network, E: Environment> {
     /// The IP address of the peer, with the port set to the listener port.
     listener_ip: SocketAddr,
-    /// The message version of the peer.
-    version: u32,
+    // TODO (raychu86): Introduce message version.
+    // /// The message version of the peer.
+    // version: u32,
     /// The timestamp of the last message received from this peer.
     last_seen: Instant,
     /// The TCP socket that handles sending and receiving data with this peer.
@@ -59,9 +59,9 @@ pub(crate) struct Peer<N: Network, E: Environment> {
     /// When a message is received on this `OutboundHandler`, it will be written to the socket.
     outbound_handler: OutboundHandler<N>,
     /// The map of transaction IDs to their last seen timestamp.
-    seen_inbound_transactions: HashMap<N::TransactionID, SystemTime>,
+    seen_inbound_transactions: IndexMap<N::TransactionID, SystemTime>,
     /// The map of peers to a map of transaction IDs to their last seen timestamp.
-    seen_outbound_transactions: HashMap<N::TransactionID, SystemTime>,
+    seen_outbound_transactions: IndexMap<N::TransactionID, SystemTime>,
     _phantom: PhantomData<E>,
 }
 
@@ -85,7 +85,6 @@ impl<N: Network, E: Environment> Peer<N, E> {
 
         Ok(Self {
             listener_ip: peer_ip,
-            version: 0,
             last_seen: Instant::now(),
             outbound_socket,
             outbound_handler,
@@ -108,8 +107,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
     }
 
     /// A handler to process an individual peer.
-    #[allow(clippy::too_many_arguments)]
-    pub(super) async fn handler(stream: TcpStream, peer_ip: SocketAddr, ledger: Arc<Ledger<N>>, peers_router: &PeersRouter<N>) {
+    pub async fn handler(stream: TcpStream, peer_ip: SocketAddr, ledger: Arc<Ledger<N, E>>, peers_router: &PeersRouter<N>) {
         let peers_router = peers_router.clone();
 
         // TODO (raychu86): Use a ledger router for ledger operations.

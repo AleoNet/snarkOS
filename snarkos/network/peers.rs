@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{environment::Environment, Data, Message, OldPeer, OutboundRouter};
+use crate::{environment::Environment, Data, Message, OutboundRouter};
 
 use snarkvm::prelude::*;
 
@@ -78,7 +78,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     /// Initializes a new instance of `Peers`.
     ///
-    pub(crate) async fn new(local_ip: SocketAddr) -> Arc<Self> {
+    pub async fn new(local_ip: SocketAddr) -> Arc<Self> {
         // Initialize an mpsc channel for sending requests to the `Peers` struct.
         let (peers_router, mut peers_handler) = mpsc::channel(1024);
 
@@ -128,11 +128,16 @@ impl<N: Network, E: Environment> Peers<N, E> {
         self.peers_router.clone()
     }
 
+    /// Returns the IP address of this node.
+    pub const fn local_ip(&self) -> &SocketAddr {
+        &self.local_ip
+    }
+
     ///
     /// Returns `true` if the node is connected to the given IP.
     ///
-    pub async fn is_connected_to(&self, ip: SocketAddr) -> bool {
-        self.connected_peers.read().await.contains_key(&ip)
+    pub async fn is_connected_to(&self, ip: &SocketAddr) -> bool {
+        self.connected_peers.read().await.contains_key(ip)
     }
 
     ///
