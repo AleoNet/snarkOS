@@ -68,6 +68,29 @@ impl<T: FromBytes + ToBytes + Send + 'static> Data<T> {
     }
 }
 
+/// The reason behind the node disconnecting from a peer.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub enum DisconnectReason {
+    /// No reason given.
+    NoReasonGiven,
+    /// The peer's client is outdated, judging by its version.
+    OutdatedClientVersion,
+    /// Dropping a dead connection.
+    PeerHasDisconnected,
+    /// The node is shutting down.
+    ShuttingDown,
+    /// The sync node has served its purpose.
+    SyncComplete,
+    /// The peer has caused too many failures.
+    TooManyFailures,
+    /// The node has too many connections already.
+    TooManyPeers,
+    /// The peer is a sync node that's behind our node, and it needs to sync itself first.
+    YouNeedToSyncFirst,
+    /// The peer's listening port is closed.
+    YourPortIsClosed(u16),
+}
+
 #[derive(Clone, Debug)]
 pub enum Message<N: Network> {
     /// Ping with the current block height.
@@ -82,6 +105,8 @@ pub enum Message<N: Network> {
     TransactionBroadcast(Data<Transaction<N>>),
     /// A message containing a new block to be broadcast.
     BlockBroadcast(Data<Block<N>>),
+    /// Disconnect := ()
+    Disconnect(DisconnectReason),
 }
 
 impl<N: Network> Message<N> {
@@ -95,6 +120,7 @@ impl<N: Network> Message<N> {
             Self::BlockResponse(..) => "BlockResponse",
             Self::TransactionBroadcast(..) => "TransactionBroadcast",
             Self::BlockBroadcast(..) => "BlockBroadcast",
+            Self::Disconnect(..) => "Disconnect",
         }
     }
 
@@ -108,6 +134,7 @@ impl<N: Network> Message<N> {
             Self::BlockResponse(..) => 3,
             Self::TransactionBroadcast(..) => 4,
             Self::BlockBroadcast(..) => 5,
+            Self::Disconnect(..) => 6,
         }
     }
 
@@ -122,6 +149,7 @@ impl<N: Network> Message<N> {
             Self::BlockRequest(block_height) => Ok(writer.write_all(&block_height.to_le_bytes())?),
             Self::BlockResponse(block) | Self::BlockBroadcast(block) => block.serialize_blocking_into(writer),
             Self::TransactionBroadcast(transaction) => transaction.serialize_blocking_into(writer),
+            Self::Disconnect(reason) => Ok(bincode::serialize_into(writer, reason)?),
         }
     }
 
@@ -153,6 +181,10 @@ impl<N: Network> Message<N> {
             3 => Message::<N>::BlockResponse(Data::Buffer(bytes.freeze())),
             4 => Message::<N>::TransactionBroadcast(Data::Buffer(bytes.freeze())),
             5 => Message::<N>::BlockBroadcast(Data::Buffer(bytes.freeze())),
+            6 => {
+                let mut reader = bytes.reader();
+                Message::<N>::Disconnect(bincode::deserialize_from(&mut reader)?)
+            }
             _ => bail!("Unknown message ID"),
         };
 
