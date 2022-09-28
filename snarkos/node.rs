@@ -14,15 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Peer, CLI};
+use crate::CLI;
 
-use crate::{connect_to_leader, handle_listener, request_genesis_block, send_pings, Account, Ledger, Peers};
+use crate::{connect_to_leader, handle_listener, request_genesis_block, send_pings, Account, Ledger, Peers, PeersRequest};
 use snarkos_environment::{helpers::Status, Environment};
 use snarkvm::prelude::Network;
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use core::marker::PhantomData;
 use std::{net::SocketAddr, sync::Arc};
+use tokio::sync::oneshot;
 
 #[derive(Clone)]
 pub struct Node<N: Network, E: Environment> {
@@ -82,19 +83,18 @@ impl<N: Network, E: Environment> Node<N, E> {
     /// Sends a connection request to the given IP address.
     pub async fn connect_to(&self, peer_ip: SocketAddr) -> Result<()> {
         trace!("Attempting to connect to peer {}", peer_ip);
-        match tokio::net::TcpStream::connect(peer_ip).await {
-            Ok(stream) => {
-                let ledger = self.ledger.clone();
 
-                Peer::<N, E>::handler(stream, peer_ip, ledger.peers_router(), ledger.router()).await;
+        // Initialize the connection process.
+        let (router, handler) = oneshot::channel();
 
-                Ok(())
-            }
-            Err(error) => {
-                warn!("Failed to connect to peer {}: {}", peer_ip, error);
-                bail!("{error}")
-            }
-        }
+        // Route a `Connect` request to the peer manager.
+        self.ledger
+            .peers_router()
+            .send(PeersRequest::Connect(peer_ip, self.ledger.router(), router))
+            .await?;
+
+        // Wait until the connection task is initialized.
+        handler.await.map(|_| ()).map_err(|e| e.into())
     }
 
     ///

@@ -18,17 +18,19 @@ use crate::{environment::Environment, Data, LedgerRouter, Message, OutboundRoute
 
 use snarkvm::prelude::Network;
 
+use anyhow::Result;
 use indexmap::IndexMap;
 use std::{
     marker::PhantomData,
     net::SocketAddr,
     sync::Arc,
-    time::{Instant, SystemTime},
+    time::{Duration, Instant, SystemTime},
 };
 use tokio::{
     net::TcpStream,
     sync::{mpsc, oneshot, RwLock},
     task,
+    time::timeout,
 };
 
 /// Shorthand for the parent half of the `Peers` message channel.
@@ -37,11 +39,16 @@ pub(crate) type PeersRouter<N> = mpsc::Sender<PeersRequest<N>>;
 /// Shorthand for the child half of the `Peers` message channel.
 type PeersHandler<N> = mpsc::Receiver<PeersRequest<N>>;
 
+/// Shorthand for the parent half of the connection result channel.
+pub(crate) type ConnectionResult = oneshot::Sender<Result<()>>;
+
 ///
 /// An enum of requests that the `Peers` struct processes.
 ///
 #[derive(Debug)]
 pub enum PeersRequest<N: Network> {
+    /// Connect := (peer_ip, ledger_reader, ledger_router, operator_router, prover_router, connection_result)
+    Connect(SocketAddr, LedgerRouter<N>, ConnectionResult),
     /// Heartbeat
     Heartbeat,
     /// MessagePropagate := (peer_ip, message)
@@ -173,6 +180,58 @@ impl<N: Network, E: Environment> Peers<N, E> {
     ///
     pub(super) async fn update(&self, request: PeersRequest<N>) {
         match request {
+            PeersRequest::Connect(peer_ip, ledger_router, _connection_result) => {
+                // Ensure the peer IP is not this node.
+                if peer_ip == self.local_ip
+                    || (peer_ip.ip().is_unspecified() || peer_ip.ip().is_loopback()) && peer_ip.port() == self.local_ip.port()
+                {
+                    debug!("Skipping connection request to {} (attempted to self-connect)", peer_ip);
+                }
+                // Ensure the node does not surpass the maximum number of peer connections.
+                else if self.number_of_connected_peers().await >= E::MAXIMUM_NUMBER_OF_PEERS {
+                    debug!("Skipping connection request to {} (maximum peers reached)", peer_ip);
+                }
+                // Ensure the peer is a new connection.
+                else if self.is_connected_to(&peer_ip).await {
+                    debug!("Skipping connection request to {} (already connected)", peer_ip);
+                }
+                // Ensure the peer is not restricted.
+                else if self.is_restricted(&peer_ip).await {
+                    debug!("Skipping connection request to {} (restricted)", peer_ip);
+                }
+                // Attempt to open a TCP stream.
+                else {
+                    // Lock seen_outbound_connections for further processing.
+                    let mut seen_outbound_connections = self.seen_outbound_connections.write().await;
+
+                    // Ensure the node respects the connection frequency limit.
+                    let last_seen = seen_outbound_connections.entry(peer_ip).or_insert(SystemTime::UNIX_EPOCH);
+                    let elapsed = last_seen.elapsed().unwrap_or(Duration::MAX).as_secs();
+                    if elapsed < E::RADIO_SILENCE_IN_SECS {
+                        trace!("Skipping connection request to {} (tried {} secs ago)", peer_ip, elapsed);
+                    } else {
+                        debug!("Connecting to {}...", peer_ip);
+                        // Update the last seen timestamp for this peer.
+                        seen_outbound_connections.insert(peer_ip, SystemTime::now());
+
+                        // Release the lock over seen_outbound_connections.
+                        drop(seen_outbound_connections);
+
+                        // Initialize the peer handler.
+                        match timeout(Duration::from_millis(E::CONNECTION_TIMEOUT_IN_MILLIS), TcpStream::connect(peer_ip)).await {
+                            Ok(stream) => match stream {
+                                Ok(stream) => Peer::<N, E>::handler(stream, peer_ip, self.router(), ledger_router).await,
+                                Err(error) => {
+                                    trace!("Failed to connect to '{}': '{:?}'", peer_ip, error);
+                                }
+                            },
+                            Err(error) => {
+                                error!("Unable to reach '{}': '{:?}'", peer_ip, error);
+                            }
+                        };
+                    }
+                }
+            }
             PeersRequest::Heartbeat => {
                 // TODO (raychu86): Implement this.
             }
