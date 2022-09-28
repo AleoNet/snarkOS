@@ -15,8 +15,10 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 use crate::{
     environment::{helpers::NodeType, Environment},
+    ledger::LedgerRequest,
     Data,
-    Ledger,
+    DisconnectReason,
+    LedgerRouter,
     Message,
     MessageCodec,
     PeersRequest,
@@ -31,7 +33,6 @@ use indexmap::IndexMap;
 use std::{
     marker::PhantomData,
     net::SocketAddr,
-    sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
 use tokio::{net::TcpStream, sync::mpsc};
@@ -107,26 +108,25 @@ impl<N: Network, E: Environment> Peer<N, E> {
     }
 
     /// A handler to process an individual peer.
-    pub async fn handler(stream: TcpStream, peer_ip: SocketAddr, ledger: Arc<Ledger<N, E>>, peers_router: &PeersRouter<N>) {
-        let peers_router = peers_router.clone();
+    pub async fn handler(stream: TcpStream, peer_ip: SocketAddr, peers_router: PeersRouter<N>, ledger_router: LedgerRouter<N>) {
+        E::resources().register_task(
+            None,
+            tokio::spawn(async move {
+                // Register our peer with state which internally sets up some channels.
+                let mut peer = match Peer::<N, E>::new(stream, &peers_router).await {
+                    Ok(peer) => peer,
+                    Err(err) => {
+                        warn!("Failed to register peer {}: {}", peer_ip, err);
+                        return;
+                    }
+                };
 
-        // TODO (raychu86): Use a ledger router for ledger operations.
+                // Retrieve the peer IP.
+                info!("Connected to {}", peer_ip);
 
-        // Register our peer with state which internally sets up some channels.
-        let mut peer = match Peer::<N, E>::new(stream, &peers_router).await {
-            Ok(peer) => peer,
-            Err(err) => {
-                warn!("Failed to register peer {}: {}", peer_ip, err);
-                return;
-            }
-        };
-
-        // Retrieve the peer IP.
-        info!("Connected to {}", peer_ip);
-
-        // Process incoming messages until this stream is disconnected.
-        loop {
-            tokio::select! {
+                // Process incoming messages until this stream is disconnected.
+                loop {
+                    tokio::select! {
                 // Message channel is routing a message outbound to the peer.
                 Some(mut message) = peer.outbound_handler.recv() => {
                     // Disconnect if the peer has not communicated back within the predefined time.
@@ -200,67 +200,40 @@ impl<N: Network, E: Environment> Peer<N, E> {
                         trace!("Received '{}' from {}", message.name(), peer_ip);
                         match message {
                             Message::Ping => {
-                                // Send a `Pong` message to the peer.
-                                let latest_height = ledger.ledger().read().latest_height();
-                                if let Err(error) = peer.send(Message::<N>::Pong(latest_height)).await {
-                                    warn!("[Pong] {}", error);
+                                // Route the `Ping` to the ledger.
+                                if let Err(error) = ledger_router.send(LedgerRequest::Ping(peer_ip)).await {
+                                    warn!("[Ping] {}", error);
                                 }
                             }
                             Message::Pong(height) => {
-                                // TODO (raychu86): Handle syncs. Currently just asks for one new block at a time.
-                                // If the peer is ahead, ask for next block.
-                                let latest_height = ledger.ledger().read().latest_height();
-                                if height > latest_height {
-                                    if let Err(err) = peer.send(Message::<N>::BlockRequest(latest_height + 1)).await {
-                                        warn!("[BlockRequest] {}", err);
-                                    }
+                                // Route the request to the ledger.
+                                if let Err(error) = ledger_router.send(LedgerRequest::Pong(peer_ip, height, None)).await {
+                                    warn!("[Pong] {}", error);
                                 }
                             },
+                            Message::Disconnect(reason) => {
+                                debug!("Peer {} disconnected for the following reason: {:?}", peer_ip, reason);
+                                break;
+                            },
                             Message::BlockRequest(height) => {
-                                let latest_height = ledger.ledger().read().latest_height();
-                                if height > latest_height {
-                                    trace!("Peer requested block {height}, which is greater than the current height {latest_height}");
-                                } else {
-
-                                    let block = match ledger.ledger().read().get_block(height) {
-                                        Ok(block) => block,
-                                        Err(err) => {
-                                            warn!("Failed to retrieve block {height} from the ledger: {err}");
-                                            break;
-                                        }
-                                    };
-
-                                    if let Err(error) = peer.send(Message::BlockResponse(Data::Object(block))).await {
-                                        warn!("[BlockResponse] {}", error);
-                                    }
+                                // Route the request to the ledger.
+                                if let Err(error) = ledger_router.send(LedgerRequest::BlockRequest(peer_ip, height)).await {
+                                    warn!("[BlockRequest] {}", error);
                                 }
                             },
                             Message::BlockResponse(block_bytes) => {
                                 // Perform the deferred non-blocking deserialization of the block.
                                 match block_bytes.deserialize().await {
                                     Ok(block) => {
-                                        let block_height = block.height();
-                                        let block_hash = block.hash();
-
-                                        // Check if the block can be added to the ledger.
-                                        if block_height == ledger.ledger().read().latest_height() + 1 {
-                                            // Attempt to add the block to the ledger.
-                                            match ledger.add_next_block(block).await {
-                                                Ok(_) => info!("Advanced to block {} ({})", block_height, block_hash),
-                                                Err(err) => warn!("Failed to process block {} (height: {}): {:?}", block_hash, block_height, err)
-                                            };
-
-                                            // TODO (raychu86): Remove this. Currently used for naive sync.
-                                            // Send a ping.
-                                             if let Err(err) = peer.send(Message::<N>::Ping).await {
-                                                warn!("[Ping] {}", err);
-                                            }
-                                        }  else {
-                                            trace!("Skipping block {} (height: {})", block_hash, block_height);
+                                        // Route the `BlockResponse` to the ledger.
+                                        if let Err(error) = ledger_router.send(LedgerRequest::BlockResponse(peer_ip, block)).await {
+                                            warn!("[BlockResponse] {}", error);
                                         }
                                     },
-                                    // Log the block deserialization error.
-                                    Err(error) => warn!("[Failure] {}", error),
+                                    // Route the `Failure` to the ledger.
+                                    Err(error) => if let Err(error) = ledger_router.send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
+                                        warn!("[Failure] {}", error);
+                                    }
                                 }
                             }
 
@@ -291,22 +264,10 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                         if E::NODE_TYPE == NodeType::Beacon || !is_router_ready {
                                             trace!("Skipping 'TransactionBroadcast {}' from {}", transaction_id, peer_ip);
                                         } else {
-                                            // Attempt to insert the transaction into the mempool.
-                                            match ledger.add_to_memory_pool(transaction.clone()) {
-                                                Ok(_) => {
-                                                // Broadcast transaction to all peers except the sender.
-                                                if let Err(error) = peers_router.send(PeersRequest::MessagePropagate(peer.peer_ip(),  Message::TransactionBroadcast(transaction_bytes))).await {
-                                                    warn!("[TransactionBroadcast] {}", error);
-                                                }
+                                             // Route the `TransactionBroadcast` to the ledger.
+                                            if let Err(error) = ledger_router.send(LedgerRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
+                                                warn!("[TransactionBroadcast] {}", error);
 
-                                                },
-                                                Err(err) => {
-                                                    trace!(
-                                                        "Failed to add transaction {} to mempool: {:?}",
-                                                        transaction_id,
-                                                        err
-                                                    );
-                                                }
                                             }
                                         }
 
@@ -316,37 +277,16 @@ impl<N: Network, E: Environment> Peer<N, E> {
                             }
                             Message::BlockBroadcast(block_bytes) => {
                                 // Perform the deferred non-blocking deserialization of the block.
-                                match block_bytes.clone().deserialize().await {
-                                    Ok(block) => {
-                                        let block_height = block.height();
-                                        let block_hash = block.hash();
+                                let request = match block_bytes.deserialize().await {
+                                        // Route the `UnconfirmedBlock` to the ledger.
+                                    Ok(block) => LedgerRequest::UnconfirmedBlock(peer_ip, block),
+                                    // Route the `Failure` to the ledger.
+                                    Err(error) => LedgerRequest::Failure(peer_ip, format!("{}", error)),
+                                };
 
-                                        // Check if the block can be added to the ledger.
-                                        if block_height == ledger.ledger().read().latest_height() + 1 {
-                                            // Attempt to add the block to the ledger.
-                                            match ledger.add_next_block(block).await {
-                                                Ok(_) => {
-                                                    info!("Advanced to block {} ({})", block_height, block_hash);
-
-                                                    // Broadcast block to all peers except the sender.
-                                                    if let Err(error) = peers_router.send(PeersRequest::MessagePropagate(peer.peer_ip(), Message::<N>::BlockBroadcast(block_bytes))).await {
-                                                        warn!("[BlockBroadcast] {}", error);
-                                                    }
-                                                },
-                                                 Err(err) => {
-                                                    trace!(
-                                                        "Failed to process block {} (height: {}): {:?}",
-                                                        block_hash,
-                                                        block_height,
-                                                        err
-                                                    );
-                                                }
-                                            };
-                                        } else {
-                                            trace!("Skipping block {} (height: {})", block_hash, block_height);
-                                        }
-                                    },
-                                    Err(error) => warn!("[BlockBroadcast] {}", error)
+                                // Route the request to the ledger.
+                                if let Err(error) = ledger_router.send(request).await {
+                                    warn!("[BlockBroadcast] {}", error);
                                 }
                             }
                         }
@@ -357,12 +297,17 @@ impl<N: Network, E: Environment> Peer<N, E> {
                     None => break,
                 },
             }
-        }
+                }
 
-        // When this is reached, it means the peer has disconnected.
-        // Route a `Disconnect` to the peers handler.
-        if let Err(error) = peers_router.send(PeersRequest::PeerDisconnected(peer_ip)).await {
-            warn!("[[Peer::Disconnect] {}", error);
-        }
+                // When this is reached, it means the peer has disconnected.
+                // Route a `Disconnect` to the ledger.
+                if let Err(error) = ledger_router
+                    .send(LedgerRequest::Disconnect(peer_ip, DisconnectReason::PeerHasDisconnected))
+                    .await
+                {
+                    warn!("[Peer::Disconnect] {}", error);
+                }
+            }),
+        );
     }
 }

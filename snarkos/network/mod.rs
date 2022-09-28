@@ -42,17 +42,14 @@ pub fn handle_listener<N: Network, E: Environment>(listener: TcpListener, ledger
 
     tokio::spawn(async move {
         loop {
-            let ledger_clone = ledger.clone();
-
             match listener.accept().await {
                 // Process the inbound connection request.
                 Ok((stream, peer_ip)) => {
-                    E::resources().register_task(
-                        None,
-                        tokio::spawn(
-                            async move { Peer::handler(stream, peer_ip, ledger_clone.clone(), &ledger_clone.peers().router()).await },
-                        ),
-                    );
+                    let request = PeersRequest::PeerConnecting(stream, peer_ip, ledger.router());
+
+                    if let Err(error) = ledger.peers_router().send(request).await {
+                        error!("Failed to send request to peers: {}", error)
+                    }
                 }
                 Err(error) => warn!("Failed to accept a connection: {}", error),
             }
@@ -99,12 +96,12 @@ pub fn connect_to_leader<N: Network, E: Environment>(initial_peer: SocketAddr, l
                 match TcpStream::connect(initial_peer).await {
                     Ok(stream) => {
                         let ledger_clone = ledger.clone();
-                        E::resources().register_task(
-                            None,
-                            tokio::spawn(async move {
-                                Peer::handler(stream, initial_peer, ledger_clone.clone(), &ledger_clone.peers().router()).await;
-                            }),
-                        );
+
+                        let request = PeersRequest::PeerConnecting(stream, initial_peer, ledger_clone.router());
+
+                        if let Err(error) = ledger_clone.peers_router().send(request).await {
+                            error!("Failed to send request to peers: {}", error)
+                        }
                     }
                     Err(error) => warn!("Failed to connect to peer {}: {}", initial_peer, error),
                 }

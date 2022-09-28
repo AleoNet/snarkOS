@@ -45,7 +45,7 @@ impl<N: Network, E: Environment> Node<N, E> {
         let ledger = match cli.dev {
             None => {
                 // Initialize the ledger.
-                let ledger = Ledger::<N, E>::load(*account.private_key(), peers.clone(), cli.dev)?;
+                let ledger = Ledger::<N, E>::load(*account.private_key(), peers.clone(), cli.dev).await?;
                 // Sync the ledger with the network.
                 ledger.initial_sync_with_network(cli.beacon_addr.ip()).await?;
 
@@ -58,7 +58,7 @@ impl<N: Network, E: Environment> Node<N, E> {
                 let genesis_block = request_genesis_block::<N>(cli.beacon_addr.ip()).await?;
 
                 // Initialize the ledger from the provided genesis block.
-                Ledger::<N, E>::new_with_genesis(*account.private_key(), genesis_block, peers.clone(), cli.dev)?
+                Ledger::<N, E>::new_with_genesis(*account.private_key(), genesis_block, peers.clone(), cli.dev).await?
             }
         };
 
@@ -85,12 +85,8 @@ impl<N: Network, E: Environment> Node<N, E> {
         match tokio::net::TcpStream::connect(peer_ip).await {
             Ok(stream) => {
                 let ledger = self.ledger.clone();
-                E::resources().register_task(
-                    None,
-                    tokio::spawn(async move {
-                        Peer::handler(stream, peer_ip, ledger.clone(), &ledger.peers().router()).await;
-                    }),
-                );
+
+                Peer::<N, E>::handler(stream, peer_ip, ledger.peers_router(), ledger.router()).await;
 
                 Ok(())
             }
