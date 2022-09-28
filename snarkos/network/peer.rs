@@ -59,6 +59,8 @@ pub(crate) struct Peer<N: Network, E: Environment> {
     /// The `outbound_handler` half of the MPSC message channel, used to receive messages from peers.
     /// When a message is received on this `OutboundHandler`, it will be written to the socket.
     outbound_handler: OutboundHandler<N>,
+    /// The map of block heights to their last seen timestamp and number of attempts.
+    seen_inbound_block_requests: IndexMap<u32, (SystemTime, u32)>,
     /// The map of transaction IDs to their last seen timestamp.
     seen_inbound_transactions: IndexMap<N::TransactionID, SystemTime>,
     /// The map of peers to a map of transaction IDs to their last seen timestamp.
@@ -89,6 +91,7 @@ impl<N: Network, E: Environment> Peer<N, E> {
             last_seen: Instant::now(),
             outbound_socket,
             outbound_handler,
+            seen_inbound_block_requests: Default::default(),
             seen_inbound_transactions: Default::default(),
             seen_outbound_transactions: Default::default(),
             _phantom: PhantomData,
@@ -216,9 +219,32 @@ impl<N: Network, E: Environment> Peer<N, E> {
                                 break;
                             },
                             Message::BlockRequest(height) => {
-                                // Route the request to the ledger.
-                                if let Err(error) = ledger_router.send(LedgerRequest::BlockRequest(peer_ip, height)).await {
-                                    warn!("[BlockRequest] {}", error);
+                                // Drop the peer, if they have sent more than 50 requests for the same block in the last 5 seconds.
+                                let frequency = peer.seen_inbound_block_requests.values().filter(|(t, n)| t.elapsed().unwrap().as_secs() <= 5 && *n >= 50).count();
+                                if frequency >= 1 {
+                                    warn!("Dropping {} for spamming block requests", peer_ip);
+                                    // Send a `PeerRestricted` message.
+                                    if let Err(error) = peers_router.send(PeersRequest::PeerRestricted(peer_ip)).await {
+                                        warn!("[PeerRestricted] {}", error);
+                                    }
+                                    break;
+                                }
+
+                                // Retrieve the last seen timestamp of the block request.
+                                let (last_seen, num_requests) = peer.seen_inbound_block_requests.entry(height).or_insert((SystemTime::UNIX_EPOCH, 0));
+                                let is_router_ready = last_seen.elapsed().unwrap().as_secs() > E::RADIO_SILENCE_IN_SECS;
+
+                                // Update the timestamp for the received transaction.
+                                let new_num_requests = *num_requests + 1;
+                                peer.seen_inbound_block_requests.insert(height, (SystemTime::now(), new_num_requests));
+
+                                if !is_router_ready {
+                                    trace!("Skipping 'BlockRequest {}' from {}", height, peer_ip);
+                                } else {
+                                    // Route the request to the ledger.
+                                    if let Err(error) = ledger_router.send(LedgerRequest::BlockRequest(peer_ip, height)).await {
+                                        warn!("[BlockRequest] {}", error);
+                                    }
                                 }
                             },
                             Message::BlockResponse(block_bytes) => {

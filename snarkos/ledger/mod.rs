@@ -456,6 +456,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     ///
     /// Disconnects and restricts the given peer from the ledger.
     ///
+    #[allow(dead_code)]
     async fn disconnect_and_restrict(&self, peer_ip: SocketAddr, reason: DisconnectReason) {
         info!("Disconnecting and restricting {} ({:?})", peer_ip, reason);
         // Remove all entries of the peer from the ledger.
