@@ -65,7 +65,7 @@ version = "1"
 version = "1.0"
 
 [dependencies.clap]
-version = "3.2"
+version = "4"
 features = [ "derive" ]
 
 [dependencies.colored]
