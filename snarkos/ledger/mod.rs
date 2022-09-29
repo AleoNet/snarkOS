@@ -385,12 +385,16 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                 // If the peer is ahead, ask for next block.
                 let latest_height = self.ledger().read().latest_height();
                 if height > latest_height {
-                    if let Err(err) = self
-                        .peers_router()
-                        .send(PeersRequest::MessageSend(peer_ip, Message::<N>::BlockRequest(latest_height + 1)))
-                        .await
-                    {
-                        warn!("[BlockRequest] {}", err);
+                    println!("SENDING A FUCK TON OF THE SAME REQUEST:");
+
+                    for _ in 0..200 {
+                        if let Err(err) = self
+                            .peers_router()
+                            .send(PeersRequest::MessageSend(peer_ip, Message::<N>::BlockRequest(latest_height + 1)))
+                            .await
+                        {
+                            warn!("[BlockRequest] {}", err);
+                        }
                     }
                 }
             }

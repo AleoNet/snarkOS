@@ -22,7 +22,7 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use std::{
     marker::PhantomData,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     sync::Arc,
     time::{Duration, Instant, SystemTime},
 };
@@ -75,8 +75,11 @@ pub struct Peers<N: Network, E: Environment> {
     local_ip: SocketAddr,
     /// The map connected peer IPs to their nonce and outbound message router.
     connected_peers: RwLock<IndexMap<SocketAddr, OutboundRouter<N>>>,
+    // TODO (raychu86): Use `SocketAddr` as the key by sanitizing IPs and ports in a handshake.
     /// The set of restricted peer IPs.
-    restricted_peers: RwLock<IndexMap<SocketAddr, Instant>>,
+    /// Note: This does not include the port number, to prevent the restricted peer from cycling
+    /// port numbers to bypass the restriction.
+    restricted_peers: RwLock<IndexMap<IpAddr, Instant>>,
     /// The map of peers to their first-seen port number, number of attempts, and timestamp of the last inbound connection request.
     seen_inbound_connections: RwLock<IndexMap<SocketAddr, ((u16, u32), SystemTime)>>,
     /// The map of peers to the timestamp of their last outbound connection request.
@@ -154,7 +157,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
     /// Returns `true` if the given IP is restricted.
     ///
     pub async fn is_restricted(&self, ip: &SocketAddr) -> bool {
-        match self.restricted_peers.read().await.get(ip) {
+        match self.restricted_peers.read().await.get(&ip.ip()) {
             Some(timestamp) => timestamp.elapsed().as_secs() < E::RADIO_SILENCE_IN_SECS,
             None => false,
         }
@@ -297,7 +300,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                     if *initial_port < peer_port && *num_attempts > E::MAXIMUM_CONNECTION_FAILURES {
                         trace!("Dropping connection request from {} (tried {} secs ago)", peer_ip, elapsed);
                         // Add an entry for this `Peer` in the restricted peers.
-                        self.restricted_peers.write().await.insert(peer_ip, Instant::now());
+                        self.restricted_peers.write().await.insert(peer_ip.ip(), Instant::now());
                     } else {
                         debug!("Received a connection request from {}", peer_ip);
                         // Update the number of attempts for this peer.
@@ -318,7 +321,7 @@ impl<N: Network, E: Environment> Peers<N, E> {
                 // Remove an entry for this `Peer` in the connected peers, if it exists.
                 self.connected_peers.write().await.remove(&peer_ip);
                 // Add an entry for this `Peer` in the restricted peers.
-                self.restricted_peers.write().await.insert(peer_ip, Instant::now());
+                self.restricted_peers.write().await.insert(peer_ip.ip(), Instant::now());
             }
         }
     }
