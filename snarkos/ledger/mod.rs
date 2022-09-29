@@ -210,10 +210,9 @@ impl<N: Network, E: Environment> Ledger<N, E> {
                     let _ = router.send(());
                     // Asynchronously wait for a ledger request.
                     while let Some(request) = ledger_handler.recv().await {
-                        // Hold the ledger write lock briefly, to update the state of the ledger.
                         // Note: Do not wrap this call in a `task::spawn` as `BlockResponse` messages
                         // will end up being processed out of order.
-                        ledger.clone().update(request).await;
+                        ledger.update(request).await;
                     }
                 }),
             );
@@ -311,7 +310,7 @@ impl<N: Network, E: Environment> Ledger<N, E> {
     /// Performs the given `request` to the ledger.
     /// All requests must go through this `update`, so that a unified view is preserved.
     ///
-    pub(super) async fn update(self: Arc<Self>, request: LedgerRequest<N>) {
+    pub(super) async fn update(self: &Arc<Self>, request: LedgerRequest<N>) {
         match request {
             LedgerRequest::BlockResponse(peer_ip, block) => {
                 let block_height = block.height();
