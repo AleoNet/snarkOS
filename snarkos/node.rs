@@ -29,6 +29,8 @@ use tokio::sync::oneshot;
 pub struct Node<N: Network, E: Environment> {
     /// The ledger.
     ledger: Arc<Ledger<N, E>>,
+    /// The list of peers for the node.
+    peers: Arc<Peers<N, E>>,
     /// PhantomData.
     _phantom: PhantomData<(N, E)>,
 }
@@ -76,6 +78,7 @@ impl<N: Network, E: Environment> Node<N, E> {
 
         Ok(Self {
             ledger,
+            peers,
             _phantom: PhantomData,
         })
     }
@@ -88,8 +91,8 @@ impl<N: Network, E: Environment> Node<N, E> {
         let (router, handler) = oneshot::channel();
 
         // Route a `Connect` request to the peer manager.
-        self.ledger
-            .peers_router()
+        self.peers
+            .router()
             .send(PeersRequest::Connect(peer_ip, self.ledger.router(), router))
             .await?;
 
