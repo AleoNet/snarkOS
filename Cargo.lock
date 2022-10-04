@@ -390,13 +390,13 @@ dependencies = [
 
 [[package]]
 name = "clap"
-version = "4.0.2"
+version = "4.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "31c9484ccdc4cb8e7b117cbd0eb150c7c0f04464854e4679aeb50ef03b32d003"
+checksum = "30607dd93c420c6f1f80b544be522a0238a7db35e6a12968d28910983fee0df0"
 dependencies = [
  "atty",
  "bitflags",
- "clap_derive 4.0.1",
+ "clap_derive 4.0.9",
  "clap_lex 0.3.0",
  "once_cell",
  "strsim",
@@ -418,9 +418,9 @@ dependencies = [
 
 [[package]]
 name = "clap_derive"
-version = "4.0.1"
+version = "4.0.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca689d7434ce44517a12a89456b2be4d1ea1cafcd8f581978c03d45f5a5c12a7"
+checksum = "a4a307492e1a34939f79d3b6b9650bd2b971513cd775436bf2b78defeb5af00b"
 dependencies = [
  "heck",
  "proc-macro-error",
@@ -2319,7 +2319,7 @@ dependencies = [
  "backoff",
  "bincode",
  "bytes",
- "clap 4.0.2",
+ "clap 4.0.9",
  "colored",
  "crossterm 0.24.0",
  "dotenv",
