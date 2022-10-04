@@ -70,7 +70,7 @@ jobs:
 
   environment:
     docker:
-      - image: cimg/rust:1.59
+      - image: cimg/rust:1.62
     resource_class: xlarge
     parallelism: 1
     steps:
@@ -79,13 +79,13 @@ jobs:
           cache_key: snarkos-environment-cache
       - run_parallel:
           workspace_member: environment
-          features: network
+          features: ""
       - clear_environment:
           cache_key: snarkos-environment-cache
 
   snarkos:
     docker:
-      - image: cimg/rust:1.59
+      - image: cimg/rust:1.62
     resource_class: xlarge
     parallelism: 20
     steps:
@@ -94,7 +94,7 @@ jobs:
           cache_key: snarkos-stable-cache
       - run_parallel:
           workspace_member: .
-          features: test
+          features: ""
       - clear_environment:
           cache_key: snarkos-stable-cache
 
@@ -116,7 +116,7 @@ jobs:
 
   fmt:
     docker:
-      - image: cimg/rust:1.59
+      - image: cimg/rust:1.62
     resource_class: xlarge
     steps:
       - checkout
@@ -132,7 +132,7 @@ jobs:
 
   clippy:
     docker:
-      - image: cimg/rust:1.59
+      - image: cimg/rust:1.62
     resource_class: xlarge
     steps:
       - checkout

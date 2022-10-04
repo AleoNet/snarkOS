@@ -220,8 +220,8 @@ pub(crate) async fn handle_peer<N: Network, E: Environment>(
                                 // Perform deferred deserialization.
                                 let prover_solution = prover_solution_bytes.clone().deserialize().await?;
 
-                                // Attempt to insert the prover puzzle solution into the mempool.
-                                if let Err(err) = ledger.add_to_prover_puzzle_memory_pool(prover_solution) {
+                                // Attempt to insert the prover solution into the mempool.
+                                if let Err(err) = ledger.add_to_coinbase_memory_pool(prover_solution) {
                                     trace!(
                                         "Failed to add prover solution (from {}) to mempool: {:?}",
                                         prover_solution.commitment().0,

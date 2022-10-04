@@ -99,11 +99,7 @@ impl<N: Network, E: Environment> Prover<N, E> {
                             E::resources().register_task(
                                 Some(proving_task_id),
                                 tokio::spawn(async move {
-                                    // Construct a coinbase proof.
-                                    let epoch_info = ledger.ledger().read().latest_epoch_info();
-
-                                    trace!("Generating proof for round {}", epoch_info.epoch_number);
-
+                                    // Get the latest epoch challenge.
                                     let epoch_challenge = match ledger.ledger().read().latest_epoch_challenge() {
                                         Ok(challenge) => challenge,
                                         Err(error) => {
@@ -112,11 +108,13 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                         }
                                     };
 
+                                    trace!("Generating proof for round {}", epoch_challenge.epoch_number());
+
                                     let nonce = u64::rand(&mut ::rand::thread_rng());
 
+                                    // Construct a coinbase solution.
                                     let prover_solution = match CoinbasePuzzle::<N>::prove(
-                                        ledger.ledger().read().coinbase_puzzle_proving_key(),
-                                        &epoch_info,
+                                        ledger.ledger().read().coinbase_proving_key(),
                                         &epoch_challenge,
                                         ledger.address(),
                                         nonce,
@@ -128,11 +126,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                         }
                                     };
 
-                                    // Fetch the prover solution difficulty target.
-                                    let prover_solution_difficulty_target = match prover_solution.to_difficulty_target() {
-                                        Ok(difficulty_target) => difficulty_target,
+                                    // Fetch the prover solution target.
+                                    let prover_solution_target = match prover_solution.to_target() {
+                                        Ok(target) => target,
                                         Err(error) => {
-                                            warn!("Failed to fetch prover solution difficulty target: {}", error);
+                                            warn!("Failed to fetch prover solution target: {}", error);
                                             return;
                                         }
                                     };
@@ -146,11 +144,11 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                         }
                                     };
 
-                                    // Ensure that the prover solution difficulty is sufficient.
-                                    if prover_solution_difficulty_target > proof_target {
+                                    // Ensure that the prover solution target is sufficient.
+                                    if prover_solution_target < proof_target {
                                         warn!(
-                                            "Generated coinbase proof does not meet the target difficulty. {} > {}",
-                                            prover_solution_difficulty_target, proof_target
+                                            "Generated coinbase proof does not meet the target requirement. {} < {}",
+                                            prover_solution_target, proof_target
                                         );
                                         return;
                                     }

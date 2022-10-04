@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm::{compiler::ProverPuzzleSolution, prelude::*};
+use snarkvm::{compiler::ProverSolution, prelude::*};
 
 use ::bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::marker::PhantomData;
@@ -83,7 +83,7 @@ pub enum Message<N: Network> {
     /// A message containing a new block to be broadcast.
     BlockBroadcast(Data<Block<N>>),
     /// A message containing a prover solution the current epoch.
-    ProverSolution(Data<ProverPuzzleSolution<N>>),
+    ProverSolution(Data<ProverSolution<N>>),
 }
 
 impl<N: Network> Message<N> {

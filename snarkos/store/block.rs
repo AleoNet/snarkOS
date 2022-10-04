@@ -40,7 +40,7 @@ pub struct BlockDB<N: Network> {
     /// The signature map.
     signature_map: DataMap<N::BlockHash, Signature<N>>,
     /// The coinbase proof map.
-    coinbase_proof_map: DataMap<N::BlockHash, CombinedPuzzleSolution<N>>,
+    coinbase_proof_map: DataMap<N::BlockHash, Option<CoinbaseSolution<N>>>,
 }
 
 #[rustfmt::skip]
@@ -53,7 +53,7 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
     type TransactionStorage = TransactionDB<N>;
     type TransitionStorage = TransitionDB<N>;
     type SignatureMap = DataMap<N::BlockHash, Signature<N>>;
-    type CoinbaseProofMap = DataMap<N::BlockHash, CombinedPuzzleSolution<N>>;
+    type CoinbaseProofMap = DataMap<N::BlockHash, Option<CoinbaseSolution<N>>>;
 
     /// Initializes the block storage.
     fn open(dev: Option<u16>) -> Result<Self> {
