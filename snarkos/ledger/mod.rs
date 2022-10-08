@@ -138,9 +138,15 @@ impl<N: Network> Ledger<N> {
         }))
     }
 
+    // TODO (raychu86): Restrict visibility.
     /// Returns the ledger.
-    pub(super) const fn ledger(&self) -> &Arc<RwLock<InternalLedger<N>>> {
+    pub const fn ledger(&self) -> &Arc<RwLock<InternalLedger<N>>> {
         &self.ledger
+    }
+
+    /// Returns the ledger address.
+    pub const fn address(&self) -> &Address<N> {
+        &self.address
     }
 
     /// Returns the connected peers.
@@ -309,19 +315,21 @@ impl<N: Network> Ledger<N> {
                         let block_url = format!("{TARGET_URL}{height}.block");
 
                         // Fetch the bytes from the given url
-                        reqwest::get(block_url).await
+                        let block_bytes = reqwest::get(block_url).await?.bytes().await?;
+
+                        // Parse the block.
+                        let block = task::spawn_blocking(move || Block::from_bytes_le(&block_bytes)).await.unwrap()?;
+
+                        std::future::ready(Ok(block)).await
                     })
                 })
                 .buffered(CONCURRENT_REQUESTS)
-                .for_each(|response| async {
+                .for_each(|block| async {
+                    let block = block.unwrap();
                     // Use blocking tasks, as deserialization and adding blocks are expensive operations.
                     let self_clone = self.clone();
-                    let block_bytes = response.unwrap().bytes().await;
 
                     task::spawn_blocking(move || {
-                        // Parse the block.
-                        let block = Block::from_bytes_le(&block_bytes.unwrap()).unwrap();
-
                         // Add the block to the ledger.
                         self_clone.ledger.write().add_next_block(&block).unwrap();
 
