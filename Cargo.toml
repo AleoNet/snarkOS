@@ -128,6 +128,9 @@ features = [ "env-filter", "parking_lot" ]
 version = "0.18"
 optional = true
 
+[dev-dependencies.peak_alloc]
+version = "0.1"
+
 [dev-dependencies.rusty-hook]
 version = "0.11.2"
 
