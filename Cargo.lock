@@ -1580,6 +1580,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "b1de2e551fb905ac83f73f7aedf2f0cb4a0da7e35efa24a202a936269f1f18e1"
 
 [[package]]
+name = "peak_alloc"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ae5ca2a4f36e9bba393e6711350dde5d11f5aacca3660fcca7877fe6b6e9d98"
+
+[[package]]
 name = "peeking_take_while"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2310,6 +2316,7 @@ dependencies = [
  "num_cpus",
  "once_cell",
  "parking_lot",
+ "peak_alloc",
  "rand",
  "rayon",
  "reqwest",
