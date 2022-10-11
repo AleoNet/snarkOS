@@ -207,14 +207,15 @@ impl<N: Network> Ledger<N> {
 // Internal operations.
 impl<N: Network> Ledger<N> {
     /// Returns the unspent records.
-    pub fn find_unspent_records(&self) -> Result<IndexMap<Field<N>, Record<N, Plaintext<N>>>> {
+    pub fn find_unspent_records(&self) -> Result<Vec<Record<N, Plaintext<N>>>> {
         // Fetch the unspent records.
         let records = self
             .ledger
             .read()
             .find_records(&self.view_key, RecordsFilter::Unspent)?
-            .filter(|(_, record)| !record.gates().is_zero())
-            .collect::<IndexMap<_, _>>();
+            .map(|(_, record)| record)
+            .filter(|record| !record.gates().is_zero())
+            .collect::<Vec<_>>();
         // Return the unspent records.
         Ok(records)
     }
@@ -239,7 +240,7 @@ impl<N: Network> Ledger<N> {
         ensure!(!records.len().is_zero(), "The Aleo account has no records to spend.");
 
         // Prepare the additional fee.
-        let credits = records.values().max_by(|a, b| (**a.gates()).cmp(&**b.gates())).unwrap().clone();
+        let credits = records.into_iter().max_by(|a, b| (**a.gates()).cmp(&**b.gates())).unwrap();
         ensure!(
             ***credits.gates() >= additional_fee,
             "The additional fee is more than the record balance."
@@ -258,7 +259,7 @@ impl<N: Network> Ledger<N> {
     /// Creates a transfer transaction.
     pub fn create_transfer(&self, to: &Address<N>, amount: u64) -> Result<Transaction<N>> {
         // Fetch the unspent records.
-        let records = self.find_unspent_records()?;
+        let mut records = self.find_unspent_records()?;
         ensure!(!records.len().is_zero(), "The Aleo account has no records to spend.");
 
         // Initialize an RNG.
@@ -271,7 +272,7 @@ impl<N: Network> Ledger<N> {
             &ProgramID::from_str("credits.aleo")?,
             Identifier::from_str("transfer")?,
             &[
-                Value::Record(records.values().next().unwrap().clone()),
+                Value::Record(records.pop().unwrap()),
                 Value::from_str(&format!("{to}"))?,
                 Value::from_str(&format!("{amount}u64"))?,
             ],
