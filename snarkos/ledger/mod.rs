@@ -206,6 +206,19 @@ impl<N: Network> Ledger<N> {
 
 // Internal operations.
 impl<N: Network> Ledger<N> {
+    /// Returns the first unspent record.
+    pub fn find_first_unspent_record(&self) -> Result<Option<Record<N, Plaintext<N>>>> {
+        // Fetch the first unspent record.
+        let record = self
+            .ledger
+            .read()
+            .find_records(&self.view_key, RecordsFilter::Unspent)?
+            .map(|(_, record)| record)
+            .find(|record| !record.gates().is_zero());
+        // Return the first unspent record.
+        Ok(record)
+    }
+
     /// Returns the unspent records.
     pub fn find_unspent_records(&self) -> Result<Vec<Record<N, Plaintext<N>>>> {
         // Fetch the unspent records.
@@ -258,9 +271,9 @@ impl<N: Network> Ledger<N> {
 
     /// Creates a transfer transaction.
     pub fn create_transfer(&self, to: &Address<N>, amount: u64) -> Result<Transaction<N>> {
-        // Fetch the unspent records.
-        let mut records = self.find_unspent_records()?;
-        ensure!(!records.len().is_zero(), "The Aleo account has no records to spend.");
+        // Fetch the first unspent record.
+        let record = self.find_first_unspent_record()?;
+        ensure!(record.is_some(), "The Aleo account has no records to spend.");
 
         // Initialize an RNG.
         let rng = &mut ::rand::thread_rng();
@@ -272,7 +285,7 @@ impl<N: Network> Ledger<N> {
             &ProgramID::from_str("credits.aleo")?,
             Identifier::from_str("transfer")?,
             &[
-                Value::Record(records.pop().unwrap()),
+                Value::Record(record.unwrap()),
                 Value::from_str(&format!("{to}"))?,
                 Value::from_str(&format!("{amount}u64"))?,
             ],
