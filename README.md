@@ -60,6 +60,9 @@ cd snarkOS
 ./build_ubuntu.sh
 ```
 
+Please ensure ports 4130 and 4180 on yourlocal network, in your network firewall for Cloud Providers and on your router for Home users.
+
+
 ## 3a. Run an Aleo Client Node
 
 Start by following the instructions in the [Build Guide](#2-build-guide).
