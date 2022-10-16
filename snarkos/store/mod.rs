@@ -37,8 +37,8 @@ pub enum DataID {
     BlockHeaderMap,
     BlockTransactionsMap,
     BlockReverseTransactionsMap,
-    BlockSignatureMap,
     BlockCoinbaseProofMap,
+    BlockSignatureMap,
     // Deployment
     DeploymentIDMap,
     DeploymentEditionMap,

@@ -37,10 +37,10 @@ pub struct BlockDB<N: Network> {
     reverse_transactions_map: DataMap<N::TransactionID, N::BlockHash>,
     /// The transaction store.
     transaction_store: TransactionStore<N, TransactionDB<N>>,
-    /// The signature map.
-    signature_map: DataMap<N::BlockHash, Signature<N>>,
     /// The coinbase proof map.
     coinbase_proof_map: DataMap<N::BlockHash, Option<CoinbaseSolution<N>>>,
+    /// The signature map.
+    signature_map: DataMap<N::BlockHash, Signature<N>>,
 }
 
 #[rustfmt::skip]
@@ -52,8 +52,8 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
     type ReverseTransactionsMap = DataMap<N::TransactionID, N::BlockHash>;
     type TransactionStorage = TransactionDB<N>;
     type TransitionStorage = TransitionDB<N>;
-    type SignatureMap = DataMap<N::BlockHash, Signature<N>>;
     type CoinbaseProofMap = DataMap<N::BlockHash, Option<CoinbaseSolution<N>>>;
+    type SignatureMap = DataMap<N::BlockHash, Signature<N>>;
 
     /// Initializes the block storage.
     fn open(dev: Option<u16>) -> Result<Self> {
@@ -104,13 +104,13 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
         &self.transaction_store
     }
 
-    /// Returns the signature map.
-    fn signature_map(&self) -> &Self::SignatureMap {
-        &self.signature_map
-    }
-
     /// Returns the coinbase proof map.
     fn coinbase_proof_map(&self) -> &Self::CoinbaseProofMap {
         &self.coinbase_proof_map
+    }
+
+    /// Returns the signature map.
+    fn signature_map(&self) -> &Self::SignatureMap {
+        &self.signature_map
     }
 }
