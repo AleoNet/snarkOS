@@ -293,8 +293,13 @@ impl<N: Network> Ledger<N> {
         // Fetch the ledger height.
         let ledger_height = self.ledger.read().latest_height();
 
+        // Create a Client to maintain a connection pool throughout the sync.
+        let client = reqwest::Client::builder().build()?;
+
         // Fetch the latest height.
-        let latest_height = reqwest::get(format!("http://{leader_ip}/testnet3/latest/height"))
+        let latest_height = client
+            .get(format!("http://{leader_ip}/testnet3/latest/height"))
+            .send()
             .await?
             .text()
             .await?
@@ -310,17 +315,21 @@ impl<N: Network> Ledger<N> {
                     trace!("Requesting block {height} of {latest_height}");
 
                     // Download the block with an exponential backoff retry policy.
-                    handle_dispatch_error(move || async move {
-                        // Get the URL for the block download.
-                        let block_url = format!("{TARGET_URL}{height}.block");
+                    let client_clone = client.clone();
+                    handle_dispatch_error(move || {
+                        let client = client_clone.clone();
+                        async move {
+                            // Get the URL for the block download.
+                            let block_url = format!("{TARGET_URL}{height}.block");
 
-                        // Fetch the bytes from the given url
-                        let block_bytes = reqwest::get(block_url).await?.bytes().await?;
+                            // Fetch the bytes from the given url
+                            let block_bytes = client.get(block_url).send().await?.bytes().await?;
 
-                        // Parse the block.
-                        let block = task::spawn_blocking(move || Block::from_bytes_le(&block_bytes)).await.unwrap()?;
+                            // Parse the block.
+                            let block = task::spawn_blocking(move || Block::from_bytes_le(&block_bytes)).await.unwrap()?;
 
-                        std::future::ready(Ok(block)).await
+                            std::future::ready(Ok(block)).await
+                        }
                     })
                 })
                 .buffered(CONCURRENT_REQUESTS)
