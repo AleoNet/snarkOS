@@ -150,7 +150,7 @@ pub(crate) async fn handle_peer<N: Network, E: Environment>(
                                 trace!("Skipping block {} (height: {})", block_hash, block_height);
                             }
                         },
-                        Message::TransactionBroadcast(transaction_bytes) => {
+                        Message::BroadcastTransaction(transaction_bytes) => {
                             // Perform deferred deserialization.
                             let transaction = transaction_bytes.clone().deserialize().await?;
 
@@ -165,7 +165,7 @@ pub(crate) async fn handle_peer<N: Network, E: Environment>(
                                         let peers = ledger.peers().read().clone();
                                         tokio::spawn(async move {
                                             for (_, sender) in peers.iter().filter(|(ip, _)| *ip != &peer.ip) {
-                                                let _ = sender.send(Message::<N>::TransactionBroadcast(transaction_bytes.clone())).await;
+                                                let _ = sender.send(Message::<N>::BroadcastTransaction(transaction_bytes.clone())).await;
                                             }
                                         });
 
@@ -180,7 +180,7 @@ pub(crate) async fn handle_peer<N: Network, E: Environment>(
                                 }
                             }
                         },
-                        Message::BlockBroadcast(block_bytes) => {
+                        Message::BroadcastBlock(block_bytes) => {
                             // Perform deferred deserialization.
                             let block = block_bytes.clone().deserialize().await?;
 
@@ -198,7 +198,7 @@ pub(crate) async fn handle_peer<N: Network, E: Environment>(
                                         let peers = ledger.peers().read().clone();
                                         tokio::spawn(async move {
                                             for (_, sender) in peers.iter().filter(|(ip, _)| *ip != &peer.ip) {
-                                                let _ = sender.send(Message::<N>::BlockBroadcast(block_bytes.clone())).await;
+                                                let _ = sender.send(Message::<N>::BroadcastBlock(block_bytes.clone())).await;
                                             }
                                         });
                                     },

@@ -187,7 +187,7 @@ impl<N: Network> Ledger<N> {
         let peers = self.peers().read().clone();
         for (_, sender) in peers.iter() {
             let _ = sender
-                .send(crate::Message::<N>::BlockBroadcast(Data::Buffer(serialized_block.clone())))
+                .send(crate::Message::<N>::BroadcastBlock(Data::Buffer(serialized_block.clone())))
                 .await;
         }
 

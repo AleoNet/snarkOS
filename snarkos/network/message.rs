@@ -78,10 +78,10 @@ pub enum Message<N: Network> {
     BlockRequest(u32),
     /// A response to a `BlockRequest`.
     BlockResponse(Data<Block<N>>),
+    /// A message containing a block to be broadcast.
+    BroadcastBlock(Data<Block<N>>),
     /// A message containing a transaction to be broadcast.
-    TransactionBroadcast(Data<Transaction<N>>),
-    /// A message containing a new block to be broadcast.
-    BlockBroadcast(Data<Block<N>>),
+    BroadcastTransaction(Data<Transaction<N>>),
     /// A message containing a prover solution the current epoch.
     ProverSolution(Data<ProverSolution<N>>),
 }
@@ -95,8 +95,8 @@ impl<N: Network> Message<N> {
             Self::Pong(..) => "Pong",
             Self::BlockRequest(..) => "BlockRequest",
             Self::BlockResponse(..) => "BlockResponse",
-            Self::TransactionBroadcast(..) => "TransactionBroadcast",
-            Self::BlockBroadcast(..) => "BlockBroadcast",
+            Self::BroadcastBlock(..) => "BroadcastBlock",
+            Self::BroadcastTransaction(..) => "BroadcastTransaction",
             Self::ProverSolution(..) => "ProverSolution",
         }
     }
@@ -109,8 +109,8 @@ impl<N: Network> Message<N> {
             Self::Pong(..) => 1,
             Self::BlockRequest(..) => 2,
             Self::BlockResponse(..) => 3,
-            Self::TransactionBroadcast(..) => 4,
-            Self::BlockBroadcast(..) => 5,
+            Self::BroadcastBlock(..) => 4,
+            Self::BroadcastTransaction(..) => 5,
             Self::ProverSolution(..) => 6,
         }
     }
@@ -124,8 +124,9 @@ impl<N: Network> Message<N> {
             Self::Ping => Ok(()),
             Self::Pong(block_height) => Ok(writer.write_all(&block_height.to_le_bytes())?),
             Self::BlockRequest(block_height) => Ok(writer.write_all(&block_height.to_le_bytes())?),
-            Self::BlockResponse(block) | Self::BlockBroadcast(block) => block.serialize_blocking_into(writer),
-            Self::TransactionBroadcast(transaction) => transaction.serialize_blocking_into(writer),
+            Self::BlockResponse(block) => block.serialize_blocking_into(writer),
+            Self::BroadcastBlock(block) => block.serialize_blocking_into(writer),
+            Self::BroadcastTransaction(transaction) => transaction.serialize_blocking_into(writer),
             Self::ProverSolution(prover_solution) => prover_solution.serialize_blocking_into(writer),
         }
     }
@@ -156,8 +157,8 @@ impl<N: Network> Message<N> {
                 Message::<N>::BlockRequest(bincode::deserialize_from(&mut reader)?)
             }
             3 => Message::<N>::BlockResponse(Data::Buffer(bytes.freeze())),
-            4 => Message::<N>::TransactionBroadcast(Data::Buffer(bytes.freeze())),
-            5 => Message::<N>::BlockBroadcast(Data::Buffer(bytes.freeze())),
+            4 => Message::<N>::BroadcastBlock(Data::Buffer(bytes.freeze())),
+            5 => Message::<N>::BroadcastTransaction(Data::Buffer(bytes.freeze())),
             6 => Message::<N>::ProverSolution(Data::Buffer(bytes.freeze())),
             _ => bail!("Unknown message ID"),
         };

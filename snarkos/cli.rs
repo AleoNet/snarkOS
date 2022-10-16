@@ -97,9 +97,11 @@ impl CLI {
             },
         }
     }
+}
 
+impl CLI {
     /// Returns the node type corresponding to the given CLI configurations.
-    pub fn node_type(&self) -> Result<NodeType> {
+    fn node_type(&self) -> Result<NodeType> {
         match (&self.prover, &self.validator, self.beacon) {
             (None, None, false) => Ok(NodeType::Client),
             (Some(_), None, false) => Ok(NodeType::Prover),
@@ -175,7 +177,7 @@ impl CLI {
 
     /// Handles OS signals for the node to intercept and perform a clean shutdown.
     /// Note: Only Ctrl-C is supported; it should work on both Unix-family systems and Windows.
-    pub fn handle_signals<N: Network, E: Environment>(node: Node<N, E>) {
+    fn handle_signals<N: Network, E: Environment>(node: Node<N, E>) {
         E::resources().register_task(
             None, // No need to provide an id, as the task will run indefinitely.
             tokio::task::spawn(async move {
