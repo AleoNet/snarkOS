@@ -26,17 +26,15 @@ use std::{
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Serialize, Deserialize, Hash)]
 #[repr(u8)]
 pub enum Status {
-    /// The ledger is ready to handle requests.
+    /// The node is ready to handle requests.
     Ready = 0,
-    /// The ledger is mining the next block.
-    Mining,
-    /// The ledger is generating a coinbase proof.
+    /// The node is producing a coinbase proof.
     Proving,
-    /// The ledger is connecting to the minimum number of required peers.
+    /// The node is connecting to the minimum number of required peers.
     Peering,
-    /// The ledger is syncing blocks with a connected peer.
+    /// The node is syncing blocks with a connected peer.
     Syncing,
-    /// The ledger is terminating and shutting down.
+    /// The node is terminating and shutting down.
     ShuttingDown,
 }
 
@@ -64,11 +62,10 @@ impl RawStatus {
     pub fn get(&self) -> Status {
         match self.0.load(Ordering::SeqCst) {
             0 => Status::Ready,
-            1 => Status::Mining,
-            2 => Status::Proving,
-            3 => Status::Peering,
-            4 => Status::Syncing,
-            5 => Status::ShuttingDown,
+            1 => Status::Proving,
+            2 => Status::Peering,
+            3 => Status::Syncing,
+            4 => Status::ShuttingDown,
             _ => unreachable!("Invalid status code"),
         }
     }
@@ -76,11 +73,6 @@ impl RawStatus {
     /// Returns `true` if the node is ready to handle requests.
     pub fn is_ready(&self) -> bool {
         self.get() == Status::Ready
-    }
-
-    /// Returns `true` if the node is currently mining.
-    pub fn is_mining(&self) -> bool {
-        self.get() == Status::Mining
     }
 
     /// Returns `true` if the node is currently proving.
