@@ -69,8 +69,8 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
             transactions_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockTransactionsMap)?,
             reverse_transactions_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockReverseTransactionsMap)?,
             transaction_store,
-            signature_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockSignatureMap)?,
             coinbase_proof_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockCoinbaseProofMap)?,
+            signature_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockSignatureMap)?,
         })
     }
 

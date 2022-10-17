@@ -58,8 +58,11 @@ fn main() -> Result<()> {
         .build_global()
         .unwrap();
 
+    // Start the node.
     runtime.block_on(async move {
-        cli.start().await.expect("Failed to start the node");
+        if let Err(error) = cli.start().await {
+            eprintln!("Error: {error}");
+        }
     });
 
     Ok(())
