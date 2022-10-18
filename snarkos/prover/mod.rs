@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm::{compiler::CoinbasePuzzle, prelude::*};
+use snarkvm::prelude::*;
 
 use crate::{
     environment::{
@@ -113,18 +113,19 @@ impl<N: Network, E: Environment> Prover<N, E> {
                                     let nonce = u64::rand(&mut ::rand::thread_rng());
 
                                     // Construct a coinbase solution.
-                                    let prover_solution = match CoinbasePuzzle::<N>::prove(
-                                        ledger.ledger().read().coinbase_proving_key(),
-                                        &epoch_challenge,
-                                        ledger.address(),
-                                        nonce,
-                                    ) {
-                                        Ok(proof) => proof,
-                                        Err(error) => {
-                                            warn!("Failed to generate prover solution: {}", error);
-                                            return;
-                                        }
-                                    };
+                                    let prover_solution =
+                                        match ledger
+                                            .ledger()
+                                            .read()
+                                            .coinbase_puzzle()
+                                            .prove(&epoch_challenge, ledger.address(), nonce)
+                                        {
+                                            Ok(proof) => proof,
+                                            Err(error) => {
+                                                warn!("Failed to generate prover solution: {}", error);
+                                                return;
+                                            }
+                                        };
 
                                     // Fetch the prover solution target.
                                     let prover_solution_target = match prover_solution.to_target() {

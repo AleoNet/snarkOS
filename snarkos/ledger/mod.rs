@@ -145,8 +145,8 @@ impl<N: Network> Ledger<N> {
     }
 
     /// Returns the ledger address.
-    pub const fn address(&self) -> &Address<N> {
-        &self.address
+    pub const fn address(&self) -> Address<N> {
+        self.address
     }
 
     /// Returns the connected peers.
