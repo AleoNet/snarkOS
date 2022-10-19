@@ -87,14 +87,10 @@ where
         use backoff::Error;
 
         if let Ok(err) = err.downcast::<reqwest::Error>() {
-            if err.is_timeout() {
-                debug!("Retrying server timeout error");
-                Error::Transient {
-                    err: err.into(),
-                    retry_after: None,
-                }
-            } else {
-                Error::Permanent(err.into())
+            debug!("Server error: {err}; retrying...");
+            Error::Transient {
+                err: err.into(),
+                retry_after: None,
             }
         } else {
             Error::Transient {
