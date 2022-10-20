@@ -88,4 +88,20 @@ impl<N: Network> ProgramStorage<N> for ProgramDB<N> {
     fn dev(&self) -> Option<u16> {
         self.dev
     }
+
+   
+
+}
+
+#[test]
+fn a_test(){
+    for _i in 0..10000000 {
+        for _j in 0..10000000 {
+            for _z in 0..10000000 {
+                let _ = rocksdb::RocksDB::open(1, Some(1));
+            }
+
+        }
+
+    }
 }
