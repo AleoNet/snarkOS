@@ -55,10 +55,10 @@ pub struct CLI {
     #[clap(hide = true, long = "rest_port")]
     pub rest_port: Option<u16>,
     /// Specify the username for the REST server.
-    #[clap(default_value = "root", long = "username")]
+    #[clap(hide = true, default_value = "root", long = "username")]
     pub rest_username: String,
     /// Specify the password for the REST server.
-    #[clap(default_value = "pass", long = "password")]
+    #[clap(hide = true, default_value = "pass", long = "password")]
     pub rest_password: String,
     /// If the flag is set, the node will not initialize the REST server.
     #[clap(hide = true, long)]
