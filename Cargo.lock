@@ -367,13 +367,28 @@ checksum = "86447ad904c7fb335a790c9d7fe3d0d971dc523b8ccd1561a520de9a85302750"
 dependencies = [
  "atty",
  "bitflags",
- "clap_derive",
- "clap_lex",
+ "clap_derive 3.2.18",
+ "clap_lex 0.2.4",
  "indexmap",
  "once_cell",
  "strsim",
  "termcolor",
  "textwrap",
+]
+
+[[package]]
+name = "clap"
+version = "4.0.17"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "06badb543e734a2d6568e19a40af66ed5364360b9226184926f89d229b4b4267"
+dependencies = [
+ "atty",
+ "bitflags",
+ "clap_derive 4.0.13",
+ "clap_lex 0.3.0",
+ "once_cell",
+ "strsim",
+ "termcolor",
 ]
 
 [[package]]
@@ -390,10 +405,32 @@ dependencies = [
 ]
 
 [[package]]
+name = "clap_derive"
+version = "4.0.13"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c42f169caba89a7d512b5418b09864543eeb4d497416c917d7137863bd2076ad"
+dependencies = [
+ "heck",
+ "proc-macro-error",
+ "proc-macro2 1.0.47",
+ "quote 1.0.21",
+ "syn 1.0.102",
+]
+
+[[package]]
 name = "clap_lex"
 version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2850f2f5a82cbf437dd5af4d49848fbdfc27c157c3d010345776f952765261c5"
+dependencies = [
+ "os_str_bytes",
+]
+
+[[package]]
+name = "clap_lex"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d4198f73e42b4936b35b5bb248d81d2b595ecb170da0bac7655c54eedfa8da8"
 dependencies = [
  "os_str_bytes",
 ]
@@ -1176,18 +1213,6 @@ dependencies = [
  "hashbrown",
  "rayon",
  "serde",
-]
-
-[[package]]
-name = "indicatif"
-version = "0.16.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2d207dc617c7a380ab07ff572a6e52fa202a2a8f355860ac9c38e23f8196be1b"
-dependencies = [
- "console",
- "lazy_static",
- "number_prefix",
- "regex",
 ]
 
 [[package]]
@@ -2153,14 +2178,14 @@ dependencies = [
 
 [[package]]
 name = "self_update"
-version = "0.30.0"
+version = "0.32.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88c865d17fb512577be02a09fd2fd96c31c7e46fe649205d84feefd8b2a332da"
+checksum = "7e08f3ce73aed26096783c26570ba416ff8f4524c89a14bcdf068967dc80daef"
 dependencies = [
  "either",
  "flate2",
  "hyper",
- "indicatif 0.16.2",
+ "indicatif",
  "log",
  "quick-xml",
  "regex",
@@ -2169,23 +2194,6 @@ dependencies = [
  "serde_json",
  "tempfile",
  "zip",
-]
-
-[[package]]
-name = "self_update"
-version = "0.32.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7e08f3ce73aed26096783c26570ba416ff8f4524c89a14bcdf068967dc80daef"
-dependencies = [
- "hyper",
- "indicatif 0.17.1",
- "log",
- "quick-xml",
- "regex",
- "reqwest",
- "semver",
- "serde_json",
- "tempfile",
 ]
 
 [[package]]
@@ -2378,7 +2386,7 @@ dependencies = [
  "backoff",
  "bincode",
  "bytes",
- "clap",
+ "clap 4.0.17",
  "colored",
  "crossterm 0.24.0",
  "dotenv",
@@ -2395,7 +2403,7 @@ dependencies = [
  "rocksdb",
  "rusoto_core",
  "rusty-hook",
- "self_update 0.30.0",
+ "self_update",
  "serde",
  "serde_json",
  "serial_test",
@@ -2435,14 +2443,14 @@ version = "0.9.0"
 source = "git+https://github.com/Entropy1729/snarkVM.git?branch=testnet3#2c4e282df46ed71c809fd4b49738fd78562354ac"
 dependencies = [
  "anyhow",
- "clap",
+ "clap 3.2.22",
  "colored",
  "indexmap",
  "once_cell",
  "parking_lot",
  "rand",
  "rayon",
- "self_update 0.32.0",
+ "self_update",
  "serde_json",
  "snarkvm-algorithms",
  "snarkvm-circuit",

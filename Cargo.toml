@@ -57,7 +57,7 @@ features = ["circuit", "console", "parallel", "rest", "utilities"]
 
 [dependencies.aleo-std]
 version = "0.1.14"
-default-features = false
+features = [ "cpu" ]
 
 [dependencies.anyhow]
 version = "1"
@@ -66,7 +66,7 @@ version = "1"
 version = "1.0"
 
 [dependencies.clap]
-version = "3.2"
+version = "4"
 features = [ "derive" ]
 
 [dependencies.colored]
@@ -94,7 +94,7 @@ default-features = false
 features = [ "lz4" ]
 
 [dependencies.self_update]
-version = "0.30"
+version = "0.32"
 features = [
   "archive-zip",
   "compression-zip-bzip2",

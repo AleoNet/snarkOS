@@ -42,22 +42,17 @@ pub struct CLI {
     pub beacon: bool,
 
     /// Specify the IP address and port for the node server.
-    #[clap(parse(try_from_str), default_value = "0.0.0.0:4133", long = "node")]
+    #[clap(default_value = "0.0.0.0:4133", long = "node")]
     pub node: SocketAddr,
     /// Specify the IP address and port of a beacon node to connect to.
-    #[clap(
-        hide = true,
-        parse(try_from_str),
-        default_value = "159.203.77.113:4130",
-        long = "connect_to_beacon"
-    )]
+    #[clap(hide = true, default_value = "159.203.77.113:4130", long = "connect_to_beacon")]
     pub beacon_addr: SocketAddr,
     /// Specify the IP address and port of a peer to connect to.
     #[clap(long = "connect")]
     pub connect: Option<String>,
 
     /// Specify the IP address and port for the RPC server.
-    #[clap(parse(try_from_str), default_value = "0.0.0.0:3033", long = "rpc")]
+    #[clap(default_value = "0.0.0.0:3033", long = "rpc")]
     pub rpc: SocketAddr,
     /// Specify the username for the RPC server.
     #[clap(default_value = "root", long = "username")]
@@ -331,5 +326,17 @@ impl NewAccount {
         writeln!(output, " {:>12}  {}", "Address".cyan().bold(), address)?;
 
         Ok(output)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // As per the official clap recommendation.
+    #[test]
+    fn verify_cli() {
+        use clap::CommandFactory;
+        CLI::command().debug_assert()
     }
 }
