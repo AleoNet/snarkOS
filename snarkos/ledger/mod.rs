@@ -54,7 +54,13 @@ pub struct Ledger<N: Network> {
 
 impl<N: Network> Ledger<N> {
     /// Initializes a new instance of the ledger.
-    pub(super) fn new_with_genesis(private_key: PrivateKey<N>, genesis_block: Block<N>, dev: Option<u16>) -> Result<Arc<Self>> {
+    pub(super) fn new_with_genesis(
+        private_key: PrivateKey<N>,
+        genesis_block: Block<N>,
+        dev: Option<u16>,
+        custom_port: Option<u16>,
+        auth_token: String,
+    ) -> Result<Arc<Self>> {
         // Initialize the ledger.
         let ledger = match InternalLedger::new_with_genesis(&genesis_block, genesis_block.signature().to_address(), dev) {
             Ok(ledger) => Arc::new(RwLock::new(ledger)),
@@ -70,19 +76,24 @@ impl<N: Network> Ledger<N> {
         };
 
         // Return the ledger.
-        Self::from(ledger, private_key)
+        Self::from(ledger, private_key, custom_port, auth_token)
     }
 
     /// Opens an instance of the ledger.
-    pub fn load(private_key: PrivateKey<N>, dev: Option<u16>) -> Result<Arc<Self>> {
+    pub fn load(private_key: PrivateKey<N>, dev: Option<u16>, custom_port: Option<u16>, auth_token: String) -> Result<Arc<Self>> {
         // Initialize the ledger.
         let ledger = Arc::new(RwLock::new(InternalLedger::open(dev)?));
         // Return the ledger.
-        Self::from(ledger, private_key)
+        Self::from(ledger, private_key, custom_port, auth_token)
     }
 
     /// Initializes a new instance of the ledger.
-    pub fn from(ledger: Arc<RwLock<InternalLedger<N>>>, private_key: PrivateKey<N>) -> Result<Arc<Self>> {
+    pub fn from(
+        ledger: Arc<RwLock<InternalLedger<N>>>,
+        private_key: PrivateKey<N>,
+        custom_port: Option<u16>,
+        auth_token: String,
+    ) -> Result<Arc<Self>> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
@@ -125,7 +136,7 @@ impl<N: Network> Ledger<N> {
         };
 
         // Initialize the server.
-        let server = InternalServer::<N>::start(ledger.clone(), Some(additional_routes), None)?;
+        let server = InternalServer::<N>::start(ledger.clone(), Some(additional_routes), custom_port, auth_token)?;
 
         // Return the ledger.
         Ok(Arc::new(Self {

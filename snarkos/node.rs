@@ -35,11 +35,14 @@ pub struct Node<N: Network, E: Environment> {
 impl<N: Network, E: Environment> Node<N, E> {
     /// Initializes a new instance of the node.
     pub async fn new(cli: &CLI, account: Account<N>) -> Result<Self> {
+        // Encode the authorization token.
+        let auth_token = base64::encode(format!("{}:{}", cli.rest_username, cli.rest_password).as_bytes());
+
         // Initialize the ledger.
         let ledger = match cli.dev {
             None => {
                 // Initialize the ledger.
-                let ledger = Ledger::<N>::load(*account.private_key(), cli.dev)?;
+                let ledger = Ledger::<N>::load(*account.private_key(), cli.dev, cli.rest_port, auth_token)?;
                 // Sync the ledger with the network.
                 ledger.initial_sync_with_network(cli.beacon_addr.ip()).await?;
 
@@ -52,7 +55,7 @@ impl<N: Network, E: Environment> Node<N, E> {
                 let genesis_block = request_genesis_block::<N>(cli.beacon_addr.ip()).await?;
 
                 // Initialize the ledger from the provided genesis block.
-                Ledger::<N>::new_with_genesis(*account.private_key(), genesis_block, cli.dev)?
+                Ledger::<N>::new_with_genesis(*account.private_key(), genesis_block, cli.dev, cli.rest_port, auth_token)?
             }
         };
 
