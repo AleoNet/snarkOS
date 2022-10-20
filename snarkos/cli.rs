@@ -51,18 +51,18 @@ pub struct CLI {
     #[clap(long = "connect")]
     pub connect: Option<String>,
 
-    /// Specify the IP address and port for the RPC server.
-    #[clap(default_value = "0.0.0.0:3033", long = "rpc")]
-    pub rpc: SocketAddr,
-    /// Specify the username for the RPC server.
+    /// Specify the IP address and port for the REST server.
+    #[clap(hide = true, long = "rest_port")]
+    pub rest_port: Option<u16>,
+    /// Specify the username for the REST server.
     #[clap(default_value = "root", long = "username")]
-    pub rpc_username: String,
-    /// Specify the password for the RPC server.
+    pub rest_username: String,
+    /// Specify the password for the REST server.
     #[clap(default_value = "pass", long = "password")]
-    pub rpc_password: String,
-    /// If the flag is set, the node will not initialize the RPC server.
-    #[clap(long)]
-    pub norpc: bool,
+    pub rest_password: String,
+    /// If the flag is set, the node will not initialize the REST server.
+    #[clap(hide = true, long)]
+    pub norest: bool,
 
     /// Specify the verbosity of the node [options: 0, 1, 2, 3]
     #[clap(default_value = "2", long = "verbosity")]
