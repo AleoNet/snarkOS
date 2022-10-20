@@ -254,8 +254,15 @@ pub fn handle_listener<N: Network>(listener: TcpListener, ledger: Arc<Ledger<N>>
 /// Request the genesis block from the leader.
 pub(super) async fn request_genesis_block<N: Network>(leader_ip: IpAddr) -> Result<Block<N>> {
     info!("Requesting genesis block from {}", leader_ip);
-    let block_string = reqwest::get(format!("http://{leader_ip}/testnet3/block/0")).await?.text().await?;
-
+    let rsp = reqwest::get(format!("http://{leader_ip}/testnet3/block/0")).await?;
+    if rsp.status() != 200 {
+        return Err(anyhow!(
+            "Failed to get genesis block from leader ip:{} with http status: {}",
+            leader_ip,
+            rsp.status(),
+        ));
+    }
+    let block_string = rsp.text().await?;
     Block::from_str(&block_string)
 }
 
