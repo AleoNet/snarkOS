@@ -32,6 +32,7 @@ path = "snarkos/main.rs"
 
 [dependencies]
 backoff = { version = "0.4", features = ["tokio"] }
+base64 = { version = "0.13" }
 bytes = { version = "1" }
 dotenv = { version = "0.15" }
 futures = { version = "0.3" }
@@ -51,7 +52,7 @@ version = "2.0.2"
 [dependencies.snarkvm]
 #path = "../snarkVM"
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "1f0f2c9"
+rev = "e971bc4"
 features = ["circuit", "console", "parallel", "rest", "utilities"]
 
 [dependencies.aleo-std]
