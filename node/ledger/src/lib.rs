@@ -19,6 +19,9 @@
 #[macro_use]
 extern crate tracing;
 
+mod ledger;
+use ledger::{*, Ledger as ILedger, RecordsFilter};
+
 use snarkos_node_router::{Data, Message, Router, RouterRequest, UnconfirmedBlock};
 use snarkos_node_store::{BlockDB, ProgramDB};
 use snarkvm::prelude::*;
@@ -34,11 +37,11 @@ use std::{net::IpAddr, sync::Arc};
 use tokio::task;
 use warp::{reply, Filter, Rejection, Reply};
 
-pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockDB<N>, ProgramDB<N>>;
+pub(crate) type InternalLedger<N> = ILedger<N, BlockDB<N>, ProgramDB<N>>;
 // pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockMemory<N>, ProgramMemory<N>>;
 
-pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockDB<N>, ProgramDB<N>>;
-// pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockMemory<N>, ProgramMemory<N>>;
+// pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockDB<N>, ProgramDB<N>>;
+// // pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockMemory<N>, ProgramMemory<N>>;
 
 pub(crate) async fn handle_dispatch_error<'a, T, F>(func: impl Fn() -> F + 'a) -> Result<T>
 where
@@ -70,8 +73,8 @@ where
 pub struct Ledger<N: Network> {
     /// The ledger.
     ledger: Arc<RwLock<InternalLedger<N>>>,
-    /// The server.
-    server: Arc<InternalServer<N>>,
+    // /// The server.
+    // server: Arc<InternalServer<N>>,
     /// The router.
     router: Router<N>,
     /// The account private key.
@@ -124,44 +127,44 @@ impl<N: Network> Ledger<N> {
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
 
-        // Initialize the additional routes.
-        let additional_routes = {
-            // GET /testnet3/node/address
-            let get_node_address = warp::get()
-                .and(warp::path!("testnet3" / "node" / "address"))
-                .and(with(address))
-                .and_then(|address: Address<N>| async move { Ok::<_, Rejection>(reply::json(&address.to_string())) });
-
-            // GET /testnet3/peers/count
-            let get_peers_count = warp::get()
-                .and(warp::path!("testnet3" / "peers" / "count"))
-                .and(with(router.clone()))
-                .and_then(get_peers_count);
-
-            // GET /testnet3/peers/all
-            let get_peers_all = warp::get()
-                .and(warp::path!("testnet3" / "peers" / "all"))
-                .and(with(router.clone()))
-                .and_then(get_peers_all);
-
-            /// Returns the number of peers connected to the node.
-            async fn get_peers_count<N: Network>(router: Router<N>) -> Result<impl Reply, Rejection> {
-                Ok(reply::json(&router.number_of_connected_peers().await))
-            }
-
-            /// Returns the peers connected to the node.
-            async fn get_peers_all<N: Network>(router: Router<N>) -> Result<impl Reply, Rejection> {
-                Ok(reply::json(&router.connected_peers().await))
-            }
-
-            get_node_address.or(get_peers_count).or(get_peers_all)
-        };
-
-        // Initialize the server.
-        let server = Arc::new(InternalServer::<N>::start(ledger.clone(), Some(additional_routes), None)?);
+        // // Initialize the additional routes.
+        // let additional_routes = {
+        //     // GET /testnet3/node/address
+        //     let get_node_address = warp::get()
+        //         .and(warp::path!("testnet3" / "node" / "address"))
+        //         .and(with(address))
+        //         .and_then(|address: Address<N>| async move { Ok::<_, Rejection>(reply::json(&address.to_string())) });
+        //
+        //     // GET /testnet3/peers/count
+        //     let get_peers_count = warp::get()
+        //         .and(warp::path!("testnet3" / "peers" / "count"))
+        //         .and(with(router.clone()))
+        //         .and_then(get_peers_count);
+        //
+        //     // GET /testnet3/peers/all
+        //     let get_peers_all = warp::get()
+        //         .and(warp::path!("testnet3" / "peers" / "all"))
+        //         .and(with(router.clone()))
+        //         .and_then(get_peers_all);
+        //
+        //     /// Returns the number of peers connected to the node.
+        //     async fn get_peers_count<N: Network>(router: Router<N>) -> Result<impl Reply, Rejection> {
+        //         Ok(reply::json(&router.number_of_connected_peers().await))
+        //     }
+        //
+        //     /// Returns the peers connected to the node.
+        //     async fn get_peers_all<N: Network>(router: Router<N>) -> Result<impl Reply, Rejection> {
+        //         Ok(reply::json(&router.connected_peers().await))
+        //     }
+        //
+        //     get_node_address.or(get_peers_count).or(get_peers_all)
+        // };
+        //
+        // // Initialize the server.
+        // let server = Arc::new(InternalServer::<N>::start(ledger.clone(), Some(additional_routes), None)?);
 
         // Return the ledger.
-        Ok(Self { ledger, server, router, private_key, view_key, address })
+        Ok(Self { ledger, router, private_key, view_key, address })
     }
 
     // TODO (raychu86): Restrict visibility.

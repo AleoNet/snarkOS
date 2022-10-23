@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2021"
 
 [workspace]
-members = [ "account", "cli", "display", "node", "node/executor", "node/ledger", "node/router", "node/store" ]
+members = [ "account", "cli", "display", "node", "node/executor", "node/ledger", "node/rest", "node/router", "node/store" ]
 
 #[lib]
 #path = "snarkos/lib.rs"
@@ -29,7 +29,7 @@ path = "snarkos/main.rs"
 [workspace.dependencies.snarkvm]
 # path = "../snarkvm"
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "d9f4c52"
+rev = "37e4594"
 features = ["circuit", "console", "parallel", "rest"]
 
 [dependencies.snarkos-account]
@@ -49,6 +49,9 @@ path = "./node/executor"
 
 [dependencies.snarkos-node-ledger]
 path = "./node/ledger"
+
+[dependencies.snarkos-node-rest]
+path = "./node/rest"
 
 [dependencies.snarkos-node-router]
 path = "./node/router"
