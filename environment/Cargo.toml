@@ -29,7 +29,7 @@ version = "1"
 version = "1"
 
 [dependencies.serde]
-version = "1.0.145"
+version = "1.0.147"
 
 [dependencies.serde_json]
 version = "1"
