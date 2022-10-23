@@ -16,7 +16,7 @@
 
 use super::*;
 
-use snarkvm::compiler::{Map, MapRead};
+use snarkvm::synthesizer::store::helpers::{Map, MapRead};
 
 use core::{fmt, fmt::Debug, hash::Hash};
 use std::{borrow::Cow, sync::atomic::Ordering};

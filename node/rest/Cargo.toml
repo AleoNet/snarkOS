@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-node-ledger"
-version = "2.0.2"
+name = "snarkos-node-rest"
+version = "0.9.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "A node ledger for a decentralized operating system"
+description = "A REST API server for a decentralized virtual machine"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
@@ -19,47 +19,25 @@ edition = "2021"
 [dependencies.anyhow]
 version = "1"
 
-[dependencies.backoff]
-version = "0.4"
-features = [ "tokio" ]
-
-[dependencies.colored]
-version = "2.0"
-
-[dependencies.futures]
-version = "0.3"
+[dependencies.http]
+version = "0.2"
 
 [dependencies.indexmap]
-version = "1.9"
-features = [ "rayon" ]
+version = "1.8"
 
 [dependencies.parking_lot]
 version = "0.12"
 
-[dependencies.rand]
-version = "0.8"
-
-[dependencies.rayon]
+[dependencies.serde]
 version = "1"
-
-[dependencies.reqwest]
-version = "0.11"
-
-[dependencies.snarkos-node-router]
-path = "../router"
-
-[dependencies.snarkos-node-store]
-path = "../store"
+default-features = false
+features = [ "derive" ]
 
 [dependencies.snarkvm]
 workspace = true
 
-[dependencies.time]
-version = "0.3.15"
-
 [dependencies.tokio]
-version = "1.21"
-features = ["rt"]
+version = "1"
 
 [dependencies.tracing]
 version = "0.1"
