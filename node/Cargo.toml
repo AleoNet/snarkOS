@@ -38,8 +38,14 @@ path = "./executor"
 [dependencies.snarkos-node-ledger]
 path = "./ledger"
 
+[dependencies.snarkos-node-rest]
+path = "./rest"
+
 [dependencies.snarkos-node-router]
 path = "./router"
+
+[dependencies.snarkos-node-store]
+path = "./store"
 
 [dependencies.snarkvm]
 workspace = true

@@ -24,6 +24,9 @@ pub mod rocksdb;
 mod block;
 pub use block::*;
 
+mod consensus;
+pub use consensus::*;
+
 mod program;
 pub use program::*;
 
@@ -37,6 +40,8 @@ pub use transition::*;
 #[repr(u16)]
 pub enum DataID {
     // Block
+    BlockStateRootMap,
+    BlockReverseStateRootMap,
     BlockIDMap,
     BlockReverseIDMap,
     BlockHeaderMap,

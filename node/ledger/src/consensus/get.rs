@@ -16,7 +16,7 @@
 
 use super::*;
 
-impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Ledger<N, B, P> {
+impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Returns the block for the given block height.
     pub fn get_block(&self, height: u32) -> Result<Block<N>> {
         // Retrieve the block hash.
@@ -75,20 +75,20 @@ impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Ledger<N, B, P> {
         }
     }
 
-    /// Returns the transaction for the given transaction id.
+    /// Returns the transaction for the given transaction ID.
     pub fn get_transaction(&self, transaction_id: N::TransactionID) -> Result<Transaction<N>> {
         // Retrieve the transaction.
         match self.transactions.get_transaction(&transaction_id)? {
             Some(transaction) => Ok(transaction),
-            None => bail!("Missing transaction for id {transaction_id}"),
+            None => bail!("Missing transaction for ID {transaction_id}"),
         }
     }
 
-    /// Returns the program for the given program id.
+    /// Returns the program for the given program ID.
     pub fn get_program(&self, program_id: ProgramID<N>) -> Result<Program<N>> {
         match self.transactions.get_program(&program_id)? {
             Some(program) => Ok(program),
-            None => bail!("Missing program for id {program_id}"),
+            None => bail!("Missing program for ID {program_id}"),
         }
     }
 
@@ -121,7 +121,7 @@ impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Ledger<N, B, P> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ledger::test_helpers::CurrentLedger;
+    use crate::consensus::test_helpers::CurrentConsensus;
     use snarkvm::console::network::Testnet3;
 
     type CurrentNetwork = Testnet3;
@@ -132,7 +132,7 @@ mod tests {
         let genesis = Block::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
 
         // Initialize a new ledger.
-        let ledger = CurrentLedger::new(None).unwrap();
+        let ledger = CurrentConsensus::new(None).unwrap();
         // Retrieve the genesis block.
         let candidate = ledger.get_block(0).unwrap();
         // Ensure the genesis block matches.

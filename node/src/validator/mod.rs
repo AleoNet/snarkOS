@@ -21,6 +21,7 @@ use snarkos_account::Account;
 use snarkos_node_executor::{Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
+use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::Result;
@@ -34,7 +35,7 @@ pub struct Validator<N: Network> {
     /// The router of the node.
     router: Router<N>,
     /// The ledger of the node.
-    ledger: Ledger<N>,
+    ledger: Ledger<N, ConsensusDB<N>>,
 }
 
 impl<N: Network> Validator<N> {
@@ -50,7 +51,7 @@ impl<N: Network> Validator<N> {
         // Initialize the node router.
         let router = Router::new::<Self>(node_ip, *account.address(), NodeType::Validator, trusted_peers).await?;
         // Initialize the ledger.
-        let ledger = Ledger::<N>::load(private_key, dev, router.clone())?;
+        let ledger = Ledger::load(private_key, dev, router.clone())?;
         // Initialize the node.
         let node = Self { account, router, ledger };
         // Initialize the signal handler.

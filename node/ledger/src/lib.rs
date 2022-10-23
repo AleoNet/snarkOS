@@ -19,12 +19,11 @@
 #[macro_use]
 extern crate tracing;
 
-pub mod ledger;
-use ledger::{*, Ledger as ILedger};
+pub mod consensus;
+pub use consensus::*;
 
 use snarkos_node_messages::{Data, Message, UnconfirmedBlock};
-use snarkos_node_router::{Router, RouterRequest, };
-use snarkos_node_store::{BlockDB, ProgramDB};
+use snarkos_node_router::{Router, RouterRequest};
 use snarkvm::prelude::*;
 
 use anyhow::{anyhow, bail, ensure, Result};
@@ -37,9 +36,6 @@ use parking_lot::RwLock;
 use std::{net::IpAddr, sync::Arc};
 use tokio::task;
 use warp::{reply, Filter, Rejection, Reply};
-
-pub(crate) type InternalLedger<N> = ILedger<N, BlockDB<N>, ProgramDB<N>>;
-// pub(crate) type InternalLedger<N> = snarkvm::prelude::Ledger<N, BlockMemory<N>, ProgramMemory<N>>;
 
 // pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockDB<N>, ProgramDB<N>>;
 // // pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockMemory<N>, ProgramMemory<N>>;
@@ -71,9 +67,9 @@ where
 }
 
 #[derive(Clone)]
-pub struct Ledger<N: Network> {
-    /// The ledger.
-    ledger: Arc<RwLock<InternalLedger<N>>>,
+pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
+    /// The consensus module.
+    consensus: Arc<RwLock<Consensus<N, C>>>,
     // /// The server.
     // server: Arc<InternalServer<N>>,
     /// The router.
@@ -86,7 +82,7 @@ pub struct Ledger<N: Network> {
     address: Address<N>,
 }
 
-impl<N: Network> Ledger<N> {
+impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     /// Initializes a new instance of the ledger with a fresh genesis block.
     /// This is used for testing purposes only.
     fn new_with_genesis(
@@ -96,12 +92,11 @@ impl<N: Network> Ledger<N> {
         router: Router<N>,
     ) -> Result<Self> {
         // Initialize the ledger.
-        let ledger = match InternalLedger::new_with_genesis(&genesis_block, genesis_block.signature().to_address(), dev)
-        {
+        let ledger = match Consensus::new_with_genesis(&genesis_block, genesis_block.signature().to_address(), dev) {
             Ok(ledger) => Arc::new(RwLock::new(ledger)),
             Err(_) => {
                 // Open the internal ledger.
-                let ledger = InternalLedger::open(dev)?;
+                let ledger = Consensus::open(dev)?;
                 // Ensure the ledger contains the correct genesis block.
                 match ledger.contains_block_hash(&genesis_block.hash())? {
                     true => Arc::new(RwLock::new(ledger)),
@@ -117,13 +112,13 @@ impl<N: Network> Ledger<N> {
     /// Opens an instance of the ledger.
     pub fn load(private_key: PrivateKey<N>, dev: Option<u16>, router: Router<N>) -> Result<Self> {
         // Initialize the ledger.
-        let ledger = Arc::new(RwLock::new(InternalLedger::open(dev)?));
+        let ledger = Arc::new(RwLock::new(Consensus::open(dev)?));
         // Return the ledger.
         Self::from(ledger, private_key, router)
     }
 
     /// Initializes a new instance of the ledger.
-    pub fn from(ledger: Arc<RwLock<InternalLedger<N>>>, private_key: PrivateKey<N>, router: Router<N>) -> Result<Self> {
+    pub fn from(ledger: Arc<RwLock<Consensus<N, C>>>, private_key: PrivateKey<N>, router: Router<N>) -> Result<Self> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
@@ -165,13 +160,13 @@ impl<N: Network> Ledger<N> {
         // let server = Arc::new(InternalServer::<N>::start(ledger.clone(), Some(additional_routes), None)?);
 
         // Return the ledger.
-        Ok(Self { ledger, router, private_key, view_key, address })
+        Ok(Self { consensus: ledger, router, private_key, view_key, address })
     }
 
     // TODO (raychu86): Restrict visibility.
-    /// Returns the ledger.
-    pub const fn ledger(&self) -> &Arc<RwLock<InternalLedger<N>>> {
-        &self.ledger
+    /// Returns the consensus module.
+    pub const fn consensus(&self) -> &Arc<RwLock<Consensus<N, C>>> {
+        &self.consensus
     }
 
     /// Returns the ledger address.
@@ -179,21 +174,14 @@ impl<N: Network> Ledger<N> {
         self.address
     }
 
-    /// Returns the router.
-    const fn router(&self) -> &Router<N> {
-        &self.router
-    }
-}
-
-impl<N: Network> Ledger<N> {
     /// Adds the given transaction to the memory pool.
     pub fn add_to_memory_pool(&self, transaction: Transaction<N>) -> Result<()> {
-        self.ledger.write().add_to_memory_pool(transaction)
+        self.consensus.write().add_to_memory_pool(transaction)
     }
 
     /// Adds the given transaction to the memory pool.
     pub fn add_to_coinbase_memory_pool(&self, prover_puzzle_solution: ProverSolution<N>) -> Result<()> {
-        self.ledger.write().add_to_coinbase_memory_pool(prover_puzzle_solution)
+        self.consensus.write().add_to_coinbase_memory_pool(prover_puzzle_solution)
     }
 
     /// Advances the ledger to the next block.
@@ -203,7 +191,7 @@ impl<N: Network> Ledger<N> {
             // Initialize an RNG.
             let rng = &mut ::rand::thread_rng();
             // Propose the next block.
-            self_clone.ledger.read().propose_next_block(&self_clone.private_key, rng)
+            self_clone.consensus.read().propose_next_block(&self_clone.private_key, rng)
         })
         .await??;
 
@@ -219,7 +207,7 @@ impl<N: Network> Ledger<N> {
             block_hash: next_block.hash(),
             block: Data::Buffer(serialized_block.clone()),
         });
-        if let Err(error) = self.router().process(RouterRequest::MessagePropagate(message)).await {
+        if let Err(error) = self.router.process(RouterRequest::MessagePropagate(message)).await {
             trace!("Failed to broadcast the next block: {error}");
         }
 
@@ -231,7 +219,9 @@ impl<N: Network> Ledger<N> {
     pub(crate) async fn add_next_block(&self, next_block: Block<N>) -> Result<()> {
         // Add the next block to the ledger.
         let self_clone = self.clone();
-        if let Err(error) = task::spawn_blocking(move || self_clone.ledger.write().add_next_block(&next_block)).await? {
+        if let Err(error) =
+            task::spawn_blocking(move || self_clone.consensus.write().add_next_block(&next_block)).await?
+        {
             // Log the error.
             warn!("{error}");
             return Err(error);
@@ -239,14 +229,11 @@ impl<N: Network> Ledger<N> {
 
         Ok(())
     }
-}
 
-// Internal operations.
-impl<N: Network> Ledger<N> {
     /// Returns the unspent records.
     pub fn find_unspent_records(&self) -> Result<IndexMap<Field<N>, Record<N, Plaintext<N>>>> {
         Ok(self
-            .ledger
+            .consensus
             .read()
             .find_records(&self.view_key, RecordsFilter::Unspent)?
             .filter(|(_, record)| !record.gates().is_zero())
@@ -256,7 +243,7 @@ impl<N: Network> Ledger<N> {
     /// Returns the spent records.
     pub fn find_spent_records(&self) -> Result<IndexMap<Field<N>, Record<N, Plaintext<N>>>> {
         Ok(self
-            .ledger
+            .consensus
             .read()
             .find_records(&self.view_key, RecordsFilter::Spent)?
             .filter(|(_, record)| !record.gates().is_zero())
@@ -276,10 +263,15 @@ impl<N: Network> Ledger<N> {
         // Initialize an RNG.
         let rng = &mut ::rand::thread_rng();
         // Deploy.
-        let transaction =
-            Transaction::deploy(self.ledger.read().vm(), &self.private_key, program, (credits, additional_fee), rng)?;
+        let transaction = Transaction::deploy(
+            self.consensus.read().vm(),
+            &self.private_key,
+            program,
+            (credits, additional_fee),
+            rng,
+        )?;
         // Verify.
-        assert!(self.ledger.read().vm().verify(&transaction));
+        assert!(self.consensus.read().vm().verify(&transaction));
         // Return the transaction.
         Ok(transaction)
     }
@@ -295,7 +287,7 @@ impl<N: Network> Ledger<N> {
 
         // Create a new transaction.
         Transaction::execute(
-            self.ledger.read().vm(),
+            self.consensus.read().vm(),
             &self.private_key,
             &ProgramID::from_str("credits.aleo")?,
             Identifier::from_str("transfer")?,
@@ -308,10 +300,7 @@ impl<N: Network> Ledger<N> {
             rng,
         )
     }
-}
 
-// Internal operations.
-impl<N: Network> Ledger<N> {
     /// Syncs the ledger with the network.
     pub(crate) async fn initial_sync_with_network(self: &Arc<Self>, leader_ip: IpAddr) -> Result<()> {
         /// The number of concurrent requests with the network.
@@ -320,7 +309,7 @@ impl<N: Network> Ledger<N> {
         const TARGET_URL: &str = "https://vm.aleo.org/testnet3/block/testnet3/";
 
         // Fetch the ledger height.
-        let ledger_height = self.ledger.read().latest_height();
+        let ledger_height = self.consensus.read().latest_height();
 
         // Create a Client to maintain a connection pool throughout the sync.
         let client = reqwest::Client::builder().build()?;
@@ -370,7 +359,7 @@ impl<N: Network> Ledger<N> {
 
                     task::spawn_blocking(move || {
                         // Add the block to the ledger.
-                        self_clone.ledger.write().add_next_block(&block).unwrap();
+                        self_clone.consensus.write().add_next_block(&block).unwrap();
 
                         // Retrieve the current height.
                         let height = block.height();

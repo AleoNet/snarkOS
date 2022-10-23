@@ -72,8 +72,8 @@ pub trait MessageTrait {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()>;
     /// Deserializes the given buffer into a message.
     fn deserialize(bytes: BytesMut) -> Result<Self>
-        where
-            Self: Sized;
+    where
+        Self: Sized;
 }
 
 #[derive(Clone, Debug)]

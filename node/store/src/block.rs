@@ -25,6 +25,10 @@ use snarkvm::prelude::*;
 /// A RocksDB block storage.
 #[derive(Clone)]
 pub struct BlockDB<N: Network> {
+    /// The mapping of `block height` to `state root`.
+    state_root_map: DataMap<u32, Field<N>>,
+    /// The mapping of `state root` to `block height`.
+    reverse_state_root_map: DataMap<Field<N>, u32>,
     /// The mapping of `block height` to `block hash`.
     id_map: DataMap<u32, N::BlockHash>,
     /// The mapping of `block hash` to `block height`.
@@ -45,6 +49,8 @@ pub struct BlockDB<N: Network> {
 
 #[rustfmt::skip]
 impl<N: Network> BlockStorage<N> for BlockDB<N> {
+    type StateRootMap = DataMap<u32, Field<N>>;
+    type ReverseStateRootMap = DataMap<Field<N>, u32>;
     type IDMap = DataMap<u32, N::BlockHash>;
     type ReverseIDMap = DataMap<N::BlockHash, u32>;
     type HeaderMap = DataMap<N::BlockHash, Header<N>>;
@@ -63,6 +69,8 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
         let transaction_store = TransactionStore::<N, TransactionDB<N>>::open(transition_store)?;
         // Return the block storage.
         Ok(Self {
+            state_root_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockStateRootMap)?,
+            reverse_state_root_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockReverseStateRootMap)?,
             id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockIDMap)?,
             reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockReverseIDMap)?,
             header_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockHeaderMap)?,
@@ -72,6 +80,16 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
             coinbase_proof_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockCoinbaseProofMap)?,
             signature_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockSignatureMap)?,
         })
+    }
+
+    /// Returns the state root map.
+    fn state_root_map(&self) -> &Self::StateRootMap {
+        &self.state_root_map
+    }
+
+    /// Returns the reverse state root map.
+    fn reverse_state_root_map(&self) -> &Self::ReverseStateRootMap {
+        &self.reverse_state_root_map
     }
 
     /// Returns the ID map.

@@ -17,10 +17,10 @@
 use super::*;
 use http::header::HeaderName;
 
-impl<N: Network, B: 'static + BlockStorage<N>, P: 'static + ProgramStorage<N>> Server<N, B, P> {
+impl<N: Network, C: 'static + ConsensusStorage<N>> Server<N, C> {
     /// Initializes a new instance of the server.
     pub fn start(
-        ledger: Arc<RwLock<Ledger<N, B, P>>>,
+        ledger: Ledger<N, C>,
         additional_routes: Option<impl Filter<Extract = impl Reply, Error = Rejection> + Clone + Sync + Send + 'static>,
         custom_port: Option<u16>,
     ) -> Result<Self> {
@@ -39,7 +39,7 @@ impl<N: Network, B: 'static + BlockStorage<N>, P: 'static + ProgramStorage<N>> S
     }
 }
 
-impl<N: Network, B: 'static + BlockStorage<N>, P: 'static + ProgramStorage<N>> Server<N, B, P> {
+impl<N: Network, C: 'static + ConsensusStorage<N>> Server<N, C> {
     /// Initializes the server.
     fn spawn_server(
         &mut self,
@@ -81,7 +81,7 @@ impl<N: Network, B: 'static + BlockStorage<N>, P: 'static + ProgramStorage<N>> S
                         // Retrieve the transaction ID.
                         let transaction_id = transaction.id();
                         // Add the transaction to the memory pool.
-                        match ledger.write().add_to_memory_pool(transaction) {
+                        match ledger.add_to_memory_pool(transaction) {
                             Ok(()) => trace!("✉️ Added transaction '{transaction_id}' to the memory pool"),
                             Err(error) => {
                                 warn!("⚠️ Failed to add transaction '{transaction_id}' to the memory pool: {error}")

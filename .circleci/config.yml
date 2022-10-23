@@ -189,7 +189,7 @@ jobs:
   node-ledger:
     docker:
       - image: cimg/rust:1.64
-    resource_class: xlarge
+    resource_class: 2xlarge
     steps:
       - run_serial:
           workspace_member: node/ledger

@@ -24,29 +24,20 @@ mod iterators;
 mod latest;
 
 use snarkvm::{
-    synthesizer::{
-        block::{Block, BlockTree, Header, Metadata, Origin, Transaction, Transactions},
-        coinbase_puzzle::{CoinbasePuzzle, CoinbaseSolution, EpochChallenge, ProverSolution},
-        program::Program,
-        state_path::StatePath,
-        store::{
-            BlockMemory,
-            BlockStorage,
-            BlockStore,
-            ProgramMemory,
-            ProgramStorage,
-            ProgramStore,
-            TransactionStore,
-            TransitionStore,
-        },
-        vm::VM,
-    },
     console::{
         account::{Address, GraphKey, PrivateKey, Signature, ViewKey},
         network::prelude::*,
         program::{Ciphertext, Identifier, Plaintext, ProgramID, Record},
         types::{Field, Group},
-    }
+    },
+    synthesizer::{
+        block::{Block, BlockTree, Header, Metadata, Origin, Transaction, Transactions},
+        coinbase_puzzle::{CoinbasePuzzle, CoinbaseSolution, EpochChallenge, ProverSolution},
+        program::Program,
+        state_path::StatePath,
+        store::{BlockStore, ConsensusMemory, ConsensusStorage, ConsensusStore, TransactionStore, TransitionStore},
+        vm::VM,
+    },
 };
 
 use anyhow::Result;
@@ -72,7 +63,9 @@ pub enum RecordsFilter<N: Network> {
 }
 
 #[derive(Clone)]
-pub struct Ledger<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> {
+pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
+    /// The VM state.
+    vm: VM<N, C>,
     /// The current block hash.
     current_hash: N::BlockHash,
     /// The current block height.
@@ -82,11 +75,11 @@ pub struct Ledger<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> {
     /// The current block tree.
     block_tree: BlockTree<N>,
     /// The block store.
-    blocks: BlockStore<N, B>,
+    blocks: BlockStore<N, C::BlockStorage>,
     /// The transaction store.
-    transactions: TransactionStore<N, B::TransactionStorage>,
+    transactions: TransactionStore<N, C::TransactionStorage>,
     /// The transition store.
-    transitions: TransitionStore<N, B::TransitionStorage>,
+    transitions: TransitionStore<N, C::TransitionStorage>,
     /// The validators.
     // TODO (howardwu): Update this to retrieve from a validators store.
     validators: IndexMap<Address<N>, ()>,
@@ -97,14 +90,11 @@ pub struct Ledger<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> {
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The memory pool of proposed coinbase puzzle solutions for the current epoch.
     coinbase_memory_pool: IndexSet<ProverSolution<N>>,
-
-    /// The VM state.
-    vm: VM<N, P>,
     // /// The mapping of program IDs to their global state.
     // states: MemoryMap<ProgramID<N>, IndexMap<Identifier<N>, Plaintext<N>>>,
 }
 
-impl<N: Network> Ledger<N, BlockMemory<N>, ProgramMemory<N>> {
+impl<N: Network> Consensus<N, ConsensusMemory<N>> {
     /// Initializes a new instance of `Ledger` with the genesis block.
     pub fn new(dev: Option<u16>) -> Result<Self> {
         // Load the genesis block.
@@ -114,114 +104,110 @@ impl<N: Network> Ledger<N, BlockMemory<N>, ProgramMemory<N>> {
     }
 }
 
-impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Ledger<N, B, P> {
-    /// Initializes a new instance of `Ledger` with the given genesis block.
+impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
+    /// Initializes a new instance of `Consensus` with the given genesis block.
     pub fn new_with_genesis(genesis: &Block<N>, address: Address<N>, dev: Option<u16>) -> Result<Self> {
-        // Initialize the block store.
-        let blocks = BlockStore::<N, B>::open(dev)?;
-        // Initialize the program store.
-        let store = ProgramStore::<N, P>::open(dev)?;
+        // Initialize the consensus store.
+        let store = ConsensusStore::<N, C>::open(dev)?;
         // Initialize a new VM.
-        let vm = VM::new(store)?;
+        let vm = VM::from(store.clone())?;
 
         // Ensure that a genesis block doesn't already exist in the block store.
-        if blocks.contains_block_height(0)? {
+        if vm.block_store().contains_block_height(0)? {
             bail!("Genesis block already exists in the ledger.");
         }
 
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
 
-        // Initialize the ledger.
-        let mut ledger = Self {
+        // Initialize the consensus module.
+        let mut consensus = Self {
+            vm,
             current_hash: Default::default(),
             current_height: 0,
             current_round: 0,
             block_tree: N::merkle_tree_bhp(&[])?,
-            transactions: blocks.transaction_store().clone(),
-            transitions: blocks.transition_store().clone(),
-            blocks,
+            blocks: store.block_store().clone(),
+            transactions: store.transaction_store().clone(),
+            transitions: store.transition_store().clone(),
             // TODO (howardwu): Update this to retrieve from a validators store.
             validators: [(address, ())].into_iter().collect(),
-            vm,
             memory_pool: Default::default(),
             coinbase_puzzle,
             coinbase_memory_pool: Default::default(),
         };
 
         // Add the genesis block.
-        ledger.add_next_block(genesis)?;
+        consensus.add_next_block(genesis)?;
 
-        // Return the ledger.
-        Ok(ledger)
+        // Return the consensus.
+        Ok(consensus)
     }
 
-    /// Initializes the `Ledger` from storage.
+    /// Initializes the consensus module from storage.
     pub fn open(dev: Option<u16>) -> Result<Self> {
-        // Initialize the block store.
-        let blocks = BlockStore::<N, B>::open(dev)?;
-        // Initialize the program store.
-        let store = ProgramStore::open(dev)?;
-        // Return the ledger.
-        Self::from(blocks, store)
+        // Initialize the consensus store.
+        let store = ConsensusStore::<N, C>::open(dev)?;
+        // Return the consensus.
+        Self::from(store)
     }
 
-    /// Initializes the `Ledger` from storage.
-    pub fn from(blocks: BlockStore<N, B>, store: ProgramStore<N, P>) -> Result<Self> {
+    /// Initializes the consensus module from storage.
+    pub fn from(store: ConsensusStore<N, C>) -> Result<Self> {
         // Initialize a new VM.
-        let vm = VM::<N, P>::from(&blocks, store)?;
+        let vm = VM::from(store.clone())?;
 
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
 
-        // Initialize the ledger.
-        let mut ledger = Self {
+        // Initialize the consensus.
+        let mut consensus = Self {
+            vm,
             current_hash: Default::default(),
             current_height: 0,
             current_round: 0,
             block_tree: N::merkle_tree_bhp(&[])?,
-            transactions: blocks.transaction_store().clone(),
-            transitions: blocks.transition_store().clone(),
-            blocks,
+            blocks: store.block_store().clone(),
+            transactions: store.transaction_store().clone(),
+            transitions: store.transition_store().clone(),
             // TODO (howardwu): Update this to retrieve from a validators store.
             validators: Default::default(),
-            vm,
             memory_pool: Default::default(),
             coinbase_puzzle,
             coinbase_memory_pool: Default::default(),
         };
 
         // Fetch the latest height.
-        let latest_height = match ledger.blocks.heights().max() {
+        let latest_height = match consensus.blocks.heights().max() {
             Some(height) => *height,
             // If there are no previous hashes, add the genesis block.
             None => {
                 // Load the genesis block.
                 let genesis = Block::<N>::from_bytes_le(N::genesis_bytes())?;
                 // Add the genesis block.
-                ledger.blocks.insert(&genesis)?;
+                consensus.add_next_block(&genesis)?;
                 // Return the genesis height.
                 genesis.height()
             }
         };
 
         // Add the initial validator.
-        let genesis_block = ledger.get_block(0)?;
-        ledger.add_validator(genesis_block.signature().to_address())?;
+        let genesis_block = consensus.get_block(0)?;
+        consensus.add_validator(genesis_block.signature().to_address())?;
 
         // Fetch the latest block.
-        let block = ledger.get_block(latest_height)?;
+        let block = consensus.get_block(latest_height)?;
 
         // Set the current hash, height, and round.
-        ledger.current_hash = block.hash();
-        ledger.current_height = block.height();
-        ledger.current_round = block.round();
+        consensus.current_hash = block.hash();
+        consensus.current_height = block.height();
+        consensus.current_round = block.round();
 
         // TODO (howardwu): Improve the performance here by using iterators.
         // Generate the block tree.
         let hashes: Vec<_> =
-            (0..=latest_height).map(|height| ledger.get_hash(height).map(|hash| hash.to_bits_le())).try_collect()?;
-        ledger.block_tree.append(&hashes)?;
+            (1..=latest_height).map(|height| consensus.get_hash(height).map(|hash| hash.to_bits_le())).try_collect()?;
+        consensus.block_tree.append(&hashes)?;
 
         // Safety check the existence of every block.
         #[cfg(feature = "parallel")]
@@ -229,15 +215,15 @@ impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Ledger<N, B, P> {
         #[cfg(not(feature = "parallel"))]
         let mut heights_iter = (0..=latest_height).into_iter();
         heights_iter.try_for_each(|height| {
-            ledger.get_block(height)?;
+            consensus.get_block(height)?;
             Ok::<_, Error>(())
         })?;
 
-        Ok(ledger)
+        Ok(consensus)
     }
 
     /// Returns the VM.
-    pub fn vm(&self) -> &VM<N, P> {
+    pub fn vm(&self) -> &VM<N, C> {
         &self.vm
     }
 
@@ -639,7 +625,7 @@ impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Ledger<N, B, P> {
             ledger.current_height = block.height();
             ledger.current_round = block.round();
             ledger.block_tree.append(&[block.hash().to_bits_le()])?;
-            ledger.blocks.insert(block)?;
+            ledger.blocks.insert(*ledger.block_tree.root(), block)?;
 
             // Update the VM.
             for transaction in block.transactions().values() {
@@ -835,17 +821,19 @@ impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Ledger<N, B, P> {
 #[cfg(test)]
 pub(crate) mod test_helpers {
     use super::*;
-    use snarkvm::{synthesizer::Block};
-    use snarkvm::console::{account::PrivateKey, network::Testnet3, program::Value};
-    use snarkvm::prelude::TestRng;
+    use snarkvm::{
+        console::{account::PrivateKey, network::Testnet3, program::Value},
+        prelude::TestRng,
+        synthesizer::Block,
+    };
 
     use once_cell::sync::OnceCell;
 
     type CurrentNetwork = Testnet3;
-    pub(crate) type CurrentLedger = Ledger<CurrentNetwork, BlockMemory<CurrentNetwork>, ProgramMemory<CurrentNetwork>>;
+    pub(crate) type CurrentConsensus = Consensus<CurrentNetwork, ConsensusMemory<CurrentNetwork>>;
 
-    pub(crate) fn sample_vm() -> VM<CurrentNetwork, ProgramMemory<CurrentNetwork>> {
-        VM::new(ProgramStore::open(None).unwrap()).unwrap()
+    pub(crate) fn sample_vm() -> VM<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
+        VM::from(ConsensusStore::open(None).unwrap()).unwrap()
     }
 
     pub(crate) fn sample_genesis_private_key(rng: &mut TestRng) -> PrivateKey<CurrentNetwork> {
@@ -862,7 +850,7 @@ pub(crate) mod test_helpers {
         INSTANCE
             .get_or_init(|| {
                 // Initialize the VM.
-                let vm = crate::ledger::test_helpers::sample_vm();
+                let vm = crate::consensus::test_helpers::sample_vm();
                 // Initialize a new caller.
                 let caller_private_key = PrivateKey::<CurrentNetwork>::new(rng).unwrap();
                 // Return the block.
@@ -879,14 +867,14 @@ pub(crate) mod test_helpers {
         INSTANCE
             .get_or_init(|| {
                 // Initialize the VM.
-                let vm = crate::ledger::test_helpers::sample_vm();
+                let vm = crate::consensus::test_helpers::sample_vm();
                 // Return the block.
                 Block::genesis(&vm, &private_key, rng).unwrap()
             })
             .clone()
     }
 
-    pub(crate) fn sample_genesis_ledger(rng: &mut TestRng) -> CurrentLedger {
+    pub(crate) fn sample_genesis_ledger(rng: &mut TestRng) -> CurrentConsensus {
         // Sample the genesis private key.
         let private_key = sample_genesis_private_key(rng);
         // Sample the genesis block.
@@ -894,7 +882,7 @@ pub(crate) mod test_helpers {
 
         // Initialize the ledger with the genesis block and the associated private key.
         let address = Address::try_from(&private_key).unwrap();
-        let ledger = CurrentLedger::new_with_genesis(&genesis, address, None).unwrap();
+        let ledger = CurrentConsensus::new_with_genesis(&genesis, address, None).unwrap();
         assert_eq!(0, ledger.latest_height());
         assert_eq!(genesis.hash(), ledger.latest_hash());
         assert_eq!(genesis.round(), ledger.latest_round());
@@ -943,11 +931,11 @@ function compute:
                 let program = sample_program();
 
                 // Initialize a new caller.
-                let caller_private_key = crate::ledger::test_helpers::sample_genesis_private_key(rng);
+                let caller_private_key = crate::consensus::test_helpers::sample_genesis_private_key(rng);
                 let caller_view_key = ViewKey::try_from(&caller_private_key).unwrap();
 
                 // Initialize the ledger.
-                let ledger = crate::ledger::test_helpers::sample_genesis_ledger(rng);
+                let ledger = crate::consensus::test_helpers::sample_genesis_ledger(rng);
 
                 // Fetch the unspent records.
                 let records = ledger
@@ -978,12 +966,12 @@ function compute:
         INSTANCE
             .get_or_init(|| {
                 // Initialize a new caller.
-                let caller_private_key = crate::ledger::test_helpers::sample_genesis_private_key(rng);
+                let caller_private_key = crate::consensus::test_helpers::sample_genesis_private_key(rng);
                 let caller_view_key = ViewKey::try_from(&caller_private_key).unwrap();
                 let address = Address::try_from(&caller_private_key).unwrap();
 
                 // Initialize the ledger.
-                let ledger = crate::ledger::test_helpers::sample_genesis_ledger(rng);
+                let ledger = crate::consensus::test_helpers::sample_genesis_ledger(rng);
 
                 // Fetch the unspent records.
                 let records = ledger
@@ -1028,9 +1016,11 @@ function compute:
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ledger::test_helpers::CurrentLedger;
-    use snarkvm::console::{network::Testnet3, program::Value};
-    use snarkvm::prelude::TestRng;
+    use crate::consensus::test_helpers::CurrentConsensus;
+    use snarkvm::{
+        console::{network::Testnet3, program::Value},
+        prelude::TestRng,
+    };
 
     use tracing_test::traced_test;
 
@@ -1047,7 +1037,7 @@ mod tests {
         let address = Address::try_from(&view_key).unwrap();
 
         // Initialize the VM.
-        let vm = crate::ledger::test_helpers::sample_vm();
+        let vm = crate::consensus::test_helpers::sample_vm();
 
         // Create a genesis block.
         let genesis = Block::genesis(&vm, &private_key, rng).unwrap();
@@ -1075,8 +1065,8 @@ mod tests {
         // Load the genesis block.
         let genesis = Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
 
-        // Initialize a ledger with the genesis block.
-        let ledger = CurrentLedger::new(None).unwrap();
+        // Initialize consensus with the genesis block.
+        let ledger = CurrentConsensus::new(None).unwrap();
         assert_eq!(ledger.latest_hash(), genesis.hash());
         assert_eq!(ledger.latest_height(), genesis.height());
         assert_eq!(ledger.latest_round(), genesis.round());
@@ -1092,19 +1082,15 @@ mod tests {
             Address::<CurrentNetwork>::from_str("aleo1q6qstg8q8shwqf5m6q5fcenuwsdqsvp4hhsgfnx5chzjm3secyzqt9mxm8")
                 .unwrap();
 
-        // Initialize a ledger without the genesis block.
-        let ledger = CurrentLedger::from(
-            BlockStore::<_, BlockMemory<_>>::open(None).unwrap(),
-            ProgramStore::<_, ProgramMemory<_>>::open(None).unwrap(),
-        )
-        .unwrap();
+        // Initialize consensus without the genesis block.
+        let ledger = CurrentConsensus::from(ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap()).unwrap();
         assert_eq!(ledger.latest_hash(), genesis.hash());
         assert_eq!(ledger.latest_height(), genesis.height());
         assert_eq!(ledger.latest_round(), genesis.round());
         assert_eq!(ledger.latest_block().unwrap(), genesis);
 
         // Initialize the ledger with the genesis block.
-        let ledger = CurrentLedger::new_with_genesis(&genesis, address, None).unwrap();
+        let ledger = CurrentConsensus::new_with_genesis(&genesis, address, None).unwrap();
         assert_eq!(ledger.latest_hash(), genesis.hash());
         assert_eq!(ledger.latest_height(), genesis.height());
         assert_eq!(ledger.latest_round(), genesis.round());
@@ -1114,7 +1100,7 @@ mod tests {
     #[test]
     fn test_state_path() {
         // Initialize the ledger with the genesis block.
-        let ledger = CurrentLedger::new(None).unwrap();
+        let ledger = CurrentConsensus::new(None).unwrap();
         // Retrieve the genesis block.
         let genesis = ledger.get_block(0).unwrap();
 
@@ -1131,12 +1117,12 @@ mod tests {
         let rng = &mut TestRng::default();
 
         // Sample the genesis private key.
-        let private_key = crate::ledger::test_helpers::sample_genesis_private_key(rng);
+        let private_key = crate::consensus::test_helpers::sample_genesis_private_key(rng);
         // Sample the genesis ledger.
         let mut ledger = test_helpers::sample_genesis_ledger(rng);
 
         // Add a transaction to the memory pool.
-        let transaction = crate::ledger::test_helpers::sample_deployment_transaction(rng);
+        let transaction = crate::consensus::test_helpers::sample_deployment_transaction(rng);
         ledger.add_to_memory_pool(transaction.clone()).unwrap();
 
         // Propose the next block.
@@ -1164,12 +1150,12 @@ mod tests {
         let rng = &mut TestRng::default();
 
         // Sample the genesis private key.
-        let private_key = crate::ledger::test_helpers::sample_genesis_private_key(rng);
+        let private_key = crate::consensus::test_helpers::sample_genesis_private_key(rng);
         // Sample the genesis ledger.
         let mut ledger = test_helpers::sample_genesis_ledger(rng);
 
         // Add a transaction to the memory pool.
-        let transaction = crate::ledger::test_helpers::sample_execution_transaction(rng);
+        let transaction = crate::consensus::test_helpers::sample_execution_transaction(rng);
         ledger.add_to_memory_pool(transaction.clone()).unwrap();
 
         // Propose the next block.
@@ -1192,17 +1178,16 @@ mod tests {
         let rng = &mut TestRng::default();
 
         // Sample the genesis private key, view key, and address.
-        let private_key = crate::ledger::test_helpers::sample_genesis_private_key(rng);
+        let private_key = crate::consensus::test_helpers::sample_genesis_private_key(rng);
         let view_key = ViewKey::try_from(private_key).unwrap();
         let address = Address::try_from(&view_key).unwrap();
 
         // Initialize the store.
-        let store = ProgramStore::<_, ProgramMemory<_>>::open(None).unwrap();
+        let store = ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap();
         // Create a genesis block.
-        let genesis = Block::genesis(&VM::new(store).unwrap(), &private_key, rng).unwrap();
+        let genesis = Block::genesis(&VM::from(store).unwrap(), &private_key, rng).unwrap();
         // Initialize the ledger.
-        let mut ledger =
-            Ledger::<_, BlockMemory<_>, ProgramMemory<_>>::new_with_genesis(&genesis, address, None).unwrap();
+        let mut ledger = CurrentConsensus::new_with_genesis(&genesis, address, None).unwrap();
 
         for height in 1..6 {
             // Fetch the unspent records.
@@ -1249,11 +1234,11 @@ mod tests {
         let rng = &mut TestRng::default();
 
         // Sample the genesis private key and address.
-        let private_key = crate::ledger::test_helpers::sample_genesis_private_key(rng);
+        let private_key = crate::consensus::test_helpers::sample_genesis_private_key(rng);
         let address = Address::try_from(&private_key).unwrap();
 
         // Sample the genesis ledger.
-        let mut ledger = crate::ledger::test_helpers::sample_genesis_ledger(rng);
+        let mut ledger = crate::consensus::test_helpers::sample_genesis_ledger(rng);
 
         // Fetch the proof target and epoch challenge for the block.
         let proof_target = ledger.latest_proof_target().unwrap();
@@ -1278,14 +1263,14 @@ mod tests {
         let rng = &mut TestRng::default();
 
         // Sample the genesis private key and address.
-        let private_key = crate::ledger::test_helpers::sample_genesis_private_key(rng);
+        let private_key = crate::consensus::test_helpers::sample_genesis_private_key(rng);
         let address = Address::try_from(&private_key).unwrap();
 
         // Sample the genesis ledger.
         let mut ledger = test_helpers::sample_genesis_ledger(rng);
 
         // Add a transaction to the memory pool.
-        let transaction = crate::ledger::test_helpers::sample_execution_transaction(rng);
+        let transaction = crate::consensus::test_helpers::sample_execution_transaction(rng);
         ledger.add_to_memory_pool(transaction).unwrap();
 
         // Ensure that the ledger can't create a block that satisfies the coinbase target.

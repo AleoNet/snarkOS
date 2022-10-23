@@ -21,6 +21,7 @@ use snarkos_account::Account;
 use snarkos_node_executor::{spawn_task, Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
+use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::Result;
@@ -40,7 +41,7 @@ pub struct Beacon<N: Network> {
     /// The router of the node.
     router: Router<N>,
     /// The ledger of the node.
-    ledger: Ledger<N>,
+    ledger: Ledger<N, ConsensusDB<N>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
 }
@@ -58,7 +59,7 @@ impl<N: Network> Beacon<N> {
         // Initialize the node router.
         let router = Router::new::<Self>(node_ip, *account.address(), NodeType::Beacon, trusted_peers).await?;
         // Initialize the ledger.
-        let ledger = Ledger::<N>::load(private_key, dev, router.clone())?;
+        let ledger = Ledger::load(private_key, dev, router.clone())?;
         // Initialize the node.
         let node = Self { account, router, ledger, shutdown: Default::default() };
 
@@ -77,7 +78,7 @@ impl<N: Network> Beacon<N> {
         spawn_task!(Self, {
             loop {
                 // Produce a transaction if the mempool is empty.
-                if beacon.ledger.ledger().read().memory_pool().len() == 0 {
+                if beacon.ledger.consensus().read().memory_pool().len() == 0 {
                     // Create a transfer transaction.
                     let transaction = match beacon.ledger.create_transfer(beacon.address(), 1) {
                         Ok(transaction) => transaction,
@@ -87,7 +88,7 @@ impl<N: Network> Beacon<N> {
                         }
                     };
                     // Add the transaction to the memory pool.
-                    if let Err(error) = beacon.ledger.ledger().write().add_to_memory_pool(transaction) {
+                    if let Err(error) = beacon.ledger.consensus().write().add_to_memory_pool(transaction) {
                         error!("Failed to add a transfer transaction to the memory pool: {error}");
                         continue;
                     }

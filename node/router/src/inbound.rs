@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Router, RouterRequest, Peer, ALEO_MAXIMUM_FORK_DEPTH};
+use crate::{Peer, Router, RouterRequest, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_executor::{spawn_task, Executor};
 use snarkos_node_messages::*;
 use snarkvm::prelude::Network;

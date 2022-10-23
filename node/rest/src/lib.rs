@@ -28,20 +28,19 @@ pub use routes::*;
 mod start;
 pub use start::*;
 
-use snarkos_node_ledger::ledger::{Ledger, RecordsFilter};
+use snarkos_node_ledger::{Ledger, RecordsFilter};
 use snarkvm::{
-    prelude::Network,
     console::{
         account::{Address, ViewKey},
         program::ProgramID,
         types::Field,
     },
-    synthesizer::{BlockStorage, Program, ProgramStorage, Transaction}
+    prelude::Network,
+    synthesizer::{ConsensusStorage, Program, Transaction},
 };
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use parking_lot::RwLock;
 use serde::{Deserialize, Serialize};
 use std::{str::FromStr, sync::Arc};
 use tokio::{sync::mpsc, task::JoinHandle};
@@ -60,28 +59,28 @@ pub enum LedgerRequest<N: Network> {
 
 /// A REST API server for the ledger.
 #[derive(Clone)]
-pub struct Server<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> {
+pub struct Server<N: Network, C: ConsensusStorage<N>> {
     /// The ledger.
-    ledger: Arc<RwLock<Ledger<N, B, P>>>,
+    ledger: Ledger<N, C>,
     /// The ledger sender.
     ledger_sender: LedgerSender<N>,
     /// The server handles.
     handles: Vec<Arc<JoinHandle<()>>>,
 }
 
-impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Server<N, B, P> {
+impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
     /// Returns the ledger.
-    pub fn ledger(&self) -> Arc<RwLock<Ledger<N, B, P>>> {
-        self.ledger.clone()
+    pub const fn ledger(&self) -> &Ledger<N, C> {
+        &self.ledger
     }
 
     /// Returns the ledger sender.
-    pub fn ledger_sender(&self) -> &LedgerSender<N> {
+    pub const fn ledger_sender(&self) -> &LedgerSender<N> {
         &self.ledger_sender
     }
 
     /// Returns the handles.
-    pub fn handles(&self) -> &Vec<Arc<JoinHandle<()>>> {
+    pub const fn handles(&self) -> &Vec<Arc<JoinHandle<()>>> {
         &self.handles
     }
 }

@@ -14,21 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{
-    Peer,
-    Router,
-    ALEO_MAXIMUM_FORK_DEPTH,
-};
-use snarkos_node_messages::{
-    ChallengeRequest,
-    ChallengeResponse,
-    Data,
-    DisconnectReason,
-    Ping,
-    Message,
-    MessageCodec,
-};
-use snarkos_node_executor::{Executor, NodeType,  Status};
+use crate::{Peer, Router, ALEO_MAXIMUM_FORK_DEPTH};
+use snarkos_node_executor::{Executor, NodeType, Status};
+use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, DisconnectReason, Message, MessageCodec, Ping};
 use snarkvm::prelude::{Block, FromBytes, Network};
 
 use anyhow::{bail, Result};

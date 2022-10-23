@@ -16,7 +16,7 @@
 
 use super::*;
 
-impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Ledger<N, B, P> {
+impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Returns `true` if the given state root exists.
     pub fn contains_state_root(&self, _state_root: &Field<N>) -> bool {
         todo!()

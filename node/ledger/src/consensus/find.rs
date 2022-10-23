@@ -18,7 +18,7 @@ use super::*;
 
 use std::borrow::Cow;
 
-impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Ledger<N, B, P> {
+impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Returns the block hash that contains the given `transaction ID`.
     pub fn find_block_hash(&self, transaction_id: &N::TransactionID) -> Result<Option<N::BlockHash>> {
         self.blocks.find_block_hash(transaction_id)

@@ -23,7 +23,7 @@ struct BlockRange {
     end: u32,
 }
 
-impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Server<N, B, P> {
+impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
     /// Initializes the routes, given the ledger and ledger sender.
     #[allow(clippy::redundant_clone)]
     pub fn routes(&self) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
@@ -188,32 +188,29 @@ impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Server<N, B, P> {
     }
 }
 
-impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Server<N, B, P> {
+impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
     /// Returns the latest block height.
-    async fn latest_height(ledger: Arc<RwLock<Ledger<N, B, P>>>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.read().latest_height()))
+    async fn latest_height(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().latest_height()))
     }
 
     /// Returns the latest block hash.
-    async fn latest_hash(ledger: Arc<RwLock<Ledger<N, B, P>>>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.read().latest_hash()))
+    async fn latest_hash(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().latest_hash()))
     }
 
     /// Returns the latest block.
-    async fn latest_block(ledger: Arc<RwLock<Ledger<N, B, P>>>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.read().latest_block().or_reject()?))
+    async fn latest_block(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().latest_block().or_reject()?))
     }
 
     /// Returns the block for the given block height.
-    async fn get_block(height: u32, ledger: Arc<RwLock<Ledger<N, B, P>>>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.read().get_block(height).or_reject()?))
+    async fn get_block(height: u32, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().get_block(height).or_reject()?))
     }
 
     /// Returns the blocks for the given block range.
-    async fn get_blocks(
-        block_range: BlockRange,
-        ledger: Arc<RwLock<Ledger<N, B, P>>>,
-    ) -> Result<impl Reply, Rejection> {
+    async fn get_blocks(block_range: BlockRange, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         let start_height = block_range.start;
         let end_height = block_range.end;
 
@@ -232,117 +229,102 @@ impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Server<N, B, P> {
         }
 
         let blocks = (start_height..end_height)
-            .map(|height| ledger.read().get_block(height).or_reject())
+            .map(|height| ledger.consensus().read().get_block(height).or_reject())
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(reply::json(&blocks))
     }
 
     /// Returns the transactions for the given block height.
-    async fn get_transactions(height: u32, ledger: Arc<RwLock<Ledger<N, B, P>>>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.read().get_transactions(height).or_reject()?))
+    async fn get_transactions(height: u32, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().get_transactions(height).or_reject()?))
     }
 
     /// Returns the transaction for the given transaction ID.
-    async fn get_transaction(
-        transaction_id: N::TransactionID,
-        ledger: Arc<RwLock<Ledger<N, B, P>>>,
-    ) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.read().get_transaction(transaction_id).or_reject()?))
+    async fn get_transaction(transaction_id: N::TransactionID, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().get_transaction(transaction_id).or_reject()?))
     }
 
     /// Returns the transactions in the memory pool.
-    async fn get_transactions_mempool(ledger: Arc<RwLock<Ledger<N, B, P>>>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.read().memory_pool().values().collect::<Vec<_>>()))
+    async fn get_transactions_mempool(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().memory_pool().values().collect::<Vec<_>>()))
     }
 
     /// Returns the program for the given program ID.
-    async fn get_program(
-        program_id: ProgramID<N>,
-        ledger: Arc<RwLock<Ledger<N, B, P>>>,
-    ) -> Result<impl Reply, Rejection> {
+    async fn get_program(program_id: ProgramID<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         let program = if program_id == ProgramID::<N>::from_str("credits.aleo").or_reject()? {
             Program::<N>::credits().or_reject()?
         } else {
-            ledger.read().get_program(program_id).or_reject()?
+            ledger.consensus().read().get_program(program_id).or_reject()?
         };
 
         Ok(reply::json(&program))
     }
 
     /// Returns the list of current validators.
-    async fn get_validators(ledger: Arc<RwLock<Ledger<N, B, P>>>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.read().validators().keys().collect::<Vec<&Address<N>>>()))
+    async fn get_validators(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().validators().keys().collect::<Vec<&Address<N>>>()))
     }
 
     /// Returns the state path for the given commitment.
-    async fn get_state_path(
-        commitment: Field<N>,
-        ledger: Arc<RwLock<Ledger<N, B, P>>>,
-    ) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.read().to_state_path(&commitment).or_reject()?))
+    async fn get_state_path(commitment: Field<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().to_state_path(&commitment).or_reject()?))
     }
 
     /// Returns the block hash that contains the given `transaction ID`.
-    async fn find_block_hash(
-        transaction_id: N::TransactionID,
-        ledger: Arc<RwLock<Ledger<N, B, P>>>,
-    ) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.read().find_block_hash(&transaction_id).or_reject()?))
+    async fn find_block_hash(transaction_id: N::TransactionID, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().find_block_hash(&transaction_id).or_reject()?))
     }
 
     /// Returns the transaction ID that contains the given `program ID`.
-    async fn find_deployment_id(
-        program_id: ProgramID<N>,
-        ledger: Arc<RwLock<Ledger<N, B, P>>>,
-    ) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.read().find_deployment_id(&program_id).or_reject()?))
+    async fn find_deployment_id(program_id: ProgramID<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().find_deployment_id(&program_id).or_reject()?))
     }
 
     /// Returns the transaction ID that contains the given `transition ID`.
     async fn find_transaction_id(
         transition_id: N::TransitionID,
-        ledger: Arc<RwLock<Ledger<N, B, P>>>,
+        ledger: Ledger<N, C>,
     ) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.read().find_transaction_id(&transition_id).or_reject()?))
+        Ok(reply::json(&ledger.consensus().read().find_transaction_id(&transition_id).or_reject()?))
     }
 
     /// Returns the transition ID that contains the given `input ID` or `output ID`.
-    async fn find_transition_id(
-        input_or_output_id: Field<N>,
-        ledger: Arc<RwLock<Ledger<N, B, P>>>,
-    ) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.read().find_transition_id(&input_or_output_id).or_reject()?))
+    async fn find_transition_id(input_or_output_id: Field<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().find_transition_id(&input_or_output_id).or_reject()?))
     }
 
     /// Returns all of the records for the given view key.
-    async fn records_all(view_key: ViewKey<N>, ledger: Arc<RwLock<Ledger<N, B, P>>>) -> Result<impl Reply, Rejection> {
+    async fn records_all(view_key: ViewKey<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         // Fetch the records using the view key.
-        let records: IndexMap<_, _> = ledger.read().find_records(&view_key, RecordsFilter::All).or_reject()?.collect();
+        let records: IndexMap<_, _> =
+            ledger.consensus().read().find_records(&view_key, RecordsFilter::All).or_reject()?.collect();
         // Return the records.
         Ok(reply::with_status(reply::json(&records), StatusCode::OK))
     }
 
     /// Returns the spent records for the given view key.
-    async fn records_spent(
-        view_key: ViewKey<N>,
-        ledger: Arc<RwLock<Ledger<N, B, P>>>,
-    ) -> Result<impl Reply, Rejection> {
+    async fn records_spent(view_key: ViewKey<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         // Fetch the records using the view key.
-        let records =
-            ledger.read().find_records(&view_key, RecordsFilter::Spent).or_reject()?.collect::<IndexMap<_, _>>();
+        let records = ledger
+            .consensus()
+            .read()
+            .find_records(&view_key, RecordsFilter::Spent)
+            .or_reject()?
+            .collect::<IndexMap<_, _>>();
         // Return the records.
         Ok(reply::with_status(reply::json(&records), StatusCode::OK))
     }
 
     /// Returns the unspent records for the given view key.
-    async fn records_unspent(
-        view_key: ViewKey<N>,
-        ledger: Arc<RwLock<Ledger<N, B, P>>>,
-    ) -> Result<impl Reply, Rejection> {
+    async fn records_unspent(view_key: ViewKey<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         // Fetch the records using the view key.
-        let records =
-            ledger.read().find_records(&view_key, RecordsFilter::Unspent).or_reject()?.collect::<IndexMap<_, _>>();
+        let records = ledger
+            .consensus()
+            .read()
+            .find_records(&view_key, RecordsFilter::Unspent)
+            .or_reject()?
+            .collect::<IndexMap<_, _>>();
         // Return the records.
         Ok(reply::with_status(reply::json(&records), StatusCode::OK))
     }
@@ -351,10 +333,10 @@ impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Server<N, B, P> {
     async fn transaction_broadcast(
         transaction: Transaction<N>,
         ledger_sender: LedgerSender<N>,
-        ledger: Arc<RwLock<Ledger<N, B, P>>>,
+        ledger: Ledger<N, C>,
     ) -> Result<impl Reply, Rejection> {
         // Validate the transaction.
-        ledger.read().check_transaction(&transaction).or_reject()?;
+        ledger.consensus().read().check_transaction(&transaction).or_reject()?;
 
         // Send the transaction to the ledger.
         match ledger_sender.send(LedgerRequest::TransactionBroadcast(transaction)).await {

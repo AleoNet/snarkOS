@@ -19,9 +19,9 @@ use crate::{
     DataID,
 };
 use snarkvm::{
-    synthesizer::store::helpers::{Map, MapRead},
     console::{network::Testnet3, types::Scalar},
     prelude::{Network, TestRng, Uniform},
+    synthesizer::store::helpers::{Map, MapRead},
 };
 
 use serial_test::serial;
