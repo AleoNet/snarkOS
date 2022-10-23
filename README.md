@@ -160,22 +160,17 @@ SUBCOMMANDS:
 
 ## 6. Development
 
-[//]: # (In one terminal, start the first node by running:)
+In one terminal, start the first node by running:
+```
+cargo run --release -- start --dev 0 --nodisplay
+```
 
-[//]: # (```)
+In a second terminal, run:
+```
+cargo run --release -- start --dev 1 --nodisplay
+```
 
-[//]: # (cargo run --release -- --dev 1 --node 0.0.0.0:4135 --rpc 0.0.0.0:3035 --prover aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah)
-
-[//]: # (```)
-
-[//]: # ()
-[//]: # (After the first node starts, in a second terminal, run:)
-
-[//]: # (```)
-
-[//]: # (cargo run --release -- --dev 2)
-
-[//]: # (```)
+This prodedure can be repeated to start more nodes.
 
 We welcome all contributions to snarkOS. Please refer to the [license](#7-license) for the terms of contributions.
 

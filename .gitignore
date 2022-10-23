@@ -1,11 +1,7 @@
-.vscode
 **/*.idea/
 **/target
-**/.DS_Store
-**/.ledger*
-**/.operator*
-**/.prover*
-**inner.proving*
-**outer.proving*
-**posw.proving*
-**universal.srs*
+**.DS_Store
+storage*/
+wasm/Cargo.lock
+**/build
+**.ledger-*

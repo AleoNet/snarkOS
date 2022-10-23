@@ -6,16 +6,8 @@
 
 ## Test Plan
 
-<!-- If you changed any code, please provide us with clear instructions on how you verified your changes work. -->
-
-(Write your test plan here)
+(If you changed any code, please provide clear instructions on how you verified your changes work.)
 
 ## Related PRs
 
-<!--
-    If this PR adds or changes functionality,
-    please take some time to update the docs at https://github.com/AleoHQ/snarkOS,
-    and link to your PR here.
--->
-
-(Link your related PRs here)
+(Link any related PRs here)
