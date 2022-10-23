@@ -17,7 +17,18 @@ license = "GPL-3.0"
 edition = "2021"
 
 [workspace]
-members = [ "account", "cli", "display", "node", "node/executor", "node/ledger", "node/rest", "node/router", "node/store" ]
+members = [
+    "account",
+    "cli",
+    "display",
+    "node",
+    "node/executor",
+    "node/ledger",
+    "node/messages",
+    "node/rest",
+    "node/router",
+    "node/store"
+]
 
 #[lib]
 #path = "snarkos/lib.rs"
@@ -31,6 +42,13 @@ path = "snarkos/main.rs"
 git = "https://github.com/AleoHQ/snarkVM.git"
 rev = "58f94cc"
 features = ["circuit", "console", "parallel"]
+
+[dependencies.anyhow]
+version = "1"
+
+[dependencies.clap]
+version = "3.2"
+features = ["derive"]
 
 [dependencies.snarkos-account]
 path = "./account"
@@ -50,6 +68,9 @@ path = "./node/executor"
 [dependencies.snarkos-node-ledger]
 path = "./node/ledger"
 
+[dependencies.snarkos-node-messages]
+path = "./node/messages"
+
 [dependencies.snarkos-node-rest]
 path = "./node/rest"
 
@@ -58,13 +79,6 @@ path = "./node/router"
 
 [dependencies.snarkos-node-store]
 path = "./node/store"
-
-[dependencies.anyhow]
-version = "1"
-
-[dependencies.clap]
-version = "3.2"
-features = ["derive"]
 
 [dev-dependencies.rusty-hook]
 version = "0.11.2"

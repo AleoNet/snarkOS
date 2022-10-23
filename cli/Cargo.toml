@@ -16,15 +16,6 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
-[dependencies.snarkos-account]
-path = "../account"
-
-[dependencies.snarkos-display]
-path = "../display"
-
-[dependencies.snarkos-node]
-path = "../node"
-
 [dependencies.aleo-std]
 version = "0.1.15"
 default-features = false
@@ -64,6 +55,15 @@ version = "1"
 
 [dependencies.serde_json]
 version = "1"
+
+[dependencies.snarkos-account]
+path = "../account"
+
+[dependencies.snarkos-display]
+path = "../display"
+
+[dependencies.snarkos-node]
+path = "../node"
 
 [dependencies.snarkvm]
 workspace = true

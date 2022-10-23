@@ -2056,6 +2056,7 @@ dependencies = [
  "snarkos-node",
  "snarkos-node-executor",
  "snarkos-node-ledger",
+ "snarkos-node-messages",
  "snarkos-node-rest",
  "snarkos-node-router",
  "snarkos-node-store",
@@ -2157,6 +2158,7 @@ dependencies = [
  "rand",
  "rayon",
  "reqwest",
+ "snarkos-node-messages",
  "snarkos-node-router",
  "snarkos-node-store",
  "snarkvm",
@@ -2165,6 +2167,21 @@ dependencies = [
  "tracing",
  "tracing-test",
  "warp",
+]
+
+[[package]]
+name = "snarkos-node-messages"
+version = "2.0.2"
+dependencies = [
+ "anyhow",
+ "bincode",
+ "bytes",
+ "serde",
+ "snarkos-node-executor",
+ "snarkvm",
+ "tokio",
+ "tokio-util",
+ "tracing",
 ]
 
 [[package]]
@@ -2197,6 +2214,7 @@ dependencies = [
  "rand",
  "serde",
  "snarkos-node-executor",
+ "snarkos-node-messages",
  "snarkvm",
  "tokio",
  "tokio-stream",

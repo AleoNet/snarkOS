@@ -22,7 +22,8 @@ extern crate tracing;
 pub mod ledger;
 use ledger::{*, Ledger as ILedger};
 
-use snarkos_node_router::{Data, Message, Router, RouterRequest, UnconfirmedBlock};
+use snarkos_node_messages::{Data, Message, UnconfirmedBlock};
+use snarkos_node_router::{Router, RouterRequest, };
 use snarkos_node_store::{BlockDB, ProgramDB};
 use snarkvm::prelude::*;
 

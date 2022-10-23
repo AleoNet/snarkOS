@@ -15,18 +15,20 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{
+    Peer,
+    Router,
+    ALEO_MAXIMUM_FORK_DEPTH,
+};
+use snarkos_node_messages::{
     ChallengeRequest,
     ChallengeResponse,
     Data,
     DisconnectReason,
+    Ping,
     Message,
     MessageCodec,
-    Peer,
-    Ping,
-    Router,
-    ALEO_MAXIMUM_FORK_DEPTH,
 };
-use snarkos_node_executor::{Executor, NodeType, Status};
+use snarkos_node_executor::{Executor, NodeType,  Status};
 use snarkvm::prelude::{Block, FromBytes, Network};
 
 use anyhow::{bail, Result};

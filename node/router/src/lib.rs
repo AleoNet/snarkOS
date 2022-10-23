@@ -24,14 +24,8 @@ extern crate tracing;
 mod handshake;
 pub use handshake::*;
 
-mod helpers;
-pub use helpers::*;
-
 mod inbound;
 pub use inbound::*;
-
-mod message;
-pub use message::*;
 
 mod outbound;
 pub use outbound::*;
@@ -40,6 +34,7 @@ mod peer;
 pub use peer::*;
 
 use snarkos_node_executor::{spawn_task, Executor, NodeType};
+use snarkos_node_messages::*;
 use snarkvm::prelude::{Address, Network};
 
 use anyhow::Result;

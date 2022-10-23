@@ -14,7 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Data, Message, MessageCodec, Peer, Router};
+use crate::{Peer, Router};
+use snarkos_node_messages::{Data, Message, MessageCodec};
 use snarkvm::prelude::Network;
 
 use futures::SinkExt;

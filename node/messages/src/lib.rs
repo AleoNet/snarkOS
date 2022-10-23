@@ -14,6 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#![forbid(unsafe_code)]
+
+#[macro_use]
+extern crate tracing;
+
+mod helpers;
+pub use helpers::*;
+
 mod block_request;
 pub use block_request::BlockRequest;
 
@@ -50,7 +58,6 @@ pub use unconfirmed_solution::UnconfirmedSolution;
 mod unconfirmed_transaction;
 pub use unconfirmed_transaction::UnconfirmedTransaction;
 
-use crate::{Data, DisconnectReason};
 use snarkos_node_executor::{NodeType, Status};
 use snarkvm::prelude::{Block, Header, Network, ProverSolution, ToBytes, Transaction};
 
@@ -65,8 +72,8 @@ pub trait MessageTrait {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()>;
     /// Deserializes the given buffer into a message.
     fn deserialize(bytes: BytesMut) -> Result<Self>
-    where
-        Self: Sized;
+        where
+            Self: Sized;
 }
 
 #[derive(Clone, Debug)]

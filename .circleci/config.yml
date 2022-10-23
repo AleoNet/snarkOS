@@ -195,6 +195,24 @@ jobs:
           workspace_member: node/ledger
           cache_key: snarkos-node-ledger-cache
 
+  node-messages:
+    docker:
+      - image: cimg/rust:1.64
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/messages
+          cache_key: snarkos-node-messages-cache
+
+  node-rest:
+    docker:
+      - image: cimg/rust:1.64
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/rest
+          cache_key: snarkos-node-rest-cache
+
   node-router:
     docker:
       - image: cimg/rust:1.64
@@ -375,6 +393,8 @@ workflows:
       - node
       - node-executor
       - node-ledger
+      - node-messages
+      - node-rest
       - node-router
       - node-store
       - check-fmt

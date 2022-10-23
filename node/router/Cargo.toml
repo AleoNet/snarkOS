@@ -16,9 +16,6 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
-[dependencies.snarkos-node-executor]
-path = "../executor"
-
 [dependencies.anyhow]
 version = "1"
 
@@ -47,6 +44,12 @@ version = "0.8"
 
 [dependencies.serde]
 version = "1"
+
+[dependencies.snarkos-node-executor]
+path = "../executor"
+
+[dependencies.snarkos-node-messages]
+path = "../messages"
 
 [dependencies.snarkvm]
 workspace = true

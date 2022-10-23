@@ -16,9 +16,6 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
-[dependencies.snarkos-node]
-path = "../node"
-
 [dependencies.anyhow]
 version = "1"
 
@@ -27,6 +24,9 @@ version = "2.0"
 
 [dependencies.crossterm]
 version = "0.25"
+
+[dependencies.snarkos-node]
+path = "../node"
 
 [dependencies.snarkvm]
 workspace = true
