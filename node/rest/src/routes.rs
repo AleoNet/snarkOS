@@ -86,11 +86,11 @@ impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
             .and(with(self.ledger.clone()))
             .and_then(Self::get_program);
 
-        // GET /testnet3/validators
+        // GET /testnet3/beacons
         let get_validators = warp::get()
-            .and(warp::path!("testnet3" / "validators"))
+            .and(warp::path!("testnet3" / "beacons"))
             .and(with(self.ledger.clone()))
-            .and_then(Self::get_validators);
+            .and_then(Self::get_beacons);
 
         // GET /testnet3/statePath/{commitment}
         let get_state_path = warp::get()
@@ -261,9 +261,9 @@ impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
         Ok(reply::json(&program))
     }
 
-    /// Returns the list of current validators.
-    async fn get_validators(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.consensus().read().validators().keys().collect::<Vec<&Address<N>>>()))
+    /// Returns the list of current beacons.
+    async fn get_beacons(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().beacons().keys().collect::<Vec<&Address<N>>>()))
     }
 
     /// Returns the state path for the given commitment.

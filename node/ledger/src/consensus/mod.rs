@@ -43,6 +43,7 @@ use snarkvm::{
 use anyhow::Result;
 use indexmap::{IndexMap, IndexSet};
 use std::borrow::Cow;
+use futures::TryStreamExt;
 use time::OffsetDateTime;
 
 #[cfg(feature = "parallel")]
@@ -80,9 +81,9 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     transactions: TransactionStore<N, C::TransactionStorage>,
     /// The transition store.
     transitions: TransitionStore<N, C::TransitionStorage>,
-    /// The validators.
-    // TODO (howardwu): Update this to retrieve from a validators store.
-    validators: IndexMap<Address<N>, ()>,
+    /// The beacons.
+    // TODO (howardwu): Update this to retrieve from a beacons store.
+    beacons: IndexMap<Address<N>, ()>,
     /// The memory pool of unconfirmed transactions.
     memory_pool: IndexMap<N::TransactionID, Transaction<N>>,
 
@@ -131,7 +132,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             transactions: store.transaction_store().clone(),
             transitions: store.transition_store().clone(),
             // TODO (howardwu): Update this to retrieve from a validators store.
-            validators: [(address, ())].into_iter().collect(),
+            beacons: [(address, ())].into_iter().collect(),
             memory_pool: Default::default(),
             coinbase_puzzle,
             coinbase_memory_pool: Default::default(),
@@ -171,30 +172,24 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             transactions: store.transaction_store().clone(),
             transitions: store.transition_store().clone(),
             // TODO (howardwu): Update this to retrieve from a validators store.
-            validators: Default::default(),
+            beacons: Default::default(),
             memory_pool: Default::default(),
             coinbase_puzzle,
             coinbase_memory_pool: Default::default(),
         };
 
-        // Fetch the latest height.
-        let latest_height = match consensus.blocks.heights().max() {
-            Some(height) => *height,
-            // If there are no previous hashes, add the genesis block.
-            None => {
-                // Load the genesis block.
-                let genesis = Block::<N>::from_bytes_le(N::genesis_bytes())?;
-                // Add the genesis block.
-                consensus.add_next_block(&genesis)?;
-                // Return the genesis height.
-                genesis.height()
-            }
-        };
+        // If the block store is empty, initialize the genesis block.
+        if consensus.blocks.heights().max().is_none() {
+            // Load the genesis block.
+            let genesis = Block::<N>::from_bytes_le(N::genesis_bytes())?;
+            // Add the initial beacon.
+            consensus.add_beacon(genesis.signature().to_address())?;
+            // Add the genesis block.
+            consensus.add_next_block(&genesis)?;
+        }
 
-        // Add the initial validator.
-        let genesis_block = consensus.get_block(0)?;
-        consensus.add_validator(genesis_block.signature().to_address())?;
-
+        // Retrieve the latest height.
+        let latest_height = *consensus.blocks.heights().max().ok_or(anyhow!("Failed to load blocks in consensus"))?;
         // Fetch the latest block.
         let block = consensus.get_block(latest_height)?;
 
@@ -209,12 +204,14 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             (1..=latest_height).map(|height| consensus.get_hash(height).map(|hash| hash.to_bits_le())).try_collect()?;
         consensus.block_tree.append(&hashes)?;
 
+        // Add the genesis beacon.
+        let genesis_beacon = consensus.get_block(0)?.signature().to_address();
+        if !consensus.beacons.contains_key(&genesis_beacon) {
+            consensus.add_beacon(genesis_beacon)?;
+        }
+
         // Safety check the existence of every block.
-        #[cfg(feature = "parallel")]
-        let heights_iter = (0..=latest_height).into_par_iter();
-        #[cfg(not(feature = "parallel"))]
-        let mut heights_iter = (0..=latest_height).into_iter();
-        heights_iter.try_for_each(|height| {
+        cfg_into_iter!((0..=latest_height)).try_for_each(|height| {
             consensus.get_block(height)?;
             Ok::<_, Error>(())
         })?;
@@ -506,12 +503,12 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         /* Signature */
 
-        // Ensure the block is signed by an authorized validator.
+        // Ensure the block is signed by an authorized beacon.
         let signer = block.signature().to_address();
-        if !self.validators.contains_key(&signer) {
-            let validator = self.validators.iter().next().unwrap().0;
-            eprintln!("{} {} {} {}", *validator, signer, *validator == signer, self.validators.contains_key(&signer));
-            bail!("Block {} ({}) is signed by an unauthorized validator ({})", block.height(), block.hash(), signer);
+        if !self.beacons.contains_key(&signer) {
+            let beacon = self.beacons.iter().next().unwrap().0;
+            eprintln!("{} {} {} {}", *beacon, signer, *beacon == signer, self.beacons.contains_key(&signer));
+            bail!("Block {} ({}) is signed by an unauthorized beacon ({})", block.height(), block.hash(), signer);
         }
 
         // Check the signature.
@@ -548,11 +545,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         // Ensure each transaction is well-formed and unique.
-        #[cfg(feature = "parallel")]
-        let transactions_iter = block.transactions().par_iter();
-        #[cfg(not(feature = "parallel"))]
-        let mut transactions_iter = block.transactions().iter();
-        transactions_iter.try_for_each(|(_, transaction)| {
+        cfg_iter!(block.transactions()).try_for_each(|(_, transaction)| {
             self.check_transaction(transaction)
                 .map_err(|e| anyhow!("Invalid transaction found in the transactions list: {e}"))
         })?;
@@ -652,7 +645,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                 blocks: ledger.blocks,
                 transactions: ledger.transactions,
                 transitions: ledger.transitions,
-                validators: ledger.validators,
+                beacons: ledger.beacons,
                 vm: ledger.vm,
                 memory_pool: ledger.memory_pool,
                 coinbase_puzzle: ledger.coinbase_puzzle,
@@ -663,19 +656,19 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         Ok(())
     }
 
-    /// Adds a given address to the validator set.
-    pub fn add_validator(&mut self, address: Address<N>) -> Result<()> {
-        if self.validators.insert(address, ()).is_some() {
-            bail!("'{address}' is already in the validator set.")
+    /// Adds a given address to the beacon set.
+    pub fn add_beacon(&mut self, address: Address<N>) -> Result<()> {
+        if self.beacons.insert(address, ()).is_some() {
+            bail!("'{address}' is already in the beacon set.")
         } else {
             Ok(())
         }
     }
 
-    /// Removes a given address from the validator set.
-    pub fn remove_validator(&mut self, address: Address<N>) -> Result<()> {
-        if self.validators.remove(&address).is_none() {
-            bail!("'{address}' is not in the validator set.")
+    /// Removes a given address from the beacon set.
+    pub fn remove_beacon(&mut self, address: Address<N>) -> Result<()> {
+        if self.beacons.remove(&address).is_none() {
+            bail!("'{address}' is not in the beacon set.")
         } else {
             Ok(())
         }
@@ -686,9 +679,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         &self.block_tree
     }
 
-    /// Returns the validator set.
-    pub const fn validators(&self) -> &IndexMap<Address<N>, ()> {
-        &self.validators
+    /// Returns the beacon set.
+    pub const fn beacons(&self) -> &IndexMap<Address<N>, ()> {
+        &self.beacons
     }
 
     /// Returns the memory pool.
