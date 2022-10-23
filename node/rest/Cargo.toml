@@ -33,6 +33,9 @@ version = "1"
 default-features = false
 features = [ "derive" ]
 
+[dependencies.snarkos-node-ledger]
+path = "../ledger"
+
 [dependencies.snarkvm]
 workspace = true
 

@@ -28,6 +28,7 @@ pub use routes::*;
 mod start;
 pub use start::*;
 
+use snarkos_node_ledger::ledger::{Ledger, RecordsFilter};
 use snarkvm::{
     prelude::Network,
     console::{
@@ -35,7 +36,7 @@ use snarkvm::{
         program::ProgramID,
         types::Field,
     },
-    synthesizer::{BlockStorage, Ledger, Program, ProgramStorage, RecordsFilter, Transaction}
+    synthesizer::{BlockStorage, Program, ProgramStorage, Transaction}
 };
 
 use anyhow::Result;

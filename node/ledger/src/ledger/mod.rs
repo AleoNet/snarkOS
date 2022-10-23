@@ -835,14 +835,18 @@ impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Ledger<N, B, P> {
 #[cfg(test)]
 pub(crate) mod test_helpers {
     use super::*;
-    use crate::{ledger::Block, vm::test_helpers::sample_vm};
-    use console::{account::PrivateKey, network::Testnet3, program::Value};
-    use snarkvm_utilities::TestRng;
+    use snarkvm::{synthesizer::Block};
+    use snarkvm::console::{account::PrivateKey, network::Testnet3, program::Value};
+    use snarkvm::prelude::TestRng;
 
     use once_cell::sync::OnceCell;
 
     type CurrentNetwork = Testnet3;
     pub(crate) type CurrentLedger = Ledger<CurrentNetwork, BlockMemory<CurrentNetwork>, ProgramMemory<CurrentNetwork>>;
+
+    pub(crate) fn sample_vm() -> VM<CurrentNetwork, ProgramMemory<CurrentNetwork>> {
+        VM::new(ProgramStore::open(None).unwrap()).unwrap()
+    }
 
     pub(crate) fn sample_genesis_private_key(rng: &mut TestRng) -> PrivateKey<CurrentNetwork> {
         static INSTANCE: OnceCell<PrivateKey<CurrentNetwork>> = OnceCell::new();
@@ -858,7 +862,7 @@ pub(crate) mod test_helpers {
         INSTANCE
             .get_or_init(|| {
                 // Initialize the VM.
-                let vm = crate::vm::test_helpers::sample_vm();
+                let vm = crate::ledger::test_helpers::sample_vm();
                 // Initialize a new caller.
                 let caller_private_key = PrivateKey::<CurrentNetwork>::new(rng).unwrap();
                 // Return the block.
@@ -875,7 +879,7 @@ pub(crate) mod test_helpers {
         INSTANCE
             .get_or_init(|| {
                 // Initialize the VM.
-                let vm = crate::vm::test_helpers::sample_vm();
+                let vm = crate::ledger::test_helpers::sample_vm();
                 // Return the block.
                 Block::genesis(&vm, &private_key, rng).unwrap()
             })
@@ -1025,8 +1029,8 @@ function compute:
 mod tests {
     use super::*;
     use crate::ledger::test_helpers::CurrentLedger;
-    use console::{network::Testnet3, program::Value};
-    use snarkvm_utilities::TestRng;
+    use snarkvm::console::{network::Testnet3, program::Value};
+    use snarkvm::prelude::TestRng;
 
     use tracing_test::traced_test;
 
@@ -1043,7 +1047,7 @@ mod tests {
         let address = Address::try_from(&view_key).unwrap();
 
         // Initialize the VM.
-        let vm = crate::vm::test_helpers::sample_vm();
+        let vm = crate::ledger::test_helpers::sample_vm();
 
         // Create a genesis block.
         let genesis = Block::genesis(&vm, &private_key, rng).unwrap();

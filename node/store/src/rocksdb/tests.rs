@@ -19,7 +19,7 @@ use crate::{
     DataID,
 };
 use snarkvm::{
-    compiler::{Map, MapRead},
+    synthesizer::store::helpers::{Map, MapRead},
     console::{network::Testnet3, types::Scalar},
     prelude::{Network, TestRng, Uniform},
 };

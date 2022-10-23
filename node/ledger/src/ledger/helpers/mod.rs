@@ -205,8 +205,8 @@ fn retarget(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use console::network::Testnet3;
-    use snarkvm_utilities::TestRng;
+    use snarkvm::console::network::Testnet3;
+    use snarkvm::prelude::TestRng;
 
     use rand::Rng;
 

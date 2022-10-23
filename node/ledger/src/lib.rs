@@ -19,8 +19,8 @@
 #[macro_use]
 extern crate tracing;
 
-mod ledger;
-use ledger::{*, Ledger as ILedger, RecordsFilter};
+pub mod ledger;
+use ledger::{*, Ledger as ILedger};
 
 use snarkos_node_router::{Data, Message, Router, RouterRequest, UnconfirmedBlock};
 use snarkos_node_store::{BlockDB, ProgramDB};

@@ -122,7 +122,7 @@ impl<N: Network, B: BlockStorage<N>, P: ProgramStorage<N>> Ledger<N, B, P> {
 mod tests {
     use super::*;
     use crate::ledger::test_helpers::CurrentLedger;
-    use console::network::Testnet3;
+    use snarkvm::console::network::Testnet3;
 
     type CurrentNetwork = Testnet3;
 
