@@ -32,10 +32,10 @@ use std::net::SocketAddr;
 pub struct Validator<N: Network> {
     /// The account of the node.
     account: Account<N>,
-    /// The router of the node.
-    router: Router<N>,
     /// The ledger of the node.
     ledger: Ledger<N, ConsensusDB<N>>,
+    /// The router of the node.
+    router: Router<N>,
 }
 
 impl<N: Network> Validator<N> {
@@ -48,12 +48,12 @@ impl<N: Network> Validator<N> {
     ) -> Result<Self> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
+        // Initialize the ledger.
+        let ledger = Ledger::load(private_key, dev)?;
         // Initialize the node router.
         let router = Router::new::<Self>(node_ip, *account.address(), NodeType::Validator, trusted_peers).await?;
-        // Initialize the ledger.
-        let ledger = Ledger::load(private_key, dev, router.clone())?;
         // Initialize the node.
-        let node = Self { account, router, ledger };
+        let node = Self { account, ledger, router };
         // Initialize the signal handler.
         let _ = node.handle_signals();
         // Return the node.

@@ -53,12 +53,6 @@ optional = true
 [dependencies.reqwest]
 version = "0.11"
 
-[dependencies.snarkos-node-messages]
-path = "../messages"
-
-[dependencies.snarkos-node-router]
-path = "../router"
-
 [dependencies.snarkos-node-store]
 path = "../store"
 

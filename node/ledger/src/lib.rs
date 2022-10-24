@@ -24,12 +24,9 @@ pub use consensus::*;
 
 mod memory_pool;
 
-use snarkos_node_messages::{Data, Message, UnconfirmedBlock};
-use snarkos_node_router::{Router, RouterRequest};
 use snarkvm::prelude::*;
 
 use anyhow::{anyhow, bail, ensure, Result};
-use backoff::{future::retry, ExponentialBackoff};
 use colored::Colorize;
 use core::time::Duration;
 use futures::{Future, StreamExt};
@@ -42,40 +39,12 @@ use warp::{reply, Filter, Rejection, Reply};
 // pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockDB<N>, ProgramDB<N>>;
 // // pub(crate) type InternalServer<N> = snarkvm::prelude::Server<N, BlockMemory<N>, ProgramMemory<N>>;
 
-pub(crate) async fn handle_dispatch_error<'a, T, F>(func: impl Fn() -> F + 'a) -> Result<T>
-where
-    F: Future<Output = Result<T, Error>>,
-{
-    fn default_backoff() -> ExponentialBackoff {
-        ExponentialBackoff {
-            max_interval: Duration::from_secs(10),
-            max_elapsed_time: Some(Duration::from_secs(45)),
-            ..Default::default()
-        }
-    }
-
-    fn from_anyhow_err(err: Error) -> backoff::Error<Error> {
-        use backoff::Error;
-
-        if let Ok(err) = err.downcast::<reqwest::Error>() {
-            debug!("Server error: {err}; retrying...");
-            Error::Transient { err: err.into(), retry_after: None }
-        } else {
-            Error::Transient { err: anyhow!("Block parse error"), retry_after: None }
-        }
-    }
-
-    retry(default_backoff(), || async { func().await.map_err(from_anyhow_err) }).await
-}
-
 #[derive(Clone)]
 pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
     /// The consensus module.
     consensus: Arc<RwLock<Consensus<N, C>>>,
     // /// The server.
     // server: Arc<InternalServer<N>>,
-    /// The router.
-    router: Router<N>,
     /// The account private key.
     private_key: PrivateKey<N>,
     /// The account view key.
@@ -87,12 +56,7 @@ pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
 impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     /// Initializes a new instance of the ledger with a fresh genesis block.
     /// This is used for testing purposes only.
-    fn new_with_genesis(
-        private_key: PrivateKey<N>,
-        genesis: Block<N>,
-        dev: Option<u16>,
-        router: Router<N>,
-    ) -> Result<Self> {
+    fn new_with_genesis(private_key: PrivateKey<N>, genesis: Block<N>, dev: Option<u16>) -> Result<Self> {
         // Retrieve the genesis hash.
         let genesis_hash = genesis.hash();
         // Initialize consensus.
@@ -109,23 +73,19 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
             }
         };
         // Return the ledger.
-        Self::from(consensus, private_key, router)
+        Self::from(consensus, private_key)
     }
 
     /// Opens an instance of the ledger.
-    pub fn load(private_key: PrivateKey<N>, dev: Option<u16>, router: Router<N>) -> Result<Self> {
+    pub fn load(private_key: PrivateKey<N>, dev: Option<u16>) -> Result<Self> {
         // Initialize the ledger.
         let ledger = Arc::new(RwLock::new(Consensus::load(dev)?));
         // Return the ledger.
-        Self::from(ledger, private_key, router)
+        Self::from(ledger, private_key)
     }
 
     /// Initializes a new instance of the ledger.
-    pub fn from(
-        consensus: Arc<RwLock<Consensus<N, C>>>,
-        private_key: PrivateKey<N>,
-        router: Router<N>,
-    ) -> Result<Self> {
+    pub fn from(consensus: Arc<RwLock<Consensus<N, C>>>, private_key: PrivateKey<N>) -> Result<Self> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
@@ -167,10 +127,9 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         // let server = Arc::new(InternalServer::<N>::start(ledger.clone(), Some(additional_routes), None)?);
 
         // Return the ledger.
-        Ok(Self { consensus, router, private_key, view_key, address })
+        Ok(Self { consensus, private_key, view_key, address })
     }
 
-    // TODO (raychu86): Restrict visibility.
     /// Returns the consensus module.
     pub const fn consensus(&self) -> &Arc<RwLock<Consensus<N, C>>> {
         &self.consensus
@@ -189,52 +148,6 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     /// Adds the given unconfirmed solution to the memory pool.
     pub fn add_unconfirmed_solution(&self, solution: &ProverSolution<N>) -> Result<()> {
         self.consensus.write().add_unconfirmed_solution(solution)
-    }
-
-    /// Advances the ledger to the next block.
-    pub async fn advance_to_next_block(&self) -> Result<Block<N>> {
-        let self_clone = self.clone();
-        let next_block = task::spawn_blocking(move || {
-            // Initialize an RNG.
-            let rng = &mut ::rand::thread_rng();
-            // Propose the next block.
-            self_clone.consensus.read().propose_next_block(&self_clone.private_key, rng)
-        })
-        .await??;
-
-        // Add the next block to the ledger.
-        self.add_next_block(next_block.clone()).await?;
-
-        // Serialize the block ahead of time to not do it for each peer.
-        let serialized_block = Data::Object(next_block.clone()).serialize().await?;
-
-        // Broadcast the block to all peers.
-        let message = Message::<N>::UnconfirmedBlock(UnconfirmedBlock {
-            block_height: next_block.height(),
-            block_hash: next_block.hash(),
-            block: Data::Buffer(serialized_block.clone()),
-        });
-        if let Err(error) = self.router.process(RouterRequest::MessagePropagate(message)).await {
-            trace!("Failed to broadcast the next block: {error}");
-        }
-
-        // Return the next block.
-        Ok(next_block)
-    }
-
-    /// Attempts to add the given block to the ledger.
-    pub(crate) async fn add_next_block(&self, next_block: Block<N>) -> Result<()> {
-        // Add the next block to the ledger.
-        let self_clone = self.clone();
-        if let Err(error) =
-            task::spawn_blocking(move || self_clone.consensus.write().add_next_block(&next_block)).await?
-        {
-            // Log the error.
-            warn!("{error}");
-            return Err(error);
-        }
-
-        Ok(())
     }
 
     /// Returns the unspent records.
@@ -314,6 +227,34 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         const CONCURRENT_REQUESTS: usize = 100;
         /// Url to fetch the blocks from.
         const TARGET_URL: &str = "https://vm.aleo.org/testnet3/block/testnet3/";
+
+        async fn handle_dispatch_error<'a, T, F>(func: impl Fn() -> F + 'a) -> Result<T>
+        where
+            F: Future<Output = Result<T, Error>>,
+        {
+            use backoff::{future::retry, ExponentialBackoff};
+
+            fn default_backoff() -> ExponentialBackoff {
+                ExponentialBackoff {
+                    max_interval: Duration::from_secs(10),
+                    max_elapsed_time: Some(Duration::from_secs(45)),
+                    ..Default::default()
+                }
+            }
+
+            fn from_anyhow_err(err: Error) -> backoff::Error<Error> {
+                use backoff::Error;
+
+                if let Ok(err) = err.downcast::<reqwest::Error>() {
+                    debug!("Server error: {err}; retrying...");
+                    Error::Transient { err: err.into(), retry_after: None }
+                } else {
+                    Error::Transient { err: anyhow!("Block parse error"), retry_after: None }
+                }
+            }
+
+            retry(default_backoff(), || async { func().await.map_err(from_anyhow_err) }).await
+        }
 
         // Fetch the ledger height.
         let ledger_height = self.consensus.read().latest_height();

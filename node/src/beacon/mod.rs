@@ -20,7 +20,8 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{spawn_task, Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
+use snarkos_node_messages::{Data, Message, UnconfirmedBlock};
+use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
@@ -38,10 +39,10 @@ use std::{
 pub struct Beacon<N: Network> {
     /// The account of the node.
     account: Account<N>,
-    /// The router of the node.
-    router: Router<N>,
     /// The ledger of the node.
     ledger: Ledger<N, ConsensusDB<N>>,
+    /// The router of the node.
+    router: Router<N>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
 }
@@ -56,12 +57,12 @@ impl<N: Network> Beacon<N> {
     ) -> Result<Self> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
+        // Initialize the ledger.
+        let ledger = Ledger::load(private_key, dev)?;
         // Initialize the node router.
         let router = Router::new::<Self>(node_ip, *account.address(), NodeType::Beacon, trusted_peers).await?;
-        // Initialize the ledger.
-        let ledger = Ledger::load(private_key, dev, router.clone())?;
         // Initialize the node.
-        let node = Self { account, router, ledger, shutdown: Default::default() };
+        let node = Self { account, ledger, router, shutdown: Default::default() };
 
         // Initialize the block production.
         node.initialize_block_production().await;
@@ -94,14 +95,53 @@ impl<N: Network> Beacon<N> {
                     }
                 }
 
+                // Propose the next block.
+                let next_block = match beacon
+                    .ledger
+                    .consensus()
+                    .read()
+                    .propose_next_block(&beacon.private_key(), &mut rand::thread_rng())
+                {
+                    Ok(next_block) => next_block,
+                    Err(error) => {
+                        error!("Failed to propose the next block: {error}");
+                        continue;
+                    }
+                };
+                let next_block_height = next_block.height();
+                let next_block_hash = next_block.hash();
+
                 // Advance to the next block.
-                match beacon.ledger.advance_to_next_block().await {
-                    Ok(next_block) => trace!(
-                        "Block {}: {}",
-                        next_block.height(),
+                match beacon.ledger.consensus().write().add_next_block(&next_block) {
+                    Ok(()) => trace!(
+                        "Block {next_block_height}: {}",
                         serde_json::to_string_pretty(&next_block).expect("Failed to print next block")
                     ),
-                    Err(error) => error!("Failed to advance to the next block: {error}"),
+                    Err(error) => {
+                        error!("Failed to advance to the next block: {error}");
+                        continue;
+                    }
+                }
+
+                // Serialize the block ahead of time to not do it for each peer.
+                let serialized_block = match Data::Object(next_block).serialize().await {
+                    Ok(serialized_block) => serialized_block,
+                    Err(error) => {
+                        error!("Failed to serialize the next block for propagation: {error}");
+                        continue;
+                    }
+                };
+
+                // Prepare the block to be sent to all peers.
+                let message = Message::<N>::UnconfirmedBlock(UnconfirmedBlock {
+                    block_height: next_block_height,
+                    block_hash: next_block_hash,
+                    block: Data::Buffer(serialized_block),
+                });
+
+                // Propagate the block to all peers.
+                if let Err(error) = beacon.router.process(RouterRequest::MessagePropagate(message)).await {
+                    trace!("Failed to broadcast the next block: {error}");
                 }
             }
         });
