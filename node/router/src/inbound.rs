@@ -222,8 +222,13 @@ pub trait Inbound: Executor {
         router: &Router<N>,
     ) -> bool {
         // Drop the peer, if they have sent more than 5 unconfirmed blocks in the last 5 seconds.
-        let frequency =
-            peer.seen_inbound_blocks.read().await.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
+        let frequency = peer
+            .seen_inbound_blocks
+            .read()
+            .await
+            .values()
+            .filter(|t| t.elapsed().unwrap_or_default().as_secs() <= 5)
+            .count();
         if frequency >= 10 {
             warn!("Dropping {peer_ip} for spamming unconfirmed blocks (frequency = {frequency})");
             // Send a `PeerRestricted` message.
@@ -238,7 +243,7 @@ pub trait Inbound: Executor {
 
         // Retrieve the last seen timestamp of the received block.
         let last_seen = seen_inbound_blocks.entry(message.block_hash).or_insert(SystemTime::UNIX_EPOCH);
-        let is_router_ready = last_seen.elapsed().unwrap().as_secs() > Router::<N>::RADIO_SILENCE_IN_SECS;
+        let is_router_ready = last_seen.elapsed().unwrap_or_default().as_secs() > Router::<N>::RADIO_SILENCE_IN_SECS;
 
         // Update the timestamp for the received block.
         seen_inbound_blocks.insert(message.block_hash, SystemTime::now());
@@ -288,8 +293,13 @@ pub trait Inbound: Executor {
         router: &Router<N>,
     ) -> bool {
         // Drop the peer, if they have sent more than 500 unconfirmed solutions in the last 5 seconds.
-        let frequency =
-            peer.seen_inbound_solutions.read().await.values().filter(|t| t.elapsed().unwrap().as_secs() <= 5).count();
+        let frequency = peer
+            .seen_inbound_solutions
+            .read()
+            .await
+            .values()
+            .filter(|t| t.elapsed().unwrap_or_default().as_secs() <= 5)
+            .count();
         if frequency >= 500 {
             warn!("Dropping {peer_ip} for spamming unconfirmed solutions (frequency = {frequency})");
             // Send a `PeerRestricted` message.
@@ -307,7 +317,8 @@ pub trait Inbound: Executor {
 
                 // Retrieve the last seen timestamp of the received solution.
                 let last_seen = seen_inbound_solutions.entry(solution.commitment()).or_insert(SystemTime::UNIX_EPOCH);
-                let is_router_ready = last_seen.elapsed().unwrap().as_secs() > Router::<N>::RADIO_SILENCE_IN_SECS;
+                let is_router_ready =
+                    last_seen.elapsed().unwrap_or_default().as_secs() > Router::<N>::RADIO_SILENCE_IN_SECS;
 
                 // Update the timestamp for the received solution.
                 seen_inbound_solutions.insert(solution.commitment(), SystemTime::now());
@@ -345,7 +356,7 @@ pub trait Inbound: Executor {
             .read()
             .await
             .values()
-            .filter(|t| t.elapsed().unwrap().as_secs() <= 5)
+            .filter(|t| t.elapsed().unwrap_or_default().as_secs() <= 5)
             .count();
         if frequency >= 500 {
             warn!("Dropping {peer_ip} for spamming unconfirmed transactions (frequency = {frequency})");
@@ -364,7 +375,8 @@ pub trait Inbound: Executor {
 
                 // Retrieve the last seen timestamp of the received transaction.
                 let last_seen = seen_inbound_transactions.entry(transaction.id()).or_insert(SystemTime::UNIX_EPOCH);
-                let is_router_ready = last_seen.elapsed().unwrap().as_secs() > Router::<N>::RADIO_SILENCE_IN_SECS;
+                let is_router_ready =
+                    last_seen.elapsed().unwrap_or_default().as_secs() > Router::<N>::RADIO_SILENCE_IN_SECS;
 
                 // Update the timestamp for the received transaction.
                 seen_inbound_transactions.insert(transaction.id(), SystemTime::now());

@@ -39,7 +39,7 @@ use snarkvm::prelude::{Address, Network};
 
 use anyhow::Result;
 use indexmap::{IndexMap, IndexSet};
-use rand::{prelude::IteratorRandom, rngs::OsRng};
+use rand::{prelude::IteratorRandom, rngs::OsRng, Rng};
 use std::{
     net::SocketAddr,
     sync::Arc,
@@ -613,9 +613,6 @@ impl<N: Network> Router<N> {
                 tokio::select! {
                     // Message channel is routing a message outbound to the peer.
                     Some(message) = peer_handler.recv() => {
-                        // Retrieve the peer IP.
-                        let peer_ip = peer.ip();
-
                         // Disconnect if the peer has not communicated back within the predefined time.
                         let last_seen_elapsed = peer.last_seen.read().await.elapsed().as_secs();
                         if last_seen_elapsed > Self::RADIO_SILENCE_IN_SECS {
@@ -628,9 +625,6 @@ impl<N: Network> Router<N> {
                     result = outbound_socket.next() => match result {
                         // Received a message from the peer.
                         Some(Ok(message)) => {
-                            // Retrieve the peer IP.
-                            let peer_ip = *peer.ip();
-
                             // Disconnect if the peer has not communicated back within the predefined time.
                             let last_seen_elapsed = peer.last_seen.read().await.elapsed().as_secs();
                             match last_seen_elapsed > Self::RADIO_SILENCE_IN_SECS {
@@ -640,6 +634,19 @@ impl<N: Network> Router<N> {
                                 }
                                 // Update the last seen timestamp.
                                 false => *peer.last_seen.write().await = Instant::now(),
+                            }
+
+                            // Update the timestamp for the received message.
+                            peer.seen_messages.write().await.insert((message.id(), rand::thread_rng().gen()), SystemTime::now());
+                            // Drop the peer, if they have sent more than 1000 messages in the last 5 seconds.
+                            let frequency = peer.seen_messages.read().await.values().filter(|t| t.elapsed().unwrap_or_default().as_secs() <= 5).count();
+                            if frequency >= 1000 {
+                                warn!("Dropping {peer_ip} for spamming messages (frequency = {frequency})");
+                                // Send a `PeerRestricted` message.
+                                if let Err(error) = router.process(RouterRequest::PeerRestricted(peer_ip)).await {
+                                    warn!("[PeerRestricted] {error}");
+                                }
+                                break;
                             }
 
                             // Process the message.

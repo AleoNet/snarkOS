@@ -15,10 +15,11 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Message, MessageCodec, Router, RouterRequest};
-use snarkos_node_executor::{Executor, NodeType, Status};
+use snarkos_node_executor::{spawn_task, Executor, NodeType, Status};
 use snarkvm::prelude::*;
 
 use anyhow::Result;
+use core::time::Duration;
 use std::{
     collections::HashMap,
     net::SocketAddr,
@@ -51,6 +52,8 @@ pub struct Peer<N: Network> {
     pub block_height: Arc<RwLock<u32>>,
     /// The timestamp of the last message received from this peer.
     pub last_seen: Arc<RwLock<Instant>>,
+    /// The map of (message ID, random nonce) pairs to their last seen timestamp.
+    pub seen_messages: Arc<RwLock<HashMap<(u16, u32), SystemTime>>>,
     /// The map of block hashes to their last seen timestamp.
     pub seen_inbound_blocks: Arc<RwLock<HashMap<N::BlockHash, SystemTime>>>,
     /// The map of solution commitments to their last seen timestamp.
@@ -87,6 +90,7 @@ impl<N: Network> Peer<N> {
             status: Arc::new(RwLock::new(status)),
             block_height: Arc::new(RwLock::new(0)),
             last_seen: Arc::new(RwLock::new(Instant::now())),
+            seen_messages: Default::default(),
             seen_inbound_blocks: Default::default(),
             seen_inbound_solutions: Default::default(),
             seen_inbound_transactions: Default::default(),
@@ -95,6 +99,9 @@ impl<N: Network> Peer<N> {
             seen_outbound_transactions: Default::default(),
             peer_sender,
         };
+
+        // Initialize the garbage collector for the peer.
+        peer.initialize_gc::<E>().await;
 
         // Add an entry for this `Peer` in the connected peers.
         match router.process(RouterRequest::PeerConnected(peer.clone(), outbound_socket, peer_handler)).await {
@@ -137,5 +144,53 @@ impl<N: Network> Peer<N> {
     /// Sends the given message to this peer.
     pub async fn send(&self, message: Message<N>) -> Result<(), SendError<Message<N>>> {
         self.peer_sender.send(message).await
+    }
+
+    /// Initialize a new instance of the garbage collector.
+    async fn initialize_gc<E: Executor>(&self) {
+        let peer = self.clone();
+        spawn_task!({
+            const SLEEP: u64 = 60 * 10; // 10 minutes
+            loop {
+                // Sleep for the heartbeat interval.
+                tokio::time::sleep(Duration::from_secs(SLEEP)).await;
+
+                // Clear the seen messages to only those in the last 5 seconds.
+                peer.seen_messages
+                    .write()
+                    .await
+                    .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);
+                // Clear the seen inbound blocks to only those in the last 5 seconds.
+                peer.seen_inbound_blocks
+                    .write()
+                    .await
+                    .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);
+                // Clear the seen inbound solutions to only those in the last 5 seconds.
+                peer.seen_inbound_solutions
+                    .write()
+                    .await
+                    .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);
+                // Clear the seen inbound transactions to only those in the last 5 seconds.
+                peer.seen_inbound_transactions
+                    .write()
+                    .await
+                    .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);
+                // Clear the seen outbound blocks to only those in the last 5 seconds.
+                peer.seen_outbound_blocks
+                    .write()
+                    .await
+                    .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);
+                // Clear the seen outbound solutions to only those in the last 5 seconds.
+                peer.seen_outbound_solutions
+                    .write()
+                    .await
+                    .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);
+                // Clear the seen outbound transactions to only those in the last 5 seconds.
+                peer.seen_outbound_transactions
+                    .write()
+                    .await
+                    .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);
+            }
+        });
     }
 }
