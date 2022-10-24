@@ -23,6 +23,7 @@ mod get;
 mod iterators;
 mod latest;
 
+use crate::memory_pool::MemoryPool;
 use snarkvm::{
     console::{
         account::{Address, GraphKey, PrivateKey, Signature, ViewKey},
@@ -41,9 +42,9 @@ use snarkvm::{
 };
 
 use anyhow::Result;
+use futures::TryStreamExt;
 use indexmap::{IndexMap, IndexSet};
 use std::borrow::Cow;
-use futures::TryStreamExt;
 use time::OffsetDateTime;
 
 #[cfg(feature = "parallel")]
@@ -67,6 +68,8 @@ pub enum RecordsFilter<N: Network> {
 pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     /// The VM state.
     vm: VM<N, C>,
+    /// The coinbase puzzle.
+    coinbase_puzzle: CoinbasePuzzle<N>,
     /// The current block hash.
     current_hash: N::BlockHash,
     /// The current block height.
@@ -84,30 +87,23 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     /// The beacons.
     // TODO (howardwu): Update this to retrieve from a beacons store.
     beacons: IndexMap<Address<N>, ()>,
-    /// The memory pool of unconfirmed transactions.
-    memory_pool: IndexMap<N::TransactionID, Transaction<N>>,
-
-    /// The coinbase puzzle.
-    coinbase_puzzle: CoinbasePuzzle<N>,
-    /// The memory pool of proposed coinbase puzzle solutions for the current epoch.
-    coinbase_memory_pool: IndexSet<ProverSolution<N>>,
+    /// The memory pool.
+    memory_pool: MemoryPool<N>,
     // /// The mapping of program IDs to their global state.
     // states: MemoryMap<ProgramID<N>, IndexMap<Identifier<N>, Plaintext<N>>>,
 }
 
-impl<N: Network> Consensus<N, ConsensusMemory<N>> {
-    /// Initializes a new instance of `Ledger` with the genesis block.
+impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
+    /// Initializes a new instance of `Consensus` with the genesis block.
     pub fn new(dev: Option<u16>) -> Result<Self> {
         // Load the genesis block.
         let genesis = Block::<N>::from_bytes_le(N::genesis_bytes())?;
         // Initialize the ledger.
-        Self::new_with_genesis(&genesis, genesis.signature().to_address(), dev)
+        Self::new_with_genesis(genesis, dev)
     }
-}
 
-impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Initializes a new instance of `Consensus` with the given genesis block.
-    pub fn new_with_genesis(genesis: &Block<N>, address: Address<N>, dev: Option<u16>) -> Result<Self> {
+    pub fn new_with_genesis(genesis: Block<N>, dev: Option<u16>) -> Result<Self> {
         // Initialize the consensus store.
         let store = ConsensusStore::<N, C>::open(dev)?;
         // Initialize a new VM.
@@ -118,70 +114,48 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             bail!("Genesis block already exists in the ledger.");
         }
 
-        // Load the coinbase puzzle.
-        let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
-
-        // Initialize the consensus module.
-        let mut consensus = Self {
-            vm,
-            current_hash: Default::default(),
-            current_height: 0,
-            current_round: 0,
-            block_tree: N::merkle_tree_bhp(&[])?,
-            blocks: store.block_store().clone(),
-            transactions: store.transaction_store().clone(),
-            transitions: store.transition_store().clone(),
-            // TODO (howardwu): Update this to retrieve from a validators store.
-            beacons: [(address, ())].into_iter().collect(),
-            memory_pool: Default::default(),
-            coinbase_puzzle,
-            coinbase_memory_pool: Default::default(),
-        };
-
-        // Add the genesis block.
-        consensus.add_next_block(genesis)?;
-
         // Return the consensus.
-        Ok(consensus)
+        Self::from(vm, Some(genesis))
     }
 
-    /// Initializes the consensus module from storage.
-    pub fn open(dev: Option<u16>) -> Result<Self> {
+    /// Loads the consensus module from storage.
+    pub fn load(dev: Option<u16>) -> Result<Self> {
         // Initialize the consensus store.
         let store = ConsensusStore::<N, C>::open(dev)?;
-        // Return the consensus.
-        Self::from(store)
-    }
-
-    /// Initializes the consensus module from storage.
-    pub fn from(store: ConsensusStore<N, C>) -> Result<Self> {
         // Initialize a new VM.
         let vm = VM::from(store.clone())?;
+        // Return the consensus.
+        Self::from(vm, None)
+    }
 
+    /// Initializes the consensus module from storage, with an optional genesis block (when the storage is empty).
+    pub fn from(vm: VM<N, C>, genesis: Option<Block<N>>) -> Result<Self> {
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
 
         // Initialize the consensus.
         let mut consensus = Self {
-            vm,
             current_hash: Default::default(),
             current_height: 0,
             current_round: 0,
             block_tree: N::merkle_tree_bhp(&[])?,
-            blocks: store.block_store().clone(),
-            transactions: store.transaction_store().clone(),
-            transitions: store.transition_store().clone(),
+            blocks: vm.block_store().clone(),
+            transactions: vm.transaction_store().clone(),
+            transitions: vm.transition_store().clone(),
             // TODO (howardwu): Update this to retrieve from a validators store.
             beacons: Default::default(),
             memory_pool: Default::default(),
             coinbase_puzzle,
-            coinbase_memory_pool: Default::default(),
+            vm,
         };
 
         // If the block store is empty, initialize the genesis block.
         if consensus.blocks.heights().max().is_none() {
             // Load the genesis block.
-            let genesis = Block::<N>::from_bytes_le(N::genesis_bytes())?;
+            let genesis = match genesis {
+                Some(genesis) => genesis,
+                None => Block::<N>::from_bytes_le(N::genesis_bytes())?,
+            };
             // Add the initial beacon.
             consensus.add_beacon(genesis.signature().to_address())?;
             // Add the genesis block.
@@ -219,28 +193,19 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         Ok(consensus)
     }
 
-    /// Returns the VM.
-    pub fn vm(&self) -> &VM<N, C> {
-        &self.vm
-    }
-
-    /// Appends the given transaction to the memory pool.
-    pub fn add_to_memory_pool(&mut self, transaction: Transaction<N>) -> Result<()> {
-        // Ensure the transaction does not already exist.
-        if self.memory_pool.contains_key(&transaction.id()) {
-            bail!("Transaction '{}' already exists in the memory pool.", transaction.id());
-        }
-
-        // Check that the transaction is well formed and unique.
-        self.check_transaction(&transaction)?;
+    /// Adds the given unconfirmed transaction to the memory pool.
+    pub fn add_unconfirmed_transaction(&mut self, transaction: Transaction<N>) -> Result<()> {
+        // Check that the transaction is well-formed and unique.
+        self.check_transaction_basic(&transaction)?;
 
         // Insert the transaction to the memory pool.
-        self.memory_pool.insert(transaction.id(), transaction);
+        self.memory_pool.add_unconfirmed_transaction(&transaction);
+
         Ok(())
     }
 
-    /// Appends the given prover solution to the coinbase memory pool.
-    pub fn add_to_coinbase_memory_pool(&mut self, prover_solution: ProverSolution<N>) -> Result<()> {
+    /// Adds the given unconfirmed solution to the memory pool.
+    pub fn add_unconfirmed_solution(&mut self, solution: &ProverSolution<N>) -> Result<()> {
         // Ensure that prover solutions are not accepted after 10 years.
         if self.latest_height() > anchor_block_height(N::ANCHOR_TIME, 10) {
             bail!("Coinbase proofs are no longer accepted after year 10.");
@@ -252,45 +217,22 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let proof_target = self.latest_proof_target()?;
 
         // Ensure that the prover solution is valid for the given epoch.
-        if !prover_solution.verify(self.coinbase_puzzle.coinbase_verifying_key()?, &epoch_challenge, proof_target)? {
-            bail!("Prover puzzle '{}' is invalid for the given epoch.", prover_solution.commitment().0);
+        if !solution.verify(self.coinbase_puzzle.coinbase_verifying_key()?, &epoch_challenge, proof_target)? {
+            bail!("Prover puzzle '{}' is invalid for the given epoch.", solution.commitment().0);
         }
 
-        // Insert the prover solution to the memory pool.
-        if !self.coinbase_memory_pool.insert(prover_solution) {
-            bail!("Prover puzzle '{}' already exists in the memory pool.", prover_solution.commitment().0);
-        }
+        // Insert the solution to the memory pool.
+        self.memory_pool.add_unconfirmed_solution(&solution);
 
         Ok(())
     }
 
     /// Returns a candidate for the next block in the ledger.
     pub fn propose_next_block<R: Rng + CryptoRng>(&self, private_key: &PrivateKey<N>, rng: &mut R) -> Result<Block<N>> {
-        // Construct the transactions for the block.
-        let transactions = {
-            // TODO (raychu86): Add more sophisticated logic for transaction selection.
-
-            // Add the transactions from the memory pool that do not have input collisions.
-            let mut transcations = Vec::new();
-            let mut input_ids = Vec::new();
-
-            'outer: for transaction in self.memory_pool.values() {
-                for input_id in transaction.input_ids() {
-                    if input_ids.contains(&input_id) {
-                        continue 'outer;
-                    }
-                }
-
-                transcations.push(transaction);
-                input_ids.extend(transaction.input_ids());
-            }
-
-            transcations.into_iter().collect::<Transactions<N>>()
-        };
-
+        // Select the transactions from the memory pool.
+        let transactions = self.memory_pool.candidate_transactions(self).into_iter().collect::<Transactions<N>>();
         // Select the prover solutions from the memory pool.
-        let prover_solutions =
-            self.coinbase_memory_pool.iter().take(N::MAX_PROVER_SOLUTIONS).cloned().collect::<Vec<_>>();
+        let prover_solutions = self.memory_pool.candidate_solutions();
 
         // Compute the total cumulative target of the prover puzzle solutions as a u128.
         let cumulative_prover_target: u128 = prover_solutions.iter().try_fold(0u128, |cumulative, solution| {
@@ -380,7 +322,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     pub fn check_next_block(&self, block: &Block<N>) -> Result<()> {
         // Ensure the previous block hash is correct.
         if self.current_hash != block.previous_hash() {
-            bail!("The given block has an incorrect previous block hash")
+            bail!("The next block has an incorrect previous block hash")
         }
 
         // Ensure the block hash does not already exist.
@@ -390,7 +332,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         // Ensure the next block height is correct.
         if self.latest_height() > 0 && self.latest_height() + 1 != block.height() {
-            bail!("The given block has an incorrect block height")
+            bail!("The next block has an incorrect block height")
         }
 
         // Ensure the block height does not already exist.
@@ -401,13 +343,15 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // TODO (raychu86): Ensure the next round number includes timeouts.
         // Ensure the next round is correct.
         if self.latest_round() > 0 && self.latest_round() + 1 /*+ block.number_of_timeouts()*/ != block.round() {
-            bail!("The given block has an incorrect round number")
+            bail!("The next block has an incorrect round number")
         }
 
         // TODO (raychu86): Ensure the next block timestamp is the median of proposed blocks.
         // Ensure the next block timestamp is after the current block timestamp.
-        if block.height() > 0 && block.header().timestamp() <= self.latest_block()?.header().timestamp() {
-            bail!("The given block timestamp is before the current timestamp")
+        let next_timestamp = block.header().timestamp();
+        let latest_timestamp = self.latest_block()?.header().timestamp();
+        if block.height() > 0 && next_timestamp <= latest_timestamp {
+            bail!("The next block timestamp {next_timestamp} is before the current timestamp {latest_timestamp}")
         }
 
         for transaction_id in block.transaction_ids() {
@@ -546,7 +490,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         // Ensure each transaction is well-formed and unique.
         cfg_iter!(block.transactions()).try_for_each(|(_, transaction)| {
-            self.check_transaction(transaction)
+            self.check_transaction_basic(transaction)
                 .map_err(|e| anyhow!("Invalid transaction found in the transactions list: {e}"))
         })?;
 
@@ -611,45 +555,40 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         // Add the block to the ledger. This code section executes atomically.
         {
-            let mut ledger = self.clone();
+            let mut consensus = self.clone();
 
             // Update the blocks.
-            ledger.current_hash = block.hash();
-            ledger.current_height = block.height();
-            ledger.current_round = block.round();
-            ledger.block_tree.append(&[block.hash().to_bits_le()])?;
-            ledger.blocks.insert(*ledger.block_tree.root(), block)?;
+            consensus.current_hash = block.hash();
+            consensus.current_height = block.height();
+            consensus.current_round = block.round();
+            consensus.block_tree.append(&[block.hash().to_bits_le()])?;
+            consensus.blocks.insert(*consensus.block_tree.root(), block)?;
 
             // Update the VM.
             for transaction in block.transactions().values() {
-                ledger.vm.finalize(transaction)?;
+                consensus.vm.finalize(transaction)?;
             }
 
-            // Clear the memory pool of the transactions that are now invalid.
-            for (transaction_id, transaction) in self.memory_pool() {
-                if ledger.check_transaction(transaction).is_err() {
-                    ledger.memory_pool.remove(transaction_id);
-                }
-            }
+            // Clear the memory pool of unconfirmed transactions that are now invalid.
+            consensus.memory_pool.clear_invalid_transactions(&consensus.clone());
 
-            // Clear the coinbase memory pool of the coinbase proofs if a new epoch has started.
+            // Clear the memory pool of the unconfirmed solutions if a new epoch has started.
             if block.epoch_number() > self.latest_epoch_number() {
-                ledger.coinbase_memory_pool.clear();
+                consensus.memory_pool.clear_unconfirmed_solutions();
             }
 
             *self = Self {
-                current_hash: ledger.current_hash,
-                current_height: ledger.current_height,
-                current_round: ledger.current_round,
-                block_tree: ledger.block_tree,
-                blocks: ledger.blocks,
-                transactions: ledger.transactions,
-                transitions: ledger.transitions,
-                beacons: ledger.beacons,
-                vm: ledger.vm,
-                memory_pool: ledger.memory_pool,
-                coinbase_puzzle: ledger.coinbase_puzzle,
-                coinbase_memory_pool: ledger.coinbase_memory_pool,
+                current_hash: consensus.current_hash,
+                current_height: consensus.current_height,
+                current_round: consensus.current_round,
+                block_tree: consensus.block_tree,
+                blocks: consensus.blocks,
+                transactions: consensus.transactions,
+                transitions: consensus.transitions,
+                beacons: consensus.beacons,
+                vm: consensus.vm,
+                memory_pool: consensus.memory_pool,
+                coinbase_puzzle: consensus.coinbase_puzzle,
             };
         }
 
@@ -667,11 +606,17 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
     /// Removes a given address from the beacon set.
     pub fn remove_beacon(&mut self, address: Address<N>) -> Result<()> {
-        if self.beacons.remove(&address).is_none() {
-            bail!("'{address}' is not in the beacon set.")
-        } else {
-            Ok(())
-        }
+        if self.beacons.remove(&address).is_none() { bail!("'{address}' is not in the beacon set.") } else { Ok(()) }
+    }
+
+    /// Returns the VM.
+    pub fn vm(&self) -> &VM<N, C> {
+        &self.vm
+    }
+
+    /// Returns the coinbase puzzle.
+    pub const fn coinbase_puzzle(&self) -> &CoinbasePuzzle<N> {
+        &self.coinbase_puzzle
     }
 
     /// Returns the block tree.
@@ -685,18 +630,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     }
 
     /// Returns the memory pool.
-    pub const fn memory_pool(&self) -> &IndexMap<N::TransactionID, Transaction<N>> {
+    pub const fn memory_pool(&self) -> &MemoryPool<N> {
         &self.memory_pool
-    }
-
-    /// Returns the coinbase puzzle.
-    pub const fn coinbase_puzzle(&self) -> &CoinbasePuzzle<N> {
-        &self.coinbase_puzzle
-    }
-
-    /// Returns the coinbase memory pool.
-    pub const fn coinbase_memory_pool(&self) -> &IndexSet<ProverSolution<N>> {
-        &self.coinbase_memory_pool
     }
 
     /// Returns a state path for the given commitment.
@@ -705,17 +640,17 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     }
 
     /// Checks the given transaction is well formed and unique.
-    pub fn check_transaction(&self, transaction: &Transaction<N>) -> Result<()> {
+    pub fn check_transaction_basic(&self, transaction: &Transaction<N>) -> Result<()> {
         let transaction_id = transaction.id();
-
-        // Ensure the transaction is valid.
-        if !self.vm.verify(transaction) {
-            bail!("Transaction '{transaction_id}' is invalid")
-        }
 
         // Ensure the ledger does not already contain the given transaction ID.
         if self.contains_transaction_id(&transaction_id)? {
             bail!("Transaction '{transaction_id}' already exists in the ledger")
+        }
+
+        // Ensure the transaction is valid.
+        if !self.vm.verify(transaction) {
+            bail!("Transaction '{transaction_id}' is invalid")
         }
 
         /* Input */
@@ -875,7 +810,7 @@ pub(crate) mod test_helpers {
 
         // Initialize the ledger with the genesis block and the associated private key.
         let address = Address::try_from(&private_key).unwrap();
-        let ledger = CurrentConsensus::new_with_genesis(&genesis, address, None).unwrap();
+        let ledger = CurrentConsensus::new_with_genesis(genesis, None).unwrap();
         assert_eq!(0, ledger.latest_height());
         assert_eq!(genesis.hash(), ledger.latest_hash());
         assert_eq!(genesis.round(), ledger.latest_round());
@@ -1075,15 +1010,17 @@ mod tests {
             Address::<CurrentNetwork>::from_str("aleo1q6qstg8q8shwqf5m6q5fcenuwsdqsvp4hhsgfnx5chzjm3secyzqt9mxm8")
                 .unwrap();
 
+        // Initialize the VM.
+        let vm = VM::from(ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap()).unwrap();
         // Initialize consensus without the genesis block.
-        let ledger = CurrentConsensus::from(ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap()).unwrap();
+        let ledger = CurrentConsensus::from(vm, None).unwrap();
         assert_eq!(ledger.latest_hash(), genesis.hash());
         assert_eq!(ledger.latest_height(), genesis.height());
         assert_eq!(ledger.latest_round(), genesis.round());
         assert_eq!(ledger.latest_block().unwrap(), genesis);
 
         // Initialize the ledger with the genesis block.
-        let ledger = CurrentConsensus::new_with_genesis(&genesis, address, None).unwrap();
+        let ledger = CurrentConsensus::new_with_genesis(genesis, None).unwrap();
         assert_eq!(ledger.latest_hash(), genesis.hash());
         assert_eq!(ledger.latest_height(), genesis.height());
         assert_eq!(ledger.latest_round(), genesis.round());
@@ -1116,7 +1053,7 @@ mod tests {
 
         // Add a transaction to the memory pool.
         let transaction = crate::consensus::test_helpers::sample_deployment_transaction(rng);
-        ledger.add_to_memory_pool(transaction.clone()).unwrap();
+        ledger.add_unconfirmed_transaction(transaction.clone()).unwrap();
 
         // Propose the next block.
         let next_block = ledger.propose_next_block(&private_key, rng).unwrap();
@@ -1132,9 +1069,9 @@ mod tests {
         // Ensure that the VM can't re-deploy the same program.
         assert!(ledger.vm.finalize(&transaction).is_err());
         // Ensure that the ledger deems the same transaction invalid.
-        assert!(ledger.check_transaction(&transaction).is_err());
+        assert!(ledger.check_transaction_basic(&transaction).is_err());
         // Ensure that the ledger cannot add the same transaction.
-        assert!(ledger.add_to_memory_pool(transaction).is_err());
+        assert!(ledger.add_unconfirmed_transaction(transaction).is_err());
     }
 
     #[test]
@@ -1149,7 +1086,7 @@ mod tests {
 
         // Add a transaction to the memory pool.
         let transaction = crate::consensus::test_helpers::sample_execution_transaction(rng);
-        ledger.add_to_memory_pool(transaction.clone()).unwrap();
+        ledger.add_unconfirmed_transaction(transaction.clone()).unwrap();
 
         // Propose the next block.
         let next_block = ledger.propose_next_block(&private_key, rng).unwrap();
@@ -1160,9 +1097,9 @@ mod tests {
         assert_eq!(ledger.latest_hash(), next_block.hash());
 
         // Ensure that the ledger deems the same transaction invalid.
-        assert!(ledger.check_transaction(&transaction).is_err());
+        assert!(ledger.check_transaction_basic(&transaction).is_err());
         // Ensure that the ledger cannot add the same transaction.
-        assert!(ledger.add_to_memory_pool(transaction).is_err());
+        assert!(ledger.add_unconfirmed_transaction(transaction).is_err());
     }
 
     #[test]
@@ -1180,7 +1117,7 @@ mod tests {
         // Create a genesis block.
         let genesis = Block::genesis(&VM::from(store).unwrap(), &private_key, rng).unwrap();
         // Initialize the ledger.
-        let mut ledger = CurrentConsensus::new_with_genesis(&genesis, address, None).unwrap();
+        let mut ledger = CurrentConsensus::new_with_genesis(genesis, None).unwrap();
 
         for height in 1..6 {
             // Fetch the unspent records.
@@ -1207,7 +1144,7 @@ mod tests {
                 )
                 .unwrap();
                 // Add the transaction to the memory pool.
-                ledger.add_to_memory_pool(transaction).unwrap();
+                ledger.add_unconfirmed_transaction(transaction).unwrap();
             }
             assert_eq!(ledger.memory_pool().len(), 1 << (height - 1));
 
@@ -1243,9 +1180,9 @@ mod tests {
 
             // Check that the prover solution meets the proof target requirement.
             if prover_solution.to_target().unwrap() >= proof_target {
-                assert!(ledger.add_to_coinbase_memory_pool(prover_solution).is_ok())
+                assert!(ledger.add_unconfirmed_solution(prover_solution).is_ok())
             } else {
-                assert!(ledger.add_to_coinbase_memory_pool(prover_solution).is_err())
+                assert!(ledger.add_unconfirmed_solution(prover_solution).is_err())
             }
         }
     }
@@ -1264,7 +1201,7 @@ mod tests {
 
         // Add a transaction to the memory pool.
         let transaction = crate::consensus::test_helpers::sample_execution_transaction(rng);
-        ledger.add_to_memory_pool(transaction).unwrap();
+        ledger.add_unconfirmed_transaction(transaction).unwrap();
 
         // Ensure that the ledger can't create a block that satisfies the coinbase target.
         let proposed_block = ledger.propose_next_block(&private_key, rng).unwrap();
@@ -1283,7 +1220,7 @@ mod tests {
             };
 
             // Try to add the prover solution to the memory pool.
-            if ledger.add_to_coinbase_memory_pool(prover_solution).is_ok() {
+            if ledger.add_unconfirmed_solution(prover_solution).is_ok() {
                 // Add to the cumulative target if the prover solution is valid.
                 cumulative_target += prover_solution.to_target().unwrap() as u128;
             }

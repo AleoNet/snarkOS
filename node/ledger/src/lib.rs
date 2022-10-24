@@ -22,6 +22,8 @@ extern crate tracing;
 pub mod consensus;
 pub use consensus::*;
 
+mod memory_pool;
+
 use snarkos_node_messages::{Data, Message, UnconfirmedBlock};
 use snarkos_node_router::{Router, RouterRequest};
 use snarkvm::prelude::*;
@@ -87,38 +89,43 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     /// This is used for testing purposes only.
     fn new_with_genesis(
         private_key: PrivateKey<N>,
-        genesis_block: Block<N>,
+        genesis: Block<N>,
         dev: Option<u16>,
         router: Router<N>,
     ) -> Result<Self> {
-        // Initialize the ledger.
-        let ledger = match Consensus::new_with_genesis(&genesis_block, genesis_block.signature().to_address(), dev) {
-            Ok(ledger) => Arc::new(RwLock::new(ledger)),
+        // Retrieve the genesis hash.
+        let genesis_hash = genesis.hash();
+        // Initialize consensus.
+        let consensus = match Consensus::new_with_genesis(genesis, dev) {
+            Ok(consensus) => Arc::new(RwLock::new(consensus)),
             Err(_) => {
-                // Open the internal ledger.
-                let ledger = Consensus::open(dev)?;
+                // Initialize consensus.
+                let consensus = Consensus::new(dev)?;
                 // Ensure the ledger contains the correct genesis block.
-                match ledger.contains_block_hash(&genesis_block.hash())? {
-                    true => Arc::new(RwLock::new(ledger)),
+                match consensus.contains_block_hash(&genesis_hash)? {
+                    true => Arc::new(RwLock::new(consensus)),
                     false => bail!("Incorrect genesis block (run 'snarkos clean' and try again)"),
                 }
             }
         };
-
         // Return the ledger.
-        Self::from(ledger, private_key, router)
+        Self::from(consensus, private_key, router)
     }
 
     /// Opens an instance of the ledger.
     pub fn load(private_key: PrivateKey<N>, dev: Option<u16>, router: Router<N>) -> Result<Self> {
         // Initialize the ledger.
-        let ledger = Arc::new(RwLock::new(Consensus::open(dev)?));
+        let ledger = Arc::new(RwLock::new(Consensus::load(dev)?));
         // Return the ledger.
         Self::from(ledger, private_key, router)
     }
 
     /// Initializes a new instance of the ledger.
-    pub fn from(ledger: Arc<RwLock<Consensus<N, C>>>, private_key: PrivateKey<N>, router: Router<N>) -> Result<Self> {
+    pub fn from(
+        consensus: Arc<RwLock<Consensus<N, C>>>,
+        private_key: PrivateKey<N>,
+        router: Router<N>,
+    ) -> Result<Self> {
         // Derive the view key and address.
         let view_key = ViewKey::try_from(private_key)?;
         let address = Address::try_from(&view_key)?;
@@ -160,7 +167,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         // let server = Arc::new(InternalServer::<N>::start(ledger.clone(), Some(additional_routes), None)?);
 
         // Return the ledger.
-        Ok(Self { consensus: ledger, router, private_key, view_key, address })
+        Ok(Self { consensus, router, private_key, view_key, address })
     }
 
     // TODO (raychu86): Restrict visibility.
@@ -174,14 +181,14 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         self.address
     }
 
-    /// Adds the given transaction to the memory pool.
-    pub fn add_to_memory_pool(&self, transaction: Transaction<N>) -> Result<()> {
-        self.consensus.write().add_to_memory_pool(transaction)
+    /// Adds the given unconfirmed transaction to the memory pool.
+    pub fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
+        self.consensus.write().add_unconfirmed_transaction(transaction)
     }
 
-    /// Adds the given transaction to the memory pool.
-    pub fn add_to_coinbase_memory_pool(&self, prover_puzzle_solution: ProverSolution<N>) -> Result<()> {
-        self.consensus.write().add_to_coinbase_memory_pool(prover_puzzle_solution)
+    /// Adds the given unconfirmed solution to the memory pool.
+    pub fn add_unconfirmed_solution(&self, solution: &ProverSolution<N>) -> Result<()> {
+        self.consensus.write().add_unconfirmed_solution(solution)
     }
 
     /// Advances the ledger to the next block.

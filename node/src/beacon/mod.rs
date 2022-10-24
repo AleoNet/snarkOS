@@ -78,7 +78,7 @@ impl<N: Network> Beacon<N> {
         spawn_task!(Self, {
             loop {
                 // Produce a transaction if the mempool is empty.
-                if beacon.ledger.consensus().read().memory_pool().len() == 0 {
+                if beacon.ledger.consensus().read().memory_pool().num_unconfirmed_transactions() == 0 {
                     // Create a transfer transaction.
                     let transaction = match beacon.ledger.create_transfer(beacon.address(), 1) {
                         Ok(transaction) => transaction,
@@ -88,7 +88,7 @@ impl<N: Network> Beacon<N> {
                         }
                     };
                     // Add the transaction to the memory pool.
-                    if let Err(error) = beacon.ledger.consensus().write().add_to_memory_pool(transaction) {
+                    if let Err(error) = beacon.ledger.consensus().write().add_unconfirmed_transaction(transaction) {
                         error!("Failed to add a transfer transaction to the memory pool: {error}");
                         continue;
                     }

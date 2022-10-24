@@ -81,11 +81,8 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Server<N, C> {
                         // Retrieve the transaction ID.
                         let transaction_id = transaction.id();
                         // Add the transaction to the memory pool.
-                        match ledger.add_to_memory_pool(transaction) {
-                            Ok(()) => trace!("✉️ Added transaction '{transaction_id}' to the memory pool"),
-                            Err(error) => {
-                                warn!("⚠️ Failed to add transaction '{transaction_id}' to the memory pool: {error}")
-                            }
+                        if let Err(error) = ledger.add_unconfirmed_transaction(transaction) {
+                            warn!("⚠️ Failed to add transaction '{transaction_id}' to the memory pool: {error}")
                         }
                     }
                 };

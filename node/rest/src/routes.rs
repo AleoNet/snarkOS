@@ -247,7 +247,7 @@ impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
 
     /// Returns the transactions in the memory pool.
     async fn get_transactions_mempool(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.consensus().read().memory_pool().values().collect::<Vec<_>>()))
+        Ok(reply::json(&ledger.consensus().read().memory_pool().unconfirmed_transactions().collect::<Vec<_>>()))
     }
 
     /// Returns the program for the given program ID.
@@ -336,7 +336,7 @@ impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
         ledger: Ledger<N, C>,
     ) -> Result<impl Reply, Rejection> {
         // Validate the transaction.
-        ledger.consensus().read().check_transaction(&transaction).or_reject()?;
+        ledger.consensus().read().check_transaction_basic(&transaction).or_reject()?;
 
         // Send the transaction to the ledger.
         match ledger_sender.send(LedgerRequest::TransactionBroadcast(transaction)).await {
