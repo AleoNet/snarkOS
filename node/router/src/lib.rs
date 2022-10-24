@@ -33,14 +33,13 @@ pub use outbound::*;
 mod peer;
 pub use peer::*;
 
-use snarkos_node_executor::{spawn_task, Executor, NodeType};
+use snarkos_node_executor::{spawn_task, Executor};
 use snarkos_node_messages::*;
-use snarkvm::prelude::{Address, Network};
+use snarkvm::prelude::Network;
 
 use anyhow::Result;
 use indexmap::{IndexMap, IndexSet};
 use rand::{prelude::IteratorRandom, rngs::OsRng, Rng};
-use snarkvm::circuit::Itertools;
 use std::{
     net::SocketAddr,
     sync::Arc,
@@ -92,10 +91,6 @@ pub struct Router<N: Network> {
     router_sender: RouterSender<N>,
     /// The local IP of the node.
     local_ip: SocketAddr,
-    /// The account address of the node.
-    address: Address<N>,
-    /// The node type.
-    node_type: NodeType,
     /// The set of trusted peers.
     trusted_peers: Arc<IndexSet<SocketAddr>>,
     /// The map of connected peer IPs to their peer handlers.
@@ -137,8 +132,6 @@ impl<N: Network> Router<N> {
     /// Initializes a new `Router` instance.
     pub async fn new<E: Handshake + Inbound + Outbound>(
         node_ip: SocketAddr,
-        address: Address<N>,
-        node_type: NodeType,
         trusted_peers: &[SocketAddr],
     ) -> Result<Self> {
         // Initialize a new TCP listener at the given IP.
@@ -154,8 +147,6 @@ impl<N: Network> Router<N> {
         let router = Self {
             router_sender,
             local_ip,
-            address,
-            node_type,
             trusted_peers: Arc::new(trusted_peers.iter().copied().collect()),
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
@@ -182,16 +173,6 @@ impl<N: Network> Router<N> {
     /// Returns the IP address of this node.
     pub const fn local_ip(&self) -> &SocketAddr {
         &self.local_ip
-    }
-
-    /// Returns the account address of this node.
-    pub const fn address(&self) -> &Address<N> {
-        &self.address
-    }
-
-    /// Returns the node type.
-    pub const fn node_type(&self) -> &NodeType {
-        &self.node_type
     }
 
     /// Returns `true` if the node is connected to the given IP.

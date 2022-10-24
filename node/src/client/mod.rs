@@ -40,7 +40,7 @@ impl<N: Network> Client<N> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the node router.
-        let router = Router::new::<Self>(node_ip, *account.address(), NodeType::Client, trusted_peers).await?;
+        let router = Router::new::<Self>(node_ip, trusted_peers).await?;
         // Initialize the node.
         let node = Self { account, router };
         // Initialize the signal handler.

@@ -55,7 +55,7 @@ impl<N: Network> Validator<N> {
         // Initialize the ledger.
         let ledger = Ledger::load(private_key, dev)?;
         // Initialize the node router.
-        let router = Router::new::<Self>(node_ip, *account.address(), NodeType::Validator, trusted_peers).await?;
+        let router = Router::new::<Self>(node_ip, trusted_peers).await?;
         // Initialize the REST server.
         let rest = match rest_ip {
             Some(rest_ip) => Some(Arc::new(Rest::start(rest_ip, ledger.clone(), router.clone())?)),
