@@ -42,7 +42,6 @@ use snarkvm::{
 };
 
 use anyhow::Result;
-use futures::TryStreamExt;
 use indexmap::IndexMap;
 use std::borrow::Cow;
 use time::OffsetDateTime;

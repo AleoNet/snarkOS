@@ -36,12 +36,7 @@ pub struct Prover<N: Network> {
 
 impl<N: Network> Prover<N> {
     /// Initializes a new prover node.
-    pub async fn new(
-        node_ip: SocketAddr,
-        private_key: PrivateKey<N>,
-        trusted_peers: &[SocketAddr],
-        dev: Option<u16>,
-    ) -> Result<Self> {
+    pub async fn new(node_ip: SocketAddr, private_key: PrivateKey<N>, trusted_peers: &[SocketAddr]) -> Result<Self> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the node router.

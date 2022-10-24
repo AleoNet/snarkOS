@@ -23,7 +23,7 @@ struct BlockRange {
     end: u32,
 }
 
-impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
+impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     /// Initializes the routes, given the ledger and ledger sender.
     #[allow(clippy::redundant_clone)]
     pub fn routes(&self) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
@@ -86,12 +86,6 @@ impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
             .and(with(self.ledger.clone()))
             .and_then(Self::get_program);
 
-        // GET /testnet3/beacons
-        let get_validators = warp::get()
-            .and(warp::path!("testnet3" / "beacons"))
-            .and(with(self.ledger.clone()))
-            .and_then(Self::get_beacons);
-
         // GET /testnet3/statePath/{commitment}
         let get_state_path = warp::get()
             .and(warp::path!("testnet3" / "statePath" / ..))
@@ -99,6 +93,30 @@ impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
             .and(warp::path::end())
             .and(with(self.ledger.clone()))
             .and_then(Self::get_state_path);
+
+        // GET /testnet3/beacons
+        let get_beacons = warp::get()
+            .and(warp::path!("testnet3" / "beacons"))
+            .and(with(self.ledger.clone()))
+            .and_then(Self::get_beacons);
+
+        // GET /testnet3/peers/count
+        let get_peers_count = warp::get()
+            .and(warp::path!("testnet3" / "peers" / "count"))
+            .and(with(self.router.clone()))
+            .and_then(Self::get_peers_count);
+
+        // GET /testnet3/peers/all
+        let get_peers_all = warp::get()
+            .and(warp::path!("testnet3" / "peers" / "all"))
+            .and(with(self.router.clone()))
+            .and_then(Self::get_peers_all);
+
+        // GET /testnet3/node/address
+        let get_node_address = warp::get()
+            .and(warp::path!("testnet3" / "node" / "address"))
+            .and(with(self.ledger.address()))
+            .and_then(|address: Address<N>| async move { Ok::<_, Rejection>(reply::json(&address.to_string())) });
 
         // GET /testnet3/find/blockHash/{transactionID}
         let find_block_hash = warp::get()
@@ -175,8 +193,11 @@ impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
             .or(get_transaction)
             .or(get_transactions_mempool)
             .or(get_program)
-            .or(get_validators)
             .or(get_state_path)
+            .or(get_beacons)
+            .or(get_peers_count)
+            .or(get_peers_all)
+            .or(get_node_address)
             .or(find_block_hash)
             .or(find_deployment_id)
             .or(find_transaction_id)
@@ -188,7 +209,7 @@ impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
     }
 }
 
-impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
+impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     /// Returns the latest block height.
     async fn latest_height(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.consensus().read().latest_height()))
@@ -261,14 +282,24 @@ impl<N: Network, C: ConsensusStorage<N>> Server<N, C> {
         Ok(reply::json(&program))
     }
 
+    /// Returns the state path for the given commitment.
+    async fn get_state_path(commitment: Field<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.consensus().read().to_state_path(&commitment).or_reject()?))
+    }
+
     /// Returns the list of current beacons.
     async fn get_beacons(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.consensus().read().beacons().keys().collect::<Vec<&Address<N>>>()))
     }
 
-    /// Returns the state path for the given commitment.
-    async fn get_state_path(commitment: Field<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.consensus().read().to_state_path(&commitment).or_reject()?))
+    /// Returns the number of peers connected to the node.
+    async fn get_peers_count(router: Router<N>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&router.number_of_connected_peers().await))
+    }
+
+    /// Returns the peers connected to the node.
+    async fn get_peers_all(router: Router<N>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&router.connected_peers().await))
     }
 
     /// Returns the block hash that contains the given `transaction ID`.

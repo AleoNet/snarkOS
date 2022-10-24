@@ -20,12 +20,13 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
+use snarkos_node_rest::Rest;
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
 use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::Result;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, sync::Arc};
 
 /// A validator is a full node, capable of validating blocks.
 #[derive(Clone)]
@@ -36,12 +37,15 @@ pub struct Validator<N: Network> {
     ledger: Ledger<N, ConsensusDB<N>>,
     /// The router of the node.
     router: Router<N>,
+    /// The REST server of the node.
+    rest: Option<Arc<Rest<N, ConsensusDB<N>>>>,
 }
 
 impl<N: Network> Validator<N> {
     /// Initializes a new validator node.
     pub async fn new(
         node_ip: SocketAddr,
+        rest_ip: Option<SocketAddr>,
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
         dev: Option<u16>,
@@ -52,12 +56,27 @@ impl<N: Network> Validator<N> {
         let ledger = Ledger::load(private_key, dev)?;
         // Initialize the node router.
         let router = Router::new::<Self>(node_ip, *account.address(), NodeType::Validator, trusted_peers).await?;
+        // Initialize the REST server.
+        let rest = match rest_ip {
+            Some(rest_ip) => Some(Arc::new(Rest::start(rest_ip, ledger.clone(), router.clone())?)),
+            None => None,
+        };
         // Initialize the node.
-        let node = Self { account, ledger, router };
+        let node = Self { account, ledger, router, rest };
         // Initialize the signal handler.
         let _ = node.handle_signals();
         // Return the node.
         Ok(node)
+    }
+
+    /// Returns the ledger.
+    pub fn ledger(&self) -> &Ledger<N, ConsensusDB<N>> {
+        &self.ledger
+    }
+
+    /// Returns the REST server.
+    pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>>>> {
+        &self.rest
     }
 }
 

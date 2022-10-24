@@ -72,12 +72,10 @@ impl<'a, N: Network> Display<N> {
 
         // If the display is not enabled, render the welcome message.
         if nodisplay {
-            // Print the welcome.
-            println!("{}", Self::welcome_message());
             // Print the Aleo address.
-            println!("Your Aleo address is {}.\n", node.address().to_string().bold());
+            println!("🪪 Your Aleo address is {}.\n", node.address().to_string().bold());
             // Print the node type and network.
-            println!("Starting {} on {}.\n", node.node_type().description().bold(), N::NAME.bold());
+            println!("🧭 Starting {} on {}.\n", node.node_type().description().bold(), N::NAME.bold());
         }
         // If the display is enabled, render the display.
         else {
@@ -239,7 +237,7 @@ impl<N: Network> Display<N> {
     }
 
     /// Returns the welcome message as a string.
-    fn welcome_message() -> String {
+    pub fn welcome_message() -> String {
         use colored::*;
 
         let mut output = String::new();
@@ -260,7 +258,7 @@ impl<N: Network> Display<N> {
 "#
         .white()
         .bold();
-        output += &"Welcome to Aleo! We thank you for running a node and supporting privacy.\n".bold();
+        output += &"👋 Welcome to Aleo! We thank you for running a node and supporting privacy.\n".bold();
         output
     }
 }

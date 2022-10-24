@@ -17,15 +17,13 @@
 use snarkos_account::Account;
 use snarkos_display::Display;
 use snarkos_node::Node;
-use snarkvm::prelude::PrivateKey;
+use snarkvm::prelude::{Network, PrivateKey, Testnet3};
 
 use anyhow::{bail, Result};
 use clap::Parser;
 use core::str::FromStr;
 use std::net::SocketAddr;
 use tokio::runtime::{self, Runtime};
-
-type Network = snarkvm::prelude::Testnet3;
 
 /// Starts the snarkOS node.
 #[derive(Debug, Clone, Parser)]
@@ -78,10 +76,17 @@ impl Start {
         Self::runtime().block_on(async move {
             // Clone the configurations.
             let mut cli = self.clone();
-            // Parse the node from the configurations.
-            let node = cli.parse_node().await.expect("Failed to parse the node");
-            // Initialize the display.
-            let _ = Display::start(node, cli.verbosity, cli.nodisplay).expect("Failed to initialize the display");
+            // Parse the network.
+            match cli.network {
+                3 => {
+                    // Parse the node from the configurations.
+                    let node = cli.parse_node::<Testnet3>().await.expect("Failed to parse the node");
+                    // Initialize the display.
+                    let _ =
+                        Display::start(node, cli.verbosity, cli.nodisplay).expect("Failed to initialize the display");
+                }
+                _ => panic!("Invalid network ID specified"),
+            };
             // Note: Do not move this. The pending await must be here otherwise
             // other snarkOS commands will not exit.
             std::future::pending::<()>().await;
@@ -112,11 +117,19 @@ impl Start {
 
     /// Returns the node type corresponding to the given configurations.
     #[rustfmt::skip]
-    async fn parse_node(&mut self) -> Result<Node<Network>> {
+    async fn parse_node<N: Network>(&mut self) -> Result<Node<N>> {
+        // Print the welcome.
+        println!("{}", Display::<N>::welcome_message());
+
         // Parse the trusted IPs to connect to.
         let mut trusted_peers = self.parse_trusted_peers()?;
         // Parse the node IP.
         let mut node_ip = self.node;
+        // Parse the REST IP.
+        let mut rest_ip = match self.norest {
+            true => None,
+            false => Some(self.rest),
+        };
 
         // If `--dev` is set, assume the dev nodes are initialized from 0 to `dev`,
         // and add each of them to the trusted peers. In addition, set the node IP to `4130 + dev`.
@@ -127,12 +140,17 @@ impl Start {
             }
             // Set the node IP to `4130 + dev`.
             node_ip = SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?;
+            // Set the REST IP to `3030 + dev`.
+            rest_ip = match self.norest {
+                true => None,
+                false => Some(SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev))?),
+            };
 
             // If the node type flag is set, but no private key is provided, then sample one.
             let sample_account = |node: &mut Option<String>| -> Result<()> {
-                let account = Account::<Network>::sample()?;
+                let account = Account::<N>::sample()?;
                 *node = Some(account.private_key().to_string());
-                println!("ATTENTION - No private key was provided, sampling a one-time account for this instance:\n\n{account}\n");
+                println!("⚠️ ATTENTION - No private key was provided, sampling a one-time account for this instance:\n\n{account}\n");
                 Ok(())
             };
             if let Some("") = self.beacon.as_ref().map(|s| s.as_str()) {
@@ -148,11 +166,11 @@ impl Start {
 
         // Ensures only one of the four flags is set. If no flags are set, defaults to a client node.
         match (&self.beacon, &self.validator, &self.prover, &self.client) {
-            (Some(private_key), None, None, None) => Node::new_beacon(node_ip, PrivateKey::<Network>::from_str(private_key)?, &trusted_peers, self.dev).await,
-            (None, Some(private_key), None, None) => Node::new_validator(node_ip, PrivateKey::<Network>::from_str(private_key)?, &trusted_peers, self.dev).await,
-            (None, None, Some(private_key), None) => Node::new_prover(node_ip, PrivateKey::<Network>::from_str(private_key)?, &trusted_peers, self.dev).await,
-            (None, None, None, Some(private_key)) => Node::new_client(node_ip, PrivateKey::<Network>::from_str(private_key)?, &trusted_peers, self.dev).await,
-            (None, None, None, None) => Node::new_client(node_ip, PrivateKey::<Network>::new(&mut rand::thread_rng())?, &trusted_peers, self.dev).await,
+            (Some(private_key), None, None, None) => Node::new_beacon(node_ip, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, self.dev).await,
+            (None, Some(private_key), None, None) => Node::new_validator(node_ip, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, self.dev).await,
+            (None, None, Some(private_key), None) => Node::new_prover(node_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers).await,
+            (None, None, None, Some(private_key)) => Node::new_client(node_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers).await,
+            (None, None, None, None) => Node::new_client(node_ip, PrivateKey::<N>::new(&mut rand::thread_rng())?, &trusted_peers).await,
             _ => bail!("Unsupported node configuration"),
         }
     }

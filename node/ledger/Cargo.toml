@@ -69,8 +69,5 @@ features = ["rt"]
 [dependencies.tracing]
 version = "0.1"
 
-[dependencies.warp]
-version = "0.3"
-
 [dev-dependencies.tracing-test]
 version = "0.2"

@@ -57,21 +57,23 @@ impl<N: Network> Node<N> {
     /// Initializes a new beacon node.
     pub async fn new_beacon(
         node_ip: SocketAddr,
+        rest_ip: Option<SocketAddr>,
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Beacon(Arc::new(Beacon::new(node_ip, private_key, trusted_peers, dev).await?)))
+        Ok(Self::Beacon(Arc::new(Beacon::new(node_ip, rest_ip, private_key, trusted_peers, dev).await?)))
     }
 
     /// Initializes a new validator node.
     pub async fn new_validator(
         node_ip: SocketAddr,
+        rest_ip: Option<SocketAddr>,
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Validator(Arc::new(Validator::new(node_ip, private_key, trusted_peers, dev).await?)))
+        Ok(Self::Validator(Arc::new(Validator::new(node_ip, rest_ip, private_key, trusted_peers, dev).await?)))
     }
 
     /// Initializes a new prover node.
@@ -79,9 +81,8 @@ impl<N: Network> Node<N> {
         node_ip: SocketAddr,
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
-        dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Prover(Arc::new(Prover::new(node_ip, private_key, trusted_peers, dev).await?)))
+        Ok(Self::Prover(Arc::new(Prover::new(node_ip, private_key, trusted_peers).await?)))
     }
 
     /// Initializes a new client node.
@@ -89,9 +90,8 @@ impl<N: Network> Node<N> {
         node_ip: SocketAddr,
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
-        dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Client(Arc::new(Client::new(node_ip, private_key, trusted_peers, dev).await?)))
+        Ok(Self::Client(Arc::new(Client::new(node_ip, private_key, trusted_peers).await?)))
     }
 
     /// Returns the node type.
