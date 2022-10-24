@@ -19,11 +19,12 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{spawn_task, Executor, NodeType, Status};
-use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedSolution};
+use snarkos_node_messages::{Data, Message, PuzzleRequest, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ViewKey};
 
 use anyhow::Result;
+use core::time::Duration;
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
@@ -62,6 +63,8 @@ impl<N: Network> Prover<N> {
         };
         // Initialize the router handler.
         router.initialize_handler(node.clone(), router_receiver).await;
+        // Initialize the heartbeat.
+        node.initialize_heartbeat().await;
         // Initialize coinbase proving.
         node.initialize_coinbase_proving().await;
         // Initialize the signal handler.
@@ -71,15 +74,74 @@ impl<N: Network> Prover<N> {
     }
 }
 
+#[async_trait]
+impl<N: Network> Executor for Prover<N> {
+    /// The node type.
+    const NODE_TYPE: NodeType = NodeType::Prover;
+}
+
+impl<N: Network> NodeInterface<N> for Prover<N> {
+    /// Returns the node type.
+    fn node_type(&self) -> NodeType {
+        Self::NODE_TYPE
+    }
+
+    /// Returns the node router.
+    fn router(&self) -> &Router<N> {
+        &self.router
+    }
+
+    /// Returns the account private key of the node.
+    fn private_key(&self) -> &PrivateKey<N> {
+        self.account.private_key()
+    }
+
+    /// Returns the account view key of the node.
+    fn view_key(&self) -> &ViewKey<N> {
+        self.account.view_key()
+    }
+
+    /// Returns the account address of the node.
+    fn address(&self) -> &Address<N> {
+        self.account.address()
+    }
+}
+
 impl<N: Network> Prover<N> {
+    /// The frequency at which the node sends a heartbeat.
+    const HEARTBEAT_IN_SECS: u64 = N::ANCHOR_TIME as u64 / 2;
+
+    /// Initialize a new instance of the heartbeat.
+    async fn initialize_heartbeat(&self) {
+        let prover = self.clone();
+        spawn_task!(Self, {
+            loop {
+                // Retrieve the first connected beacon.
+                if let Some(connected_beacon) = prover.router.connected_beacons().await.first() {
+                    // Send the "PuzzleRequest" to the beacon.
+                    let request = RouterRequest::MessageSend(*connected_beacon, Message::PuzzleRequest(PuzzleRequest));
+                    if let Err(error) = prover.router.process(request).await {
+                        warn!("[PuzzleRequest] {}", error);
+                    }
+                } else {
+                    warn!("[PuzzleRequest] No connected beacons");
+                }
+
+                // Sleep for `Self::HEARTBEAT_IN_SECS` seconds.
+                tokio::time::sleep(Duration::from_secs(Self::HEARTBEAT_IN_SECS)).await;
+            }
+        });
+    }
+
     /// Initialize a new instance of coinbase proving.
     async fn initialize_coinbase_proving(&self) {
         let prover = self.clone();
         spawn_task!(Self, {
             loop {
-                // If the status is `Peering`, then skip this iteration.
-                if !Self::status().is_peering() {
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                // If the node is not connected to any peers, then skip this iteration.
+                if prover.router.number_of_connected_peers().await == 0 {
+                    warn!("Skipping an iteration of the prover solution (no connected peers)");
+                    tokio::time::sleep(Duration::from_secs(Self::HEARTBEAT_IN_SECS)).await;
                     continue;
                 }
 
@@ -142,42 +204,9 @@ impl<N: Network> Prover<N> {
                         Self::status().update(Status::Ready);
                     })
                 } else {
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
         });
-    }
-}
-
-#[async_trait]
-impl<N: Network> Executor for Prover<N> {
-    /// The node type.
-    const NODE_TYPE: NodeType = NodeType::Prover;
-}
-
-impl<N: Network> NodeInterface<N> for Prover<N> {
-    /// Returns the node type.
-    fn node_type(&self) -> NodeType {
-        Self::NODE_TYPE
-    }
-
-    /// Returns the node router.
-    fn router(&self) -> &Router<N> {
-        &self.router
-    }
-
-    /// Returns the account private key of the node.
-    fn private_key(&self) -> &PrivateKey<N> {
-        self.account.private_key()
-    }
-
-    /// Returns the account view key of the node.
-    fn view_key(&self) -> &ViewKey<N> {
-        self.account.view_key()
-    }
-
-    /// Returns the account address of the node.
-    fn address(&self) -> &Address<N> {
-        self.account.address()
     }
 }

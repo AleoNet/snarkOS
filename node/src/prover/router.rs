@@ -23,14 +23,17 @@ impl<N: Network> Handshake for Prover<N> {}
 impl<N: Network> Inbound<N> for Prover<N> {
     /// Saves the latest epoch challenge and latest block in the prover.
     async fn puzzle_response(&self, message: PuzzleResponse<N>) -> bool {
+        let epoch_challenge = message.epoch_challenge;
         match message.block.deserialize().await {
             Ok(block) => {
+                // Save the latest epoch challenge in the prover.
+                self.latest_epoch_challenge.write().await.replace(epoch_challenge);
                 // Save the latest block in the prover.
                 self.latest_block.write().await.replace(block);
                 true
             }
             Err(error) => {
-                error!("Failed to deserialize the block from the state response: {error}");
+                error!("Failed to deserialize the block from the puzzle response: {error}");
                 false
             }
         }
