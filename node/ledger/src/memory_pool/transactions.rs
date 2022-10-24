@@ -15,8 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
-use crate::Consensus;
-use snarkvm::prelude::ConsensusStorage;
 
 impl<N: Network> MemoryPool<N> {
     /// Returns `true` if the given unconfirmed transaction exists in the memory pool.

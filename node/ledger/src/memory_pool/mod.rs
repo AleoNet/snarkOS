@@ -17,17 +17,18 @@
 mod solutions;
 mod transactions;
 
-use snarkvm::prelude::{Network, ProverSolution, PuzzleCommitment, Transaction};
+use crate::{anchor_block_height, Consensus};
+use snarkvm::prelude::{ConsensusStorage, Itertools, Network, ProverSolution, PuzzleCommitment, Transaction};
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, Result};
 use std::collections::HashMap;
 
 #[derive(Clone, Debug)]
 pub struct MemoryPool<N: Network> {
     /// The pool of unconfirmed transactions.
     unconfirmed_transactions: HashMap<N::TransactionID, Transaction<N>>,
-    /// The pool of unconfirmed solutions.
-    unconfirmed_solutions: HashMap<PuzzleCommitment<N>, ProverSolution<N>>,
+    /// The pool of unconfirmed solutions and their proof targets.
+    unconfirmed_solutions: HashMap<PuzzleCommitment<N>, (ProverSolution<N>, u64)>,
 }
 
 impl<N: Network> Default for MemoryPool<N> {

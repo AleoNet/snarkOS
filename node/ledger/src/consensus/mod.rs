@@ -36,14 +36,14 @@ use snarkvm::{
         coinbase_puzzle::{CoinbasePuzzle, CoinbaseSolution, EpochChallenge, ProverSolution},
         program::Program,
         state_path::StatePath,
-        store::{BlockStore, ConsensusMemory, ConsensusStorage, ConsensusStore, TransactionStore, TransitionStore},
+        store::{BlockStore, ConsensusStorage, ConsensusStore, TransactionStore, TransitionStore},
         vm::VM,
     },
 };
 
 use anyhow::Result;
 use futures::TryStreamExt;
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexMap;
 use std::borrow::Cow;
 use time::OffsetDateTime;
 
@@ -165,7 +165,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Retrieve the latest height.
         let latest_height = *consensus.blocks.heights().max().ok_or(anyhow!("Failed to load blocks in consensus"))?;
         // Fetch the latest block.
-        let block = consensus.get_block(latest_height)?;
+        let block = consensus
+            .get_block(latest_height)
+            .map_err(|_| anyhow!("Failed to load block {latest_height} in consensus"))?;
 
         // Set the current hash, height, and round.
         consensus.current_hash = block.hash();
@@ -218,57 +220,64 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         // Ensure that the prover solution is valid for the given epoch.
         if !solution.verify(self.coinbase_puzzle.coinbase_verifying_key()?, &epoch_challenge, proof_target)? {
-            bail!("Prover puzzle '{}' is invalid for the given epoch.", solution.commitment().0);
+            bail!("Invalid prover solution '{}' for the current epoch.", solution.commitment().0);
         }
 
         // Insert the solution to the memory pool.
-        self.memory_pool.add_unconfirmed_solution(&solution);
+        self.memory_pool.add_unconfirmed_solution(&solution)?;
 
         Ok(())
     }
 
     /// Returns a candidate for the next block in the ledger.
     pub fn propose_next_block<R: Rng + CryptoRng>(&self, private_key: &PrivateKey<N>, rng: &mut R) -> Result<Block<N>> {
+        // Retrieve the latest state root.
+        let latest_state_root = self.latest_state_root();
+        // Retrieve the latest block.
+        let latest_block = self.latest_block()?;
+        // Retrieve the latest coinbase target.
+        let latest_coinbase_target = latest_block.coinbase_target();
+
         // Select the transactions from the memory pool.
         let transactions = self.memory_pool.candidate_transactions(self).into_iter().collect::<Transactions<N>>();
         // Select the prover solutions from the memory pool.
-        let prover_solutions = self.memory_pool.candidate_solutions();
+        let prover_solutions = self.memory_pool.candidate_solutions(self.latest_height(), latest_coinbase_target)?;
 
-        // Compute the total cumulative target of the prover puzzle solutions as a u128.
-        let cumulative_prover_target: u128 = prover_solutions.iter().try_fold(0u128, |cumulative, solution| {
-            cumulative.checked_add(solution.to_target()? as u128).ok_or_else(|| anyhow!("Cumulative target overflowed"))
-        })?;
-
-        // TODO (howardwu): Add `has_coinbase` to function arguments.
         // Construct the coinbase proof.
-        let anchor_height_at_year_10 = anchor_block_height(N::ANCHOR_TIME, 10);
-        let (coinbase_proof, coinbase_accumulator_point) = if self.latest_height() > anchor_height_at_year_10
-            || cumulative_prover_target < self.latest_coinbase_target()? as u128
-        {
-            (None, Field::<N>::zero())
-        } else {
-            let epoch_challenge = self.latest_epoch_challenge()?;
-            let coinbase_proof = self.coinbase_puzzle.accumulate_unchecked(&epoch_challenge, &prover_solutions)?;
-            let coinbase_accumulator_point = coinbase_proof.to_accumulator_point()?;
+        let (coinbase_proof, coinbase_accumulator_point) = match &prover_solutions {
+            Some(prover_solutions) => {
+                let epoch_challenge = self.latest_epoch_challenge()?;
+                let coinbase_proof = self.coinbase_puzzle.accumulate_unchecked(&epoch_challenge, prover_solutions)?;
+                let coinbase_accumulator_point = coinbase_proof.to_accumulator_point()?;
 
-            (Some(coinbase_proof), coinbase_accumulator_point)
+                (Some(coinbase_proof), coinbase_accumulator_point)
+            }
+            None => (None, Field::<N>::zero()),
         };
 
-        // Fetch the latest block and state root.
-        let block = self.latest_block()?;
-        let state_root = self.latest_state_root();
-
-        // Fetch the new round state.
-        let timestamp = OffsetDateTime::now_utc().unix_timestamp();
+        // Fetch the next round state.
+        let next_timestamp = OffsetDateTime::now_utc().unix_timestamp();
         let next_height = self.latest_height().saturating_add(1);
-        let round = block.round().saturating_add(1);
+        let next_round = latest_block.round().saturating_add(1);
 
         // TODO (raychu86): Pay the provers. Currently we do not pay the provers with the `credits.aleo` program
         //  and instead, will track prover leaderboards via the `coinbase_proof` in each block.
-        {
+        if let Some(prover_solutions) = prover_solutions {
             // Calculate the coinbase reward.
-            let coinbase_reward =
-                coinbase_reward(block.timestamp(), timestamp, next_height, N::STARTING_SUPPLY, N::ANCHOR_TIME)?;
+            let coinbase_reward = coinbase_reward(
+                latest_block.timestamp(),
+                next_timestamp,
+                next_height,
+                N::STARTING_SUPPLY,
+                N::ANCHOR_TIME,
+            )?;
+
+            // Compute the total cumulative target of the prover puzzle solutions as a u128.
+            let cumulative_prover_target: u128 = prover_solutions.iter().try_fold(0u128, |cumulative, solution| {
+                cumulative
+                    .checked_add(solution.to_target()? as u128)
+                    .ok_or_else(|| anyhow!("Cumulative target overflowed"))
+            })?;
 
             // Calculate the rewards for the individual provers.
             let mut prover_rewards: Vec<(Address<N>, u64)> = Vec::new();
@@ -296,26 +305,27 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             }
         }
 
-        // Construct the new coinbase target.
-        let coinbase_target = coinbase_target(
-            self.latest_coinbase_target()?,
-            block.timestamp(),
-            timestamp,
+        // Construct the next coinbase target.
+        let next_coinbase_target = coinbase_target(
+            latest_coinbase_target,
+            latest_block.timestamp(),
+            next_timestamp,
             N::ANCHOR_TIME,
             N::NUM_BLOCKS_PER_EPOCH,
         )?;
 
-        // Construct the new proof target.
-        let proof_target = proof_target(coinbase_target);
+        // Construct the next proof target.
+        let next_proof_target = proof_target(next_coinbase_target);
 
         // Construct the metadata.
-        let metadata = Metadata::new(N::ID, round, next_height, coinbase_target, proof_target, timestamp)?;
+        let metadata =
+            Metadata::new(N::ID, next_round, next_height, next_coinbase_target, next_proof_target, next_timestamp)?;
 
         // Construct the header.
-        let header = Header::from(*state_root, transactions.to_root()?, coinbase_accumulator_point, metadata)?;
+        let header = Header::from(*latest_state_root, transactions.to_root()?, coinbase_accumulator_point, metadata)?;
 
         // Construct the new block.
-        Block::new(private_key, block.hash(), header, transactions, coinbase_proof, rng)
+        Block::new(private_key, latest_block.hash(), header, transactions, coinbase_proof, rng)
     }
 
     /// Checks the given block is valid next block.
@@ -348,10 +358,12 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         // TODO (raychu86): Ensure the next block timestamp is the median of proposed blocks.
         // Ensure the next block timestamp is after the current block timestamp.
-        let next_timestamp = block.header().timestamp();
-        let latest_timestamp = self.latest_block()?.header().timestamp();
-        if block.height() > 0 && next_timestamp <= latest_timestamp {
-            bail!("The next block timestamp {next_timestamp} is before the current timestamp {latest_timestamp}")
+        if block.height() > 0 {
+            let next_timestamp = block.header().timestamp();
+            let latest_timestamp = self.latest_block()?.header().timestamp();
+            if next_timestamp <= latest_timestamp {
+                bail!("The next block timestamp {next_timestamp} is before the current timestamp {latest_timestamp}")
+            }
         }
 
         for transaction_id in block.transaction_ids() {
@@ -752,7 +764,7 @@ pub(crate) mod test_helpers {
     use snarkvm::{
         console::{account::PrivateKey, network::Testnet3, program::Value},
         prelude::TestRng,
-        synthesizer::Block,
+        synthesizer::{Block, ConsensusMemory},
     };
 
     use once_cell::sync::OnceCell;
@@ -810,7 +822,7 @@ pub(crate) mod test_helpers {
 
         // Initialize the ledger with the genesis block and the associated private key.
         let address = Address::try_from(&private_key).unwrap();
-        let ledger = CurrentConsensus::new_with_genesis(genesis, None).unwrap();
+        let ledger = CurrentConsensus::new_with_genesis(genesis.clone(), None).unwrap();
         assert_eq!(0, ledger.latest_height());
         assert_eq!(genesis.hash(), ledger.latest_hash());
         assert_eq!(genesis.round(), ledger.latest_round());
@@ -948,6 +960,7 @@ mod tests {
     use snarkvm::{
         console::{network::Testnet3, program::Value},
         prelude::TestRng,
+        synthesizer::ConsensusMemory,
     };
 
     use tracing_test::traced_test;
@@ -1020,7 +1033,7 @@ mod tests {
         assert_eq!(ledger.latest_block().unwrap(), genesis);
 
         // Initialize the ledger with the genesis block.
-        let ledger = CurrentConsensus::new_with_genesis(genesis, None).unwrap();
+        let ledger = CurrentConsensus::new_with_genesis(genesis.clone(), None).unwrap();
         assert_eq!(ledger.latest_hash(), genesis.hash());
         assert_eq!(ledger.latest_height(), genesis.height());
         assert_eq!(ledger.latest_round(), genesis.round());
@@ -1146,7 +1159,7 @@ mod tests {
                 // Add the transaction to the memory pool.
                 ledger.add_unconfirmed_transaction(transaction).unwrap();
             }
-            assert_eq!(ledger.memory_pool().len(), 1 << (height - 1));
+            assert_eq!(ledger.memory_pool().num_unconfirmed_transactions(), 1 << (height - 1));
 
             // Propose the next block.
             let next_block = ledger.propose_next_block(&private_key, rng).unwrap();
@@ -1180,9 +1193,9 @@ mod tests {
 
             // Check that the prover solution meets the proof target requirement.
             if prover_solution.to_target().unwrap() >= proof_target {
-                assert!(ledger.add_unconfirmed_solution(prover_solution).is_ok())
+                assert!(ledger.add_unconfirmed_solution(&prover_solution).is_ok())
             } else {
-                assert!(ledger.add_unconfirmed_solution(prover_solution).is_err())
+                assert!(ledger.add_unconfirmed_solution(&prover_solution).is_err())
             }
         }
     }
@@ -1220,7 +1233,7 @@ mod tests {
             };
 
             // Try to add the prover solution to the memory pool.
-            if ledger.add_unconfirmed_solution(prover_solution).is_ok() {
+            if ledger.add_unconfirmed_solution(&prover_solution).is_ok() {
                 // Add to the cumulative target if the prover solution is valid.
                 cumulative_target += prover_solution.to_target().unwrap() as u128;
             }

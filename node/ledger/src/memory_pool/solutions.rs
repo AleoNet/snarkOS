@@ -28,40 +28,68 @@ impl<N: Network> MemoryPool<N> {
     }
 
     /// Returns the unconfirmed solutions in the memory pool.
-    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = &ProverSolution<N>> {
+    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = &(ProverSolution<N>, u64)> {
         self.unconfirmed_solutions.values()
     }
 
     /// Returns a candidate set of unconfirmed solutions for inclusion in a block.
-    pub fn candidate_solutions(&self) -> Vec<ProverSolution<N>> {
+    pub fn candidate_solutions(
+        &self,
+        latest_height: u32,
+        latest_coinbase_target: u64,
+    ) -> Result<Option<Vec<ProverSolution<N>>>> {
+        // If the latest height is greater than or equal to the anchor height at year 10, then return 'None'.
+        if latest_height >= anchor_block_height(N::ANCHOR_TIME, 10) {
+            return Ok(None);
+        }
+
         // Add the solutions from the memory pool that do not have collisions.
         let mut solutions = Vec::new();
         let mut commitments = Vec::new();
+        let mut cumulative_prover_target: u128 = 0u128;
 
-        for (commitment, solution) in self.unconfirmed_solutions.iter().take(N::MAX_PROVER_SOLUTIONS) {
+        for (commitment, (solution, target)) in
+            self.unconfirmed_solutions.iter().sorted_by(|a, b| b.1.1.cmp(&a.1.1)).take(N::MAX_PROVER_SOLUTIONS)
+        {
             // Ensure the commitments are unique.
             if commitments.contains(commitment) {
                 continue;
             }
 
+            // Append the solution.
             solutions.push(solution.clone());
+            // Append the commitment.
             commitments.push(*commitment);
+            // Compute the cumulative prover target of the prover solutions as a u128.
+            cumulative_prover_target = cumulative_prover_target
+                .checked_add(*target as u128)
+                .ok_or_else(|| anyhow!("Cumulative target overflowed"))?;
         }
 
-        solutions
+        // Return the prover solutions if the cumulative target is greater than or equal to the coinbase target.
+        match cumulative_prover_target >= latest_coinbase_target as u128 {
+            true => Ok(Some(solutions)),
+            false => Ok(None),
+        }
     }
 
     /// Adds the given unconfirmed solution to the memory pool.
-    pub fn add_unconfirmed_solution(&mut self, solution: &ProverSolution<N>) -> bool {
+    pub fn add_unconfirmed_solution(&mut self, solution: &ProverSolution<N>) -> Result<bool> {
         // Ensure the solution does not already exist in the memory pool.
         match !self.contains_unconfirmed_solution(solution.commitment()) {
             true => {
-                self.unconfirmed_solutions.insert(solution.commitment(), solution.clone());
-                true
+                // Compute the proof target.
+                let proof_target = solution.to_target()?;
+                self.unconfirmed_solutions.insert(solution.commitment(), (solution.clone(), proof_target));
+                trace!(
+                    "✉️  Added a prover solution with target '{proof_target}' ('{}') to the memory pool",
+                    solution.commitment().0
+                );
+                Ok(true)
             }
             false => {
-                trace!("Solution '{}' already exists in memory pool", solution.commitment().0);
-                false
+                trace!("Prover solution '{}' already exists in memory pool", solution.commitment().0);
+                Ok(false)
             }
         }
     }
