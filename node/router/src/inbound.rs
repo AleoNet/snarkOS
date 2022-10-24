@@ -49,7 +49,7 @@ pub trait Inbound<N: Network>: Executor {
             Message::Ping(message) => Self::ping(message, peer_ip, peer).await,
             Message::Pong(message) => Self::pong(message, peer_ip, router).await,
             Message::PuzzleRequest(..) => self.puzzle_request(peer_ip, router).await,
-            Message::PuzzleResponse(message) => self.puzzle_response(message).await,
+            Message::PuzzleResponse(message) => self.puzzle_response(message, peer_ip).await,
             Message::UnconfirmedBlock(message) => Self::unconfirmed_block(message, peer_ip, peer, router).await,
             Message::UnconfirmedSolution(message) => Self::unconfirmed_solution(message, peer_ip, peer, router).await,
             Message::UnconfirmedTransaction(message) => Self::unconfirmed_transaction(message, peer_ip, peer, router).await
@@ -207,12 +207,14 @@ pub trait Inbound<N: Network>: Executor {
         true
     }
 
-    async fn puzzle_request(&self, _peer_ip: SocketAddr, _router: &Router<N>) -> bool {
-        true
+    async fn puzzle_request(&self, peer_ip: SocketAddr, _router: &Router<N>) -> bool {
+        debug!("Peer {peer_ip} disconnected for the following reason: {:?}", DisconnectReason::ProtocolViolation);
+        false
     }
 
-    async fn puzzle_response(&self, _message: PuzzleResponse<N>) -> bool {
-        true
+    async fn puzzle_response(&self, _message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
+        debug!("Peer {peer_ip} disconnected for the following reason: {:?}", DisconnectReason::ProtocolViolation);
+        false
     }
 
     async fn unconfirmed_block(

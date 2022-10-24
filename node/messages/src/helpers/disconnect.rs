@@ -27,6 +27,8 @@ pub enum DisconnectReason {
     INeedToSyncFirst,
     /// No reason given.
     NoReasonGiven,
+    /// The peer is not following the protocol.
+    ProtocolViolation,
     /// The peer's client is outdated, judging by its version.
     OutdatedClientVersion,
     /// Dropping a dead connection.

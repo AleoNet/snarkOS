@@ -22,7 +22,7 @@ impl<N: Network> Handshake for Prover<N> {}
 #[async_trait]
 impl<N: Network> Inbound<N> for Prover<N> {
     /// Saves the latest epoch challenge and latest block in the prover.
-    async fn puzzle_response(&self, message: PuzzleResponse<N>) -> bool {
+    async fn puzzle_response(&self, message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
         let epoch_challenge = message.epoch_challenge;
         match message.block.deserialize().await {
             Ok(block) => {
@@ -33,7 +33,7 @@ impl<N: Network> Inbound<N> for Prover<N> {
                 true
             }
             Err(error) => {
-                error!("Failed to deserialize the block from the puzzle response: {error}");
+                error!("Failed to deserialize the puzzle response from '{peer_ip}': {error}");
                 false
             }
         }
