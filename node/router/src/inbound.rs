@@ -41,7 +41,7 @@ pub trait Inbound<N: Network>: Executor {
                 false
             }
             Message::Disconnect(message) => {
-                debug!("Peer {peer_ip} disconnected for the following reason: {:?}", message.reason);
+                debug!("Disconnecting peer {peer_ip} for the following reason: {:?}", message.reason);
                 false
             }
             Message::PeerRequest(..) => Self::peer_request(peer_ip, router).await,
@@ -208,12 +208,12 @@ pub trait Inbound<N: Network>: Executor {
     }
 
     async fn puzzle_request(&self, peer_ip: SocketAddr, _router: &Router<N>) -> bool {
-        debug!("Peer {peer_ip} disconnected for the following reason: {:?}", DisconnectReason::ProtocolViolation);
+        debug!("Disconnecting peer {peer_ip} for the following reason: {:?}", DisconnectReason::ProtocolViolation);
         false
     }
 
     async fn puzzle_response(&self, _message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
-        debug!("Peer {peer_ip} disconnected for the following reason: {:?}", DisconnectReason::ProtocolViolation);
+        debug!("Disconnecting peer {peer_ip} for the following reason: {:?}", DisconnectReason::ProtocolViolation);
         false
     }
 
