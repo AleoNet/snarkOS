@@ -210,7 +210,7 @@ impl<N: Network> Beacon<N> {
                 });
 
                 // Propagate the block to all peers.
-                if let Err(error) = beacon.router.process(RouterRequest::MessagePropagate(message)).await {
+                if let Err(error) = beacon.router.process(RouterRequest::MessagePropagate(message, vec![])).await {
                     trace!("Failed to broadcast the next block: {error}");
                 }
             }

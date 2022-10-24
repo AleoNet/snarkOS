@@ -150,7 +150,7 @@ impl Start {
             let sample_account = |node: &mut Option<String>| -> Result<()> {
                 let account = Account::<N>::sample()?;
                 *node = Some(account.private_key().to_string());
-                println!("⚠️ ATTENTION - No private key was provided, sampling a one-time account for this instance:\n\n{account}\n");
+                println!("⚠️  ATTENTION - No private key was provided, sampling a one-time account for this instance:\n\n{account}\n");
                 Ok(())
             };
             if let Some("") = self.beacon.as_ref().map(|s| s.as_str()) {

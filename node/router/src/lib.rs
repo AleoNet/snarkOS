@@ -40,6 +40,7 @@ use snarkvm::prelude::{Address, Network};
 use anyhow::Result;
 use indexmap::{IndexMap, IndexSet};
 use rand::{prelude::IteratorRandom, rngs::OsRng, Rng};
+use snarkvm::circuit::Itertools;
 use std::{
     net::SocketAddr,
     sync::Arc,
@@ -65,8 +66,8 @@ pub type RouterReceiver<N> = mpsc::Receiver<RouterRequest<N>>;
 pub enum RouterRequest<N: Network> {
     /// Heartbeat
     Heartbeat,
-    /// MessagePropagate := (message)
-    MessagePropagate(Message<N>),
+    /// MessagePropagate := (message, \[ excluded_peers \])
+    MessagePropagate(Message<N>, Vec<SocketAddr>),
     /// MessageSend := (peer_ip, message)
     MessageSend(SocketAddr, Message<N>),
     /// PeerConnect := (peer_ip)
@@ -326,7 +327,9 @@ impl<N: Network> Router<N> {
 
         match request {
             RouterRequest::Heartbeat => self.handle_heartbeat().await,
-            RouterRequest::MessagePropagate(message) => self.handle_propagate(message).await,
+            RouterRequest::MessagePropagate(message, excluded_peers) => {
+                self.handle_propagate(message, excluded_peers).await
+            }
             RouterRequest::MessageSend(sender, message) => self.handle_send(sender, message).await,
             RouterRequest::PeerConnect(peer_ip) => self.handle_peer_connect::<E>(peer_ip).await,
             RouterRequest::PeerConnecting(stream, peer_ip) => self.handle_peer_connecting::<E>(stream, peer_ip).await,
@@ -692,16 +695,33 @@ impl<N: Network> Router<N> {
         }
     }
 
-    /// Sends the given message to every connected peer, excluding the sender.
-    async fn handle_propagate(&self, mut message: Message<N>) {
+    /// Sends the given message to every connected peer, excluding the sender and any specified peer IPs.
+    async fn handle_propagate(&self, mut message: Message<N>, excluded_peers: Vec<SocketAddr>) {
         // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         if let Message::UnconfirmedBlock(ref mut message) = message {
             let serialized_block = Data::serialize(message.block.clone()).await.expect("Block serialization is bugged");
             let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
         }
+        // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
+        if let Message::UnconfirmedSolution(ref mut message) = message {
+            let serialized_solution =
+                Data::serialize(message.solution.clone()).await.expect("Solution serialization is bugged");
+            let _ = std::mem::replace(&mut message.solution, Data::Buffer(serialized_solution));
+        }
+        // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
+        if let Message::UnconfirmedTransaction(ref mut message) = message {
+            let serialized_transaction =
+                Data::serialize(message.transaction.clone()).await.expect("Transaction serialization is bugged");
+            let _ = std::mem::replace(&mut message.transaction, Data::Buffer(serialized_transaction));
+        }
 
         // Iterate through all peers that are not the sender.
-        for peer in self.connected_peers().await.iter().filter(|peer_ip| !self.is_local_ip(peer_ip)) {
+        for peer in self
+            .connected_peers()
+            .await
+            .iter()
+            .filter(|peer_ip| !self.is_local_ip(peer_ip) && !excluded_peers.contains(peer_ip))
+        {
             self.handle_send(*peer, message.clone()).await;
         }
     }

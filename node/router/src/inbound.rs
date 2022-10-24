@@ -207,11 +207,11 @@ pub trait Inbound: Executor {
         true
     }
 
-    async fn state_request<N: Network>(peer_ip: SocketAddr, router: &Router<N>) -> bool {
+    async fn state_request<N: Network>(_peer_ip: SocketAddr, _router: &Router<N>) -> bool {
         true
     }
 
-    async fn state_response<N: Network>(message: StateResponse<N>) -> bool {
+    async fn state_response<N: Network>(_message: StateResponse<N>) -> bool {
         true
     }
 
@@ -309,6 +309,9 @@ pub trait Inbound: Executor {
             return false;
         }
 
+        // Prepare the full message.
+        let full_message = Message::UnconfirmedSolution(message.clone());
+
         // Perform the deferred non-blocking deserialization of the solution.
         match message.solution.deserialize().await {
             Ok(solution) => {
@@ -331,12 +334,12 @@ pub trait Inbound: Executor {
 
                 if !is_router_ready || !is_node_ready {
                     trace!("Skipping 'UnconfirmedSolution {:?}' from {peer_ip}", solution.commitment());
-                    // } else {
-                    //     // // Route the `UnconfirmedSolution` to the prover.
-                    //     // if let Err(error) = state.prover().router().send(ProverRequest::UnconfirmedSolution(peer_ip, solution)).await {
-                    //     //     warn!("[UnconfirmedSolution] {}", error);
-                    //     //
-                    //     // }
+                } else {
+                    // Propagate the `UnconfirmedSolution`.
+                    let request = RouterRequest::MessagePropagate(full_message, vec![peer_ip]);
+                    if let Err(error) = router.process(request).await {
+                        warn!("[UnconfirmedSolution] {}", error);
+                    }
                 }
             }
             Err(error) => warn!("[UnconfirmedSolution] {error}"),
@@ -367,6 +370,9 @@ pub trait Inbound: Executor {
             return false;
         }
 
+        // Prepare the full message.
+        let full_message = Message::UnconfirmedTransaction(message.clone());
+
         // Perform the deferred non-blocking deserialization of the transaction.
         match message.transaction.deserialize().await {
             Ok(transaction) => {
@@ -389,12 +395,12 @@ pub trait Inbound: Executor {
 
                 if !is_router_ready || !is_node_ready {
                     trace!("Skipping 'UnconfirmedTransaction {}' from {peer_ip}", transaction.id());
-                    // } else {
-                    //     // // Route the `UnconfirmedTransaction` to the prover.
-                    //     // if let Err(error) = state.prover().router().send(ProverRequest::UnconfirmedTransaction(peer_ip, transaction)).await {
-                    //     //     warn!("[UnconfirmedTransaction] {}", error);
-                    //     //
-                    //     // }
+                } else {
+                    // Propagate the `UnconfirmedTransaction`.
+                    let request = RouterRequest::MessagePropagate(full_message, vec![peer_ip]);
+                    if let Err(error) = router.process(request).await {
+                        warn!("[UnconfirmedTransaction] {}", error);
+                    }
                 }
             }
             Err(error) => warn!("[UnconfirmedTransaction] {error}"),
