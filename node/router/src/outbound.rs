@@ -36,6 +36,14 @@ pub trait Outbound {
 
         // Ensure sufficient time has passed before needing to send the message.
         let is_ready_to_send = match message {
+            Message::StateResponse(ref mut message) => {
+                // Perform non-blocking serialization of the block (if it hasn't been serialized yet).
+                let serialized_block =
+                    Data::serialize(message.block.clone()).await.expect("Block serialization is bugged");
+                let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
+
+                true
+            }
             Message::UnconfirmedBlock(ref mut message) => {
                 // Retrieve the last seen timestamp of this block for this peer.
                 let last_seen = peer

@@ -49,6 +49,12 @@ pub use ping::Ping;
 mod pong;
 pub use pong::Pong;
 
+mod state_request;
+pub use state_request::StateRequest;
+
+mod state_response;
+pub use state_response::StateResponse;
+
 mod unconfirmed_block;
 pub use unconfirmed_block::UnconfirmedBlock;
 
@@ -87,6 +93,8 @@ pub enum Message<N: Network> {
     PeerResponse(PeerResponse),
     Ping(Ping),
     Pong(Pong),
+    StateRequest(StateRequest),
+    StateResponse(StateResponse<N>),
     UnconfirmedBlock(UnconfirmedBlock<N>),
     UnconfirmedSolution(UnconfirmedSolution<N>),
     UnconfirmedTransaction(UnconfirmedTransaction<N>),
@@ -109,6 +117,8 @@ impl<N: Network> Message<N> {
             Self::PeerResponse(message) => message.name(),
             Self::Ping(message) => message.name(),
             Self::Pong(message) => message.name(),
+            Self::StateRequest(message) => message.name(),
+            Self::StateResponse(message) => message.name(),
             Self::UnconfirmedBlock(message) => message.name(),
             Self::UnconfirmedSolution(message) => message.name(),
             Self::UnconfirmedTransaction(message) => message.name(),
@@ -128,9 +138,11 @@ impl<N: Network> Message<N> {
             Self::PeerResponse(..) => 6,
             Self::Ping(..) => 7,
             Self::Pong(..) => 8,
-            Self::UnconfirmedBlock(..) => 9,
-            Self::UnconfirmedSolution(..) => 10,
-            Self::UnconfirmedTransaction(..) => 11,
+            Self::StateRequest(..) => 9,
+            Self::StateResponse(..) => 10,
+            Self::UnconfirmedBlock(..) => 11,
+            Self::UnconfirmedSolution(..) => 12,
+            Self::UnconfirmedTransaction(..) => 13,
         }
     }
 
@@ -149,6 +161,8 @@ impl<N: Network> Message<N> {
             Self::PeerResponse(message) => message.serialize(writer),
             Self::Ping(message) => message.serialize(writer),
             Self::Pong(message) => message.serialize(writer),
+            Self::StateRequest(message) => message.serialize(writer),
+            Self::StateResponse(message) => message.serialize(writer),
             Self::UnconfirmedBlock(message) => message.serialize(writer),
             Self::UnconfirmedSolution(message) => message.serialize(writer),
             Self::UnconfirmedTransaction(message) => message.serialize(writer),
@@ -177,9 +191,11 @@ impl<N: Network> Message<N> {
             6 => Self::PeerResponse(MessageTrait::deserialize(bytes)?),
             7 => Self::Ping(MessageTrait::deserialize(bytes)?),
             8 => Self::Pong(MessageTrait::deserialize(bytes)?),
-            9 => Self::UnconfirmedBlock(MessageTrait::deserialize(bytes)?),
-            10 => Self::UnconfirmedSolution(MessageTrait::deserialize(bytes)?),
-            11 => Self::UnconfirmedTransaction(MessageTrait::deserialize(bytes)?),
+            9 => Self::StateRequest(MessageTrait::deserialize(bytes)?),
+            10 => Self::StateResponse(MessageTrait::deserialize(bytes)?),
+            11 => Self::UnconfirmedBlock(MessageTrait::deserialize(bytes)?),
+            12 => Self::UnconfirmedSolution(MessageTrait::deserialize(bytes)?),
+            13 => Self::UnconfirmedTransaction(MessageTrait::deserialize(bytes)?),
             _ => bail!("Unknown message ID {id}"),
         };
 

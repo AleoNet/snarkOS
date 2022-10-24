@@ -48,6 +48,8 @@ pub trait Inbound: Executor {
             Message::PeerResponse(message) => Self::peer_response(message, router).await,
             Message::Ping(message) => Self::ping(message, peer_ip, peer).await,
             Message::Pong(message) => Self::pong(message, peer_ip, router).await,
+            Message::StateRequest(..) => Self::state_request(peer_ip, router).await,
+            Message::StateResponse(message) => Self::state_response(message).await,
             Message::UnconfirmedBlock(message) => Self::unconfirmed_block(message, peer_ip, peer, router).await,
             Message::UnconfirmedSolution(message) => Self::unconfirmed_solution(message, peer_ip, peer, router).await,
             Message::UnconfirmedTransaction(message) => Self::unconfirmed_transaction(message, peer_ip, peer, router).await
@@ -202,6 +204,14 @@ pub trait Inbound: Executor {
                 warn!("[Ping] {error}");
             }
         });
+        true
+    }
+
+    async fn state_request<N: Network>(peer_ip: SocketAddr, router: &Router<N>) -> bool {
+        true
+    }
+
+    async fn state_response<N: Network>(message: StateResponse<N>) -> bool {
         true
     }
 
