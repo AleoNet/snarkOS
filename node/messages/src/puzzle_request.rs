@@ -17,13 +17,13 @@
 use super::*;
 
 #[derive(Clone, Debug)]
-pub struct StateRequest;
+pub struct PuzzleRequest;
 
-impl MessageTrait for StateRequest {
+impl MessageTrait for PuzzleRequest {
     /// Returns the message name.
     #[inline]
     fn name(&self) -> &str {
-        "StateRequest"
+        "PuzzleRequest"
     }
 
     /// Serializes the message into the buffer.
@@ -37,7 +37,7 @@ impl MessageTrait for StateRequest {
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         match bytes.remaining() == 0 {
             true => Ok(Self),
-            false => bail!("Invalid 'StateRequest' message"),
+            false => bail!("Invalid 'PuzzleRequest' message"),
         }
     }
 }

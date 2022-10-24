@@ -23,10 +23,10 @@ use core::time::Duration;
 use std::{net::SocketAddr, time::SystemTime};
 
 #[async_trait]
-pub trait Inbound: Executor {
+pub trait Inbound<N: Network>: Executor {
     /// Handles the receiving of a message from a peer. Upon success, returns `true`.
     #[rustfmt::skip]
-    async fn inbound<N: Network>(peer: &Peer<N>, message: Message<N>, router: &Router<N>) -> bool {
+    async fn inbound(&self, peer: &Peer<N>, message: Message<N>, router: &Router<N>) -> bool {
         // Retrieve the peer IP.
         let peer_ip = *peer.ip();
 
@@ -48,8 +48,8 @@ pub trait Inbound: Executor {
             Message::PeerResponse(message) => Self::peer_response(message, router).await,
             Message::Ping(message) => Self::ping(message, peer_ip, peer).await,
             Message::Pong(message) => Self::pong(message, peer_ip, router).await,
-            Message::StateRequest(..) => Self::state_request(peer_ip, router).await,
-            Message::StateResponse(message) => Self::state_response(message).await,
+            Message::PuzzleRequest(..) => self.puzzle_request(peer_ip, router).await,
+            Message::PuzzleResponse(message) => self.puzzle_response(message).await,
             Message::UnconfirmedBlock(message) => Self::unconfirmed_block(message, peer_ip, peer, router).await,
             Message::UnconfirmedSolution(message) => Self::unconfirmed_solution(message, peer_ip, peer, router).await,
             Message::UnconfirmedTransaction(message) => Self::unconfirmed_transaction(message, peer_ip, peer, router).await
@@ -89,7 +89,7 @@ pub trait Inbound: Executor {
         true
     }
 
-    async fn block_response<N: Network>(_message: BlockResponse<N>) -> bool {
+    async fn block_response(_message: BlockResponse<N>) -> bool {
         // // Perform the deferred non-blocking deserialization of the block.
         // match block.deserialize().await {
         //     Ok(block) => {
@@ -106,7 +106,7 @@ pub trait Inbound: Executor {
         true
     }
 
-    async fn peer_request<N: Network>(peer_ip: SocketAddr, router: &Router<N>) -> bool {
+    async fn peer_request(peer_ip: SocketAddr, router: &Router<N>) -> bool {
         // Send a `PeerResponse` message.
         if let Err(error) = router.process(RouterRequest::SendPeerResponse(peer_ip)).await {
             warn!("[PeerRequest] {error}");
@@ -114,7 +114,7 @@ pub trait Inbound: Executor {
         true
     }
 
-    async fn peer_response<N: Network>(message: PeerResponse, router: &Router<N>) -> bool {
+    async fn peer_response(message: PeerResponse, router: &Router<N>) -> bool {
         // Adds the given peer IPs to the list of candidate peers.
         if let Err(error) = router.process(RouterRequest::ReceivePeerResponse(message.peers)).await {
             warn!("[PeerResponse] {error}");
@@ -122,7 +122,7 @@ pub trait Inbound: Executor {
         true
     }
 
-    async fn ping<N: Network>(message: Ping, peer_ip: SocketAddr, peer: &Peer<N>) -> bool {
+    async fn ping(message: Ping, peer_ip: SocketAddr, peer: &Peer<N>) -> bool {
         // Ensure the message protocol version is not outdated.
         if message.version < Message::<N>::VERSION {
             warn!("Dropping {peer_ip} on version {} (outdated)", message.version);
@@ -173,7 +173,7 @@ pub trait Inbound: Executor {
         true
     }
 
-    async fn pong<N: Network>(_message: Pong, peer_ip: SocketAddr, router: &Router<N>) -> bool {
+    async fn pong(_message: Pong, peer_ip: SocketAddr, router: &Router<N>) -> bool {
         // // Perform the deferred non-blocking deserialization of block locators.
         // let request = match block_locators.deserialize().await {
         //     // Route the `Pong` to the ledger.
@@ -207,15 +207,15 @@ pub trait Inbound: Executor {
         true
     }
 
-    async fn state_request<N: Network>(_peer_ip: SocketAddr, _router: &Router<N>) -> bool {
+    async fn puzzle_request(&self, _peer_ip: SocketAddr, _router: &Router<N>) -> bool {
         true
     }
 
-    async fn state_response<N: Network>(_message: StateResponse<N>) -> bool {
+    async fn puzzle_response(&self, _message: PuzzleResponse<N>) -> bool {
         true
     }
 
-    async fn unconfirmed_block<N: Network>(
+    async fn unconfirmed_block(
         message: UnconfirmedBlock<N>,
         peer_ip: SocketAddr,
         peer: &Peer<N>,
@@ -286,7 +286,7 @@ pub trait Inbound: Executor {
         true
     }
 
-    async fn unconfirmed_solution<N: Network>(
+    async fn unconfirmed_solution(
         message: UnconfirmedSolution<N>,
         peer_ip: SocketAddr,
         peer: &Peer<N>,
@@ -347,7 +347,7 @@ pub trait Inbound: Executor {
         true
     }
 
-    async fn unconfirmed_transaction<N: Network>(
+    async fn unconfirmed_transaction(
         message: UnconfirmedTransaction<N>,
         peer_ip: SocketAddr,
         peer: &Peer<N>,

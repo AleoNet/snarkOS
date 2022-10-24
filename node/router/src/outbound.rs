@@ -27,6 +27,7 @@ use tokio_util::codec::Framed;
 pub trait Outbound {
     /// Handles the sending of a message to a peer.
     async fn outbound<N: Network>(
+        &self,
         peer: &Peer<N>,
         mut message: Message<N>,
         outbound_socket: &mut Framed<TcpStream, MessageCodec<N>>,
@@ -36,7 +37,7 @@ pub trait Outbound {
 
         // Ensure sufficient time has passed before needing to send the message.
         let is_ready_to_send = match message {
-            Message::StateResponse(ref mut message) => {
+            Message::PuzzleResponse(ref mut message) => {
                 // Perform non-blocking serialization of the block (if it hasn't been serialized yet).
                 let serialized_block =
                     Data::serialize(message.block.clone()).await.expect("Block serialization is bugged");

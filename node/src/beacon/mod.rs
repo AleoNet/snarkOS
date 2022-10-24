@@ -20,7 +20,7 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{spawn_task, Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::{Data, Message, UnconfirmedBlock};
+use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedBlock};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkos_node_store::ConsensusDB;
@@ -64,14 +64,16 @@ impl<N: Network> Beacon<N> {
         // Initialize the ledger.
         let ledger = Ledger::load(private_key, dev)?;
         // Initialize the node router.
-        let router = Router::new::<Self>(node_ip, trusted_peers).await?;
+        let (router, router_receiver) = Router::new::<Self>(node_ip, trusted_peers).await?;
         // Initialize the REST server.
         let rest = match rest_ip {
             Some(rest_ip) => Some(Arc::new(Rest::start(rest_ip, ledger.clone(), router.clone())?)),
             None => None,
         };
         // Initialize the node.
-        let node = Self { account, ledger, router, rest, shutdown: Default::default() };
+        let node = Self { account, ledger, router: router.clone(), rest, shutdown: Default::default() };
+        // Initialize the router handler.
+        router.initialize_handler(node.clone(), router_receiver).await;
 
         // Initialize the block production.
         node.initialize_block_production().await;

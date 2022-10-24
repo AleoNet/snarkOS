@@ -40,9 +40,11 @@ impl<N: Network> Client<N> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the node router.
-        let router = Router::new::<Self>(node_ip, trusted_peers).await?;
+        let (router, router_receiver) = Router::new::<Self>(node_ip, trusted_peers).await?;
         // Initialize the node.
-        let node = Self { account, router };
+        let node = Self { account, router: router.clone() };
+        // Initialize the router handler.
+        router.initialize_handler(node.clone(), router_receiver).await;
         // Initialize the signal handler.
         let _ = node.handle_signals();
         // Return the node.

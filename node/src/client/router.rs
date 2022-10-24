@@ -20,7 +20,7 @@ use super::*;
 impl<N: Network> Handshake for Client<N> {}
 
 #[async_trait]
-impl<N: Network> Inbound for Client<N> {}
+impl<N: Network> Inbound<N> for Client<N> {}
 
 #[async_trait]
 impl<N: Network> Outbound for Client<N> {}

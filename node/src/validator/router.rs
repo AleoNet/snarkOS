@@ -20,7 +20,7 @@ use super::*;
 impl<N: Network> Handshake for Validator<N> {}
 
 #[async_trait]
-impl<N: Network> Inbound for Validator<N> {}
+impl<N: Network> Inbound<N> for Validator<N> {}
 
 #[async_trait]
 impl<N: Network> Outbound for Validator<N> {}

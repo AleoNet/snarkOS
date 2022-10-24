@@ -20,7 +20,44 @@ use super::*;
 impl<N: Network> Handshake for Beacon<N> {}
 
 #[async_trait]
-impl<N: Network> Inbound for Beacon<N> {}
+impl<N: Network> Inbound<N> for Beacon<N> {
+    /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
+    async fn puzzle_request(&self, peer_ip: SocketAddr, router: &Router<N>) -> bool {
+        // Retrieve the latest epoch challenge and latest block.
+        let (epoch_challenge, block) = {
+            // Acquire a read lock on the consensus module.
+            let consensus = self.ledger.consensus().read();
+
+            // Retrieve the latest epoch challenge.
+            let epoch_challenge = match consensus.latest_epoch_challenge() {
+                Ok(block) => block,
+                Err(error) => {
+                    error!("Failed to retrieve latest epoch challenge for a puzzle request: {error}");
+                    return false;
+                }
+            };
+
+            // Retrieve the latest block.
+            let block = match consensus.latest_block() {
+                Ok(block) => block,
+                Err(error) => {
+                    error!("Failed to retrieve latest block for a puzzle request: {error}");
+                    return false;
+                }
+            };
+
+            // Scope drops the read lock on the consensus module.
+            (epoch_challenge, block)
+        };
+        // Send the `PuzzleResponse` message to the peer.
+        let message = Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block: Data::Object(block) });
+        if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
+            warn!("[PuzzleResponse] {}", error);
+        }
+
+        true
+    }
+}
 
 #[async_trait]
 impl<N: Network> Outbound for Beacon<N> {}

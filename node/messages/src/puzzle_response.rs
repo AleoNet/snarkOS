@@ -17,26 +17,32 @@
 use super::*;
 
 #[derive(Clone, Debug)]
-pub struct StateResponse<N: Network> {
+pub struct PuzzleResponse<N: Network> {
+    pub epoch_challenge: EpochChallenge<N>,
     pub block: Data<Block<N>>,
 }
 
-impl<N: Network> MessageTrait for StateResponse<N> {
+impl<N: Network> MessageTrait for PuzzleResponse<N> {
     /// Returns the message name.
     #[inline]
     fn name(&self) -> &str {
-        "StateResponse"
+        "PuzzleResponse"
     }
 
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+        writer.write_all(&self.epoch_challenge.to_bytes_le()?)?;
         self.block.serialize_blocking_into(writer)
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        Ok(Self { block: Data::Buffer(bytes.freeze()) })
+        let mut reader = bytes.reader();
+        Ok(Self {
+            epoch_challenge: EpochChallenge::read_le(&mut reader)?,
+            block: Data::Buffer(reader.into_inner().freeze()),
+        })
     }
 }

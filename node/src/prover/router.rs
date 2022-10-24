@@ -20,7 +20,22 @@ use super::*;
 impl<N: Network> Handshake for Prover<N> {}
 
 #[async_trait]
-impl<N: Network> Inbound for Prover<N> {}
+impl<N: Network> Inbound<N> for Prover<N> {
+    /// Saves the latest epoch challenge and latest block in the prover.
+    async fn puzzle_response(&self, message: PuzzleResponse<N>) -> bool {
+        match message.block.deserialize().await {
+            Ok(block) => {
+                // Save the latest block in the prover.
+                self.latest_block.write().await.replace(block);
+                true
+            }
+            Err(error) => {
+                error!("Failed to deserialize the block from the state response: {error}");
+                false
+            }
+        }
+    }
+}
 
 #[async_trait]
 impl<N: Network> Outbound for Prover<N> {}

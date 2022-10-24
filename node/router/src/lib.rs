@@ -130,10 +130,10 @@ impl<N: Network> Router<N> {
 
 impl<N: Network> Router<N> {
     /// Initializes a new `Router` instance.
-    pub async fn new<E: Handshake + Inbound + Outbound>(
+    pub async fn new<E: Handshake + Inbound<N> + Outbound>(
         node_ip: SocketAddr,
         trusted_peers: &[SocketAddr],
-    ) -> Result<Self> {
+    ) -> Result<(Self, RouterReceiver<N>)> {
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(node_ip).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
@@ -155,14 +155,12 @@ impl<N: Network> Router<N> {
             seen_outbound_connections: Default::default(),
         };
 
-        // Initialize the handler.
-        router.initialize_handler::<E>(router_receiver).await;
         // Initialize the listener.
         router.initialize_listener::<E>(listener).await;
         // Initialize the heartbeat.
         router.initialize_heartbeat::<E>().await;
 
-        Ok(router)
+        Ok((router, router_receiver))
     }
 
     /// Returns `true` if the given IP is this node.
@@ -237,15 +235,20 @@ impl<N: Network> Router<N> {
 
 impl<N: Network> Router<N> {
     /// Initialize the handler for router requests.
-    async fn initialize_handler<E: Handshake + Inbound + Outbound>(&self, mut router_receiver: RouterReceiver<N>) {
+    pub async fn initialize_handler<E: Handshake + Inbound<N> + Outbound>(
+        &self,
+        executor: E,
+        mut router_receiver: RouterReceiver<N>,
+    ) {
         let router = self.clone();
         spawn_task!({
             // Asynchronously wait for a router request.
             while let Some(request) = router_receiver.recv().await {
                 let router = router.clone();
+                let executor_clone = executor.clone();
                 spawn_task!(E::resources().procure_id(), {
                     // Update the router.
-                    router.handler::<E>(request).await;
+                    router.handler::<E>(executor_clone, request).await;
                 });
             }
         });
@@ -303,7 +306,7 @@ impl<N: Network> Router<N> {
 
     /// Performs the given `request` to the peers.
     /// All requests must go through this `handler`, so that a unified view is preserved.
-    pub(crate) async fn handler<E: Handshake + Inbound + Outbound>(&self, request: RouterRequest<N>) {
+    pub(crate) async fn handler<E: Handshake + Inbound<N> + Outbound>(&self, executor: E, request: RouterRequest<N>) {
         debug!("Peers: {:?}", self.connected_peers().await);
 
         match request {
@@ -320,7 +323,7 @@ impl<N: Network> Router<N> {
                 // Remove an entry for this `Peer` in the candidate peers, if it exists.
                 self.candidate_peers.write().await.remove(peer.ip());
                 // Handle the peer connection.
-                self.handle_peer_connected::<E>(peer, outbound_socket, peer_handler).await;
+                self.handle_peer_connected::<E>(executor, peer, outbound_socket, peer_handler).await;
             }
             RouterRequest::PeerDisconnected(peer_ip) => {
                 // Remove an entry for this `Peer` in the connected peers, if it exists.
@@ -579,8 +582,9 @@ impl<N: Network> Router<N> {
     }
 
     /// Initialize the handler for the new peer.
-    async fn handle_peer_connected<E: Inbound + Outbound>(
+    async fn handle_peer_connected<E: Inbound<N> + Outbound>(
         &self,
+        executor: E,
         peer: Peer<N>,
         mut outbound_socket: Framed<TcpStream, MessageCodec<N>>,
         mut peer_handler: PeerHandler<N>,
@@ -593,6 +597,7 @@ impl<N: Network> Router<N> {
             info!("Connected to {peer_ip}");
 
             // Process incoming messages until this stream is disconnected.
+            let executor_clone = executor.clone();
             loop {
                 tokio::select! {
                     // Message channel is routing a message outbound to the peer.
@@ -604,7 +609,7 @@ impl<N: Network> Router<N> {
                             break;
                         }
 
-                        E::outbound(&peer, message, &mut outbound_socket).await
+                        executor_clone.outbound(&peer, message, &mut outbound_socket).await
                     },
                     result = outbound_socket.next() => match result {
                         // Received a message from the peer.
@@ -634,7 +639,7 @@ impl<N: Network> Router<N> {
                             }
 
                             // Process the message.
-                            let success = E::inbound(&peer, message, &router).await;
+                            let success = executor_clone.inbound(&peer, message, &router).await;
                             // Disconnect if the peer violated the protocol.
                             if !success {
                                 warn!("Disconnecting from {peer_ip} (violated protocol)");
