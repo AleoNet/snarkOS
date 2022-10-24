@@ -688,18 +688,6 @@ impl<N: Network> Router<N> {
             let serialized_block = Data::serialize(message.block.clone()).await.expect("Block serialization is bugged");
             let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
         }
-        // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
-        if let Message::UnconfirmedSolution(ref mut message) = message {
-            let serialized_solution =
-                Data::serialize(message.solution.clone()).await.expect("Solution serialization is bugged");
-            let _ = std::mem::replace(&mut message.solution, Data::Buffer(serialized_solution));
-        }
-        // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
-        if let Message::UnconfirmedTransaction(ref mut message) = message {
-            let serialized_transaction =
-                Data::serialize(message.transaction.clone()).await.expect("Transaction serialization is bugged");
-            let _ = std::mem::replace(&mut message.transaction, Data::Buffer(serialized_transaction));
-        }
 
         // Iterate through all peers that are not the sender.
         for peer in self
