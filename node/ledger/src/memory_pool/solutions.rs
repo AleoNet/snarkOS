@@ -32,6 +32,24 @@ impl<N: Network> MemoryPool<N> {
         self.unconfirmed_solutions.values()
     }
 
+    /// Returns the candidate coinbase target of the valid unconfirmed solutions in the memory pool.
+    pub fn candidate_coinbase_target(&self, latest_proof_target: u64) -> Result<u128> {
+        // Filter the solutions by the latest proof target, ensure they are unique, and rank in descending order of proof target.
+        let mut candidate_proof_targets = self
+            .unconfirmed_solutions
+            .iter()
+            .filter(|(_, (_, proof_target))| *proof_target >= latest_proof_target)
+            .unique_by(|(k, _)| *k)
+            .map(|(_, v)| v.1.clone())
+            .sorted_by(|a, b| b.cmp(a))
+            .take(N::MAX_PROVER_SOLUTIONS);
+
+        // Compute the cumulative proof target of the prover solutions as a u128.
+        candidate_proof_targets.try_fold(0u128, |cumulative, proof_target| {
+            cumulative.checked_add(proof_target as u128).ok_or_else(|| anyhow!("Candidate coinbase target overflowed"))
+        })
+    }
+
     /// Returns a candidate set of unconfirmed solutions for inclusion in a block.
     pub fn candidate_solutions(
         &self,
@@ -44,41 +62,27 @@ impl<N: Network> MemoryPool<N> {
             return Ok(None);
         }
 
-        // Add the solutions from the memory pool that do not have collisions.
-        let mut solutions = Vec::new();
-        let mut commitments = Vec::new();
-        let mut cumulative_prover_target: u128 = 0u128;
+        // Filter the solutions by the latest proof target, ensure they are unique, and rank in descending order of proof target.
+        let candidate_solutions: Vec<_> = self
+            .unconfirmed_solutions
+            .iter()
+            .filter(|(_, (_, proof_target))| *proof_target >= latest_proof_target)
+            .sorted_by(|a, b| b.1.1.cmp(&a.1.1))
+            .map(|(_, v)| v.0.clone())
+            .unique_by(|s| s.commitment())
+            .take(N::MAX_PROVER_SOLUTIONS)
+            .collect();
 
-        for (commitment, (solution, proof_target)) in
-            self.unconfirmed_solutions.iter().sorted_by(|a, b| b.1.1.cmp(&a.1.1))
-        {
-            // Ensure the commitments are unique.
-            if commitments.contains(commitment) {
-                continue;
-            }
-            // Ensure the proof target is sufficient.
-            if *proof_target < latest_proof_target {
-                continue;
-            }
-
-            // Append the solution.
-            solutions.push(solution.clone());
-            // Append the commitment.
-            commitments.push(*commitment);
-            // Compute the cumulative prover target of the prover solutions as a u128.
-            cumulative_prover_target = cumulative_prover_target
-                .checked_add(*proof_target as u128)
-                .ok_or_else(|| anyhow!("Cumulative target overflowed"))?;
-
-            // If the maximum number of solutions has been reached, then break.
-            if solutions.len() >= N::MAX_PROVER_SOLUTIONS {
-                break;
-            }
-        }
+        // Compute the cumulative proof target of the prover solutions as a u128.
+        let cumulative_proof_target: u128 = candidate_solutions.iter().try_fold(0u128, |cumulative, solution| {
+            cumulative
+                .checked_add(solution.to_target()? as u128)
+                .ok_or_else(|| anyhow!("Cumulative proof target overflowed"))
+        })?;
 
         // Return the prover solutions if the cumulative target is greater than or equal to the coinbase target.
-        match cumulative_prover_target >= latest_coinbase_target as u128 {
-            true => Ok(Some(solutions)),
+        match cumulative_proof_target >= latest_coinbase_target as u128 {
+            true => Ok(Some(candidate_solutions)),
             false => Ok(None),
         }
     }

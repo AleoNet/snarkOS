@@ -42,6 +42,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         self.current_round
     }
 
+    /// Returns the latest block header.
+    pub fn latest_header(&self) -> Result<Header<N>> {
+        self.get_header(self.current_height)
+    }
+
     /// Returns the latest block coinbase target.
     pub fn latest_coinbase_target(&self) -> Result<u64> {
         Ok(self.get_header(self.current_height)?.coinbase_target())

@@ -22,6 +22,9 @@ version = "1"
 [dependencies.async-trait]
 version = "0.1"
 
+[dependencies.parking_lot]
+version = "0.12"
+
 [dependencies.rand]
 version = "0.8"
 default-features = false

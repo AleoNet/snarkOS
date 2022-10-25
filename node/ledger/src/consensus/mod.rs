@@ -216,6 +216,24 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         Ok(())
     }
 
+    /// Returns the candidate coinbase target of the valid unconfirmed solutions in the memory pool.
+    pub fn candidate_coinbase_target(&self) -> Result<u128> {
+        // Retrieve the latest proof target.
+        let latest_proof_target = self.latest_proof_target()?;
+        // Compute the candidate coinbase target.
+        self.memory_pool.candidate_coinbase_target(latest_proof_target)
+    }
+
+    /// Returns `true` if the coinbase target is met.
+    pub fn is_coinbase_target_met(&self) -> Result<bool> {
+        // Retrieve the latest block header.
+        let header = self.latest_header()?;
+        // Compute the candidate coinbase target.
+        let cumuluative_proof_target = self.memory_pool.candidate_coinbase_target(header.proof_target())?;
+        // Check if the coinbase target is met.
+        Ok(cumuluative_proof_target >= header.coinbase_target() as u128)
+    }
+
     /// Returns a candidate for the next block in the ledger.
     pub fn propose_next_block<R: Rng + CryptoRng>(&self, private_key: &PrivateKey<N>, rng: &mut R) -> Result<Block<N>> {
         // Retrieve the latest state root.
@@ -262,11 +280,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                 N::ANCHOR_TIME,
             )?;
 
-            // Compute the total cumulative target of the prover puzzle solutions as a u128.
-            let cumulative_prover_target: u128 = prover_solutions.iter().try_fold(0u128, |cumulative, solution| {
+            // Compute the cumulative proof target of the prover solutions as a u128.
+            let cumulative_proof_target: u128 = prover_solutions.iter().try_fold(0u128, |cumulative, solution| {
                 cumulative
                     .checked_add(solution.to_target()? as u128)
-                    .ok_or_else(|| anyhow!("Cumulative target overflowed"))
+                    .ok_or_else(|| anyhow!("Cumulative proof target overflowed"))
             })?;
 
             // Calculate the rewards for the individual provers.
@@ -282,7 +300,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     .ok_or_else(|| anyhow!("Prover reward numerator overflowed"))?;
 
                 // Compute the denominator.
-                let denominator = (cumulative_prover_target as u128)
+                let denominator = (cumulative_proof_target as u128)
                     .checked_mul(2)
                     .ok_or_else(|| anyhow!("Prover reward denominator overflowed"))?;
 

@@ -19,7 +19,7 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{spawn_task, Executor, NodeType, Status};
-use snarkos_node_ledger::Ledger;
+use snarkos_node_ledger::{Consensus, Ledger};
 use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedBlock, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
@@ -28,6 +28,7 @@ use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
 use core::time::Duration;
+use parking_lot::RwLock;
 use std::{
     net::SocketAddr,
     sync::{
@@ -37,6 +38,7 @@ use std::{
     time::SystemTime,
 };
 use time::OffsetDateTime;
+use tokio::{io::AsyncReadExt, time::timeout};
 
 /// A beacon is a full node, capable of producing blocks.
 #[derive(Clone)]
@@ -147,6 +149,20 @@ impl<N: Network> NodeInterface<N> for Beacon<N> {
     }
 }
 
+/// A helper method to check if the coinbase target has been met.
+async fn check_for_coinbase<N: Network>(consensus: Arc<RwLock<Consensus<N, ConsensusDB<N>>>>) {
+    loop {
+        // Check if the coinbase target has been met.
+        match consensus.read().is_coinbase_target_met() {
+            Ok(true) => break,
+            Ok(false) => (),
+            Err(error) => error!("Failed to check if coinbase target is met: {error}"),
+        }
+        // Sleep for one second.
+        tokio::time::sleep(Duration::from_secs(1)).await
+    }
+}
+
 impl<N: Network> Beacon<N> {
     /// Initialize a new instance of block production.
     async fn initialize_block_production(&self) {
@@ -174,9 +190,14 @@ impl<N: Network> Beacon<N> {
                 // This will ensure a block is produced at intervals of approximately `EXPECTED_BLOCK_TIME`.
                 let time_to_wait = EXPECTED_BLOCK_TIME.saturating_sub(block_generation_time);
                 if elapsed_time < time_to_wait {
-                    // Sleep until the next block should be produced.
-                    tokio::time::sleep(Duration::from_secs(time_to_wait.saturating_sub(elapsed_time))).await;
-                    continue;
+                    if let Err(error) = timeout(
+                        Duration::from_secs(time_to_wait.saturating_sub(elapsed_time)),
+                        check_for_coinbase(beacon.ledger.consensus().clone()),
+                    )
+                    .await
+                    {
+                        trace!("Check for coinbase - {error}");
+                    }
                 }
 
                 // Start a timer.

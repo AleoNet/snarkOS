@@ -157,7 +157,7 @@ impl<N: Network> Prover<N> {
                         // Set the status to `Proving`.
                         Self::status().update(Status::Proving);
 
-                        trace!("Generating a prover solution for epoch {}", epoch_challenge.epoch_number());
+                        debug!("Proving the coinbase puzzle for epoch {}", epoch_challenge.epoch_number());
 
                         // Construct a coinbase solution.
                         let prover_solution = match prover.coinbase_puzzle.prove(
@@ -182,13 +182,16 @@ impl<N: Network> Prover<N> {
                         };
 
                         // Ensure that the prover solution target is sufficient.
-                        if prover_solution_target < block.proof_target() {
-                            warn!(
-                                "Generated prover solution does not meet the target requirement. {} < {}",
-                                prover_solution_target,
-                                block.proof_target()
-                            );
-                            return;
+                        match prover_solution_target >= block.proof_target() {
+                            true => info!("Found a prover solution with target {prover_solution_target}"),
+                            false => {
+                                trace!(
+                                    "Prover solution is below the necessary proof target ({} < {})",
+                                    prover_solution_target,
+                                    block.proof_target()
+                                );
+                                return;
+                            }
                         }
 
                         // Propagate the "UnconfirmedSolution" to the network.

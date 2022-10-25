@@ -2118,6 +2118,7 @@ version = "2.0.2"
 dependencies = [
  "anyhow",
  "async-trait",
+ "parking_lot",
  "rand",
  "serde_json",
  "snarkos-account",
