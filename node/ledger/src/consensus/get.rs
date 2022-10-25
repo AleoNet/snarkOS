@@ -132,7 +132,7 @@ mod tests {
         let genesis = Block::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
 
         // Initialize a new ledger.
-        let ledger = CurrentConsensus::new(None).unwrap();
+        let ledger = CurrentConsensus::load(None, None).unwrap();
         // Retrieve the genesis block.
         let candidate = ledger.get_block(0).unwrap();
         // Ensure the genesis block matches.

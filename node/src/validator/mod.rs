@@ -23,7 +23,7 @@ use snarkos_node_ledger::Ledger;
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
 use snarkos_node_store::ConsensusDB;
-use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
+use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
 
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};
@@ -48,12 +48,13 @@ impl<N: Network> Validator<N> {
         rest_ip: Option<SocketAddr>,
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
+        genesis: Option<Block<N>>,
         dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the ledger.
-        let ledger = Ledger::load(private_key, dev)?;
+        let ledger = Ledger::load(private_key, genesis, dev)?;
         // Initialize the node router.
         let (router, router_receiver) = Router::new::<Self>(node_ip, trusted_peers).await?;
         // Initialize the REST server.

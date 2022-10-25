@@ -26,7 +26,7 @@ mod memory_pool;
 
 use snarkvm::prelude::*;
 
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{anyhow, ensure, Result};
 use colored::Colorize;
 use core::time::Duration;
 use futures::{Future, StreamExt};
@@ -48,34 +48,12 @@ pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
-    /// Initializes a new instance of the ledger with a fresh genesis block.
-    /// This is used for testing purposes only.
-    fn new_with_genesis(private_key: PrivateKey<N>, genesis: Block<N>, dev: Option<u16>) -> Result<Self> {
-        // Retrieve the genesis hash.
-        let genesis_hash = genesis.hash();
+    /// Loads an instance of the ledger.
+    pub fn load(private_key: PrivateKey<N>, genesis: Option<Block<N>>, dev: Option<u16>) -> Result<Self> {
         // Initialize consensus.
-        let consensus = match Consensus::new_with_genesis(genesis, dev) {
-            Ok(consensus) => Arc::new(RwLock::new(consensus)),
-            Err(_) => {
-                // Initialize consensus.
-                let consensus = Consensus::new(dev)?;
-                // Ensure the ledger contains the correct genesis block.
-                match consensus.contains_block_hash(&genesis_hash)? {
-                    true => Arc::new(RwLock::new(consensus)),
-                    false => bail!("Incorrect genesis block (run 'snarkos clean' and try again)"),
-                }
-            }
-        };
+        let consensus = Arc::new(RwLock::new(Consensus::load(genesis, dev)?));
         // Return the ledger.
         Self::from(consensus, private_key)
-    }
-
-    /// Opens an instance of the ledger.
-    pub fn load(private_key: PrivateKey<N>, dev: Option<u16>) -> Result<Self> {
-        // Initialize the ledger.
-        let ledger = Arc::new(RwLock::new(Consensus::load(dev)?));
-        // Return the ledger.
-        Self::from(ledger, private_key)
     }
 
     /// Initializes a new instance of the ledger.

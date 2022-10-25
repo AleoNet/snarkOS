@@ -93,41 +93,29 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
-    /// Initializes a new instance of `Consensus` with the genesis block.
-    pub fn new(dev: Option<u16>) -> Result<Self> {
-        // Load the genesis block.
-        let genesis = Block::<N>::from_bytes_le(N::genesis_bytes())?;
-        // Initialize the ledger.
-        Self::new_with_genesis(genesis, dev)
-    }
-
-    /// Initializes a new instance of `Consensus` with the given genesis block.
-    pub fn new_with_genesis(genesis: Block<N>, dev: Option<u16>) -> Result<Self> {
-        // Initialize the consensus store.
-        let store = ConsensusStore::<N, C>::open(dev)?;
-        // Initialize a new VM.
-        let vm = VM::from(store.clone())?;
-
-        // Ensure that a genesis block doesn't already exist in the block store.
-        if vm.block_store().contains_block_height(0)? {
-            bail!("Genesis block already exists in the ledger.");
-        }
-
-        // Return the consensus.
-        Self::from(vm, Some(genesis))
-    }
-
     /// Loads the consensus module from storage.
-    pub fn load(dev: Option<u16>) -> Result<Self> {
+    pub fn load(genesis: Option<Block<N>>, dev: Option<u16>) -> Result<Self> {
+        // Retrieve the genesis hash.
+        let genesis_hash = match genesis {
+            Some(ref genesis) => genesis.hash(),
+            None => Block::<N>::from_bytes_le(N::genesis_bytes())?.hash(),
+        };
+
         // Initialize the consensus store.
         let store = ConsensusStore::<N, C>::open(dev)?;
         // Initialize a new VM.
         let vm = VM::from(store.clone())?;
-        // Return the consensus.
-        Self::from(vm, None)
+        // Initialize consensus.
+        let consensus = Self::from(vm, genesis)?;
+
+        // Ensure the ledger contains the correct genesis block.
+        match consensus.contains_block_hash(&genesis_hash)? {
+            true => Ok(consensus),
+            false => bail!("Incorrect genesis block (run 'snarkos clean' and try again)"),
+        }
     }
 
-    /// Initializes the consensus module from storage, with an optional genesis block (when the storage is empty).
+    /// Initializes the consensus module from storage, with an optional genesis block.
     pub fn from(vm: VM<N, C>, genesis: Option<Block<N>>) -> Result<Self> {
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
@@ -820,8 +808,7 @@ pub(crate) mod test_helpers {
         let genesis = sample_genesis_block_with_private_key(rng, private_key);
 
         // Initialize the ledger with the genesis block and the associated private key.
-        let address = Address::try_from(&private_key).unwrap();
-        let ledger = CurrentConsensus::new_with_genesis(genesis.clone(), None).unwrap();
+        let ledger = CurrentConsensus::load(Some(genesis.clone()), None).unwrap();
         assert_eq!(0, ledger.latest_height());
         assert_eq!(genesis.hash(), ledger.latest_hash());
         assert_eq!(genesis.round(), ledger.latest_round());
@@ -1001,12 +988,18 @@ mod tests {
     }
 
     #[test]
-    fn test_new() {
-        // Load the genesis block.
-        let genesis = Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
+    fn test_load() {
+        let rng = &mut TestRng::default();
+
+        // Sample the genesis private key.
+        let private_key = crate::consensus::test_helpers::sample_genesis_private_key(rng);
+        // Initialize the store.
+        let store = ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap();
+        // Create a genesis block.
+        let genesis = Block::genesis(&VM::from(store).unwrap(), &private_key, rng).unwrap();
 
         // Initialize consensus with the genesis block.
-        let ledger = CurrentConsensus::new(None).unwrap();
+        let ledger = CurrentConsensus::load(Some(genesis.clone()), None).unwrap();
         assert_eq!(ledger.latest_hash(), genesis.hash());
         assert_eq!(ledger.latest_height(), genesis.height());
         assert_eq!(ledger.latest_round(), genesis.round());
@@ -1017,10 +1010,6 @@ mod tests {
     fn test_from() {
         // Load the genesis block.
         let genesis = Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
-        // Initialize the address.
-        let address =
-            Address::<CurrentNetwork>::from_str("aleo1q6qstg8q8shwqf5m6q5fcenuwsdqsvp4hhsgfnx5chzjm3secyzqt9mxm8")
-                .unwrap();
 
         // Initialize the VM.
         let vm = VM::from(ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap()).unwrap();
@@ -1032,7 +1021,7 @@ mod tests {
         assert_eq!(ledger.latest_block().unwrap(), genesis);
 
         // Initialize the ledger with the genesis block.
-        let ledger = CurrentConsensus::new_with_genesis(genesis.clone(), None).unwrap();
+        let ledger = CurrentConsensus::load(Some(genesis.clone()), None).unwrap();
         assert_eq!(ledger.latest_hash(), genesis.hash());
         assert_eq!(ledger.latest_height(), genesis.height());
         assert_eq!(ledger.latest_round(), genesis.round());
@@ -1041,8 +1030,10 @@ mod tests {
 
     #[test]
     fn test_state_path() {
+        // Load the genesis block.
+        let genesis = Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
         // Initialize the ledger with the genesis block.
-        let ledger = CurrentConsensus::new(None).unwrap();
+        let ledger = CurrentConsensus::load(Some(genesis), None).unwrap();
         // Retrieve the genesis block.
         let genesis = ledger.get_block(0).unwrap();
 
@@ -1122,14 +1113,14 @@ mod tests {
         // Sample the genesis private key, view key, and address.
         let private_key = crate::consensus::test_helpers::sample_genesis_private_key(rng);
         let view_key = ViewKey::try_from(private_key).unwrap();
-        let address = Address::try_from(&view_key).unwrap();
+        let _address = Address::try_from(&view_key).unwrap();
 
         // Initialize the store.
         let store = ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap();
         // Create a genesis block.
         let genesis = Block::genesis(&VM::from(store).unwrap(), &private_key, rng).unwrap();
         // Initialize the ledger.
-        let mut ledger = CurrentConsensus::new_with_genesis(genesis, None).unwrap();
+        let mut ledger = CurrentConsensus::load(Some(genesis), None).unwrap();
 
         for height in 1..6 {
             // Fetch the unspent records.

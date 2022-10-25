@@ -37,7 +37,7 @@ mod traits;
 pub use traits::*;
 
 use snarkos_node_executor::NodeType;
-use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
+use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
 
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};
@@ -60,9 +60,10 @@ impl<N: Network> Node<N> {
         rest_ip: Option<SocketAddr>,
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
+        genesis: Option<Block<N>>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Beacon(Arc::new(Beacon::new(node_ip, rest_ip, private_key, trusted_peers, dev).await?)))
+        Ok(Self::Beacon(Arc::new(Beacon::new(node_ip, rest_ip, private_key, trusted_peers, genesis, dev).await?)))
     }
 
     /// Initializes a new validator node.
@@ -71,9 +72,10 @@ impl<N: Network> Node<N> {
         rest_ip: Option<SocketAddr>,
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
+        genesis: Option<Block<N>>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Validator(Arc::new(Validator::new(node_ip, rest_ip, private_key, trusted_peers, dev).await?)))
+        Ok(Self::Validator(Arc::new(Validator::new(node_ip, rest_ip, private_key, trusted_peers, genesis, dev).await?)))
     }
 
     /// Initializes a new prover node.
