@@ -29,8 +29,9 @@
 
 ## 1. Overview
 
-__snarkOS__ is a decentralized operating system for zero-knowledge applications. It forms the backbone of [Aleo](https://aleo.org/) and
-the network verifies and stores encrypted state in a publicly-auditable manner.
+__snarkOS__ is a decentralized operating system for zero-knowledge applications.
+This code forms the backbone the [Aleo](https://aleo.org/) network,
+which verifies transactions and stores the encrypted state applications in a publicly-verifiable manner.
 
 ## 2. Build Guide
 
@@ -95,7 +96,7 @@ This will output a new Aleo account in the terminal.
 
   Private Key  APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Save Me
      View Key  AViewKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Save Me
-      Address  aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Use Me For The Next Step
+      Address  aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Use In The Next Step
 ```
 
 Next, to start a proving node, from the `snarkOS` directory, run:
@@ -214,6 +215,6 @@ cargo run --release -- clean --dev XX
 
 ## 7. License
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
-
 We welcome all contributions to `snarkOS`. Please refer to the [license](#7-license) for the terms of contributions.
+
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
