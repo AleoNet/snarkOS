@@ -56,10 +56,6 @@ pub struct Peer<N: Network> {
     pub seen_messages: Arc<RwLock<HashMap<(u16, u32), SystemTime>>>,
     /// The map of block hashes to their last seen timestamp.
     pub seen_inbound_blocks: Arc<RwLock<HashMap<N::BlockHash, SystemTime>>>,
-    /// The map of solution commitments to their last seen timestamp.
-    pub seen_inbound_solutions: Arc<RwLock<HashMap<PuzzleCommitment<N>, SystemTime>>>,
-    /// The map of transaction IDs to their last seen timestamp.
-    pub seen_inbound_transactions: Arc<RwLock<HashMap<N::TransactionID, SystemTime>>>,
     /// The map of peers to a map of block hashes to their last seen timestamp.
     pub seen_outbound_blocks: Arc<RwLock<HashMap<N::BlockHash, SystemTime>>>,
     /// The map of peers to a map of solution commitments to their last seen timestamp.
@@ -92,8 +88,6 @@ impl<N: Network> Peer<N> {
             last_seen: Arc::new(RwLock::new(Instant::now())),
             seen_messages: Default::default(),
             seen_inbound_blocks: Default::default(),
-            seen_inbound_solutions: Default::default(),
-            seen_inbound_transactions: Default::default(),
             seen_outbound_blocks: Default::default(),
             seen_outbound_solutions: Default::default(),
             seen_outbound_transactions: Default::default(),
@@ -162,16 +156,6 @@ impl<N: Network> Peer<N> {
                     .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);
                 // Clear the seen inbound blocks to only those in the last 5 seconds.
                 peer.seen_inbound_blocks
-                    .write()
-                    .await
-                    .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);
-                // Clear the seen inbound solutions to only those in the last 5 seconds.
-                peer.seen_inbound_solutions
-                    .write()
-                    .await
-                    .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);
-                // Clear the seen inbound transactions to only those in the last 5 seconds.
-                peer.seen_inbound_transactions
                     .write()
                     .await
                     .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);

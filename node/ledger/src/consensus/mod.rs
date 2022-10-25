@@ -222,13 +222,16 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let latest_state_root = self.latest_state_root();
         // Retrieve the latest block.
         let latest_block = self.latest_block()?;
+        // Retrieve the latest proof target.
+        let latest_proof_target = latest_block.proof_target();
         // Retrieve the latest coinbase target.
         let latest_coinbase_target = latest_block.coinbase_target();
 
         // Select the transactions from the memory pool.
         let transactions = self.memory_pool.candidate_transactions(self).into_iter().collect::<Transactions<N>>();
         // Select the prover solutions from the memory pool.
-        let prover_solutions = self.memory_pool.candidate_solutions(self.latest_height(), latest_coinbase_target)?;
+        let prover_solutions =
+            self.memory_pool.candidate_solutions(self.latest_height(), latest_proof_target, latest_coinbase_target)?;
 
         // Construct the coinbase proof.
         let (coinbase_proof, coinbase_accumulator_point) = match &prover_solutions {

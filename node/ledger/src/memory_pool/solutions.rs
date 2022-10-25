@@ -36,6 +36,7 @@ impl<N: Network> MemoryPool<N> {
     pub fn candidate_solutions(
         &self,
         latest_height: u32,
+        latest_proof_target: u64,
         latest_coinbase_target: u64,
     ) -> Result<Option<Vec<ProverSolution<N>>>> {
         // If the latest height is greater than or equal to the anchor height at year 10, then return 'None'.
@@ -48,11 +49,15 @@ impl<N: Network> MemoryPool<N> {
         let mut commitments = Vec::new();
         let mut cumulative_prover_target: u128 = 0u128;
 
-        for (commitment, (solution, target)) in
-            self.unconfirmed_solutions.iter().sorted_by(|a, b| b.1.1.cmp(&a.1.1)).take(N::MAX_PROVER_SOLUTIONS)
+        for (commitment, (solution, proof_target)) in
+            self.unconfirmed_solutions.iter().sorted_by(|a, b| b.1.1.cmp(&a.1.1))
         {
             // Ensure the commitments are unique.
             if commitments.contains(commitment) {
+                continue;
+            }
+            // Ensure the proof target is sufficient.
+            if *proof_target < latest_proof_target {
                 continue;
             }
 
@@ -62,8 +67,13 @@ impl<N: Network> MemoryPool<N> {
             commitments.push(*commitment);
             // Compute the cumulative prover target of the prover solutions as a u128.
             cumulative_prover_target = cumulative_prover_target
-                .checked_add(*target as u128)
+                .checked_add(*proof_target as u128)
                 .ok_or_else(|| anyhow!("Cumulative target overflowed"))?;
+
+            // If the maximum number of solutions has been reached, then break.
+            if solutions.len() >= N::MAX_PROVER_SOLUTIONS {
+                break;
+            }
         }
 
         // Return the prover solutions if the cumulative target is greater than or equal to the coinbase target.

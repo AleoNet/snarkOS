@@ -50,9 +50,9 @@ pub trait Inbound<N: Network>: Executor {
             Message::Pong(message) => Self::pong(message, peer_ip, router).await,
             Message::PuzzleRequest(..) => self.puzzle_request(peer_ip, router).await,
             Message::PuzzleResponse(message) => self.puzzle_response(message, peer_ip).await,
-            Message::UnconfirmedBlock(message) => Self::unconfirmed_block(message, peer_ip, peer, router).await,
-            Message::UnconfirmedSolution(message) => Self::unconfirmed_solution(message, peer_ip, peer, router).await,
-            Message::UnconfirmedTransaction(message) => Self::unconfirmed_transaction(message, peer_ip, peer, router).await
+            Message::UnconfirmedBlock(message) => self.unconfirmed_block(message, peer_ip, peer, router).await,
+            Message::UnconfirmedSolution(message) => self.unconfirmed_solution(message, peer_ip, router).await,
+            Message::UnconfirmedTransaction(message) => self.unconfirmed_transaction(message, peer_ip, router).await
         }
     }
 
@@ -218,6 +218,7 @@ pub trait Inbound<N: Network>: Executor {
     }
 
     async fn unconfirmed_block(
+        &self,
         message: UnconfirmedBlock<N>,
         peer_ip: SocketAddr,
         peer: &Peer<N>,
@@ -289,58 +290,34 @@ pub trait Inbound<N: Network>: Executor {
     }
 
     async fn unconfirmed_solution(
+        &self,
         message: UnconfirmedSolution<N>,
         peer_ip: SocketAddr,
-        peer: &Peer<N>,
         router: &Router<N>,
     ) -> bool {
-        // Drop the peer, if they have sent more than 500 unconfirmed solutions in the last 5 seconds.
-        let frequency = peer
-            .seen_inbound_solutions
-            .read()
-            .await
-            .values()
-            .filter(|t| t.elapsed().unwrap_or_default().as_secs() <= 5)
-            .count();
-        if frequency >= 500 {
-            warn!("Dropping {peer_ip} for spamming unconfirmed solutions (frequency = {frequency})");
-            // Send a `PeerRestricted` message.
-            if let Err(error) = router.process(RouterRequest::PeerRestricted(peer_ip)).await {
-                warn!("[PeerRestricted] {error}");
-            }
-            return false;
-        }
-
         // Prepare the full message.
         let full_message = Message::UnconfirmedSolution(message.clone());
 
         // Perform the deferred non-blocking deserialization of the solution.
         match message.solution.deserialize().await {
             Ok(solution) => {
-                // Acquire the lock on the seen inbound solutions.
-                let mut seen_inbound_solutions = peer.seen_inbound_solutions.write().await;
+                // Update the timestamp for the unconfirmed solution.
+                let seen_before = router
+                    .seen_unconfirmed_solutions
+                    .write()
+                    .await
+                    .insert(solution.commitment(), SystemTime::now())
+                    .is_some();
+                // Determine whether to propagate the solution.
+                let should_propagate = !seen_before;
 
-                // Retrieve the last seen timestamp of the received solution.
-                let last_seen = seen_inbound_solutions.entry(solution.commitment()).or_insert(SystemTime::UNIX_EPOCH);
-                let is_router_ready =
-                    last_seen.elapsed().unwrap_or_default().as_secs() > Router::<N>::RADIO_SILENCE_IN_SECS;
-
-                // Update the timestamp for the received solution.
-                seen_inbound_solutions.insert(solution.commitment(), SystemTime::now());
-
-                // Drop the lock on the seen inbound solutions.
-                drop(seen_inbound_solutions);
-
-                // Ensure the node is not peering.
-                let is_node_ready = !Self::status().is_peering();
-
-                if !is_router_ready || !is_node_ready {
-                    trace!("Skipping 'UnconfirmedSolution {:?}' from {peer_ip}", solution.commitment());
+                if !should_propagate {
+                    trace!("Skipping 'UnconfirmedSolution {}' from {peer_ip}", solution.commitment().0);
                 } else {
                     // Propagate the `UnconfirmedSolution`.
                     let request = RouterRequest::MessagePropagate(full_message, vec![peer_ip]);
                     if let Err(error) = router.process(request).await {
-                        warn!("[UnconfirmedSolution] {}", error);
+                        warn!("[UnconfirmedSolution] {error}");
                     }
                 }
             }
@@ -350,58 +327,34 @@ pub trait Inbound<N: Network>: Executor {
     }
 
     async fn unconfirmed_transaction(
+        &self,
         message: UnconfirmedTransaction<N>,
         peer_ip: SocketAddr,
-        peer: &Peer<N>,
         router: &Router<N>,
     ) -> bool {
-        // Drop the peer, if they have sent more than 500 unconfirmed transactions in the last 5 seconds.
-        let frequency = peer
-            .seen_inbound_transactions
-            .read()
-            .await
-            .values()
-            .filter(|t| t.elapsed().unwrap_or_default().as_secs() <= 5)
-            .count();
-        if frequency >= 500 {
-            warn!("Dropping {peer_ip} for spamming unconfirmed transactions (frequency = {frequency})");
-            // Send a `PeerRestricted` message.
-            if let Err(error) = router.process(RouterRequest::PeerRestricted(peer_ip)).await {
-                warn!("[PeerRestricted] {error}");
-            }
-            return false;
-        }
-
         // Prepare the full message.
         let full_message = Message::UnconfirmedTransaction(message.clone());
 
         // Perform the deferred non-blocking deserialization of the transaction.
         match message.transaction.deserialize().await {
             Ok(transaction) => {
-                // Acquire the lock on the seen inbound transactions.
-                let mut seen_inbound_transactions = peer.seen_inbound_transactions.write().await;
+                // Update the timestamp for the unconfirmed transaction.
+                let seen_before = router
+                    .seen_unconfirmed_transactions
+                    .write()
+                    .await
+                    .insert(transaction.id(), SystemTime::now())
+                    .is_some();
+                // Determine whether to propagate the transaction.
+                let should_propagate = !seen_before;
 
-                // Retrieve the last seen timestamp of the received transaction.
-                let last_seen = seen_inbound_transactions.entry(transaction.id()).or_insert(SystemTime::UNIX_EPOCH);
-                let is_router_ready =
-                    last_seen.elapsed().unwrap_or_default().as_secs() > Router::<N>::RADIO_SILENCE_IN_SECS;
-
-                // Update the timestamp for the received transaction.
-                seen_inbound_transactions.insert(transaction.id(), SystemTime::now());
-
-                // Drop the lock on the seen inbound transactions.
-                drop(seen_inbound_transactions);
-
-                // Ensure the node is not peering.
-                let is_node_ready = !Self::status().is_peering();
-
-                if !is_router_ready || !is_node_ready {
+                if !should_propagate {
                     trace!("Skipping 'UnconfirmedTransaction {}' from {peer_ip}", transaction.id());
                 } else {
                     // Propagate the `UnconfirmedTransaction`.
                     let request = RouterRequest::MessagePropagate(full_message, vec![peer_ip]);
                     if let Err(error) = router.process(request).await {
-                        warn!("[UnconfirmedTransaction] {}", error);
+                        warn!("[UnconfirmedTransaction] {error}");
                     }
                 }
             }

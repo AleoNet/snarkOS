@@ -95,7 +95,7 @@ pub trait Outbound {
                 peer.seen_outbound_solutions.write().await.insert(solution_commitment, SystemTime::now());
                 // Report the unconfirmed block height.
                 if is_ready_to_send {
-                    trace!("Preparing to send 'UnconfirmedSolution {:?}' to {peer_ip}", solution_commitment);
+                    trace!("Preparing to send 'UnconfirmedSolution {}' to {peer_ip}", solution_commitment.0);
                 }
 
                 // Perform non-blocking serialization of the solution.

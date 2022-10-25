@@ -2128,6 +2128,7 @@ dependencies = [
  "snarkos-node-router",
  "snarkos-node-store",
  "snarkvm",
+ "time",
  "tokio",
  "tracing",
 ]

@@ -35,7 +35,7 @@ pub use peer::*;
 
 use snarkos_node_executor::{spawn_task, Executor};
 use snarkos_node_messages::*;
-use snarkvm::prelude::Network;
+use snarkvm::prelude::{Field, Network, PuzzleCommitment};
 
 use anyhow::Result;
 use indexmap::{IndexMap, IndexSet};
@@ -103,6 +103,12 @@ pub struct Router<N: Network> {
     seen_inbound_connections: Arc<RwLock<IndexMap<SocketAddr, ((u16, u32), SystemTime)>>>,
     /// The map of peers to the timestamp of their last outbound connection request.
     seen_outbound_connections: Arc<RwLock<IndexMap<SocketAddr, SystemTime>>>,
+    /// The map of block hashes to their last seen timestamp.
+    pub seen_unconfirmed_blocks: Arc<RwLock<IndexMap<Field<N>, SystemTime>>>,
+    /// The map of solution commitments to their last seen timestamp.
+    pub seen_unconfirmed_solutions: Arc<RwLock<IndexMap<PuzzleCommitment<N>, SystemTime>>>,
+    /// The map of transaction IDs to their last seen timestamp.
+    pub seen_unconfirmed_transactions: Arc<RwLock<IndexMap<N::TransactionID, SystemTime>>>,
 }
 
 #[rustfmt::skip]
@@ -153,6 +159,9 @@ impl<N: Network> Router<N> {
             restricted_peers: Default::default(),
             seen_inbound_connections: Default::default(),
             seen_outbound_connections: Default::default(),
+            seen_unconfirmed_blocks: Default::default(),
+            seen_unconfirmed_solutions: Default::default(),
+            seen_unconfirmed_transactions: Default::default(),
         };
 
         // Initialize the listener.

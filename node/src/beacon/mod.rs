@@ -20,20 +20,23 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{spawn_task, Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedBlock};
+use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedBlock, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
+use core::time::Duration;
 use std::{
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, Ordering},
         Arc,
     },
+    time::SystemTime,
 };
+use time::OffsetDateTime;
 
 /// A beacon is a full node, capable of producing blocks.
 #[derive(Clone)]
@@ -109,7 +112,6 @@ impl<N: Network> Executor for Beacon<N> {
 
         // Shut down the ledger.
         trace!("Proceeding to shut down the ledger...");
-        // self.state.ledger().shut_down().await;
         self.shutdown.store(true, Ordering::Relaxed);
 
         // Flush the tasks.
@@ -150,73 +152,109 @@ impl<N: Network> Beacon<N> {
     async fn initialize_block_production(&self) {
         let beacon = self.clone();
         spawn_task!(Self, {
+            // Expected time per block.
+            const EXPECTED_BLOCK_TIME: u64 = 15; // 15 seconds per block
+            // The time it took to generate the previous block.
+            let mut block_generation_time = 0;
+
+            // Produce blocks.
             loop {
-                // Produce a transaction if the mempool is empty.
-                if beacon.ledger.consensus().read().memory_pool().num_unconfirmed_transactions() == 0 {
-                    // Create a transfer transaction.
-                    let transaction = match beacon.ledger.create_transfer(beacon.address(), 1) {
-                        Ok(transaction) => transaction,
-                        Err(error) => {
-                            error!("Failed to create a transfer transaction for the next block: {error}");
-                            continue;
-                        }
-                    };
-                    // Add the transaction to the memory pool.
-                    if let Err(error) = beacon.ledger.consensus().write().add_unconfirmed_transaction(transaction) {
-                        error!("Failed to add a transfer transaction to the memory pool: {error}");
-                        continue;
-                    }
-                }
-
-                // Propose the next block.
-                let next_block = match beacon
-                    .ledger
-                    .consensus()
-                    .read()
-                    .propose_next_block(&beacon.private_key(), &mut rand::thread_rng())
-                {
-                    Ok(next_block) => next_block,
-                    Err(error) => {
-                        error!("Failed to propose the next block: {error}");
-                        continue;
-                    }
-                };
-                let next_block_height = next_block.height();
-                let next_block_hash = next_block.hash();
-
-                // Advance to the next block.
-                match beacon.ledger.consensus().write().add_next_block(&next_block) {
-                    Ok(()) => trace!(
-                        "Block {next_block_height}: {}",
-                        serde_json::to_string_pretty(&next_block).expect("Failed to print next block")
-                    ),
-                    Err(error) => {
-                        error!("Failed to advance to the next block: {error}");
-                        continue;
-                    }
-                }
-
-                // Serialize the block ahead of time to not do it for each peer.
-                let serialized_block = match Data::Object(next_block).serialize().await {
-                    Ok(serialized_block) => serialized_block,
-                    Err(error) => {
-                        error!("Failed to serialize the next block for propagation: {error}");
-                        continue;
+                // Fetch the current timestamp.
+                let current_timestamp = OffsetDateTime::now_utc().unix_timestamp();
+                // Compute the elapsed time.
+                let elapsed_time = match beacon.ledger.consensus().read().latest_timestamp() {
+                    Ok(latest_timestamp) => current_timestamp.saturating_sub(latest_timestamp) as u64,
+                    Err(_) => {
+                        warn!("Failed to fetch the latest block timestamp");
+                        0
                     }
                 };
 
-                // Prepare the block to be sent to all peers.
-                let message = Message::<N>::UnconfirmedBlock(UnconfirmedBlock {
-                    block_height: next_block_height,
-                    block_hash: next_block_hash,
-                    block: Data::Buffer(serialized_block),
-                });
+                // Do not produce a block if the elapsed time has not exceeded `EXPECTED_BLOCK_TIME - block_generation_time`.
+                // This will ensure a block is produced at intervals of approximately `EXPECTED_BLOCK_TIME`.
+                let time_to_wait = EXPECTED_BLOCK_TIME.saturating_sub(block_generation_time);
+                if elapsed_time < time_to_wait {
+                    // Sleep until the next block should be produced.
+                    tokio::time::sleep(Duration::from_secs(time_to_wait.saturating_sub(elapsed_time))).await;
+                    continue;
+                }
 
-                // Propagate the block to all peers.
-                if let Err(error) = beacon.router.process(RouterRequest::MessagePropagate(message, vec![])).await {
-                    trace!("Failed to broadcast the next block: {error}");
+                // Start a timer.
+                let timer = std::time::Instant::now();
+                // Produce the next block and propagate it to all peers.
+                if let Err(error) = beacon.produce_next_block().await {
+                    error!("{error}");
+                    continue;
+                }
+                // Update the block generation time.
+                block_generation_time = timer.elapsed().as_secs();
+
+                // If the Ctrl-C handler registered the signal, stop the node once the current block is complete.
+                if beacon.shutdown.load(Ordering::Relaxed) {
+                    info!("Shutting down block production");
+                    break;
                 }
             }
         });
+    }
+
+    /// Produces the next block and propagates it to all peers.
+    async fn produce_next_block(&self) -> Result<()> {
+        // Produce a transaction if the mempool is empty.
+        if self.ledger.consensus().read().memory_pool().num_unconfirmed_transactions() == 0 {
+            // Create a transfer transaction.
+            let transaction = match self.ledger.create_transfer(self.address(), 1) {
+                Ok(transaction) => transaction,
+                Err(error) => {
+                    bail!("Failed to create a transfer transaction for the next block: {error}")
+                }
+            };
+            // Add the transaction to the memory pool.
+            if let Err(error) = self.ledger.consensus().write().add_unconfirmed_transaction(transaction) {
+                bail!("Failed to add a transfer transaction to the memory pool: {error}")
+            }
+        }
+
+        // Propose the next block.
+        let next_block =
+            match self.ledger.consensus().read().propose_next_block(&self.private_key(), &mut rand::thread_rng()) {
+                Ok(next_block) => next_block,
+                Err(error) => {
+                    bail!("Failed to propose the next block: {error}")
+                }
+            };
+        let next_block_height = next_block.height();
+        let next_block_hash = next_block.hash();
+
+        // Advance to the next block.
+        match self.ledger.consensus().write().add_next_block(&next_block) {
+            Ok(()) => trace!(
+                "Block {next_block_height}: {}",
+                serde_json::to_string_pretty(&next_block).expect("Failed to print next block")
+            ),
+            Err(error) => {
+                bail!("Failed to advance to the next block: {error}")
+            }
+        }
+
+        // Serialize the block ahead of time to not do it for each peer.
+        let serialized_block = match Data::Object(next_block).serialize().await {
+            Ok(serialized_block) => serialized_block,
+            Err(error) => bail!("Failed to serialize the next block for propagation: {error}"),
+        };
+
+        // Prepare the block to be sent to all peers.
+        let message = Message::<N>::UnconfirmedBlock(UnconfirmedBlock {
+            block_height: next_block_height,
+            block_hash: next_block_hash,
+            block: Data::Buffer(serialized_block),
+        });
+
+        // Propagate the block to all peers.
+        if let Err(error) = self.router.process(RouterRequest::MessagePropagate(message, vec![])).await {
+            trace!("Failed to broadcast the next block: {error}");
+        }
+
+        Ok(())
     }
 }

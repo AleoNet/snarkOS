@@ -157,7 +157,7 @@ impl Start {
                 };
                 *node = Some(account.private_key().to_string());
                 println!(
-                    "⚠️  ATTENTION - No private key was provided, sampling a one-time account for this instance:\n\n{account}\n"
+                    "⚠️  Attention - Sampling a *one-time* account for this instance, please save this securely:\n\n{account}\n"
                 );
                 Ok(())
             };

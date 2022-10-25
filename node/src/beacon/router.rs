@@ -57,6 +57,50 @@ impl<N: Network> Inbound<N> for Beacon<N> {
 
         true
     }
+
+    /// Adds the unconfirmed solution to the memory pool, and propagates the solution to all peers.
+    async fn unconfirmed_solution(
+        &self,
+        message: UnconfirmedSolution<N>,
+        peer_ip: SocketAddr,
+        router: &Router<N>,
+    ) -> bool {
+        // Prepare the full message.
+        let full_message = Message::UnconfirmedSolution(message.clone());
+
+        // Perform the deferred non-blocking deserialization of the solution.
+        match message.solution.deserialize().await {
+            Ok(solution) => {
+                // Update the timestamp for the unconfirmed solution.
+                let seen_before = router
+                    .seen_unconfirmed_solutions
+                    .write()
+                    .await
+                    .insert(solution.commitment(), SystemTime::now())
+                    .is_some();
+                // Determine whether to propagate the solution.
+                let should_propagate = !seen_before;
+
+                if !should_propagate {
+                    trace!("Skipping 'UnconfirmedSolution {}' from {peer_ip}", solution.commitment().0);
+                } else {
+                    // Add the unconfirmed solution to the memory pool.
+                    if let Err(error) = self.ledger.consensus().write().add_unconfirmed_solution(&solution) {
+                        trace!("[UnconfirmedSolution] {error}");
+                        return true; // Maintain the connection.
+                    }
+
+                    // Propagate the `UnconfirmedSolution`.
+                    let request = RouterRequest::MessagePropagate(full_message, vec![peer_ip]);
+                    if let Err(error) = router.process(request).await {
+                        warn!("[UnconfirmedSolution] {error}");
+                    }
+                }
+            }
+            Err(error) => warn!("[UnconfirmedSolution] {error}"),
+        }
+        true
+    }
 }
 
 #[async_trait]
