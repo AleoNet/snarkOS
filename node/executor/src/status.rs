@@ -28,10 +28,10 @@ use std::{
 pub enum Status {
     /// The node is ready to handle requests.
     Ready = 0,
-    /// The node is producing a coinbase proof.
-    Proving,
     /// The node is connecting to the minimum number of required peers.
     Peering,
+    /// The node is producing a coinbase proof.
+    Proving,
     /// The node is syncing blocks with a connected peer.
     Syncing,
     /// The node is terminating and shutting down.
@@ -62,8 +62,8 @@ impl RawStatus {
     pub fn get(&self) -> Status {
         match self.0.load(Ordering::SeqCst) {
             0 => Status::Ready,
-            1 => Status::Proving,
-            2 => Status::Peering,
+            1 => Status::Peering,
+            2 => Status::Proving,
             3 => Status::Syncing,
             4 => Status::ShuttingDown,
             _ => unreachable!("Invalid status code"),
@@ -75,14 +75,14 @@ impl RawStatus {
         self.get() == Status::Ready
     }
 
-    /// Returns `true` if the node is currently proving.
-    pub fn is_proving(&self) -> bool {
-        self.get() == Status::Proving
-    }
-
     /// Returns `true` if the node is currently peering.
     pub fn is_peering(&self) -> bool {
         self.get() == Status::Peering
+    }
+
+    /// Returns `true` if the node is currently proving.
+    pub fn is_proving(&self) -> bool {
+        self.get() == Status::Proving
     }
 
     /// Returns `true` if the node is currently syncing.
