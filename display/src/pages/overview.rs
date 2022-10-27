@@ -14,6 +14,9 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use snarkos_node::Node;
+use snarkvm::prelude::Network;
+
 use tui::{
     backend::Backend,
     layout::{Constraint, Direction, Layout, Rect},
@@ -26,7 +29,7 @@ use tui::{
 pub(crate) struct Overview;
 
 impl Overview {
-    pub(crate) fn draw<B: Backend>(&self, f: &mut Frame<B>, area: Rect) {
+    pub(crate) fn draw<B: Backend, N: Network>(&self, f: &mut Frame<B>, area: Rect, _node: &Node<N>) {
         // Initialize the layout of the page.
         let chunks = Layout::default()
             .direction(Direction::Vertical)

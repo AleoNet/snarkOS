@@ -64,7 +64,7 @@ pub struct Display<N: Network> {
     logs: Logs,
 }
 
-impl<'a, N: Network> Display<N> {
+impl<N: Network> Display<N> {
     /// Initializes a new display.
     pub fn start(node: Node<N>, verbosity: u8, nodisplay: bool) -> Result<()> {
         // Initialize the logger.
@@ -230,7 +230,7 @@ impl<N: Network> Display<N> {
 
         // Initialize the page.
         match self.tabs.index {
-            0 => Overview.draw(f, chunks[1]),
+            0 => Overview.draw(f, chunks[1], &self.node),
             1 => self.logs.draw(f, chunks[1]),
             _ => unreachable!(),
         };

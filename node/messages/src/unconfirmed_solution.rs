@@ -31,7 +31,7 @@ impl<N: Network> MessageTrait for UnconfirmedSolution<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(self.solution.serialize_blocking_into(writer)?)
+        self.solution.serialize_blocking_into(writer)
     }
 
     /// Deserializes the given buffer into a message.

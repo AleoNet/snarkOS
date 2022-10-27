@@ -68,7 +68,7 @@ impl<N: Network> Prover<N> {
         // Initialize coinbase proving.
         node.initialize_coinbase_proving().await;
         // Initialize the signal handler.
-        let _ = node.handle_signals();
+        node.handle_signals();
         // Return the node.
         Ok(node)
     }
@@ -157,7 +157,11 @@ impl<N: Network> Prover<N> {
                         // Set the status to `Proving`.
                         Self::status().update(Status::Proving);
 
-                        debug!("Proving the coinbase puzzle for epoch {}", epoch_challenge.epoch_number());
+                        debug!(
+                            "Proving the coinbase puzzle (Epoch {}, Block {})",
+                            epoch_challenge.epoch_number(),
+                            block.height()
+                        );
 
                         // Construct a coinbase solution.
                         let prover_solution = match prover.coinbase_puzzle.prove(

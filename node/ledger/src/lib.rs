@@ -35,6 +35,8 @@ use parking_lot::RwLock;
 use std::{net::IpAddr, sync::Arc};
 use tokio::task;
 
+type RecordMap<N> = IndexMap<Field<N>, Record<N, Plaintext<N>>>;
+
 #[derive(Clone)]
 pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
     /// The consensus module.
@@ -87,7 +89,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     }
 
     /// Returns the unspent records.
-    pub fn find_unspent_records(&self) -> Result<IndexMap<Field<N>, Record<N, Plaintext<N>>>> {
+    pub fn find_unspent_records(&self) -> Result<RecordMap<N>> {
         Ok(self
             .consensus
             .read()
@@ -97,7 +99,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     }
 
     /// Returns the spent records.
-    pub fn find_spent_records(&self) -> Result<IndexMap<Field<N>, Record<N, Plaintext<N>>>> {
+    pub fn find_spent_records(&self) -> Result<RecordMap<N>> {
         Ok(self
             .consensus
             .read()
@@ -158,6 +160,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     }
 
     /// Syncs the ledger with the network.
+    #[allow(dead_code)]
     pub(crate) async fn initial_sync_with_network(self: &Arc<Self>, leader_ip: IpAddr) -> Result<()> {
         /// The number of concurrent requests with the network.
         const CONCURRENT_REQUESTS: usize = 100;

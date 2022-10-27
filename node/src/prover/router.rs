@@ -26,10 +26,17 @@ impl<N: Network> Inbound<N> for Prover<N> {
         let epoch_challenge = message.epoch_challenge;
         match message.block.deserialize().await {
             Ok(block) => {
+                // Retrieve the epoch number.
+                let epoch_number = epoch_challenge.epoch_number();
+                // Retrieve the block height.
+                let block_height = block.height();
+
                 // Save the latest epoch challenge in the prover.
                 self.latest_epoch_challenge.write().await.replace(epoch_challenge);
                 // Save the latest block in the prover.
                 self.latest_block.write().await.replace(block);
+
+                trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
                 true
             }
             Err(error) => {

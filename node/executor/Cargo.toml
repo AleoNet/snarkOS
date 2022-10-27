@@ -33,13 +33,18 @@ version = "1"
 
 [dependencies.serde]
 version = "1"
+features = [ "derive" ]
 
 [dependencies.tokio]
-version = "1.21"
-features = ["rt"]
+version = "1"
+features = ["rt", "signal", "sync", "time"]
 
 [dependencies.tracing]
 version = "0.1"
 
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
+
+[dev-dependencies.tokio]
+version = "1"
+features = ["macros", "rt-multi-thread"]

@@ -61,6 +61,9 @@ pub type RouterSender<N> = mpsc::Sender<RouterRequest<N>>;
 /// Shorthand for the child half of the `Router` channel.
 pub type RouterReceiver<N> = mpsc::Receiver<RouterRequest<N>>;
 
+/// The first-seen port number, number of attempts, and timestamp of the last inbound connection request.
+type ConnectionStats = ((u16, u32), SystemTime);
+
 /// An enum of requests that the `Router` processes.
 pub enum RouterRequest<N: Network> {
     /// Heartbeat
@@ -100,7 +103,7 @@ pub struct Router<N: Network> {
     /// The set of restricted peer IPs.
     restricted_peers: Arc<RwLock<IndexMap<SocketAddr, Instant>>>,
     /// The map of peers to their first-seen port number, number of attempts, and timestamp of the last inbound connection request.
-    seen_inbound_connections: Arc<RwLock<IndexMap<SocketAddr, ((u16, u32), SystemTime)>>>,
+    seen_inbound_connections: Arc<RwLock<IndexMap<SocketAddr, ConnectionStats>>>,
     /// The map of peers to the timestamp of their last outbound connection request.
     seen_outbound_connections: Arc<RwLock<IndexMap<SocketAddr, SystemTime>>>,
     /// The map of block hashes to their last seen timestamp.
@@ -115,8 +118,6 @@ pub struct Router<N: Network> {
 impl<N: Network> Router<N> {
     /// The maximum duration in seconds permitted for establishing a connection with a node, before dropping the connection.
     const CONNECTION_TIMEOUT_IN_MILLIS: u64 = 210; // 3.5 minutes
-    /// The duration in seconds after which to expire a failure from a peer.
-    const FAILURE_EXPIRY_TIME_IN_SECS: u64 = 7200; // 2 hours
     /// The duration in seconds to sleep in between heartbeat executions.
     const HEARTBEAT_IN_SECS: u64 = 9; // 9 seconds
     /// The maximum number of candidate peers permitted to be stored in the node.

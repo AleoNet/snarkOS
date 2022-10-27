@@ -104,7 +104,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Initialize the consensus store.
         let store = ConsensusStore::<N, C>::open(dev)?;
         // Initialize a new VM.
-        let vm = VM::from(store.clone())?;
+        let vm = VM::from(store)?;
         // Initialize consensus.
         let consensus = Self::from(vm, genesis)?;
 
@@ -150,7 +150,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         // Retrieve the latest height.
-        let latest_height = *consensus.blocks.heights().max().ok_or(anyhow!("Failed to load blocks in consensus"))?;
+        let latest_height =
+            *consensus.blocks.heights().max().ok_or_else(|| anyhow!("Failed to load blocks in consensus"))?;
         // Fetch the latest block.
         let block = consensus
             .get_block(latest_height)
@@ -211,7 +212,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         // Insert the solution to the memory pool.
-        self.memory_pool.add_unconfirmed_solution(&solution)?;
+        self.memory_pool.add_unconfirmed_solution(solution)?;
 
         Ok(())
     }
@@ -595,6 +596,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             // Clear the memory pool of the unconfirmed solutions if a new epoch has started.
             if block.epoch_number() > self.latest_epoch_number() {
                 consensus.memory_pool.clear_unconfirmed_solutions();
+            } else if let Some(coinbase_solution) = block.coinbase_proof() {
+                // Clear the memory pool of unconfirmed solutions that are now invalid.
+                coinbase_solution.partial_solutions().iter().map(|s| s.commitment()).for_each(|commitment| {
+                    consensus.memory_pool.remove_unconfirmed_solution(&commitment);
+                });
             }
 
             *self = Self {

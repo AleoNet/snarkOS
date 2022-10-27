@@ -40,7 +40,7 @@ impl<N: Network> MemoryPool<N> {
             .iter()
             .filter(|(_, (_, proof_target))| *proof_target >= latest_proof_target)
             .unique_by(|(k, _)| *k)
-            .map(|(_, v)| v.1.clone())
+            .map(|(_, v)| v.1)
             .sorted_by(|a, b| b.cmp(a))
             .take(N::MAX_PROVER_SOLUTIONS);
 
@@ -68,7 +68,7 @@ impl<N: Network> MemoryPool<N> {
             .iter()
             .filter(|(_, (_, proof_target))| *proof_target >= latest_proof_target)
             .sorted_by(|a, b| b.1.1.cmp(&a.1.1))
-            .map(|(_, v)| v.0.clone())
+            .map(|(_, v)| v.0)
             .unique_by(|s| s.commitment())
             .take(N::MAX_PROVER_SOLUTIONS)
             .collect();
@@ -94,7 +94,7 @@ impl<N: Network> MemoryPool<N> {
             true => {
                 // Compute the proof target.
                 let proof_target = solution.to_target()?;
-                self.unconfirmed_solutions.insert(solution.commitment(), (solution.clone(), proof_target));
+                self.unconfirmed_solutions.insert(solution.commitment(), (*solution, proof_target));
                 trace!(
                     "✉️  Added a prover solution with target '{proof_target}' ('{}') to the memory pool",
                     solution.commitment().0

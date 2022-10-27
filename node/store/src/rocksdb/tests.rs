@@ -33,9 +33,9 @@ pub(crate) fn temp_dir() -> std::path::PathBuf {
     tempfile::tempdir().expect("Failed to open temporary directory").into_path()
 }
 
-pub(crate) fn temp_file() -> std::path::PathBuf {
-    tempfile::NamedTempFile::new().expect("Failed to open temporary file").path().to_owned()
-}
+// pub(crate) fn temp_file() -> std::path::PathBuf {
+//     tempfile::NamedTempFile::new().expect("Failed to open temporary file").path().to_owned()
+// }
 
 #[test]
 #[serial]
@@ -186,5 +186,5 @@ fn test_scalar_mul() {
     }
 
     let elapsed = timer.elapsed().as_secs();
-    println!("{}", format!(" {ITERATIONS} Scalar Muls : {} s", elapsed));
+    println!(" {ITERATIONS} Scalar Muls : {elapsed} s");
 }

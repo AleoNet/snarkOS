@@ -38,7 +38,7 @@ pub trait Handshake: Executor {
 
         // TODO (howardwu): Make this step more efficient (by not deserializing every time).
         // Retrieve the genesis block header.
-        let genesis_header = Block::<N>::from_bytes_le(N::genesis_bytes())?.header().clone();
+        let genesis_header = *Block::<N>::from_bytes_le(N::genesis_bytes())?.header();
 
         // Send a challenge request to the peer.
         let message = Message::<N>::ChallengeRequest(ChallengeRequest {
@@ -130,7 +130,7 @@ pub trait Handshake: Executor {
                         }
                         // Send the challenge response.
                         let message = Message::ChallengeResponse(ChallengeResponse {
-                            header: Data::Object(genesis_header.clone()),
+                            header: Data::Object(genesis_header),
                         });
                         trace!("Sending '{}-B' to {peer_ip}", message.name());
                         outbound_socket.send(message).await?;

@@ -20,4 +20,4 @@ pub(crate) use logs::Logs;
 mod overview;
 pub(crate) use overview::Overview;
 
-pub(crate) const PAGES: [&'static str; 2] = [" Overview ", " Logs "];
+pub(crate) const PAGES: [&str; 2] = [" Overview ", " Logs "];

@@ -38,7 +38,7 @@ use std::{
     time::SystemTime,
 };
 use time::OffsetDateTime;
-use tokio::{io::AsyncReadExt, time::timeout};
+use tokio::time::timeout;
 
 /// A beacon is a full node, capable of producing blocks.
 #[derive(Clone)]
@@ -85,7 +85,7 @@ impl<N: Network> Beacon<N> {
         node.initialize_block_production().await;
 
         // Initialize the signal handler.
-        let _ = node.handle_signals();
+        node.handle_signals();
         // Return the node.
         Ok(node)
     }
@@ -238,7 +238,7 @@ impl<N: Network> Beacon<N> {
 
         // Propose the next block.
         let next_block =
-            match self.ledger.consensus().read().propose_next_block(&self.private_key(), &mut rand::thread_rng()) {
+            match self.ledger.consensus().read().propose_next_block(self.private_key(), &mut rand::thread_rng()) {
                 Ok(next_block) => next_block,
                 Err(error) => {
                     bail!("Failed to propose the next block: {error}")

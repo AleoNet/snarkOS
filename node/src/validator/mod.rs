@@ -67,7 +67,7 @@ impl<N: Network> Validator<N> {
         // Initialize the router handler.
         router.initialize_handler(node.clone(), router_receiver).await;
         // Initialize the signal handler.
-        let _ = node.handle_signals();
+        node.handle_signals();
         // Return the node.
         Ok(node)
     }

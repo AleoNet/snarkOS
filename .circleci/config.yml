@@ -407,8 +407,8 @@ workflows:
             parameters:
               workspace_member: [
                 account,
-                cli,
-                display
+#                cli,
+#                display
                 node
               ]
 

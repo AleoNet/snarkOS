@@ -246,7 +246,7 @@ pub trait Inbound<N: Network>: Executor {
 
         // Retrieve the last seen timestamp of the received block.
         let last_seen = seen_inbound_blocks.entry(message.block_hash).or_insert(SystemTime::UNIX_EPOCH);
-        let is_router_ready = last_seen.elapsed().unwrap_or_default().as_secs() > Router::<N>::RADIO_SILENCE_IN_SECS;
+        let _is_router_ready = last_seen.elapsed().unwrap_or_default().as_secs() > Router::<N>::RADIO_SILENCE_IN_SECS;
 
         // Update the timestamp for the received block.
         seen_inbound_blocks.insert(message.block_hash, SystemTime::now());
