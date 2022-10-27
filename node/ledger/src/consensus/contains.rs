@@ -15,13 +15,17 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
+use crate::PuzzleCommitment;
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Returns `true` if the given state root exists.
-    pub fn contains_state_root(&self, _state_root: &Field<N>) -> bool {
-        todo!()
-        // state_root == self.latest_state_root()
-        //     || self.headers.values().any(|h| Header::previous_state_root(&h) == state_root)
+    pub fn contains_state_root(&self, state_root: Field<N>) -> Result<bool> {
+        self.blocks.contains_state_root(state_root)
+    }
+
+    /// Returns `true` if the given block height exists.
+    pub fn contains_block_height(&self, height: u32) -> Result<bool> {
+        self.blocks.contains_block_height(height)
     }
 
     /// Returns `true` if the given block hash exists.
@@ -29,9 +33,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         self.blocks.contains_block_hash(block_hash)
     }
 
-    /// Returns `true` if the given block height exists.
-    pub fn contains_block_height(&self, height: u32) -> Result<bool> {
-        self.blocks.contains_block_height(height)
+    /// Returns `true` if the given puzzle commitment exists.
+    pub fn contains_puzzle_commitment(&self, puzzle_commitment: &PuzzleCommitment<N>) -> Result<bool> {
+        self.blocks.contains_puzzle_commitment(puzzle_commitment)
     }
 
     /// Returns `true` if the given program ID exists.

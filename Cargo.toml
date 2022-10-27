@@ -40,7 +40,7 @@ path = "snarkos/main.rs"
 [workspace.dependencies.snarkvm]
 # path = "../snarkvm"
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "70c0428"
+rev = "3c8a9be"
 features = ["circuit", "console", "parallel"]
 
 [dependencies.anyhow]

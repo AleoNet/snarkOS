@@ -30,7 +30,7 @@ pub enum Status {
     Ready = 0,
     /// The node is connecting to the minimum number of required peers.
     Peering,
-    /// The node is producing a coinbase proof.
+    /// The node is proving the coinbase puzzle.
     Proving,
     /// The node is syncing blocks with a connected peer.
     Syncing,

@@ -97,12 +97,12 @@ impl<N: Network> MemoryPool<N> {
                 self.unconfirmed_solutions.insert(solution.commitment(), (*solution, proof_target));
                 trace!(
                     "✉️  Added a prover solution with target '{proof_target}' ('{}') to the memory pool",
-                    solution.commitment().0
+                    solution.commitment()
                 );
                 Ok(true)
             }
             false => {
-                trace!("Prover solution '{}' already exists in memory pool", solution.commitment().0);
+                trace!("Prover solution '{}' already exists in memory pool", solution.commitment());
                 Ok(false)
             }
         }

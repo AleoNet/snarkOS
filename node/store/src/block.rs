@@ -42,7 +42,9 @@ pub struct BlockDB<N: Network> {
     /// The transaction store.
     transaction_store: TransactionStore<N, TransactionDB<N>>,
     /// The coinbase solution map.
-    coinbase_proof_map: DataMap<N::BlockHash, Option<CoinbaseSolution<N>>>,
+    coinbase_solution_map: DataMap<N::BlockHash, Option<CoinbaseSolution<N>>>,
+    /// The coinbase puzzle commitment map.
+    coinbase_puzzle_commitment_map: DataMap<PuzzleCommitment<N>, N::BlockHash>,
     /// The signature map.
     signature_map: DataMap<N::BlockHash, Signature<N>>,
 }
@@ -58,7 +60,8 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
     type ReverseTransactionsMap = DataMap<N::TransactionID, N::BlockHash>;
     type TransactionStorage = TransactionDB<N>;
     type TransitionStorage = TransitionDB<N>;
-    type CoinbaseProofMap = DataMap<N::BlockHash, Option<CoinbaseSolution<N>>>;
+    type CoinbaseSolutionMap = DataMap<N::BlockHash, Option<CoinbaseSolution<N>>>;
+    type CoinbasePuzzleCommitmentMap = DataMap<PuzzleCommitment<N>, N::BlockHash>;
     type SignatureMap = DataMap<N::BlockHash, Signature<N>>;
 
     /// Initializes the block storage.
@@ -77,7 +80,8 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
             transactions_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockTransactionsMap)?,
             reverse_transactions_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockReverseTransactionsMap)?,
             transaction_store,
-            coinbase_proof_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockCoinbaseProofMap)?,
+            coinbase_solution_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockCoinbaseSolutionMap)?,
+            coinbase_puzzle_commitment_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockCoinbasePuzzleCommitmentMap)?,
             signature_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockSignatureMap)?,
         })
     }
@@ -122,9 +126,14 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
         &self.transaction_store
     }
 
-    /// Returns the coinbase proof map.
-    fn coinbase_proof_map(&self) -> &Self::CoinbaseProofMap {
-        &self.coinbase_proof_map
+    /// Returns the coinbase solution map.
+    fn coinbase_solution_map(&self) -> &Self::CoinbaseSolutionMap {
+        &self.coinbase_solution_map
+    }
+
+    /// Returns the coinbase puzzle commitment map.
+    fn coinbase_puzzle_commitment_map(&self) -> &Self::CoinbasePuzzleCommitmentMap {
+        &self.coinbase_puzzle_commitment_map
     }
 
     /// Returns the signature map.

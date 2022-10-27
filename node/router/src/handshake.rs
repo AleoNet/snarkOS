@@ -129,9 +129,8 @@ pub trait Handshake: Executor {
                             }
                         }
                         // Send the challenge response.
-                        let message = Message::ChallengeResponse(ChallengeResponse {
-                            header: Data::Object(genesis_header),
-                        });
+                        let message =
+                            Message::ChallengeResponse(ChallengeResponse { header: Data::Object(genesis_header) });
                         trace!("Sending '{}-B' to {peer_ip}", message.name());
                         outbound_socket.send(message).await?;
 

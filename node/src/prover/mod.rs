@@ -65,8 +65,8 @@ impl<N: Network> Prover<N> {
         router.initialize_handler(node.clone(), router_receiver).await;
         // Initialize the heartbeat.
         node.initialize_heartbeat().await;
-        // Initialize coinbase proving.
-        node.initialize_coinbase_proving().await;
+        // Initialize the coinbase puzzle.
+        node.initialize_coinbase_puzzle().await;
         // Initialize the signal handler.
         node.handle_signals();
         // Return the node.
@@ -133,8 +133,8 @@ impl<N: Network> Prover<N> {
         });
     }
 
-    /// Initialize a new instance of coinbase proving.
-    async fn initialize_coinbase_proving(&self) {
+    /// Initialize a new instance of the coinbase puzzle.
+    async fn initialize_coinbase_puzzle(&self) {
         let prover = self.clone();
         spawn_task!(Self, {
             loop {
@@ -150,7 +150,7 @@ impl<N: Network> Prover<N> {
                 // Read the latest block.
                 let latest_block = prover.latest_block.read().await.clone();
 
-                // If the latest epoch challenge and latest block exists, then generate a coinbase proof.
+                // If the latest epoch challenge and latest block exists, then generate a prover solution.
                 if let (Some(epoch_challenge), Some(block)) = (latest_epoch_challenge, latest_block) {
                     let prover = prover.clone();
                     spawn_task!(Self, {

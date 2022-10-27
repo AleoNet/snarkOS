@@ -17,6 +17,11 @@
 use super::*;
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
+    /// Returns the state root that contains the given `block height`.
+    pub fn get_state_root(&self, block_height: u32) -> Result<Option<Field<N>>> {
+        self.blocks.get_state_root(block_height)
+    }
+
     /// Returns the block for the given block height.
     pub fn get_block(&self, height: u32) -> Result<Block<N>> {
         // Retrieve the block hash.
@@ -92,15 +97,15 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
     }
 
-    /// Returns the block coinbase proof for the given block height.
-    pub fn get_coinbase_proof(&self, height: u32) -> Result<Option<CoinbaseSolution<N>>> {
+    /// Returns the block coinbase solution for the given block height.
+    pub fn get_coinbase(&self, height: u32) -> Result<Option<CoinbaseSolution<N>>> {
         // Retrieve the block hash.
         let block_hash = match self.blocks.get_block_hash(height)? {
             Some(block_hash) => block_hash,
             None => bail!("Block {height} does not exist in storage"),
         };
-        // Retrieve the block coinbase proof.
-        self.blocks.get_block_coinbase_proof(&block_hash)
+        // Retrieve the block coinbase solution.
+        self.blocks.get_block_coinbase(&block_hash)
     }
 
     /// Returns the block signature for the given block height.

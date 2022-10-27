@@ -15,14 +15,20 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
+use crate::PuzzleCommitment;
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
-    /* Transaction */
-
-    /// Returns an iterator over the transaction IDs, for all transactions in `self`.
-    pub fn transaction_ids(&self) -> impl '_ + Iterator<Item = Cow<'_, N::TransactionID>> {
-        self.transactions.transaction_ids()
+    /// Returns an iterator over the state roots, for all blocks in `self`.
+    pub fn state_roots(&self) -> impl '_ + Iterator<Item = Cow<'_, Field<N>>> {
+        self.blocks.state_roots()
     }
+
+    /// Returns an iterator over the puzzle commitments, for all blocks in `self`.
+    pub fn puzzle_commitments(&self) -> impl '_ + Iterator<Item = Cow<'_, PuzzleCommitment<N>>> {
+        self.blocks.puzzle_commitments()
+    }
+
+    /* Transaction */
 
     /// Returns an iterator over the program IDs, for all transactions in `self`.
     pub fn program_ids(&self) -> impl '_ + Iterator<Item = Cow<'_, ProgramID<N>>> {
@@ -32,6 +38,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Returns an iterator over the programs, for all transactions in `self`.
     pub fn programs(&self) -> impl '_ + Iterator<Item = Cow<'_, Program<N>>> {
         self.transactions.programs()
+    }
+
+    /// Returns an iterator over the transaction IDs, for all transactions in `self`.
+    pub fn transaction_ids(&self) -> impl '_ + Iterator<Item = Cow<'_, N::TransactionID>> {
+        self.transactions.transaction_ids()
     }
 
     /* Transition */

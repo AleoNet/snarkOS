@@ -208,7 +208,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         // Ensure that the prover solution is valid for the given epoch.
         if !solution.verify(self.coinbase_puzzle.coinbase_verifying_key()?, &epoch_challenge, proof_target)? {
-            bail!("Invalid prover solution '{}' for the current epoch.", solution.commitment().0);
+            bail!("Invalid prover solution '{}' for the current epoch.", solution.commitment());
         }
 
         // Insert the solution to the memory pool.
@@ -252,14 +252,15 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let prover_solutions =
             self.memory_pool.candidate_solutions(self.latest_height(), latest_proof_target, latest_coinbase_target)?;
 
-        // Construct the coinbase proof.
-        let (coinbase_proof, coinbase_accumulator_point) = match &prover_solutions {
+        // Construct the coinbase solution.
+        let (coinbase, coinbase_accumulator_point) = match &prover_solutions {
             Some(prover_solutions) => {
                 let epoch_challenge = self.latest_epoch_challenge()?;
-                let coinbase_proof = self.coinbase_puzzle.accumulate_unchecked(&epoch_challenge, prover_solutions)?;
-                let coinbase_accumulator_point = coinbase_proof.to_accumulator_point()?;
+                let coinbase_solution =
+                    self.coinbase_puzzle.accumulate_unchecked(&epoch_challenge, prover_solutions)?;
+                let coinbase_accumulator_point = coinbase_solution.to_accumulator_point()?;
 
-                (Some(coinbase_proof), coinbase_accumulator_point)
+                (Some(coinbase_solution), coinbase_accumulator_point)
             }
             None => (None, Field::<N>::zero()),
         };
@@ -270,7 +271,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let next_round = latest_block.round().saturating_add(1);
 
         // TODO (raychu86): Pay the provers. Currently we do not pay the provers with the `credits.aleo` program
-        //  and instead, will track prover leaderboards via the `coinbase_proof` in each block.
+        //  and instead, will track prover leaderboards via the `coinbase_solution` in each block.
         if let Some(prover_solutions) = prover_solutions {
             // Calculate the coinbase reward.
             let coinbase_reward = coinbase_reward(
@@ -326,15 +327,28 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Construct the next proof target.
         let next_proof_target = proof_target(next_coinbase_target);
 
+        // Construct the next coinbase timestamp.
+        let next_coinbase_timestamp = match coinbase {
+            Some(_) => next_timestamp,
+            None => latest_block.last_coinbase_timestamp(),
+        };
+
         // Construct the metadata.
-        let metadata =
-            Metadata::new(N::ID, next_round, next_height, next_coinbase_target, next_proof_target, next_timestamp)?;
+        let metadata = Metadata::new(
+            N::ID,
+            next_round,
+            next_height,
+            next_coinbase_target,
+            next_proof_target,
+            next_coinbase_timestamp,
+            next_timestamp,
+        )?;
 
         // Construct the header.
         let header = Header::from(*latest_state_root, transactions.to_root()?, coinbase_accumulator_point, metadata)?;
 
         // Construct the new block.
-        Block::new(private_key, latest_block.hash(), header, transactions, coinbase_proof, rng)
+        Block::new(private_key, latest_block.hash(), header, transactions, coinbase, rng)
     }
 
     /// Checks the given block is valid next block.
@@ -517,29 +531,43 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         /* Coinbase Proof */
 
-        // Ensure the coinbase proof is valid, if it exists.
-        if let Some(coinbase_proof) = block.coinbase_proof() {
-            // Ensure coinbase proofs are not accepted after the anchor block height at year 10.
+        // Ensure the coinbase solution is valid, if it exists.
+        if let Some(coinbase) = block.coinbase() {
+            // Ensure coinbase solutions are not accepted after the anchor block height at year 10.
             if block.height() > anchor_block_height(N::ANCHOR_TIME, 10) {
                 bail!("Coinbase proofs are no longer accepted after the anchor block height at year 10.");
             }
             // Ensure the coinbase accumulator point matches in the block header.
-            if block.header().coinbase_accumulator_point() != coinbase_proof.to_accumulator_point()? {
-                bail!("Coinbase accumulator point does not match the coinbase proof.");
+            if block.header().coinbase_accumulator_point() != coinbase.to_accumulator_point()? {
+                bail!("Coinbase accumulator point does not match the coinbase solution.");
             }
-            // Ensure the coinbase proof is valid.
+            // Ensure the puzzle commitments are new.
+            for puzzle_commitment in coinbase.puzzle_commitments() {
+                if self.contains_puzzle_commitment(&puzzle_commitment)? {
+                    bail!("Puzzle commitment {puzzle_commitment} already exists in the ledger");
+                }
+            }
+            // Ensure the last coinbase timestamp matches the *next block timestamp*.
+            if block.last_coinbase_timestamp() != block.timestamp() {
+                bail!("The last coinbase timestamp does not match the next block timestamp.");
+            }
+            // Ensure the coinbase solution is valid.
             if !self.coinbase_puzzle.verify(
-                coinbase_proof,
+                coinbase,
                 &self.latest_epoch_challenge()?,
                 self.latest_coinbase_target()?,
                 self.latest_proof_target()?,
             )? {
-                bail!("Invalid coinbase proof: {:?}", coinbase_proof);
+                bail!("Invalid coinbase solution: {:?}", coinbase);
             }
         } else {
             // Ensure that the block header does not contain a coinbase accumulator point.
             if block.header().coinbase_accumulator_point() != Field::<N>::zero() {
-                bail!("Coinbase accumulator point should be zero as there is no coinbase proof in the block.");
+                bail!("Coinbase accumulator point should be zero as there is no coinbase solution in the block.");
+            }
+            // Ensure the last coinbase timestamp matches the *latest coinbase timestamp*.
+            if block.height() > 0 && block.last_coinbase_timestamp() != self.latest_coinbase_timestamp()? {
+                bail!("The last coinbase timestamp does not match the latest coinbase timestamp.");
             }
         }
 
@@ -596,7 +624,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             // Clear the memory pool of the unconfirmed solutions if a new epoch has started.
             if block.epoch_number() > self.latest_epoch_number() {
                 consensus.memory_pool.clear_unconfirmed_solutions();
-            } else if let Some(coinbase_solution) = block.coinbase_proof() {
+            } else if let Some(coinbase_solution) = block.coinbase() {
                 // Clear the memory pool of unconfirmed solutions that are now invalid.
                 coinbase_solution.partial_solutions().iter().map(|s| s.commitment()).for_each(|commitment| {
                     consensus.memory_pool.remove_unconfirmed_solution(&commitment);
@@ -1235,8 +1263,8 @@ mod tests {
 
         // Ensure that the ledger can't create a block that satisfies the coinbase target.
         let proposed_block = ledger.propose_next_block(&private_key, rng).unwrap();
-        // Ensure the block does not contain a coinbase proof.
-        assert!(proposed_block.coinbase_proof().is_none());
+        // Ensure the block does not contain a coinbase solution.
+        assert!(proposed_block.coinbase().is_none());
 
         // Check that the ledger won't generate a block for a cumulative target that does not meet the requirements.
         let mut cumulative_target = 0u128;
@@ -1258,7 +1286,7 @@ mod tests {
 
         // Ensure that the ledger can create a block that satisfies the coinbase target.
         let proposed_block = ledger.propose_next_block(&private_key, rng).unwrap();
-        // Ensure the block contains a coinbase proof.
-        assert!(proposed_block.coinbase_proof().is_some());
+        // Ensure the block contains a coinbase solution.
+        assert!(proposed_block.coinbase().is_some());
     }
 }

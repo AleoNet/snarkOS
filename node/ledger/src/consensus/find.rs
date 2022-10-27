@@ -16,12 +16,26 @@
 
 use super::*;
 
+use crate::PuzzleCommitment;
 use std::borrow::Cow;
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
+    /// Returns the block height that contains the given `state root`.
+    pub fn find_block_height_from_state_root(&self, state_root: Field<N>) -> Result<Option<u32>> {
+        self.blocks.find_block_height_from_state_root(state_root)
+    }
+
     /// Returns the block hash that contains the given `transaction ID`.
     pub fn find_block_hash(&self, transaction_id: &N::TransactionID) -> Result<Option<N::BlockHash>> {
         self.blocks.find_block_hash(transaction_id)
+    }
+
+    /// Returns the block hash that contains the given `puzzle commitment`.
+    pub fn find_block_hash_from_puzzle_commitment(
+        &self,
+        puzzle_commitment: &PuzzleCommitment<N>,
+    ) -> Result<Option<N::BlockHash>> {
+        self.blocks.find_block_hash_from_puzzle_commitment(puzzle_commitment)
     }
 
     /// Returns the transaction ID that contains the given `program ID`.

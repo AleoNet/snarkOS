@@ -312,7 +312,7 @@ pub trait Inbound<N: Network>: Executor {
                 let should_propagate = !seen_before;
 
                 if !should_propagate {
-                    trace!("Skipping 'UnconfirmedSolution {}' from {peer_ip}", solution.commitment().0);
+                    trace!("Skipping 'UnconfirmedSolution {}' from {peer_ip}", solution.commitment());
                 } else {
                     // Propagate the `UnconfirmedSolution`.
                     let request = RouterRequest::MessagePropagate(full_message, vec![peer_ip]);

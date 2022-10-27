@@ -73,7 +73,7 @@ pub trait Outbound {
                 is_ready_to_send
             }
             Message::UnconfirmedSolution(ref mut message) => {
-                let solution_commitment = if let Data::Object(solution) = &message.solution {
+                let puzzle_commitment = if let Data::Object(solution) = &message.solution {
                     solution.commitment()
                 } else {
                     panic!("Logic error: the solution shouldn't have been serialized yet.");
@@ -84,7 +84,7 @@ pub trait Outbound {
                     .seen_outbound_solutions
                     .write()
                     .await
-                    .entry(solution_commitment)
+                    .entry(puzzle_commitment)
                     .or_insert(SystemTime::UNIX_EPOCH)
                     .elapsed()
                     .unwrap()
@@ -92,10 +92,10 @@ pub trait Outbound {
                 let is_ready_to_send = last_seen > Router::<N>::RADIO_SILENCE_IN_SECS;
 
                 // Update the timestamp for the peer and sent solution.
-                peer.seen_outbound_solutions.write().await.insert(solution_commitment, SystemTime::now());
+                peer.seen_outbound_solutions.write().await.insert(puzzle_commitment, SystemTime::now());
                 // Report the unconfirmed block height.
                 if is_ready_to_send {
-                    trace!("Preparing to send 'UnconfirmedSolution {}' to {peer_ip}", solution_commitment.0);
+                    trace!("Preparing to send 'UnconfirmedSolution {puzzle_commitment}' to {peer_ip}");
                 }
 
                 // Perform non-blocking serialization of the solution.

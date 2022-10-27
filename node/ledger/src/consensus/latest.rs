@@ -42,31 +42,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         self.current_round
     }
 
-    /// Returns the latest block header.
-    pub fn latest_header(&self) -> Result<Header<N>> {
-        self.get_header(self.current_height)
-    }
-
-    /// Returns the latest block coinbase target.
-    pub fn latest_coinbase_target(&self) -> Result<u64> {
-        Ok(self.get_header(self.current_height)?.coinbase_target())
-    }
-
-    /// Returns the latest block proof target.
-    pub fn latest_proof_target(&self) -> Result<u64> {
-        Ok(self.get_header(self.current_height)?.proof_target())
-    }
-
-    /// Returns the latest block timestamp.
-    pub fn latest_timestamp(&self) -> Result<i64> {
-        Ok(self.get_header(self.current_height)?.timestamp())
-    }
-
-    /// Returns the latest block transactions.
-    pub fn latest_transactions(&self) -> Result<Transactions<N>> {
-        self.get_transactions(self.current_height)
-    }
-
     /// Returns the latest epoch number.
     pub fn latest_epoch_number(&self) -> u32 {
         self.current_height / N::NUM_BLOCKS_PER_EPOCH
@@ -74,9 +49,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
     /// Returns the latest epoch challenge.
     pub fn latest_epoch_challenge(&self) -> Result<EpochChallenge<N>> {
-        // Get the latest epoch number.
-        let latest_epoch_number = self.latest_epoch_number();
-
         // Get the epoch's starting height (multiple of `NUM_BLOCKS_PER_EPOCH`).
         let epoch_starting_height = self.current_height - self.current_height % N::NUM_BLOCKS_PER_EPOCH;
         ensure!(epoch_starting_height % N::NUM_BLOCKS_PER_EPOCH == 0, "Invalid epoch starting height");
@@ -84,6 +56,36 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Fetch the epoch block hash, defined as the 'previous block hash' from the starting block height.
         let epoch_block_hash = self.get_previous_hash(epoch_starting_height)?;
 
-        EpochChallenge::new(latest_epoch_number, epoch_block_hash, N::COINBASE_PUZZLE_DEGREE)
+        EpochChallenge::new(self.latest_epoch_number(), epoch_block_hash, N::COINBASE_PUZZLE_DEGREE)
+    }
+
+    /// Returns the latest block header.
+    pub fn latest_header(&self) -> Result<Header<N>> {
+        self.get_header(self.current_height)
+    }
+
+    /// Returns the latest block coinbase target.
+    pub fn latest_coinbase_target(&self) -> Result<u64> {
+        Ok(self.latest_header()?.coinbase_target())
+    }
+
+    /// Returns the latest block proof target.
+    pub fn latest_proof_target(&self) -> Result<u64> {
+        Ok(self.latest_header()?.proof_target())
+    }
+
+    /// Returns the latest coinbase timestamp.
+    pub fn latest_coinbase_timestamp(&self) -> Result<i64> {
+        Ok(self.latest_header()?.last_coinbase_timestamp())
+    }
+
+    /// Returns the latest block timestamp.
+    pub fn latest_timestamp(&self) -> Result<i64> {
+        Ok(self.latest_header()?.timestamp())
+    }
+
+    /// Returns the latest block transactions.
+    pub fn latest_transactions(&self) -> Result<Transactions<N>> {
+        self.get_transactions(self.current_height)
     }
 }
