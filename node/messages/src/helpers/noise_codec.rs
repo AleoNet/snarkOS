@@ -270,3 +270,67 @@ impl Decoder for NoiseCodec {
         Ok(msg)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use crate::Pong;
+    use snow::{params::NoiseParams, Builder};
+
+    fn handshake_xx() -> (NoiseCodec, NoiseCodec) {
+        let params: NoiseParams = "Noise_XX_25519_ChaChaPoly_BLAKE2s".parse().unwrap();
+
+        let initiator_builder = Builder::new(params.clone());
+        let initiator_kp = initiator_builder.generate_keypair().unwrap();
+        let initiator = initiator_builder.local_private_key(&initiator_kp.private).build_initiator().unwrap();
+
+        let responder_builder = Builder::new(params);
+        let responder_kp = responder_builder.generate_keypair().unwrap();
+        let responder = responder_builder.local_private_key(&responder_kp.private).build_responder().unwrap();
+
+        let mut initiator_codec = NoiseCodec::new(NoiseState::Handshake(Box::new(initiator)));
+        let mut responder_codec = NoiseCodec::new(NoiseState::Handshake(Box::new(responder)));
+
+        let mut ciphertext = BytesMut::new();
+
+        // -> e
+        assert!(initiator_codec.encode(MessageOrBytes::Bytes(Bytes::new()), &mut ciphertext).is_ok());
+        assert!(
+            matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(), MessageOrBytes::Bytes(bytes) if bytes.is_empty())
+        );
+
+        // <- e, ee, s, es
+        assert!(responder_codec.encode(MessageOrBytes::Bytes(Bytes::new()), &mut ciphertext).is_ok());
+        assert!(
+            matches!(initiator_codec.decode(&mut ciphertext).unwrap().unwrap(), MessageOrBytes::Bytes(bytes) if bytes.is_empty())
+        );
+
+        // -> s, se
+        assert!(initiator_codec.encode(MessageOrBytes::Bytes(Bytes::new()), &mut ciphertext).is_ok());
+        assert!(
+            matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(), MessageOrBytes::Bytes(bytes) if bytes.is_empty())
+        );
+
+        initiator_codec.noise_state = initiator_codec.noise_state.into_post_handshake_state();
+        responder_codec.noise_state = responder_codec.noise_state.into_post_handshake_state();
+
+        (initiator_codec, responder_codec)
+    }
+
+    #[test]
+    fn pong_roundtrip() {
+        let (mut initiator_codec, mut responder_codec) = handshake_xx();
+        let mut ciphertext = BytesMut::new();
+
+        let expected_pong = Pong { is_fork: Some(true) };
+
+        assert!(
+            initiator_codec
+                .encode(MessageOrBytes::SnarkOSMessage(SnarkOSMessage::Pong(expected_pong.clone())), &mut ciphertext)
+                .is_ok()
+        );
+        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
+            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::Pong(pong)) if pong == expected_pong));
+    }
+}
