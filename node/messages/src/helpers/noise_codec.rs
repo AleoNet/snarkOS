@@ -51,7 +51,7 @@ impl TryFrom<u8> for MessageType {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub enum MessageOrBytes {
     Bytes(Bytes),
     SnarkOSMessage(SnarkOSMessage<CurrentNetwork>),
@@ -275,7 +275,19 @@ impl Decoder for NoiseCodec {
 mod tests {
     use super::*;
 
-    use crate::Pong;
+    use crate::{
+        BlockRequest,
+        ChallengeRequest,
+        Disconnect,
+        DisconnectReason,
+        NodeType,
+        PeerRequest,
+        PeerResponse,
+        Ping,
+        Pong,
+        PuzzleRequest,
+        Status,
+    };
     use snow::{params::NoiseParams, Builder};
 
     fn handshake_xx() -> (NoiseCodec, NoiseCodec) {
@@ -318,6 +330,141 @@ mod tests {
         (initiator_codec, responder_codec)
     }
 
+    //  BlockRequest
+    //  BlockResponse
+    //  ChallengeRequest
+    //  ChallengeResponse
+    //  Disconnect
+    //  PeerRequest
+    //  PeerResponse
+    //  Ping
+    //  Pong
+    //  PuzzleRequest
+    //  PuzzleResponse
+    //  UnconfirmedBlock
+    //  UnconfirmedSolution
+    //  UnconfirmedTransaction
+
+    #[test]
+    fn block_request_roundtrip() {
+        let (mut initiator_codec, mut responder_codec) = handshake_xx();
+        let mut ciphertext = BytesMut::new();
+
+        let expected_block_request = BlockRequest { start_block_height: 0, end_block_height: 100 };
+
+        assert!(
+            initiator_codec
+                .encode(
+                    MessageOrBytes::SnarkOSMessage(SnarkOSMessage::BlockRequest(expected_block_request.clone())),
+                    &mut ciphertext
+                )
+                .is_ok()
+        );
+        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
+            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::BlockRequest(block_request)) if block_request == expected_block_request));
+    }
+
+    #[test]
+    fn challenge_request_roundtrip() {
+        let (mut initiator_codec, mut responder_codec) = handshake_xx();
+        let mut ciphertext = BytesMut::new();
+
+        let expected_challenge_request = ChallengeRequest {
+            version: 0,
+            fork_depth: 0,
+            node_type: NodeType::Client,
+            status: Status::Ready,
+            listener_port: 0,
+        };
+
+        assert!(
+            initiator_codec
+                .encode(
+                    MessageOrBytes::SnarkOSMessage(SnarkOSMessage::ChallengeRequest(
+                        expected_challenge_request.clone()
+                    )),
+                    &mut ciphertext
+                )
+                .is_ok()
+        );
+        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
+            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::ChallengeRequest(challenge_request)) if challenge_request == expected_challenge_request));
+    }
+
+    #[test]
+    fn disconnect_roundtrip() {
+        let (mut initiator_codec, mut responder_codec) = handshake_xx();
+        let mut ciphertext = BytesMut::new();
+
+        let expected_disconnect = Disconnect { reason: DisconnectReason::NoReasonGiven };
+
+        assert!(
+            initiator_codec
+                .encode(
+                    MessageOrBytes::SnarkOSMessage(SnarkOSMessage::Disconnect(expected_disconnect.clone())),
+                    &mut ciphertext
+                )
+                .is_ok()
+        );
+        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
+            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::Disconnect(disconnect)) if disconnect == expected_disconnect));
+    }
+
+    #[test]
+    fn peer_request_roundtrip() {
+        let (mut initiator_codec, mut responder_codec) = handshake_xx();
+        let mut ciphertext = BytesMut::new();
+
+        let expected_peer_request = PeerRequest;
+
+        assert!(
+            initiator_codec
+                .encode(
+                    MessageOrBytes::SnarkOSMessage(SnarkOSMessage::PeerRequest(expected_peer_request.clone())),
+                    &mut ciphertext
+                )
+                .is_ok()
+        );
+        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
+            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::PeerRequest(peer_request)) if peer_request == expected_peer_request));
+    }
+
+    #[test]
+    fn peer_response_roundtrip() {
+        let (mut initiator_codec, mut responder_codec) = handshake_xx();
+        let mut ciphertext = BytesMut::new();
+
+        let expected_peer_response = PeerResponse { peers: vec![] };
+
+        assert!(
+            initiator_codec
+                .encode(
+                    MessageOrBytes::SnarkOSMessage(SnarkOSMessage::PeerResponse(expected_peer_response.clone())),
+                    &mut ciphertext
+                )
+                .is_ok()
+        );
+        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
+            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::PeerResponse(peer_response)) if peer_response == expected_peer_response));
+    }
+
+    #[test]
+    fn ping_roundtrip() {
+        let (mut initiator_codec, mut responder_codec) = handshake_xx();
+        let mut ciphertext = BytesMut::new();
+
+        let expected_ping = Ping { version: 0, fork_depth: 0, node_type: NodeType::Client, status: Status::Ready };
+
+        assert!(
+            initiator_codec
+                .encode(MessageOrBytes::SnarkOSMessage(SnarkOSMessage::Ping(expected_ping.clone())), &mut ciphertext)
+                .is_ok()
+        );
+
+        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
+              MessageOrBytes::SnarkOSMessage(SnarkOSMessage::Ping(ping)) if ping == expected_ping));
+    }
+
     #[test]
     fn pong_roundtrip() {
         let (mut initiator_codec, mut responder_codec) = handshake_xx();
@@ -332,5 +479,24 @@ mod tests {
         );
         assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
             MessageOrBytes::SnarkOSMessage(SnarkOSMessage::Pong(pong)) if pong == expected_pong));
+    }
+
+    #[test]
+    fn puzzle_request_roundtrip() {
+        let (mut initiator_codec, mut responder_codec) = handshake_xx();
+        let mut ciphertext = BytesMut::new();
+
+        let expected_puzzle_request = PuzzleRequest;
+
+        assert!(
+            initiator_codec
+                .encode(
+                    MessageOrBytes::SnarkOSMessage(SnarkOSMessage::PuzzleRequest(expected_puzzle_request.clone())),
+                    &mut ciphertext
+                )
+                .is_ok()
+        );
+        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
+            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::PuzzleRequest(puzzle_request)) if puzzle_request == expected_puzzle_request));
     }
 }
