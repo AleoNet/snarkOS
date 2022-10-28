@@ -39,11 +39,7 @@ impl<N: Network, E: Environment> Node<N, E> {
         let ledger = match cli.dev {
             None => {
                 // Initialize the ledger.
-                let ledger = Ledger::<N>::load(*account.private_key(), cli.dev)?;
-                // Sync the ledger with the network.
-                ledger.initial_sync_with_network(cli.beacon_addr.ip()).await?;
-
-                ledger
+                Ledger::<N>::load(*account.private_key(), cli.dev)?
             }
             Some(_) => {
                 // TODO (raychu86): Formalize this process via network messages.
@@ -56,24 +52,33 @@ impl<N: Network, E: Environment> Node<N, E> {
             }
         };
 
+        Ok(Self {
+            ledger,
+            _phantom: PhantomData,
+        })
+    }
+
+    pub async fn start(&self, cli: &CLI) -> Result<()> {
+        if cli.dev.is_none() {
+            // Sync the ledger with the network.
+            self.ledger.initial_sync_with_network(cli.beacon_addr.ip()).await?;
+        }
+
         // Initialize the listener.
         let listener = tokio::net::TcpListener::bind(cli.node).await?;
 
         // Handle incoming connections.
-        let _handle_listener = handle_listener::<N>(listener, ledger.clone());
+        let _handle_listener = handle_listener::<N>(listener, self.ledger.clone());
 
         // Connect to the leader node and listen for new blocks.
         let leader_addr = cli.beacon_addr;
         trace!("Connecting to '{}'...", leader_addr);
-        let _leader_conn_task = connect_to_leader::<N>(leader_addr, ledger.clone());
+        let _leader_conn_task = connect_to_leader::<N>(leader_addr, self.ledger.clone());
 
         // Send pings to all peers every 10 seconds.
-        let _pings = send_pings::<N>(ledger.clone());
+        let _pings = send_pings::<N>(self.ledger.clone());
 
-        Ok(Self {
-            ledger: ledger.clone(),
-            _phantom: PhantomData,
-        })
+        Ok(())
     }
 
     /// Sends a connection request to the given IP address.

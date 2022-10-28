@@ -22,6 +22,8 @@ use anyhow::{bail, ensure, Result};
 use clap::Parser;
 use colored::*;
 use std::{fmt::Write, net::SocketAddr, str::FromStr};
+#[cfg(unix)]
+use tokio::signal::unix::{signal, SignalKind};
 
 #[derive(Debug, Parser)]
 #[clap(name = "snarkos", author = "The Aleo Team <hello@aleo.org>")]
@@ -147,6 +149,9 @@ impl CLI {
         // Initialize signal handling and maintain ownership of the node - to keep it in scope.
         Self::handle_signals(node.clone());
 
+        // Start the node's services.
+        node.start(self).await?;
+
         // Connect to peer(s) if given as an argument.
         if let Some(peer_ips) = &self.connect {
             // Separate the IP addresses.
@@ -171,17 +176,33 @@ impl CLI {
     }
 
     /// Handles OS signals for the node to intercept and perform a clean shutdown.
-    /// Note: Only Ctrl-C is supported; it should work on both Unix-family systems and Windows.
+    /// It should work on both Unix-family systems and Windows.
     pub fn handle_signals<N: Network, E: Environment>(node: Node<N, E>) {
+        // Handle the Ctrl-C signal.
+        let node_clone = node.clone();
         E::resources().register_task(
             None, // No need to provide an id, as the task will run indefinitely.
             tokio::task::spawn(async move {
                 match tokio::signal::ctrl_c().await {
                     Ok(()) => {
-                        node.shut_down().await;
+                        node_clone.shut_down().await;
                         std::process::exit(0);
                     }
                     Err(error) => error!("tokio::signal::ctrl_c encountered an error: {}", error),
+                }
+            }),
+        );
+
+        // Handle the SIGTERM signal on UNIX-family systems.
+        #[cfg(unix)]
+        E::resources().register_task(
+            None, // No need to provide an id, as the task will run indefinitely.
+            tokio::task::spawn(async move {
+                let mut stream = signal(SignalKind::terminate()).unwrap();
+
+                if stream.recv().await.is_some() {
+                    node.shut_down().await;
+                    std::process::exit(0);
                 }
             }),
         );
