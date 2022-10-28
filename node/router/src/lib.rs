@@ -144,7 +144,7 @@ impl<N: Network> Router<N> {
         // Initialize a new TCP listener at the given IP.
         let (local_ip, listener) = match TcpListener::bind(node_ip).await {
             Ok(listener) => (listener.local_addr().expect("Failed to fetch the local IP"), listener),
-            Err(error) => panic!("Failed to bind listener: {:?}. Check if another Aleo node is running", error),
+            Err(error) => panic!("Failed to bind listener: {error:?}. Check if another Aleo node is running"),
         };
 
         // Initialize an MPSC channel for sending requests to the `Router` struct.

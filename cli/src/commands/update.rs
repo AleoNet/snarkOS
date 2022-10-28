@@ -39,7 +39,7 @@ impl Update {
         match self.list {
             true => match Updater::show_available_releases() {
                 Ok(output) => Ok(output),
-                Err(error) => Ok(format!("Failed to list the available versions of snarkOS\n{}\n", error)),
+                Err(error) => Ok(format!("Failed to list the available versions of snarkOS\n{error}\n")),
             },
             false => {
                 let result = Updater::update_to_release(!self.quiet, self.version);
@@ -54,7 +54,7 @@ impl Update {
                                 Ok(String::new())
                             }
                         }
-                        Err(e) => Ok(format!("\nFailed to update snarkOS to the latest version\n{}\n", e)),
+                        Err(e) => Ok(format!("\nFailed to update snarkOS to the latest version\n{e}\n")),
                     }
                 } else {
                     Ok(String::new())

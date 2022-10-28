@@ -46,7 +46,7 @@ impl TryFrom<u8> for MessageType {
             0 => Ok(MessageType::Bytes),
             1 => Ok(MessageType::SnarkOS),
             2 => Ok(MessageType::Kadmium),
-            _ => Err(format!("u8 value: {} doesn't correspond to a message variant", value)),
+            _ => Err(format!("u8 value: {value} doesn't correspond to a message variant")),
         }
     }
 }

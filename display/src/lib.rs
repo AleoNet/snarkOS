@@ -104,7 +104,7 @@ impl<N: Network> Display<N> {
 
             // Exit.
             if let Err(err) = res {
-                println!("{:?}", err)
+                println!("{err:?}")
             }
         }
 
