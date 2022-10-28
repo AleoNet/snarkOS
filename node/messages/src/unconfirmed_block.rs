@@ -16,7 +16,7 @@
 
 use super::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnconfirmedBlock<N: Network> {
     pub block_height: u32,
     pub block_hash: N::BlockHash,

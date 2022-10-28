@@ -25,6 +25,13 @@ version = "1.0"
 [dependencies.bytes]
 version = "1.0.0"
 
+[dependencies.kadmium]
+git = "https://github.com/niklaslong/kadmium"
+features = ["codec", "sync"]
+
+[dependencies.rayon]
+version = "1"
+
 [dependencies.serde]
 version = "1"
 
@@ -33,6 +40,9 @@ path = "../executor"
 
 [dependencies.snarkvm]
 workspace = true
+
+[dependencies.snow]
+version = "0.9.0"
 
 [dependencies.tokio]
 version = "1.21"

@@ -17,6 +17,8 @@
 mod codec;
 pub use codec::MessageCodec;
 
+mod noise_codec;
+
 mod data;
 pub use data::Data;
 
