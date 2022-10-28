@@ -218,7 +218,8 @@ impl Start {
         //     (num_cpus::get(), 512, num_cpus::get()) // 512 is tokio's current default
         // };
         let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) =
-            { ((num_cpus::get() / 2).max(1), num_cpus::get(), (num_cpus::get() / 4 * 3).max(1)) };
+            // { ((num_cpus::get() / 2).max(1), num_cpus::get(), (num_cpus::get() / 4 * 3).max(1)) };
+            { (num_cpus::get(), 512, num_cpus::get()) };
 
         // Initialize the parallelization parameters.
         rayon::ThreadPoolBuilder::new()
