@@ -16,7 +16,7 @@
 
 use super::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChallengeRequest {
     pub version: u32,
     pub fork_depth: u32,

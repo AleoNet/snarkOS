@@ -16,7 +16,7 @@
 
 use super::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnconfirmedSolution<N: Network> {
     pub puzzle_commitment: PuzzleCommitment<N>,
     pub solution: Data<ProverSolution<N>>,

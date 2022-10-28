@@ -486,7 +486,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let signer = block.signature().to_address();
         if !self.beacons.contains_key(&signer) {
             let beacon = self.beacons.iter().next().unwrap().0;
-            eprintln!("{} {} {} {}", *beacon, signer, *beacon == signer, self.beacons.contains_key(&signer));
+            eprintln!("{} {signer} {} {}", *beacon, *beacon == signer, self.beacons.contains_key(&signer));
             bail!("Block {} ({}) is signed by an unauthorized beacon ({})", block.height(), block.hash(), signer);
         }
 

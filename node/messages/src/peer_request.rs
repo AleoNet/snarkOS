@@ -16,7 +16,7 @@
 
 use super::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PeerRequest;
 
 impl MessageTrait for PeerRequest {

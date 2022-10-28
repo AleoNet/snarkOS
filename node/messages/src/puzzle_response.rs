@@ -16,7 +16,7 @@
 
 use super::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PuzzleResponse<N: Network> {
     pub epoch_challenge: EpochChallenge<N>,
     pub block: Data<Block<N>>,
