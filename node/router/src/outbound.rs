@@ -74,11 +74,7 @@ pub trait Outbound {
                 should_send
             }
             Message::UnconfirmedSolution(ref mut message) => {
-                let puzzle_commitment = if let Data::Object(solution) = &message.solution {
-                    solution.commitment()
-                } else {
-                    panic!("Logic error: the solution shouldn't have been serialized yet.");
-                };
+                let puzzle_commitment = message.puzzle_commitment;
 
                 // Retrieve the last seen timestamp of this solution for this peer.
                 let last_seen = peer
@@ -107,11 +103,7 @@ pub trait Outbound {
                 is_ready_to_send
             }
             Message::UnconfirmedTransaction(ref mut message) => {
-                let transaction_id = if let Data::Object(transaction) = &message.transaction {
-                    transaction.id()
-                } else {
-                    panic!("Logic error: the transaction shouldn't have been serialized yet.");
-                };
+                let transaction_id = message.transaction_id;
 
                 // Retrieve the last seen timestamp of this transaction for this peer.
                 let last_seen = peer

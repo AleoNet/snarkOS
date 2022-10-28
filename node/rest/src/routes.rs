@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
-use anyhow::bail;
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]

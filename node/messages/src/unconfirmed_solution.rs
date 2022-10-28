@@ -18,6 +18,7 @@ use super::*;
 
 #[derive(Clone, Debug)]
 pub struct UnconfirmedSolution<N: Network> {
+    pub puzzle_commitment: PuzzleCommitment<N>,
     pub solution: Data<ProverSolution<N>>,
 }
 
@@ -31,12 +32,17 @@ impl<N: Network> MessageTrait for UnconfirmedSolution<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+        writer.write_all(&self.puzzle_commitment.to_bytes_le()?)?;
         self.solution.serialize_blocking_into(writer)
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        Ok(Self { solution: Data::Buffer(bytes.freeze()) })
+        let mut reader = bytes.reader();
+        Ok(Self {
+            puzzle_commitment: PuzzleCommitment::read_le(&mut reader)?,
+            solution: Data::Buffer(reader.into_inner().freeze()),
+        })
     }
 }

@@ -200,6 +200,7 @@ impl<N: Network> Prover<N> {
 
                         // Propagate the "UnconfirmedSolution" to the network.
                         let message = Message::UnconfirmedSolution(UnconfirmedSolution {
+                            puzzle_commitment: prover_solution.commitment(),
                             solution: Data::Object(prover_solution),
                         });
                         let request = RouterRequest::MessagePropagate(message, vec![]);

@@ -86,6 +86,13 @@ pub trait Inbound<N: Network>: Executor {
                 // Perform the deferred non-blocking deserialization of the solution.
                 match message.solution.deserialize().await {
                     Ok(solution) => {
+                        // Check that the solution parameters match.
+                        if message.puzzle_commitment != solution.commitment() {
+                            // Peer is not following the protocol.
+                            warn!("Peer {peer_ip} is not following the 'UnconfirmedSolution' protocol");
+                            return false;
+                        }
+
                         // Update the timestamp for the unconfirmed solution.
                         let seen_before = router
                             .seen_unconfirmed_solutions
@@ -93,6 +100,7 @@ pub trait Inbound<N: Network>: Executor {
                             .await
                             .insert(solution.commitment(), SystemTime::now())
                             .is_some();
+
                         // Handle the unconfirmed solution.
                         self.unconfirmed_solution(message_clone, solution.commitment(), solution, peer_ip, router, seen_before).await
                     }
@@ -108,6 +116,13 @@ pub trait Inbound<N: Network>: Executor {
                 // Perform the deferred non-blocking deserialization of the transaction.
                 match message.transaction.deserialize().await {
                     Ok(transaction) => {
+                        // Check that the transaction parameters match.
+                        if message.transaction_id != transaction.id() {
+                            // Peer is not following the protocol.
+                            warn!("Peer {peer_ip} is not following the 'UnconfirmedTransaction' protocol");
+                            return false;
+                        }
+
                         // Update the timestamp for the unconfirmed transaction.
                         let seen_before = router
                             .seen_unconfirmed_transactions
@@ -115,6 +130,7 @@ pub trait Inbound<N: Network>: Executor {
                             .await
                             .insert(transaction.id(), SystemTime::now())
                             .is_some();
+
                         // Handle the unconfirmed transaction.
                         self.unconfirmed_transaction(message_clone, transaction.id(), transaction, peer_ip, router, seen_before).await
                     }

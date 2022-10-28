@@ -18,6 +18,7 @@ use super::*;
 
 #[derive(Clone, Debug)]
 pub struct UnconfirmedTransaction<N: Network> {
+    pub transaction_id: N::TransactionID,
     pub transaction: Data<Transaction<N>>,
 }
 
@@ -31,12 +32,17 @@ impl<N: Network> MessageTrait for UnconfirmedTransaction<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+        writer.write_all(&self.transaction_id.to_bytes_le()?)?;
         self.transaction.serialize_blocking_into(writer)
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        Ok(Self { transaction: Data::Buffer(bytes.freeze()) })
+        let mut reader = bytes.reader();
+        Ok(Self {
+            transaction_id: N::TransactionID::read_le(&mut reader)?,
+            transaction: Data::Buffer(reader.into_inner().freeze()),
+        })
     }
 }

@@ -65,7 +65,17 @@ mod unconfirmed_transaction;
 pub use unconfirmed_transaction::UnconfirmedTransaction;
 
 use snarkos_node_executor::{NodeType, Status};
-use snarkvm::prelude::{Block, EpochChallenge, FromBytes, Header, Network, ProverSolution, ToBytes, Transaction};
+use snarkvm::prelude::{
+    Block,
+    EpochChallenge,
+    FromBytes,
+    Header,
+    Network,
+    ProverSolution,
+    PuzzleCommitment,
+    ToBytes,
+    Transaction,
+};
 
 use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
