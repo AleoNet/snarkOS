@@ -16,7 +16,7 @@
 
 use super::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChallengeResponse<N: Network> {
     pub header: Data<Header<N>>,
 }

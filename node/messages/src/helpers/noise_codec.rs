@@ -51,7 +51,7 @@ impl TryFrom<u8> for MessageType {
     }
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageOrBytes {
     Bytes(Bytes),
     Message(Message<CurrentNetwork>),

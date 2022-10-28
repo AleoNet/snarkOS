@@ -82,7 +82,7 @@ pub trait MessageTrait {
         Self: Sized;
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Message<N: Network> {
     BlockRequest(BlockRequest),
     BlockResponse(BlockResponse<N>),

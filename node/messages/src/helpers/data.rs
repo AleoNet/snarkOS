@@ -23,7 +23,7 @@ use tokio::task;
 
 /// This object enables deferred deserialization / ahead-of-time serialization for objects that
 /// take a while to deserialize / serialize, in order to allow these operations to be non-blocking.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Data<T: FromBytes + ToBytes + Send + 'static> {
     Object(T),
     Buffer(Bytes),

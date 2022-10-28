@@ -16,7 +16,7 @@
 
 use super::*;
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnconfirmedTransaction<N: Network> {
     pub transaction: Data<Transaction<N>>,
 }
