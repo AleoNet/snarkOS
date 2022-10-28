@@ -55,7 +55,7 @@ pub trait Handshake: Executor {
         let (node_type, status) = match outbound_socket.next().await {
             Some(Ok(message)) => {
                 // Process the message.
-                trace!("Received '{}-B' from {peer_ip}", message.name());
+                trace!("Received '{}-B' from '{peer_ip}'", message.name());
                 match message {
                     Message::ChallengeRequest(ChallengeRequest {
                         version,
@@ -140,12 +140,12 @@ pub trait Handshake: Executor {
                         bail!("Peer {peer_ip} disconnected for the following reason: {:?}", reason);
                     }
                     message => {
-                        bail!("Expected challenge request, received '{}' from {peer_ip}", message.name());
+                        bail!("Expected challenge request, received '{}' from '{peer_ip}'", message.name());
                     }
                 }
             }
             // An error occurred.
-            Some(Err(error)) => bail!("Failed to get challenge request from {peer_ip}: {:?}", error),
+            Some(Err(error)) => bail!("Failed to get challenge request from '{peer_ip}': {:?}", error),
             // Did not receive anything.
             None => bail!("Dropped prior to challenge request of {peer_ip}"),
         };
@@ -154,7 +154,7 @@ pub trait Handshake: Executor {
         match outbound_socket.next().await {
             Some(Ok(message)) => {
                 // Process the message.
-                trace!("Received '{}-A' from {peer_ip}", message.name());
+                trace!("Received '{}-A' from '{peer_ip}'", message.name());
                 match message {
                     Message::ChallengeResponse(message) => {
                         // Perform the deferred non-blocking deserialization of the block header.
@@ -177,19 +177,19 @@ pub trait Handshake: Executor {
                                 // Initialize the peer.
                                 Peer::initialize::<Self>(peer_ip, node_type, status, router, outbound_socket).await
                             }
-                            false => bail!("Challenge response from {peer_ip} failed, received '{block_header}'"),
+                            false => bail!("Challenge response from '{peer_ip}' failed, received '{block_header}'"),
                         }
                     }
                     Message::Disconnect(reason) => {
                         bail!("Peer {peer_ip} disconnected for the following reason: {:?}", reason)
                     }
-                    message => bail!("Expected challenge response, received '{}' from {peer_ip}", message.name()),
+                    message => bail!("Expected challenge response, received '{}' from '{peer_ip}'", message.name()),
                 }
             }
             // An error occurred.
-            Some(Err(error)) => bail!("Failed to get challenge response from {peer_ip}: {:?}", error),
+            Some(Err(error)) => bail!("Failed to get challenge response from '{peer_ip}': {:?}", error),
             // Did not receive anything.
-            None => bail!("Failed to get challenge response from {peer_ip}, peer has disconnected"),
+            None => bail!("Failed to get challenge response from '{peer_ip}', peer has disconnected"),
         }
     }
 }

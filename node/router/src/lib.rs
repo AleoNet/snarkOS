@@ -35,7 +35,7 @@ pub use peer::*;
 
 use snarkos_node_executor::{spawn_task, Executor};
 use snarkos_node_messages::*;
-use snarkvm::prelude::{Field, Network, PuzzleCommitment};
+use snarkvm::prelude::{Network, PuzzleCommitment};
 
 use anyhow::Result;
 use indexmap::{IndexMap, IndexSet};
@@ -107,7 +107,7 @@ pub struct Router<N: Network> {
     /// The map of peers to the timestamp of their last outbound connection request.
     seen_outbound_connections: Arc<RwLock<IndexMap<SocketAddr, SystemTime>>>,
     /// The map of block hashes to their last seen timestamp.
-    pub seen_unconfirmed_blocks: Arc<RwLock<IndexMap<Field<N>, SystemTime>>>,
+    pub seen_unconfirmed_blocks: Arc<RwLock<IndexMap<N::BlockHash, SystemTime>>>,
     /// The map of solution commitments to their last seen timestamp.
     pub seen_unconfirmed_solutions: Arc<RwLock<IndexMap<PuzzleCommitment<N>, SystemTime>>>,
     /// The map of transaction IDs to their last seen timestamp.
@@ -169,6 +169,8 @@ impl<N: Network> Router<N> {
         router.initialize_listener::<E>(listener).await;
         // Initialize the heartbeat.
         router.initialize_heartbeat::<E>().await;
+        // Initialize the GC.
+        router.initialize_gc::<E>().await;
 
         Ok((router, router_receiver))
     }
@@ -306,6 +308,30 @@ impl<N: Network> Router<N> {
             }
         });
     }
+
+    /// Initialize a new instance of the garbage collector.
+    async fn initialize_gc<E: Executor>(&self) {
+        let router = self.clone();
+        spawn_task!({
+            loop {
+                // Sleep for the interval.
+                tokio::time::sleep(Duration::from_secs(Self::RADIO_SILENCE_IN_SECS)).await;
+
+                // Clear the seen unconfirmed blocks.
+                router.seen_unconfirmed_blocks.write().await.retain(|_, timestamp| {
+                    timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS
+                });
+                // Clear the seen unconfirmed solutions.
+                router.seen_unconfirmed_solutions.write().await.retain(|_, timestamp| {
+                    timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS
+                });
+                // Clear the seen unconfirmed transactions.
+                router.seen_unconfirmed_transactions.write().await.retain(|_, timestamp| {
+                    timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS
+                });
+            }
+        });
+    }
 }
 
 impl<N: Network> Router<N> {
@@ -382,7 +408,7 @@ impl<N: Network> Router<N> {
 
             // Proceed to send disconnect requests to these peers.
             for peer_ip in peer_ips_to_disconnect {
-                info!("Disconnecting from {peer_ip} (exceeded maximum connections)");
+                info!("Disconnecting from '{peer_ip}' (exceeded maximum connections)");
                 self.handle_send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers.into())).await;
                 // Add an entry for this `Peer` in the restricted peers.
                 self.restricted_peers.write().await.insert(peer_ip, Instant::now());
@@ -525,19 +551,19 @@ impl<N: Network> Router<N> {
     async fn handle_peer_connecting<E: Handshake>(&self, stream: TcpStream, peer_ip: SocketAddr) {
         // Ensure the peer IP is not this node.
         if self.is_local_ip(&peer_ip) {
-            debug!("Dropping connection request from {peer_ip} (attempted to self-connect)");
+            debug!("Dropping connection request from '{peer_ip}' (attempted to self-connect)");
         }
         // Ensure the node does not surpass the maximum number of peer connections.
         else if self.number_of_connected_peers().await >= Self::MAXIMUM_NUMBER_OF_PEERS {
-            debug!("Dropping connection request from {peer_ip} (maximum peers reached)");
+            debug!("Dropping connection request from '{peer_ip}' (maximum peers reached)");
         }
         // Ensure the node is not already connected to this peer.
         else if self.is_connected_to(peer_ip).await {
-            debug!("Dropping connection request from {peer_ip} (already connected)");
+            debug!("Dropping connection request from '{peer_ip}' (already connected)");
         }
         // Ensure the peer is not restricted.
         else if self.is_restricted(peer_ip).await {
-            debug!("Dropping connection request from {peer_ip} (restricted)");
+            debug!("Dropping connection request from '{peer_ip}' (restricted)");
         }
         // Spawn a handler to be run asynchronously.
         else {
@@ -569,11 +595,11 @@ impl<N: Network> Router<N> {
 
             // Ensure the connecting peer has not surpassed the connection attempt limit.
             if *num_attempts > Self::MAXIMUM_CONNECTION_FAILURES {
-                trace!("Dropping connection request from {peer_ip} (tried {elapsed} secs ago)");
+                trace!("Dropping connection request from '{peer_ip}' (tried {elapsed} secs ago)");
                 // Add an entry for this `Peer` in the restricted peers.
                 self.restricted_peers.write().await.insert(peer_ip, Instant::now());
             } else {
-                debug!("Received a connection request from {peer_ip}");
+                debug!("Received a connection request from '{peer_ip}'");
                 // Update the number of attempts for this peer.
                 *num_attempts += 1;
 
@@ -619,7 +645,7 @@ impl<N: Network> Router<N> {
                             break;
                         }
 
-                        executor_clone.outbound(&peer, message, &mut outbound_socket).await
+                        executor_clone.outbound(&peer, message, &router, &mut outbound_socket).await
                     },
                     result = outbound_socket.next() => match result {
                         // Received a message from the peer.
@@ -628,7 +654,7 @@ impl<N: Network> Router<N> {
                             let last_seen_elapsed = peer.last_seen.read().await.elapsed().as_secs();
                             match last_seen_elapsed > Self::RADIO_SILENCE_IN_SECS {
                                 true => {
-                                    warn!("Failed to receive a message from {peer_ip} in {last_seen_elapsed} seconds");
+                                    warn!("Failed to receive a message from '{peer_ip}' in {last_seen_elapsed} seconds");
                                     break;
                                 }
                                 // Update the last seen timestamp.
@@ -652,12 +678,12 @@ impl<N: Network> Router<N> {
                             let success = executor_clone.inbound(&peer, message, &router).await;
                             // Disconnect if the peer violated the protocol.
                             if !success {
-                                warn!("Disconnecting from {peer_ip} (violated protocol)");
+                                warn!("Disconnecting from '{peer_ip}' (violated protocol)");
                                 break;
                             }
                         },
                         // An error occurred.
-                        Some(Err(error)) => error!("Failed to read message from {peer_ip}: {error}"),
+                        Some(Err(error)) => error!("Failed to read message from '{peer_ip}': {error}"),
                         // The stream has been disconnected.
                         None => break,
                     },

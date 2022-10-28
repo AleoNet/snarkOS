@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
+use snarkvm::prelude::{ProverSolution, PuzzleCommitment};
 
 #[async_trait]
 impl<N: Network> Handshake for Beacon<N> {}
@@ -62,42 +63,29 @@ impl<N: Network> Inbound<N> for Beacon<N> {
     async fn unconfirmed_solution(
         &self,
         message: UnconfirmedSolution<N>,
+        puzzle_commitment: PuzzleCommitment<N>,
+        solution: ProverSolution<N>,
         peer_ip: SocketAddr,
         router: &Router<N>,
+        seen_before: bool,
     ) -> bool {
-        // Prepare the full message.
-        let full_message = Message::UnconfirmedSolution(message.clone());
+        // Determine whether to propagate the solution.
+        let should_propagate = !seen_before;
 
-        // Perform the deferred non-blocking deserialization of the solution.
-        match message.solution.deserialize().await {
-            Ok(solution) => {
-                // Update the timestamp for the unconfirmed solution.
-                let seen_before = router
-                    .seen_unconfirmed_solutions
-                    .write()
-                    .await
-                    .insert(solution.commitment(), SystemTime::now())
-                    .is_some();
-                // Determine whether to propagate the solution.
-                let should_propagate = !seen_before;
-
-                if !should_propagate {
-                    trace!("Skipping 'UnconfirmedSolution {}' from {peer_ip}", solution.commitment().0);
-                } else {
-                    // Add the unconfirmed solution to the memory pool.
-                    if let Err(error) = self.ledger.consensus().write().add_unconfirmed_solution(&solution) {
-                        trace!("[UnconfirmedSolution] {error}");
-                        return true; // Maintain the connection.
-                    }
-
-                    // Propagate the `UnconfirmedSolution`.
-                    let request = RouterRequest::MessagePropagate(full_message, vec![peer_ip]);
-                    if let Err(error) = router.process(request).await {
-                        warn!("[UnconfirmedSolution] {error}");
-                    }
-                }
+        if !should_propagate {
+            trace!("Skipping 'UnconfirmedSolution {puzzle_commitment}' from '{peer_ip}'");
+        } else {
+            // Add the unconfirmed solution to the memory pool.
+            if let Err(error) = self.ledger.consensus().write().add_unconfirmed_solution(&solution) {
+                trace!("[UnconfirmedSolution] {error}");
+                return true; // Maintain the connection.
             }
-            Err(error) => warn!("[UnconfirmedSolution] {error}"),
+
+            // Propagate the `UnconfirmedSolution`.
+            let request = RouterRequest::MessagePropagate(Message::UnconfirmedSolution(message), vec![peer_ip]);
+            if let Err(error) = router.process(request).await {
+                warn!("[UnconfirmedSolution] {error}");
+            }
         }
         true
     }

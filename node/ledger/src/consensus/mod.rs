@@ -302,7 +302,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     .ok_or_else(|| anyhow!("Prover reward numerator overflowed"))?;
 
                 // Compute the denominator.
-                let denominator = (cumulative_proof_target as u128)
+                let denominator = cumulative_proof_target
                     .checked_mul(2)
                     .ok_or_else(|| anyhow!("Prover reward denominator overflowed"))?;
 

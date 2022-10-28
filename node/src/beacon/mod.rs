@@ -32,10 +32,9 @@ use parking_lot::RwLock;
 use std::{
     net::SocketAddr,
     sync::{
-        atomic::{AtomicBool, Ordering},
+        atomic::{AtomicBool, AtomicU64, Ordering},
         Arc,
     },
-    time::SystemTime,
 };
 use time::OffsetDateTime;
 use tokio::time::timeout;
@@ -51,6 +50,8 @@ pub struct Beacon<N: Network> {
     router: Router<N>,
     /// The REST server of the node.
     rest: Option<Arc<Rest<N, ConsensusDB<N>>>>,
+    /// The time it to generate a block.
+    block_generation_time: Arc<AtomicU64>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
 }
@@ -76,14 +77,16 @@ impl<N: Network> Beacon<N> {
             Some(rest_ip) => Some(Arc::new(Rest::start(rest_ip, ledger.clone(), router.clone())?)),
             None => None,
         };
+        // Initialize the block generation time.
+        let block_generation_time = Arc::new(AtomicU64::new(2));
         // Initialize the node.
-        let node = Self { account, ledger, router: router.clone(), rest, shutdown: Default::default() };
+        let node =
+            Self { account, ledger, router: router.clone(), rest, block_generation_time, shutdown: Default::default() };
         // Initialize the router handler.
         router.initialize_handler(node.clone(), router_receiver).await;
 
         // Initialize the block production.
         node.initialize_block_production().await;
-
         // Initialize the signal handler.
         node.handle_signals();
         // Return the node.
@@ -169,9 +172,7 @@ impl<N: Network> Beacon<N> {
         let beacon = self.clone();
         spawn_task!(Self, {
             // Expected time per block.
-            const EXPECTED_BLOCK_TIME: u64 = 15; // 15 seconds per block
-            // The time it took to generate the previous block.
-            let mut block_generation_time = 0;
+            const ROUND_TIME: u64 = 15; // 15 seconds per block
 
             // Produce blocks.
             loop {
@@ -186,9 +187,9 @@ impl<N: Network> Beacon<N> {
                     }
                 };
 
-                // Do not produce a block if the elapsed time has not exceeded `EXPECTED_BLOCK_TIME - block_generation_time`.
-                // This will ensure a block is produced at intervals of approximately `EXPECTED_BLOCK_TIME`.
-                let time_to_wait = EXPECTED_BLOCK_TIME.saturating_sub(block_generation_time);
+                // Do not produce a block if the elapsed time has not exceeded `ROUND_TIME - block_generation_time`.
+                // This will ensure a block is produced at intervals of approximately `ROUND_TIME`.
+                let time_to_wait = ROUND_TIME.saturating_sub(beacon.block_generation_time.load(Ordering::Relaxed));
                 if elapsed_time < time_to_wait {
                     if let Err(error) = timeout(
                         Duration::from_secs(time_to_wait.saturating_sub(elapsed_time)),
@@ -200,15 +201,19 @@ impl<N: Network> Beacon<N> {
                     }
                 }
 
-                // Start a timer.
-                let timer = std::time::Instant::now();
-                // Produce the next block and propagate it to all peers.
-                if let Err(error) = beacon.produce_next_block().await {
-                    error!("{error}");
-                    continue;
-                }
-                // Update the block generation time.
-                block_generation_time = timer.elapsed().as_secs();
+                let beacon_clone = beacon.clone();
+                spawn_task!(Self, {
+                    // Start a timer.
+                    let timer = std::time::Instant::now();
+                    // Produce the next block and propagate it to all peers.
+                    match beacon_clone.produce_next_block().await {
+                        // Update the block generation time.
+                        Ok(()) => {
+                            beacon_clone.block_generation_time.store(timer.elapsed().as_secs(), Ordering::Relaxed)
+                        }
+                        Err(error) => error!("{error}"),
+                    }
+                });
 
                 // If the Ctrl-C handler registered the signal, stop the node once the current block is complete.
                 if beacon.shutdown.load(Ordering::Relaxed) {
