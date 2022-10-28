@@ -275,7 +275,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         if let Some(prover_solutions) = prover_solutions {
             // Calculate the coinbase reward.
             let coinbase_reward = coinbase_reward(
-                latest_block.timestamp(),
+                latest_block.last_coinbase_timestamp(),
                 next_timestamp,
                 next_height,
                 N::STARTING_SUPPLY,
@@ -318,7 +318,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Construct the next coinbase target.
         let next_coinbase_target = coinbase_target(
             latest_coinbase_target,
-            latest_block.timestamp(),
+            latest_block.last_coinbase_timestamp(),
             next_timestamp,
             N::ANCHOR_TIME,
             N::NUM_BLOCKS_PER_EPOCH,
