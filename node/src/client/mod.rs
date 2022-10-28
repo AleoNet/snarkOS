@@ -18,12 +18,15 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_executor::{Executor, NodeType};
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
-use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
+use snarkos_node_executor::{spawn_task, Executor, NodeType};
+use snarkos_node_messages::{Message, PuzzleRequest, PuzzleResponse};
+use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
+use snarkvm::prelude::{Address, Block, EpochChallenge, Network, PrivateKey, ViewKey};
 
 use anyhow::Result;
-use std::net::SocketAddr;
+use core::time::Duration;
+use std::{net::SocketAddr, sync::Arc};
+use tokio::sync::RwLock;
 
 /// A client node is a full node, capable of querying with the network.
 #[derive(Clone)]
@@ -32,6 +35,10 @@ pub struct Client<N: Network> {
     account: Account<N>,
     /// The router of the node.
     router: Router<N>,
+    /// The latest epoch challenge.
+    latest_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
+    /// The latest block.
+    latest_block: Arc<RwLock<Option<Block<N>>>>,
 }
 
 impl<N: Network> Client<N> {
@@ -42,9 +49,16 @@ impl<N: Network> Client<N> {
         // Initialize the node router.
         let (router, router_receiver) = Router::new::<Self>(node_ip, trusted_peers).await?;
         // Initialize the node.
-        let node = Self { account, router: router.clone() };
+        let node = Self {
+            account,
+            router: router.clone(),
+            latest_epoch_challenge: Default::default(),
+            latest_block: Default::default(),
+        };
         // Initialize the router handler.
         router.initialize_handler(node.clone(), router_receiver).await;
+        // Initialize the heartbeat.
+        node.initialize_heartbeat().await;
         // Initialize the signal handler.
         node.handle_signals();
         // Return the node.
@@ -82,5 +96,32 @@ impl<N: Network> NodeInterface<N> for Client<N> {
     /// Returns the account address of the node.
     fn address(&self) -> &Address<N> {
         self.account.address()
+    }
+}
+
+impl<N: Network> Client<N> {
+    /// The frequency at which the node sends a heartbeat.
+    const HEARTBEAT_IN_SECS: u64 = N::ANCHOR_TIME as u64 / 2;
+
+    /// Initialize a new instance of the heartbeat.
+    async fn initialize_heartbeat(&self) {
+        let client = self.clone();
+        spawn_task!(Self, {
+            loop {
+                // Retrieve the first connected beacon.
+                if let Some(connected_beacon) = client.router.connected_beacons().await.first() {
+                    // Send the "PuzzleRequest" to the beacon.
+                    let request = RouterRequest::MessageSend(*connected_beacon, Message::PuzzleRequest(PuzzleRequest));
+                    if let Err(error) = client.router.process(request).await {
+                        warn!("[PuzzleRequest] {}", error);
+                    }
+                } else {
+                    warn!("[PuzzleRequest] No connected beacons");
+                }
+
+                // Sleep for `Self::HEARTBEAT_IN_SECS` seconds.
+                tokio::time::sleep(Duration::from_secs(Self::HEARTBEAT_IN_SECS)).await;
+            }
+        });
     }
 }

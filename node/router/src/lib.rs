@@ -317,8 +317,6 @@ impl<N: Network> Router<N> {
     /// Performs the given `request` to the peers.
     /// All requests must go through this `handler`, so that a unified view is preserved.
     pub(crate) async fn handler<E: Handshake + Inbound<N> + Outbound>(&self, executor: E, request: RouterRequest<N>) {
-        debug!("Peers: {:?}", self.connected_peers().await);
-
         match request {
             RouterRequest::Heartbeat => self.handle_heartbeat().await,
             RouterRequest::MessagePropagate(message, excluded_peers) => {
@@ -360,6 +358,8 @@ impl<N: Network> Router<N> {
 
     /// Handles the heartbeat request.
     async fn handle_heartbeat(&self) {
+        debug!("Peers: {:?}", self.connected_peers().await);
+
         // Obtain the number of connected peers.
         let number_of_connected_peers = self.number_of_connected_peers().await;
         // Ensure the number of connected peers is below the maximum threshold.
