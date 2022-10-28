@@ -107,11 +107,17 @@ pub struct Router<N: Network> {
     /// The map of peers to the timestamp of their last outbound connection request.
     seen_outbound_connections: Arc<RwLock<IndexMap<SocketAddr, SystemTime>>>,
     /// The map of block hashes to their last seen timestamp.
-    pub seen_unconfirmed_blocks: Arc<RwLock<IndexMap<N::BlockHash, SystemTime>>>,
+    pub seen_inbound_blocks: Arc<RwLock<IndexMap<N::BlockHash, SystemTime>>>,
     /// The map of solution commitments to their last seen timestamp.
-    pub seen_unconfirmed_solutions: Arc<RwLock<IndexMap<PuzzleCommitment<N>, SystemTime>>>,
+    pub seen_inbound_solutions: Arc<RwLock<IndexMap<PuzzleCommitment<N>, SystemTime>>>,
     /// The map of transaction IDs to their last seen timestamp.
-    pub seen_unconfirmed_transactions: Arc<RwLock<IndexMap<N::TransactionID, SystemTime>>>,
+    pub seen_inbound_transactions: Arc<RwLock<IndexMap<N::TransactionID, SystemTime>>>,
+    /// The map of block hashes to their last seen timestamp.
+    pub seen_outbound_blocks: Arc<RwLock<IndexMap<N::BlockHash, SystemTime>>>,
+    /// The map of solution commitments to their last seen timestamp.
+    pub seen_outbound_solutions: Arc<RwLock<IndexMap<PuzzleCommitment<N>, SystemTime>>>,
+    /// The map of transaction IDs to their last seen timestamp.
+    pub seen_outbound_transactions: Arc<RwLock<IndexMap<N::TransactionID, SystemTime>>>,
 }
 
 #[rustfmt::skip]
@@ -160,9 +166,12 @@ impl<N: Network> Router<N> {
             restricted_peers: Default::default(),
             seen_inbound_connections: Default::default(),
             seen_outbound_connections: Default::default(),
-            seen_unconfirmed_blocks: Default::default(),
-            seen_unconfirmed_solutions: Default::default(),
-            seen_unconfirmed_transactions: Default::default(),
+            seen_inbound_blocks: Default::default(),
+            seen_inbound_solutions: Default::default(),
+            seen_inbound_transactions: Default::default(),
+            seen_outbound_blocks: Default::default(),
+            seen_outbound_solutions: Default::default(),
+            seen_outbound_transactions: Default::default(),
         };
 
         // Initialize the listener.
@@ -318,15 +327,27 @@ impl<N: Network> Router<N> {
                 tokio::time::sleep(Duration::from_secs(Self::RADIO_SILENCE_IN_SECS)).await;
 
                 // Clear the seen unconfirmed blocks.
-                router.seen_unconfirmed_blocks.write().await.retain(|_, timestamp| {
+                router.seen_inbound_blocks.write().await.retain(|_, timestamp| {
                     timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS
                 });
                 // Clear the seen unconfirmed solutions.
-                router.seen_unconfirmed_solutions.write().await.retain(|_, timestamp| {
+                router.seen_inbound_solutions.write().await.retain(|_, timestamp| {
                     timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS
                 });
                 // Clear the seen unconfirmed transactions.
-                router.seen_unconfirmed_transactions.write().await.retain(|_, timestamp| {
+                router.seen_inbound_transactions.write().await.retain(|_, timestamp| {
+                    timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS
+                });
+                // Clear the seen unconfirmed blocks.
+                router.seen_outbound_blocks.write().await.retain(|_, timestamp| {
+                    timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS
+                });
+                // Clear the seen unconfirmed solutions.
+                router.seen_outbound_solutions.write().await.retain(|_, timestamp| {
+                    timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS
+                });
+                // Clear the seen unconfirmed transactions.
+                router.seen_outbound_transactions.write().await.retain(|_, timestamp| {
                     timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS
                 });
             }
@@ -416,7 +437,7 @@ impl<N: Network> Router<N> {
         }
 
         // TODO (howardwu): This logic can be optimized and unified with the context around it.
-        // Determine if the node is connected to more sync nodes than expected.
+        // Determine if the node is connected to more sync nodes than allowed.
         let connected_beacons = self.connected_beacons().await;
         let number_of_connected_beacons = connected_beacons.len();
         let num_excess_beacons = number_of_connected_beacons.saturating_sub(1);
@@ -476,7 +497,7 @@ impl<N: Network> Router<N> {
             // }
 
             if !self.is_connected_to(peer_ip).await {
-                trace!("Attempting connection to {peer_ip}...");
+                trace!("Attempting connection to '{peer_ip}'...");
                 if let Err(error) = self.process(RouterRequest::PeerConnect(peer_ip)).await {
                     warn!("Failed to transmit the request: '{error}'");
                 }
@@ -488,19 +509,19 @@ impl<N: Network> Router<N> {
     async fn handle_peer_connect<E: Handshake>(&self, peer_ip: SocketAddr) {
         // Ensure the peer IP is not this node.
         if self.is_local_ip(&peer_ip) {
-            debug!("Skipping connection request to {peer_ip} (attempted to self-connect)");
+            debug!("Skipping connection request to '{peer_ip}' (attempted to self-connect)");
         }
         // Ensure the node does not surpass the maximum number of peer connections.
         else if self.number_of_connected_peers().await >= Self::MAXIMUM_NUMBER_OF_PEERS {
-            debug!("Skipping connection request to {peer_ip} (maximum peers reached)");
+            debug!("Skipping connection request to '{peer_ip}' (maximum peers reached)");
         }
         // Ensure the peer is a new connection.
         else if self.is_connected_to(peer_ip).await {
-            debug!("Skipping connection request to {peer_ip} (already connected)");
+            debug!("Skipping connection request to '{peer_ip}' (already connected)");
         }
         // Ensure the peer is not restricted.
         else if self.is_restricted(peer_ip).await {
-            debug!("Skipping connection request to {peer_ip} (restricted)");
+            debug!("Skipping connection request to '{peer_ip}' (restricted)");
         }
         // Attempt to open a TCP stream.
         else {
@@ -511,9 +532,9 @@ impl<N: Network> Router<N> {
             let last_seen = seen_outbound_connections.entry(peer_ip).or_insert(SystemTime::UNIX_EPOCH);
             let elapsed = last_seen.elapsed().unwrap_or(Duration::MAX).as_secs();
             if elapsed < Self::RADIO_SILENCE_IN_SECS {
-                trace!("Skipping connection request to {peer_ip} (tried {elapsed} secs ago)");
+                trace!("Skipping connection request to '{peer_ip}' (tried {elapsed} secs ago)");
             } else {
-                debug!("Connecting to {peer_ip}...");
+                debug!("Connecting to '{peer_ip}'...");
                 // Update the last seen timestamp for this peer.
                 seen_outbound_connections.insert(peer_ip, SystemTime::now());
 
@@ -630,7 +651,7 @@ impl<N: Network> Router<N> {
             // Retrieve the peer IP.
             let peer_ip = *peer.ip();
 
-            info!("Connected to {peer_ip}");
+            info!("Connected to '{peer_ip}'");
 
             // Process incoming messages until this stream is disconnected.
             let executor_clone = executor.clone();
@@ -663,9 +684,9 @@ impl<N: Network> Router<N> {
 
                             // Update the timestamp for the received message.
                             peer.seen_messages.write().await.insert((message.id(), rand::thread_rng().gen()), SystemTime::now());
-                            // Drop the peer, if they have sent more than 1000 messages in the last 5 seconds.
+                            // Drop the peer, if they have sent more than 500 messages in the last 5 seconds.
                             let frequency = peer.seen_messages.read().await.values().filter(|t| t.elapsed().unwrap_or_default().as_secs() <= 5).count();
-                            if frequency >= 1000 {
+                            if frequency >= 500 {
                                 warn!("Dropping {peer_ip} for spamming messages (frequency = {frequency})");
                                 // Send a `PeerRestricted` message.
                                 if let Err(error) = router.process(RouterRequest::PeerRestricted(peer_ip)).await {
@@ -709,7 +730,7 @@ impl<N: Network> Router<N> {
         match target_peer {
             Some(peer) => {
                 if let Err(error) = peer.send(message).await {
-                    trace!("Failed to send message to {peer_ip}: {error}");
+                    trace!("Failed to send message to '{peer_ip}': {error}");
                     self.connected_peers.write().await.remove(&peer_ip);
                 }
             }
@@ -721,11 +742,26 @@ impl<N: Network> Router<N> {
     async fn handle_propagate(&self, mut message: Message<N>, excluded_peers: Vec<SocketAddr>) {
         // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         if let Message::UnconfirmedBlock(ref mut message) = message {
-            let serialized_block = Data::serialize(message.block.clone()).await.expect("Block serialization is bugged");
-            let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
+            if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
+                let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
+            } else {
+                error!("Block serialization is bugged");
+            }
+        } else if let Message::UnconfirmedSolution(ref mut message) = message {
+            if let Ok(serialized_solution) = Data::serialize(message.solution.clone()).await {
+                let _ = std::mem::replace(&mut message.solution, Data::Buffer(serialized_solution));
+            } else {
+                error!("Solution serialization is bugged");
+            }
+        } else if let Message::UnconfirmedTransaction(ref mut message) = message {
+            if let Ok(serialized_transaction) = Data::serialize(message.transaction.clone()).await {
+                let _ = std::mem::replace(&mut message.transaction, Data::Buffer(serialized_transaction));
+            } else {
+                error!("Transaction serialization is bugged");
+            }
         }
 
-        // Iterate through all peers that are not the sender.
+        // Iterate through all peers that are not the sender and excluded peers.
         for peer in self
             .connected_peers()
             .await

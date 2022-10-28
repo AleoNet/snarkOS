@@ -95,10 +95,7 @@ impl<N: Network> MemoryPool<N> {
                 // Compute the proof target.
                 let proof_target = solution.to_target()?;
                 self.unconfirmed_solutions.insert(solution.commitment(), (*solution, proof_target));
-                trace!(
-                    "✉️  Added a prover solution with target '{proof_target}' ('{}') to the memory pool",
-                    solution.commitment()
-                );
+                trace!("✉️  Added a prover solution with target '{proof_target}' to the memory pool");
                 Ok(true)
             }
             false => {

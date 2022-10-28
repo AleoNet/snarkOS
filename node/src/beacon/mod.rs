@@ -254,13 +254,11 @@ impl<N: Network> Beacon<N> {
 
         // Advance to the next block.
         match self.ledger.consensus().write().add_next_block(&next_block) {
-            Ok(()) => trace!(
-                "Block {next_block_height}: {}",
-                serde_json::to_string_pretty(&next_block).expect("Failed to print next block")
-            ),
-            Err(error) => {
-                bail!("Failed to advance to the next block: {error}")
-            }
+            Ok(()) => match serde_json::to_string_pretty(&next_block) {
+                Ok(block) => info!("Block {next_block_height}: {block}"),
+                Err(error) => info!("Block {next_block_height}: (serde failed: {error})"),
+            },
+            Err(error) => bail!("Failed to advance to the next block: {error}"),
         }
 
         // Serialize the block ahead of time to not do it for each peer.

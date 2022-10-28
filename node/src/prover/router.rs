@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
+use snarkvm::prelude::{ProverSolution, PuzzleCommitment};
 
 #[async_trait]
 impl<N: Network> Handshake for Prover<N> {}
@@ -44,6 +45,36 @@ impl<N: Network> Inbound<N> for Prover<N> {
                 false
             }
         }
+    }
+
+    /// If the last coinbase timestamp exceeds a multiple of the anchor time,
+    /// then the prover will assist by propagating unconfirmed solutions.
+    /// Otherwise, the prover will ignore the message.
+    async fn unconfirmed_solution(
+        &self,
+        message: UnconfirmedSolution<N>,
+        _puzzle_commitment: PuzzleCommitment<N>,
+        _solution: ProverSolution<N>,
+        peer_ip: SocketAddr,
+        router: &Router<N>,
+        seen_before: bool,
+    ) -> bool {
+        // Determine whether to propagate the solution.
+        if !seen_before {
+            trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
+        } else if let Some(block) = self.latest_block.read().await.as_ref() {
+            // Compute the elapsed time since the last coinbase block.
+            let elapsed = OffsetDateTime::now_utc().unix_timestamp().saturating_sub(block.last_coinbase_timestamp());
+            // If the elapsed time exceeds a multiple of the anchor time, then assist in propagation.
+            if elapsed > N::ANCHOR_TIME as i64 * 6 {
+                // Propagate the `UnconfirmedSolution`.
+                let request = RouterRequest::MessagePropagate(Message::UnconfirmedSolution(message), vec![peer_ip]);
+                if let Err(error) = router.process(request).await {
+                    warn!("[UnconfirmedSolution] {error}");
+                }
+            }
+        }
+        true
     }
 }
 

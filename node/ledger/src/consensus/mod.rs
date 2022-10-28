@@ -200,6 +200,14 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         if self.latest_height() > anchor_block_height(N::ANCHOR_TIME, 10) {
             bail!("Coinbase proofs are no longer accepted after year 10.");
         }
+        // Ensure the prover solution is not already in the ledger.
+        if self.contains_puzzle_commitment(&solution.commitment())? {
+            bail!("Prover solution is already in the ledger.");
+        }
+        // Ensure the prover solution is not already in the memory pool.
+        if self.memory_pool.contains_unconfirmed_solution(solution.commitment()) {
+            bail!("Prover solution is already in the memory pool.");
+        }
 
         // Compute the current epoch challenge.
         let epoch_challenge = self.latest_epoch_challenge()?;

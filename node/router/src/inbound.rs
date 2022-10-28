@@ -65,7 +65,7 @@ pub trait Inbound<N: Network>: Executor {
 
                         // Update the timestamp for the unconfirmed block.
                         let seen_before = router
-                            .seen_unconfirmed_blocks
+                            .seen_inbound_blocks
                             .write()
                             .await
                             .insert(block.hash(), SystemTime::now())
@@ -95,7 +95,7 @@ pub trait Inbound<N: Network>: Executor {
 
                         // Update the timestamp for the unconfirmed solution.
                         let seen_before = router
-                            .seen_unconfirmed_solutions
+                            .seen_inbound_solutions
                             .write()
                             .await
                             .insert(solution.commitment(), SystemTime::now())
@@ -125,7 +125,7 @@ pub trait Inbound<N: Network>: Executor {
 
                         // Update the timestamp for the unconfirmed transaction.
                         let seen_before = router
-                            .seen_unconfirmed_transactions
+                            .seen_inbound_transactions
                             .write()
                             .await
                             .insert(transaction.id(), SystemTime::now())
@@ -366,7 +366,7 @@ pub trait Inbound<N: Network>: Executor {
     async fn unconfirmed_solution(
         &self,
         message: UnconfirmedSolution<N>,
-        puzzle_commitment: PuzzleCommitment<N>,
+        _puzzle_commitment: PuzzleCommitment<N>,
         _solution: ProverSolution<N>,
         peer_ip: SocketAddr,
         router: &Router<N>,
@@ -376,7 +376,7 @@ pub trait Inbound<N: Network>: Executor {
         let should_propagate = !seen_before;
 
         if !should_propagate {
-            trace!("Skipping 'UnconfirmedSolution {puzzle_commitment}' from '{peer_ip}'");
+            trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
         } else {
             // Propagate the `UnconfirmedSolution`.
             let request = RouterRequest::MessagePropagate(Message::UnconfirmedSolution(message), vec![peer_ip]);

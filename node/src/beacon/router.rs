@@ -63,7 +63,7 @@ impl<N: Network> Inbound<N> for Beacon<N> {
     async fn unconfirmed_solution(
         &self,
         message: UnconfirmedSolution<N>,
-        puzzle_commitment: PuzzleCommitment<N>,
+        _puzzle_commitment: PuzzleCommitment<N>,
         solution: ProverSolution<N>,
         peer_ip: SocketAddr,
         router: &Router<N>,
@@ -73,7 +73,7 @@ impl<N: Network> Inbound<N> for Beacon<N> {
         let should_propagate = !seen_before;
 
         if !should_propagate {
-            trace!("Skipping 'UnconfirmedSolution {puzzle_commitment}' from '{peer_ip}'");
+            trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
         } else {
             // Add the unconfirmed solution to the memory pool.
             if let Err(error) = self.ledger.consensus().write().add_unconfirmed_solution(&solution) {

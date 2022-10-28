@@ -54,10 +54,6 @@ pub struct Peer<N: Network> {
     pub last_seen: Arc<RwLock<Instant>>,
     /// The map of (message ID, random nonce) pairs to their last seen timestamp.
     pub seen_messages: Arc<RwLock<HashMap<(u16, u32), SystemTime>>>,
-    /// The map of peers to a map of solution commitments to their last seen timestamp.
-    pub seen_outbound_solutions: Arc<RwLock<HashMap<PuzzleCommitment<N>, SystemTime>>>,
-    /// The map of peers to a map of transaction IDs to their last seen timestamp.
-    pub seen_outbound_transactions: Arc<RwLock<HashMap<N::TransactionID, SystemTime>>>,
     /// The sender channel to the peer.
     peer_sender: PeerSender<N>,
 }
@@ -83,8 +79,6 @@ impl<N: Network> Peer<N> {
             block_height: Arc::new(RwLock::new(0)),
             last_seen: Arc::new(RwLock::new(Instant::now())),
             seen_messages: Default::default(),
-            seen_outbound_solutions: Default::default(),
-            seen_outbound_transactions: Default::default(),
             peer_sender,
         };
 
@@ -145,16 +139,6 @@ impl<N: Network> Peer<N> {
 
                 // Clear the seen messages to only those in the last 5 seconds.
                 peer.seen_messages
-                    .write()
-                    .await
-                    .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);
-                // Clear the seen outbound solutions to only those in the last 5 seconds.
-                peer.seen_outbound_solutions
-                    .write()
-                    .await
-                    .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);
-                // Clear the seen outbound transactions to only those in the last 5 seconds.
-                peer.seen_outbound_transactions
                     .write()
                     .await
                     .retain(|_, timestamp| timestamp.elapsed().unwrap_or_default().as_secs() <= 5);

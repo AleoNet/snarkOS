@@ -48,7 +48,7 @@ pub trait Handshake: Executor {
             status: Self::status().get(),
             listener_port: router.local_ip().port(),
         });
-        trace!("Sending '{}-A' to {peer_ip}", message.name());
+        trace!("Sending '{}-A' to '{peer_ip}'", message.name());
         outbound_socket.send(message).await?;
 
         // Wait for the counterparty challenge request to come in.
@@ -131,7 +131,7 @@ pub trait Handshake: Executor {
                         // Send the challenge response.
                         let message =
                             Message::ChallengeResponse(ChallengeResponse { header: Data::Object(genesis_header) });
-                        trace!("Sending '{}-B' to {peer_ip}", message.name());
+                        trace!("Sending '{}-B' to '{peer_ip}'", message.name());
                         outbound_socket.send(message).await?;
 
                         (node_type, peer_status)
@@ -171,7 +171,7 @@ pub trait Handshake: Executor {
                                     node_type: Self::NODE_TYPE,
                                     status: Self::status().get(),
                                 });
-                                trace!("Sending '{}' to {peer_ip}", message.name());
+                                trace!("Sending '{}' to '{peer_ip}'", message.name());
                                 outbound_socket.send(message).await?;
 
                                 // Initialize the peer.
