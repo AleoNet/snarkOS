@@ -17,13 +17,13 @@
 use std::{io, sync::Arc};
 
 use bytes::{Buf, BufMut, Bytes, BytesMut};
-use kadmium::{codec::MessageCodec, message::Message as KadmiumMessage};
+use kadmium::{codec::MessageCodec as KadmiumCodec, message::Message as KadmiumMessage};
 use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
 use snarkvm::prelude::Testnet3;
 use snow::{HandshakeState, StatelessTransportState};
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
-use crate::{Message as SnarkOSMessage, MessageCodec as SnarkOSCodec};
+use crate::{Message, MessageCodec};
 
 type CurrentNetwork = Testnet3;
 
@@ -54,7 +54,7 @@ impl TryFrom<u8> for MessageType {
 #[derive(Clone, Debug)]
 pub enum MessageOrBytes {
     Bytes(Bytes),
-    SnarkOSMessage(SnarkOSMessage<CurrentNetwork>),
+    Message(Message<CurrentNetwork>),
     KadmiumMessage(KadmiumMessage),
 }
 
@@ -62,7 +62,7 @@ impl MessageOrBytes {
     fn message_type(&self) -> MessageType {
         match self {
             MessageOrBytes::Bytes(_) => MessageType::Bytes,
-            MessageOrBytes::SnarkOSMessage(_) => MessageType::SnarkOS,
+            MessageOrBytes::Message(_) => MessageType::SnarkOS,
             MessageOrBytes::KadmiumMessage(_) => MessageType::Kadmium,
         }
     }
@@ -92,7 +92,7 @@ impl Clone for NoiseState {
 impl NoiseState {
     pub fn into_post_handshake_state(self) -> Self {
         if let Self::Handshake(noise_state) = self {
-            let noise_state = noise_state.into_stateless_transport_mode().unwrap();
+            let noise_state = noise_state.into_stateless_transport_mode().expect("handshake isn't finished");
             Self::PostHandshake(PostHandshakeState { state: Arc::new(noise_state), tx_nonce: 0, rx_nonce: 0 })
         } else {
             panic!()
@@ -102,17 +102,17 @@ impl NoiseState {
 
 pub struct NoiseCodec {
     codec: LengthDelimitedCodec,
-    kadmium_codec: MessageCodec,
-    snarkos_codec: SnarkOSCodec<CurrentNetwork>,
-    pub noise_state: NoiseState,
+    kadmium_codec: KadmiumCodec,
+    snarkos_codec: MessageCodec<CurrentNetwork>,
+    noise_state: NoiseState,
 }
 
 impl NoiseCodec {
     pub fn new(noise_state: NoiseState) -> Self {
         Self {
             codec: LengthDelimitedCodec::new(),
-            kadmium_codec: MessageCodec::new(),
-            snarkos_codec: SnarkOSCodec::default(),
+            kadmium_codec: KadmiumCodec::new(),
+            snarkos_codec: MessageCodec::default(),
             noise_state,
         }
     }
@@ -128,10 +128,12 @@ impl Encoder<MessageOrBytes> for NoiseCodec {
             NoiseState::Handshake(ref mut noise) => {
                 match message_or_bytes {
                     // Don't allow message sending before the noise handshake has completed.
-                    MessageOrBytes::SnarkOSMessage(_) | MessageOrBytes::KadmiumMessage(_) => unimplemented!(),
+                    MessageOrBytes::Message(_) | MessageOrBytes::KadmiumMessage(_) => unimplemented!(),
                     MessageOrBytes::Bytes(bytes) => {
                         let mut buffer = [0u8; MAX_MESSAGE_LEN + 1];
-                        let len = noise.write_message(&bytes, &mut buffer[1..]).unwrap();
+                        let len = noise
+                            .write_message(&bytes, &mut buffer[1..])
+                            .map_err(|e| Self::Error::new(io::ErrorKind::InvalidInput, e))?;
 
                         // Set the message type flag.
                         buffer[0] = message_type as u8;
@@ -147,8 +149,8 @@ impl Encoder<MessageOrBytes> for NoiseCodec {
                 match message_or_bytes {
                     // Don't allow sending raw bytes after the noise handshake has completed.
                     MessageOrBytes::Bytes(_) => unimplemented!(),
-                    MessageOrBytes::SnarkOSMessage(message) => self.snarkos_codec.encode(message, &mut bytes).unwrap(),
-                    MessageOrBytes::KadmiumMessage(message) => self.kadmium_codec.encode(message, &mut bytes).unwrap(),
+                    MessageOrBytes::Message(message) => self.snarkos_codec.encode(message, &mut bytes)?,
+                    MessageOrBytes::KadmiumMessage(message) => self.kadmium_codec.encode(message, &mut bytes)?,
                 }
 
                 // Chunk the payload if necessary.
@@ -156,7 +158,7 @@ impl Encoder<MessageOrBytes> for NoiseCodec {
                 let num_chunks = chunked_plaintext_msg.len() as u64;
 
                 // Encrypt the resulting bytes with Noise.
-                let encrypted_chunks: Vec<Vec<u8>> = chunked_plaintext_msg
+                let encrypted_chunks: Vec<io::Result<Vec<u8>>> = chunked_plaintext_msg
                     .into_par_iter()
                     .enumerate()
                     .map(|(nonce_offset, plaintext_chunk)| {
@@ -165,10 +167,11 @@ impl Encoder<MessageOrBytes> for NoiseCodec {
                         let len = noise
                             .state
                             .write_message(noise.tx_nonce + nonce_offset as u64, plaintext_chunk, &mut buffer)
-                            .unwrap();
+                            .map_err(|e| Self::Error::new(io::ErrorKind::InvalidInput, e))?;
 
                         buffer.truncate(len);
-                        buffer
+
+                        Ok(buffer)
                     })
                     .collect();
 
@@ -177,7 +180,7 @@ impl Encoder<MessageOrBytes> for NoiseCodec {
                 buffer.put_u8(message_type as u8);
 
                 for chunk in encrypted_chunks {
-                    buffer.extend_from_slice(&chunk)
+                    buffer.extend_from_slice(&chunk?)
                 }
 
                 noise.tx_nonce += num_chunks;
@@ -256,9 +259,7 @@ impl Decoder for NoiseCodec {
 
                 // Decode with message codecs.
                 match flag {
-                    MessageType::SnarkOS => {
-                        self.snarkos_codec.decode(&mut plaintext)?.map(MessageOrBytes::SnarkOSMessage)
-                    }
+                    MessageType::SnarkOS => self.snarkos_codec.decode(&mut plaintext)?.map(MessageOrBytes::Message),
                     MessageType::Kadmium => {
                         self.kadmium_codec.decode(&mut plaintext)?.map(MessageOrBytes::KadmiumMessage)
                     }
@@ -354,14 +355,11 @@ mod tests {
 
         assert!(
             initiator_codec
-                .encode(
-                    MessageOrBytes::SnarkOSMessage(SnarkOSMessage::BlockRequest(expected_block_request.clone())),
-                    &mut ciphertext
-                )
+                .encode(MessageOrBytes::Message(Message::BlockRequest(expected_block_request.clone())), &mut ciphertext)
                 .is_ok()
         );
         assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::BlockRequest(block_request)) if block_request == expected_block_request));
+            MessageOrBytes::Message(Message::BlockRequest(block_request)) if block_request == expected_block_request));
     }
 
     #[test]
@@ -380,15 +378,13 @@ mod tests {
         assert!(
             initiator_codec
                 .encode(
-                    MessageOrBytes::SnarkOSMessage(SnarkOSMessage::ChallengeRequest(
-                        expected_challenge_request.clone()
-                    )),
+                    MessageOrBytes::Message(Message::ChallengeRequest(expected_challenge_request.clone())),
                     &mut ciphertext
                 )
                 .is_ok()
         );
         assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::ChallengeRequest(challenge_request)) if challenge_request == expected_challenge_request));
+            MessageOrBytes::Message(Message::ChallengeRequest(challenge_request)) if challenge_request == expected_challenge_request));
     }
 
     #[test]
@@ -400,14 +396,11 @@ mod tests {
 
         assert!(
             initiator_codec
-                .encode(
-                    MessageOrBytes::SnarkOSMessage(SnarkOSMessage::Disconnect(expected_disconnect.clone())),
-                    &mut ciphertext
-                )
+                .encode(MessageOrBytes::Message(Message::Disconnect(expected_disconnect.clone())), &mut ciphertext)
                 .is_ok()
         );
         assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::Disconnect(disconnect)) if disconnect == expected_disconnect));
+            MessageOrBytes::Message(Message::Disconnect(disconnect)) if disconnect == expected_disconnect));
     }
 
     #[test]
@@ -419,14 +412,11 @@ mod tests {
 
         assert!(
             initiator_codec
-                .encode(
-                    MessageOrBytes::SnarkOSMessage(SnarkOSMessage::PeerRequest(expected_peer_request.clone())),
-                    &mut ciphertext
-                )
+                .encode(MessageOrBytes::Message(Message::PeerRequest(expected_peer_request.clone())), &mut ciphertext)
                 .is_ok()
         );
         assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::PeerRequest(peer_request)) if peer_request == expected_peer_request));
+            MessageOrBytes::Message(Message::PeerRequest(peer_request)) if peer_request == expected_peer_request));
     }
 
     #[test]
@@ -438,14 +428,11 @@ mod tests {
 
         assert!(
             initiator_codec
-                .encode(
-                    MessageOrBytes::SnarkOSMessage(SnarkOSMessage::PeerResponse(expected_peer_response.clone())),
-                    &mut ciphertext
-                )
+                .encode(MessageOrBytes::Message(Message::PeerResponse(expected_peer_response.clone())), &mut ciphertext)
                 .is_ok()
         );
         assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::PeerResponse(peer_response)) if peer_response == expected_peer_response));
+            MessageOrBytes::Message(Message::PeerResponse(peer_response)) if peer_response == expected_peer_response));
     }
 
     #[test]
@@ -457,12 +444,12 @@ mod tests {
 
         assert!(
             initiator_codec
-                .encode(MessageOrBytes::SnarkOSMessage(SnarkOSMessage::Ping(expected_ping.clone())), &mut ciphertext)
+                .encode(MessageOrBytes::Message(Message::Ping(expected_ping.clone())), &mut ciphertext)
                 .is_ok()
         );
 
         assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-              MessageOrBytes::SnarkOSMessage(SnarkOSMessage::Ping(ping)) if ping == expected_ping));
+              MessageOrBytes::Message(Message::Ping(ping)) if ping == expected_ping));
     }
 
     #[test]
@@ -474,11 +461,11 @@ mod tests {
 
         assert!(
             initiator_codec
-                .encode(MessageOrBytes::SnarkOSMessage(SnarkOSMessage::Pong(expected_pong.clone())), &mut ciphertext)
+                .encode(MessageOrBytes::Message(Message::Pong(expected_pong.clone())), &mut ciphertext)
                 .is_ok()
         );
         assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::Pong(pong)) if pong == expected_pong));
+            MessageOrBytes::Message(Message::Pong(pong)) if pong == expected_pong));
     }
 
     #[test]
@@ -491,12 +478,12 @@ mod tests {
         assert!(
             initiator_codec
                 .encode(
-                    MessageOrBytes::SnarkOSMessage(SnarkOSMessage::PuzzleRequest(expected_puzzle_request.clone())),
+                    MessageOrBytes::Message(Message::PuzzleRequest(expected_puzzle_request.clone())),
                     &mut ciphertext
                 )
                 .is_ok()
         );
         assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::SnarkOSMessage(SnarkOSMessage::PuzzleRequest(puzzle_request)) if puzzle_request == expected_puzzle_request));
+            MessageOrBytes::Message(Message::PuzzleRequest(puzzle_request)) if puzzle_request == expected_puzzle_request));
     }
 }
