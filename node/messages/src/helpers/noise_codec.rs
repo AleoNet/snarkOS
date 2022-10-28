@@ -54,7 +54,7 @@ impl TryFrom<u8> for MessageType {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum MessageOrBytes {
     Bytes(Bytes),
-    Message(Message<CurrentNetwork>),
+    Message(Box<Message<CurrentNetwork>>),
     KadmiumMessage(KadmiumMessage),
 }
 
@@ -149,7 +149,7 @@ impl Encoder<MessageOrBytes> for NoiseCodec {
                 match message_or_bytes {
                     // Don't allow sending raw bytes after the noise handshake has completed.
                     MessageOrBytes::Bytes(_) => unimplemented!(),
-                    MessageOrBytes::Message(message) => self.snarkos_codec.encode(message, &mut bytes)?,
+                    MessageOrBytes::Message(message) => self.snarkos_codec.encode(*message, &mut bytes)?,
                     MessageOrBytes::KadmiumMessage(message) => self.kadmium_codec.encode(message, &mut bytes)?,
                 }
 
@@ -259,7 +259,9 @@ impl Decoder for NoiseCodec {
 
                 // Decode with message codecs.
                 match flag {
-                    MessageType::SnarkOS => self.snarkos_codec.decode(&mut plaintext)?.map(MessageOrBytes::Message),
+                    MessageType::SnarkOS => {
+                        self.snarkos_codec.decode(&mut plaintext)?.map(|msg| MessageOrBytes::Message(Box::new(msg)))
+                    }
                     MessageType::Kadmium => {
                         self.kadmium_codec.decode(&mut plaintext)?.map(MessageOrBytes::KadmiumMessage)
                     }
@@ -331,159 +333,79 @@ mod tests {
         (initiator_codec, responder_codec)
     }
 
-    //  BlockRequest
-    //  BlockResponse
-    //  ChallengeRequest
-    //  ChallengeResponse
-    //  Disconnect
-    //  PeerRequest
-    //  PeerResponse
-    //  Ping
-    //  Pong
-    //  PuzzleRequest
-    //  PuzzleResponse
-    //  UnconfirmedBlock
-    //  UnconfirmedSolution
-    //  UnconfirmedTransaction
-
-    #[test]
-    fn block_request_roundtrip() {
+    fn assert_roundtrip(msg: MessageOrBytes) {
         let (mut initiator_codec, mut responder_codec) = handshake_xx();
         let mut ciphertext = BytesMut::new();
 
-        let expected_block_request = BlockRequest { start_block_height: 0, end_block_height: 100 };
+        assert!(initiator_codec.encode(msg.clone(), &mut ciphertext).is_ok());
+        assert_eq!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(), msg);
+    }
 
-        assert!(
-            initiator_codec
-                .encode(MessageOrBytes::Message(Message::BlockRequest(expected_block_request.clone())), &mut ciphertext)
-                .is_ok()
-        );
-        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::Message(Message::BlockRequest(block_request)) if block_request == expected_block_request));
+    #[test]
+    fn block_request_roundtrip() {
+        let block_request = MessageOrBytes::Message(Box::new(Message::BlockRequest(BlockRequest {
+            start_block_height: 0,
+            end_block_height: 100,
+        })));
+
+        assert_roundtrip(block_request);
     }
 
     #[test]
     fn challenge_request_roundtrip() {
-        let (mut initiator_codec, mut responder_codec) = handshake_xx();
-        let mut ciphertext = BytesMut::new();
-
-        let expected_challenge_request = ChallengeRequest {
+        let challenge_request = MessageOrBytes::Message(Box::new(Message::ChallengeRequest(ChallengeRequest {
             version: 0,
             fork_depth: 0,
             node_type: NodeType::Client,
             status: Status::Ready,
             listener_port: 0,
-        };
+        })));
 
-        assert!(
-            initiator_codec
-                .encode(
-                    MessageOrBytes::Message(Message::ChallengeRequest(expected_challenge_request.clone())),
-                    &mut ciphertext
-                )
-                .is_ok()
-        );
-        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::Message(Message::ChallengeRequest(challenge_request)) if challenge_request == expected_challenge_request));
+        assert_roundtrip(challenge_request);
     }
 
     #[test]
     fn disconnect_roundtrip() {
-        let (mut initiator_codec, mut responder_codec) = handshake_xx();
-        let mut ciphertext = BytesMut::new();
+        let disconnect = MessageOrBytes::Message(Box::new(Message::Disconnect(Disconnect {
+            reason: DisconnectReason::NoReasonGiven,
+        })));
 
-        let expected_disconnect = Disconnect { reason: DisconnectReason::NoReasonGiven };
-
-        assert!(
-            initiator_codec
-                .encode(MessageOrBytes::Message(Message::Disconnect(expected_disconnect.clone())), &mut ciphertext)
-                .is_ok()
-        );
-        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::Message(Message::Disconnect(disconnect)) if disconnect == expected_disconnect));
+        assert_roundtrip(disconnect);
     }
 
     #[test]
     fn peer_request_roundtrip() {
-        let (mut initiator_codec, mut responder_codec) = handshake_xx();
-        let mut ciphertext = BytesMut::new();
-
-        let expected_peer_request = PeerRequest;
-
-        assert!(
-            initiator_codec
-                .encode(MessageOrBytes::Message(Message::PeerRequest(expected_peer_request.clone())), &mut ciphertext)
-                .is_ok()
-        );
-        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::Message(Message::PeerRequest(peer_request)) if peer_request == expected_peer_request));
+        let peer_request = MessageOrBytes::Message(Box::new(Message::PeerRequest(PeerRequest)));
+        assert_roundtrip(peer_request);
     }
 
     #[test]
     fn peer_response_roundtrip() {
-        let (mut initiator_codec, mut responder_codec) = handshake_xx();
-        let mut ciphertext = BytesMut::new();
-
-        let expected_peer_response = PeerResponse { peers: vec![] };
-
-        assert!(
-            initiator_codec
-                .encode(MessageOrBytes::Message(Message::PeerResponse(expected_peer_response.clone())), &mut ciphertext)
-                .is_ok()
-        );
-        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::Message(Message::PeerResponse(peer_response)) if peer_response == expected_peer_response));
+        let peer_response = MessageOrBytes::Message(Box::new(Message::PeerResponse(PeerResponse { peers: vec![] })));
+        assert_roundtrip(peer_response);
     }
 
     #[test]
     fn ping_roundtrip() {
-        let (mut initiator_codec, mut responder_codec) = handshake_xx();
-        let mut ciphertext = BytesMut::new();
+        let ping = MessageOrBytes::Message(Box::new(Message::Ping(Ping {
+            version: 0,
+            fork_depth: 0,
+            node_type: NodeType::Client,
+            status: Status::Ready,
+        })));
 
-        let expected_ping = Ping { version: 0, fork_depth: 0, node_type: NodeType::Client, status: Status::Ready };
-
-        assert!(
-            initiator_codec
-                .encode(MessageOrBytes::Message(Message::Ping(expected_ping.clone())), &mut ciphertext)
-                .is_ok()
-        );
-
-        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-              MessageOrBytes::Message(Message::Ping(ping)) if ping == expected_ping));
+        assert_roundtrip(ping)
     }
 
     #[test]
     fn pong_roundtrip() {
-        let (mut initiator_codec, mut responder_codec) = handshake_xx();
-        let mut ciphertext = BytesMut::new();
-
-        let expected_pong = Pong { is_fork: Some(true) };
-
-        assert!(
-            initiator_codec
-                .encode(MessageOrBytes::Message(Message::Pong(expected_pong.clone())), &mut ciphertext)
-                .is_ok()
-        );
-        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::Message(Message::Pong(pong)) if pong == expected_pong));
+        let pong = MessageOrBytes::Message(Box::new(Message::Pong(Pong { is_fork: Some(true) })));
+        assert_roundtrip(pong);
     }
 
     #[test]
     fn puzzle_request_roundtrip() {
-        let (mut initiator_codec, mut responder_codec) = handshake_xx();
-        let mut ciphertext = BytesMut::new();
-
-        let expected_puzzle_request = PuzzleRequest;
-
-        assert!(
-            initiator_codec
-                .encode(
-                    MessageOrBytes::Message(Message::PuzzleRequest(expected_puzzle_request.clone())),
-                    &mut ciphertext
-                )
-                .is_ok()
-        );
-        assert!(matches!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(),
-            MessageOrBytes::Message(Message::PuzzleRequest(puzzle_request)) if puzzle_request == expected_puzzle_request));
+        let puzzle_request = MessageOrBytes::Message(Box::new(Message::PuzzleRequest(PuzzleRequest)));
+        assert_roundtrip(puzzle_request);
     }
 }
