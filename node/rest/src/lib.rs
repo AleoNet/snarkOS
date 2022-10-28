@@ -33,7 +33,7 @@ use snarkvm::{
         program::ProgramID,
         types::Field,
     },
-    prelude::Network,
+    prelude::{cfg_into_iter, Network},
     synthesizer::{ConsensusStorage, Program, Transaction},
 };
 

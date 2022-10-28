@@ -15,11 +15,14 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
+use anyhow::bail;
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
 struct BlockRange {
+    /// The starting block height (inclusive).
     start: u32,
+    /// The ending block height (inclusive).
     end: u32,
 }
 
@@ -50,18 +53,18 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and(with(self.ledger.clone()))
             .and_then(Self::get_block);
 
-        // GET /testnet3/block?start={start_height}&end={end_height}
+        // GET /testnet3/blocks?start={start_height}&end={end_height}
         let get_blocks = warp::get()
             .and(warp::path!("testnet3" / "blocks"))
             .and(warp::query::<BlockRange>())
             .and(with(self.ledger.clone()))
             .and_then(Self::get_blocks);
 
-        // GET /testnet3/transactions/{height}
-        let get_transactions = warp::get()
-            .and(warp::path!("testnet3" / "transactions" / u32))
+        // GET /testnet3/block/{height}/transactions
+        let get_block_transactions = warp::get()
+            .and(warp::path!("testnet3" / "block" / u32 / "transactions"))
             .and(with(self.ledger.clone()))
-            .and_then(Self::get_transactions);
+            .and_then(Self::get_block_transactions);
 
         // GET /testnet3/transaction/{transactionID}
         let get_transaction = warp::get()
@@ -71,11 +74,11 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and(with(self.ledger.clone()))
             .and_then(Self::get_transaction);
 
-        // GET /testnet3/transactions/mempool
-        let get_transactions_mempool = warp::get()
-            .and(warp::path!("testnet3" / "transactions" / "mempool"))
+        // GET /testnet3/memoryPool/transactions
+        let get_memory_pool_transactions = warp::get()
+            .and(warp::path!("testnet3" / "memoryPool" / "transactions"))
             .and(with(self.ledger.clone()))
-            .and_then(Self::get_transactions_mempool);
+            .and_then(Self::get_memory_pool_transactions);
 
         // GET /testnet3/program/{programID}
         let get_program = warp::get()
@@ -188,9 +191,9 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .or(latest_block)
             .or(get_block)
             .or(get_blocks)
-            .or(get_transactions)
+            .or(get_block_transactions)
             .or(get_transaction)
-            .or(get_transactions_mempool)
+            .or(get_memory_pool_transactions)
             .or(get_program)
             .or(get_state_path)
             .or(get_beacons)
@@ -234,21 +237,27 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         let start_height = block_range.start;
         let end_height = block_range.end;
 
+        const MAX_BLOCK_RANGE: u32 = 50;
+
         // Ensure the end height is greater than the start height.
         if start_height > end_height {
             return Err(reject::custom(RestError::Request("Invalid block range".to_string())));
         }
-
         // Ensure the block range is bounded.
-        const MAX_BLOCK_RANGE: u32 = 50;
-        if end_height - start_height >= MAX_BLOCK_RANGE {
+        else if end_height - start_height > MAX_BLOCK_RANGE {
             return Err(reject::custom(RestError::Request(format!(
-                "Too many blocks requested. Max 50, requested {}",
+                "Cannot request more than {MAX_BLOCK_RANGE} blocks per call (requested {})",
                 end_height - start_height
+            ))));
+        } else if end_height - start_height == MAX_BLOCK_RANGE {
+            return Err(reject::custom(RestError::Request(format!(
+                "Did you mean to request blocks {} to {}? (inclusive range)",
+                start_height,
+                end_height - 1
             ))));
         }
 
-        let blocks = (start_height..end_height)
+        let blocks = cfg_into_iter!((start_height..end_height))
             .map(|height| ledger.consensus().read().get_block(height).or_reject())
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -256,7 +265,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     }
 
     /// Returns the transactions for the given block height.
-    async fn get_transactions(height: u32, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+    async fn get_block_transactions(height: u32, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.consensus().read().get_transactions(height).or_reject()?))
     }
 
@@ -266,7 +275,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     }
 
     /// Returns the transactions in the memory pool.
-    async fn get_transactions_mempool(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+    async fn get_memory_pool_transactions(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.consensus().read().memory_pool().unconfirmed_transactions().collect::<Vec<_>>()))
     }
 
