@@ -26,11 +26,8 @@ impl<N: Network> Inbound<N> for Beacon<N> {
     async fn puzzle_request(&self, peer_ip: SocketAddr, router: &Router<N>) -> bool {
         // Retrieve the latest epoch challenge and latest block.
         let (epoch_challenge, block) = {
-            // Acquire a read lock on the consensus module.
-            let consensus = self.ledger.consensus().read();
-
             // Retrieve the latest epoch challenge.
-            let epoch_challenge = match consensus.latest_epoch_challenge() {
+            let epoch_challenge = match self.ledger.latest_epoch_challenge() {
                 Ok(block) => block,
                 Err(error) => {
                     error!("Failed to retrieve latest epoch challenge for a puzzle request: {error}");
@@ -39,7 +36,7 @@ impl<N: Network> Inbound<N> for Beacon<N> {
             };
 
             // Retrieve the latest block.
-            let block = match consensus.latest_block() {
+            let block = match self.ledger.latest_block() {
                 Ok(block) => block,
                 Err(error) => {
                     error!("Failed to retrieve latest block for a puzzle request: {error}");
@@ -76,7 +73,7 @@ impl<N: Network> Inbound<N> for Beacon<N> {
             trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
         } else {
             // Add the unconfirmed solution to the memory pool.
-            if let Err(error) = self.ledger.consensus().write().add_unconfirmed_solution(&solution) {
+            if let Err(error) = self.consensus.add_unconfirmed_solution(&solution) {
                 trace!("[UnconfirmedSolution] {error}");
                 return true; // Maintain the connection.
             }

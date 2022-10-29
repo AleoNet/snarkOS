@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-node-ledger"
+name = "snarkos-node-consensus"
 version = "2.0.2"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "A node ledger for a decentralized operating system"
+description = "A node consensus for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
@@ -23,16 +23,6 @@ parallel = [ "rayon" ]
 [dependencies.anyhow]
 version = "1"
 
-[dependencies.backoff]
-version = "0.4"
-features = [ "tokio" ]
-
-[dependencies.colored]
-version = "2.0"
-
-[dependencies.futures]
-version = "0.3"
-
 [dependencies.indexmap]
 version = "1.9"
 features = [ "rayon" ]
@@ -50,8 +40,8 @@ version = "0.8"
 version = "1"
 optional = true
 
-[dependencies.reqwest]
-version = "0.11"
+[dependencies.snarkos-node-ledger]
+path = "../ledger"
 
 [dependencies.snarkos-node-store]
 path = "../store"
@@ -62,9 +52,8 @@ workspace = true
 [dependencies.time]
 version = "0.3"
 
-[dependencies.tokio]
-version = "1.21"
-features = ["rt"]
-
 [dependencies.tracing]
 version = "0.1"
+
+[dev-dependencies.tracing-test]
+version = "0.2"

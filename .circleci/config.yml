@@ -177,6 +177,15 @@ jobs:
           workspace_member: node
           cache_key: snarkos-node-cache
 
+  node-consensus:
+    docker:
+      - image: cimg/rust:1.64
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/consensus
+          cache_key: snarkos-node-consensus-cache
+
   node-executor:
     docker:
       - image: cimg/rust:1.64
@@ -391,6 +400,7 @@ workflows:
       - cli
       - display
       - node
+      - node-consensus
       - node-executor
       - node-ledger
       - node-messages

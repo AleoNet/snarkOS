@@ -2221,6 +2221,7 @@ dependencies = [
  "snarkos-cli",
  "snarkos-display",
  "snarkos-node",
+ "snarkos-node-consensus",
  "snarkos-node-executor",
  "snarkos-node-ledger",
  "snarkos-node-messages",
@@ -2289,6 +2290,7 @@ dependencies = [
  "rand",
  "serde_json",
  "snarkos-account",
+ "snarkos-node-consensus",
  "snarkos-node-executor",
  "snarkos-node-ledger",
  "snarkos-node-messages",
@@ -2299,6 +2301,24 @@ dependencies = [
  "time",
  "tokio",
  "tracing",
+]
+
+[[package]]
+name = "snarkos-node-consensus"
+version = "2.0.2"
+dependencies = [
+ "anyhow",
+ "indexmap",
+ "once_cell",
+ "parking_lot",
+ "rand",
+ "rayon",
+ "snarkos-node-ledger",
+ "snarkos-node-store",
+ "snarkvm",
+ "time",
+ "tracing",
+ "tracing-test",
 ]
 
 [[package]]
@@ -2335,7 +2355,6 @@ dependencies = [
  "time",
  "tokio",
  "tracing",
- "tracing-test",
 ]
 
 [[package]]
@@ -2365,7 +2384,9 @@ dependencies = [
  "http",
  "indexmap",
  "serde",
+ "snarkos-node-consensus",
  "snarkos-node-ledger",
+ "snarkos-node-messages",
  "snarkos-node-router",
  "snarkvm",
  "tokio",
