@@ -105,6 +105,6 @@ mod tests {
         let commitments = genesis.transactions().commitments().collect::<Vec<_>>();
         let commitment = commitments[0];
 
-        let _state_path = ledger.to_state_path(commitment).unwrap();
+        let _state_path = ledger.get_state_path(commitment).unwrap();
     }
 }

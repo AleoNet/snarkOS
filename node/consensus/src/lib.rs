@@ -48,6 +48,8 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     beacons: Arc<RwLock<IndexMap<Address<N>, ()>>>,
     /// The ledger.
     ledger: Ledger<N, C>,
+    /// The coinbase puzzle.
+    coinbase_puzzle: CoinbasePuzzle<N>,
     /// The memory pool.
     memory_pool: MemoryPool<N>,
 }
@@ -55,10 +57,14 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Initializes a new instance of consensus.
     pub fn new(ledger: Ledger<N, C>) -> Result<Self> {
+        // Load the coinbase puzzle.
+        let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
+
         let mut consensus = Self {
             // TODO (howardwu): Update this to retrieve from a validators store.
             beacons: Default::default(),
             ledger,
+            coinbase_puzzle,
             memory_pool: Default::default(),
         };
 
@@ -69,6 +75,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         Ok(consensus)
+    }
+
+    /// Returns the coinbase puzzle.
+    pub const fn coinbase_puzzle(&self) -> &CoinbasePuzzle<N> {
+        &self.coinbase_puzzle
     }
 
     /// Returns the memory pool.
@@ -104,10 +115,10 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Compute the current epoch challenge.
         let epoch_challenge = self.ledger.latest_epoch_challenge()?;
         // Retrieve the current proof target.
-        let proof_target = self.ledger.latest_proof_target()?;
+        let proof_target = self.ledger.latest_proof_target();
 
         // Ensure that the prover solution is valid for the given epoch.
-        if !solution.verify(self.ledger.coinbase_puzzle().coinbase_verifying_key()?, &epoch_challenge, proof_target)? {
+        if !solution.verify(self.coinbase_puzzle.coinbase_verifying_key()?, &epoch_challenge, proof_target)? {
             bail!("Invalid prover solution '{}' for the current epoch.", solution.commitment());
         }
 
@@ -119,12 +130,14 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
     /// Returns `true` if the coinbase target is met.
     pub fn is_coinbase_target_met(&self) -> Result<bool> {
-        // Retrieve the latest block header.
-        let header = self.ledger.latest_header()?;
+        // Retrieve the latest proof target.
+        let latest_proof_target = self.ledger.latest_proof_target();
         // Compute the candidate coinbase target.
-        let cumuluative_proof_target = self.memory_pool.candidate_coinbase_target(header.proof_target())?;
+        let cumulative_proof_target = self.memory_pool.candidate_coinbase_target(latest_proof_target)?;
+        // Retrieve the latest coinbase target.
+        let latest_coinbase_target = self.ledger.latest_coinbase_target();
         // Check if the coinbase target is met.
-        Ok(cumuluative_proof_target >= header.coinbase_target() as u128)
+        Ok(cumulative_proof_target >= latest_coinbase_target as u128)
     }
 
     /// Returns the beacon set.
@@ -175,7 +188,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             Some(prover_solutions) => {
                 let epoch_challenge = self.ledger.latest_epoch_challenge()?;
                 let coinbase_solution =
-                    self.ledger.coinbase_puzzle().accumulate_unchecked(&epoch_challenge, prover_solutions)?;
+                    self.coinbase_puzzle.accumulate_unchecked(&epoch_challenge, prover_solutions)?;
                 let coinbase_accumulator_point = coinbase_solution.to_accumulator_point()?;
 
                 (Some(coinbase_solution), coinbase_accumulator_point)
@@ -263,14 +276,14 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         )?;
 
         // Construct the header.
-        let header = Header::from(*latest_state_root, transactions.to_root()?, coinbase_accumulator_point, metadata)?;
+        let header = Header::from(latest_state_root, transactions.to_root()?, coinbase_accumulator_point, metadata)?;
 
         // Construct the new block.
         Block::new(private_key, latest_block.hash(), header, transactions, coinbase, rng)
     }
 
     /// Advances the ledger to the next block.
-    pub fn advance_to_next_block(&mut self, block: &Block<N>) -> Result<()> {
+    pub fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
         // Ensure the given block is a valid next block.
         self.check_next_block(block)?;
         // Adds the next block to the ledger.
@@ -493,11 +506,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                 bail!("The last coinbase timestamp does not match the next block timestamp.");
             }
             // Ensure the coinbase solution is valid.
-            if !self.ledger.coinbase_puzzle().verify(
+            if !self.coinbase_puzzle.verify(
                 coinbase,
                 &self.ledger.latest_epoch_challenge()?,
-                self.ledger.latest_coinbase_target()?,
-                self.ledger.latest_proof_target()?,
+                self.ledger.latest_coinbase_target(),
+                self.ledger.latest_proof_target(),
             )? {
                 bail!("Invalid coinbase solution: {:?}", coinbase);
             }
@@ -507,7 +520,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                 bail!("Coinbase accumulator point should be zero as there is no coinbase solution in the block.");
             }
             // Ensure the last coinbase timestamp matches the *latest coinbase timestamp*.
-            if block.height() > 0 && block.last_coinbase_timestamp() != self.ledger.latest_coinbase_timestamp()? {
+            if block.height() > 0 && block.last_coinbase_timestamp() != self.ledger.latest_coinbase_timestamp() {
                 bail!("The last coinbase timestamp does not match the latest coinbase timestamp.");
             }
         }

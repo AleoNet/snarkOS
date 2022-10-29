@@ -293,7 +293,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
 
     /// Returns the state path for the given commitment.
     async fn get_state_path(commitment: Field<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.to_state_path(&commitment).or_reject()?))
+        Ok(reply::json(&ledger.get_state_path(&commitment).or_reject()?))
     }
 
     /// Returns the list of current beacons.

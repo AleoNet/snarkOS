@@ -301,7 +301,7 @@ mod tests {
         assert!(consensus.ledger.contains_input_id(transaction.input_ids().next().unwrap()).unwrap());
 
         // Ensure that the VM can't re-deploy the same program.
-        assert!(consensus.ledger.vm.finalize(&transaction).is_err());
+        assert!(consensus.ledger.vm().finalize(&transaction).is_err());
         // Ensure that the ledger deems the same transaction invalid.
         assert!(consensus.check_transaction_basic(&transaction).is_err());
         // Ensure that the ledger cannot add the same transaction.
@@ -398,16 +398,15 @@ mod tests {
         let address = Address::try_from(&private_key).unwrap();
 
         // Sample the genesis consensus.
-        let mut consensus = crate::tests::test_helpers::sample_genesis_consensus(rng);
+        let consensus = crate::tests::test_helpers::sample_genesis_consensus(rng);
 
         // Fetch the proof target and epoch challenge for the block.
-        let proof_target = consensus.ledger.latest_proof_target().unwrap();
+        let proof_target = consensus.ledger.latest_proof_target();
         let epoch_challenge = consensus.ledger.latest_epoch_challenge().unwrap();
 
         for _ in 0..100 {
             // Generate a prover solution.
-            let prover_solution =
-                consensus.ledger.coinbase_puzzle().prove(&epoch_challenge, address, rng.gen()).unwrap();
+            let prover_solution = consensus.coinbase_puzzle.prove(&epoch_challenge, address, rng.gen()).unwrap();
 
             // Check that the prover solution meets the proof target requirement.
             if prover_solution.to_target().unwrap() >= proof_target {
@@ -428,7 +427,7 @@ mod tests {
         let address = Address::try_from(&private_key).unwrap();
 
         // Sample the genesis consensus.
-        let mut consensus = test_helpers::sample_genesis_consensus(rng);
+        let consensus = test_helpers::sample_genesis_consensus(rng);
 
         // Add a transaction to the memory pool.
         let transaction = crate::tests::test_helpers::sample_execution_transaction(rng);
@@ -443,9 +442,9 @@ mod tests {
         let mut cumulative_target = 0u128;
         let epoch_challenge = consensus.ledger.latest_epoch_challenge().unwrap();
 
-        while cumulative_target < consensus.ledger.latest_coinbase_target().unwrap() as u128 {
+        while cumulative_target < consensus.ledger.latest_coinbase_target() as u128 {
             // Generate a prover solution.
-            let prover_solution = match consensus.ledger.coinbase_puzzle().prove(&epoch_challenge, address, rng.gen()) {
+            let prover_solution = match consensus.coinbase_puzzle.prove(&epoch_challenge, address, rng.gen()) {
                 Ok(prover_solution) => prover_solution,
                 Err(_) => continue,
             };

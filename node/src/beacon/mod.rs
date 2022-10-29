@@ -197,13 +197,7 @@ impl<N: Network> Beacon<N> {
                 // Fetch the current timestamp.
                 let current_timestamp = OffsetDateTime::now_utc().unix_timestamp();
                 // Compute the elapsed time.
-                let elapsed_time = match beacon.ledger.latest_timestamp() {
-                    Ok(latest_timestamp) => current_timestamp.saturating_sub(latest_timestamp) as u64,
-                    Err(_) => {
-                        warn!("Failed to fetch the latest block timestamp");
-                        0
-                    }
-                };
+                let elapsed_time = current_timestamp.saturating_sub(beacon.ledger.latest_timestamp()) as u64;
 
                 // Do not produce a block if the elapsed time has not exceeded `ROUND_TIME - block_generation_time`.
                 // This will ensure a block is produced at intervals of approximately `ROUND_TIME`.

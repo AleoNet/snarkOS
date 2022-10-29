@@ -36,17 +36,18 @@ use snarkvm::{
     },
     synthesizer::{
         block::{Block, BlockTree, Header, Transaction, Transactions},
-        coinbase_puzzle::{CoinbasePuzzle, CoinbaseSolution, EpochChallenge, PuzzleCommitment},
+        coinbase_puzzle::{CoinbaseSolution, EpochChallenge, PuzzleCommitment},
         program::Program,
         state_path::StatePath,
-        store::{BlockStore, ConsensusStorage, ConsensusStore, TransactionStore, TransitionStore},
+        store::{ConsensusStorage, ConsensusStore},
         vm::VM,
     },
 };
 
 use anyhow::Result;
 use indexmap::IndexMap;
-use std::borrow::Cow;
+use parking_lot::RwLock;
+use std::{borrow::Cow, sync::Arc};
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -70,23 +71,13 @@ pub enum RecordsFilter<N: Network> {
 #[derive(Clone)]
 pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
     /// The VM state.
-    pub vm: VM<N, C>,
-    /// The coinbase puzzle.
-    coinbase_puzzle: CoinbasePuzzle<N>,
+    vm: VM<N, C>,
     /// The current block hash.
-    current_hash: N::BlockHash,
-    /// The current block height.
-    current_height: u32,
-    /// The current round number.
-    current_round: u64,
+    current_hash: Arc<RwLock<N::BlockHash>>,
+    /// The current block header.
+    current_header: Arc<RwLock<Header<N>>>,
     /// The current block tree.
-    block_tree: BlockTree<N>,
-    /// The block store.
-    blocks: BlockStore<N, C::BlockStorage>,
-    /// The transaction store.
-    transactions: TransactionStore<N, C::TransactionStorage>,
-    /// The transition store.
-    transitions: TransitionStore<N, C::TransitionStorage>,
+    block_tree: Arc<RwLock<BlockTree<N>>>,
     // /// The mapping of program IDs to their global state.
     // states: MemoryMap<ProgramID<N>, IndexMap<Identifier<N>, Plaintext<N>>>,
 }
@@ -116,51 +107,43 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Initializes the ledger from storage, with an optional genesis block.
     pub fn from(vm: VM<N, C>, genesis: Option<Block<N>>) -> Result<Self> {
-        // Load the coinbase puzzle.
-        let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
+        // Load the genesis block.
+        let genesis = match genesis {
+            Some(genesis) => genesis,
+            None => Block::<N>::from_bytes_le(N::genesis_bytes())?,
+        };
 
         // Initialize the ledger.
         let mut ledger = Self {
-            coinbase_puzzle,
-            current_hash: Default::default(),
-            current_height: 0,
-            current_round: 0,
-            block_tree: N::merkle_tree_bhp(&[])?,
-            blocks: vm.block_store().clone(),
-            transactions: vm.transaction_store().clone(),
-            transitions: vm.transition_store().clone(),
             vm,
+            current_hash: Arc::new(RwLock::new(genesis.hash())),
+            current_header: Arc::new(RwLock::new(*genesis.header())),
+            block_tree: Arc::new(RwLock::new(N::merkle_tree_bhp(&[genesis.hash().to_bits_le()])?)),
         };
 
         // If the block store is empty, initialize the genesis block.
-        if ledger.blocks.heights().max().is_none() {
-            // Load the genesis block.
-            let genesis = match genesis {
-                Some(genesis) => genesis,
-                None => Block::<N>::from_bytes_le(N::genesis_bytes())?,
-            };
+        if ledger.vm.block_store().heights().max().is_none() {
             // Add the genesis block.
             ledger.add_next_block(&genesis)?;
         }
 
         // Retrieve the latest height.
         let latest_height =
-            *ledger.blocks.heights().max().ok_or_else(|| anyhow!("Failed to load blocks from the ledger"))?;
+            *ledger.vm.block_store().heights().max().ok_or_else(|| anyhow!("Failed to load blocks from the ledger"))?;
         // Fetch the latest block.
         let block = ledger
             .get_block(latest_height)
             .map_err(|_| anyhow!("Failed to load block {latest_height} from the ledger"))?;
 
         // Set the current hash, height, and round.
-        ledger.current_hash = block.hash();
-        ledger.current_height = block.height();
-        ledger.current_round = block.round();
+        ledger.current_hash = Arc::new(RwLock::new(block.hash()));
+        ledger.current_header = Arc::new(RwLock::new(*block.header()));
 
         // TODO (howardwu): Improve the performance here by using iterators.
         // Generate the block tree.
         let hashes: Vec<_> =
             (0..=latest_height).map(|height| ledger.get_hash(height).map(|hash| hash.to_bits_le())).try_collect()?;
-        ledger.block_tree = N::merkle_tree_bhp(&hashes)?;
+        ledger.block_tree = Arc::new(RwLock::new(N::merkle_tree_bhp(&hashes)?));
 
         // Safety check the existence of every block.
         cfg_into_iter!((0..=latest_height)).try_for_each(|height| {
@@ -176,55 +159,76 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         &self.vm
     }
 
-    /// Returns the coinbase puzzle.
-    pub const fn coinbase_puzzle(&self) -> &CoinbasePuzzle<N> {
-        &self.coinbase_puzzle
-    }
-
-    /// Returns the block tree.
-    pub const fn block_tree(&self) -> &BlockTree<N> {
-        &self.block_tree
-    }
-
-    /// Returns a state path for the given commitment.
-    pub fn to_state_path(&self, commitment: &Field<N>) -> Result<StatePath<N>> {
-        StatePath::new_commitment(&self.block_tree, &self.blocks, commitment)
-    }
-
     /// Returns the latest state root.
-    pub const fn latest_state_root(&self) -> &Field<N> {
-        self.block_tree.root()
+    pub fn latest_state_root(&self) -> Field<N> {
+        *self.block_tree.read().root()
     }
 
     /// Returns the latest block.
     pub fn latest_block(&self) -> Result<Block<N>> {
-        self.get_block(self.current_height)
+        self.get_block(self.latest_height())
     }
 
     /// Returns the latest block hash.
-    pub const fn latest_hash(&self) -> N::BlockHash {
-        self.current_hash
+    pub fn latest_hash(&self) -> N::BlockHash {
+        *self.current_hash.read()
+    }
+
+    /// Returns the latest block header.
+    pub fn latest_header(&self) -> Header<N> {
+        *self.current_header.read()
     }
 
     /// Returns the latest block height.
-    pub const fn latest_height(&self) -> u32 {
-        self.current_height
+    pub fn latest_height(&self) -> u32 {
+        self.current_header.read().height()
     }
 
     /// Returns the latest round number.
-    pub const fn latest_round(&self) -> u64 {
-        self.current_round
+    pub fn latest_round(&self) -> u64 {
+        self.current_header.read().round()
+    }
+
+    /// Returns the latest block coinbase accumulator point.
+    pub fn latest_coinbase_accumulator_point(&self) -> Field<N> {
+        self.current_header.read().coinbase_accumulator_point()
+    }
+
+    /// Returns the latest block coinbase target.
+    pub fn latest_coinbase_target(&self) -> u64 {
+        self.current_header.read().coinbase_target()
+    }
+
+    /// Returns the latest block proof target.
+    pub fn latest_proof_target(&self) -> u64 {
+        self.current_header.read().proof_target()
+    }
+
+    /// Returns the latest coinbase timestamp.
+    pub fn latest_coinbase_timestamp(&self) -> i64 {
+        self.current_header.read().last_coinbase_timestamp()
+    }
+
+    /// Returns the latest block timestamp.
+    pub fn latest_timestamp(&self) -> i64 {
+        self.current_header.read().timestamp()
+    }
+
+    /// Returns the latest block transactions.
+    pub fn latest_transactions(&self) -> Result<Transactions<N>> {
+        self.get_transactions(self.latest_height())
     }
 
     /// Returns the latest epoch number.
     pub fn latest_epoch_number(&self) -> u32 {
-        self.current_height / N::NUM_BLOCKS_PER_EPOCH
+        self.current_header.read().height() / N::NUM_BLOCKS_PER_EPOCH
     }
 
     /// Returns the latest epoch challenge.
     pub fn latest_epoch_challenge(&self) -> Result<EpochChallenge<N>> {
         // Get the epoch starting height (a multiple of `NUM_BLOCKS_PER_EPOCH`).
-        let epoch_starting_height = self.current_height - self.current_height % N::NUM_BLOCKS_PER_EPOCH;
+        let latest_height = self.latest_height();
+        let epoch_starting_height = latest_height - latest_height % N::NUM_BLOCKS_PER_EPOCH;
         ensure!(epoch_starting_height % N::NUM_BLOCKS_PER_EPOCH == 0, "Invalid epoch starting height");
         // Retrieve the epoch block hash, defined as the 'previous block hash' from the epoch starting height.
         let epoch_block_hash = self.get_previous_hash(epoch_starting_height)?;
@@ -232,67 +236,24 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         EpochChallenge::new(self.latest_epoch_number(), epoch_block_hash, N::COINBASE_PUZZLE_DEGREE)
     }
 
-    /// Returns the latest block header.
-    pub fn latest_header(&self) -> Result<Header<N>> {
-        self.get_header(self.current_height)
-    }
-
-    /// Returns the latest block coinbase target.
-    pub fn latest_coinbase_target(&self) -> Result<u64> {
-        Ok(self.latest_header()?.coinbase_target())
-    }
-
-    /// Returns the latest block proof target.
-    pub fn latest_proof_target(&self) -> Result<u64> {
-        Ok(self.latest_header()?.proof_target())
-    }
-
-    /// Returns the latest coinbase timestamp.
-    pub fn latest_coinbase_timestamp(&self) -> Result<i64> {
-        Ok(self.latest_header()?.last_coinbase_timestamp())
-    }
-
-    /// Returns the latest block timestamp.
-    pub fn latest_timestamp(&self) -> Result<i64> {
-        Ok(self.latest_header()?.timestamp())
-    }
-
-    /// Returns the latest block transactions.
-    pub fn latest_transactions(&self) -> Result<Transactions<N>> {
-        self.get_transactions(self.current_height)
-    }
-
     /// Adds the given block as the next block in the chain.
-    pub fn add_next_block(&mut self, block: &Block<N>) -> Result<()> {
+    pub fn add_next_block(&self, block: &Block<N>) -> Result<()> {
         /* ATOMIC CODE SECTION */
+        let mut current_hash = self.current_hash.write();
+        let mut current_header = self.current_header.write();
+        let mut block_tree = self.block_tree.write();
 
         // Add the block to the ledger. This code section executes atomically.
-        {
-            let mut ledger = self.clone();
 
-            // Update the blocks.
-            ledger.current_hash = block.hash();
-            ledger.current_height = block.height();
-            ledger.current_round = block.round();
-            ledger.block_tree.append(&[block.hash().to_bits_le()])?;
-            ledger.blocks.insert(*ledger.block_tree.root(), block)?;
+        // Update the blocks.
+        current_hash.clone_from(&block.hash());
+        current_header.clone_from(block.header());
+        block_tree.append(&[block.hash().to_bits_le()])?;
 
-            // Update the VM.
-            for transaction in block.transactions().values() {
-                ledger.vm.finalize(transaction)?;
-            }
-
-            *self = Self {
-                vm: ledger.vm,
-                coinbase_puzzle: ledger.coinbase_puzzle,
-                current_hash: ledger.current_hash,
-                current_height: ledger.current_height,
-                current_round: ledger.current_round,
-                block_tree: ledger.block_tree,
-                blocks: ledger.blocks,
-                transactions: ledger.transactions,
-                transitions: ledger.transitions,
-            };
+        // Update the VM.
+        self.vm.block_store().insert(*block_tree.root(), block)?;
+        for transaction in block.transactions().values() {
+            self.vm.finalize(transaction)?;
         }
 
         Ok(())
