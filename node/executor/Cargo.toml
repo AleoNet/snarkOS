@@ -1,0 +1,50 @@
+[package]
+name = "snarkos-node-executor"
+version = "2.0.2"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A node executor for a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "GPL-3.0"
+edition = "2021"
+
+[dependencies.anyhow]
+version = "1"
+
+[dependencies.async-trait]
+version = "0.1"
+
+[dependencies.num_cpus]
+version = "1"
+
+[dependencies.once_cell]
+version = "1"
+
+[dependencies.rayon]
+version = "1"
+
+[dependencies.serde]
+version = "1"
+features = [ "derive" ]
+
+[dependencies.tokio]
+version = "1"
+features = ["rt", "signal", "sync", "time"]
+
+[dependencies.tracing]
+version = "0.1"
+
+[dev-dependencies.tracing-subscriber]
+version = "0.3"
+
+[dev-dependencies.tokio]
+version = "1"
+features = ["macros", "rt-multi-thread"]

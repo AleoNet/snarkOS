@@ -1,0 +1,55 @@
+[package]
+name = "snarkos-node-store"
+version = "2.0.2"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A node storage for a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "GPL-3.0"
+edition = "2021"
+
+[dependencies.aleo-std]
+version = "0.1.15"
+
+[dependencies.anyhow]
+version = "1"
+
+[dependencies.bincode]
+version = "1.0"
+
+[dependencies.indexmap]
+version = "1.9"
+
+[dependencies.once_cell]
+version = "1.15"
+
+[dependencies.parking_lot]
+version = "0.12"
+
+[dependencies.rocksdb]
+version = "0.19"
+default-features = false
+features = [ "lz4" ]
+
+[dependencies.serde]
+version = "1"
+
+[dependencies.snarkvm]
+workspace = true
+
+[dependencies.tracing]
+version = "0.1"
+
+[dev-dependencies.serial_test]
+version = "0.9.0"
+
+[dev-dependencies.tempfile]
+version = "3.2"

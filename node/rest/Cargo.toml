@@ -1,0 +1,52 @@
+[package]
+name = "snarkos-node-rest"
+version = "0.9.0"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A REST API server for a decentralized virtual machine"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "GPL-3.0"
+edition = "2021"
+
+[dependencies.anyhow]
+version = "1"
+
+[dependencies.colored]
+version = "2.0"
+
+[dependencies.http]
+version = "0.2"
+
+[dependencies.indexmap]
+version = "1.8"
+
+[dependencies.serde]
+version = "1"
+default-features = false
+features = [ "derive" ]
+
+[dependencies.snarkos-node-ledger]
+path = "../ledger"
+
+[dependencies.snarkos-node-router]
+path = "../router"
+
+[dependencies.snarkvm]
+workspace = true
+
+[dependencies.tokio]
+version = "1"
+
+[dependencies.tracing]
+version = "0.1"
+
+[dependencies.warp]
+version = "0.3"

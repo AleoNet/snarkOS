@@ -1,0 +1,73 @@
+[package]
+name = "snarkos-node-ledger"
+version = "2.0.2"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A node ledger for a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "GPL-3.0"
+edition = "2021"
+
+[features]
+default = [ "parallel" ]
+parallel = [ "rayon" ]
+
+[dependencies.anyhow]
+version = "1"
+
+[dependencies.backoff]
+version = "0.4"
+features = [ "tokio" ]
+
+[dependencies.colored]
+version = "2.0"
+
+[dependencies.futures]
+version = "0.3"
+
+[dependencies.indexmap]
+version = "1.9"
+features = [ "rayon" ]
+
+[dependencies.once_cell]
+version = "1.13"
+
+[dependencies.parking_lot]
+version = "0.12"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.rayon]
+version = "1"
+optional = true
+
+[dependencies.reqwest]
+version = "0.11"
+
+[dependencies.snarkos-node-store]
+path = "../store"
+
+[dependencies.snarkvm]
+workspace = true
+
+[dependencies.time]
+version = "0.3"
+
+[dependencies.tokio]
+version = "1.21"
+features = ["rt"]
+
+[dependencies.tracing]
+version = "0.1"
+
+[dev-dependencies.tracing-test]
+version = "0.2"

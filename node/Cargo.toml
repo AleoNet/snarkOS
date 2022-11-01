@@ -1,0 +1,67 @@
+[package]
+name = "snarkos-node"
+version = "2.0.2"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A node for a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "GPL-3.0"
+edition = "2021"
+
+[dependencies.anyhow]
+version = "1"
+
+[dependencies.async-trait]
+version = "0.1"
+
+[dependencies.parking_lot]
+version = "0.12"
+
+[dependencies.rand]
+version = "0.8"
+default-features = false
+
+[dependencies.serde_json]
+version = "1"
+
+[dependencies.snarkos-account]
+path = "../account"
+
+[dependencies.snarkos-node-executor]
+path = "./executor"
+
+[dependencies.snarkos-node-ledger]
+path = "./ledger"
+
+[dependencies.snarkos-node-messages]
+path = "./messages"
+
+[dependencies.snarkos-node-rest]
+path = "./rest"
+
+[dependencies.snarkos-node-router]
+path = "./router"
+
+[dependencies.snarkos-node-store]
+path = "./store"
+
+[dependencies.snarkvm]
+workspace = true
+
+[dependencies.time]
+version = "0.3"
+
+[dependencies.tokio]
+version = "1.21"
+features = ["rt", "signal"]
+
+[dependencies.tracing]
+version = "0.1"

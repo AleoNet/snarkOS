@@ -33,16 +33,16 @@ source $HOME/.cargo/env
 cargo install --path .
 
 echo "=================================================="
-echo " Attention - Please ensure ports 4130 and 4180"
+echo " Attention - Please ensure ports 4133 and 3033"
 echo "             are enabled on your local network."
 echo ""
-echo " Cloud Providers - Enable ports 4130 and 4180"
+echo " Cloud Providers - Enable ports 4133 and 3033"
 echo "                   in your network firewall"
 echo ""
 echo " Home Users - Enable port forwarding or NAT rules"
-echo "              for 4130 and 4180 on your router."
+echo "              for 4133 and 3033 on your router."
 echo "=================================================="
 
 # Open ports on system
-ufw allow 4130/tcp
-ufw allow 4180/tcp
+ufw allow 4133/tcp
+ufw allow 3033/tcp

@@ -12,13 +12,16 @@
 
 * [1. Overview](#1-overview)
 * [2. Build Guide](#2-build-guide)
-    * [2.1 Requirements](#21-requirements)
-    * [2.2 Installation](#22-installation)
-* [3a. Run an Aleo Client Node](#3a-run-an-aleo-client-node)
-* [3b. Run an Aleo Mining Node](#3a-run-an-aleo-mining-node)
+  * [2.1 Requirements](#21-requirements)
+  * [2.2 Installation](#22-installation)
+* [3. Run an Aleo Node](#3-run-an-aleo-node)
+  * [3a. Run an Aleo Client](#3a-run-an-aleo-client)
+  * [3b. Run an Aleo Prover](#3a-run-an-aleo-prover)
 * [4. FAQs](#4-faqs)
 * [5. Command Line Interface](#5-configuration-file)
 * [6. Development Guide](#6-development-guide)
+  * [6.1 Quick Start](#61-quick-start)
+  * [6.2 Operations](#61-operations)
 * [7. License](#7-license)
 
 [comment]: <> (* [4. JSON-RPC Interface]&#40;#4-json-rpc-interface&#41;)
@@ -26,8 +29,9 @@
 
 ## 1. Overview
 
-__snarkOS__ is a decentralized operating system for private applications. It forms the backbone of [Aleo](https://aleo.org/) and
-enables applications to verify and store state in a publicly verifiable manner.
+__snarkOS__ is a decentralized operating system for zero-knowledge applications.
+This code forms the backbone the [Aleo](https://aleo.org/) network,
+which verifies transactions and stores the encrypted state applications in a publicly-verifiable manner.
 
 ## 2. Build Guide
 
@@ -39,49 +43,50 @@ The following are **minimum** requirements to run an Aleo node:
  - **Storage**: 128GB of disk space
  - **Network**: 50 Mbps of upload **and** download bandwidth
 
-Please note to run an Aleo proving node that is **competitive**, the machine will require more than these requirements.
+Please note to run an Aleo Prover that is **competitive**, the machine will require more than these requirements.
 
 ### 2.2 Installation
 
-Before beginning, please ensure your machine has `Rust v1.62+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
+Before beginning, please ensure your machine has `Rust v1.64+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 
-Start by cloning the snarkOS Github repository:
+Start by cloning this Github repository:
 ```
 git clone https://github.com/AleoHQ/snarkOS.git --depth 1
 ```
 
-Next, move into the snarkOS directory:
+Next, move into the `snarkOS` directory:
 ```
 cd snarkOS
 ```
 
-**[For Ubuntu users]** A helper script to install dependencies is available. From the snarkOS directory, run:
+**[For Ubuntu users]** A helper script to install dependencies is available. From the `snarkOS` directory, run:
 ```
 ./build_ubuntu.sh
 ```
 
-## 3a. Run an Aleo Client Node
+Lastly, install `snarkOS`:
+```
+cargo install --path .
+```
+
+## 3. Run an Aleo Node
+
+## 3a. Run an Aleo Client
 
 Start by following the instructions in the [Build Guide](#2-build-guide).
 
-Next, to start a client node, from the snarkOS directory, run:
+Next, to start a client node, from the `snarkOS` directory, run:
 ```
 ./run-client.sh
 ```
 
-## 3b. Run an Aleo Prover Node
-
-**Note:** The Aleo prover node will be available in Phase 2.
+## 3b. Run an Aleo Prover
 
 Start by following the instructions in the [Build Guide](#2-build-guide).
 
-Next, to generate an Aleo prover address, run:
+Next, generate an Aleo account address:
 ```
-snarkos experimental new_account 
-```
-or from the snarkOS directory, run:
-```
-cargo run --release -- experimental new_account
+snarkos account new
 ```
 This will output a new Aleo account in the terminal.
 
@@ -91,16 +96,16 @@ This will output a new Aleo account in the terminal.
 
   Private Key  APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Save Me
      View Key  AViewKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Save Me
-      Address  aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Use Me For The Next Step
+      Address  aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Use In The Next Step
 ```
 
-Next, to start a proving node, from the snarkOS directory, run:
+Next, to start a proving node, from the `snarkOS` directory, run:
 ```
 ./run-prover.sh
 ```
-When prompted, enter your Aleo prover address:
+When prompted, enter your Aleo address:
 ```
-Enter your Aleo prover address:
+Enter the Aleo Prover account address:
 aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
@@ -108,77 +113,108 @@ aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ### 1. My node is unable to compile.
 
-- Ensure your machine has `Rust v1.62+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
+- Ensure your machine has `Rust v1.64+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 - If large errors appear during compilation, try running `cargo clean`.
-- Ensure snarkOS is started using `./run-client.sh` or `./run-prover.sh`.
+- Ensure `snarkOS` is started using `./run-client.sh` or `./run-prover.sh`.
 
 ### 2. My node is unable to connect to peers on the network.
 
-- Ensure ports `4130/tcp` and `4180/tcp` are open on your router and OS firewall.
-- Ensure snarkOS is started using `./run-client.sh` or `./run-prover.sh`.
+- Ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
+- Ensure `snarkOS` is started using `./run-client.sh` or `./run-prover.sh`.
 
 ### 3. I can't generate a new address ### 
 
-- Before running the command above (`snarkos experimental new_account`) try `source ~/.bashrc` 
-- Also double check the spelling of `snarkos`. Note the directory is `/snarkOS`, the command is `snarkos`
+- Before running the command above (`snarkos account new`) try `source ~/.bashrc`
+- Also double-check the spelling of `snarkos`. Note the directory is `/snarkOS`, the command is `snarkos`
 
 ## 5. Command Line Interface
 
-To run a node with custom settings, refer to the full list of options and flags available in the snarkOS CLI.
+To run a node with custom settings, refer to the full list of options and flags available in the `snarkOS` CLI.
 
 The full list of CLI flags and options can be viewed with `snarkos --help`:
 ```
-snarkos
+snarkOS 
 The Aleo Team <hello@aleo.org>
 
 USAGE:
-    snarkos [FLAGS] [OPTIONS] [SUBCOMMAND]
-
-FLAGS:
-        --display    If the flag is set, the node will render a read-only display
-    -h, --help       Prints help information
-        --norpc      If the flag is set, the node will not initialize the RPC server
-    -V, --version    Prints version information
+    snarkos [OPTIONS] <SUBCOMMAND>
 
 OPTIONS:
-        --connect <connect>          Specify the IP address and port of a peer to connect to
-        --dev <dev>                  Enables development mode, specify a unique ID for the local node
-        --network <network>          Specify the network of this node [default: 2]
-        --node <node>                Specify the IP address and port for the node server [default: 0.0.0.0:4132]
-        --prover <prover>            Specify this as a prover node, with the given prover address
-        --rpc <rpc>                  Specify the IP address and port for the RPC server [default: 0.0.0.0:3032]
-        --password <rpc-password>    Specify the password for the RPC server [default: pass]
-        --username <rpc-username>    Specify the username for the RPC server [default: root]
-        --verbosity <verbosity>      Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
+    -h, --help                     Print help information
+    -v, --verbosity <VERBOSITY>    Specify the verbosity [options: 0, 1, 2, 3] [default: 2]
 
 SUBCOMMANDS:
-    clean           Removes the ledger files from storage
-    experimental    Experimental features
-    help            Prints this message or the help of the given subcommand(s)
-    update          Updates snarkOS to the latest version
+    account    Commands to manage Aleo accounts
+    clean      Cleans the snarkOS node storage
+    help       Print this message or the help of the given subcommand(s)
+    start      Starts the snarkOS node
+    update     Update snarkOS
+```
+
+The following are the options for the `snarkos start` command:
+```
+snarkos-start 
+Starts the snarkOS node
+
+USAGE:
+    snarkos start [OPTIONS]
+
+OPTIONS:
+        --beacon <BEACON>          Specify this as a beacon, with the given account private key for this node
+        --client <CLIENT>          Specify this as a client, with an optional account private key for this node
+        --connect <CONNECT>        Specify the IP address and port of a peer to connect to
+        --dev <DEV>                Enables development mode, specify a unique ID for this node
+    -h, --help                     Print help information
+        --network <NETWORK>        Specify the network of this node [default: 3]
+        --node <NODE>              Specify the IP address and port for the node server [default: 0.0.0.0:4133]
+        --nodisplay                If the flag is set, the node will not render the display
+        --norest                   If the flag is set, the node will not initialize the REST server
+        --prover <PROVER>          Specify this as a prover, with the given account private key for this node
+        --rest <REST>              Specify the IP address and port for the REST server [default: 0.0.0.0:3033]
+        --validator <VALIDATOR>    Specify this as a validator, with the given account private key for this node
+        --verbosity <VERBOSITY>    Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
 ```
 
 ## 6. Development
 
-[//]: # (In one terminal, start the first node by running:)
+### 6.1 Quick Start
 
-[//]: # (```)
+In one terminal, start the beacon by running:
+```
+cargo run --release -- start --nodisplay --dev 0 --beacon ""
+```
 
-[//]: # (cargo run --release -- --dev 1 --node 0.0.0.0:4135 --rpc 0.0.0.0:3035 --prover aleo1d5hg2z3ma00382pngntdp68e74zv54jdxy249qhaujhks9c72yrs33ddah)
+In a second terminal, run:
+```
+cargo run --release -- start --nodisplay --dev 1 --prover ""
+```
 
-[//]: # (```)
+This procedure can be repeated to start more nodes.
 
-[//]: # ()
-[//]: # (After the first node starts, in a second terminal, run:)
+### 6.2 Operations
 
-[//]: # (```)
+It is important to initialize the nodes starting from `0` and incrementing by `1` for each new node.
 
-[//]: # (cargo run --release -- --dev 2)
+The following is a list of options to initialize a node (replace `XX` with a number starting from `0`):
+```
+cargo run --release -- start --nodisplay --dev XX --beacon ""
+cargo run --release -- start --nodisplay --dev XX --validator ""
+cargo run --release -- start --nodisplay --dev XX --prover ""
+cargo run --release -- start --nodisplay --dev XX --client ""
+cargo run --release -- start --nodisplay --dev XX
+```
 
-[//]: # (```)
+When no node type is specified, the node will default to `--client`.
 
-We welcome all contributions to snarkOS. Please refer to the [license](#7-license) for the terms of contributions.
+##### Clean Up
+
+To clean up the node storage, run:
+```
+cargo run --release -- clean --dev XX
+```
 
 ## 7. License
+
+We welcome all contributions to `snarkOS`. Please refer to the [license](#7-license) for the terms of contributions.
 
 [![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)

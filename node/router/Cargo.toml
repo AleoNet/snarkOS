@@ -1,0 +1,77 @@
+[package]
+name = "snarkos-node-router"
+version = "2.0.2"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A node router for a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "GPL-3.0"
+edition = "2021"
+
+[dependencies.anyhow]
+version = "1"
+
+[dependencies.async-trait]
+version = "0.1"
+
+[dependencies.bincode]
+version = "1.0"
+
+[dependencies.bytes]
+version = "1.0.0"
+
+[dependencies.futures]
+version = "0.3.21"
+features = [ "thread-pool" ]
+
+[dependencies.indexmap]
+version = "1.9"
+features = ["rayon"]
+
+[dependencies.once_cell]
+version = "1"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.serde]
+version = "1"
+
+[dependencies.snarkos-node-executor]
+path = "../executor"
+
+[dependencies.snarkos-node-messages]
+path = "../messages"
+
+[dependencies.snarkvm]
+workspace = true
+
+[dependencies.tokio]
+version = "1.21"
+features = [
+  "io-util",
+  "macros",
+  "net",
+  "rt-multi-thread",
+  "signal",
+  "sync",
+  "time"
+]
+
+[dependencies.tokio-util]
+version = "0.7"
+features = [ "codec" ]
+
+[dependencies.tokio-stream]
+version = "=0.1"
+
+[dependencies.tracing]
+version = "0.1"

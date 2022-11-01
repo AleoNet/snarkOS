@@ -1,0 +1,46 @@
+[package]
+name = "snarkos-display"
+version = "2.0.2"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A display for a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "GPL-3.0"
+edition = "2021"
+
+[dependencies.anyhow]
+version = "1"
+
+[dependencies.colored]
+version = "2.0"
+
+[dependencies.crossterm]
+version = "0.25"
+
+[dependencies.snarkos-node]
+path = "../node"
+
+[dependencies.snarkvm]
+workspace = true
+
+[dependencies.tokio]
+version = "1.21"
+features = ["rt"]
+
+[dependencies.tracing]
+version = "0.1"
+
+[dependencies.tracing-subscriber]
+version = "0.3"
+features = [ "env-filter" ]
+
+[dependencies.tui]
+version = "0.19"
