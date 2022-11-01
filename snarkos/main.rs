@@ -18,6 +18,11 @@ use snarkos_cli::{commands::CLI, helpers::Updater};
 
 use clap::Parser;
 
+use tikv_jemallocator::Jemalloc;
+
+#[global_allocator]
+static GLOBAL: Jemalloc = Jemalloc;
+
 fn main() -> anyhow::Result<()> {
     // Parse the given arguments.
     let cli = CLI::parse();

@@ -80,6 +80,9 @@ path = "./node/router"
 [dependencies.snarkos-node-store]
 path = "./node/store"
 
+[dependencies.tikv-jemallocator]
+version = "0.5"
+
 [dev-dependencies.rusty-hook]
 version = "0.11.2"
 
