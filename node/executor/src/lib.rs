@@ -37,6 +37,7 @@ use crate::resources::Resources;
 use once_cell::sync::OnceCell;
 use rayon::{ThreadPool, ThreadPoolBuilder};
 use std::sync::Arc;
+use tokio::task::JoinHandle;
 
 #[async_trait]
 pub trait Executor: 'static + Clone + Send + Sync {
@@ -76,13 +77,21 @@ pub trait Executor: 'static + Clone + Send + Sync {
 
     /// Handles OS signals for the node to intercept and perform a clean shutdown.
     /// Note: Only Ctrl-C is supported; it should work on both Unix-family systems and Windows.
-    fn handle_signals(&self) {
+    fn handle_signals(&self, additional_tasks: Option<Vec<JoinHandle<()>>>) {
         let node = self.clone();
         Self::resources().register_task(
             None, // No need to provide an id, as the task will run indefinitely.
             tokio::task::spawn(async move {
                 match tokio::signal::ctrl_c().await {
                     Ok(()) => {
+                        // Shut down the additional tasks.
+                        if let Some(tasks) = additional_tasks {
+                            for task in tasks {
+                                trace!("Aborting additional task");
+                                task.abort();
+                            }
+                        }
+                        // Shut down the node.
                         node.shut_down().await;
                         std::process::exit(0);
                     }

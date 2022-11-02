@@ -88,7 +88,7 @@ impl<N: Network> Beacon<N> {
         // Initialize the block production.
         node.initialize_block_production().await;
         // Initialize the signal handler.
-        node.handle_signals();
+        node.handle_signals(None);
         // Return the node.
         Ok(node)
     }

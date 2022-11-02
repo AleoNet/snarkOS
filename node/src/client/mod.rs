@@ -60,7 +60,7 @@ impl<N: Network> Client<N> {
         // Initialize the heartbeat.
         node.initialize_heartbeat().await;
         // Initialize the signal handler.
-        node.handle_signals();
+        node.handle_signals(None);
         // Return the node.
         Ok(node)
     }
