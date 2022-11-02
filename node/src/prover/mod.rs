@@ -67,11 +67,9 @@ impl<N: Network> Prover<N> {
         // Initialize the prover tasks.
         let mut prover_tasks = Vec::new();
         // Initialize the heartbeat.
-        let heartbeat = node.initialize_heartbeat().await;
-        prover_tasks.push(heartbeat);
+        prover_tasks.push(node.initialize_heartbeat().await);
         // Initialize the coinbase puzzle.
-        let coinbase_puzzle = node.initialize_coinbase_puzzle().await;
-        prover_tasks.push(coinbase_puzzle);
+        prover_tasks.push(node.initialize_coinbase_puzzle().await);
         // Initialize the signal handler.
         node.handle_signals(Some(prover_tasks));
         // Return the node.
