@@ -231,7 +231,12 @@ impl<N: Network> Beacon<N> {
                 }
             };
             // Add the transaction to the memory pool.
-            if let Err(error) = self.ledger.consensus().write().add_unconfirmed_transaction(transaction) {
+            let ledger = self.ledger.clone();
+            if let Err(error) =
+                task::spawn_blocking(move || ledger.consensus().write().add_unconfirmed_transaction(transaction))
+                    .await
+                    .unwrap()
+            {
                 bail!("Failed to add a transfer transaction to the memory pool: {error}")
             }
         }
