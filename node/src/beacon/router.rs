@@ -76,9 +76,17 @@ impl<N: Network> Inbound<N> for Beacon<N> {
             trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
         } else {
             // Add the unconfirmed solution to the memory pool.
-            if let Err(error) = self.ledger.consensus().write().add_unconfirmed_solution(&solution) {
-                trace!("[UnconfirmedSolution] {error}");
-                return true; // Maintain the connection.
+            match self.ledger.consensus().try_write() {
+                Some(mut ledger) => {
+                    if let Err(error) = ledger.add_unconfirmed_solution(&solution) {
+                        trace!("[UnconfirmedSolution] {error}");
+                        return true; // Maintain the connection.
+                    }
+                }
+                None => {
+                    trace!("Ignoring an unconfirmed solution (already creating a block).");
+                    return true;
+                }
             }
 
             // Propagate the `UnconfirmedSolution`.
