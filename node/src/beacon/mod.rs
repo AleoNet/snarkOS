@@ -243,30 +243,37 @@ impl<N: Network> Beacon<N> {
 
         // Propose the next block.
         let self_clone = self.clone();
-        let next_block = match task::spawn_blocking(move || {
-            self_clone.ledger.consensus().read().propose_next_block(self_clone.private_key(), &mut rand::thread_rng())
+        let next_block = task::spawn_blocking(move || {
+            let next_block = match self_clone
+                .ledger
+                .consensus()
+                .read()
+                .propose_next_block(self_clone.private_key(), &mut rand::thread_rng())
+            {
+                Ok(next_block) => next_block,
+                Err(error) => {
+                    bail!("Failed to propose the next block: {error}")
+                }
+            };
+
+            let next_block_height = next_block.height();
+
+            // Advance to the next block.
+            match self_clone.ledger().consensus().write().add_next_block(&next_block) {
+                Ok(()) => match serde_json::to_string_pretty(&next_block) {
+                    Ok(block) => info!("Block {next_block_height}: {block}"),
+                    Err(error) => info!("Block {next_block_height}: (serde failed: {error})"),
+                },
+                Err(error) => bail!("Failed to advance to the next block: {error}"),
+            }
+
+            Ok(next_block)
         })
         .await
-        .unwrap()
-        {
-            Ok(next_block) => next_block,
-            Err(error) => {
-                bail!("Failed to propose the next block: {error}")
-            }
-        };
+        .unwrap()?;
+
         let next_block_height = next_block.height();
         let next_block_hash = next_block.hash();
-
-        // Advance to the next block.
-        let ledger = self.ledger.clone();
-        let block_clone = next_block.clone();
-        match task::spawn_blocking(move || ledger.consensus().write().add_next_block(&block_clone)).await.unwrap() {
-            Ok(()) => match serde_json::to_string_pretty(&next_block) {
-                Ok(block) => info!("Block {next_block_height}: {block}"),
-                Err(error) => info!("Block {next_block_height}: (serde failed: {error})"),
-            },
-            Err(error) => bail!("Failed to advance to the next block: {error}"),
-        }
 
         // Serialize the block ahead of time to not do it for each peer.
         let serialized_block = match Data::Object(next_block).serialize().await {
