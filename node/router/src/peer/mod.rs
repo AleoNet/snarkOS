@@ -41,7 +41,7 @@ pub(crate) type PeerHandler<N> = mpsc::Receiver<Message<N>>;
 #[derive(Clone, Debug)]
 pub struct Peer<N: Network> {
     /// The IP address of the peer, with the port set to the listener port.
-    ip: Arc<SocketAddr>,
+    ip: SocketAddr,
     /// The message version of the peer.
     pub version: Arc<RwLock<u32>>,
     /// The node type of the peer.
@@ -72,7 +72,7 @@ impl<N: Network> Peer<N> {
 
         // Construct the peer.
         let peer = Peer {
-            ip: Arc::new(ip),
+            ip,
             version: Arc::new(RwLock::new(0)),
             node_type: Arc::new(RwLock::new(node_type)),
             status: Arc::new(RwLock::new(status)),
