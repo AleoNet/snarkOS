@@ -18,7 +18,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_executor::{spawn_task, Executor, NodeType, Status};
+use snarkos_node_executor::{Executor, NodeType, Status};
 use snarkos_node_messages::{Data, Message, PuzzleRequest, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ViewKey};
@@ -28,7 +28,7 @@ use core::time::Duration;
 use rand::Rng;
 use std::{net::SocketAddr, sync::Arc};
 use time::OffsetDateTime;
-use tokio::sync::RwLock;
+use tokio::{sync::RwLock, task::JoinHandle};
 
 /// A prover is a full node, capable of producing proofs for consensus.
 #[derive(Clone)]
@@ -64,12 +64,16 @@ impl<N: Network> Prover<N> {
         };
         // Initialize the router handler.
         router.initialize_handler(node.clone(), router_receiver).await;
+        // Initialize the prover tasks.
+        let mut prover_tasks = Vec::new();
         // Initialize the heartbeat.
-        node.initialize_heartbeat().await;
+        let heartbeat = node.initialize_heartbeat().await;
+        prover_tasks.push(heartbeat);
         // Initialize the coinbase puzzle.
-        node.initialize_coinbase_puzzle().await;
+        let coinbase_puzzle = node.initialize_coinbase_puzzle().await;
+        prover_tasks.push(coinbase_puzzle);
         // Initialize the signal handler.
-        node.handle_signals();
+        node.handle_signals(Some(prover_tasks));
         // Return the node.
         Ok(node)
     }
@@ -113,16 +117,16 @@ impl<N: Network> Prover<N> {
     const HEARTBEAT_IN_SECS: u64 = N::ANCHOR_TIME as u64 / 2;
 
     /// Initialize a new instance of the heartbeat.
-    async fn initialize_heartbeat(&self) {
+    async fn initialize_heartbeat(&self) -> JoinHandle<()> {
         let prover = self.clone();
-        spawn_task!(Self, {
+        tokio::task::spawn(async move {
             loop {
                 // Send a "PuzzleRequest" to a beacon node.
                 prover.send_puzzle_request().await;
                 // Sleep for `Self::HEARTBEAT_IN_SECS` seconds.
                 tokio::time::sleep(Duration::from_secs(Self::HEARTBEAT_IN_SECS)).await;
             }
-        });
+        })
     }
 
     /// Sends a "PuzzleRequest" to a beacon node.
@@ -140,9 +144,10 @@ impl<N: Network> Prover<N> {
     }
 
     /// Initialize a new instance of the coinbase puzzle.
-    async fn initialize_coinbase_puzzle(&self) {
+    async fn initialize_coinbase_puzzle(&self) -> JoinHandle<()> {
         let prover = self.clone();
-        spawn_task!(Self, {
+
+        tokio::task::spawn(async move {
             loop {
                 // If the node is not connected to any peers, then skip this iteration.
                 if prover.router.number_of_connected_peers().await == 0 {
@@ -174,7 +179,7 @@ impl<N: Network> Prover<N> {
                 // If the latest epoch challenge and latest block exists, then generate a prover solution.
                 if let (Some(epoch_challenge), Some(block)) = (latest_epoch_challenge, latest_block) {
                     let prover = prover.clone();
-                    spawn_task!(Self, {
+                    tokio::task::spawn(async move {
                         // Set the status to `Proving`.
                         Self::status().update(Status::Proving);
 
@@ -237,11 +242,11 @@ impl<N: Network> Prover<N> {
                         // Set the status to `Ready`.
                         Self::status().update(Status::Ready);
                         tokio::time::sleep(Duration::from_millis(50)).await;
-                    })
+                    });
                 } else {
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
             }
-        });
+        })
     }
 }
