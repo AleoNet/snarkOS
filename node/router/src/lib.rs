@@ -654,7 +654,6 @@ impl<N: Network> Router<N> {
             info!("Connected to '{peer_ip}'");
 
             // Process incoming messages until this stream is disconnected.
-            let executor_clone = executor.clone();
             loop {
                 tokio::select! {
                     // Message channel is routing a message outbound to the peer.
@@ -666,7 +665,7 @@ impl<N: Network> Router<N> {
                             break;
                         }
 
-                        executor_clone.outbound(&peer, message, &router, &mut outbound_socket).await
+                        executor.outbound(&peer, message, &router, &mut outbound_socket).await
                     },
                     result = outbound_socket.next() => match result {
                         // Received a message from the peer.
@@ -683,7 +682,9 @@ impl<N: Network> Router<N> {
                             }
 
                             // Update the timestamp for the received message.
-                            peer.seen_messages.write().await.insert((message.id(), rand::thread_rng().gen()), SystemTime::now());
+                            let msg_id = (message.id(), rand::thread_rng().gen());
+                            let timestamp = SystemTime::now();
+                            peer.seen_messages.write().await.insert(msg_id, timestamp);
                             // Drop the peer, if they have sent more than 500 messages in the last 5 seconds.
                             let frequency = peer.seen_messages.read().await.values().filter(|t| t.elapsed().unwrap_or_default().as_secs() <= 5).count();
                             if frequency >= 500 {
@@ -696,7 +697,7 @@ impl<N: Network> Router<N> {
                             }
 
                             // Process the message.
-                            let success = executor_clone.inbound(&peer, message, &router).await;
+                            let success = executor.inbound(&peer, message, &router).await;
                             // Disconnect if the peer violated the protocol.
                             if !success {
                                 warn!("Disconnecting from '{peer_ip}' (violated protocol)");
