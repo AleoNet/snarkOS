@@ -141,40 +141,35 @@ impl RocksDB {
     /// Opens the test database.
     #[cfg(test)]
     fn open_testing(temp_dir: std::path::PathBuf, dev: Option<u16>) -> Result<Self> {
-        static DB: OnceCell<RocksDB> = OnceCell::new();
+        let database = {
+            // Customize database options.
+            let mut options = rocksdb::Options::default();
+            options.set_compression_type(rocksdb::DBCompressionType::Lz4);
 
-        // Retrieve the database.
-        let database = DB
-            .get_or_try_init(|| {
-                // Customize database options.
-                let mut options = rocksdb::Options::default();
-                options.set_compression_type(rocksdb::DBCompressionType::Lz4);
+            // Register the prefix length.
+            let prefix_extractor = rocksdb::SliceTransform::create_fixed_prefix(PREFIX_LEN);
+            options.set_prefix_extractor(prefix_extractor);
 
-                // Register the prefix length.
-                let prefix_extractor = rocksdb::SliceTransform::create_fixed_prefix(PREFIX_LEN);
-                options.set_prefix_extractor(prefix_extractor);
+            // Construct the directory for the test database.
+            let primary = match dev {
+                Some(dev) => temp_dir.join(dev.to_string()),
+                None => temp_dir,
+            };
 
-                // Construct the directory for the test database.
-                let primary = match dev {
-                    Some(dev) => temp_dir.join(dev.to_string()),
-                    None => temp_dir,
-                };
+            let rocksdb = {
+                options.increase_parallelism(2);
+                options.create_if_missing(true);
+                Arc::new(rocksdb::DB::open(&options, primary)?)
+            };
 
-                let rocksdb = {
-                    options.increase_parallelism(2);
-                    options.create_if_missing(true);
-                    Arc::new(rocksdb::DB::open(&options, primary)?)
-                };
-
-                Ok::<_, anyhow::Error>(RocksDB {
-                    rocksdb,
-                    network_id: u16::MAX,
-                    dev,
-                    batch_in_progress: Default::default(),
-                    atomic_batch: Default::default(),
-                })
-            })?
-            .clone();
+            Ok::<_, anyhow::Error>(RocksDB {
+                rocksdb,
+                network_id: u16::MAX,
+                dev,
+                batch_in_progress: Default::default(),
+                atomic_batch: Default::default(),
+            })
+        }?;
 
         // Ensure the database development ID match.
         match database.dev == dev {
