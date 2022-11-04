@@ -115,11 +115,21 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
 
         // Initialize the routes.
         let routes = self.routes();
+
+        // Add custom logging for each request.
+        let custom_log = warp::log::custom(|info| {
+            // Use a log macro, or slog, or println, or whatever!
+            match info.remote_addr() {
+                Some(addr) => debug!("Received '{} {}' from '{addr}' ({})", info.method(), info.path(), info.status()),
+                None => debug!("Received '{} {}' ({})", info.method(), info.path(), info.status()),
+            }
+        });
+
         // Spawn the server.
         self.handles.push(Arc::new(tokio::spawn(async move {
             println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
             // Start the server.
-            warp::serve(routes.with(cors)).run(rest_ip).await
+            warp::serve(routes.with(cors).with(custom_log)).run(rest_ip).await
         })))
     }
 
