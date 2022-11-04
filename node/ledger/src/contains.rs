@@ -18,7 +18,7 @@ use super::*;
 
 impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     /// Returns `true` if the given state root exists.
-    pub fn contains_state_root(&self, state_root: Field<N>) -> Result<bool> {
+    pub fn contains_state_root(&self, state_root: &N::StateRoot) -> Result<bool> {
         self.vm.block_store().contains_state_root(state_root)
     }
 

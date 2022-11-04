@@ -21,7 +21,7 @@ use std::borrow::Cow;
 
 impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     /// Returns the block height that contains the given `state root`.
-    pub fn find_block_height_from_state_root(&self, state_root: Field<N>) -> Result<Option<u32>> {
+    pub fn find_block_height_from_state_root(&self, state_root: N::StateRoot) -> Result<Option<u32>> {
         self.vm.block_store().find_block_height_from_state_root(state_root)
     }
 

@@ -19,7 +19,7 @@ use crate::PuzzleCommitment;
 
 impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     /// Returns an iterator over the state roots, for all blocks in `self`.
-    pub fn state_roots(&self) -> impl '_ + Iterator<Item = Cow<'_, Field<N>>> {
+    pub fn state_roots(&self) -> impl '_ + Iterator<Item = Cow<'_, N::StateRoot>> {
         self.vm.block_store().state_roots()
     }
 

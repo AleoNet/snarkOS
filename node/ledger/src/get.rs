@@ -18,13 +18,13 @@ use super::*;
 
 impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     /// Returns the state root that contains the given `block height`.
-    pub fn get_state_root(&self, block_height: u32) -> Result<Option<Field<N>>> {
+    pub fn get_state_root(&self, block_height: u32) -> Result<Option<N::StateRoot>> {
         self.vm.block_store().get_state_root(block_height)
     }
 
     /// Returns a state path for the given commitment.
-    pub fn get_state_path(&self, commitment: &Field<N>) -> Result<StatePath<N>> {
-        StatePath::new_commitment(&self.block_tree.read(), self.vm.block_store(), commitment)
+    pub fn get_state_path_for_commitment(&self, commitment: &Field<N>) -> Result<StatePath<N>> {
+        self.vm.block_store().get_state_path_for_commitment(commitment)
     }
 
     /// Returns the block for the given block height.

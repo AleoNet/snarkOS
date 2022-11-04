@@ -31,14 +31,13 @@ use snarkvm::{
     console::{
         account::{Address, GraphKey, PrivateKey, Signature, ViewKey},
         network::prelude::*,
-        program::{Ciphertext, Identifier, Plaintext, ProgramID, Record, Value},
+        program::{Ciphertext, Identifier, Plaintext, StatePath, ProgramID, Record, Value},
         types::{Field, Group},
     },
     synthesizer::{
-        block::{Block, BlockTree, Header, Transaction, Transactions},
+        block::{Block, Header, Transaction, Transactions},
         coinbase_puzzle::{CoinbaseSolution, EpochChallenge, PuzzleCommitment},
         program::Program,
-        state_path::StatePath,
         store::{ConsensusStorage, ConsensusStore},
         vm::VM,
     },
@@ -76,10 +75,6 @@ pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
     current_hash: Arc<RwLock<N::BlockHash>>,
     /// The current block header.
     current_header: Arc<RwLock<Header<N>>>,
-    /// The current block tree.
-    block_tree: Arc<RwLock<BlockTree<N>>>,
-    // /// The mapping of program IDs to their global state.
-    // states: MemoryMap<ProgramID<N>, IndexMap<Identifier<N>, Plaintext<N>>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
@@ -118,7 +113,6 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
             vm,
             current_hash: Arc::new(RwLock::new(genesis.hash())),
             current_header: Arc::new(RwLock::new(*genesis.header())),
-            block_tree: Arc::new(RwLock::new(N::merkle_tree_bhp(&[genesis.hash().to_bits_le()])?)),
         };
 
         // If the block store is empty, initialize the genesis block.
@@ -139,12 +133,6 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         ledger.current_hash = Arc::new(RwLock::new(block.hash()));
         ledger.current_header = Arc::new(RwLock::new(*block.header()));
 
-        // TODO (howardwu): Improve the performance here by using iterators.
-        // Generate the block tree.
-        let hashes: Vec<_> =
-            (0..=latest_height).map(|height| ledger.get_hash(height).map(|hash| hash.to_bits_le())).try_collect()?;
-        ledger.block_tree = Arc::new(RwLock::new(N::merkle_tree_bhp(&hashes)?));
-
         // Safety check the existence of every block.
         cfg_into_iter!((0..=latest_height)).try_for_each(|height| {
             ledger.get_block(height)?;
@@ -161,7 +149,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the latest state root.
     pub fn latest_state_root(&self) -> Field<N> {
-        *self.block_tree.read().root()
+        *self.vm.block_store().current_state_root()
     }
 
     /// Returns the latest block.
@@ -238,23 +226,15 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Adds the given block as the next block in the chain.
     pub fn add_next_block(&self, block: &Block<N>) -> Result<()> {
-        /* ATOMIC CODE SECTION */
         let mut current_hash = self.current_hash.write();
         let mut current_header = self.current_header.write();
-        let mut block_tree = self.block_tree.write();
 
-        // Add the block to the ledger. This code section executes atomically.
+        // Update the VM.
+        self.vm.add_next_block(block)?;
 
         // Update the blocks.
         current_hash.clone_from(&block.hash());
         current_header.clone_from(block.header());
-        block_tree.append(&[block.hash().to_bits_le()])?;
-
-        // Update the VM.
-        self.vm.block_store().insert(*block_tree.root(), block)?;
-        for transaction in block.transactions().values() {
-            self.vm.finalize(transaction)?;
-        }
 
         Ok(())
     }
