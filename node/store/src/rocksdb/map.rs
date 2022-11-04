@@ -208,7 +208,7 @@ impl<
             };
 
             // Retrieve the atomic batch.
-            let batch = core::mem::take(&mut *self.database.atomic_batch.lock());
+            let batch = self.database.atomic_batch.lock();
 
             // Initialize the operation finder.
             let mut finder = OperationFinder { key: raw_key, value: None };
