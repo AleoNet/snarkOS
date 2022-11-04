@@ -31,7 +31,7 @@ use snarkvm::{
     console::{
         account::{Address, GraphKey, PrivateKey, Signature, ViewKey},
         network::prelude::*,
-        program::{Ciphertext, Identifier, Plaintext, StatePath, ProgramID, Record, Value},
+        program::{Ciphertext, Identifier, Plaintext, ProgramID, Record, StatePath, Value},
         types::{Field, Group},
     },
     synthesizer::{

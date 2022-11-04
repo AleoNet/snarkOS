@@ -292,7 +292,10 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     }
 
     /// Returns the state path for the given commitment.
-    async fn get_state_path_for_commitment(commitment: Field<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+    async fn get_state_path_for_commitment(
+        commitment: Field<N>,
+        ledger: Ledger<N, C>,
+    ) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.get_state_path_for_commitment(&commitment).or_reject()?))
     }
 

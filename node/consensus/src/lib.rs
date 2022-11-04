@@ -508,27 +508,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             }
         }
 
-        /* Fees */
-
-        // Prepare the block height, credits program ID, and genesis function name.
-        let height = block.height();
-        let credits_program_id = ProgramID::from_str("credits.aleo")?;
-        let credits_genesis = Identifier::from_str("genesis")?;
-
-        // Ensure the fee is correct for each transition.
-        for transition in block.transitions() {
-            if height > 0 {
-                // Ensure the genesis function is not called.
-                if *transition.program_id() == credits_program_id && *transition.function_name() == credits_genesis {
-                    bail!("The genesis function cannot be called.");
-                }
-                // Ensure the transition fee is not negative.
-                if transition.fee().is_negative() {
-                    bail!("The transition fee cannot be negative.");
-                }
-            }
-        }
-
         Ok(())
     }
 
@@ -544,6 +523,13 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Ensure the transaction is valid.
         if !self.ledger.vm().verify(transaction) {
             bail!("Transaction '{transaction_id}' is invalid")
+        }
+
+        /* Fee */
+
+        // Ensure transactions with a positive balance must pay for its storage in bytes.
+        if transaction.fee() >= 0 && transaction.to_bytes_le()?.len() < usize::try_from(transaction.fee()?)? {
+            bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
         }
 
         /* Input */
