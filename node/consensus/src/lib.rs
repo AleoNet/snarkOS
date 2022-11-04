@@ -354,23 +354,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         /* Input */
 
-        // Ensure that the origin are valid.
-        for origin in block.origins() {
-            match origin {
-                // Check that the commitment exists in the ledger.
-                Origin::Commitment(commitment) => {
-                    if !self.ledger.contains_commitment(commitment)? {
-                        bail!("The given transaction references a non-existent commitment {}", &commitment)
-                    }
-                }
-                // TODO (raychu86): Ensure that the state root exists in the ledger.
-                // Check that the state root is an existing state root.
-                Origin::StateRoot(_state_root) => {
-                    bail!("State roots are currently not supported (yet)")
-                }
-            }
-        }
-
         // Ensure the ledger does not already contain a given serial numbers.
         for serial_number in block.serial_numbers() {
             if self.ledger.contains_serial_number(serial_number)? {
@@ -583,23 +566,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         for tag in transaction.tags() {
             if self.ledger.contains_tag(tag)? {
                 bail!("Tag '{tag}' already exists in the ledger")
-            }
-        }
-
-        // Ensure that the origin are valid.
-        for origin in transaction.origins() {
-            match origin {
-                // Check that the commitment exists in the ledger.
-                Origin::Commitment(commitment) => {
-                    if !self.ledger.contains_commitment(commitment)? {
-                        bail!("The given transaction references a non-existent commitment {}", &commitment)
-                    }
-                }
-                // TODO (raychu86): Ensure that the state root exists in the ledger.
-                // Check that the state root is an existing state root.
-                Origin::StateRoot(_state_root) => {
-                    bail!("State roots are currently not supported (yet)")
-                }
             }
         }
 

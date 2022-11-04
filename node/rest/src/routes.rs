@@ -88,12 +88,12 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and_then(Self::get_program);
 
         // GET /testnet3/statePath/{commitment}
-        let get_state_path = warp::get()
+        let get_state_path_for_commitment = warp::get()
             .and(warp::path!("testnet3" / "statePath" / ..))
             .and(warp::path::param::<Field<N>>())
             .and(warp::path::end())
             .and(with(self.ledger.clone()))
-            .and_then(Self::get_state_path);
+            .and_then(Self::get_state_path_for_commitment);
 
         // GET /testnet3/beacons
         let get_beacons = warp::get()
@@ -193,7 +193,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .or(get_transaction)
             .or(get_memory_pool_transactions)
             .or(get_program)
-            .or(get_state_path)
+            .or(get_state_path_for_commitment)
             .or(get_beacons)
             .or(get_peers_count)
             .or(get_peers_all)
@@ -292,8 +292,8 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     }
 
     /// Returns the state path for the given commitment.
-    async fn get_state_path(commitment: Field<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.get_state_path(&commitment).or_reject()?))
+    async fn get_state_path_for_commitment(commitment: Field<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.get_state_path_for_commitment(&commitment).or_reject()?))
     }
 
     /// Returns the list of current beacons.

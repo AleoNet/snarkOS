@@ -29,7 +29,6 @@ use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
 use core::time::Duration;
-use parking_lot::RwLock;
 use std::{
     net::SocketAddr,
     sync::{

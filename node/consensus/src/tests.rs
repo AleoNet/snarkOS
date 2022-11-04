@@ -235,6 +235,7 @@ mod tests {
     use snarkvm::{
         console::{network::Testnet3, program::Value},
         prelude::TestRng,
+        synthesizer::Transactions,
     };
 
     use tracing_test::traced_test;
@@ -301,7 +302,7 @@ mod tests {
         assert!(consensus.ledger.contains_input_id(transaction.input_ids().next().unwrap()).unwrap());
 
         // Ensure that the VM can't re-deploy the same program.
-        assert!(consensus.ledger.vm().finalize(&transaction).is_err());
+        assert!(consensus.ledger.vm().finalize(&Transactions::from(&[transaction])).is_err());
         // Ensure that the ledger deems the same transaction invalid.
         assert!(consensus.check_transaction_basic(&transaction).is_err());
         // Ensure that the ledger cannot add the same transaction.
