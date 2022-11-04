@@ -2432,6 +2432,7 @@ dependencies = [
  "snarkvm",
  "tempfile",
  "tracing",
+ "tracing-test",
 ]
 
 [[package]]

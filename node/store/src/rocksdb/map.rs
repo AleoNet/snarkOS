@@ -173,26 +173,27 @@ impl<
     /// If the key is inserted in the batch, returns `Some(Some(value))`.
     ///
     fn get_batched<Q>(&self, key: &Q) -> Option<Option<V>>
-        where
-            K: Borrow<Q>,
-            Q: PartialEq + Eq + Hash + Serialize + ?Sized,
+    where
+        K: Borrow<Q>,
+        Q: PartialEq + Eq + Hash + Serialize + ?Sized,
     {
         // Return early if there is no atomic batch in progress.
         if self.database.batch_in_progress.load(Ordering::SeqCst) {
             struct OperationFinder {
                 key: Vec<u8>,
-                value: Option<Box<[u8]>>,
+                value: Option<Option<Box<[u8]>>>,
             }
 
             impl rocksdb::WriteBatchIterator for OperationFinder {
                 fn put(&mut self, key: Box<[u8]>, value: Box<[u8]>) {
                     if &*key == &self.key {
-                        self.value = Some(value);
+                        self.value = Some(Some(value));
                     }
                 }
+
                 fn delete(&mut self, key: Box<[u8]>) {
                     if &*key == &self.key {
-                        self.value = None;
+                        self.value = Some(None);
                     }
                 }
             }
@@ -202,24 +203,31 @@ impl<
                 Ok(key) => key,
                 Err(error) => {
                     error!("Failed to create prefixed key in 'get_batched': {:?}", error);
-                    return None
-                },
+                    return None;
+                }
             };
 
             // Retrieve the atomic batch.
             let batch = core::mem::take(&mut *self.database.atomic_batch.lock());
 
             // Initialize the operation finder.
-            let mut finder = OperationFinder {
-                key: raw_key,
-                value: None,
-            };
+            let mut finder = OperationFinder { key: raw_key, value: None };
 
             // Iterate over the batch.
             batch.iterate(&mut finder);
 
             // Return the value.
-            finder.value.map(|v| bincode::deserialize(&v).ok())
+            match finder.value {
+                Some(Some(value)) => match bincode::deserialize(&value) {
+                    Ok(value) => Some(Some(value)),
+                    Err(error) => {
+                        error!("Failed to deserialize value in 'get_batched': {:?}", error);
+                        None
+                    }
+                },
+                Some(None) => Some(None),
+                None => None,
+            }
         } else {
             None
         }
@@ -280,11 +288,12 @@ impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> fmt::Debu
 
 #[cfg(test)]
 mod tests {
-    use snarkvm::prelude::{Address, FromStr, Testnet3};
     use super::*;
     use crate::rocksdb::tests::temp_dir;
+    use snarkvm::prelude::{Address, FromStr, Testnet3};
 
     use serial_test::serial;
+    use tracing_test::traced_test;
 
     type CurrentNetwork = Testnet3;
 
@@ -297,16 +306,19 @@ mod tests {
                 .unwrap();
 
         // Initialize a map.
-        let map: DataMap<Address<CurrentNetwork>, ()> = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+        let map: DataMap<Address<CurrentNetwork>, ()> =
+            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
         map.insert(address.clone(), ()).expect("Failed to insert into data map");
         assert!(map.contains_key(&address).unwrap());
     }
 
     #[test]
     #[serial]
+    #[traced_test]
     fn test_insert_and_get_speculative() {
         // Initialize a map.
-        let map: DataMap<usize, String> = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+        let map: DataMap<usize, String> =
+            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
 
         // Sanity check.
         assert!(map.iter().next().is_none());
@@ -355,9 +367,11 @@ mod tests {
 
     #[test]
     #[serial]
+    #[traced_test]
     fn test_remove_and_get_speculative() {
         // Initialize a map.
-        let map: DataMap<usize, String> = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+        let map: DataMap<usize, String> =
+            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
 
         // Sanity check.
         assert!(map.iter().next().is_none());
@@ -413,12 +427,14 @@ mod tests {
 
     #[test]
     #[serial]
+    #[traced_test]
     fn test_atomic_writes_are_batched() {
         // The number of items that will be inserted into the map.
         const NUM_ITEMS: usize = 10;
 
         // Initialize a map.
-        let map: DataMap<usize, String> = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+        let map: DataMap<usize, String> =
+            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
 
         // Sanity check.
         assert!(map.iter().next().is_none());
@@ -472,12 +488,14 @@ mod tests {
 
     #[test]
     #[serial]
+    #[traced_test]
     fn test_atomic_writes_can_be_aborted() {
         // The number of items that will be queued to be inserted into the map.
         const NUM_ITEMS: usize = 10;
 
         // Initialize a map.
-        let map: DataMap<usize, String> = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+        let map: DataMap<usize, String> =
+            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
 
         // Sanity check.
         assert!(map.iter().next().is_none());
