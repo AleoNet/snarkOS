@@ -57,11 +57,12 @@ pub enum DataID {
     DeploymentProgramMap,
     DeploymentVerifyingKeyMap,
     DeploymentCertificateMap,
-    DeploymentAdditionalFeeMap,
+    DeploymentFeeMap,
     // Execution
     ExecutionIDMap,
     ExecutionReverseIDMap,
-    ExecutionEditionMap,
+    ExecutionInclusionMap,
+    ExecutionFeeMap,
     // Input
     InputIDMap,
     InputReverseIDMap,
