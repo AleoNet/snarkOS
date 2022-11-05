@@ -182,6 +182,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let transactions = self.memory_pool.candidate_transactions(self).into_iter().collect::<Transactions<N>>();
         // Select the prover solutions from the memory pool.
         let prover_solutions = self.memory_pool.candidate_solutions(
+            &self,
             self.ledger.latest_height(),
             latest_proof_target,
             latest_coinbase_target,

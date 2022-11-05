@@ -52,8 +52,9 @@ impl<N: Network> MemoryPool<N> {
     }
 
     /// Returns a candidate set of unconfirmed solutions for inclusion in a block.
-    pub fn candidate_solutions(
+    pub fn candidate_solutions<C: ConsensusStorage<N>>(
         &self,
+        consensus: &Consensus<N, C>,
         latest_height: u32,
         latest_proof_target: u64,
         latest_coinbase_target: u64,
@@ -69,6 +70,17 @@ impl<N: Network> MemoryPool<N> {
             .read()
             .iter()
             .filter(|(_, (_, proof_target))| *proof_target >= latest_proof_target)
+            .filter(|(_, (solution, _))| {
+                // Ensure the prover solution is not already in the ledger.
+                match consensus.ledger.contains_puzzle_commitment(&solution.commitment()) {
+                    Ok(true) => false,
+                    Ok(false) => true,
+                    Err(error) => {
+                        error!("Failed to check if prover solution {error} is in the ledger");
+                        false
+                    }
+                }
+            })
             .sorted_by(|a, b| b.1.1.cmp(&a.1.1))
             .map(|(_, v)| v.0)
             .unique_by(|s| s.commitment())
