@@ -182,7 +182,7 @@ impl<N: Network> Prover<N> {
                     let prover = prover.clone();
                     spawn_task_away!(Self, {
                         // To prevent starvation, the number of puzzle instances is limited.
-                        if prover.puzzle_instances.load(std::sync::atomic::Ordering::SeqCst) > 2 {
+                        if prover.puzzle_instances.load(std::sync::atomic::Ordering::SeqCst) > 1 {
                             tokio::time::sleep(Duration::from_secs(1)).await;
                             return;
                         }
