@@ -154,6 +154,8 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         // GET /testnet3/records/all
         let records_all = warp::get()
             .and(warp::path!("testnet3" / "records" / "all"))
+            .and(with_auth())
+            .untuple_one()
             .and(warp::body::content_length_limit(128))
             .and(warp::body::json())
             .and(with(self.ledger.clone()))
@@ -162,6 +164,8 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         // GET /testnet3/records/spent
         let records_spent = warp::get()
             .and(warp::path!("testnet3" / "records" / "spent"))
+            .and(with_auth())
+            .untuple_one()
             .and(warp::body::content_length_limit(128))
             .and(warp::body::json())
             .and(with(self.ledger.clone()))
@@ -170,6 +174,8 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         // GET /testnet3/records/unspent
         let records_unspent = warp::get()
             .and(warp::path!("testnet3" / "records" / "unspent"))
+            .and(with_auth())
+            .untuple_one()
             .and(warp::body::content_length_limit(128))
             .and(warp::body::json())
             .and(with(self.ledger.clone()))
