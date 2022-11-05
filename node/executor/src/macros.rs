@@ -73,3 +73,26 @@ macro_rules! spawn_task_loop {
     // Spawns a new task, without a task ID, using a custom executor.
     ($E:ident, $logic:expr) => {{ $crate::spawn_task!($E, None, { $logic }) }};
 }
+
+#[macro_export]
+macro_rules! spawn_task_away {
+    // Spawns a new task, with a task ID, using a custom executor.
+    ($E:ident, $logic:block) => {{
+        // Procure a resource ID for the task, as it may terminate at any time.
+        let resource_id = $E::resources().procure_id();
+
+        // Register the task with the environment.
+        $E::resources().register_task(
+            Some(resource_id),
+            tokio::task::spawn(async move {
+                let result = $logic;
+                // Unregister the task from the environment.
+                $E::resources().deregister(resource_id);
+                result
+            }),
+        );
+    }};
+
+    // Spawns a new task, with a task ID, using a custom executor.
+    ($E:ident, $logic:expr) => {{ $crate::spawn_task!($E, { $logic }) }};
+}
