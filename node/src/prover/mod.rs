@@ -18,7 +18,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType, Status};
+use snarkos_node_executor::{spawn_task_away, spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_messages::{Data, Message, PuzzleRequest, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ViewKey};
@@ -180,7 +180,7 @@ impl<N: Network> Prover<N> {
                 // If the latest epoch challenge and latest block exists, then generate a prover solution.
                 if let (Some(epoch_challenge), Some(block)) = (latest_epoch_challenge, latest_block) {
                     let prover = prover.clone();
-                    spawn_task!(Self, {
+                    spawn_task_away!({
                         // To prevent starvation, the number of puzzle instances is limited.
                         if prover.puzzle_instances.load(std::sync::atomic::Ordering::SeqCst) > 1 {
                             tokio::time::sleep(Duration::from_secs(1)).await;
@@ -260,7 +260,7 @@ impl<N: Network> Prover<N> {
                         prover.puzzle_instances.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
                         // Sleep briefly to give this instance a chance to clear state.
                         tokio::time::sleep(Duration::from_millis(50)).await;
-                    })
+                    });
                 } else {
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 }
