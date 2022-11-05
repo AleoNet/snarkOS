@@ -184,7 +184,7 @@ impl<N: Network> Prover<N> {
                         let latest_proof_target = block.proof_target();
 
                         debug!(
-                            "Proving CoinbasePuzzle(Epoch {}, Block {}, Coinbase Target {}, Proof Target {})",
+                            "Proving 'CoinbasePuzzle' (Epoch {}, Block {}, Coinbase Target {}, Proof Target {})",
                             epoch_challenge.epoch_number(),
                             block.height(),
                             latest_coinbase_target,
@@ -215,7 +215,7 @@ impl<N: Network> Prover<N> {
 
                         // Ensure that the prover solution target is sufficient.
                         match prover_solution_target >= latest_proof_target {
-                            true => info!("Found a Solution(Proof Target {prover_solution_target})"),
+                            true => info!("Found a Solution (Proof Target {prover_solution_target})"),
                             false => {
                                 trace!(
                                     "Prover solution was below the necessary proof target ({prover_solution_target} < {latest_proof_target})"
