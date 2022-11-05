@@ -256,6 +256,24 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         // Initialize an RNG.
         let rng = &mut rand::thread_rng();
 
+        // Fetch the payment record.
+        let payment_record = records.values().next().unwrap().clone();
+
+        // TODO (raychu86): Find a proper record to pay for the fee.
+        // Fetch the fee record.
+        let fee_amount = 10_000;
+        let fee_records = records
+            .into_iter()
+            .skip(1)
+            .filter(|(_, record)| ***record.gates() >= fee_amount)
+            .collect::<IndexMap<_, _>>();
+        let fee_record = match fee_records.values().next() {
+            Some(record) => record.clone(),
+            None => {
+                bail!("Missing fee record.");
+            }
+        };
+
         // Create a new transaction.
         Transaction::execute(
             &self.vm,
@@ -263,11 +281,11 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
             &ProgramID::from_str("credits.aleo")?,
             Identifier::from_str("transfer")?,
             &[
-                Value::Record(records.values().next().unwrap().clone()),
+                Value::Record(payment_record),
                 Value::from_str(&format!("{to}"))?,
                 Value::from_str(&format!("{amount}u64"))?,
             ],
-            None,
+            Some((fee_record, fee_amount)),
             rng,
         )
     }
