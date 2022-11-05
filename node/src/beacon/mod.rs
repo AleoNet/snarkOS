@@ -19,7 +19,7 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_executor::{spawn_task, Executor, NodeType, Status};
+use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedBlock, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
@@ -187,7 +187,7 @@ impl<N: Network> Beacon<N> {
     /// Initialize a new instance of block production.
     async fn initialize_block_production(&self) {
         let beacon = self.clone();
-        spawn_task!(Self, {
+        spawn_task_loop!(Self, {
             // Expected time per block.
             const ROUND_TIME: u64 = 15; // 15 seconds per block
 

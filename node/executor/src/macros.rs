@@ -119,3 +119,29 @@ macro_rules! spawn_task {
     // Spawns a new task, with a task ID, using a custom executor.
     ($E:ident, $logic:expr) => {{ $crate::spawn_task!($E, { $logic }) }};
 }
+
+#[macro_export]
+macro_rules! spawn_task_loop {
+    // Spawns a new task, without a task ID, using a custom executor.
+    ($E:ident, $logic:block) => {{
+        // Initialize a handler for the task.
+        let (router, handler) = tokio::sync::oneshot::channel();
+
+        // Register the task with the environment.
+        // No need to provide an id, as the task will run indefinitely.
+        $E::resources().register_task(
+            None,
+            tokio::task::spawn(async move {
+                // Notify the outer function that the task is ready.
+                let _ = router.send(());
+                $logic
+            }),
+        );
+
+        // Wait until the task is ready.
+        let _ = handler.await;
+    }};
+
+    // Spawns a new task, without a task ID, using a custom executor.
+    ($E:ident, $logic:expr) => {{ $crate::spawn_task!($E, None, { $logic }) }};
+}

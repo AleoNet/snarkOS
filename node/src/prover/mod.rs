@@ -18,7 +18,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_executor::{spawn_task, Executor, NodeType, Status};
+use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_messages::{Data, Message, PuzzleRequest, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ViewKey};
@@ -115,7 +115,7 @@ impl<N: Network> Prover<N> {
     /// Initialize a new instance of the heartbeat.
     async fn initialize_heartbeat(&self) {
         let prover = self.clone();
-        spawn_task!(Self, {
+        spawn_task_loop!(Self, {
             loop {
                 // Send a "PuzzleRequest" to a beacon node.
                 prover.send_puzzle_request().await;
@@ -142,7 +142,7 @@ impl<N: Network> Prover<N> {
     /// Initialize a new instance of the coinbase puzzle.
     async fn initialize_coinbase_puzzle(&self) {
         let prover = self.clone();
-        spawn_task!(Self, {
+        spawn_task_loop!(Self, {
             loop {
                 // If the node is not connected to any peers, then skip this iteration.
                 if prover.router.number_of_connected_peers().await == 0 {

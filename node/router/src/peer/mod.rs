@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Message, MessageCodec, Router, RouterRequest};
-use snarkos_node_executor::{spawn_task, Executor, NodeType, Status};
+use snarkos_node_executor::{spawn_task_loop, Executor, NodeType, Status};
 use snarkvm::prelude::*;
 
 use anyhow::Result;
@@ -131,7 +131,7 @@ impl<N: Network> Peer<N> {
     /// Initialize a new instance of the garbage collector.
     async fn initialize_gc<E: Executor>(&self) {
         let peer = self.clone();
-        spawn_task!(E, {
+        spawn_task_loop!(E, {
             const SLEEP: u64 = 60 * 10; // 10 minutes
             loop {
                 // Sleep for the heartbeat interval.
