@@ -117,11 +117,9 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
         let routes = self.routes();
 
         // Add custom logging for each request.
-        let custom_log = warp::log::custom(|info| {
-            match info.remote_addr() {
-                Some(addr) => debug!("Received '{} {}' from '{addr}' ({})", info.method(), info.path(), info.status()),
-                None => debug!("Received '{} {}' ({})", info.method(), info.path(), info.status()),
-            }
+        let custom_log = warp::log::custom(|info| match info.remote_addr() {
+            Some(addr) => debug!("Received '{} {}' from '{addr}' ({})", info.method(), info.path(), info.status()),
+            None => debug!("Received '{} {}' ({})", info.method(), info.path(), info.status()),
         });
 
         // Spawn the server.
