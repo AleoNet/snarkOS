@@ -289,8 +289,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
     /// Advances the ledger to the next block.
     pub fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
-        // Ensure the given block is a valid next block.
-        self.check_next_block(block)?;
         // Adds the next block to the ledger.
         self.ledger.add_next_block(block)?;
 

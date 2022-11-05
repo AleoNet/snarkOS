@@ -262,6 +262,13 @@ impl<N: Network> Beacon<N> {
         let next_block_height = next_block.height();
         let next_block_hash = next_block.hash();
 
+        // Ensure the block is a valid next block.
+        if let Err(error) = self.consensus.check_next_block(&next_block) {
+            // Sleep for one second.
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            bail!("Proposed an invalid block: {error}")
+        }
+
         // Advance to the next block.
         match self.consensus.advance_to_next_block(&next_block) {
             Ok(()) => match serde_json::to_string_pretty(&next_block.header()) {

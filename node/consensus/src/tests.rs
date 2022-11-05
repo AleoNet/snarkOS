@@ -285,6 +285,9 @@ fn test_ledger_deploy() {
     // Propose the next block.
     let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
 
+    // Ensure the block is a valid next block.
+    consensus.check_next_block(&next_block).unwrap();
+
     // Construct a next block.
     consensus.advance_to_next_block(&next_block).unwrap();
     assert_eq!(consensus.ledger.latest_height(), 1);
@@ -317,6 +320,9 @@ fn test_ledger_execute() {
 
     // Propose the next block.
     let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
+
+    // Ensure the block is a valid next block.
+    consensus.check_next_block(&next_block).unwrap();
 
     // Construct a next block.
     consensus.advance_to_next_block(&next_block).unwrap();
@@ -371,6 +377,8 @@ fn test_ledger_execute_many() {
         // Propose the next block.
         let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
 
+        // Ensure the block is a valid next block.
+        consensus.check_next_block(&next_block).unwrap();
         // Construct a next block.
         consensus.advance_to_next_block(&next_block).unwrap();
         assert_eq!(consensus.ledger.latest_height(), height);
