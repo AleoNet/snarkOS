@@ -529,7 +529,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         // Ensure transactions with a positive balance must pay for its storage in bytes.
         let fee = transaction.fee()?;
-        if fee >= 0 && transaction.to_bytes_le()?.len() < usize::try_from(fee)? {
+        if fee >= 0 && usize::try_from(fee)? < transaction.to_bytes_le()?.len() {
             bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
         }
 
