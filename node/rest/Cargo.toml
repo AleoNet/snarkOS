@@ -28,6 +28,12 @@ version = "0.2"
 [dependencies.indexmap]
 version = "1.8"
 
+[dependencies.jsonwebtoken]
+version = "8.1.1"
+
+[dependencies.once_cell]
+version = "1.13"
+
 [dependencies.serde]
 version = "1"
 default-features = false
@@ -45,8 +51,14 @@ path = "../messages"
 [dependencies.snarkos-node-router]
 path = "../router"
 
+[dependencies.rand]
+version = "0.8"
+
 [dependencies.snarkvm]
 workspace = true
+
+[dependencies.time]
+version = "0.3"
 
 [dependencies.tokio]
 version = "1"
