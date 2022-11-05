@@ -25,6 +25,7 @@ use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 
 #[derive(Clone, Debug)]
+#[allow(clippy::type_complexity)]
 pub struct MemoryPool<N: Network> {
     /// The pool of unconfirmed transactions.
     unconfirmed_transactions: Arc<RwLock<HashMap<N::TransactionID, Transaction<N>>>>,

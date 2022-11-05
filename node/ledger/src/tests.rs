@@ -14,11 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Ledger;
+use crate::{tests::test_helpers::CurrentLedger, Ledger};
 use snarkvm::{
-    console::network::prelude::*,
-    synthesizer::{block::Block, store::ConsensusStore, vm::VM},
+    console::network::{prelude::*, Testnet3},
+    prelude::TestRng,
+    synthesizer::{block::Block, store::ConsensusStore, vm::VM, ConsensusMemory},
 };
+
+type CurrentNetwork = Testnet3;
 
 #[cfg(test)]
 pub(crate) mod test_helpers {
@@ -43,68 +46,59 @@ pub(crate) mod test_helpers {
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::tests::test_helpers::CurrentLedger;
-    use snarkvm::{console::network::Testnet3, prelude::TestRng, synthesizer::ConsensusMemory};
+#[test]
+fn test_load() {
+    let rng = &mut TestRng::default();
 
-    type CurrentNetwork = Testnet3;
+    // Sample the genesis private key.
+    let private_key = crate::tests::test_helpers::sample_genesis_private_key(rng);
+    // Initialize the store.
+    let store = ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap();
+    // Create a genesis block.
+    let genesis = Block::genesis(&VM::from(store).unwrap(), &private_key, rng).unwrap();
 
-    #[test]
-    fn test_load() {
-        let rng = &mut TestRng::default();
+    // Initialize the ledger with the genesis block.
+    let ledger = CurrentLedger::load(Some(genesis.clone()), None).unwrap();
+    assert_eq!(ledger.latest_hash(), genesis.hash());
+    assert_eq!(ledger.latest_height(), genesis.height());
+    assert_eq!(ledger.latest_round(), genesis.round());
+    assert_eq!(ledger.latest_block().unwrap(), genesis);
+}
 
-        // Sample the genesis private key.
-        let private_key = crate::tests::test_helpers::sample_genesis_private_key(rng);
-        // Initialize the store.
-        let store = ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap();
-        // Create a genesis block.
-        let genesis = Block::genesis(&VM::from(store).unwrap(), &private_key, rng).unwrap();
+#[test]
+fn test_from() {
+    // Load the genesis block.
+    let genesis = Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
 
-        // Initialize the ledger with the genesis block.
-        let ledger = CurrentLedger::load(Some(genesis.clone()), None).unwrap();
-        assert_eq!(ledger.latest_hash(), genesis.hash());
-        assert_eq!(ledger.latest_height(), genesis.height());
-        assert_eq!(ledger.latest_round(), genesis.round());
-        assert_eq!(ledger.latest_block().unwrap(), genesis);
-    }
+    // Initialize the VM.
+    let vm = VM::from(ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap()).unwrap();
+    // Initialize the ledger without the genesis block.
+    let ledger = CurrentLedger::from(vm, None).unwrap();
+    assert_eq!(ledger.latest_hash(), genesis.hash());
+    assert_eq!(ledger.latest_height(), genesis.height());
+    assert_eq!(ledger.latest_round(), genesis.round());
+    assert_eq!(ledger.latest_block().unwrap(), genesis);
 
-    #[test]
-    fn test_from() {
-        // Load the genesis block.
-        let genesis = Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
+    // Initialize the ledger with the genesis block.
+    let ledger = CurrentLedger::load(Some(genesis.clone()), None).unwrap();
+    assert_eq!(ledger.latest_hash(), genesis.hash());
+    assert_eq!(ledger.latest_height(), genesis.height());
+    assert_eq!(ledger.latest_round(), genesis.round());
+    assert_eq!(ledger.latest_block().unwrap(), genesis);
+}
 
-        // Initialize the VM.
-        let vm = VM::from(ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap()).unwrap();
-        // Initialize the ledger without the genesis block.
-        let ledger = CurrentLedger::from(vm, None).unwrap();
-        assert_eq!(ledger.latest_hash(), genesis.hash());
-        assert_eq!(ledger.latest_height(), genesis.height());
-        assert_eq!(ledger.latest_round(), genesis.round());
-        assert_eq!(ledger.latest_block().unwrap(), genesis);
+#[test]
+fn test_state_path() {
+    // Load the genesis block.
+    let genesis = Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
+    // Initialize the ledger with the genesis block.
+    let ledger = CurrentLedger::load(Some(genesis), None).unwrap();
+    // Retrieve the genesis block.
+    let genesis = ledger.get_block(0).unwrap();
 
-        // Initialize the ledger with the genesis block.
-        let ledger = CurrentLedger::load(Some(genesis.clone()), None).unwrap();
-        assert_eq!(ledger.latest_hash(), genesis.hash());
-        assert_eq!(ledger.latest_height(), genesis.height());
-        assert_eq!(ledger.latest_round(), genesis.round());
-        assert_eq!(ledger.latest_block().unwrap(), genesis);
-    }
+    // Construct the state path.
+    let commitments = genesis.transactions().commitments().collect::<Vec<_>>();
+    let commitment = commitments[0];
 
-    #[test]
-    fn test_state_path() {
-        // Load the genesis block.
-        let genesis = Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
-        // Initialize the ledger with the genesis block.
-        let ledger = CurrentLedger::load(Some(genesis), None).unwrap();
-        // Retrieve the genesis block.
-        let genesis = ledger.get_block(0).unwrap();
-
-        // Construct the state path.
-        let commitments = genesis.transactions().commitments().collect::<Vec<_>>();
-        let commitment = commitments[0];
-
-        let _state_path = ledger.get_state_path_for_commitment(commitment).unwrap();
-    }
+    let _state_path = ledger.get_state_path_for_commitment(commitment).unwrap();
 }

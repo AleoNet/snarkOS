@@ -67,6 +67,7 @@ impl<N: Network> TransactionStorage<N> for TransactionDB<N> {
 
 /// A database deployment storage.
 #[derive(Clone)]
+#[allow(clippy::type_complexity)]
 pub struct DeploymentDB<N: Network> {
     /// The ID map.
     id_map: DataMap<N::TransactionID, ProgramID<N>>,

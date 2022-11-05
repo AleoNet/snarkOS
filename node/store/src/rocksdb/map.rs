@@ -186,20 +186,20 @@ impl<
 
             impl rocksdb::WriteBatchIterator for OperationFinder {
                 fn put(&mut self, key: Box<[u8]>, value: Box<[u8]>) {
-                    if &*key == &self.key {
+                    if *key == self.key {
                         self.value = Some(Some(value));
                     }
                 }
 
                 fn delete(&mut self, key: Box<[u8]>) {
-                    if &*key == &self.key {
+                    if *key == self.key {
                         self.value = Some(None);
                     }
                 }
             }
 
             // Prepare the prefixed key and serialized value.
-            let raw_key = match self.create_prefixed_key(&key) {
+            let raw_key = match self.create_prefixed_key(key) {
                 Ok(key) => key,
                 Err(error) => {
                     error!("Failed to create prefixed key in 'get_batched': {:?}", error);
@@ -308,7 +308,7 @@ mod tests {
         // Initialize a map.
         let map: DataMap<Address<CurrentNetwork>, ()> =
             RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
-        map.insert(address.clone(), ()).expect("Failed to insert into data map");
+        map.insert(address, ()).expect("Failed to insert into data map");
         assert!(map.contains_key(&address).unwrap());
     }
 
