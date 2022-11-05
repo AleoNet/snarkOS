@@ -70,29 +70,21 @@ impl<N: Network> MemoryPool<N> {
 
     /// Adds the given unconfirmed transaction to the memory pool.
     pub fn add_unconfirmed_transaction(&self, transaction: &Transaction<N>) -> bool {
+        // Acquire the write lock on the unconfirmed transactions.
+        let mut unconfirmed_transactions = self.unconfirmed_transactions.write();
+
         // Ensure the transaction does not already exist in the memory pool.
-        match !self.contains_unconfirmed_transaction(transaction.id()) {
+        match !unconfirmed_transactions.contains_key(&transaction.id()) {
             true => {
-                self.unconfirmed_transactions.write().insert(transaction.id(), transaction.clone());
-                trace!("✉️  Added transaction '{}' to the memory pool", transaction.id());
+                // Add the transaction to the memory pool.
+                unconfirmed_transactions.insert(transaction.id(), transaction.clone());
+                debug!("✉️  Added transaction '{}' to the memory pool", transaction.id());
                 true
             }
             false => {
                 trace!("Transaction '{}' already exists in memory pool", transaction.id());
                 false
             }
-        }
-    }
-
-    /// Clears an unconfirmed transaction from the memory pool.
-    pub fn remove_unconfirmed_transaction(&self, transaction_id: &N::TransactionID) {
-        self.unconfirmed_transactions.write().remove(transaction_id);
-    }
-
-    /// Clears a list of unconfirmed transactions from the memory pool.
-    pub fn remove_unconfirmed_transactions(&self, transaction_ids: &[N::TransactionID]) {
-        for transaction_id in transaction_ids {
-            self.unconfirmed_transactions.write().remove(transaction_id);
         }
     }
 

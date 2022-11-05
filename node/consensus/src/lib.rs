@@ -89,6 +89,10 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
     /// Adds the given unconfirmed transaction to the memory pool.
     pub fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
+        // Ensure the transaction is not already in the memory pool.
+        if self.memory_pool.contains_unconfirmed_transaction(transaction.id()) {
+            bail!("Transaction is already in the memory pool.");
+        }
         // Check that the transaction is well-formed and unique.
         self.check_transaction_basic(&transaction)?;
         // Insert the transaction to the memory pool.
@@ -103,13 +107,13 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         if self.ledger.latest_height() > anchor_block_height(N::ANCHOR_TIME, 10) {
             bail!("Coinbase proofs are no longer accepted after year 10.");
         }
-        // Ensure the prover solution is not already in the ledger.
-        if self.ledger.contains_puzzle_commitment(&solution.commitment())? {
-            bail!("Prover solution is already in the ledger.");
-        }
         // Ensure the prover solution is not already in the memory pool.
         if self.memory_pool.contains_unconfirmed_solution(solution.commitment()) {
             bail!("Prover solution is already in the memory pool.");
+        }
+        // Ensure the prover solution is not already in the ledger.
+        if self.ledger.contains_puzzle_commitment(&solution.commitment())? {
+            bail!("Prover solution is already in the ledger.");
         }
 
         // Compute the current epoch challenge.
@@ -292,14 +296,13 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Clear the memory pool of unconfirmed transactions that are now invalid.
         self.memory_pool.clear_invalid_transactions(&self.clone());
 
-        // Clear the memory pool of the unconfirmed solutions if a new epoch has started.
+        // If this starts a new epoch, clear all unconfirmed solutions from the memory pool.
         if block.epoch_number() > self.ledger.latest_epoch_number() {
-            self.memory_pool.clear_unconfirmed_solutions();
-        } else if let Some(coinbase_solution) = block.coinbase() {
-            // Clear the memory pool of unconfirmed solutions that are now invalid.
-            coinbase_solution.partial_solutions().iter().map(|s| s.commitment()).for_each(|commitment| {
-                self.memory_pool.remove_unconfirmed_solution(&commitment);
-            });
+            self.memory_pool.clear_all_unconfirmed_solutions();
+        }
+        // Otherwise, if a new coinbase was produced, clear the memory pool of unconfirmed solutions that are now invalid.
+        else if block.coinbase().is_some() {
+            self.memory_pool.clear_invalid_solutions(&self.clone());
         }
 
         Ok(())
@@ -520,17 +523,19 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             bail!("Transaction '{transaction_id}' already exists in the ledger")
         }
 
-        // Ensure the transaction is valid.
-        if !self.ledger.vm().verify(transaction) {
-            bail!("Transaction '{transaction_id}' is invalid")
-        }
-
         /* Fee */
 
         // Ensure transactions with a positive balance must pay for its storage in bytes.
         let fee = transaction.fee()?;
         if fee >= 0 && transaction.to_bytes_le()?.len() < usize::try_from(fee)? {
             bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
+        }
+
+        /* Proof(s) */
+
+        // Ensure the transaction is valid.
+        if !self.ledger.vm().verify(transaction) {
+            bail!("Transaction '{transaction_id}' is invalid")
         }
 
         /* Input */

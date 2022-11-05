@@ -91,13 +91,17 @@ impl<N: Network> MemoryPool<N> {
 
     /// Adds the given unconfirmed solution to the memory pool.
     pub fn add_unconfirmed_solution(&self, solution: &ProverSolution<N>) -> Result<bool> {
+        // Acquire the write lock on the unconfirmed solutions.
+        let mut unconfirmed_solutions = self.unconfirmed_solutions.write();
+
         // Ensure the solution does not already exist in the memory pool.
-        match !self.contains_unconfirmed_solution(solution.commitment()) {
+        match !unconfirmed_solutions.contains_key(&solution.commitment()) {
             true => {
                 // Compute the proof target.
                 let proof_target = solution.to_target()?;
-                self.unconfirmed_solutions.write().insert(solution.commitment(), (*solution, proof_target));
-                trace!("✉️  Added a prover solution with target '{proof_target}' to the memory pool");
+                // Add the solution to the memory pool.
+                unconfirmed_solutions.insert(solution.commitment(), (*solution, proof_target));
+                debug!("✉️  Added a prover solution with target '{proof_target}' to the memory pool");
                 Ok(true)
             }
             false => {
@@ -107,20 +111,22 @@ impl<N: Network> MemoryPool<N> {
         }
     }
 
-    /// Clears an unconfirmed solution from the memory pool.
-    pub fn remove_unconfirmed_solution(&self, puzzle_commitment: &PuzzleCommitment<N>) {
-        self.unconfirmed_solutions.write().remove(puzzle_commitment);
-    }
-
-    /// Clears a list of unconfirmed solutions from the memory pool.
-    pub fn remove_unconfirmed_solutions(&self, puzzle_commitments: &[PuzzleCommitment<N>]) {
-        for puzzle_commitment in puzzle_commitments {
-            self.unconfirmed_solutions.write().remove(puzzle_commitment);
-        }
+    /// Clears the memory pool of unconfirmed transactions that are now invalid.
+    pub fn clear_invalid_solutions<C: ConsensusStorage<N>>(&self, consensus: &Consensus<N, C>) {
+        self.unconfirmed_solutions.write().retain(|puzzle_commitment, _solution| {
+            // Ensure the prover solution is still valid.
+            match consensus.ledger.contains_puzzle_commitment(puzzle_commitment) {
+                Ok(true) | Err(_) => {
+                    trace!("Removed prover solution '{puzzle_commitment}' from the memory pool");
+                    false
+                }
+                Ok(false) => true,
+            }
+        });
     }
 
     /// Clears all unconfirmed solutions from the memory pool.
-    pub fn clear_unconfirmed_solutions(&self) {
+    pub fn clear_all_unconfirmed_solutions(&self) {
         self.unconfirmed_solutions.write().clear();
     }
 }

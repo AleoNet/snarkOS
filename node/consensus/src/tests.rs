@@ -169,12 +169,12 @@ function compute:
                 let credits = records.values().next().unwrap().clone();
                 let additional_fee = (credits, 10);
 
-                // Initialize the VM.
-                let vm = sample_vm();
                 // Deploy.
-                let transaction = Transaction::deploy(&vm, &caller_private_key, &program, additional_fee, rng).unwrap();
+                let transaction =
+                    Transaction::deploy(consensus.ledger.vm(), &caller_private_key, &program, additional_fee, rng)
+                        .unwrap();
                 // Verify.
-                assert!(vm.verify(&transaction));
+                assert!(consensus.ledger.vm().verify(&transaction));
                 // Return the transaction.
                 transaction
             })
@@ -204,8 +204,8 @@ function compute:
                 // Select a record to spend.
                 let record = records.values().next().unwrap().clone();
 
-                // Initialize the VM.
-                let vm = sample_vm();
+                // Retrieve the VM.
+                let vm = consensus.ledger.vm();
 
                 // Authorize.
                 let authorization = vm
