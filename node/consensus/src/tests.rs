@@ -284,7 +284,7 @@ mod tests {
         // Sample the genesis private key.
         let private_key = crate::tests::test_helpers::sample_genesis_private_key(rng);
         // Sample the genesis consensus.
-        let mut consensus = test_helpers::sample_genesis_consensus(rng);
+        let consensus = test_helpers::sample_genesis_consensus(rng);
 
         // Add a transaction to the memory pool.
         let transaction = crate::tests::test_helpers::sample_deployment_transaction(rng);
@@ -302,7 +302,7 @@ mod tests {
         assert!(consensus.ledger.contains_input_id(transaction.input_ids().next().unwrap()).unwrap());
 
         // Ensure that the VM can't re-deploy the same program.
-        assert!(consensus.ledger.vm().finalize(&Transactions::from(&[transaction])).is_err());
+        assert!(consensus.ledger.vm().finalize(&Transactions::from(&[transaction.clone()])).is_err());
         // Ensure that the ledger deems the same transaction invalid.
         assert!(consensus.check_transaction_basic(&transaction).is_err());
         // Ensure that the ledger cannot add the same transaction.
@@ -317,7 +317,7 @@ mod tests {
         // Sample the genesis private key.
         let private_key = crate::tests::test_helpers::sample_genesis_private_key(rng);
         // Sample the genesis consensus.
-        let mut consensus = test_helpers::sample_genesis_consensus(rng);
+        let consensus = test_helpers::sample_genesis_consensus(rng);
 
         // Add a transaction to the memory pool.
         let transaction = crate::tests::test_helpers::sample_execution_transaction(rng);
@@ -347,7 +347,7 @@ mod tests {
         let view_key = ViewKey::try_from(private_key).unwrap();
 
         // Sample the genesis consensus.
-        let mut consensus = crate::tests::test_helpers::sample_genesis_consensus(rng);
+        let consensus = crate::tests::test_helpers::sample_genesis_consensus(rng);
 
         for height in 1..6 {
             // Fetch the unspent records.
