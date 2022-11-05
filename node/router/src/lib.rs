@@ -262,12 +262,12 @@ impl<N: Network> Router<N> {
         mut router_receiver: RouterReceiver<N>,
     ) {
         let router = self.clone();
-        spawn_task!({
+        spawn_task!(E, {
             // Asynchronously wait for a router request.
             while let Some(request) = router_receiver.recv().await {
                 let router = router.clone();
                 let executor_clone = executor.clone();
-                spawn_task!(E::resources().procure_id(), {
+                spawn_task!(E, {
                     // Update the router.
                     router.handler::<E>(executor_clone, request).await;
                 });
@@ -278,7 +278,7 @@ impl<N: Network> Router<N> {
     /// Initialize the connection listener for new peers.
     async fn initialize_listener<E: Executor>(&self, listener: TcpListener) {
         let router = self.clone();
-        spawn_task!({
+        spawn_task!(E, {
             info!("Listening for peers at {}", router.local_ip);
             loop {
                 // Don't accept connections if the node is breaching the configured peer limit.
@@ -306,7 +306,7 @@ impl<N: Network> Router<N> {
     /// Initialize a new instance of the heartbeat.
     async fn initialize_heartbeat<E: Executor>(&self) {
         let router = self.clone();
-        spawn_task!({
+        spawn_task!(E, {
             loop {
                 // Transmit a heartbeat request to the router.
                 if let Err(error) = router.process(RouterRequest::Heartbeat).await {
@@ -321,7 +321,7 @@ impl<N: Network> Router<N> {
     /// Initialize a new instance of the garbage collector.
     async fn initialize_gc<E: Executor>(&self) {
         let router = self.clone();
-        spawn_task!({
+        spawn_task!(E, {
             loop {
                 // Sleep for the interval.
                 tokio::time::sleep(Duration::from_secs(Self::RADIO_SILENCE_IN_SECS)).await;
@@ -548,7 +548,7 @@ impl<N: Network> Router<N> {
                     Ok(stream) => match stream {
                         Ok(stream) => {
                             let router = self.clone();
-                            spawn_task!(E::resources().procure_id(), {
+                            spawn_task!(E, {
                                 if let Err(error) = E::handshake(router, stream).await {
                                     trace!("{error}");
                                 }
@@ -629,7 +629,7 @@ impl<N: Network> Router<N> {
 
                 // Initialize the peer handler.
                 let router = self.clone();
-                spawn_task!(E::resources().procure_id(), {
+                spawn_task!(E, {
                     if let Err(error) = E::handshake(router, stream).await {
                         trace!("{error}");
                     }
@@ -647,7 +647,7 @@ impl<N: Network> Router<N> {
         mut peer_handler: PeerHandler<N>,
     ) {
         let router = self.clone();
-        spawn_task!(E::resources().procure_id(), {
+        spawn_task!(E, {
             // Retrieve the peer IP.
             let peer_ip = *peer.ip();
 

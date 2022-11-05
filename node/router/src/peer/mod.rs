@@ -131,7 +131,7 @@ impl<N: Network> Peer<N> {
     /// Initialize a new instance of the garbage collector.
     async fn initialize_gc<E: Executor>(&self) {
         let peer = self.clone();
-        spawn_task!({
+        spawn_task!(E, {
             const SLEEP: u64 = 60 * 10; // 10 minutes
             loop {
                 // Sleep for the heartbeat interval.
