@@ -118,7 +118,6 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
 
         // Add custom logging for each request.
         let custom_log = warp::log::custom(|info| {
-            // Use a log macro, or slog, or println, or whatever!
             match info.remote_addr() {
                 Some(addr) => debug!("Received '{} {}' from '{addr}' ({})", info.method(), info.path(), info.status()),
                 None => debug!("Received '{} {}' ({})", info.method(), info.path(), info.status()),
