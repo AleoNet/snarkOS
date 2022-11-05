@@ -2327,6 +2327,7 @@ version = "2.0.2"
 dependencies = [
  "anyhow",
  "async-trait",
+ "indexmap",
  "num_cpus",
  "once_cell",
  "rayon",
