@@ -21,14 +21,16 @@ use crate::{anchor_block_height, Consensus};
 use snarkvm::prelude::{ConsensusStorage, Itertools, Network, ProverSolution, PuzzleCommitment, Transaction};
 
 use anyhow::{anyhow, Result};
-use std::collections::HashMap;
+use parking_lot::RwLock;
+use std::{collections::HashMap, sync::Arc};
 
 #[derive(Clone, Debug)]
+#[allow(clippy::type_complexity)]
 pub struct MemoryPool<N: Network> {
     /// The pool of unconfirmed transactions.
-    unconfirmed_transactions: HashMap<N::TransactionID, Transaction<N>>,
+    unconfirmed_transactions: Arc<RwLock<HashMap<N::TransactionID, Transaction<N>>>>,
     /// The pool of unconfirmed solutions and their proof targets.
-    unconfirmed_solutions: HashMap<PuzzleCommitment<N>, (ProverSolution<N>, u64)>,
+    unconfirmed_solutions: Arc<RwLock<HashMap<PuzzleCommitment<N>, (ProverSolution<N>, u64)>>>,
 }
 
 impl<N: Network> Default for MemoryPool<N> {

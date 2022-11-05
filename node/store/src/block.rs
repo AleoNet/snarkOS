@@ -26,9 +26,9 @@ use snarkvm::prelude::*;
 #[derive(Clone)]
 pub struct BlockDB<N: Network> {
     /// The mapping of `block height` to `state root`.
-    state_root_map: DataMap<u32, Field<N>>,
+    state_root_map: DataMap<u32, N::StateRoot>,
     /// The mapping of `state root` to `block height`.
-    reverse_state_root_map: DataMap<Field<N>, u32>,
+    reverse_state_root_map: DataMap<N::StateRoot, u32>,
     /// The mapping of `block height` to `block hash`.
     id_map: DataMap<u32, N::BlockHash>,
     /// The mapping of `block hash` to `block height`.
@@ -51,8 +51,8 @@ pub struct BlockDB<N: Network> {
 
 #[rustfmt::skip]
 impl<N: Network> BlockStorage<N> for BlockDB<N> {
-    type StateRootMap = DataMap<u32, Field<N>>;
-    type ReverseStateRootMap = DataMap<Field<N>, u32>;
+    type StateRootMap = DataMap<u32, N::StateRoot>;
+    type ReverseStateRootMap = DataMap<N::StateRoot, u32>;
     type IDMap = DataMap<u32, N::BlockHash>;
     type ReverseIDMap = DataMap<N::BlockHash, u32>;
     type HeaderMap = DataMap<N::BlockHash, Header<N>>;

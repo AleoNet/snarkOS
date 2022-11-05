@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use indexmap::IndexMap;
 use std::{
-    collections::HashMap,
     sync::{
         atomic::{AtomicUsize, Ordering},
         Arc,
@@ -96,7 +96,7 @@ impl Resources {
         let (sender, mut receiver) = mpsc::unbounded_channel();
 
         tokio::spawn(async move {
-            let mut resources: HashMap<ResourceID, Resource> = Default::default();
+            let mut resources: IndexMap<ResourceID, Resource> = Default::default();
             while let Some(request) = receiver.recv().await {
                 match request {
                     ResourceRequest::Register(resource, id) => {

@@ -19,17 +19,17 @@ use super::*;
 impl<N: Network> MemoryPool<N> {
     /// Returns `true` if the given unconfirmed transaction exists in the memory pool.
     pub fn contains_unconfirmed_transaction(&self, transaction_id: N::TransactionID) -> bool {
-        self.unconfirmed_transactions.contains_key(&transaction_id)
+        self.unconfirmed_transactions.read().contains_key(&transaction_id)
     }
 
     /// Returns the number of unconfirmed transactions in the memory pool.
     pub fn num_unconfirmed_transactions(&self) -> usize {
-        self.unconfirmed_transactions.len()
+        self.unconfirmed_transactions.read().len()
     }
 
     /// Returns the unconfirmed transactions in the memory pool.
-    pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = &Transaction<N>> {
-        self.unconfirmed_transactions.values()
+    pub fn unconfirmed_transactions(&self) -> Vec<Transaction<N>> {
+        self.unconfirmed_transactions.read().values().cloned().collect::<Vec<_>>()
     }
 
     /// Returns a candidate set of unconfirmed transactions for inclusion in a block.
@@ -41,7 +41,7 @@ impl<N: Network> MemoryPool<N> {
         let mut input_ids = Vec::new();
         let mut output_ids = Vec::new();
 
-        'outer: for transaction in self.unconfirmed_transactions.values() {
+        'outer: for transaction in self.unconfirmed_transactions.read().values() {
             // Ensure the transaction is well-formed.
             if consensus.check_transaction_basic(transaction).is_err() {
                 continue;
@@ -69,12 +69,16 @@ impl<N: Network> MemoryPool<N> {
     }
 
     /// Adds the given unconfirmed transaction to the memory pool.
-    pub fn add_unconfirmed_transaction(&mut self, transaction: &Transaction<N>) -> bool {
+    pub fn add_unconfirmed_transaction(&self, transaction: &Transaction<N>) -> bool {
+        // Acquire the write lock on the unconfirmed transactions.
+        let mut unconfirmed_transactions = self.unconfirmed_transactions.write();
+
         // Ensure the transaction does not already exist in the memory pool.
-        match !self.contains_unconfirmed_transaction(transaction.id()) {
+        match !unconfirmed_transactions.contains_key(&transaction.id()) {
             true => {
-                self.unconfirmed_transactions.insert(transaction.id(), transaction.clone());
-                trace!("✉️  Added transaction '{}' to the memory pool", transaction.id());
+                // Add the transaction to the memory pool.
+                unconfirmed_transactions.insert(transaction.id(), transaction.clone());
+                debug!("✉️  Added transaction '{}' to the memory pool", transaction.id());
                 true
             }
             false => {
@@ -84,39 +88,17 @@ impl<N: Network> MemoryPool<N> {
         }
     }
 
-    /// Clears an unconfirmed transaction from the memory pool.
-    pub fn remove_unconfirmed_transaction(&mut self, transaction_id: &N::TransactionID) {
-        self.unconfirmed_transactions.remove(transaction_id);
-    }
-
-    /// Clears a list of unconfirmed transactions from the memory pool.
-    pub fn remove_unconfirmed_transactions(&mut self, transaction_ids: &[N::TransactionID]) {
-        // This code section executes atomically.
-
-        let mut memory_pool = self.clone();
-
-        for transaction_id in transaction_ids {
-            memory_pool.unconfirmed_transactions.remove(transaction_id);
-        }
-
-        *self = memory_pool;
-    }
-
     /// Clears the memory pool of unconfirmed transactions that are now invalid.
-    pub fn clear_invalid_transactions<C: ConsensusStorage<N>>(&mut self, consensus: &Consensus<N, C>) {
-        self.unconfirmed_transactions = self
-            .unconfirmed_transactions
-            .iter()
-            .filter_map(|(transaction_id, transaction)| {
-                // Ensure the transaction is valid.
-                match consensus.check_transaction_basic(transaction) {
-                    Ok(_) => Some((*transaction_id, transaction.clone())),
-                    Err(_) => {
-                        trace!("Removed transaction '{transaction_id}' from the memory pool");
-                        None
-                    }
+    pub fn clear_invalid_transactions<C: ConsensusStorage<N>>(&self, consensus: &Consensus<N, C>) {
+        self.unconfirmed_transactions.write().retain(|transaction_id, transaction| {
+            // Ensure the transaction is valid.
+            match consensus.check_transaction_basic(transaction) {
+                Ok(_) => true,
+                Err(_) => {
+                    trace!("Removed transaction '{transaction_id}' from the memory pool");
+                    false
                 }
-            })
-            .collect();
+            }
+        });
     }
 }

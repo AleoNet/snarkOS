@@ -48,6 +48,7 @@ impl<
         match is_batch {
             // If a batch is in progress, add the key-value pair to the batch.
             true => self.database.atomic_batch.lock().put(raw_key, raw_value),
+            // Otherwise, insert the key-value pair directly into the map.
             false => {
                 self.database.put(&raw_key, &raw_value)?;
             }
@@ -69,6 +70,7 @@ impl<
         match is_batch {
             // If a batch is in progress, add the key to the batch.
             true => self.database.atomic_batch.lock().delete(raw_key),
+            // Otherwise, remove the key-value pair directly from the map.
             false => {
                 self.database.delete(&raw_key)?;
             }
@@ -163,6 +165,75 @@ impl<
     }
 
     ///
+    /// Returns the current value for the given key if it is scheduled
+    /// to be inserted as part of an atomic batch.
+    ///
+    /// If the key does not exist, returns `None`.
+    /// If the key is removed in the batch, returns `Some(None)`.
+    /// If the key is inserted in the batch, returns `Some(Some(value))`.
+    ///
+    fn get_batched<Q>(&self, key: &Q) -> Option<Option<V>>
+    where
+        K: Borrow<Q>,
+        Q: PartialEq + Eq + Hash + Serialize + ?Sized,
+    {
+        // Return early if there is no atomic batch in progress.
+        if self.database.batch_in_progress.load(Ordering::SeqCst) {
+            struct OperationFinder {
+                key: Vec<u8>,
+                value: Option<Option<Box<[u8]>>>,
+            }
+
+            impl rocksdb::WriteBatchIterator for OperationFinder {
+                fn put(&mut self, key: Box<[u8]>, value: Box<[u8]>) {
+                    if *key == self.key {
+                        self.value = Some(Some(value));
+                    }
+                }
+
+                fn delete(&mut self, key: Box<[u8]>) {
+                    if *key == self.key {
+                        self.value = Some(None);
+                    }
+                }
+            }
+
+            // Prepare the prefixed key and serialized value.
+            let raw_key = match self.create_prefixed_key(key) {
+                Ok(key) => key,
+                Err(error) => {
+                    error!("Failed to create prefixed key in 'get_batched': {:?}", error);
+                    return None;
+                }
+            };
+
+            // Retrieve the atomic batch.
+            let batch = self.database.atomic_batch.lock();
+
+            // Initialize the operation finder.
+            let mut finder = OperationFinder { key: raw_key, value: None };
+
+            // Iterate over the batch.
+            batch.iterate(&mut finder);
+
+            // Return the value.
+            match finder.value {
+                Some(Some(value)) => match bincode::deserialize(&value) {
+                    Ok(value) => Some(Some(value)),
+                    Err(error) => {
+                        error!("Failed to deserialize value in 'get_batched': {:?}", error);
+                        None
+                    }
+                },
+                Some(None) => Some(None),
+                None => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    ///
     /// Returns an iterator visiting each key-value pair in the map.
     ///
     fn iter(&'a self) -> Self::Iterator {
@@ -212,5 +283,252 @@ impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> DataMap<K
 impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> fmt::Debug for DataMap<K, V> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("DataMap").field("context", &self.context).finish()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::rocksdb::tests::temp_dir;
+    use snarkvm::prelude::{Address, FromStr, Testnet3};
+
+    use serial_test::serial;
+    use tracing_test::traced_test;
+
+    type CurrentNetwork = Testnet3;
+
+    #[test]
+    #[serial]
+    fn test_contains_key() {
+        // Initialize an address.
+        let address =
+            Address::<CurrentNetwork>::from_str("aleo1q6qstg8q8shwqf5m6q5fcenuwsdqsvp4hhsgfnx5chzjm3secyzqt9mxm8")
+                .unwrap();
+
+        // Initialize a map.
+        let map: DataMap<Address<CurrentNetwork>, ()> =
+            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+        map.insert(address, ()).expect("Failed to insert into data map");
+        assert!(map.contains_key(&address).unwrap());
+    }
+
+    #[test]
+    #[serial]
+    #[traced_test]
+    fn test_insert_and_get_speculative() {
+        // Initialize a map.
+        let map: DataMap<usize, String> =
+            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+
+        // Sanity check.
+        assert!(map.iter().next().is_none());
+
+        /* test atomic insertions */
+
+        // Start an atomic write batch.
+        map.start_atomic();
+
+        // Insert an item into the map.
+        map.insert(0, "0".to_string()).unwrap();
+
+        // Check that the item is not yet in the map.
+        assert!(map.get(&0).unwrap().is_none());
+        // Check that the item is in the batch.
+        assert_eq!(map.get_batched(&0), Some(Some("0".to_string())));
+        // Check that the item can be speculatively retrieved.
+        assert_eq!(map.get_speculative(&0).unwrap(), Some(Cow::Owned("0".to_string())));
+
+        // Queue (since a batch is in progress) NUM_ITEMS insertions.
+        for i in 1..10 {
+            // Update the item in the map.
+            map.insert(0, i.to_string()).unwrap();
+
+            // Check that the item is not yet in the map.
+            assert!(map.get(&0).unwrap().is_none());
+            // Check that the updated item is in the batch.
+            assert_eq!(map.get_batched(&0), Some(Some(i.to_string())));
+            // Check that the updated item can be speculatively retrieved.
+            assert_eq!(map.get_speculative(&0).unwrap(), Some(Cow::Owned(i.to_string())));
+        }
+
+        // The map should still contain no items.
+        assert!(map.iter().next().is_none());
+
+        // Finish the current atomic write batch.
+        map.finish_atomic().unwrap();
+
+        // Check that the item is present in the map now.
+        assert_eq!(map.get(&0).unwrap(), Some(Cow::Owned("9".to_string())));
+        // Check that the item is not in the batch.
+        assert_eq!(map.get_batched(&0), None);
+        // Check that the item can be speculatively retrieved.
+        assert_eq!(map.get_speculative(&0).unwrap(), Some(Cow::Owned("9".to_string())));
+    }
+
+    #[test]
+    #[serial]
+    #[traced_test]
+    fn test_remove_and_get_speculative() {
+        // Initialize a map.
+        let map: DataMap<usize, String> =
+            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+
+        // Sanity check.
+        assert!(map.iter().next().is_none());
+
+        // Insert an item into the map.
+        map.insert(0, "0".to_string()).unwrap();
+
+        // Check that the item is present in the map .
+        assert_eq!(map.get(&0).unwrap(), Some(Cow::Owned("0".to_string())));
+        // Check that the item is not in the batch.
+        assert_eq!(map.get_batched(&0), None);
+        // Check that the item can be speculatively retrieved.
+        assert_eq!(map.get_speculative(&0).unwrap(), Some(Cow::Owned("0".to_string())));
+
+        /* test atomic removals */
+
+        // Start an atomic write batch.
+        map.start_atomic();
+
+        // Remove the item from the map.
+        map.remove(&0).unwrap();
+
+        // Check that the item still exists in the map.
+        assert_eq!(map.get(&0).unwrap(), Some(Cow::Owned("0".to_string())));
+        // Check that the item is removed in the batch.
+        assert_eq!(map.get_batched(&0), Some(None));
+        // Check that the item is removed when speculatively retrieved.
+        assert_eq!(map.get_speculative(&0).unwrap(), None);
+
+        // Try removing the item again.
+        map.remove(&0).unwrap();
+
+        // Check that the item still exists in the map.
+        assert_eq!(map.get(&0).unwrap(), Some(Cow::Owned("0".to_string())));
+        // Check that the item is removed in the batch.
+        assert_eq!(map.get_batched(&0), Some(None));
+        // Check that the item is removed when speculatively retrieved.
+        assert_eq!(map.get_speculative(&0).unwrap(), None);
+
+        // Finish the current atomic write batch.
+        map.finish_atomic().unwrap();
+
+        // Check that the item is not present in the map now.
+        assert!(map.get(&0).unwrap().is_none());
+        // Check that the item is not in the batch.
+        assert_eq!(map.get_batched(&0), None);
+        // Check that the item is removed when speculatively retrieved.
+        assert_eq!(map.get_speculative(&0).unwrap(), None);
+
+        // Check that the map is empty now.
+        assert!(map.iter().next().is_none());
+    }
+
+    #[test]
+    #[serial]
+    #[traced_test]
+    fn test_atomic_writes_are_batched() {
+        // The number of items that will be inserted into the map.
+        const NUM_ITEMS: usize = 10;
+
+        // Initialize a map.
+        let map: DataMap<usize, String> =
+            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+
+        // Sanity check.
+        assert!(map.iter().next().is_none());
+
+        /* test atomic insertions */
+
+        // Start an atomic write batch.
+        map.start_atomic();
+
+        // Queue (since a batch is in progress) NUM_ITEMS insertions.
+        for i in 0..NUM_ITEMS {
+            map.insert(i, i.to_string()).unwrap();
+            // Ensure that the item is queued for insertion.
+            assert_eq!(map.get_batched(&i), Some(Some(i.to_string())));
+            // Ensure that the item can be found with a speculative get.
+            assert_eq!(map.get_speculative(&i).unwrap(), Some(Cow::Owned(i.to_string())));
+        }
+
+        // The map should still contain no items.
+        assert!(map.iter().next().is_none());
+
+        // Finish the current atomic write batch.
+        map.finish_atomic().unwrap();
+
+        // Check that the items are present in the map now.
+        for i in 0..NUM_ITEMS {
+            assert_eq!(map.get(&i).unwrap(), Some(Cow::Borrowed(&i.to_string())));
+        }
+
+        /* test atomic removals */
+
+        // Start an atomic write batch.
+        map.start_atomic();
+
+        // Queue (since a batch is in progress) NUM_ITEMS removals.
+        for i in 0..NUM_ITEMS {
+            map.remove(&i).unwrap();
+            // Ensure that the item is NOT queued for insertion.
+            assert_eq!(map.get_batched(&i), Some(None));
+        }
+
+        // The map should still contains all the items.
+        assert_eq!(map.iter().count(), NUM_ITEMS);
+
+        // Finish the current atomic write batch.
+        map.finish_atomic().unwrap();
+
+        // Check that the map is empty now.
+        assert!(map.iter().next().is_none());
+    }
+
+    #[test]
+    #[serial]
+    #[traced_test]
+    fn test_atomic_writes_can_be_aborted() {
+        // The number of items that will be queued to be inserted into the map.
+        const NUM_ITEMS: usize = 10;
+
+        // Initialize a map.
+        let map: DataMap<usize, String> =
+            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+
+        // Sanity check.
+        assert!(map.iter().next().is_none());
+
+        // Start an atomic write batch.
+        map.start_atomic();
+
+        // Queue (since a batch is in progress) NUM_ITEMS insertions.
+        for i in 0..NUM_ITEMS {
+            map.insert(i, i.to_string()).unwrap();
+        }
+
+        // The map should still contain no items.
+        assert!(map.iter().next().is_none());
+
+        // Abort the current atomic write batch.
+        map.abort_atomic();
+
+        // The map should still contain no items.
+        assert!(map.iter().next().is_none());
+
+        // Start another atomic write batch.
+        map.start_atomic();
+
+        // Queue (since a batch is in progress) NUM_ITEMS insertions.
+        for i in 0..NUM_ITEMS {
+            map.insert(i, i.to_string()).unwrap();
+        }
+
+        // Finish the current atomic write batch.
+        map.finish_atomic().unwrap();
+
+        // The map should contain NUM_ITEMS items now.
+        assert_eq!(map.iter().count(), NUM_ITEMS);
     }
 }

@@ -53,3 +53,6 @@ version = "0.9.0"
 
 [dev-dependencies.tempfile]
 version = "3.2"
+
+[dev-dependencies.tracing-test]
+version = "0.2"

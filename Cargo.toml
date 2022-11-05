@@ -22,6 +22,7 @@ members = [
     "cli",
     "display",
     "node",
+    "node/consensus",
     "node/executor",
     "node/ledger",
     "node/messages",
@@ -40,7 +41,7 @@ path = "snarkos/main.rs"
 [workspace.dependencies.snarkvm]
 # path = "../snarkvm"
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "147c567"
+rev = "48b4a33"
 features = ["circuit", "console", "parallel"]
 
 [dependencies.anyhow]
@@ -61,6 +62,9 @@ path = "./display"
 
 [dependencies.snarkos-node]
 path = "./node"
+
+[dependencies.snarkos-node-consensus]
+path = "./node/consensus"
 
 [dependencies.snarkos-node-executor]
 path = "./node/executor"

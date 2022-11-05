@@ -278,7 +278,7 @@ pub trait Inbound<N: Network>: Executor {
 
         // Spawn an asynchronous task for the `Ping` request.
         let router = router.clone();
-        spawn_task!(Self, Self::resources().procure_id(), {
+        spawn_task!(Self, {
             // Sleep for the preset time before sending a `Ping` request.
             tokio::time::sleep(Duration::from_secs(Router::<N>::PING_SLEEP_IN_SECS)).await;
 
