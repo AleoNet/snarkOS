@@ -103,6 +103,13 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
 
         // Initialize the routes.
         let routes = self.routes();
+
+        // Add custom logging for each request.
+        let custom_log = warp::log::custom(|info| match info.remote_addr() {
+            Some(addr) => debug!("Received '{} {}' from '{addr}' ({})", info.method(), info.path(), info.status()),
+            None => debug!("Received '{} {}' ({})", info.method(), info.path(), info.status()),
+        });
+
         // Spawn the server.
         let address = self.address;
         self.handles.push(Arc::new(tokio::spawn(async move {
@@ -113,7 +120,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
             }
 
             // Start the server.
-            warp::serve(routes.with(cors)).run(rest_ip).await
+            warp::serve(routes.with(cors).with(custom_log)).run(rest_ip).await
         })))
     }
 }
