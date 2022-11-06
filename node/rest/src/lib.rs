@@ -111,8 +111,14 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
         });
 
         // Spawn the server.
+        let address = self.address;
         self.handles.push(Arc::new(tokio::spawn(async move {
             println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
+
+            if let Ok(jwt_token) = helpers::Claims::new(address).to_jwt_string() {
+                println!("JSON Web Token: {}\n", jwt_token);
+            }
+
             // Start the server.
             warp::serve(routes.with(cors).with(custom_log)).run(rest_ip).await
         })))
