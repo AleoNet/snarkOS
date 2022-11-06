@@ -169,6 +169,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let latest_state_root = self.ledger.latest_state_root();
         // Retrieve the latest block.
         let latest_block = self.ledger.latest_block()?;
+        // Retrieve the latest height.
+        let latest_height = latest_block.height();
         // Retrieve the latest proof target.
         let latest_proof_target = latest_block.proof_target();
         // Retrieve the latest coinbase target.
@@ -177,12 +179,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Select the transactions from the memory pool.
         let transactions = self.memory_pool.candidate_transactions(self).into_iter().collect::<Transactions<N>>();
         // Select the prover solutions from the memory pool.
-        let prover_solutions = self.memory_pool.candidate_solutions(
-            self,
-            self.ledger.latest_height(),
-            latest_proof_target,
-            latest_coinbase_target,
-        )?;
+        let prover_solutions =
+            self.memory_pool.candidate_solutions(self, latest_height, latest_proof_target, latest_coinbase_target)?;
 
         // Construct the coinbase solution.
         let (coinbase, coinbase_accumulator_point) = match &prover_solutions {
@@ -199,7 +197,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         // Fetch the next round state.
         let next_timestamp = OffsetDateTime::now_utc().unix_timestamp();
-        let next_height = self.ledger.latest_height().saturating_add(1);
+        let next_height = latest_height.saturating_add(1);
         let next_round = latest_block.round().saturating_add(1);
 
         // TODO (raychu86): Pay the provers. Currently we do not pay the provers with the `credits.aleo` program
