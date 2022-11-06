@@ -22,6 +22,9 @@ version = "1"
 [dependencies.async-trait]
 version = "0.1"
 
+[dependencies.indexmap]
+version = "1.9"
+
 [dependencies.num_cpus]
 version = "1"
 

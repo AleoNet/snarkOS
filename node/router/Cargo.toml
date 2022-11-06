@@ -42,6 +42,9 @@ version = "1"
 [dependencies.rand]
 version = "0.8"
 
+[dependencies.reqwest]
+version = "0.11"
+
 [dependencies.serde]
 version = "1"
 

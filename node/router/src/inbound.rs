@@ -278,7 +278,7 @@ pub trait Inbound<N: Network>: Executor {
 
         // Spawn an asynchronous task for the `Ping` request.
         let router = router.clone();
-        spawn_task!(Self, Self::resources().procure_id(), {
+        spawn_task!(Self, {
             // Sleep for the preset time before sending a `Ping` request.
             tokio::time::sleep(Duration::from_secs(Router::<N>::PING_SLEEP_IN_SECS)).await;
 
@@ -378,8 +378,8 @@ pub trait Inbound<N: Network>: Executor {
         if !should_propagate {
             trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
         } else {
-            // Propagate the `UnconfirmedSolution`.
-            let request = RouterRequest::MessagePropagate(Message::UnconfirmedSolution(message), vec![peer_ip]);
+            // Propagate the `UnconfirmedSolution` to connected beacons.
+            let request = RouterRequest::MessagePropagateBeacon(Message::UnconfirmedSolution(message), vec![peer_ip]);
             if let Err(error) = router.process(request).await {
                 warn!("[UnconfirmedSolution] {error}");
             }

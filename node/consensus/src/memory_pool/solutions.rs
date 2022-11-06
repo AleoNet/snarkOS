@@ -19,17 +19,17 @@ use super::*;
 impl<N: Network> MemoryPool<N> {
     /// Returns `true` if the given unconfirmed solution exists in the memory pool.
     pub fn contains_unconfirmed_solution(&self, puzzle_commitment: PuzzleCommitment<N>) -> bool {
-        self.unconfirmed_solutions.contains_key(&puzzle_commitment)
+        self.unconfirmed_solutions.read().contains_key(&puzzle_commitment)
     }
 
     /// Returns the number of unconfirmed solutions in the memory pool.
     pub fn num_unconfirmed_solutions(&self) -> usize {
-        self.unconfirmed_solutions.len()
+        self.unconfirmed_solutions.read().len()
     }
 
     /// Returns the unconfirmed solutions in the memory pool.
-    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = &(ProverSolution<N>, u64)> {
-        self.unconfirmed_solutions.values()
+    pub fn unconfirmed_solutions(&self) -> Vec<(ProverSolution<N>, u64)> {
+        self.unconfirmed_solutions.read().values().cloned().collect()
     }
 
     /// Returns the candidate coinbase target of the valid unconfirmed solutions in the memory pool.
@@ -37,6 +37,7 @@ impl<N: Network> MemoryPool<N> {
         // Filter the solutions by the latest proof target, ensure they are unique, and rank in descending order of proof target.
         let mut candidate_proof_targets = self
             .unconfirmed_solutions
+            .read()
             .iter()
             .filter(|(_, (_, proof_target))| *proof_target >= latest_proof_target)
             .unique_by(|(k, _)| *k)
@@ -51,8 +52,9 @@ impl<N: Network> MemoryPool<N> {
     }
 
     /// Returns a candidate set of unconfirmed solutions for inclusion in a block.
-    pub fn candidate_solutions(
+    pub fn candidate_solutions<C: ConsensusStorage<N>>(
         &self,
+        consensus: &Consensus<N, C>,
         latest_height: u32,
         latest_proof_target: u64,
         latest_coinbase_target: u64,
@@ -65,8 +67,20 @@ impl<N: Network> MemoryPool<N> {
         // Filter the solutions by the latest proof target, ensure they are unique, and rank in descending order of proof target.
         let candidate_solutions: Vec<_> = self
             .unconfirmed_solutions
+            .read()
             .iter()
             .filter(|(_, (_, proof_target))| *proof_target >= latest_proof_target)
+            .filter(|(_, (solution, _))| {
+                // Ensure the prover solution is not already in the ledger.
+                match consensus.ledger.contains_puzzle_commitment(&solution.commitment()) {
+                    Ok(true) => false,
+                    Ok(false) => true,
+                    Err(error) => {
+                        error!("Failed to check if prover solution {error} is in the ledger");
+                        false
+                    }
+                }
+            })
             .sorted_by(|a, b| b.1.1.cmp(&a.1.1))
             .map(|(_, v)| v.0)
             .unique_by(|s| s.commitment())
@@ -88,14 +102,18 @@ impl<N: Network> MemoryPool<N> {
     }
 
     /// Adds the given unconfirmed solution to the memory pool.
-    pub fn add_unconfirmed_solution(&mut self, solution: &ProverSolution<N>) -> Result<bool> {
+    pub fn add_unconfirmed_solution(&self, solution: &ProverSolution<N>) -> Result<bool> {
+        // Acquire the write lock on the unconfirmed solutions.
+        let mut unconfirmed_solutions = self.unconfirmed_solutions.write();
+
         // Ensure the solution does not already exist in the memory pool.
-        match !self.contains_unconfirmed_solution(solution.commitment()) {
+        match !unconfirmed_solutions.contains_key(&solution.commitment()) {
             true => {
                 // Compute the proof target.
                 let proof_target = solution.to_target()?;
-                self.unconfirmed_solutions.insert(solution.commitment(), (*solution, proof_target));
-                trace!("✉️  Added a prover solution with target '{proof_target}' to the memory pool");
+                // Add the solution to the memory pool.
+                unconfirmed_solutions.insert(solution.commitment(), (*solution, proof_target));
+                debug!("✉️  Added a prover solution with target '{proof_target}' to the memory pool");
                 Ok(true)
             }
             false => {
@@ -105,26 +123,22 @@ impl<N: Network> MemoryPool<N> {
         }
     }
 
-    /// Clears an unconfirmed solution from the memory pool.
-    pub fn remove_unconfirmed_solution(&mut self, puzzle_commitment: &PuzzleCommitment<N>) {
-        self.unconfirmed_solutions.remove(puzzle_commitment);
-    }
-
-    /// Clears a list of unconfirmed solutions from the memory pool.
-    pub fn remove_unconfirmed_solutions(&mut self, puzzle_commitments: &[PuzzleCommitment<N>]) {
-        // This code section executes atomically.
-
-        let mut memory_pool = self.clone();
-
-        for puzzle_commitment in puzzle_commitments {
-            memory_pool.unconfirmed_solutions.remove(puzzle_commitment);
-        }
-
-        *self = memory_pool;
+    /// Clears the memory pool of unconfirmed transactions that are now invalid.
+    pub fn clear_invalid_solutions<C: ConsensusStorage<N>>(&self, consensus: &Consensus<N, C>) {
+        self.unconfirmed_solutions.write().retain(|puzzle_commitment, _solution| {
+            // Ensure the prover solution is still valid.
+            match consensus.ledger.contains_puzzle_commitment(puzzle_commitment) {
+                Ok(true) | Err(_) => {
+                    trace!("Removed prover solution '{puzzle_commitment}' from the memory pool");
+                    false
+                }
+                Ok(false) => true,
+            }
+        });
     }
 
     /// Clears all unconfirmed solutions from the memory pool.
-    pub fn clear_unconfirmed_solutions(&mut self) {
-        self.unconfirmed_solutions.clear();
+    pub fn clear_all_unconfirmed_solutions(&self) {
+        self.unconfirmed_solutions.write().clear();
     }
 }

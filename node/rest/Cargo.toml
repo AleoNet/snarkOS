@@ -33,8 +33,14 @@ version = "1"
 default-features = false
 features = [ "derive" ]
 
+[dependencies.snarkos-node-consensus]
+path = "../consensus"
+
 [dependencies.snarkos-node-ledger]
 path = "../ledger"
+
+[dependencies.snarkos-node-messages]
+path = "../messages"
 
 [dependencies.snarkos-node-router]
 path = "../router"

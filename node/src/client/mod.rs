@@ -18,7 +18,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_executor::{spawn_task, Executor, NodeType};
+use snarkos_node_executor::{spawn_task_loop, Executor, NodeType};
 use snarkos_node_messages::{Message, PuzzleRequest, PuzzleResponse};
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkvm::prelude::{Address, Block, EpochChallenge, Network, PrivateKey, ViewKey};
@@ -47,7 +47,7 @@ impl<N: Network> Client<N> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the node router.
-        let (router, router_receiver) = Router::new::<Self>(node_ip, trusted_peers).await?;
+        let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
         // Initialize the node.
         let node = Self {
             account,
@@ -94,7 +94,7 @@ impl<N: Network> NodeInterface<N> for Client<N> {
     }
 
     /// Returns the account address of the node.
-    fn address(&self) -> &Address<N> {
+    fn address(&self) -> Address<N> {
         self.account.address()
     }
 }
@@ -106,7 +106,7 @@ impl<N: Network> Client<N> {
     /// Initialize a new instance of the heartbeat.
     async fn initialize_heartbeat(&self) {
         let client = self.clone();
-        spawn_task!(Self, {
+        spawn_task_loop!(Self, {
             loop {
                 // Retrieve the first connected beacon.
                 if let Some(connected_beacon) = client.router.connected_beacons().await.first() {

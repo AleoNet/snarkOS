@@ -219,7 +219,7 @@ impl Start {
         // };
         let (num_tokio_worker_threads, max_tokio_blocking_threads, num_rayon_cores_global) =
             // { ((num_cpus::get() / 2).max(1), num_cpus::get(), (num_cpus::get() / 4 * 3).max(1)) };
-            { (num_cpus::get(), 512, num_cpus::get()) };
+            { (num_cpus::get().min(4), 512, num_cpus::get().saturating_sub(4).max(1)) };
 
         // Initialize the parallelization parameters.
         rayon::ThreadPoolBuilder::new()

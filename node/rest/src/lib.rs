@@ -25,8 +25,10 @@ pub use helpers::*;
 mod routes;
 pub use routes::*;
 
+use snarkos_node_consensus::Consensus;
 use snarkos_node_ledger::{Ledger, RecordsFilter};
-use snarkos_node_router::Router;
+use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
+use snarkos_node_router::{Router, RouterRequest};
 use snarkvm::{
     console::{
         account::{Address, ViewKey},
@@ -43,27 +45,18 @@ use http::header::HeaderName;
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
-use tokio::{sync::mpsc, task::JoinHandle};
+use tokio::task::JoinHandle;
 use warp::{http::StatusCode, reject, reply, Filter, Rejection, Reply};
-
-/// Shorthand for the parent half of the `Ledger` message channel.
-pub type LedgerSender<N> = mpsc::Sender<LedgerRequest<N>>;
-/// Shorthand for the child half of the `Ledger` message channel.
-pub type LedgerReceiver<N> = mpsc::Receiver<LedgerRequest<N>>;
-
-/// An enum of requests that the `Ledger` struct processes.
-#[derive(Debug)]
-pub enum LedgerRequest<N: Network> {
-    TransactionBroadcast(Transaction<N>),
-}
 
 /// A REST API server for the ledger.
 #[derive(Clone)]
 pub struct Rest<N: Network, C: ConsensusStorage<N>> {
+    /// The node address.
+    address: Address<N>,
+    /// The consensus module.
+    consensus: Option<Consensus<N, C>>,
     /// The ledger.
     ledger: Ledger<N, C>,
-    /// The ledger sender.
-    ledger_sender: LedgerSender<N>,
     /// The router.
     router: Router<N>,
     /// The server handles.
@@ -72,17 +65,17 @@ pub struct Rest<N: Network, C: ConsensusStorage<N>> {
 
 impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
     /// Initializes a new instance of the server.
-    pub fn start(rest_ip: SocketAddr, ledger: Ledger<N, C>, router: Router<N>) -> Result<Self> {
-        // Initialize a channel to send requests to the ledger.
-        let (ledger_sender, ledger_receiver) = mpsc::channel(64);
-
+    pub fn start(
+        rest_ip: SocketAddr,
+        address: Address<N>,
+        consensus: Option<Consensus<N, C>>,
+        ledger: Ledger<N, C>,
+        router: Router<N>,
+    ) -> Result<Self> {
         // Initialize the server.
-        let mut server = Self { ledger, ledger_sender, router, handles: vec![] };
+        let mut server = Self { address, consensus, ledger, router, handles: vec![] };
         // Spawn the server.
         server.spawn_server(rest_ip);
-        // Spawn the ledger handler.
-        server.spawn_ledger_handler(ledger_receiver);
-
         // Return the server.
         Ok(server)
     }
@@ -92,11 +85,6 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     /// Returns the ledger.
     pub const fn ledger(&self) -> &Ledger<N, C> {
         &self.ledger
-    }
-
-    /// Returns the ledger sender.
-    pub const fn ledger_sender(&self) -> &LedgerSender<N> {
-        &self.ledger_sender
     }
 
     /// Returns the handles.
@@ -115,32 +103,18 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
 
         // Initialize the routes.
         let routes = self.routes();
+
+        // Add custom logging for each request.
+        let custom_log = warp::log::custom(|info| match info.remote_addr() {
+            Some(addr) => debug!("Received '{} {}' from '{addr}' ({})", info.method(), info.path(), info.status()),
+            None => debug!("Received '{} {}' ({})", info.method(), info.path(), info.status()),
+        });
+
         // Spawn the server.
         self.handles.push(Arc::new(tokio::spawn(async move {
             println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
             // Start the server.
-            warp::serve(routes.with(cors)).run(rest_ip).await
-        })))
-    }
-
-    /// Initializes the ledger handler.
-    fn spawn_ledger_handler(&mut self, mut ledger_receiver: LedgerReceiver<N>) {
-        // Prepare the ledger.
-        let ledger = self.ledger.clone();
-        // Spawn the ledger handler.
-        self.handles.push(Arc::new(tokio::spawn(async move {
-            while let Some(request) = ledger_receiver.recv().await {
-                match request {
-                    LedgerRequest::TransactionBroadcast(transaction) => {
-                        // Retrieve the transaction ID.
-                        let transaction_id = transaction.id();
-                        // Add the transaction to the memory pool.
-                        if let Err(error) = ledger.add_unconfirmed_transaction(transaction) {
-                            warn!("⚠️ Failed to add transaction '{transaction_id}' to the memory pool: {error}")
-                        }
-                    }
-                };
-            }
+            warp::serve(routes.with(cors).with(custom_log)).run(rest_ip).await
         })))
     }
 }

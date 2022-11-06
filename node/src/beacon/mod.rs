@@ -18,8 +18,9 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_executor::{spawn_task, Executor, NodeType, Status};
-use snarkos_node_ledger::{Consensus, Ledger};
+use snarkos_node_consensus::Consensus;
+use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType, Status};
+use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedBlock, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
@@ -28,7 +29,6 @@ use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
 use core::time::Duration;
-use parking_lot::RwLock;
 use std::{
     net::SocketAddr,
     sync::{
@@ -44,6 +44,8 @@ use tokio::time::timeout;
 pub struct Beacon<N: Network> {
     /// The account of the node.
     account: Account<N>,
+    /// The consensus module of the node.
+    consensus: Consensus<N, ConsensusDB<N>>,
     /// The ledger of the node.
     ledger: Ledger<N, ConsensusDB<N>>,
     /// The router of the node.
@@ -69,19 +71,34 @@ impl<N: Network> Beacon<N> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the ledger.
-        let ledger = Ledger::load(private_key, genesis, dev)?;
+        let ledger = Ledger::load(genesis, dev)?;
+        // Initialize the consensus.
+        let consensus = Consensus::new(ledger.clone())?;
         // Initialize the node router.
-        let (router, router_receiver) = Router::new::<Self>(node_ip, trusted_peers).await?;
+        let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
         // Initialize the REST server.
         let rest = match rest_ip {
-            Some(rest_ip) => Some(Arc::new(Rest::start(rest_ip, ledger.clone(), router.clone())?)),
+            Some(rest_ip) => Some(Arc::new(Rest::start(
+                rest_ip,
+                account.address(),
+                Some(consensus.clone()),
+                ledger.clone(),
+                router.clone(),
+            )?)),
             None => None,
         };
         // Initialize the block generation time.
         let block_generation_time = Arc::new(AtomicU64::new(2));
         // Initialize the node.
-        let node =
-            Self { account, ledger, router: router.clone(), rest, block_generation_time, shutdown: Default::default() };
+        let node = Self {
+            account,
+            consensus,
+            ledger,
+            router: router.clone(),
+            rest,
+            block_generation_time,
+            shutdown: Default::default(),
+        };
         // Initialize the router handler.
         router.initialize_handler(node.clone(), router_receiver).await;
 
@@ -147,16 +164,16 @@ impl<N: Network> NodeInterface<N> for Beacon<N> {
     }
 
     /// Returns the account address of the node.
-    fn address(&self) -> &Address<N> {
+    fn address(&self) -> Address<N> {
         self.account.address()
     }
 }
 
 /// A helper method to check if the coinbase target has been met.
-async fn check_for_coinbase<N: Network>(consensus: Arc<RwLock<Consensus<N, ConsensusDB<N>>>>) {
+async fn check_for_coinbase<N: Network>(consensus: Consensus<N, ConsensusDB<N>>) {
     loop {
         // Check if the coinbase target has been met.
-        match consensus.read().is_coinbase_target_met() {
+        match consensus.is_coinbase_target_met() {
             Ok(true) => break,
             Ok(false) => (),
             Err(error) => error!("Failed to check if coinbase target is met: {error}"),
@@ -170,7 +187,7 @@ impl<N: Network> Beacon<N> {
     /// Initialize a new instance of block production.
     async fn initialize_block_production(&self) {
         let beacon = self.clone();
-        spawn_task!(Self, {
+        spawn_task_loop!(Self, {
             // Expected time per block.
             const ROUND_TIME: u64 = 15; // 15 seconds per block
 
@@ -179,13 +196,7 @@ impl<N: Network> Beacon<N> {
                 // Fetch the current timestamp.
                 let current_timestamp = OffsetDateTime::now_utc().unix_timestamp();
                 // Compute the elapsed time.
-                let elapsed_time = match beacon.ledger.consensus().read().latest_timestamp() {
-                    Ok(latest_timestamp) => current_timestamp.saturating_sub(latest_timestamp) as u64,
-                    Err(_) => {
-                        warn!("Failed to fetch the latest block timestamp");
-                        0
-                    }
-                };
+                let elapsed_time = current_timestamp.saturating_sub(beacon.ledger.latest_timestamp()) as u64;
 
                 // Do not produce a block if the elapsed time has not exceeded `ROUND_TIME - block_generation_time`.
                 // This will ensure a block is produced at intervals of approximately `ROUND_TIME`.
@@ -193,7 +204,7 @@ impl<N: Network> Beacon<N> {
                 if elapsed_time < time_to_wait {
                     if let Err(error) = timeout(
                         Duration::from_secs(time_to_wait.saturating_sub(elapsed_time)),
-                        check_for_coinbase(beacon.ledger.consensus().clone()),
+                        check_for_coinbase(beacon.consensus.clone()),
                     )
                     .await
                     {
@@ -227,38 +238,56 @@ impl<N: Network> Beacon<N> {
     /// Produces the next block and propagates it to all peers.
     async fn produce_next_block(&self) -> Result<()> {
         // Produce a transaction if the mempool is empty.
-        if self.ledger.consensus().read().memory_pool().num_unconfirmed_transactions() == 0 {
+        if self.consensus.memory_pool().num_unconfirmed_transactions() == 0 {
             // Create a transfer transaction.
-            let transaction = match self.ledger.create_transfer(self.address(), 1) {
+            let transaction = match self.ledger.create_transfer(self.account.private_key(), self.address(), 1) {
                 Ok(transaction) => transaction,
                 Err(error) => {
                     bail!("Failed to create a transfer transaction for the next block: {error}")
                 }
             };
             // Add the transaction to the memory pool.
-            if let Err(error) = self.ledger.consensus().write().add_unconfirmed_transaction(transaction) {
+            if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction) {
                 bail!("Failed to add a transfer transaction to the memory pool: {error}")
             }
         }
 
         // Propose the next block.
-        let next_block =
-            match self.ledger.consensus().read().propose_next_block(self.private_key(), &mut rand::thread_rng()) {
-                Ok(next_block) => next_block,
-                Err(error) => {
-                    bail!("Failed to propose the next block: {error}")
-                }
-            };
+        let next_block = match self.consensus.propose_next_block(self.private_key(), &mut rand::thread_rng()) {
+            Ok(next_block) => next_block,
+            Err(error) => {
+                bail!("Failed to propose the next block: {error}")
+            }
+        };
         let next_block_height = next_block.height();
         let next_block_hash = next_block.hash();
 
+        // Ensure the block is a valid next block.
+        if let Err(error) = self.consensus.check_next_block(&next_block) {
+            // Clear the memory pool of invalid solutions and transactions.
+            trace!("Refreshing the memory pool...");
+            self.consensus.refresh_memory_pool()?;
+            trace!("Refreshed the memory pool");
+            // Sleep for one second.
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            bail!("Proposed an invalid block: {error}")
+        }
+
         // Advance to the next block.
-        match self.ledger.consensus().write().add_next_block(&next_block) {
-            Ok(()) => match serde_json::to_string_pretty(&next_block) {
-                Ok(block) => info!("Block {next_block_height}: {block}"),
+        match self.consensus.advance_to_next_block(&next_block) {
+            Ok(()) => match serde_json::to_string_pretty(&next_block.header()) {
+                Ok(header) => info!("Block {next_block_height}: {header}"),
                 Err(error) => info!("Block {next_block_height}: (serde failed: {error})"),
             },
-            Err(error) => bail!("Failed to advance to the next block: {error}"),
+            Err(error) => {
+                // Clear the memory pool of invalid solutions and transactions.
+                trace!("Refreshing the memory pool...");
+                self.consensus.refresh_memory_pool()?;
+                trace!("Refreshed the memory pool");
+                // Sleep for one second.
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                bail!("Failed to advance to the next block: {error}")
+            }
         }
 
         // Serialize the block ahead of time to not do it for each peer.

@@ -138,8 +138,8 @@ pub struct InputDB<N: Network> {
     public: DataMap<Field<N>, Option<Plaintext<N>>>,
     /// The mapping of `ciphertext hash` to `(optional) ciphertext`.
     private: DataMap<Field<N>, Option<Ciphertext<N>>>,
-    /// The mapping of `serial number` to `(tag, origin)`.
-    record: DataMap<Field<N>, (Field<N>, Origin<N>)>,
+    /// The mapping of `serial number` to `tag`.
+    record: DataMap<Field<N>, Field<N>>,
     /// The mapping of `record tag` to `serial number`.
     record_tag: DataMap<Field<N>, Field<N>>,
     /// The mapping of `external commitment` to `()`. Note: This is **not** the record commitment.
@@ -155,7 +155,7 @@ impl<N: Network> InputStorage<N> for InputDB<N> {
     type ConstantMap = DataMap<Field<N>, Option<Plaintext<N>>>;
     type PublicMap = DataMap<Field<N>, Option<Plaintext<N>>>;
     type PrivateMap = DataMap<Field<N>, Option<Ciphertext<N>>>;
-    type RecordMap = DataMap<Field<N>, (Field<N>, Origin<N>)>;
+    type RecordMap = DataMap<Field<N>, Field<N>>;
     type RecordTagMap = DataMap<Field<N>, Field<N>>;
     type ExternalRecordMap = DataMap<Field<N>, ()>;
 

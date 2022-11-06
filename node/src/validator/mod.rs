@@ -54,12 +54,14 @@ impl<N: Network> Validator<N> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the ledger.
-        let ledger = Ledger::load(private_key, genesis, dev)?;
+        let ledger = Ledger::load(genesis, dev)?;
         // Initialize the node router.
-        let (router, router_receiver) = Router::new::<Self>(node_ip, trusted_peers).await?;
+        let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
         // Initialize the REST server.
         let rest = match rest_ip {
-            Some(rest_ip) => Some(Arc::new(Rest::start(rest_ip, ledger.clone(), router.clone())?)),
+            Some(rest_ip) => {
+                Some(Arc::new(Rest::start(rest_ip, account.address(), None, ledger.clone(), router.clone())?))
+            }
             None => None,
         };
         // Initialize the node.
@@ -126,7 +128,7 @@ impl<N: Network> NodeInterface<N> for Validator<N> {
     }
 
     /// Returns the account address of the node.
-    fn address(&self) -> &Address<N> {
+    fn address(&self) -> Address<N> {
         self.account.address()
     }
 }

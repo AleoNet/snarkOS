@@ -67,6 +67,7 @@ impl<N: Network> TransactionStorage<N> for TransactionDB<N> {
 
 /// A database deployment storage.
 #[derive(Clone)]
+#[allow(clippy::type_complexity)]
 pub struct DeploymentDB<N: Network> {
     /// The ID map.
     id_map: DataMap<N::TransactionID, ProgramID<N>>,
@@ -80,8 +81,8 @@ pub struct DeploymentDB<N: Network> {
     verifying_key_map: DataMap<(ProgramID<N>, Identifier<N>, u16), VerifyingKey<N>>,
     /// The certificate map.
     certificate_map: DataMap<(ProgramID<N>, Identifier<N>, u16), Certificate<N>>,
-    /// The additional fee map.
-    additional_fee_map: DataMap<N::TransactionID, N::TransitionID>,
+    /// The fee map.
+    fee_map: DataMap<N::TransactionID, (N::TransitionID, N::StateRoot, Option<Proof<N>>)>,
     /// The transition store.
     transition_store: TransitionStore<N, TransitionDB<N>>,
 }
@@ -94,7 +95,7 @@ impl<N: Network> DeploymentStorage<N> for DeploymentDB<N> {
     type ProgramMap = DataMap<(ProgramID<N>, u16), Program<N>>;
     type VerifyingKeyMap = DataMap<(ProgramID<N>, Identifier<N>, u16), VerifyingKey<N>>;
     type CertificateMap = DataMap<(ProgramID<N>, Identifier<N>, u16), Certificate<N>>;
-    type AdditionalFeeMap = DataMap<N::TransactionID, N::TransitionID>;
+    type FeeMap = DataMap<N::TransactionID, (N::TransitionID, N::StateRoot, Option<Proof<N>>)>;
     type TransitionStorage = TransitionDB<N>;
 
     /// Initializes the deployment storage.
@@ -108,7 +109,7 @@ impl<N: Network> DeploymentStorage<N> for DeploymentDB<N> {
             program_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentProgramMap)?,
             verifying_key_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentVerifyingKeyMap)?,
             certificate_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentCertificateMap)?,
-            additional_fee_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentAdditionalFeeMap)?,
+            fee_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentFeeMap)?,
             transition_store,
         })
     }
@@ -143,9 +144,9 @@ impl<N: Network> DeploymentStorage<N> for DeploymentDB<N> {
         &self.certificate_map
     }
 
-    /// Returns the additional fee map.
-    fn additional_fee_map(&self) -> &Self::AdditionalFeeMap {
-        &self.additional_fee_map
+    /// Returns the fee map.
+    fn fee_map(&self) -> &Self::FeeMap {
+        &self.fee_map
     }
 
     /// Returns the transition store.
@@ -162,18 +163,21 @@ pub struct ExecutionDB<N: Network> {
     id_map: DataMap<N::TransactionID, (Vec<N::TransitionID>, Option<N::TransitionID>)>,
     /// The reverse ID map.
     reverse_id_map: DataMap<N::TransitionID, N::TransactionID>,
-    /// The edition map.
-    edition_map: DataMap<N::TransactionID, u16>,
     /// The transition store.
     transition_store: TransitionStore<N, TransitionDB<N>>,
+    /// The inclusion map.
+    inclusion_map: DataMap<N::TransactionID, (N::StateRoot, Option<Proof<N>>)>,
+    /// The fee map.
+    fee_map: DataMap<N::TransactionID, (N::StateRoot, Option<Proof<N>>)>,
 }
 
 #[rustfmt::skip]
 impl<N: Network> ExecutionStorage<N> for ExecutionDB<N> {
     type IDMap = DataMap<N::TransactionID, (Vec<N::TransitionID>, Option<N::TransitionID>)>;
     type ReverseIDMap = DataMap<N::TransitionID, N::TransactionID>;
-    type EditionMap = DataMap<N::TransactionID, u16>;
     type TransitionStorage = TransitionDB<N>;
+    type InclusionMap = DataMap<N::TransactionID, (N::StateRoot, Option<Proof<N>>)>;
+    type FeeMap = DataMap<N::TransactionID, (N::StateRoot, Option<Proof<N>>)>;
 
     /// Initializes the execution storage.
     fn open(transition_store: TransitionStore<N, Self::TransitionStorage>) -> Result<Self> {
@@ -182,8 +186,9 @@ impl<N: Network> ExecutionStorage<N> for ExecutionDB<N> {
         Ok(Self {
             id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ExecutionIDMap)?,
             reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ExecutionReverseIDMap)?,
-            edition_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ExecutionEditionMap)?,
             transition_store,
+            inclusion_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ExecutionInclusionMap)?,
+            fee_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ExecutionFeeMap)?,
         })
     }
 
@@ -197,13 +202,18 @@ impl<N: Network> ExecutionStorage<N> for ExecutionDB<N> {
         &self.reverse_id_map
     }
 
-    /// Returns the edition map.
-    fn edition_map(&self) -> &Self::EditionMap {
-        &self.edition_map
-    }
-
     /// Returns the transition store.
     fn transition_store(&self) -> &TransitionStore<N, Self::TransitionStorage> {
         &self.transition_store
+    }
+
+    /// Returns the inclusion map.
+    fn inclusion_map(&self) -> &Self::InclusionMap {
+        &self.inclusion_map
+    }
+
+    /// Returns the fee map.
+    fn fee_map(&self) -> &Self::FeeMap {
+        &self.fee_map
     }
 }

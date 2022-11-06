@@ -19,15 +19,15 @@ use super::*;
 use crate::PuzzleCommitment;
 use std::borrow::Cow;
 
-impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
+impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     /// Returns the block height that contains the given `state root`.
-    pub fn find_block_height_from_state_root(&self, state_root: Field<N>) -> Result<Option<u32>> {
-        self.blocks.find_block_height_from_state_root(state_root)
+    pub fn find_block_height_from_state_root(&self, state_root: N::StateRoot) -> Result<Option<u32>> {
+        self.vm.block_store().find_block_height_from_state_root(state_root)
     }
 
     /// Returns the block hash that contains the given `transaction ID`.
     pub fn find_block_hash(&self, transaction_id: &N::TransactionID) -> Result<Option<N::BlockHash>> {
-        self.blocks.find_block_hash(transaction_id)
+        self.vm.block_store().find_block_hash(transaction_id)
     }
 
     /// Returns the block hash that contains the given `puzzle commitment`.
@@ -35,22 +35,22 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         &self,
         puzzle_commitment: &PuzzleCommitment<N>,
     ) -> Result<Option<N::BlockHash>> {
-        self.blocks.find_block_hash_from_puzzle_commitment(puzzle_commitment)
+        self.vm.block_store().find_block_hash_from_puzzle_commitment(puzzle_commitment)
     }
 
     /// Returns the transaction ID that contains the given `program ID`.
     pub fn find_deployment_id(&self, program_id: &ProgramID<N>) -> Result<Option<N::TransactionID>> {
-        self.transactions.find_deployment_id(program_id)
+        self.vm.transaction_store().find_deployment_id(program_id)
     }
 
     /// Returns the transaction ID that contains the given `transition ID`.
     pub fn find_transaction_id(&self, transition_id: &N::TransitionID) -> Result<Option<N::TransactionID>> {
-        self.transactions.find_transaction_id(transition_id)
+        self.vm.transaction_store().find_transaction_id(transition_id)
     }
 
     /// Returns the transition ID that contains the given `input ID` or `output ID`.
     pub fn find_transition_id(&self, id: &Field<N>) -> Result<N::TransitionID> {
-        self.transitions.find_transition_id(id)
+        self.vm.transition_store().find_transition_id(id)
     }
 
     /// Returns the record ciphertexts that belong to the given view key.

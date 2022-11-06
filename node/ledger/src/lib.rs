@@ -19,134 +19,247 @@
 #[macro_use]
 extern crate tracing;
 
-pub mod consensus;
-pub use consensus::*;
+mod contains;
+mod find;
+mod get;
+mod iterators;
 
-mod memory_pool;
+#[cfg(test)]
+mod tests;
 
-use snarkvm::prelude::*;
+use snarkvm::{
+    console::{
+        account::{Address, GraphKey, PrivateKey, Signature, ViewKey},
+        network::prelude::*,
+        program::{Ciphertext, Identifier, Plaintext, ProgramID, Record, StatePath, Value},
+        types::{Field, Group},
+    },
+    synthesizer::{
+        block::{Block, Header, Transaction, Transactions},
+        coinbase_puzzle::{CoinbaseSolution, EpochChallenge, PuzzleCommitment},
+        program::Program,
+        store::{ConsensusStorage, ConsensusStore},
+        vm::VM,
+    },
+};
 
-use anyhow::{anyhow, ensure, Result};
-use colored::Colorize;
-use core::time::Duration;
-use futures::{Future, StreamExt};
+use anyhow::Result;
 use indexmap::IndexMap;
 use parking_lot::RwLock;
-use std::{net::IpAddr, sync::Arc};
-use tokio::task;
+use std::{borrow::Cow, sync::Arc};
+
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
 
 type RecordMap<N> = IndexMap<Field<N>, Record<N, Plaintext<N>>>;
 
+#[derive(Copy, Clone, Debug)]
+pub enum RecordsFilter<N: Network> {
+    /// Returns all records associated with the account.
+    All,
+    /// Returns only records associated with the account that are **spent** with the graph key.
+    Spent,
+    /// Returns only records associated with the account that are **not spent** with the graph key.
+    Unspent,
+    /// Returns all records associated with the account that are **spent** with the given private key.
+    SlowSpent(PrivateKey<N>),
+    /// Returns all records associated with the account that are **not spent** with the given private key.
+    SlowUnspent(PrivateKey<N>),
+}
+
 #[derive(Clone)]
 pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
-    /// The consensus module.
-    consensus: Arc<RwLock<Consensus<N, C>>>,
-    /// The account private key.
-    private_key: PrivateKey<N>,
-    /// The account view key.
-    view_key: ViewKey<N>,
-    /// The account address.
-    address: Address<N>,
+    /// The VM state.
+    vm: VM<N, C>,
+    /// The current block hash.
+    current_hash: Arc<RwLock<N::BlockHash>>,
+    /// The current block header.
+    current_header: Arc<RwLock<Header<N>>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
-    /// Loads an instance of the ledger.
-    pub fn load(private_key: PrivateKey<N>, genesis: Option<Block<N>>, dev: Option<u16>) -> Result<Self> {
-        // Initialize consensus.
-        let consensus = Arc::new(RwLock::new(Consensus::load(genesis, dev)?));
-        // Return the ledger.
-        Self::from(consensus, private_key)
+    /// Loads the ledger from storage.
+    pub fn load(genesis: Option<Block<N>>, dev: Option<u16>) -> Result<Self> {
+        // Retrieve the genesis hash.
+        let genesis_hash = match genesis {
+            Some(ref genesis) => genesis.hash(),
+            None => Block::<N>::from_bytes_le(N::genesis_bytes())?.hash(),
+        };
+
+        // Initialize the consensus store.
+        let store = ConsensusStore::<N, C>::open(dev)?;
+        // Initialize a new VM.
+        let vm = VM::from(store)?;
+        // Initialize the ledger.
+        let ledger = Self::from(vm, genesis)?;
+
+        // Ensure the ledger contains the correct genesis block.
+        match ledger.contains_block_hash(&genesis_hash)? {
+            true => Ok(ledger),
+            false => bail!("Incorrect genesis block (run 'snarkos clean' and try again)"),
+        }
     }
 
-    /// Initializes a new instance of the ledger.
-    pub fn from(consensus: Arc<RwLock<Consensus<N, C>>>, private_key: PrivateKey<N>) -> Result<Self> {
-        // Derive the view key and address.
-        let view_key = ViewKey::try_from(private_key)?;
-        let address = Address::try_from(&view_key)?;
+    /// Initializes the ledger from storage, with an optional genesis block.
+    pub fn from(vm: VM<N, C>, genesis: Option<Block<N>>) -> Result<Self> {
+        // Load the genesis block.
+        let genesis = match genesis {
+            Some(genesis) => genesis,
+            None => Block::<N>::from_bytes_le(N::genesis_bytes())?,
+        };
 
-        // Return the ledger.
-        Ok(Self { consensus, private_key, view_key, address })
+        // Initialize the ledger.
+        let mut ledger = Self {
+            vm,
+            current_hash: Arc::new(RwLock::new(genesis.hash())),
+            current_header: Arc::new(RwLock::new(*genesis.header())),
+        };
+
+        // If the block store is empty, initialize the genesis block.
+        if ledger.vm.block_store().heights().max().is_none() {
+            // Add the genesis block.
+            ledger.add_next_block(&genesis)?;
+        }
+
+        // Retrieve the latest height.
+        let latest_height =
+            *ledger.vm.block_store().heights().max().ok_or_else(|| anyhow!("Failed to load blocks from the ledger"))?;
+        // Fetch the latest block.
+        let block = ledger
+            .get_block(latest_height)
+            .map_err(|_| anyhow!("Failed to load block {latest_height} from the ledger"))?;
+
+        // Set the current hash, height, and round.
+        ledger.current_hash = Arc::new(RwLock::new(block.hash()));
+        ledger.current_header = Arc::new(RwLock::new(*block.header()));
+
+        // Safety check the existence of every block.
+        cfg_into_iter!((0..=latest_height)).try_for_each(|height| {
+            ledger.get_block(height)?;
+            Ok::<_, Error>(())
+        })?;
+
+        Ok(ledger)
     }
 
-    /// Returns the consensus module.
-    pub const fn consensus(&self) -> &Arc<RwLock<Consensus<N, C>>> {
-        &self.consensus
+    /// Returns the VM.
+    pub fn vm(&self) -> &VM<N, C> {
+        &self.vm
     }
 
-    /// Returns the ledger address.
-    pub const fn address(&self) -> Address<N> {
-        self.address
+    /// Returns the latest state root.
+    pub fn latest_state_root(&self) -> Field<N> {
+        *self.vm.block_store().current_state_root()
     }
 
-    /// Adds the given unconfirmed transaction to the memory pool.
-    pub fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
-        self.consensus.write().add_unconfirmed_transaction(transaction)
+    /// Returns the latest block.
+    pub fn latest_block(&self) -> Result<Block<N>> {
+        self.get_block(self.latest_height())
     }
 
-    /// Adds the given unconfirmed solution to the memory pool.
-    pub fn add_unconfirmed_solution(&self, solution: &ProverSolution<N>) -> Result<()> {
-        self.consensus.write().add_unconfirmed_solution(solution)
+    /// Returns the latest block hash.
+    pub fn latest_hash(&self) -> N::BlockHash {
+        *self.current_hash.read()
+    }
+
+    /// Returns the latest block header.
+    pub fn latest_header(&self) -> Header<N> {
+        *self.current_header.read()
+    }
+
+    /// Returns the latest block height.
+    pub fn latest_height(&self) -> u32 {
+        self.current_header.read().height()
+    }
+
+    /// Returns the latest round number.
+    pub fn latest_round(&self) -> u64 {
+        self.current_header.read().round()
+    }
+
+    /// Returns the latest block coinbase accumulator point.
+    pub fn latest_coinbase_accumulator_point(&self) -> Field<N> {
+        self.current_header.read().coinbase_accumulator_point()
+    }
+
+    /// Returns the latest block coinbase target.
+    pub fn latest_coinbase_target(&self) -> u64 {
+        self.current_header.read().coinbase_target()
+    }
+
+    /// Returns the latest block proof target.
+    pub fn latest_proof_target(&self) -> u64 {
+        self.current_header.read().proof_target()
+    }
+
+    /// Returns the latest coinbase timestamp.
+    pub fn latest_coinbase_timestamp(&self) -> i64 {
+        self.current_header.read().last_coinbase_timestamp()
+    }
+
+    /// Returns the latest block timestamp.
+    pub fn latest_timestamp(&self) -> i64 {
+        self.current_header.read().timestamp()
+    }
+
+    /// Returns the latest block transactions.
+    pub fn latest_transactions(&self) -> Result<Transactions<N>> {
+        self.get_transactions(self.latest_height())
+    }
+
+    /// Returns the latest epoch number.
+    pub fn latest_epoch_number(&self) -> u32 {
+        self.current_header.read().height() / N::NUM_BLOCKS_PER_EPOCH
+    }
+
+    /// Returns the latest epoch challenge.
+    pub fn latest_epoch_challenge(&self) -> Result<EpochChallenge<N>> {
+        // Get the epoch starting height (a multiple of `NUM_BLOCKS_PER_EPOCH`).
+        let latest_height = self.latest_height();
+        let epoch_starting_height = latest_height - latest_height % N::NUM_BLOCKS_PER_EPOCH;
+        ensure!(epoch_starting_height % N::NUM_BLOCKS_PER_EPOCH == 0, "Invalid epoch starting height");
+        // Retrieve the epoch block hash, defined as the 'previous block hash' from the epoch starting height.
+        let epoch_block_hash = self.get_previous_hash(epoch_starting_height)?;
+        // Construct the epoch challenge.
+        EpochChallenge::new(self.latest_epoch_number(), epoch_block_hash, N::COINBASE_PUZZLE_DEGREE)
+    }
+
+    /// Adds the given block as the next block in the chain.
+    pub fn add_next_block(&self, block: &Block<N>) -> Result<()> {
+        let mut current_hash = self.current_hash.write();
+        let mut current_header = self.current_header.write();
+
+        // Update the VM.
+        self.vm.add_next_block(block)?;
+
+        // Update the blocks.
+        current_hash.clone_from(&block.hash());
+        current_header.clone_from(block.header());
+
+        Ok(())
     }
 
     /// Returns the unspent records.
-    pub fn find_unspent_records(&self) -> Result<RecordMap<N>> {
+    pub fn find_unspent_records(&self, view_key: &ViewKey<N>) -> Result<RecordMap<N>> {
         Ok(self
-            .consensus
-            .read()
-            .find_records(&self.view_key, RecordsFilter::Unspent)?
+            .find_records(view_key, RecordsFilter::Unspent)?
             .filter(|(_, record)| !record.gates().is_zero())
             .collect::<IndexMap<_, _>>())
-    }
-
-    /// Returns the spent records.
-    pub fn find_spent_records(&self) -> Result<RecordMap<N>> {
-        Ok(self
-            .consensus
-            .read()
-            .find_records(&self.view_key, RecordsFilter::Spent)?
-            .filter(|(_, record)| !record.gates().is_zero())
-            .collect::<IndexMap<_, _>>())
-    }
-
-    /// Creates a deploy transaction.
-    pub fn create_deploy(&self, program: &Program<N>, additional_fee: u64) -> Result<Transaction<N>> {
-        // Fetch the unspent records.
-        let records = self.find_unspent_records()?;
-        ensure!(!records.len().is_zero(), "The Aleo account has no records to spend.");
-
-        // Prepare the additional fee.
-        let credits = records.values().max_by(|a, b| (**a.gates()).cmp(&**b.gates())).unwrap().clone();
-        ensure!(***credits.gates() >= additional_fee, "The additional fee is more than the record balance.");
-
-        // Initialize an RNG.
-        let rng = &mut ::rand::thread_rng();
-        // Deploy.
-        let transaction = Transaction::deploy(
-            self.consensus.read().vm(),
-            &self.private_key,
-            program,
-            (credits, additional_fee),
-            rng,
-        )?;
-        // Verify.
-        assert!(self.consensus.read().vm().verify(&transaction));
-        // Return the transaction.
-        Ok(transaction)
     }
 
     /// Creates a transfer transaction.
-    pub fn create_transfer(&self, to: &Address<N>, amount: u64) -> Result<Transaction<N>> {
+    pub fn create_transfer(&self, private_key: &PrivateKey<N>, to: Address<N>, amount: u64) -> Result<Transaction<N>> {
         // Fetch the unspent records.
-        let records = self.find_unspent_records()?;
+        let records = self.find_unspent_records(&ViewKey::try_from(private_key)?)?;
         ensure!(!records.len().is_zero(), "The Aleo account has no records to spend.");
 
         // Initialize an RNG.
-        let rng = &mut ::rand::thread_rng();
+        let rng = &mut rand::thread_rng();
 
         // Create a new transaction.
         Transaction::execute(
-            self.consensus.read().vm(),
-            &self.private_key,
+            &self.vm,
+            private_key,
             &ProgramID::from_str("credits.aleo")?,
             Identifier::from_str("transfer")?,
             &[
@@ -157,120 +270,5 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
             None,
             rng,
         )
-    }
-
-    /// Syncs the ledger with the network.
-    #[allow(dead_code)]
-    pub(crate) async fn initial_sync_with_network(self: &Arc<Self>, leader_ip: IpAddr) -> Result<()> {
-        /// The number of concurrent requests with the network.
-        const CONCURRENT_REQUESTS: usize = 100;
-        /// Url to fetch the blocks from.
-        const TARGET_URL: &str = "https://vm.aleo.org/testnet3/block/testnet3/";
-
-        async fn handle_dispatch_error<'a, T, F>(func: impl Fn() -> F + 'a) -> Result<T>
-        where
-            F: Future<Output = Result<T, Error>>,
-        {
-            use backoff::{future::retry, ExponentialBackoff};
-
-            fn default_backoff() -> ExponentialBackoff {
-                ExponentialBackoff {
-                    max_interval: Duration::from_secs(10),
-                    max_elapsed_time: Some(Duration::from_secs(45)),
-                    ..Default::default()
-                }
-            }
-
-            fn from_anyhow_err(err: Error) -> backoff::Error<Error> {
-                use backoff::Error;
-
-                if let Ok(err) = err.downcast::<reqwest::Error>() {
-                    debug!("Server error: {err}; retrying...");
-                    Error::Transient { err: err.into(), retry_after: None }
-                } else {
-                    Error::Transient { err: anyhow!("Block parse error"), retry_after: None }
-                }
-            }
-
-            retry(default_backoff(), || async { func().await.map_err(from_anyhow_err) }).await
-        }
-
-        // Fetch the ledger height.
-        let ledger_height = self.consensus.read().latest_height();
-
-        // Create a Client to maintain a connection pool throughout the sync.
-        let client = reqwest::Client::builder().build()?;
-
-        // Fetch the latest height.
-        let latest_height = client
-            .get(format!("http://{leader_ip}/testnet3/latest/height"))
-            .send()
-            .await?
-            .text()
-            .await?
-            .parse::<u32>()?;
-
-        // Start a timer.
-        let timer = std::time::Instant::now();
-
-        // Sync the ledger to the latest block height.
-        if latest_height > ledger_height + 1 {
-            futures::stream::iter((ledger_height + 1)..=latest_height)
-                .map(|height| {
-                    trace!("Requesting block {height} of {latest_height}");
-
-                    // Download the block with an exponential backoff retry policy.
-                    let client_clone = client.clone();
-                    handle_dispatch_error(move || {
-                        let client = client_clone.clone();
-                        async move {
-                            // Get the URL for the block download.
-                            let block_url = format!("{TARGET_URL}{height}.block");
-
-                            // Fetch the bytes from the given url
-                            let block_bytes = client.get(block_url).send().await?.bytes().await?;
-
-                            // Parse the block.
-                            let block =
-                                task::spawn_blocking(move || Block::from_bytes_le(&block_bytes)).await.unwrap()?;
-
-                            std::future::ready(Ok(block)).await
-                        }
-                    })
-                })
-                .buffered(CONCURRENT_REQUESTS)
-                .for_each(|block| async {
-                    let block = block.unwrap();
-                    // Use blocking tasks, as deserialization and adding blocks are expensive operations.
-                    let self_clone = self.clone();
-
-                    task::spawn_blocking(move || {
-                        // Add the block to the ledger.
-                        self_clone.consensus.write().add_next_block(&block).unwrap();
-
-                        // Retrieve the current height.
-                        let height = block.height();
-                        // Compute the percentage completed.
-                        let percentage = height * 100 / latest_height;
-                        // Compute the heuristic slowdown factor (in millis).
-                        let slowdown = (100 * (latest_height - height)) as u128;
-                        // Compute the time remaining (in millis).
-                        let millis_per_block = (timer.elapsed().as_millis()) / (height - ledger_height) as u128;
-                        let time_remaining = (latest_height - height) as u128 * millis_per_block + slowdown;
-                        // Prepare the estimate message (in secs).
-                        let estimate = format!("(est. {} minutes remaining)", time_remaining / (60 * 1000));
-                        // Log the progress.
-                        info!(
-                            "Synced up to block {height} of {latest_height} - {percentage}% complete {}",
-                            estimate.dimmed()
-                        );
-                    })
-                    .await
-                    .unwrap();
-                })
-                .await;
-        }
-
-        Ok(())
     }
 }

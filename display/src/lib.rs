@@ -130,7 +130,7 @@ impl<N: Network> Display<N> {
             .add_directive("hyper::proto::h1::decode=off".parse().unwrap())
             .add_directive("hyper::proto::h1::io=off".parse().unwrap())
             .add_directive("hyper::proto::h1::role=off".parse().unwrap())
-            .add_directive("jsonrpsee=off".parse().unwrap());
+            .add_directive("warp=off".parse().unwrap());
 
         // Initialize the log channel.
         let (log_sender, log_receiver) = mpsc::channel(1024);
