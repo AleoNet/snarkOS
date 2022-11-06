@@ -265,7 +265,9 @@ impl<N: Network> Beacon<N> {
         // Ensure the block is a valid next block.
         if let Err(error) = self.consensus.check_next_block(&next_block) {
             // Clear the memory pool of invalid solutions and transactions.
+            trace!("Refreshing the memory pool...");
             self.consensus.refresh_memory_pool()?;
+            trace!("Refreshed the memory pool");
             // Sleep for one second.
             tokio::time::sleep(Duration::from_secs(1)).await;
             bail!("Proposed an invalid block: {error}")
@@ -277,7 +279,15 @@ impl<N: Network> Beacon<N> {
                 Ok(header) => info!("Block {next_block_height}: {header}"),
                 Err(error) => info!("Block {next_block_height}: (serde failed: {error})"),
             },
-            Err(error) => bail!("Failed to advance to the next block: {error}"),
+            Err(error) => {
+                // Clear the memory pool of invalid solutions and transactions.
+                trace!("Refreshing the memory pool...");
+                self.consensus.refresh_memory_pool()?;
+                trace!("Refreshed the memory pool");
+                // Sleep for one second.
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                bail!("Failed to advance to the next block: {error}")
+            }
         }
 
         // Serialize the block ahead of time to not do it for each peer.
