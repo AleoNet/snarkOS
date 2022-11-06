@@ -43,15 +43,15 @@ use rayon::prelude::*;
 
 #[derive(Clone)]
 pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
-    /// The beacons.
-    // TODO (howardwu): Update this to retrieve from a beacons store.
-    beacons: Arc<RwLock<IndexMap<Address<N>, ()>>>,
     /// The ledger.
     ledger: Ledger<N, C>,
     /// The coinbase puzzle.
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The memory pool.
     memory_pool: MemoryPool<N>,
+    /// The beacons.
+    // TODO (howardwu): Update this to retrieve from a beacons store.
+    beacons: Arc<RwLock<IndexMap<Address<N>, ()>>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
@@ -60,12 +60,13 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
 
+        // Initialize consensus.
         let mut consensus = Self {
-            // TODO (howardwu): Update this to retrieve from a validators store.
-            beacons: Default::default(),
             ledger,
             coinbase_puzzle,
             memory_pool: Default::default(),
+            // TODO (howardwu): Update this to retrieve from a validators store.
+            beacons: Default::default(),
         };
 
         // Add the genesis beacon.
@@ -77,9 +78,27 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         Ok(consensus)
     }
 
-    /// Returns the coinbase puzzle.
-    pub const fn coinbase_puzzle(&self) -> &CoinbasePuzzle<N> {
-        &self.coinbase_puzzle
+    /// Returns the beacon set.
+    pub fn beacons(&self) -> IndexMap<Address<N>, ()> {
+        self.beacons.read().clone()
+    }
+
+    /// Adds a given address to the beacon set.
+    pub fn add_beacon(&mut self, address: Address<N>) -> Result<()> {
+        if self.beacons.write().insert(address, ()).is_some() {
+            bail!("'{address}' is already in the beacon set.")
+        } else {
+            Ok(())
+        }
+    }
+
+    /// Removes a given address from the beacon set.
+    pub fn remove_beacon(&mut self, address: Address<N>) -> Result<()> {
+        if self.beacons.write().remove(&address).is_none() {
+            bail!("'{address}' is not in the beacon set.")
+        } else {
+            Ok(())
+        }
     }
 
     /// Returns the memory pool.
@@ -142,29 +161,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let latest_coinbase_target = self.ledger.latest_coinbase_target();
         // Check if the coinbase target is met.
         Ok(cumulative_proof_target >= latest_coinbase_target as u128)
-    }
-
-    /// Returns the beacon set.
-    pub fn beacons(&self) -> IndexMap<Address<N>, ()> {
-        self.beacons.read().clone()
-    }
-
-    /// Adds a given address to the beacon set.
-    pub fn add_beacon(&mut self, address: Address<N>) -> Result<()> {
-        if self.beacons.write().insert(address, ()).is_some() {
-            bail!("'{address}' is already in the beacon set.")
-        } else {
-            Ok(())
-        }
-    }
-
-    /// Removes a given address from the beacon set.
-    pub fn remove_beacon(&mut self, address: Address<N>) -> Result<()> {
-        if self.beacons.write().remove(&address).is_none() {
-            bail!("'{address}' is not in the beacon set.")
-        } else {
-            Ok(())
-        }
     }
 
     /// Returns a candidate for the next block in the ledger.
