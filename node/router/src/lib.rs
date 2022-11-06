@@ -71,6 +71,8 @@ pub enum RouterRequest<N: Network> {
     Heartbeat,
     /// MessagePropagate := (message, \[ excluded_peers \])
     MessagePropagate(Message<N>, Vec<SocketAddr>),
+    /// MessagePropagateBeacon := (message, \[ excluded_beacons \])
+    MessagePropagateBeacon(Message<N>, Vec<SocketAddr>),
     /// MessageSend := (peer_ip, message)
     MessageSend(SocketAddr, Message<N>),
     /// PeerConnect := (peer_ip)
@@ -395,6 +397,9 @@ impl<N: Network> Router<N> {
             RouterRequest::Heartbeat => self.handle_heartbeat().await,
             RouterRequest::MessagePropagate(message, excluded_peers) => {
                 self.handle_propagate(message, excluded_peers).await
+            }
+            RouterRequest::MessagePropagateBeacon(message, excluded_beacons) => {
+                self.handle_propagate_beacon(message, excluded_beacons).await
             }
             RouterRequest::MessageSend(sender, message) => self.handle_send(sender, message).await,
             RouterRequest::PeerConnect(peer_ip) => self.handle_peer_connect::<E>(peer_ip).await,
@@ -794,6 +799,40 @@ impl<N: Network> Router<N> {
             .await
             .iter()
             .filter(|peer_ip| !self.is_local_ip(peer_ip) && !excluded_peers.contains(peer_ip))
+        {
+            self.handle_send(*peer, message.clone()).await;
+        }
+    }
+
+    /// Sends the given message to every connected beacon, excluding the sender and any specified beacon IPs.
+    async fn handle_propagate_beacon(&self, mut message: Message<N>, excluded_beacons: Vec<SocketAddr>) {
+        // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
+        if let Message::UnconfirmedBlock(ref mut message) = message {
+            if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
+                let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
+            } else {
+                error!("Block serialization is bugged");
+            }
+        } else if let Message::UnconfirmedSolution(ref mut message) = message {
+            if let Ok(serialized_solution) = Data::serialize(message.solution.clone()).await {
+                let _ = std::mem::replace(&mut message.solution, Data::Buffer(serialized_solution));
+            } else {
+                error!("Solution serialization is bugged");
+            }
+        } else if let Message::UnconfirmedTransaction(ref mut message) = message {
+            if let Ok(serialized_transaction) = Data::serialize(message.transaction.clone()).await {
+                let _ = std::mem::replace(&mut message.transaction, Data::Buffer(serialized_transaction));
+            } else {
+                error!("Transaction serialization is bugged");
+            }
+        }
+
+        // Iterate through all beacons that are not the sender and excluded beacons.
+        for peer in self
+            .connected_beacons()
+            .await
+            .iter()
+            .filter(|peer_ip| !self.is_local_ip(peer_ip) && !excluded_beacons.contains(peer_ip))
         {
             self.handle_send(*peer, message.clone()).await;
         }

@@ -378,8 +378,8 @@ pub trait Inbound<N: Network>: Executor {
         if !should_propagate {
             trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
         } else {
-            // Propagate the `UnconfirmedSolution`.
-            let request = RouterRequest::MessagePropagate(Message::UnconfirmedSolution(message), vec![peer_ip]);
+            // Propagate the `UnconfirmedSolution` to connected beacons.
+            let request = RouterRequest::MessagePropagateBeacon(Message::UnconfirmedSolution(message), vec![peer_ip]);
             if let Err(error) = router.process(request).await {
                 warn!("[UnconfirmedSolution] {error}");
             }

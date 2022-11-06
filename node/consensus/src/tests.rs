@@ -224,7 +224,7 @@ function compute:
                 assert_eq!(authorization.len(), 1);
 
                 // Execute.
-                let transaction = Transaction::execute_authorization(&vm, authorization, rng).unwrap();
+                let transaction = Transaction::execute_authorization(vm, authorization, rng).unwrap();
                 // Verify.
                 assert!(vm.verify(&transaction));
                 // Return the transaction.

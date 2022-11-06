@@ -78,11 +78,11 @@ impl<N: Network> Inbound<N> for Beacon<N> {
                 return true; // Maintain the connection.
             }
 
-            // // Propagate the `UnconfirmedSolution`.
-            // let request = RouterRequest::MessagePropagate(Message::UnconfirmedSolution(message), vec![peer_ip]);
-            // if let Err(error) = router.process(request).await {
-            //     warn!("[UnconfirmedSolution] {error}");
-            // }
+            // Propagate the `UnconfirmedSolution` to connected beacons.
+            let request = RouterRequest::MessagePropagateBeacon(Message::UnconfirmedSolution(message), vec![peer_ip]);
+            if let Err(error) = router.process(request).await {
+                warn!("[UnconfirmedSolution] {error}");
+            }
         }
         true
     }
