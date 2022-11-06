@@ -182,7 +182,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let transactions = self.memory_pool.candidate_transactions(self).into_iter().collect::<Transactions<N>>();
         // Select the prover solutions from the memory pool.
         let prover_solutions = self.memory_pool.candidate_solutions(
-            &self,
+            self,
             self.ledger.latest_height(),
             latest_proof_target,
             latest_coinbase_target,
@@ -293,7 +293,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         self.ledger.add_next_block(block)?;
 
         // Clear the memory pool of unconfirmed transactions that are now invalid.
-        self.memory_pool.clear_invalid_transactions(&self.clone());
+        self.memory_pool.clear_invalid_transactions(self);
 
         // If this starts a new epoch, clear all unconfirmed solutions from the memory pool.
         if block.epoch_number() > self.ledger.latest_epoch_number() {
@@ -301,9 +301,18 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
         // Otherwise, if a new coinbase was produced, clear the memory pool of unconfirmed solutions that are now invalid.
         else if block.coinbase().is_some() {
-            self.memory_pool.clear_invalid_solutions(&self.clone());
+            self.memory_pool.clear_invalid_solutions(self);
         }
 
+        Ok(())
+    }
+
+    /// Clears the memory pool of invalid solutions and transactions.
+    pub fn refresh_memory_pool(&self) -> Result<()> {
+        // Clear the memory pool of unconfirmed solutions that are now invalid.
+        self.memory_pool.clear_invalid_solutions(self);
+        // Clear the memory pool of unconfirmed transactions that are now invalid.
+        self.memory_pool.clear_invalid_transactions(self);
         Ok(())
     }
 
