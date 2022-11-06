@@ -32,5 +32,5 @@ pub trait NodeInterface<N: Network>: Executor {
     fn view_key(&self) -> &ViewKey<N>;
 
     /// Returns the account address of the node.
-    fn address(&self) -> &Address<N>;
+    fn address(&self) -> Address<N>;
 }

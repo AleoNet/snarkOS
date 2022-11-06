@@ -74,8 +74,8 @@ impl<N: Network> Account<N> {
     }
 
     /// Returns the account address.
-    pub const fn address(&self) -> &Address<N> {
-        &self.address
+    pub const fn address(&self) -> Address<N> {
+        self.address
     }
 }
 

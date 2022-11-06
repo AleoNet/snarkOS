@@ -35,12 +35,13 @@ pub use peer::*;
 
 use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor};
 use snarkos_node_messages::*;
-use snarkvm::prelude::{Network, PuzzleCommitment};
+use snarkvm::prelude::{Address, Network, PuzzleCommitment};
 
 use anyhow::Result;
 use indexmap::{IndexMap, IndexSet};
 use rand::{prelude::IteratorRandom, rngs::OsRng, Rng};
 use std::{
+    collections::HashMap,
     net::SocketAddr,
     sync::Arc,
     time::{Duration, Instant, SystemTime},
@@ -94,6 +95,8 @@ pub struct Router<N: Network> {
     router_sender: RouterSender<N>,
     /// The local IP of the node.
     local_ip: SocketAddr,
+    /// The address of the node.
+    address: Address<N>,
     /// The set of trusted peers.
     trusted_peers: Arc<IndexSet<SocketAddr>>,
     /// The map of connected peer IPs to their peer handlers.
@@ -145,6 +148,7 @@ impl<N: Network> Router<N> {
     /// Initializes a new `Router` instance.
     pub async fn new<E: Handshake + Inbound<N> + Outbound>(
         node_ip: SocketAddr,
+        address: Address<N>,
         trusted_peers: &[SocketAddr],
     ) -> Result<(Self, RouterReceiver<N>)> {
         // Initialize a new TCP listener at the given IP.
@@ -160,6 +164,7 @@ impl<N: Network> Router<N> {
         let router = Self {
             router_sender,
             local_ip,
+            address,
             trusted_peers: Arc::new(trusted_peers.iter().copied().collect()),
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
@@ -178,6 +183,8 @@ impl<N: Network> Router<N> {
         router.initialize_listener::<E>(listener).await;
         // Initialize the heartbeat.
         router.initialize_heartbeat::<E>().await;
+        // Initialize the report.
+        router.initialize_report::<E>().await;
         // Initialize the GC.
         router.initialize_gc::<E>().await;
 
@@ -314,6 +321,26 @@ impl<N: Network> Router<N> {
                 }
                 // Sleep for `Self::HEARTBEAT_IN_SECS` seconds.
                 tokio::time::sleep(Duration::from_secs(Self::HEARTBEAT_IN_SECS)).await;
+            }
+        });
+    }
+
+    /// Initialize a new instance of the report.
+    async fn initialize_report<E: Executor>(&self) {
+        let router = self.clone();
+        spawn_task_loop!(E, {
+            let url = "https://vm.aleo.org/testnet3/report";
+            loop {
+                // Prepare the report.
+                let mut report = HashMap::new();
+                report.insert("node_address".to_string(), router.address.to_string());
+                report.insert("node_type".to_string(), E::node_type().to_string());
+                // Transmit the report.
+                if reqwest::Client::new().post(url).json(&report).send().await.is_err() {
+                    warn!("Failed to send report");
+                }
+                // Sleep for a fixed duration in seconds.
+                tokio::time::sleep(Duration::from_secs(3600 * 6)).await;
             }
         });
     }

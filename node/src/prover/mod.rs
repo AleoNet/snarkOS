@@ -56,7 +56,7 @@ impl<N: Network> Prover<N> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the node router.
-        let (router, router_receiver) = Router::new::<Self>(node_ip, trusted_peers).await?;
+        let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
@@ -109,7 +109,7 @@ impl<N: Network> NodeInterface<N> for Prover<N> {
     }
 
     /// Returns the account address of the node.
-    fn address(&self) -> &Address<N> {
+    fn address(&self) -> Address<N> {
         self.account.address()
     }
 }
@@ -208,7 +208,7 @@ impl<N: Network> Prover<N> {
                         // Construct a prover solution.
                         let prover_solution = match prover.coinbase_puzzle.prove(
                             &epoch_challenge,
-                            *prover.address(),
+                            prover.address(),
                             rand::thread_rng().gen(),
                         ) {
                             Ok(proof) => proof,

@@ -248,7 +248,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     }
 
     /// Creates a transfer transaction.
-    pub fn create_transfer(&self, private_key: &PrivateKey<N>, to: &Address<N>, amount: u64) -> Result<Transaction<N>> {
+    pub fn create_transfer(&self, private_key: &PrivateKey<N>, to: Address<N>, amount: u64) -> Result<Transaction<N>> {
         // Fetch the unspent records.
         let records = self.find_unspent_records(&ViewKey::try_from(private_key)?)?;
         ensure!(!records.len().is_zero(), "The Aleo account has no records to spend.");

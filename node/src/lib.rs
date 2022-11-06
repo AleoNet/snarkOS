@@ -127,7 +127,7 @@ impl<N: Network> Node<N> {
     }
 
     /// Returns the account address of the node.
-    pub fn address(&self) -> &Address<N> {
+    pub fn address(&self) -> Address<N> {
         match self {
             Self::Beacon(node) => node.address(),
             Self::Validator(node) => node.address(),
