@@ -14,4 +14,3 @@ imports_granularity = "Crate"
 overflow_delimited_expr = true
 reorder_impl_items = true
 version = "Two"
-
