@@ -101,4 +101,9 @@ impl<N: Network> MemoryPool<N> {
             }
         });
     }
+
+    /// Clears the memory pool of all unconfirmed transactions.
+    pub fn clear_unconfirmed_transactions(&self) {
+        self.unconfirmed_transactions.write().clear();
+    }
 }

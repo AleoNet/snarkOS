@@ -310,6 +310,15 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         Ok(())
     }
 
+    /// Clears the memory pool of all solutions and transactions.
+    pub fn clear_memory_pool(&self) -> Result<()> {
+        // Clear the memory pool of unconfirmed solutions that are now invalid.
+        self.memory_pool.clear_all_unconfirmed_solutions();
+        // Clear the memory pool of unconfirmed transactions that are now invalid.
+        self.memory_pool.clear_unconfirmed_transactions();
+        Ok(())
+    }
+
     /// Checks the given block is valid next block.
     pub fn check_next_block(&self, block: &Block<N>) -> Result<()> {
         // Ensure the previous block hash is correct.
