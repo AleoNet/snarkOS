@@ -74,6 +74,10 @@ impl<N: Network> Prover<N> {
         node.initialize_heartbeat().await;
         // Initialize the coinbase puzzle.
         node.initialize_coinbase_puzzle().await;
+        // Initialize the coinbase puzzle.
+        node.initialize_coinbase_puzzle().await;
+        // Initialize the coinbase puzzle.
+        node.initialize_coinbase_puzzle().await;
         // Initialize the signal handler.
         node.handle_signals();
         // Return the node.
@@ -181,12 +185,6 @@ impl<N: Network> Prover<N> {
                 if let (Some(epoch_challenge), Some(block)) = (latest_epoch_challenge, latest_block) {
                     let prover = prover.clone();
                     spawn_task!(Self, {
-                        // To prevent starvation, the number of puzzle instances is limited.
-                        if prover.puzzle_instances.load(std::sync::atomic::Ordering::SeqCst) > 1 {
-                            tokio::time::sleep(Duration::from_secs(1)).await;
-                            return;
-                        }
-
                         // Set the status to `Proving`.
                         Self::status().update(Status::Proving);
                         // Increment the number of puzzle instances.
