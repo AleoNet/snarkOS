@@ -62,10 +62,6 @@ pub struct RocksDB {
     network_id: u16,
     /// The optional development ID.
     dev: Option<u16>,
-    /// The tracker for whether a database transaction is in progress.
-    batch_in_progress: Arc<AtomicBool>,
-    /// The database transaction.
-    atomic_batch: Arc<Mutex<rocksdb::WriteBatch>>,
 }
 
 impl Deref for RocksDB {
@@ -102,13 +98,7 @@ impl Database for RocksDB {
                     Arc::new(rocksdb::DB::open(&options, primary)?)
                 };
 
-                Ok::<_, anyhow::Error>(RocksDB {
-                    rocksdb,
-                    network_id,
-                    dev,
-                    batch_in_progress: Default::default(),
-                    atomic_batch: Default::default(),
-                })
+                Ok::<_, anyhow::Error>(RocksDB { rocksdb, network_id, dev })
             })?
             .clone();
 
@@ -133,7 +123,7 @@ impl Database for RocksDB {
         context.extend_from_slice(&(data_id as u16).to_le_bytes());
 
         // Return the DataMap.
-        Ok(DataMap { database, context, _phantom: PhantomData })
+        Ok(DataMap { database, context, batch_in_progress: Default::default(), atomic_batch: Default::default() })
     }
 }
 
@@ -162,13 +152,7 @@ impl RocksDB {
                 Arc::new(rocksdb::DB::open(&options, primary)?)
             };
 
-            Ok::<_, anyhow::Error>(RocksDB {
-                rocksdb,
-                network_id: u16::MAX,
-                dev,
-                batch_in_progress: Default::default(),
-                atomic_batch: Default::default(),
-            })
+            Ok::<_, anyhow::Error>(RocksDB { rocksdb, network_id: u16::MAX, dev })
         }?;
 
         // Ensure the database development ID match.
@@ -193,7 +177,7 @@ impl RocksDB {
         context.extend_from_slice(&(data_id as u16).to_le_bytes());
 
         // Return the DataMap.
-        Ok(DataMap { database, context, _phantom: PhantomData })
+        Ok(DataMap { database, context, batch_in_progress: Default::default(), atomic_batch: Default::default() })
     }
 }
 
