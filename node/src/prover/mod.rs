@@ -197,61 +197,58 @@ impl<N: Network> Prover<N> {
                         // Retrieve the latest proof target.
                         let latest_proof_target = block.proof_target();
 
-                        debug!(
-                            "Proving 'CoinbasePuzzle' (Epoch {}, Block {}, Coinbase Target {}, Proof Target {})",
-                            epoch_challenge.epoch_number(),
-                            block.height(),
-                            latest_coinbase_target,
-                            latest_proof_target,
-                        );
+                        loop {
+                            debug!(
+                                "Proving 'CoinbasePuzzle' (Epoch {}, Block {}, Coinbase Target {}, Proof Target {})",
+                                epoch_challenge.epoch_number(),
+                                block.height(),
+                                latest_coinbase_target,
+                                latest_proof_target,
+                            );
 
-                        // Construct a prover solution.
-                        let prover_solution = match prover.coinbase_puzzle.prove(
-                            &epoch_challenge,
-                            prover.address(),
-                            rand::thread_rng().gen(),
-                        ) {
-                            Ok(proof) => proof,
-                            Err(error) => {
-                                warn!("Failed to generate prover solution: {error}");
-                                // Decrement the number of puzzle instances.
-                                prover.puzzle_instances.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
-                                return;
-                            }
-                        };
+                            // Construct a prover solution.
+                            let prover_solution = match prover.coinbase_puzzle.prove(
+                                &epoch_challenge,
+                                prover.address(),
+                                rand::thread_rng().gen(),
+                            ) {
+                                Ok(proof) => proof,
+                                Err(error) => {
+                                    warn!("Failed to generate prover solution: {error}");
+                                    break;
+                                }
+                            };
 
-                        // Fetch the prover solution target.
-                        let prover_solution_target = match prover_solution.to_target() {
-                            Ok(target) => target,
-                            Err(error) => {
-                                warn!("Failed to fetch prover solution target: {error}");
-                                // Decrement the number of puzzle instances.
-                                prover.puzzle_instances.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
-                                return;
-                            }
-                        };
+                            // Fetch the prover solution target.
+                            let prover_solution_target = match prover_solution.to_target() {
+                                Ok(target) => target,
+                                Err(error) => {
+                                    warn!("Failed to fetch prover solution target: {error}");
+                                    break;
+                                }
+                            };
 
-                        // Ensure that the prover solution target is sufficient.
-                        match prover_solution_target >= latest_proof_target {
-                            true => info!("Found a Solution (Proof Target {prover_solution_target})"),
-                            false => {
-                                trace!(
+                            // Ensure that the prover solution target is sufficient.
+                            match prover_solution_target >= latest_proof_target {
+                                true => {
+                                    info!("Found a Solution (Proof Target {prover_solution_target})");
+
+                                    // Propagate the "UnconfirmedSolution" to the network.
+                                    let message = Message::UnconfirmedSolution(UnconfirmedSolution {
+                                        puzzle_commitment: prover_solution.commitment(),
+                                        solution: Data::Object(prover_solution),
+                                    });
+                                    let request = RouterRequest::MessagePropagate(message, vec![]);
+                                    if let Err(error) = prover.router.process(request).await {
+                                        warn!("[UnconfirmedSolution] {error}");
+                                    }
+
+                                    break;
+                                }
+                                false => trace!(
                                     "Prover solution was below the necessary proof target ({prover_solution_target} < {latest_proof_target})"
-                                );
-                                // Decrement the number of puzzle instances.
-                                prover.puzzle_instances.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
-                                return;
+                                ),
                             }
-                        }
-
-                        // Propagate the "UnconfirmedSolution" to the network.
-                        let message = Message::UnconfirmedSolution(UnconfirmedSolution {
-                            puzzle_commitment: prover_solution.commitment(),
-                            solution: Data::Object(prover_solution),
-                        });
-                        let request = RouterRequest::MessagePropagate(message, vec![]);
-                        if let Err(error) = prover.router.process(request).await {
-                            warn!("[UnconfirmedSolution] {error}");
                         }
 
                         // Set the status to `Ready`.
