@@ -1183,7 +1183,8 @@ dependencies = [
 [[package]]
 name = "kadmium"
 version = "0.6.0"
-source = "git+https://github.com/niklaslong/kadmium#fbeca669083d9042a589ff8930313b9c29d662e1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d9b367a58a53900cadde9087e3290dbf00dc5e85f94904bd017c43d6c7bb5782"
 dependencies = [
  "async-trait",
  "bincode 2.0.0-rc.2",

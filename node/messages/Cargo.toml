@@ -26,7 +26,7 @@ version = "1.0"
 version = "1.0.0"
 
 [dependencies.kadmium]
-git = "https://github.com/niklaslong/kadmium"
+version = "0.6.0"
 features = ["codec", "sync"]
 
 [dependencies.rayon]
