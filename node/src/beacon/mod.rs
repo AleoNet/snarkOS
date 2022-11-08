@@ -251,11 +251,15 @@ impl<N: Network> Beacon<N> {
         }
 
         // Propose the next block.
-        let next_block = match self.consensus.propose_next_block(self.private_key(), &mut rand::thread_rng()) {
-            Ok(next_block) => next_block,
-            Err(error) => {
-                bail!("Failed to propose the next block: {error}")
-            }
+        let beacon = self.clone();
+        let next_block = match tokio::task::spawn_blocking(move || {
+            beacon.consensus.propose_next_block(beacon.private_key(), &mut rand::thread_rng())
+        })
+        .await
+        {
+            Ok(Ok(next_block)) => next_block,
+            Ok(Err(error)) => bail!("Failed to propose the next block: {error}"),
+            Err(error) => bail!("Failed to propose the next block: {error}"),
         };
         let next_block_height = next_block.height();
         let next_block_hash = next_block.hash();
