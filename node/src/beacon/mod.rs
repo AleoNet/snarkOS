@@ -134,7 +134,7 @@ impl<N: Network> Executor for Beacon<N> {
 
         // Shut down the ledger.
         trace!("Proceeding to shut down the ledger...");
-        self.shutdown.store(true, Ordering::Relaxed);
+        self.shutdown.store(true, Ordering::SeqCst);
 
         // Flush the tasks.
         Self::resources().shut_down();
@@ -189,7 +189,7 @@ impl<N: Network> Beacon<N> {
         let beacon = self.clone();
         spawn_task_loop!(Self, {
             // Expected time per block.
-            const ROUND_TIME: u64 = 15; // 15 seconds per block
+            const ROUND_TIME: u64 = 10; // 15 seconds per block
 
             // Produce blocks.
             loop {
@@ -200,7 +200,7 @@ impl<N: Network> Beacon<N> {
 
                 // Do not produce a block if the elapsed time has not exceeded `ROUND_TIME - block_generation_time`.
                 // This will ensure a block is produced at intervals of approximately `ROUND_TIME`.
-                let time_to_wait = ROUND_TIME.saturating_sub(beacon.block_generation_time.load(Ordering::Relaxed));
+                let time_to_wait = ROUND_TIME.saturating_sub(beacon.block_generation_time.load(Ordering::SeqCst));
                 if elapsed_time < time_to_wait {
                     if let Err(error) = timeout(
                         Duration::from_secs(time_to_wait.saturating_sub(elapsed_time)),
@@ -219,9 +219,7 @@ impl<N: Network> Beacon<N> {
                     // Produce the next block and propagate it to all peers.
                     match beacon_clone.produce_next_block().await {
                         // Update the block generation time.
-                        Ok(()) => {
-                            beacon_clone.block_generation_time.store(timer.elapsed().as_secs(), Ordering::Relaxed)
-                        }
+                        Ok(()) => beacon_clone.block_generation_time.store(timer.elapsed().as_secs(), Ordering::SeqCst),
                         Err(error) => error!("{error}"),
                     }
                 });
