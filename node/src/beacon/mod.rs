@@ -201,6 +201,7 @@ impl<N: Network> Beacon<N> {
                 // Do not produce a block if the elapsed time has not exceeded `ROUND_TIME - block_generation_time`.
                 // This will ensure a block is produced at intervals of approximately `ROUND_TIME`.
                 let time_to_wait = ROUND_TIME.saturating_sub(beacon.block_generation_time.load(Ordering::SeqCst));
+                trace!("Waiting for {time_to_wait} seconds before producing a block...");
                 if elapsed_time < time_to_wait {
                     if let Err(error) = timeout(
                         Duration::from_secs(time_to_wait.saturating_sub(elapsed_time)),
@@ -235,11 +236,15 @@ impl<N: Network> Beacon<N> {
         // Produce a transaction if the mempool is empty.
         if self.consensus.memory_pool().num_unconfirmed_transactions() == 0 {
             // Create a transfer transaction.
-            let transaction = match self.ledger.create_transfer(self.account.private_key(), self.address(), 1) {
-                Ok(transaction) => transaction,
-                Err(error) => {
-                    bail!("Failed to create a transfer transaction for the next block: {error}")
-                }
+            let beacon = self.clone();
+            let transaction = match tokio::task::spawn_blocking(move || {
+                beacon.ledger.create_transfer(beacon.private_key(), beacon.address(), 1)
+            })
+            .await
+            {
+                Ok(Ok(transaction)) => transaction,
+                Ok(Err(error)) => bail!("Failed to create a transfer transaction for the next block: {error}"),
+                Err(error) => bail!("Failed to create a transfer transaction for the next block: {error}"),
             };
             // Add the transaction to the memory pool.
             let beacon = self.clone();
