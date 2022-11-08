@@ -85,7 +85,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         };
 
         // Initialize the consensus store.
-        let store = ConsensusStore::<N, C>::open(dev)?;
+        let store = match ConsensusStore::<N, C>::open(dev) {
+            Ok(store) => store,
+            _ => bail!("Failed to load ledger (run 'snarkos clean' and try again)"),
+        };
         // Initialize a new VM.
         let vm = VM::from(store)?;
         // Initialize the ledger.
