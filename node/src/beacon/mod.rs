@@ -189,7 +189,7 @@ impl<N: Network> Beacon<N> {
         let beacon = self.clone();
         spawn_task_loop!(Self, {
             // Expected time per block.
-            const ROUND_TIME: u64 = 10; // 15 seconds per block
+            const ROUND_TIME: u64 = 5; // 5 seconds per block
 
             // Produce blocks.
             loop {
@@ -242,52 +242,89 @@ impl<N: Network> Beacon<N> {
                 }
             };
             // Add the transaction to the memory pool.
-            if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction) {
-                bail!("Failed to add a transfer transaction to the memory pool: {error}")
+            let beacon = self.clone();
+            match tokio::task::spawn_blocking(move || beacon.consensus.add_unconfirmed_transaction(transaction)).await {
+                Ok(Ok(())) => (),
+                Ok(Err(error)) => bail!("Failed to add the transaction to the memory pool: {error}"),
+                Err(error) => bail!("Failed to add the transaction to the memory pool: {error}"),
             }
         }
 
         // Propose the next block.
         let beacon = self.clone();
         let next_block = match tokio::task::spawn_blocking(move || {
-            beacon.consensus.propose_next_block(beacon.private_key(), &mut rand::thread_rng())
+            let next_block = beacon.consensus.propose_next_block(beacon.private_key(), &mut rand::thread_rng())?;
+
+            // Ensure the block is a valid next block.
+            if let Err(error) = beacon.consensus.check_next_block(&next_block) {
+                // Clear the memory pool of all solutions and transactions.
+                trace!("Clearing the memory pool...");
+                beacon.consensus.clear_memory_pool()?;
+                trace!("Cleared the memory pool");
+                bail!("Proposed an invalid block: {error}")
+            }
+
+            // Advance to the next block.
+            match beacon.consensus.advance_to_next_block(&next_block) {
+                Ok(()) => match serde_json::to_string_pretty(&next_block.header()) {
+                    Ok(header) => info!("Block {}: {header}", next_block.height()),
+                    Err(error) => info!("Block {}: (serde failed: {error})", next_block.height()),
+                },
+                Err(error) => {
+                    // Clear the memory pool of all solutions and transactions.
+                    trace!("Clearing the memory pool...");
+                    beacon.consensus.clear_memory_pool()?;
+                    trace!("Cleared the memory pool");
+                    bail!("Failed to advance to the next block: {error}")
+                }
+            }
+
+            Ok(next_block)
         })
         .await
         {
             Ok(Ok(next_block)) => next_block,
-            Ok(Err(error)) => bail!("Failed to propose the next block: {error}"),
-            Err(error) => bail!("Failed to propose the next block: {error}"),
+            Ok(Err(error)) => {
+                // Sleep for one second.
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                bail!("Failed to propose the next block: {error}")
+            }
+            Err(error) => {
+                // Sleep for one second.
+                tokio::time::sleep(Duration::from_secs(1)).await;
+                bail!("Failed to propose the next block (JoinError): {error}")
+            }
         };
         let next_block_height = next_block.height();
         let next_block_hash = next_block.hash();
 
-        // Ensure the block is a valid next block.
-        if let Err(error) = self.consensus.check_next_block(&next_block) {
-            // Clear the memory pool of all solutions and transactions.
-            trace!("Clearing the memory pool...");
-            self.consensus.clear_memory_pool()?;
-            trace!("Cleared the memory pool");
-            // Sleep for one second.
-            tokio::time::sleep(Duration::from_secs(1)).await;
-            bail!("Proposed an invalid block: {error}")
-        }
-
-        // Advance to the next block.
-        match self.consensus.advance_to_next_block(&next_block) {
-            Ok(()) => match serde_json::to_string_pretty(&next_block.header()) {
-                Ok(header) => info!("Block {next_block_height}: {header}"),
-                Err(error) => info!("Block {next_block_height}: (serde failed: {error})"),
-            },
-            Err(error) => {
-                // Clear the memory pool of all solutions and transactions.
-                trace!("Clearing the memory pool...");
-                self.consensus.clear_memory_pool()?;
-                trace!("Cleared the memory pool");
-                // Sleep for one second.
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                bail!("Failed to advance to the next block: {error}")
-            }
-        }
+        // // Ensure the block is a valid next block.
+        // if let Err(error) = self.consensus.check_next_block(&next_block) {
+        //     // Clear the memory pool of all solutions and transactions.
+        //     trace!("Clearing the memory pool...");
+        //     self.consensus.clear_memory_pool()?;
+        //     trace!("Cleared the memory pool");
+        //     // Sleep for one second.
+        //     tokio::time::sleep(Duration::from_secs(1)).await;
+        //     bail!("Proposed an invalid block: {error}")
+        // }
+        //
+        // // Advance to the next block.
+        // match self.consensus.advance_to_next_block(&next_block) {
+        //     Ok(()) => match serde_json::to_string_pretty(&next_block.header()) {
+        //         Ok(header) => info!("Block {next_block_height}: {header}"),
+        //         Err(error) => info!("Block {next_block_height}: (serde failed: {error})"),
+        //     },
+        //     Err(error) => {
+        //         // Clear the memory pool of all solutions and transactions.
+        //         trace!("Clearing the memory pool...");
+        //         self.consensus.clear_memory_pool()?;
+        //         trace!("Cleared the memory pool");
+        //         // Sleep for one second.
+        //         tokio::time::sleep(Duration::from_secs(1)).await;
+        //         bail!("Failed to advance to the next block: {error}")
+        //     }
+        // }
 
         // Serialize the block ahead of time to not do it for each peer.
         let serialized_block = match Data::Object(next_block).serialize().await {
