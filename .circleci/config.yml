@@ -419,7 +419,7 @@ workflows:
                 account,
 #                cli,
 #                display
-                node
+#                node
               ]
 
   build-snarkos-docker-images:
