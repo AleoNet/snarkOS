@@ -204,17 +204,28 @@ impl Start {
         // If development mode is not set, check that the existing genesis block is correct.
         {
             if self.dev.is_none() && genesis.is_none() {
-                let consensus = ConsensusStore::<N, ConsensusDB<N>>::open(None)?;
-                // Check if a genesis block exists.
-                if let Ok(Some(genesis_block_hash)) = consensus.block_store().get_block_hash(0) {
-                    // Check if the genesis block is correct.
-                    let expected_genesis_block_hash = Block::<N>::from_bytes_le(N::genesis_bytes())?.hash();
-                    // If the existing genesis block hash does not match the expected genesis block hash, then clear the ledger.
-                    if genesis_block_hash != expected_genesis_block_hash {
-                        drop(consensus);
-                        let remove_ledger = Clean::remove_ledger(N::ID, None)?;
-                        println!("{}", remove_ledger);
-                    }
+                // Determine if we need to remove the current ledger.
+                let mut should_remove_ledger = false;
+                match ConsensusStore::<N, ConsensusDB<N>>::open(None) {
+                    Ok(consensus) => {
+                        // Check if a genesis block exists.
+                        if let Ok(Some(genesis_block_hash)) = consensus.block_store().get_block_hash(0) {
+                            // Check if the genesis block is correct.
+                            let expected_genesis_block_hash = Block::<N>::from_bytes_le(N::genesis_bytes())?.hash();
+                            // If the existing genesis block hash does not match the expected genesis block hash, then clear the ledger.
+                            if genesis_block_hash != expected_genesis_block_hash {
+                                drop(consensus);
+                                should_remove_ledger = true;
+                            }
+                        }
+                    },
+                    Err(_) => should_remove_ledger = true,
+                }
+
+                // Remove the ledger from storage.
+                if should_remove_ledger {
+                    let remove_ledger = Clean::remove_ledger(N::ID, None)?;
+                    println!("{}", remove_ledger);
                 }
             }
         }
