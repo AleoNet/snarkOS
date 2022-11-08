@@ -1,21 +1,21 @@
 #!/bin/bash
 # USAGE examples: 
-  # CLI with env vars: PROVER_ADDRESS=aleo1zkp...  ./run-prover.sh
+  # CLI with env vars: PROVER_PRIVATE_KEY=APrivateKey1...  ./run-prover.sh
   # CLI with prompts for vars:  ./run-prover.sh
 
-# If the env var PROVER_ADDRESS is not set, prompt for it
-if [ -z "${PROVER_ADDRESS}" ]
+# If the env var PROVER_PRIVATE_KEY is not set, prompt for it
+if [ -z "${PROVER_PRIVATE_KEY}" ]
 then
-  read -r -p "Enter the Aleo Prover account address: "
-  PROVER_ADDRESS=$REPLY
+  read -r -p "Enter the Aleo Prover account private key: "
+  PROVER_PRIVATE_KEY=$REPLY
 fi
 
-if [ "${PROVER_ADDRESS}" == "" ]
+if [ "${PROVER_PRIVATE_KEY}" == "" ]
 then
-  PROVER_ADDRESS="aleo1wvgwnqvy46qq0zemj0k6sfp3zv0mp77rw97khvwuhac05yuwscxqmfyhwf"
+  PROVER_PRIVATE_KEY="APrivateKey1zkp8cC4jgHEBnbtu3xxs1Ndja2EMizcvTRDq5Nikdkukg1p"
 fi
 
-COMMAND="cargo run --release -- start --nodisplay --prover ${PROVER_ADDRESS}"
+COMMAND="cargo run --release -- start --nodisplay --prover ${PROVER_PRIVATE_KEY}"
 
 for word in $*;
 do
