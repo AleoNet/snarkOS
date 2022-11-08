@@ -177,7 +177,7 @@ impl Start {
             Ok(Some(genesis))
         } else {
             // Include the beacon, as the node is not in development mode.
-            trusted_peers.push(format!("159.65.195.225:4133").parse()?);
+            trusted_peers.push("159.65.195.225:4133".to_string().parse()?);
 
             Ok(None)
         }

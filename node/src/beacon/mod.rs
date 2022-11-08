@@ -19,7 +19,7 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType, Status};
+use snarkos_node_executor::{spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedBlock, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
@@ -212,17 +212,14 @@ impl<N: Network> Beacon<N> {
                     }
                 }
 
-                let beacon_clone = beacon.clone();
-                spawn_task!(Self, {
-                    // Start a timer.
-                    let timer = std::time::Instant::now();
-                    // Produce the next block and propagate it to all peers.
-                    match beacon_clone.produce_next_block().await {
-                        // Update the block generation time.
-                        Ok(()) => beacon_clone.block_generation_time.store(timer.elapsed().as_secs(), Ordering::SeqCst),
-                        Err(error) => error!("{error}"),
-                    }
-                });
+                // Start a timer.
+                let timer = std::time::Instant::now();
+                // Produce the next block and propagate it to all peers.
+                match beacon.produce_next_block().await {
+                    // Update the block generation time.
+                    Ok(()) => beacon.block_generation_time.store(timer.elapsed().as_secs(), Ordering::SeqCst),
+                    Err(error) => error!("{error}"),
+                }
 
                 // If the Ctrl-C handler registered the signal, stop the node once the current block is complete.
                 if beacon.shutdown.load(Ordering::Relaxed) {
