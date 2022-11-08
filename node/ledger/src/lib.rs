@@ -193,6 +193,34 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         self.current_block.read().last_coinbase_timestamp()
     }
 
+    /// Returns the coinbase target of the block with the timestamp, `last_coinbase_timestamp`.
+    pub fn last_coinbase_target(&self) -> Result<u64> {
+        // Specify the maximum number of blocks to search.
+        const MAX_LOOKUP: u32 = 100_000;
+
+        // Return the genesis coinbase target if the ledger is empty.
+        if self.latest_height() == 0 {
+            return Ok(N::GENESIS_COINBASE_TARGET);
+        }
+
+        // Fetch the last coinbase timestamp.
+        let latest_coinbase_timestamp = self.latest_coinbase_timestamp();
+
+        // TODO (raychu86): Optimize this search using `cfg_iter`.
+        // Find the coinbase target corresponding to the `latest_coinbase_timestamp`.
+        for height in (0..self.latest_height()).rev().take(MAX_LOOKUP as usize) {
+            let header = self.get_header(height)?;
+            if header.timestamp() == latest_coinbase_timestamp {
+                return Ok(header.coinbase_target());
+            }
+        }
+
+        bail!(
+            "Failed to find the last coinbase target in the last {} blocks",
+            std::cmp::max(MAX_LOOKUP, self.latest_height())
+        )
+    }
+
     /// Returns the latest block timestamp.
     pub fn latest_timestamp(&self) -> i64 {
         self.current_block.read().timestamp()
