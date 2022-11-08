@@ -2272,7 +2272,6 @@ dependencies = [
  "snarkos-account",
  "snarkos-display",
  "snarkos-node",
- "snarkos-node-store",
  "snarkvm",
  "thiserror",
  "tokio",

@@ -37,7 +37,7 @@ impl Clean {
     }
 
     /// Removes the specified ledger from storage.
-    pub(super) fn remove_ledger(network: u16, dev: Option<u16>) -> Result<String> {
+    fn remove_ledger(network: u16, dev: Option<u16>) -> Result<String> {
         // Construct the path to the ledger in storage.
         let path = aleo_std::aleo_ledger_dir(network, dev);
 

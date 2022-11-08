@@ -65,9 +65,6 @@ path = "../display"
 [dependencies.snarkos-node]
 path = "../node"
 
-[dependencies.snarkos-node-store]
-path = "../node/store"
-
 [dependencies.snarkvm]
 workspace = true
 

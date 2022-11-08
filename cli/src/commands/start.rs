@@ -14,13 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::commands::Clean;
-
 use snarkos_account::Account;
 use snarkos_display::Display;
 use snarkos_node::Node;
-use snarkos_node_store::ConsensusDB;
-use snarkvm::prelude::{Block, ConsensusMemory, ConsensusStore, FromBytes, Network, PrivateKey, Testnet3, VM};
+use snarkvm::prelude::{Block, ConsensusMemory, ConsensusStore, Network, PrivateKey, Testnet3, VM};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -200,24 +197,6 @@ impl Start {
             true => None,
             false => Some(self.rest),
         };
-
-        // If development mode is not set, check that the existing genesis block is correct.
-        {
-            if self.dev.is_none() && genesis.is_none() {
-                let consensus = ConsensusStore::<N, ConsensusDB<N>>::open(None)?;
-                // Check if a genesis block exists.
-                if let Ok(Some(genesis_block_hash)) = consensus.block_store().get_block_hash(0) {
-                    // Check if the genesis block is correct.
-                    let expected_genesis_block_hash = Block::<N>::from_bytes_le(N::genesis_bytes())?.hash();
-                    // If the existing genesis block hash does not match the expected genesis block hash, then clear the ledger.
-                    if genesis_block_hash != expected_genesis_block_hash {
-                        drop(consensus);
-                        let remove_ledger = Clean::remove_ledger(N::ID, None)?;
-                        println!("{}", remove_ledger);
-                    }
-                }
-            }
-        }
 
         // Ensures only one of the four flags is set. If no flags are set, defaults to a client node.
         match (&self.beacon, &self.validator, &self.prover, &self.client) {
