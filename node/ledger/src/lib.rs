@@ -71,10 +71,8 @@ pub enum RecordsFilter<N: Network> {
 pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
     /// The VM state.
     vm: VM<N, C>,
-    /// The current block hash.
-    current_hash: Arc<RwLock<N::BlockHash>>,
-    /// The current block header.
-    current_header: Arc<RwLock<Header<N>>>,
+    /// The current block.
+    current_block: Arc<RwLock<Block<N>>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
@@ -109,11 +107,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         };
 
         // Initialize the ledger.
-        let mut ledger = Self {
-            vm,
-            current_hash: Arc::new(RwLock::new(genesis.hash())),
-            current_header: Arc::new(RwLock::new(*genesis.header())),
-        };
+        let mut ledger = Self { vm, current_block: Arc::new(RwLock::new(genesis.clone())) };
 
         // If the block store is empty, initialize the genesis block.
         if ledger.vm.block_store().heights().max().is_none() {
@@ -129,9 +123,8 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
             .get_block(latest_height)
             .map_err(|_| anyhow!("Failed to load block {latest_height} from the ledger"))?;
 
-        // Set the current hash, height, and round.
-        ledger.current_hash = Arc::new(RwLock::new(block.hash()));
-        ledger.current_header = Arc::new(RwLock::new(*block.header()));
+        // Set the current block.
+        ledger.current_block = Arc::new(RwLock::new(block));
 
         // Safety check the existence of every block.
         cfg_into_iter!((0..=latest_height)).try_for_each(|height| {
@@ -159,47 +152,47 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the latest block hash.
     pub fn latest_hash(&self) -> N::BlockHash {
-        *self.current_hash.read()
+        self.current_block.read().hash()
     }
 
     /// Returns the latest block header.
     pub fn latest_header(&self) -> Header<N> {
-        *self.current_header.read()
+        *self.current_block.read().header()
     }
 
     /// Returns the latest block height.
     pub fn latest_height(&self) -> u32 {
-        self.current_header.read().height()
+        self.current_block.read().height()
     }
 
     /// Returns the latest round number.
     pub fn latest_round(&self) -> u64 {
-        self.current_header.read().round()
+        self.current_block.read().round()
     }
 
     /// Returns the latest block coinbase accumulator point.
     pub fn latest_coinbase_accumulator_point(&self) -> Field<N> {
-        self.current_header.read().coinbase_accumulator_point()
+        self.current_block.read().header().coinbase_accumulator_point()
     }
 
     /// Returns the latest block coinbase target.
     pub fn latest_coinbase_target(&self) -> u64 {
-        self.current_header.read().coinbase_target()
+        self.current_block.read().coinbase_target()
     }
 
     /// Returns the latest block proof target.
     pub fn latest_proof_target(&self) -> u64 {
-        self.current_header.read().proof_target()
+        self.current_block.read().proof_target()
     }
 
     /// Returns the latest coinbase timestamp.
     pub fn latest_coinbase_timestamp(&self) -> i64 {
-        self.current_header.read().last_coinbase_timestamp()
+        self.current_block.read().last_coinbase_timestamp()
     }
 
     /// Returns the latest block timestamp.
     pub fn latest_timestamp(&self) -> i64 {
-        self.current_header.read().timestamp()
+        self.current_block.read().timestamp()
     }
 
     /// Returns the latest block transactions.
@@ -209,7 +202,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the latest epoch number.
     pub fn latest_epoch_number(&self) -> u32 {
-        self.current_header.read().height() / N::NUM_BLOCKS_PER_EPOCH
+        self.current_block.read().height() / N::NUM_BLOCKS_PER_EPOCH
     }
 
     /// Returns the latest epoch challenge.
@@ -226,16 +219,12 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Adds the given block as the next block in the chain.
     pub fn add_next_block(&self, block: &Block<N>) -> Result<()> {
-        let mut current_hash = self.current_hash.write();
-        let mut current_header = self.current_header.write();
-
+        // Acquire the write lock on the current block.
+        let mut current_block = self.current_block.write();
         // Update the VM.
         self.vm.add_next_block(block)?;
-
-        // Update the blocks.
-        current_hash.clone_from(&block.hash());
-        current_header.clone_from(block.header());
-
+        // Update the block.
+        *current_block = block.clone();
         Ok(())
     }
 
