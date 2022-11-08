@@ -247,7 +247,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         // Construct the next coinbase target.
         let next_coinbase_target = coinbase_target(
-            latest_coinbase_target,
+            self.ledger.last_coinbase_target()?,
             latest_block.last_coinbase_timestamp(),
             next_timestamp,
             N::ANCHOR_TIME,
@@ -410,6 +410,24 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Ensure the block header is valid.
         if !block.header().is_valid() {
             bail!("Invalid block header: {:?}", block.header());
+        }
+
+        // Ensure the coinbase target is correct.
+        let expected_coinbase_target = coinbase_target(
+            self.ledger.last_coinbase_target()?,
+            self.ledger.latest_coinbase_timestamp(),
+            block.timestamp(),
+            N::ANCHOR_TIME,
+            N::NUM_BLOCKS_PER_EPOCH,
+        )?;
+        if block.coinbase_target() != expected_coinbase_target {
+            bail!("Invalid coinbase target: expected {}, got {}", expected_coinbase_target, block.coinbase_target())
+        }
+
+        // Ensure the proof target is correct.
+        let expected_proof_target = proof_target(expected_coinbase_target);
+        if block.proof_target() != expected_proof_target {
+            bail!("Invalid proof target: expected {}, got {}", expected_proof_target, block.proof_target())
         }
 
         /* Block Hash */
