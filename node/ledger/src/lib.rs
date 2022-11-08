@@ -129,11 +129,11 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         // Set the current block.
         ledger.current_block = Arc::new(RwLock::new(block));
 
-        // Safety check the existence of every block.
-        cfg_into_iter!((0..=latest_height)).try_for_each(|height| {
-            ledger.get_block(height)?;
-            Ok::<_, Error>(())
-        })?;
+        // // Safety check the existence of every block.
+        // cfg_into_iter!((0..=latest_height)).try_for_each(|height| {
+        //     ledger.get_block(height)?;
+        //     Ok::<_, Error>(())
+        // })?;
 
         Ok(ledger)
     }
