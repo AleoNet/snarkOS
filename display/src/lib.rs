@@ -126,11 +126,9 @@ impl<N: Network> Display<N> {
         let filter = EnvFilter::from_default_env()
             .add_directive("mio=off".parse().unwrap())
             .add_directive("tokio_util=off".parse().unwrap())
-            .add_directive("hyper::proto::h1::conn=off".parse().unwrap())
-            .add_directive("hyper::proto::h1::decode=off".parse().unwrap())
-            .add_directive("hyper::proto::h1::io=off".parse().unwrap())
-            .add_directive("hyper::proto::h1::role=off".parse().unwrap())
+            .add_directive("hyper=off".parse().unwrap())
             .add_directive("reqwest=off".parse().unwrap())
+            .add_directive("want=off".parse().unwrap())
             .add_directive("warp=off".parse().unwrap());
 
         // Initialize the log channel.
