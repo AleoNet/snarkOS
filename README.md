@@ -94,19 +94,19 @@ This will output a new Aleo account in the terminal.
 ```
  Attention - Remember to store this account private key and view key.
 
-  Private Key  APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Save Me
+  Private Key  APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Save Me And Use In The Next Step
      View Key  AViewKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Save Me
-      Address  aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Use In The Next Step
+      Address  aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx  <-- Save Me
 ```
 
 Next, to start a proving node, from the `snarkOS` directory, run:
 ```
 ./run-prover.sh
 ```
-When prompted, enter your Aleo address:
+When prompted, enter your Aleo private key:
 ```
-Enter the Aleo Prover account address:
-aleo1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+Enter the Aleo Prover account private key:
+APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ## 4. FAQs
