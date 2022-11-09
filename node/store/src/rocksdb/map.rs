@@ -56,7 +56,7 @@ impl<
                 // Prepare the prefixed key and serialized value.
                 let raw_key = self.create_prefixed_key(&key)?;
                 let raw_value = bincode::serialize(&value)?;
-                self.database.put(&raw_key, &raw_value)?;
+                self.database.put(raw_key, raw_value)?;
             }
         }
 
@@ -79,7 +79,7 @@ impl<
             false => {
                 // Prepare the prefixed key.
                 let raw_key = self.create_prefixed_key(key)?;
-                self.database.delete(&raw_key)?;
+                self.database.delete(raw_key)?;
             }
         }
 
