@@ -83,31 +83,39 @@ pub trait Inbound<N: Network>: Executor {
             Message::UnconfirmedSolution(message) => {
                 // Clone the message.
                 let message_clone = message.clone();
-                // Perform the deferred non-blocking deserialization of the solution.
-                match message.solution.deserialize().await {
-                    Ok(solution) => {
-                        // Check that the solution parameters match.
-                        if message.puzzle_commitment != solution.commitment() {
-                            // Peer is not following the protocol.
-                            warn!("Peer {peer_ip} is not following the 'UnconfirmedSolution' protocol");
-                            return false;
+
+                // Update the timestamp for the unconfirmed solution.
+                let seen_before = router
+                    .seen_inbound_solutions
+                    .write()
+                    .await
+                    .insert(message.puzzle_commitment, SystemTime::now())
+                    .is_some();
+
+                // Determine whether to propagate the solution.
+                let should_propagate = !seen_before;
+
+                if !should_propagate {
+                    trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
+                    true
+                } else {
+                    // Perform the deferred non-blocking deserialization of the solution.
+                    match message.solution.deserialize().await {
+                        Ok(solution) => {
+                            // Check that the solution parameters match.
+                            if message.puzzle_commitment != solution.commitment() {
+                                // Peer is not following the protocol.
+                                warn!("Peer {peer_ip} is not following the 'UnconfirmedSolution' protocol");
+                                return false;
+                            }
+                            // Handle the unconfirmed solution.
+                            self.unconfirmed_solution(message_clone, solution.commitment(), solution, peer_ip, router).await
                         }
-
-                        // Update the timestamp for the unconfirmed solution.
-                        let seen_before = router
-                            .seen_inbound_solutions
-                            .write()
-                            .await
-                            .insert(solution.commitment(), SystemTime::now())
-                            .is_some();
-
-                        // Handle the unconfirmed solution.
-                        self.unconfirmed_solution(message_clone, solution.commitment(), solution, peer_ip, router, seen_before).await
+                        Err(error) => {
+                            warn!("[UnconfirmedSolution] {error}");
+                            true
+                        },
                     }
-                    Err(error) => {
-                        warn!("[UnconfirmedSolution] {error}");
-                        true
-                    },
                 }
             },
             Message::UnconfirmedTransaction(message) => {
@@ -370,19 +378,11 @@ pub trait Inbound<N: Network>: Executor {
         _solution: ProverSolution<N>,
         peer_ip: SocketAddr,
         router: &Router<N>,
-        seen_before: bool,
     ) -> bool {
-        // Determine whether to propagate the solution.
-        let should_propagate = !seen_before;
-
-        if !should_propagate {
-            trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
-        } else {
-            // Propagate the `UnconfirmedSolution` to connected beacons.
-            let request = RouterRequest::MessagePropagateBeacon(Message::UnconfirmedSolution(message), vec![peer_ip]);
-            if let Err(error) = router.process(request).await {
-                warn!("[UnconfirmedSolution] {error}");
-            }
+        // Propagate the `UnconfirmedSolution` to connected beacons.
+        let request = RouterRequest::MessagePropagateBeacon(Message::UnconfirmedSolution(message), vec![peer_ip]);
+        if let Err(error) = router.process(request).await {
+            warn!("[UnconfirmedSolution] {error}");
         }
         true
     }
