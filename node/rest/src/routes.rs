@@ -21,7 +21,7 @@ use super::*;
 struct BlockRange {
     /// The starting block height (inclusive).
     start: u32,
-    /// The ending block height (inclusive).
+    /// The ending block height (exclusive).
     end: u32,
 }
 
@@ -252,12 +252,6 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             return Err(reject::custom(RestError::Request(format!(
                 "Cannot request more than {MAX_BLOCK_RANGE} blocks per call (requested {})",
                 end_height - start_height
-            ))));
-        } else if end_height - start_height == MAX_BLOCK_RANGE {
-            return Err(reject::custom(RestError::Request(format!(
-                "Did you mean to request blocks {} to {}? (inclusive range)",
-                start_height,
-                end_height - 1
             ))));
         }
 
