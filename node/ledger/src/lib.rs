@@ -188,14 +188,14 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         self.current_block.read().proof_target()
     }
 
-    /// Returns the latest coinbase timestamp.
-    pub fn latest_coinbase_timestamp(&self) -> i64 {
-        self.current_block.read().last_coinbase_timestamp()
-    }
-
     /// Returns the last coinbase target.
     pub fn last_coinbase_target(&self) -> u64 {
         self.current_block.read().last_coinbase_target()
+    }
+
+    /// Returns the latest coinbase timestamp.
+    pub fn latest_coinbase_timestamp(&self) -> i64 {
+        self.current_block.read().last_coinbase_timestamp()
     }
 
     /// Returns the latest block timestamp.
