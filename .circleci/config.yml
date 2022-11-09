@@ -180,7 +180,7 @@ jobs:
   node-consensus:
     docker:
       - image: cimg/rust:1.64
-    resource_class: xlarge
+    resource_class: 2xlarge
     steps:
       - run_serial:
           workspace_member: node/consensus
@@ -286,110 +286,6 @@ jobs:
       - check_windows:
           workspace_member: << parameters.workspace_member >>
 
-  build-and-publish-docker-arm:
-    machine:
-      image: ubuntu-2204:current
-      docker_layer_caching: true
-    resource_class: arm.2xlarge
-    steps:
-      - checkout
-      - run: mkdir -p my_workspace
-      - run:
-          name: "Build snarkOS Docker image arm-v8"
-          no_output_timeout: 2h
-          command: |
-            VERSION=$(git rev-parse --short HEAD)
-            docker build -f Dockerfile -t $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64 .
-      - run:
-          name: "Push snarkOS Docker image arm-v8"
-          command: |
-            VERSION=$(git rev-parse --short HEAD)
-            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            # CREATE THE SHELL FILE WITH IMAGE NAME AND TAG
-            docker push $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64
-            echo "Pushed $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64"
-      - run:
-          name: "Save arm-v8 image tag"
-          command: |
-            VERSION=$(git rev-parse --short HEAD)
-            echo "$CIRCLE_BRANCH-$VERSION-arm64" > my_workspace/docker_tag_arm
-      - persist_to_workspace:
-          root: my_workspace
-          paths:
-            - docker_tag_arm
-
-  build-and-publish-docker-amd:
-    machine:
-      image: ubuntu-2204:current
-      docker_layer_caching: true
-    resource_class: 2xlarge
-    steps:
-      - checkout
-      - run: mkdir -p my_workspace
-      - run:
-          name: "Build snarkOS Docker image amd64"
-          no_output_timeout: 2h
-          command: |
-            VERSION=$(git rev-parse --short HEAD)
-            docker build -f Dockerfile -t $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64 .
-      - run:
-          name: "Push snarkOS Docker image amd64"
-          command: |
-            VERSION=$(git rev-parse --short HEAD)
-            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            docker push $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64
-            echo "Pushed $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64"
-      - run:
-          name: "Save amd64 image tag"
-          command: |
-            VERSION=$(git rev-parse --short HEAD)
-            echo "$CIRCLE_BRANCH-$VERSION-amd64" > my_workspace/docker_tag_amd
-      - persist_to_workspace:
-          root: my_workspace
-          paths:
-            - docker_tag_amd
-
-  publish_snarkos_manifest:
-    machine:
-      image: ubuntu-2204:current
-      docker_layer_caching: true
-    resource_class: arm.2xlarge
-    steps:
-      - checkout
-      - attach_workspace:
-          at: my_workspace
-      - run:
-          name: "Pull ARM Docker image"
-          command: |
-            ARM_TAG=$(cat my_workspace/docker_tag_arm)
-            echo $ARM_TAG
-            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            docker pull $DOCKER_REPO:$ARM_TAG
-      - run:
-          name: "Pull AMD Docker image"
-          command: |
-            AMD_TAG=$(cat my_workspace/docker_tag_amd)
-            echo $AMD_TAG
-            docker pull $DOCKER_REPO:$AMD_TAG
-      - run:
-          name: "Create and push Docker multi-arch manifests"
-          command: |
-            ARM_TAG=$(cat my_workspace/docker_tag_arm)
-            AMD_TAG=$(cat my_workspace/docker_tag_amd)
-            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            echo $DOCKER_REPO
-            echo $CIRCLE_BRANCH
-            echo $ARM_TAG
-            echo $AMD_TAG
-            docker manifest create $DOCKER_REPO:${CIRCLE_BRANCH}-latest --amend $DOCKER_REPO:${ARM_TAG} --amend $DOCKER_REPO:${AMD_TAG}
-            docker manifest inspect $DOCKER_REPO:${CIRCLE_BRANCH}-latest
-            docker manifest push $DOCKER_REPO:${CIRCLE_BRANCH}-latest
-            echo "Pushed $DOCKER_REPO:${CIRCLE_BRANCH}-latest"
-            docker manifest create $DOCKER_REPO:latest --amend $DOCKER_REPO:${ARM_TAG} --amend $DOCKER_REPO:${AMD_TAG}
-            docker manifest inspect $DOCKER_REPO:latest
-            docker manifest push $DOCKER_REPO:latest
-            echo "Pushed $DOCKER_REPO:latest"
-
 workflows:
   version: 2
 
@@ -421,15 +317,3 @@ workflows:
 #                display
 #                node
               ]
-
-  build-snarkos-docker-images:
-    when:
-      or:
-        - equal: [ testnet3, << pipeline.git.branch >> ]
-    jobs:
-      - build-and-publish-docker-arm
-      - build-and-publish-docker-amd
-      - publish_snarkos_manifest:
-          requires:
-            - build-and-publish-docker-arm
-            - build-and-publish-docker-amd

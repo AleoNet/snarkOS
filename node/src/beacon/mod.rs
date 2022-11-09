@@ -189,7 +189,7 @@ impl<N: Network> Beacon<N> {
         let beacon = self.clone();
         spawn_task_loop!(Self, {
             // Expected time per block.
-            const ROUND_TIME: u64 = 5; // 5 seconds per block
+            const ROUND_TIME: u64 = 15; // 15 seconds per block
 
             // Produce blocks.
             loop {
