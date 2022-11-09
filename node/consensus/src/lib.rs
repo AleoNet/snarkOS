@@ -122,10 +122,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
     /// Adds the given unconfirmed solution to the memory pool.
     pub fn add_unconfirmed_solution(&self, solution: &ProverSolution<N>) -> Result<()> {
-        // Ensure that prover solutions are not accepted after 10 years.
-        if self.ledger.latest_height() > anchor_block_height(N::ANCHOR_TIME, 10) {
-            bail!("Coinbase proofs are no longer accepted after year 10.");
-        }
         // Ensure the prover solution is not already in the memory pool.
         if self.memory_pool.contains_unconfirmed_solution(solution.commitment()) {
             bail!("Prover solution is already in the memory pool.");
@@ -431,9 +427,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     if block.last_coinbase_target() != self.ledger.last_coinbase_target() {
                         bail!("The last coinbase target does not match the previous block coinbase target")
                     }
-                    // Ensure the last coinbase timestamp matches the previous block timestamp.
+                    // Ensure the last coinbase timestamp matches the previous block's last coinbase timestamp.
                     if block.last_coinbase_timestamp() != self.ledger.last_coinbase_timestamp() {
-                        bail!("The last coinbase timestamp does not match the previous block timestamp")
+                        bail!("The last coinbase timestamp does not match the previous block's last coinbase timestamp")
                     }
                 }
             }
@@ -543,10 +539,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     bail!("Puzzle commitment {puzzle_commitment} already exists in the ledger");
                 }
             }
-            // Ensure the last coinbase timestamp matches the *next block timestamp*.
-            if block.last_coinbase_timestamp() != block.timestamp() {
-                bail!("The last coinbase timestamp does not match the next block timestamp.");
-            }
             // Ensure the coinbase solution is valid.
             if !self.coinbase_puzzle.verify(
                 coinbase,
@@ -560,10 +552,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             // Ensure that the block header does not contain a coinbase accumulator point.
             if block.header().coinbase_accumulator_point() != Field::<N>::zero() {
                 bail!("Coinbase accumulator point should be zero as there is no coinbase solution in the block.");
-            }
-            // Ensure the last coinbase timestamp is the same as the previous block (i.e. the latest block).
-            if block.height() > 0 && block.last_coinbase_timestamp() != self.ledger.last_coinbase_timestamp() {
-                bail!("The last coinbase timestamp does not match the latest coinbase timestamp.");
             }
         }
 
