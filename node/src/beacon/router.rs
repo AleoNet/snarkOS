@@ -18,7 +18,10 @@ use super::*;
 use snarkvm::prelude::{ProverSolution, PuzzleCommitment};
 
 #[async_trait]
-impl<N: Network> Handshake for Beacon<N> {}
+impl<N: Network> Handshake for Beacon<N> {
+    /// The maximum number of peers permitted to maintain connections with.
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 1_000;
+}
 
 #[async_trait]
 impl<N: Network> Inbound<N> for Beacon<N> {

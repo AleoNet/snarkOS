@@ -135,10 +135,6 @@ impl<N: Network> Router<N> {
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
     const MAXIMUM_CONNECTION_FAILURES: u32 = 3;
-    /// The maximum number of peers permitted to maintain connections with.
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
-    /// The minimum number of peers required to maintain connections with.
-    const MINIMUM_NUMBER_OF_PEERS: usize = 1;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
     const PING_SLEEP_IN_SECS: u64 = 60; // 1 minute
     /// The duration in seconds after which a connected peer is considered inactive or
@@ -285,13 +281,13 @@ impl<N: Network> Router<N> {
     }
 
     /// Initialize the connection listener for new peers.
-    async fn initialize_listener<E: Executor>(&self, listener: TcpListener) {
+    async fn initialize_listener<E: Handshake>(&self, listener: TcpListener) {
         let router = self.clone();
         spawn_task_loop!(E, {
             info!("Listening for peers at {}", router.local_ip);
             loop {
                 // Don't accept connections if the node is breaching the configured peer limit.
-                if router.number_of_connected_peers().await < Self::MAXIMUM_NUMBER_OF_PEERS {
+                if router.number_of_connected_peers().await < E::MAXIMUM_NUMBER_OF_PEERS {
                     // Asynchronously wait for an inbound TcpStream.
                     match listener.accept().await {
                         // Process the inbound connection request.
@@ -394,7 +390,7 @@ impl<N: Network> Router<N> {
     /// All requests must go through this `handler`, so that a unified view is preserved.
     pub(crate) async fn handler<E: Handshake + Inbound<N> + Outbound>(&self, executor: E, request: RouterRequest<N>) {
         match request {
-            RouterRequest::Heartbeat => self.handle_heartbeat().await,
+            RouterRequest::Heartbeat => self.handle_heartbeat::<E>().await,
             RouterRequest::MessagePropagate(message, excluded_peers) => {
                 self.handle_propagate(message, excluded_peers).await
             }
@@ -436,17 +432,17 @@ impl<N: Network> Router<N> {
     }
 
     /// Handles the heartbeat request.
-    async fn handle_heartbeat(&self) {
+    async fn handle_heartbeat<E: Handshake>(&self) {
         debug!("Peers: {:?}", self.connected_peers().await);
 
         // Obtain the number of connected peers.
         let number_of_connected_peers = self.number_of_connected_peers().await;
         // Ensure the number of connected peers is below the maximum threshold.
-        if number_of_connected_peers > Self::MAXIMUM_NUMBER_OF_PEERS {
+        if number_of_connected_peers > E::MAXIMUM_NUMBER_OF_PEERS {
             debug!("Exceeded maximum number of connected peers");
 
             // Determine the peers to disconnect from.
-            let num_excess_peers = number_of_connected_peers.saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS);
+            let num_excess_peers = number_of_connected_peers.saturating_sub(E::MAXIMUM_NUMBER_OF_PEERS);
             let peer_ips_to_disconnect = self
                 .connected_peers
                 .read()
@@ -498,7 +494,7 @@ impl<N: Network> Router<N> {
         }
 
         // Skip if the number of connected peers is above the minimum threshold.
-        match number_of_connected_peers < Self::MINIMUM_NUMBER_OF_PEERS {
+        match number_of_connected_peers < E::MINIMUM_NUMBER_OF_PEERS {
             true => {
                 if number_of_connected_peers > 0 {
                     trace!("Sending requests for more peer connections");
@@ -513,7 +509,7 @@ impl<N: Network> Router<N> {
 
         // Attempt to connect to more peers if the number of connected peers is below the minimum threshold.
         // Select the peers randomly from the list of candidate peers.
-        let midpoint_number_of_peers = Self::MINIMUM_NUMBER_OF_PEERS.saturating_add(Self::MAXIMUM_NUMBER_OF_PEERS) / 2;
+        let midpoint_number_of_peers = E::MINIMUM_NUMBER_OF_PEERS.saturating_add(E::MAXIMUM_NUMBER_OF_PEERS) / 2;
         for peer_ip in self
             .candidate_peers()
             .await
@@ -544,7 +540,7 @@ impl<N: Network> Router<N> {
             debug!("Skipping connection request to '{peer_ip}' (attempted to self-connect)");
         }
         // Ensure the node does not surpass the maximum number of peer connections.
-        else if self.number_of_connected_peers().await >= Self::MAXIMUM_NUMBER_OF_PEERS {
+        else if self.number_of_connected_peers().await >= E::MAXIMUM_NUMBER_OF_PEERS {
             debug!("Skipping connection request to '{peer_ip}' (maximum peers reached)");
         }
         // Ensure the peer is a new connection.
@@ -607,7 +603,7 @@ impl<N: Network> Router<N> {
             debug!("Dropping connection request from '{peer_ip}' (attempted to self-connect)");
         }
         // Ensure the node does not surpass the maximum number of peer connections.
-        else if self.number_of_connected_peers().await >= Self::MAXIMUM_NUMBER_OF_PEERS {
+        else if self.number_of_connected_peers().await >= E::MAXIMUM_NUMBER_OF_PEERS {
             debug!("Dropping connection request from '{peer_ip}' (maximum peers reached)");
         }
         // Ensure the node is not already connected to this peer.
