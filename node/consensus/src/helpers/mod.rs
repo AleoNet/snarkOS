@@ -107,7 +107,7 @@ pub fn coinbase_target(
 
 /// Calculate the minimum proof target for the given coinbase target.
 pub fn proof_target(coinbase_target: u64) -> u64 {
-    coinbase_target.checked_shr(10).unwrap_or(0)
+    coinbase_target.checked_shr(7).unwrap_or(7).saturating_add(1)
 }
 
 /// Retarget algorithm using fixed point arithmetic from https://www.reference.cash/protocol/forks/2020-11-15-asert.
@@ -213,9 +213,9 @@ mod tests {
 
     const ITERATIONS: usize = 1000;
 
-    const EXPECTED_ANCHOR_REWARD: u64 = 8;
-    const EXPECTED_STAKING_REWARD: u64 = 17_440_385;
-    const EXPECTED_COINBASE_REWARD_FOR_BLOCK_1: u64 = 126_143_992;
+    const EXPECTED_ANCHOR_REWARD: u64 = 13;
+    const EXPECTED_STAKING_REWARD: u64 = 21_800_481;
+    const EXPECTED_COINBASE_REWARD_FOR_BLOCK_1: u64 = 163_987_187;
 
     #[test]
     fn test_anchor_reward() {
