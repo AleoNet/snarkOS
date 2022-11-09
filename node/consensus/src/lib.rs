@@ -416,7 +416,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Ensure the coinbase target is correct.
         let expected_coinbase_target = coinbase_target(
             self.ledger.last_coinbase_target(),
-            self.ledger.latest_coinbase_timestamp(),
+            self.ledger.last_coinbase_timestamp(),
             block.timestamp(),
             N::ANCHOR_TIME,
             N::NUM_BLOCKS_PER_EPOCH,
@@ -535,8 +535,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             if block.header().coinbase_accumulator_point() != Field::<N>::zero() {
                 bail!("Coinbase accumulator point should be zero as there is no coinbase solution in the block.");
             }
-            // Ensure the last coinbase timestamp matches the *latest coinbase timestamp*.
-            if block.height() > 0 && block.last_coinbase_timestamp() != self.ledger.latest_coinbase_timestamp() {
+            // Ensure the last coinbase timestamp is the same as the previous block (i.e. the latest block).
+            if block.height() > 0 && block.last_coinbase_timestamp() != self.ledger.last_coinbase_timestamp() {
                 bail!("The last coinbase timestamp does not match the latest coinbase timestamp.");
             }
         }
