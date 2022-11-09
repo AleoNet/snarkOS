@@ -107,7 +107,7 @@ pub fn coinbase_target(
 
 /// Calculate the minimum proof target for the given coinbase target.
 pub fn proof_target(coinbase_target: u64) -> u64 {
-    coinbase_target.checked_shr(7).unwrap_or(8)
+    coinbase_target.checked_shr(7).unwrap_or(7).saturating_add(1)
 }
 
 /// Retarget algorithm using fixed point arithmetic from https://www.reference.cash/protocol/forks/2020-11-15-asert.
