@@ -128,7 +128,7 @@ pub struct Router<N: Network> {
 #[rustfmt::skip]
 impl<N: Network> Router<N> {
     /// The maximum duration in seconds permitted for establishing a connection with a node, before dropping the connection.
-    const CONNECTION_TIMEOUT_IN_MILLIS: u64 = 210; // 3.5 minutes
+    const CONNECTION_TIMEOUT_IN_MILLIS: u64 = 1000;
     /// The duration in seconds to sleep in between heartbeat executions.
     const HEARTBEAT_IN_SECS: u64 = 9; // 9 seconds
     /// The maximum number of candidate peers permitted to be stored in the node.
