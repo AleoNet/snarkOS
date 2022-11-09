@@ -257,8 +257,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Construct the next proof target.
         let next_proof_target = proof_target(next_coinbase_target);
 
-        // Construct the next coinbase target and next coinbase timestamp.
-        let (next_coinbase_target, next_coinbase_timestamp) = match coinbase {
+        // Construct the next last coinbase target and next last coinbase timestamp.
+        let (next_last_coinbase_target, next_last_coinbase_timestamp) = match coinbase {
             Some(_) => (next_coinbase_target, next_timestamp),
             None => (latest_block.last_coinbase_target(), latest_block.last_coinbase_timestamp()),
         };
@@ -270,8 +270,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             next_height,
             next_coinbase_target,
             next_proof_target,
-            next_coinbase_target,
-            next_coinbase_timestamp,
+            next_last_coinbase_target,
+            next_last_coinbase_timestamp,
             next_timestamp,
         )?;
 
@@ -411,6 +411,32 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Ensure the block header is valid.
         if !block.header().is_valid() {
             bail!("Invalid block header: {:?}", block.header());
+        }
+
+        // Check the last coinbase members in the block.
+        if block.height() > 0 {
+            match block.coinbase() {
+                Some(_) => {
+                    // Ensure the last coinbase target matches the coinbase target.
+                    if block.last_coinbase_target() != block.coinbase_target() {
+                        bail!("The last coinbase target does not match the coinbase target")
+                    }
+                    // Ensure the last coinbase timestamp matches the block timestamp.
+                    if block.last_coinbase_timestamp() != block.timestamp() {
+                        bail!("The last coinbase timestamp does not match the block timestamp")
+                    }
+                }
+                None => {
+                    // Ensure the last coinbase target matches the previous block coinbase target.
+                    if block.last_coinbase_target() != self.ledger.last_coinbase_target() {
+                        bail!("The last coinbase target does not match the previous block coinbase target")
+                    }
+                    // Ensure the last coinbase timestamp matches the previous block timestamp.
+                    if block.last_coinbase_timestamp() != self.ledger.last_coinbase_timestamp() {
+                        bail!("The last coinbase timestamp does not match the previous block timestamp")
+                    }
+                }
+            }
         }
 
         // Ensure the coinbase target is correct.
