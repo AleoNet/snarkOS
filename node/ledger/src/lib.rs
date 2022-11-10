@@ -51,7 +51,7 @@ use std::{borrow::Cow, sync::Arc};
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-type RecordMap<N> = IndexMap<Field<N>, Record<N, Plaintext<N>>>;
+pub type RecordMap<N> = IndexMap<Field<N>, Record<N, Plaintext<N>>>;
 
 #[derive(Copy, Clone, Debug)]
 pub enum RecordsFilter<N: Network> {
