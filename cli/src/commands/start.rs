@@ -22,7 +22,7 @@ use snarkvm::prelude::{Block, ConsensusMemory, ConsensusStore, Network, PrivateK
 use anyhow::{bail, Result};
 use clap::Parser;
 use core::str::FromStr;
-use rand::SeedableRng;
+use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaChaRng;
 use std::net::SocketAddr;
 use tokio::runtime::{self, Runtime};
@@ -176,8 +176,21 @@ impl Start {
 
             Ok(Some(genesis))
         } else {
-            // Include the beacon, as the node is not in development mode.
-            trusted_peers.push("159.65.195.225:4133".to_string().parse()?);
+            // Prepare the bootstrap.
+            let bootstrap = [
+                "164.92.111.59:4133",
+                "159.223.204.96:4133",
+                "167.71.219.176:4133",
+                "157.245.205.209:4133",
+                "134.122.95.106:4133",
+                "161.35.24.55:4133",
+            ];
+
+            // Include a bootstrap node, as the node is not in development mode.
+            match bootstrap.choose(&mut rand::thread_rng()) {
+                Some(ip) => trusted_peers.push(SocketAddr::from_str(ip)?),
+                None => bail!("Failed to choose a bootstrap node"),
+            }
 
             Ok(None)
         }

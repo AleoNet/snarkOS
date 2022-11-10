@@ -19,7 +19,7 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType, Status};
-use snarkos_node_messages::{Data, Message, PuzzleRequest, PuzzleResponse, UnconfirmedSolution};
+use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ViewKey};
 
@@ -70,8 +70,6 @@ impl<N: Network> Prover<N> {
         };
         // Initialize the router handler.
         router.initialize_handler(node.clone(), router_receiver).await;
-        // Initialize the heartbeat.
-        node.initialize_heartbeat().await;
         // Initialize the coinbase puzzle.
         node.initialize_coinbase_puzzle().await;
         // Initialize the coinbase puzzle.
@@ -119,36 +117,6 @@ impl<N: Network> NodeInterface<N> for Prover<N> {
 }
 
 impl<N: Network> Prover<N> {
-    /// The frequency at which the node sends a heartbeat.
-    const HEARTBEAT_IN_SECS: u64 = N::ANCHOR_TIME as u64;
-
-    /// Initialize a new instance of the heartbeat.
-    async fn initialize_heartbeat(&self) {
-        let prover = self.clone();
-        spawn_task_loop!(Self, {
-            loop {
-                // Send a "PuzzleRequest" to a beacon node.
-                prover.send_puzzle_request().await;
-                // Sleep for `Self::HEARTBEAT_IN_SECS` seconds.
-                tokio::time::sleep(Duration::from_secs(Self::HEARTBEAT_IN_SECS)).await;
-            }
-        });
-    }
-
-    /// Sends a "PuzzleRequest" to a beacon node.
-    async fn send_puzzle_request(&self) {
-        // Retrieve the first connected beacon.
-        if let Some(connected_beacon) = self.router.connected_beacons().await.first() {
-            // Send the "PuzzleRequest" to the beacon.
-            let request = RouterRequest::MessageSend(*connected_beacon, Message::PuzzleRequest(PuzzleRequest));
-            if let Err(error) = self.router.process(request).await {
-                warn!("[PuzzleRequest] {error}");
-            }
-        } else {
-            warn!("[PuzzleRequest] There are no connected beacons");
-        }
-    }
-
     /// Initialize a new instance of the coinbase puzzle.
     async fn initialize_coinbase_puzzle(&self) {
         let prover = self.clone();
@@ -157,7 +125,7 @@ impl<N: Network> Prover<N> {
                 // If the node is not connected to any peers, then skip this iteration.
                 if prover.router.number_of_connected_peers().await == 0 {
                     warn!("Skipping an iteration of the prover solution (no connected peers)");
-                    tokio::time::sleep(Duration::from_secs(Self::HEARTBEAT_IN_SECS)).await;
+                    tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
                     continue;
                 }
 
@@ -169,9 +137,9 @@ impl<N: Network> Prover<N> {
                     if elapsed > N::ANCHOR_TIME as i64 * 6 {
                         warn!("Skipping an iteration of the prover solution (latest block is stale)");
                         // Send a "PuzzleRequest" to a beacon node.
-                        prover.send_puzzle_request().await;
-                        // Sleep for `Self::HEARTBEAT_IN_SECS` seconds.
-                        tokio::time::sleep(Duration::from_secs(Self::HEARTBEAT_IN_SECS)).await;
+                        prover.router.send_puzzle_request().await;
+                        // Sleep for `N::ANCHOR_TIME` seconds.
+                        tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
                         continue;
                     }
                 }

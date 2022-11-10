@@ -20,13 +20,15 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
+use snarkos_node_messages::{Data, Message, PuzzleResponse};
 use snarkos_node_rest::Rest;
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
+use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
 
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};
+use tokio::sync::RwLock;
 
 /// A validator is a full node, capable of validating blocks.
 #[derive(Clone)]
@@ -39,6 +41,8 @@ pub struct Validator<N: Network> {
     router: Router<N>,
     /// The REST server of the node.
     rest: Option<Arc<Rest<N, ConsensusDB<N>>>>,
+    /// The latest puzzle response.
+    latest_puzzle_response: Arc<RwLock<Option<PuzzleResponse<N>>>>,
 }
 
 impl<N: Network> Validator<N> {
@@ -65,7 +69,7 @@ impl<N: Network> Validator<N> {
             None => None,
         };
         // Initialize the node.
-        let node = Self { account, ledger, router: router.clone(), rest };
+        let node = Self { account, ledger, router: router.clone(), rest, latest_puzzle_response: Default::default() };
         // Initialize the router handler.
         router.initialize_handler(node.clone(), router_receiver).await;
         // Initialize the signal handler.

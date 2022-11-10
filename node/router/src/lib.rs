@@ -131,6 +131,8 @@ impl<N: Network> Router<N> {
     const CONNECTION_TIMEOUT_IN_MILLIS: u64 = 1000;
     /// The duration in seconds to sleep in between heartbeat executions.
     const HEARTBEAT_IN_SECS: u64 = 9; // 9 seconds
+    /// The frequency at which the node sends a puzzle request.
+    const PUZZLE_REQUEST_IN_SECS: u64 = N::ANCHOR_TIME as u64;
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
@@ -181,6 +183,8 @@ impl<N: Network> Router<N> {
         router.initialize_listener::<E>(listener).await;
         // Initialize the heartbeat.
         router.initialize_heartbeat::<E>().await;
+        // Initialize the puzzle request.
+        router.initialize_puzzle_request::<E>().await;
         // Initialize the report.
         router.initialize_report::<E>().await;
         // Initialize the GC.
@@ -233,6 +237,13 @@ impl<N: Network> Router<N> {
         connected_beacons
     }
 
+    /// Returns the list of reliable peers.
+    pub async fn reliable_peers(&self) -> Vec<SocketAddr> {
+        let mut connected_peers: Vec<_> = self.connected_peers.read().await.keys().copied().collect();
+        connected_peers.retain(|ip| self.trusted_peers.contains(ip));
+        connected_peers
+    }
+
     /// Returns the list of candidate peers.
     pub async fn candidate_peers(&self) -> IndexSet<SocketAddr> {
         self.candidate_peers.read().await.clone()
@@ -256,6 +267,20 @@ impl<N: Network> Router<N> {
     /// Returns the number of restricted peers.
     pub async fn number_of_restricted_peers(&self) -> usize {
         self.restricted_peers.read().await.len()
+    }
+
+    /// Sends a "PuzzleRequest" to a reliable peer.
+    pub async fn send_puzzle_request(&self) {
+        // Retrieve a reliable peer.
+        if let Some(reliable_peer) = self.reliable_peers().await.first() {
+            // Send the "PuzzleRequest" to the reliable peer.
+            let request = RouterRequest::MessageSend(*reliable_peer, Message::PuzzleRequest(PuzzleRequest));
+            if let Err(error) = self.process(request).await {
+                warn!("[PuzzleRequest] {error}");
+            }
+        } else {
+            warn!("[PuzzleRequest] There are no reliable peers available yet");
+        }
     }
 }
 
@@ -321,6 +346,21 @@ impl<N: Network> Router<N> {
                 tokio::time::sleep(Duration::from_secs(Self::HEARTBEAT_IN_SECS)).await;
             }
         });
+    }
+
+    /// Initialize a new instance of the puzzle request.
+    async fn initialize_puzzle_request<E: Executor>(&self) {
+        if !E::node_type().is_beacon() {
+            let router = self.clone();
+            spawn_task_loop!(E, {
+                loop {
+                    // Send a "PuzzleRequest".
+                    router.send_puzzle_request().await;
+                    // Sleep for `Self::PUZZLE_REQUEST_IN_SECS` seconds.
+                    tokio::time::sleep(Duration::from_secs(Self::PUZZLE_REQUEST_IN_SECS)).await;
+                }
+            });
+        }
     }
 
     /// Initialize a new instance of the report.
@@ -434,6 +474,19 @@ impl<N: Network> Router<N> {
     /// Handles the heartbeat request.
     async fn handle_heartbeat<E: Handshake>(&self) {
         debug!("Peers: {:?}", self.connected_peers().await);
+
+        // TODO (howardwu): Remove this in Phase 3.
+        if E::node_type().is_beacon() {
+            // Proceed to send disconnect requests to these peers.
+            for peer_ip in self.connected_peers().await {
+                if !self.trusted_peers().contains(&peer_ip) {
+                    info!("Disconnecting from '{peer_ip}' (exceeded maximum connections)");
+                    self.handle_send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers.into())).await;
+                    // Add an entry for this `Peer` in the restricted peers.
+                    self.restricted_peers.write().await.insert(peer_ip, Instant::now());
+                }
+            }
+        }
 
         // Obtain the number of connected peers.
         let number_of_connected_peers = self.number_of_connected_peers().await;
@@ -712,9 +765,9 @@ impl<N: Network> Router<N> {
 
                             // Update the timestamp for the received message.
                             peer.seen_messages.write().await.insert((message.id(), rand::thread_rng().gen()), SystemTime::now());
-                            // Drop the peer, if they have sent more than 500 messages in the last 5 seconds.
+                            // Drop the peer, if they have sent more than 50 messages in the last 5 seconds.
                             let frequency = peer.seen_messages.read().await.values().filter(|t| t.elapsed().unwrap_or_default().as_secs() <= 5).count();
-                            if frequency >= 500 {
+                            if frequency >= 50 {
                                 warn!("Dropping {peer_ip} for spamming messages (frequency = {frequency})");
                                 // Send a `PeerRestricted` message.
                                 if let Err(error) = router.process(RouterRequest::PeerRestricted(peer_ip)).await {

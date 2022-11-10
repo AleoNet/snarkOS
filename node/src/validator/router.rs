@@ -17,10 +17,52 @@
 use super::*;
 
 #[async_trait]
-impl<N: Network> Handshake for Validator<N> {}
+impl<N: Network> Handshake for Validator<N> {
+    /// The maximum number of peers permitted to maintain connections with.
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 1_000;
+}
 
 #[async_trait]
-impl<N: Network> Inbound<N> for Validator<N> {}
+impl<N: Network> Inbound<N> for Validator<N> {
+    /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
+    async fn puzzle_request(&self, peer_ip: SocketAddr, router: &Router<N>) -> bool {
+        // Send the latest puzzle response, if it exists.
+        if let Some(puzzle_response) = self.latest_puzzle_response.read().await.clone() {
+            // Send the `PuzzleResponse` message to the peer.
+            let message = Message::PuzzleResponse(puzzle_response);
+            if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
+                warn!("[PuzzleResponse] {error}");
+            }
+        }
+        true
+    }
+
+    /// Saves the latest epoch challenge and latest block in the node.
+    async fn puzzle_response(&self, message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
+        let epoch_challenge = message.epoch_challenge;
+        match message.block.deserialize().await {
+            Ok(block) => {
+                // Retrieve the epoch number.
+                let epoch_number = epoch_challenge.epoch_number();
+                // Retrieve the block height.
+                let block_height = block.height();
+
+                // Save the latest puzzle response in the node.
+                self.latest_puzzle_response
+                    .write()
+                    .await
+                    .replace(PuzzleResponse { epoch_challenge, block: Data::Object(block) });
+
+                trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
+                true
+            }
+            Err(error) => {
+                error!("Failed to deserialize the puzzle response from '{peer_ip}': {error}");
+                false
+            }
+        }
+    }
+}
 
 #[async_trait]
 impl<N: Network> Outbound for Validator<N> {}

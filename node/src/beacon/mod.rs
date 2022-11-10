@@ -25,7 +25,7 @@ use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedBlock, Unc
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkos_node_store::ConsensusDB;
-use snarkvm::prelude::{Address, Block, Identifier, Network, PrivateKey, ProgramID, Transaction, Value, ViewKey};
+use snarkvm::prelude::{Address, Block, Identifier, Network, PrivateKey, ProgramID, Transaction, Value, ViewKey, Zero};
 
 use anyhow::{bail, Result};
 use core::{str::FromStr, time::Duration};
@@ -324,7 +324,9 @@ impl<N: Network> Beacon<N> {
                         if let Err(error) = transaction.into_transitions().try_for_each(|transition| {
                             for (commitment, record) in transition.into_output_records() {
                                 let record = record.decrypt(beacon.account.view_key())?;
-                                beacon.unspent_records.write().insert(commitment, record);
+                                if !record.gates().is_zero() {
+                                    beacon.unspent_records.write().insert(commitment, record);
+                                }
                             }
                             Ok::<_, anyhow::Error>(())
                         }) {
