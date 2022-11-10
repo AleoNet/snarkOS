@@ -120,7 +120,7 @@ impl<N: Network> NodeInterface<N> for Prover<N> {
 
 impl<N: Network> Prover<N> {
     /// The frequency at which the node sends a heartbeat.
-    const HEARTBEAT_IN_SECS: u64 = N::ANCHOR_TIME as u64 / 2;
+    const HEARTBEAT_IN_SECS: u64 = N::ANCHOR_TIME as u64;
 
     /// Initialize a new instance of the heartbeat.
     async fn initialize_heartbeat(&self) {

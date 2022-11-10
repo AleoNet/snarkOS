@@ -20,15 +20,16 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_executor::{spawn_task_loop, Executor, NodeType, Status};
-use snarkos_node_ledger::Ledger;
+use snarkos_node_ledger::{Ledger, RecordMap};
 use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedBlock, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkos_node_store::ConsensusDB;
-use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
+use snarkvm::prelude::{Address, Block, Identifier, Network, PrivateKey, ProgramID, Transaction, Value, ViewKey};
 
 use anyhow::{bail, Result};
-use core::time::Duration;
+use core::{str::FromStr, time::Duration};
+use parking_lot::RwLock;
 use std::{
     net::SocketAddr,
     sync::{
@@ -54,6 +55,8 @@ pub struct Beacon<N: Network> {
     rest: Option<Arc<Rest<N, ConsensusDB<N>>>>,
     /// The time it to generate a block.
     block_generation_time: Arc<AtomicU64>,
+    /// The unspent records.
+    unspent_records: Arc<RwLock<RecordMap<N>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
 }
@@ -89,6 +92,8 @@ impl<N: Network> Beacon<N> {
         };
         // Initialize the block generation time.
         let block_generation_time = Arc::new(AtomicU64::new(2));
+        // Retrieve the unspent records.
+        let unspent_records = ledger.find_unspent_records(account.view_key())?;
         // Initialize the node.
         let node = Self {
             account,
@@ -97,6 +102,7 @@ impl<N: Network> Beacon<N> {
             router: router.clone(),
             rest,
             block_generation_time,
+            unspent_records: Arc::new(RwLock::new(unspent_records)),
             shutdown: Default::default(),
         };
         // Initialize the router handler.
@@ -233,12 +239,49 @@ impl<N: Network> Beacon<N> {
 
     /// Produces the next block and propagates it to all peers.
     async fn produce_next_block(&self) -> Result<()> {
+        let mut beacon_transaction: Option<Transaction<N>> = None;
+
         // Produce a transaction if the mempool is empty.
         if self.consensus.memory_pool().num_unconfirmed_transactions() == 0 {
             // Create a transfer transaction.
             let beacon = self.clone();
             let transaction = match tokio::task::spawn_blocking(move || {
-                beacon.ledger.create_transfer(beacon.private_key(), beacon.address(), 1)
+                // Fetch an unspent record.
+                let (commitment, record) = match beacon.unspent_records.write().shift_remove_index(0) {
+                    Some(record) => record,
+                    None => bail!("The beacon has no unspent records available"),
+                };
+
+                // Initialize an RNG.
+                let rng = &mut rand::thread_rng();
+
+                // Prepare the inputs.
+                let to = beacon.account.address();
+                let amount = 1;
+
+                // Create a new transaction.
+                let transaction = Transaction::execute(
+                    beacon.ledger.vm(),
+                    beacon.account.private_key(),
+                    &ProgramID::from_str("credits.aleo")?,
+                    Identifier::from_str("transfer")?,
+                    &[
+                        Value::Record(record.clone()),
+                        Value::from_str(&format!("{to}"))?,
+                        Value::from_str(&format!("{amount}u64"))?,
+                    ],
+                    None,
+                    rng,
+                );
+
+                match transaction {
+                    Ok(transaction) => Ok(transaction),
+                    Err(error) => {
+                        // Push the record back into the unspent records.
+                        beacon.unspent_records.write().insert(commitment, record);
+                        bail!("Failed to create a transaction: {error}")
+                    }
+                }
             })
             .await
             {
@@ -246,6 +289,9 @@ impl<N: Network> Beacon<N> {
                 Ok(Err(error)) => bail!("Failed to create a transfer transaction for the next block: {error}"),
                 Err(error) => bail!("Failed to create a transfer transaction for the next block: {error}"),
             };
+            // Save the beacon transaction.
+            beacon_transaction = Some(transaction.clone());
+
             // Add the transaction to the memory pool.
             let beacon = self.clone();
             match tokio::task::spawn_blocking(move || beacon.consensus.add_unconfirmed_transaction(transaction)).await {
@@ -271,10 +317,29 @@ impl<N: Network> Beacon<N> {
 
             // Advance to the next block.
             match beacon.consensus.advance_to_next_block(&next_block) {
-                Ok(()) => match serde_json::to_string_pretty(&next_block.header()) {
-                    Ok(header) => info!("Block {}: {header}", next_block.height()),
-                    Err(error) => info!("Block {}: (serde failed: {error})", next_block.height()),
-                },
+                Ok(()) => {
+                    // If the beacon produced a transaction, save its output records.
+                    if let Some(transaction) = beacon_transaction {
+                        // Save the unspent records.
+                        if let Err(error) = transaction.into_transitions().try_for_each(|transition| {
+                            for (commitment, record) in transition.into_output_records() {
+                                let record = record.decrypt(beacon.account.view_key())?;
+                                beacon.unspent_records.write().insert(commitment, record);
+                            }
+                            Ok::<_, anyhow::Error>(())
+                        }) {
+                            warn!("Unable to save the beacon unspent records, recomputing unspent records: {error}");
+                            // Recompute the unspent records.
+                            *beacon.unspent_records.write() =
+                                beacon.ledger.find_unspent_records(beacon.account.view_key())?;
+                        };
+                    }
+                    // Log the next block.
+                    match serde_json::to_string_pretty(&next_block.header()) {
+                        Ok(header) => info!("Block {}: {header}", next_block.height()),
+                        Err(error) => info!("Block {}: (serde failed: {error})", next_block.height()),
+                    }
+                }
                 Err(error) => {
                     // Clear the memory pool of all solutions and transactions.
                     trace!("Clearing the memory pool...");
