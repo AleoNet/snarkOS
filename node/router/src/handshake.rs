@@ -28,6 +28,11 @@ use tokio_util::codec::Framed;
 
 #[async_trait]
 pub trait Handshake: Executor {
+    /// The minimum number of peers required to maintain connections with.
+    const MINIMUM_NUMBER_OF_PEERS: usize = 1;
+    /// The maximum number of peers permitted to maintain connections with.
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
+
     /// Performs the handshake protocol, returning the peer upon success.
     async fn handshake<N: Network>(router: Router<N>, stream: TcpStream) -> Result<Peer<N>> {
         // Construct the socket.
