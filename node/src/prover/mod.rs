@@ -137,7 +137,7 @@ impl<N: Network> Prover<N> {
                     if elapsed > N::ANCHOR_TIME as i64 * 6 {
                         warn!("Skipping an iteration of the prover solution (latest block is stale)");
                         // Send a "PuzzleRequest" to a beacon node.
-                        prover.router.send_puzzle_request().await;
+                        prover.router.send_puzzle_request(prover.node_type()).await;
                         // Sleep for `N::ANCHOR_TIME` seconds.
                         tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
                         continue;
