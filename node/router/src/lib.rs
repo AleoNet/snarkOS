@@ -269,6 +269,16 @@ impl<N: Network> Router<N> {
         self.restricted_peers.read().await.len()
     }
 
+    /// Returns the list of connected peers and their block heights.
+    pub async fn connected_peer_block_heights(&self) -> IndexMap<SocketAddr, u32> {
+        let mut peer_block_heights = IndexMap::new();
+        for (ip, peer) in self.connected_peers.read().await.iter() {
+            peer_block_heights.insert(*ip, *peer.block_height.read().await);
+        }
+
+        peer_block_heights
+    }
+
     /// Sends a "PuzzleRequest" to a reliable peer.
     pub async fn send_puzzle_request(&self, node_type: NodeType) {
         // Retrieve a reliable peer.

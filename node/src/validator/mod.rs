@@ -286,30 +286,55 @@ impl<N: Network> Validator<N> {
                     break;
                 }
 
-                // TODO (raychu86): Implement the standard block sync protocol.
+                // Fetch the latest block height.
+                let latest_height = validator.ledger().latest_height();
 
-                // // Fetch the current height.
-                // let current_height = validator.ledger().latest_height();
-                //
-                // // Fetch the latest block height of the connected peers.
-                //
-                // // If the node is caught up, then continue.
-                //
-                // // Sync the node with the peers.
-                // Self::status().update(Status::Syncing);
-                // // TODO (raychu86): Sync the node with the peer.
-                //
-                // // Set the sync status to `Ready`.
-                // Self::status().update(Status::Ready);
-                //
-                // // If the Ctrl-C handler registered the signal, stop the node once the current block is complete.
-                // if validator.shutdown.load(Ordering::Relaxed) {
-                //     info!("Shutting down block sync");
-                //     break;
-                // }
+                // Get the peer with the highest block height.
+                let peer_block_heights = validator.router.connected_peer_block_heights().await;
+                let peer = match peer_block_heights.into_iter().max_by(|(_, a), (_, b)| a.cmp(b)) {
+                    Some(peer) => Some(peer),
+                    None => {
+                        // Set the sync status to `Ready`.
+                        Self::status().update(Status::Ready);
+                        None
+                    }
+                };
 
-                // Sleep for 10 seconds.
-                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                // If a peer exists, check if the peer is ahead of the node.
+                if let Some((peer_ip, peer_block_height)) = peer {
+                    // If the peer has a greater height than the node, request blocks.
+                    if latest_height < peer_block_height {
+                        Self::status().update(Status::Syncing);
+
+                        // Specify the block height to request.
+                        let start_block_height = latest_height.saturating_add(1);
+                        let end_block_height =
+                            std::cmp::min(peer_block_height, start_block_height + Self::MAXIMUM_BLOCK_REQUEST);
+
+                        trace!(
+                            "Sending block request to peer {peer_ip} for blocks {start_block_height} to {end_block_height}."
+                        );
+
+                        // Send the `BlockRequest` message to the peer.
+                        let message = Message::BlockRequest(BlockRequest { start_block_height, end_block_height });
+                        if let Err(error) = validator.router.process(RouterRequest::MessageSend(peer_ip, message)).await
+                        {
+                            warn!("[BlockRequest] {}", error);
+                        }
+                    } else {
+                        // Set the sync status to `Ready`.
+                        Self::status().update(Status::Ready);
+                    }
+                }
+
+                // Sleep depending on the sync status.
+                if Self::status().is_syncing() {
+                    // Sleep for 1 second.
+                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                } else {
+                    // Sleep for 10 seconds.
+                    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                }
             }
         });
     }
