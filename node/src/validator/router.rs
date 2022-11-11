@@ -83,7 +83,7 @@ impl<N: Network> Inbound<N> for Validator<N> {
                 return true;
             }
 
-            info!("Ledger advanced to block {} ({})", block.height(), block.hash());
+            info!("Ledger successfully advanced to block {} ({})", block.height(), block.hash());
         }
 
         true
@@ -199,7 +199,7 @@ impl<N: Network> Inbound<N> for Validator<N> {
                 return true;
             }
 
-            info!("Ledger advanced to block {} ({})", block.height(), block.hash());
+            info!("Ledger successfully advanced to block {} ({})", block.height(), block.hash());
         }
 
         // Propagate the `UnconfirmedBlock`.
