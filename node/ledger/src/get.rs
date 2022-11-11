@@ -27,6 +27,18 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         self.vm.block_store().get_state_path_for_commitment(commitment)
     }
 
+    /// Returns the epoch challenge for the given block height.
+    pub fn get_epoch_challenge(&self, block_height: u32) -> Result<EpochChallenge<N>> {
+        // Compute the epoch number from the current block height.
+        let epoch_number = block_height / N::NUM_BLOCKS_PER_EPOCH;
+        // Compute the epoch starting height (a multiple of `NUM_BLOCKS_PER_EPOCH`).
+        let epoch_starting_height = epoch_number * N::NUM_BLOCKS_PER_EPOCH;
+        // Retrieve the epoch block hash, defined as the 'previous block hash' from the epoch starting height.
+        let epoch_block_hash = self.get_previous_hash(epoch_starting_height)?;
+        // Construct the epoch challenge.
+        EpochChallenge::new(epoch_number, epoch_block_hash, N::COINBASE_PUZZLE_DEGREE)
+    }
+
     /// Returns the block for the given block height.
     pub fn get_block(&self, height: u32) -> Result<Block<N>> {
         // Retrieve the block hash.

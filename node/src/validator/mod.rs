@@ -21,11 +21,11 @@ use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_executor::{spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::{Data, Message, PuzzleResponse};
+use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkos_node_store::ConsensusDB;
-use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
+use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
 
 use anyhow::{bail, ensure, Result};
 use sha2::{Digest, Sha256};
@@ -54,6 +54,12 @@ pub struct Validator<N: Network> {
     router: Router<N>,
     /// The REST server of the node.
     rest: Option<Arc<Rest<N, ConsensusDB<N>>>>,
+    /// The coinbase puzzle.
+    coinbase_puzzle: CoinbasePuzzle<N>,
+    /// The latest epoch challenge.
+    latest_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
+    /// The latest block.
+    latest_block: Arc<RwLock<Option<Block<N>>>>,
     /// The latest puzzle response.
     latest_puzzle_response: Arc<RwLock<Option<PuzzleResponse<N>>>>,
     /// The shutdown signal.
@@ -85,6 +91,8 @@ impl<N: Network> Validator<N> {
             }
             None => None,
         };
+        // Load the coinbase puzzle.
+        let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
         let node = Self {
             account,
@@ -92,10 +100,12 @@ impl<N: Network> Validator<N> {
             ledger,
             router: router.clone(),
             rest,
+            coinbase_puzzle,
+            latest_epoch_challenge: Default::default(),
+            latest_block: Default::default(),
             latest_puzzle_response: Default::default(),
             shutdown: Default::default(),
         };
-
         // Initialize the router handler.
         router.initialize_handler(node.clone(), router_receiver).await;
         // Initialize the signal handler.

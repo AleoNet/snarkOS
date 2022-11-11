@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
-use snarkvm::prelude::{ProverSolution, PuzzleCommitment};
 
 #[async_trait]
 impl<N: Network> Handshake for Beacon<N> {
@@ -37,15 +36,8 @@ impl<N: Network> Inbound<N> for Beacon<N> {
                     return false;
                 }
             };
-
             // Retrieve the latest block.
-            let block = match self.ledger.latest_block() {
-                Ok(block) => block,
-                Err(error) => {
-                    error!("Failed to retrieve latest block for a puzzle request: {error}");
-                    return false;
-                }
-            };
+            let block = self.ledger.latest_block();
 
             // Scope drops the read lock on the consensus module.
             (epoch_challenge, block)
@@ -62,11 +54,10 @@ impl<N: Network> Inbound<N> for Beacon<N> {
     /// Adds the unconfirmed solution to the memory pool, and propagates the solution to all peers.
     async fn unconfirmed_solution(
         &self,
-        _message: UnconfirmedSolution<N>,
-        _puzzle_commitment: PuzzleCommitment<N>,
-        solution: ProverSolution<N>,
-        _peer_ip: SocketAddr,
         _router: &Router<N>,
+        _peer_ip: SocketAddr,
+        _message: UnconfirmedSolution<N>,
+        solution: ProverSolution<N>,
     ) -> bool {
         // Add the unconfirmed solution to the memory pool.
         if let Err(error) = self.consensus.add_unconfirmed_solution(&solution) {
@@ -77,6 +68,27 @@ impl<N: Network> Inbound<N> for Beacon<N> {
         // let request = RouterRequest::MessagePropagateBeacon(Message::UnconfirmedSolution(message), vec![peer_ip]);
         // if let Err(error) = router.process(request).await {
         //     warn!("[UnconfirmedSolution] {error}");
+        // }
+        true
+    }
+
+    /// Adds the unconfirmed transaction to the memory pool, and propagates the transaction to all peers.
+    async fn unconfirmed_transaction(
+        &self,
+        _router: &Router<N>,
+        _peer_ip: SocketAddr,
+        _message: UnconfirmedTransaction<N>,
+        transaction: Transaction<N>,
+    ) -> bool {
+        // Add the unconfirmed transaction to the memory pool.
+        if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction) {
+            trace!("[UnconfirmedTransaction] {error}");
+            return true; // Maintain the connection.
+        }
+        // // Propagate the `UnconfirmedTransaction`.
+        // let request = RouterRequest::MessagePropagate(Message::UnconfirmedTransaction(message), vec![peer_ip]);
+        // if let Err(error) = router.process(request).await {
+        //     warn!("[UnconfirmedTransaction] {error}");
         // }
         true
     }

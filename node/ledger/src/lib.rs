@@ -73,6 +73,8 @@ pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
     vm: VM<N, C>,
     /// The current block.
     current_block: Arc<RwLock<Block<N>>>,
+    /// The current epoch challenge.
+    current_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
@@ -110,7 +112,11 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         };
 
         // Initialize the ledger.
-        let mut ledger = Self { vm, current_block: Arc::new(RwLock::new(genesis.clone())) };
+        let mut ledger = Self {
+            vm,
+            current_block: Arc::new(RwLock::new(genesis.clone())),
+            current_epoch_challenge: Default::default(),
+        };
 
         // If the block store is empty, initialize the genesis block.
         if ledger.vm.block_store().heights().max().is_none() {
@@ -128,6 +134,8 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
         // Set the current block.
         ledger.current_block = Arc::new(RwLock::new(block));
+        // Set the current epoch challenge.
+        ledger.current_epoch_challenge = Arc::new(RwLock::new(Some(ledger.get_epoch_challenge(latest_height)?)));
 
         // // Safety check the existence of every block.
         // cfg_into_iter!((0..=latest_height)).try_for_each(|height| {
@@ -149,8 +157,8 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     }
 
     /// Returns the latest block.
-    pub fn latest_block(&self) -> Result<Block<N>> {
-        self.get_block(self.latest_height())
+    pub fn latest_block(&self) -> Block<N> {
+        self.current_block.read().clone()
     }
 
     /// Returns the latest block hash.
@@ -204,8 +212,8 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     }
 
     /// Returns the latest block transactions.
-    pub fn latest_transactions(&self) -> Result<Transactions<N>> {
-        self.get_transactions(self.latest_height())
+    pub fn latest_transactions(&self) -> Transactions<N> {
+        self.current_block.read().transactions().clone()
     }
 
     /// Returns the latest epoch number.
@@ -215,14 +223,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the latest epoch challenge.
     pub fn latest_epoch_challenge(&self) -> Result<EpochChallenge<N>> {
-        // Get the epoch starting height (a multiple of `NUM_BLOCKS_PER_EPOCH`).
-        let latest_height = self.latest_height();
-        let epoch_starting_height = latest_height - latest_height % N::NUM_BLOCKS_PER_EPOCH;
-        ensure!(epoch_starting_height % N::NUM_BLOCKS_PER_EPOCH == 0, "Invalid epoch starting height");
-        // Retrieve the epoch block hash, defined as the 'previous block hash' from the epoch starting height.
-        let epoch_block_hash = self.get_previous_hash(epoch_starting_height)?;
-        // Construct the epoch challenge.
-        EpochChallenge::new(self.latest_epoch_number(), epoch_block_hash, N::COINBASE_PUZZLE_DEGREE)
+        match self.current_epoch_challenge.read().as_ref() {
+            Some(challenge) => Ok(challenge.clone()),
+            None => self.get_epoch_challenge(self.latest_height()),
+        }
     }
 
     /// Adds the given block as the next block in the chain.
@@ -231,8 +235,17 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         let mut current_block = self.current_block.write();
         // Update the VM.
         self.vm.add_next_block(block)?;
-        // Update the block.
+        // Update the current block.
         *current_block = block.clone();
+        // Drop the write lock on the current block.
+        drop(current_block);
+
+        // If the block is the start of a new epoch, or the epoch challenge has not been set, update the current epoch challenge.
+        if block.height() % N::NUM_BLOCKS_PER_EPOCH == 0 || self.current_epoch_challenge.read().is_none() {
+            // Update the current epoch challenge.
+            self.current_epoch_challenge.write().clone_from(&self.get_epoch_challenge(block.height()).ok());
+        }
+
         Ok(())
     }
 

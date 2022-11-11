@@ -164,7 +164,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Retrieve the latest state root.
         let latest_state_root = self.ledger.latest_state_root();
         // Retrieve the latest block.
-        let latest_block = self.ledger.latest_block()?;
+        let latest_block = self.ledger.latest_block();
         // Retrieve the latest height.
         let latest_height = latest_block.height();
         // Retrieve the latest proof target.
@@ -350,7 +350,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Ensure the next block timestamp is after the current block timestamp.
         if block.height() > 0 {
             let next_timestamp = block.header().timestamp();
-            let latest_timestamp = self.ledger.latest_block()?.header().timestamp();
+            let latest_timestamp = self.ledger.latest_block().header().timestamp();
             if next_timestamp <= latest_timestamp {
                 bail!("The next block timestamp {next_timestamp} is before the current timestamp {latest_timestamp}")
             }
