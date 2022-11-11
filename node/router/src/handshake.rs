@@ -174,6 +174,7 @@ pub trait Handshake: Executor {
                                     version: Message::<N>::VERSION,
                                     fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
                                     node_type: Self::NODE_TYPE,
+                                    block_height: None,
                                     status: Self::status().get(),
                                 });
                                 trace!("Sending '{}' to '{peer_ip}'", message.name());

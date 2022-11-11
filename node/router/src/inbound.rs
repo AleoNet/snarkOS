@@ -50,7 +50,7 @@ pub trait Inbound<N: Network>: Executor {
             Message::PeerRequest(..) => Self::peer_request(peer_ip, router).await,
             Message::PeerResponse(message) => Self::peer_response(message, router).await,
             Message::Ping(message) => Self::ping(message, peer_ip, peer).await,
-            Message::Pong(message) => Self::pong(message, peer_ip, router).await,
+            Message::Pong(message) => self.pong(message, peer_ip, router).await,
             Message::PuzzleRequest(..) => self.puzzle_request(peer_ip, router).await,
             Message::PuzzleResponse(message) => self.puzzle_response(message, peer_ip).await,
             Message::UnconfirmedBlock(message) => {
@@ -272,6 +272,10 @@ pub trait Inbound<N: Network>: Executor {
         *peer.version.write().await = message.version;
         // Update the node type of the peer.
         *peer.node_type.write().await = message.node_type;
+        // Update the block height of the peer.
+        if let Some(height) = message.block_height {
+            *peer.block_height.write().await = height;
+        }
         // Update the status of the peer.
         *peer.status.write().await = message.status;
 
@@ -289,7 +293,7 @@ pub trait Inbound<N: Network>: Executor {
         true
     }
 
-    async fn pong(_message: Pong, peer_ip: SocketAddr, router: &Router<N>) -> bool {
+    async fn pong(&self, _message: Pong, peer_ip: SocketAddr, router: &Router<N>) -> bool {
         // // Perform the deferred non-blocking deserialization of block locators.
         // let request = match block_locators.deserialize().await {
         //     // Route the `Pong` to the ledger.
@@ -314,6 +318,7 @@ pub trait Inbound<N: Network>: Executor {
                 version: Message::<N>::VERSION,
                 fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
                 node_type: Self::NODE_TYPE,
+                block_height: None,
                 status: Self::status().get(),
             });
             if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {

@@ -391,6 +391,7 @@ mod tests {
             version: 0,
             fork_depth: 0,
             node_type: NodeType::Client,
+            block_height: Some(0),
             status: Status::Ready,
         })));
 

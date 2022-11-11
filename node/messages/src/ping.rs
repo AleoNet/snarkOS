@@ -21,6 +21,7 @@ pub struct Ping {
     pub version: u32,
     pub fork_depth: u32,
     pub node_type: NodeType,
+    pub block_height: Option<u32>,
     pub status: Status,
 }
 
@@ -34,14 +35,17 @@ impl MessageTrait for Ping {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(&mut *writer, &(self.version, self.fork_depth, self.node_type, self.status))?)
+        Ok(bincode::serialize_into(
+            &mut *writer,
+            &(self.version, self.fork_depth, self.node_type, self.block_height, self.status),
+        )?)
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
-        let (version, fork_depth, node_type, status) = bincode::deserialize_from(&mut reader)?;
-        Ok(Self { version, fork_depth, node_type, status })
+        let (version, fork_depth, node_type, block_height, status) = bincode::deserialize_from(&mut reader)?;
+        Ok(Self { version, fork_depth, node_type, block_height, status })
     }
 }
