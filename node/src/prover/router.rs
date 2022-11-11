@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use super::*;
-use snarkvm::prelude::{ProverSolution, PuzzleCommitment};
 
 #[async_trait]
 impl<N: Network> Handshake for Prover<N> {}
@@ -52,11 +51,10 @@ impl<N: Network> Inbound<N> for Prover<N> {
     /// Otherwise, the prover will ignore the message.
     async fn unconfirmed_solution(
         &self,
-        message: UnconfirmedSolution<N>,
-        _puzzle_commitment: PuzzleCommitment<N>,
-        _solution: ProverSolution<N>,
-        peer_ip: SocketAddr,
         router: &Router<N>,
+        peer_ip: SocketAddr,
+        message: UnconfirmedSolution<N>,
+        _solution: ProverSolution<N>,
     ) -> bool {
         if let Some(block) = self.latest_block.read().await.as_ref() {
             // Compute the elapsed time since the last coinbase block.

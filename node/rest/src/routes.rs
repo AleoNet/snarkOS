@@ -228,7 +228,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
 
     /// Returns the latest block.
     async fn latest_block(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.latest_block().or_reject()?))
+        Ok(reply::json(&ledger.latest_block()))
     }
 
     /// Returns the block for the given block height.

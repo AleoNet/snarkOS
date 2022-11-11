@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Peer, PuzzleCommitment, Router, RouterRequest, ALEO_MAXIMUM_FORK_DEPTH};
+use crate::{Peer, Router, RouterRequest, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_executor::{spawn_task, Executor};
 use snarkos_node_messages::*;
 use snarkvm::prelude::{Block, Network, ProverSolution, Transaction};
@@ -53,31 +53,39 @@ pub trait Inbound<N: Network>: Executor {
             Message::UnconfirmedBlock(message) => {
                 // Clone the message.
                 let message_clone = message.clone();
-                // Perform the deferred non-blocking deserialization of the block.
-                match message.block.deserialize().await {
-                    Ok(block) => {
-                        // Check that the block parameters match.
-                        if message.block_height != block.height() || message.block_hash != block.hash() {
-                            // Peer is not following the protocol.
-                            warn!("Peer {peer_ip} is not following the 'UnconfirmedBlock' protocol");
-                            return false;
+
+                // Update the timestamp for the unconfirmed block.
+                let seen_before = router
+                    .seen_inbound_blocks
+                    .write()
+                    .await
+                    .insert(message.block_hash, SystemTime::now())
+                    .is_some();
+
+                // Determine whether to propagate the block.
+                let should_propagate = !seen_before;
+
+                if !should_propagate {
+                    trace!("Skipping 'UnconfirmedBlock {}' from '{peer_ip}'", message.block_hash);
+                    true
+                } else {
+                    // Perform the deferred non-blocking deserialization of the block.
+                    match message.block.deserialize().await {
+                        Ok(block) => {
+                            // Check that the block parameters match.
+                            if message.block_height != block.height() || message.block_hash != block.hash() {
+                                // Peer is not following the protocol.
+                                warn!("Peer {peer_ip} is not following the 'UnconfirmedBlock' protocol");
+                                return false;
+                            }
+                            // Handle the unconfirmed block.
+                            self.unconfirmed_block(router, peer_ip, message_clone, block).await
                         }
-
-                        // Update the timestamp for the unconfirmed block.
-                        let seen_before = router
-                            .seen_inbound_blocks
-                            .write()
-                            .await
-                            .insert(block.hash(), SystemTime::now())
-                            .is_some();
-
-                        // Handle the unconfirmed block.
-                        self.unconfirmed_block(message_clone, block.hash(), block, peer_ip, router, seen_before).await
+                        Err(error) => {
+                            warn!("[UnconfirmedBlock] {error}");
+                            true
+                        },
                     }
-                    Err(error) => {
-                        warn!("[UnconfirmedBlock] {error}");
-                        true
-                    },
                 }
             },
             Message::UnconfirmedSolution(message) => {
@@ -109,7 +117,7 @@ pub trait Inbound<N: Network>: Executor {
                                 return false;
                             }
                             // Handle the unconfirmed solution.
-                            self.unconfirmed_solution(message_clone, solution.commitment(), solution, peer_ip, router).await
+                            self.unconfirmed_solution(router, peer_ip, message_clone, solution).await
                         }
                         Err(error) => {
                             warn!("[UnconfirmedSolution] {error}");
@@ -121,31 +129,39 @@ pub trait Inbound<N: Network>: Executor {
             Message::UnconfirmedTransaction(message) => {
                 // Clone the message.
                 let message_clone = message.clone();
-                // Perform the deferred non-blocking deserialization of the transaction.
-                match message.transaction.deserialize().await {
-                    Ok(transaction) => {
-                        // Check that the transaction parameters match.
-                        if message.transaction_id != transaction.id() {
-                            // Peer is not following the protocol.
-                            warn!("Peer {peer_ip} is not following the 'UnconfirmedTransaction' protocol");
-                            return false;
+
+                // Update the timestamp for the unconfirmed transaction.
+                let seen_before = router
+                    .seen_inbound_transactions
+                    .write()
+                    .await
+                    .insert(message.transaction_id, SystemTime::now())
+                    .is_some();
+
+                // Determine whether to propagate the transaction.
+                let should_propagate = !seen_before;
+
+                if !should_propagate {
+                    trace!("Skipping 'UnconfirmedTransaction {}' from '{peer_ip}'", message.transaction_id);
+                    true
+                } else {
+                    // Perform the deferred non-blocking deserialization of the transaction.
+                    match message.transaction.deserialize().await {
+                        Ok(transaction) => {
+                            // Check that the transaction parameters match.
+                            if message.transaction_id != transaction.id() {
+                                // Peer is not following the protocol.
+                                warn!("Peer {peer_ip} is not following the 'UnconfirmedTransaction' protocol");
+                                return false;
+                            }
+                            // Handle the unconfirmed transaction.
+                            self.unconfirmed_transaction(router, peer_ip, message_clone, transaction).await
                         }
-
-                        // Update the timestamp for the unconfirmed transaction.
-                        let seen_before = router
-                            .seen_inbound_transactions
-                            .write()
-                            .await
-                            .insert(transaction.id(), SystemTime::now())
-                            .is_some();
-
-                        // Handle the unconfirmed transaction.
-                        self.unconfirmed_transaction(message_clone, transaction.id(), transaction, peer_ip, router, seen_before).await
+                        Err(error) => {
+                            warn!("[UnconfirmedTransaction] {error}");
+                            true
+                        },
                     }
-                    Err(error) => {
-                        warn!("[UnconfirmedTransaction] {error}");
-                        true
-                    },
                 }
             }
         }
@@ -316,24 +332,15 @@ pub trait Inbound<N: Network>: Executor {
 
     async fn unconfirmed_block(
         &self,
-        message: UnconfirmedBlock<N>,
-        block_hash: N::BlockHash,
-        _block: Block<N>,
-        peer_ip: SocketAddr,
         router: &Router<N>,
-        seen_before: bool,
+        peer_ip: SocketAddr,
+        message: UnconfirmedBlock<N>,
+        _block: Block<N>,
     ) -> bool {
-        // Determine whether to propagate the block.
-        let should_propagate = !seen_before;
-
-        if !should_propagate {
-            trace!("Skipping 'UnconfirmedBlock {block_hash}' from '{peer_ip}'");
-        } else {
-            // Propagate the `UnconfirmedBlock`.
-            let request = RouterRequest::MessagePropagate(Message::UnconfirmedBlock(message), vec![peer_ip]);
-            if let Err(error) = router.process(request).await {
-                warn!("[UnconfirmedBlock] {error}");
-            }
+        // Propagate the `UnconfirmedBlock`.
+        let request = RouterRequest::MessagePropagate(Message::UnconfirmedBlock(message), vec![peer_ip]);
+        if let Err(error) = router.process(request).await {
+            warn!("[UnconfirmedBlock] {error}");
         }
         true
 
@@ -373,40 +380,23 @@ pub trait Inbound<N: Network>: Executor {
 
     async fn unconfirmed_solution(
         &self,
-        message: UnconfirmedSolution<N>,
-        _puzzle_commitment: PuzzleCommitment<N>,
-        _solution: ProverSolution<N>,
-        peer_ip: SocketAddr,
         router: &Router<N>,
-    ) -> bool {
-        // Propagate the `UnconfirmedSolution` to connected beacons.
-        let request = RouterRequest::MessagePropagateBeacon(Message::UnconfirmedSolution(message), vec![peer_ip]);
-        if let Err(error) = router.process(request).await {
-            warn!("[UnconfirmedSolution] {error}");
-        }
-        true
-    }
+        peer_ip: SocketAddr,
+        message: UnconfirmedSolution<N>,
+        solution: ProverSolution<N>,
+    ) -> bool;
 
     async fn unconfirmed_transaction(
         &self,
-        message: UnconfirmedTransaction<N>,
-        transaction_id: N::TransactionID,
-        _transaction: Transaction<N>,
-        peer_ip: SocketAddr,
         router: &Router<N>,
-        seen_before: bool,
+        peer_ip: SocketAddr,
+        message: UnconfirmedTransaction<N>,
+        _transaction: Transaction<N>,
     ) -> bool {
-        // Determine whether to propagate the transaction.
-        let should_propagate = !seen_before;
-
-        if !should_propagate {
-            trace!("Skipping 'UnconfirmedTransaction {transaction_id}' from '{peer_ip}'");
-        } else {
-            // Propagate the `UnconfirmedTransaction`.
-            let request = RouterRequest::MessagePropagate(Message::UnconfirmedTransaction(message), vec![peer_ip]);
-            if let Err(error) = router.process(request).await {
-                warn!("[UnconfirmedTransaction] {error}");
-            }
+        // Propagate the `UnconfirmedTransaction`.
+        let request = RouterRequest::MessagePropagate(Message::UnconfirmedTransaction(message), vec![peer_ip]);
+        if let Err(error) = router.process(request).await {
+            warn!("[UnconfirmedTransaction] {error}");
         }
         true
     }

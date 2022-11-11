@@ -21,7 +21,7 @@ use snarkos_account::Account;
 use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
-use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ViewKey};
+use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
 
 use anyhow::Result;
 use core::time::Duration;
@@ -137,7 +137,7 @@ impl<N: Network> Prover<N> {
                     if elapsed > N::ANCHOR_TIME as i64 * 6 {
                         warn!("Skipping an iteration of the prover solution (latest block is stale)");
                         // Send a "PuzzleRequest" to a beacon node.
-                        prover.router.send_puzzle_request().await;
+                        prover.router.send_puzzle_request(prover.node_type()).await;
                         // Sleep for `N::ANCHOR_TIME` seconds.
                         tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
                         continue;

@@ -33,7 +33,7 @@ pub use outbound::*;
 mod peer;
 pub use peer::*;
 
-use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor};
+use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType};
 use snarkos_node_messages::*;
 use snarkvm::prelude::{Address, Network, PuzzleCommitment};
 
@@ -270,11 +270,16 @@ impl<N: Network> Router<N> {
     }
 
     /// Sends a "PuzzleRequest" to a reliable peer.
-    pub async fn send_puzzle_request(&self) {
+    pub async fn send_puzzle_request(&self, node_type: NodeType) {
         // Retrieve a reliable peer.
-        if let Some(reliable_peer) = self.reliable_peers().await.first() {
+        let reliable_peer = match node_type.is_validator() {
+            true => self.connected_beacons().await.first().copied(),
+            false => self.reliable_peers().await.first().copied(),
+        };
+        // If a reliable peer exists, send a "PuzzleRequest" to it.
+        if let Some(reliable_peer) = reliable_peer {
             // Send the "PuzzleRequest" to the reliable peer.
-            let request = RouterRequest::MessageSend(*reliable_peer, Message::PuzzleRequest(PuzzleRequest));
+            let request = RouterRequest::MessageSend(reliable_peer, Message::PuzzleRequest(PuzzleRequest));
             if let Err(error) = self.process(request).await {
                 warn!("[PuzzleRequest] {error}");
             }
@@ -355,7 +360,7 @@ impl<N: Network> Router<N> {
             spawn_task_loop!(E, {
                 loop {
                     // Send a "PuzzleRequest".
-                    router.send_puzzle_request().await;
+                    router.send_puzzle_request(E::node_type()).await;
                     // Sleep for `Self::PUZZLE_REQUEST_IN_SECS` seconds.
                     tokio::time::sleep(Duration::from_secs(Self::PUZZLE_REQUEST_IN_SECS)).await;
                 }
