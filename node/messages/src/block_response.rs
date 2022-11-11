@@ -18,7 +18,7 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockResponse<N: Network> {
-    pub block: Data<Block<N>>,
+    pub blocks: Vec<Data<Block<N>>>,
 }
 
 impl<N: Network> MessageTrait for BlockResponse<N> {
@@ -31,12 +31,25 @@ impl<N: Network> MessageTrait for BlockResponse<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.block.serialize_blocking_into(writer)
+        writer.write_all(&(self.blocks.len() as u32).to_bytes_le()?)?;
+        for block in &self.blocks {
+            block.serialize_blocking_into(writer)?;
+        }
+
+        Ok(())
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        Ok(Self { block: Data::Buffer(bytes.freeze()) })
+    fn deserialize(mut bytes: BytesMut) -> Result<Self> {
+        let num_blocks: u32 = bytes.get_u32();
+
+        let mut blocks = Vec::with_capacity(num_blocks as usize);
+
+        for _ in 0..num_blocks {
+            blocks.push(Data::Object(Block::<N>::from_bytes_le(&bytes)?));
+        }
+
+        Ok(Self { blocks })
     }
 }
