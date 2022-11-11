@@ -137,7 +137,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let proof_target = self.ledger.latest_proof_target();
 
         // Ensure that the prover solution is valid for the given epoch.
-        if !solution.verify(self.coinbase_puzzle.coinbase_verifying_key()?, &epoch_challenge, proof_target)? {
+        if !solution.verify(self.coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target)? {
             bail!("Invalid prover solution '{}' for the current epoch.", solution.commitment());
         }
 
