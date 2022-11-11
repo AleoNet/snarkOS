@@ -50,13 +50,10 @@ impl<N: Network> Inbound<N> for Beacon<N> {
             }
         };
 
-        // Send the blocks to the peer.
-        for block in blocks {
-            // Send the `PuzzleResponse` message to the peer.
-            let message = Message::BlockResponse(BlockResponse { block: Data::Object(block) });
-            if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
-                warn!("[BlockResponse] {}", error);
-            }
+        // Send the `BlockResponse` message to the peer.
+        let message = Message::BlockResponse(BlockResponse::new(blocks));
+        if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
+            warn!("[BlockResponse] {}", error);
         }
 
         true

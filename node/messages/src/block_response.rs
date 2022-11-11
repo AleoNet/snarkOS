@@ -18,7 +18,13 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockResponse<N: Network> {
-    pub blocks: Vec<Data<Block<N>>>,
+    pub blocks: Data<Blocks<N>>,
+}
+
+impl<N: Network> BlockResponse<N> {
+    pub fn new(blocks: Vec<Block<N>>) -> Self {
+        Self { blocks: Data::Object(Blocks(blocks)) }
+    }
 }
 
 impl<N: Network> MessageTrait for BlockResponse<N> {
@@ -31,25 +37,41 @@ impl<N: Network> MessageTrait for BlockResponse<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&(self.blocks.len() as u32).to_bytes_le()?)?;
-        for block in &self.blocks {
-            block.serialize_blocking_into(writer)?;
-        }
-
-        Ok(())
+        self.blocks.serialize_blocking_into(writer)
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
-    fn deserialize(mut bytes: BytesMut) -> Result<Self> {
-        let num_blocks: u32 = bytes.get_u32();
+    fn deserialize(bytes: BytesMut) -> Result<Self> {
+        Ok(Self { blocks: Data::Buffer(bytes.freeze()) })
+    }
+}
 
-        let mut blocks = Vec::with_capacity(num_blocks as usize);
+/// Wrapper struct around a vector of blocks.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Blocks<N: Network>(pub Vec<Block<N>>);
 
-        for _ in 0..num_blocks {
-            blocks.push(Data::Object(Block::<N>::from_bytes_le(&bytes)?));
+impl<N: Network> ToBytes for Blocks<N> {
+    #[inline]
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        (self.0.len() as u32).write_le(&mut writer)?;
+        for block in &self.0 {
+            block.write_le(&mut writer)?;
         }
 
-        Ok(Self { blocks })
+        Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for Blocks<N> {
+    #[inline]
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let num_blocks = u32::read_le(&mut reader)? as usize;
+        let mut blocks = Vec::with_capacity(num_blocks);
+        for _ in 0..num_blocks {
+            blocks.push(Block::read_le(&mut reader)?);
+        }
+
+        Ok(Self(blocks))
     }
 }

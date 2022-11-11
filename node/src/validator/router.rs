@@ -50,41 +50,41 @@ impl<N: Network> Inbound<N> for Validator<N> {
             }
         };
 
-        // Send the blocks to the peer.
-        for block in blocks {
-            // Send the `PuzzleResponse` message to the peer.
-            let message = Message::BlockResponse(BlockResponse { block: Data::Object(block) });
-            if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
-                warn!("[BlockResponse] {}", error);
-            }
+        // Send the `BlockResponse` message to the peer.
+        let message = Message::BlockResponse(BlockResponse::new(blocks));
+        if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
+            warn!("[BlockResponse] {}", error);
         }
 
         true
     }
 
     async fn block_response(&self, message: BlockResponse<N>, peer_ip: SocketAddr, _router: &Router<N>) -> bool {
-        // Deserialize the block.
-        let block = match message.block.deserialize().await {
-            Ok(block) => block,
+        // Deserialize the block response.
+        let blocks = match message.blocks.deserialize().await {
+            Ok(blocks) => blocks,
             Err(error) => {
-                error!("Failed to deserialize block from '{peer_ip}': {error}");
+                error!("Failed to deserialize blocks from '{peer_ip}': {error}");
                 return false;
             }
         };
 
-        // Check that the next block is valid.
-        if let Err(error) = self.consensus.check_next_block(&block) {
-            trace!("[BlockResponse] {error}");
-            return true;
-        }
+        // Add the blocks from the block response to the ledger.
+        for block in blocks.0 {
+            // Check that the next block is valid.
+            if let Err(error) = self.consensus.check_next_block(&block) {
+                trace!("[BlockResponse] {error}");
+                return true;
+            }
 
-        // Attempt to add the block to the ledger.
-        if let Err(error) = self.consensus.advance_to_next_block(&block) {
-            trace!("[BlockResponse] {error}");
-            return true;
-        }
+            // Attempt to add the block to the ledger.
+            if let Err(error) = self.consensus.advance_to_next_block(&block) {
+                trace!("[BlockResponse] {error}");
+                return true;
+            }
 
-        trace!("Ledger advanced to block {} ({})", block.height(), block.hash());
+            info!("Ledger advanced to block {} ({})", block.height(), block.hash());
+        }
 
         true
     }

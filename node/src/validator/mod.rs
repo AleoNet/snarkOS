@@ -265,7 +265,7 @@ impl<N: Network> Validator<N> {
                 // Attempt to add the block to the ledger.
                 self.consensus.advance_to_next_block(block)?;
 
-                trace!("Ledger advanced to block {} ({})", block.height(), block.hash());
+                info!("Ledger advanced to block {} ({})", block.height(), block.hash());
             }
 
             // If the Ctrl-C handler registered the signal, stop the node once the current block is complete.

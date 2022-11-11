@@ -79,7 +79,10 @@ use snarkvm::prelude::{
 
 use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
-use std::{io::Write, net::SocketAddr};
+use std::{
+    io::{Read, Result as IoResult, Write},
+    net::SocketAddr,
+};
 
 pub trait MessageTrait {
     /// Returns the message name.
