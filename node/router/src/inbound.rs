@@ -24,6 +24,9 @@ use std::{net::SocketAddr, time::SystemTime};
 
 #[async_trait]
 pub trait Inbound<N: Network>: Executor {
+    /// The maximum number of blocks that can be requested per `BlockRequest`.
+    const MAXIMUM_BLOCK_REQUEST: u32 = 10;
+
     /// Handles the receiving of a message from a peer. Upon success, returns `true`.
     #[rustfmt::skip]
     async fn inbound(&self, peer: &Peer<N>, message: Message<N>, router: &Router<N>) -> bool {
@@ -33,8 +36,8 @@ pub trait Inbound<N: Network>: Executor {
         // Process the message.
         trace!("Received '{}' from '{peer_ip}'", message.name());
         match message {
-            Message::BlockRequest(message) => Self::block_request(message, peer_ip).await,
-            Message::BlockResponse(message) => Self::block_response(message, peer_ip).await,
+            Message::BlockRequest(message) => self.block_request(message, peer_ip, router).await,
+            Message::BlockResponse(message) => self.block_response(message, peer_ip, router).await,
             Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => {
                 // Peer is not following the protocol.
                 warn!("Peer {peer_ip} is not following the protocol");
@@ -167,7 +170,7 @@ pub trait Inbound<N: Network>: Executor {
         }
     }
 
-    async fn block_request(_message: BlockRequest, peer_ip: SocketAddr) -> bool {
+    async fn block_request(&self, _message: BlockRequest, peer_ip: SocketAddr, _router: &Router<N>) -> bool {
         // // Ensure the request is within the accepted limits.
         // let number_of_blocks = end_block_height.saturating_sub(start_block_height);
         // if number_of_blocks > Router::<N>::MAXIMUM_BLOCK_REQUEST {
@@ -201,7 +204,7 @@ pub trait Inbound<N: Network>: Executor {
         false
     }
 
-    async fn block_response(_message: BlockResponse<N>, peer_ip: SocketAddr) -> bool {
+    async fn block_response(&self, _message: BlockResponse<N>, peer_ip: SocketAddr, _router: &Router<N>) -> bool {
         // // Perform the deferred non-blocking deserialization of the block.
         // match block.deserialize().await {
         //     Ok(block) => {
