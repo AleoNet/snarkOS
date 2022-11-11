@@ -177,10 +177,11 @@ impl<N: Network> Prover<N> {
                                 &epoch_challenge,
                                 prover.address(),
                                 rand::thread_rng().gen(),
+                                Some(latest_proof_target),
                             ) {
                                 Ok(proof) => proof,
                                 Err(error) => {
-                                    warn!("Failed to generate prover solution: {error}");
+                                    warn!("Failed to generate valid prover solution: {error}");
                                     break;
                                 }
                             };
