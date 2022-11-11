@@ -24,6 +24,69 @@ impl<N: Network> Handshake for Validator<N> {
 
 #[async_trait]
 impl<N: Network> Inbound<N> for Validator<N> {
+    /// Retrieves the blocks within the block request range, and returns the block response to the peer.
+    async fn block_request(&self, message: BlockRequest, peer_ip: SocketAddr, router: &Router<N>) -> bool {
+        // Ensure the block request is well formed.
+        if message.start_block_height > message.end_block_height {
+            debug!("Invalid BlockRequest received from '{peer_ip}' - start height is greater than end height");
+            return false;
+        }
+
+        // Ensure that the block request is within the proper bounds.
+        if message.end_block_height - message.start_block_height > Self::MAXIMUM_BLOCK_REQUEST {
+            debug!("Invalid BlockRequest received from '{peer_ip}' - exceeds maximum block request");
+            return false;
+        }
+
+        // Retrieve the requested blocks.
+        let blocks = match self.ledger.get_blocks(message.start_block_height, message.end_block_height) {
+            Ok(blocks) => blocks,
+            Err(error) => {
+                error!(
+                    "Failed to retrieve blocks {} to {} from the ledger: {error}",
+                    message.start_block_height, message.end_block_height
+                );
+                return false;
+            }
+        };
+        let blocks = blocks.into_iter().map(Data::Object).collect();
+
+        // Send the `PuzzleResponse` message to the peer.
+        let message = Message::BlockResponse(BlockResponse { blocks });
+        if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
+            warn!("[BlockResponse] {}", error);
+        }
+
+        true
+    }
+
+    async fn block_response(&self, message: BlockResponse<N>, peer_ip: SocketAddr, _router: &Router<N>) -> bool {
+        // Add the blocks from the block response to the ledger.
+        for block in message.blocks {
+            let block = match block.deserialize().await {
+                Ok(block) => block,
+                Err(error) => {
+                    error!("Failed to deserialize block from '{peer_ip}': {error}");
+                    return false;
+                }
+            };
+
+            // Check that the next block is valid.
+            if let Err(error) = self.consensus.check_next_block(&block) {
+                trace!("[BlockResponse] {error}");
+                return true;
+            }
+
+            // Attempt to add the block to the ledger.
+            if let Err(error) = self.consensus.advance_to_next_block(&block) {
+                trace!("[BlockResponse] {error}");
+                return true;
+            }
+        }
+
+        true
+    }
+
     /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
     async fn puzzle_request(&self, peer_ip: SocketAddr, router: &Router<N>) -> bool {
         // Send the latest puzzle response, if it exists.

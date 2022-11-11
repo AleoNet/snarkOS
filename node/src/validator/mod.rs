@@ -21,7 +21,7 @@ use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_executor::{spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedSolution};
+use snarkos_node_messages::{BlockRequest, BlockResponse, Data, Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
 use snarkos_node_store::ConsensusDB;
