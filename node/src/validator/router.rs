@@ -93,7 +93,7 @@ impl<N: Network> Inbound<N> for Validator<N> {
     async fn pong(&self, _message: Pong, peer_ip: SocketAddr, router: &Router<N>) -> bool {
         // Spawn an asynchronous task for the `Ping` request.
         let router = router.clone();
-        let latest_height = self.ledger.latest_height();
+        let ledger = self.ledger.clone();
         spawn_task!(Self, {
             // Sleep for the preset time before sending a `Ping` request.
             tokio::time::sleep(Duration::from_secs(Router::<N>::PING_SLEEP_IN_SECS)).await;
@@ -103,7 +103,7 @@ impl<N: Network> Inbound<N> for Validator<N> {
                 version: Message::<N>::VERSION,
                 fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
                 node_type: Self::NODE_TYPE,
-                block_height: Some(latest_height),
+                block_height: Some(ledger.latest_height()),
                 status: Self::status().get(),
             });
             if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
@@ -127,7 +127,7 @@ impl<N: Network> Inbound<N> for Validator<N> {
     }
 
     /// Saves the latest epoch challenge and latest block in the node.
-    async fn puzzle_response(&self, message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
+    async fn puzzle_response(&self, message: PuzzleResponse<N>, peer_ip: SocketAddr, peer: &Peer<N>) -> bool {
         let epoch_challenge = message.epoch_challenge;
         match message.block.deserialize().await {
             Ok(block) => {
@@ -151,6 +151,8 @@ impl<N: Network> Inbound<N> for Validator<N> {
                     .write()
                     .await
                     .replace(PuzzleResponse { epoch_challenge, block: Data::Object(block) });
+                // Update the block height of the peer.
+                *peer.block_height.write().await = block_height;
 
                 trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
                 true

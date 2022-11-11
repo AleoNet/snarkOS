@@ -52,7 +52,7 @@ pub trait Inbound<N: Network>: Executor {
             Message::Ping(message) => Self::ping(message, peer_ip, peer).await,
             Message::Pong(message) => self.pong(message, peer_ip, router).await,
             Message::PuzzleRequest(..) => self.puzzle_request(peer_ip, router).await,
-            Message::PuzzleResponse(message) => self.puzzle_response(message, peer_ip).await,
+            Message::PuzzleResponse(message) => self.puzzle_response(message, peer_ip, peer).await,
             Message::UnconfirmedBlock(message) => {
                 // Clone the message.
                 let message_clone = message.clone();
@@ -333,7 +333,7 @@ pub trait Inbound<N: Network>: Executor {
         false
     }
 
-    async fn puzzle_response(&self, _message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
+    async fn puzzle_response(&self, _message: PuzzleResponse<N>, peer_ip: SocketAddr, _peer: &Peer<N>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }

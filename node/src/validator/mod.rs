@@ -32,7 +32,7 @@ use snarkos_node_messages::{
     UnconfirmedSolution,
 };
 use snarkos_node_rest::Rest;
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest, ALEO_MAXIMUM_FORK_DEPTH};
+use snarkos_node_router::{Handshake, Inbound, Outbound, Peer, Router, RouterRequest, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
 
@@ -352,7 +352,8 @@ impl<N: Network> Validator<N> {
                     // Sleep for 1 second.
                     tokio::time::sleep(Duration::from_secs(1)).await;
                 } else {
-                    // Sleep for 10 seconds.
+                    // Sleep for
+                    // 10 seconds.
                     tokio::time::sleep(Duration::from_secs(10)).await;
                 }
             }

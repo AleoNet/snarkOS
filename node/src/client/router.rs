@@ -22,7 +22,7 @@ impl<N: Network> Handshake for Client<N> {}
 #[async_trait]
 impl<N: Network> Inbound<N> for Client<N> {
     /// Saves the latest epoch challenge and latest block in the node.
-    async fn puzzle_response(&self, message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
+    async fn puzzle_response(&self, message: PuzzleResponse<N>, peer_ip: SocketAddr, peer: &Peer<N>) -> bool {
         let epoch_challenge = message.epoch_challenge;
         match message.block.deserialize().await {
             Ok(block) => {
@@ -41,6 +41,8 @@ impl<N: Network> Inbound<N> for Client<N> {
                 self.latest_epoch_challenge.write().await.replace(epoch_challenge);
                 // Save the latest block in the node.
                 self.latest_block.write().await.replace(block);
+                // Update the block height of the peer.
+                *peer.block_height.write().await = block_height;
 
                 trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
                 true
