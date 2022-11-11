@@ -62,7 +62,7 @@ fn test_load() {
     assert_eq!(ledger.latest_hash(), genesis.hash());
     assert_eq!(ledger.latest_height(), genesis.height());
     assert_eq!(ledger.latest_round(), genesis.round());
-    assert_eq!(ledger.latest_block().unwrap(), genesis);
+    assert_eq!(ledger.latest_block(), genesis);
 }
 
 #[test]
@@ -77,14 +77,14 @@ fn test_from() {
     assert_eq!(ledger.latest_hash(), genesis.hash());
     assert_eq!(ledger.latest_height(), genesis.height());
     assert_eq!(ledger.latest_round(), genesis.round());
-    assert_eq!(ledger.latest_block().unwrap(), genesis);
+    assert_eq!(ledger.latest_block(), genesis);
 
     // Initialize the ledger with the genesis block.
     let ledger = CurrentLedger::load(Some(genesis.clone()), None).unwrap();
     assert_eq!(ledger.latest_hash(), genesis.hash());
     assert_eq!(ledger.latest_height(), genesis.height());
     assert_eq!(ledger.latest_round(), genesis.round());
-    assert_eq!(ledger.latest_block().unwrap(), genesis);
+    assert_eq!(ledger.latest_block(), genesis);
 }
 
 #[test]

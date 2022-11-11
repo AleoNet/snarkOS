@@ -19,9 +19,9 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{Executor, NodeType};
-use snarkos_node_messages::PuzzleResponse;
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
-use snarkvm::prelude::{Address, Block, EpochChallenge, Network, PrivateKey, ViewKey};
+use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
+use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
+use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
 
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};
@@ -34,6 +34,8 @@ pub struct Client<N: Network> {
     account: Account<N>,
     /// The router of the node.
     router: Router<N>,
+    /// The coinbase puzzle.
+    coinbase_puzzle: CoinbasePuzzle<N>,
     /// The latest epoch challenge.
     latest_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
     /// The latest block.
@@ -47,10 +49,13 @@ impl<N: Network> Client<N> {
         let account = Account::from(private_key)?;
         // Initialize the node router.
         let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
+        // Load the coinbase puzzle.
+        let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
         let node = Self {
             account,
             router: router.clone(),
+            coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
         };

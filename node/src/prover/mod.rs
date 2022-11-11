@@ -21,7 +21,7 @@ use snarkos_account::Account;
 use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
-use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ViewKey};
+use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
 
 use anyhow::Result;
 use core::time::Duration;

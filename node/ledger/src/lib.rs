@@ -149,8 +149,8 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     }
 
     /// Returns the latest block.
-    pub fn latest_block(&self) -> Result<Block<N>> {
-        self.get_block(self.latest_height())
+    pub fn latest_block(&self) -> Block<N> {
+        self.current_block.read().clone()
     }
 
     /// Returns the latest block hash.
