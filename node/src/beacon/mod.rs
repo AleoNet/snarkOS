@@ -22,6 +22,8 @@ use snarkos_node_consensus::Consensus;
 use snarkos_node_executor::{spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_ledger::{Ledger, RecordMap};
 use snarkos_node_messages::{
+    BlockRequest,
+    BlockResponse,
     Data,
     Message,
     PuzzleResponse,
