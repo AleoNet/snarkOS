@@ -29,6 +29,7 @@ use snarkos_node_messages::{
     Ping,
     Pong,
     PuzzleResponse,
+    UnconfirmedBlock,
     UnconfirmedSolution,
 };
 use snarkos_node_rest::Rest;

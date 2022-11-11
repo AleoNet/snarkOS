@@ -164,6 +164,52 @@ impl<N: Network> Inbound<N> for Validator<N> {
         }
     }
 
+    /// Attempts to add the unconfirmed block to the ledger. If the block is valid, propagate it to the network.
+    async fn unconfirmed_block(
+        &self,
+        router: &Router<N>,
+        peer_ip: SocketAddr,
+        message: UnconfirmedBlock<N>,
+        block: Block<N>,
+    ) -> bool {
+        // Ensure the unconfirmed block is at least within 2 blocks of the latest block height,
+        // and no more that 2 blocks ahead of the latest block height.
+        // If it is stale, skip the routing of this unconfirmed block to the ledger.
+        let latest_block_height = self.ledger.latest_height();
+        let lower_bound = latest_block_height.saturating_sub(2);
+        let upper_bound = latest_block_height.saturating_add(2);
+        let is_within_range = block.height() >= lower_bound && block.height() <= upper_bound;
+
+        // Ensure the node is not peering or syncing.
+        let is_node_ready = !(Self::status().is_peering() || Self::status().is_syncing());
+
+        if !is_within_range || !is_node_ready {
+            trace!("Skipping 'UnconfirmedBlock {}' from {}", block.height(), peer_ip);
+            return true;
+        } else {
+            // Check that the next block is valid.
+            if let Err(error) = self.consensus.check_next_block(&block) {
+                trace!("[UnconfirmedBlock] {error}");
+                return true;
+            }
+
+            // Attempt to add the block to the ledger.
+            if let Err(error) = self.consensus.advance_to_next_block(&block) {
+                trace!("[UnconfirmedBlock] {error}");
+                return true;
+            }
+
+            info!("Ledger advanced to block {} ({})", block.height(), block.hash());
+        }
+
+        // Propagate the `UnconfirmedBlock`.
+        let request = RouterRequest::MessagePropagate(Message::UnconfirmedBlock(message), vec![peer_ip]);
+        if let Err(error) = router.process(request).await {
+            warn!("[UnconfirmedBlock] {error}");
+        }
+        true
+    }
+
     /// Propagates the unconfirmed solution to all connected beacons.
     async fn unconfirmed_solution(
         &self,
