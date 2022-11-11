@@ -19,15 +19,25 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_executor::{spawn_task_loop, Executor, NodeType, Status};
+use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::{BlockRequest, BlockResponse, Data, Message, PuzzleResponse, UnconfirmedSolution};
+use snarkos_node_messages::{
+    BlockRequest,
+    BlockResponse,
+    Data,
+    Message,
+    Ping,
+    Pong,
+    PuzzleResponse,
+    UnconfirmedSolution,
+};
 use snarkos_node_rest::Rest;
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
+use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
 
 use anyhow::{bail, ensure, Result};
+use core::time::Duration;
 use sha2::{Digest, Sha256};
 use std::{
     net::SocketAddr,
@@ -111,7 +121,7 @@ impl<N: Network> Validator<N> {
         // Initialize the signal handler.
         node.handle_signals();
         // Initialize the standard block sync.
-        node.initialize_block_sync().await;
+        node.initialize_block_sync(dev).await;
         // Return the node.
         Ok(node)
     }
@@ -255,7 +265,7 @@ impl<N: Network> Validator<N> {
                 // Attempt to add the block to the ledger.
                 self.consensus.advance_to_next_block(block)?;
 
-                trace!("Ledger advanced to block {} (block hash: {})", block.height(), block.hash());
+                trace!("Ledger advanced to block {} ({})", block.height(), block.hash());
             }
 
             // If the Ctrl-C handler registered the signal, stop the node once the current block is complete.
@@ -266,14 +276,22 @@ impl<N: Network> Validator<N> {
         }
     }
 
-    /// Perform a fast sync by downloading blocks.
-    async fn initialize_block_sync(&self) {
+    ///
+    /// Initialize the block synchronizer. This will request blocks from connected peers that have
+    /// a higher block height than the node's current block height.
+    ///
+    /// If the node is a non-development node, it will first perform a fast sync before attempting
+    /// to sync with peers.
+    ///
+    async fn initialize_block_sync(&self, dev: Option<u16>) {
         // Initialize the syncing protocol.
         let validator = self.clone();
         spawn_task_loop!(Self, {
-            // Perform the fast sync.
-            let _ = validator.initialize_block_fast_sync().await;
-            info!("Fast sync completed, switching to standard sync protocol.");
+            if dev.is_none() {
+                // Perform the fast sync.
+                let _ = validator.initialize_block_fast_sync().await;
+                info!("Fast sync completed, switching to standard sync protocol.");
+            }
 
             // Set the sync status to `Ready`.
             Self::status().update(Status::Ready);
@@ -302,6 +320,8 @@ impl<N: Network> Validator<N> {
 
                 // If a peer exists, check if the peer is ahead of the node.
                 if let Some((peer_ip, peer_block_height)) = peer {
+                    // TODO (raychu86): Upgrade to a more sophisticated sync protocol.
+
                     // If the peer has a greater height than the node, request blocks.
                     if latest_height < peer_block_height {
                         Self::status().update(Status::Syncing);
@@ -330,10 +350,10 @@ impl<N: Network> Validator<N> {
                 // Sleep depending on the sync status.
                 if Self::status().is_syncing() {
                     // Sleep for 1 second.
-                    tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                    tokio::time::sleep(Duration::from_secs(1)).await;
                 } else {
                     // Sleep for 10 seconds.
-                    tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+                    tokio::time::sleep(Duration::from_secs(10)).await;
                 }
             }
         });

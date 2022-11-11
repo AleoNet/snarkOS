@@ -49,41 +49,67 @@ impl<N: Network> Inbound<N> for Validator<N> {
                 return false;
             }
         };
-        let blocks = blocks.into_iter().map(Data::Object).collect();
 
-        // Send the `PuzzleResponse` message to the peer.
-        let message = Message::BlockResponse(BlockResponse { blocks });
-        if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
-            warn!("[BlockResponse] {}", error);
+        // Send the blocks to the peer.
+        for block in blocks {
+            // Send the `PuzzleResponse` message to the peer.
+            let message = Message::BlockResponse(BlockResponse { block: Data::Object(block) });
+            if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
+                warn!("[BlockResponse] {}", error);
+            }
         }
 
         true
     }
 
     async fn block_response(&self, message: BlockResponse<N>, peer_ip: SocketAddr, _router: &Router<N>) -> bool {
-        // Add the blocks from the block response to the ledger.
-        for block in message.blocks {
-            let block = match block.deserialize().await {
-                Ok(block) => block,
-                Err(error) => {
-                    error!("Failed to deserialize block from '{peer_ip}': {error}");
-                    return false;
-                }
-            };
-
-            // Check that the next block is valid.
-            if let Err(error) = self.consensus.check_next_block(&block) {
-                trace!("[BlockResponse] {error}");
-                return true;
+        // Deserialize the block.
+        let block = match message.block.deserialize().await {
+            Ok(block) => block,
+            Err(error) => {
+                error!("Failed to deserialize block from '{peer_ip}': {error}");
+                return false;
             }
+        };
 
-            // Attempt to add the block to the ledger.
-            if let Err(error) = self.consensus.advance_to_next_block(&block) {
-                trace!("[BlockResponse] {error}");
-                return true;
-            }
+        // Check that the next block is valid.
+        if let Err(error) = self.consensus.check_next_block(&block) {
+            trace!("[BlockResponse] {error}");
+            return true;
         }
 
+        // Attempt to add the block to the ledger.
+        if let Err(error) = self.consensus.advance_to_next_block(&block) {
+            trace!("[BlockResponse] {error}");
+            return true;
+        }
+
+        trace!("Ledger advanced to block {} ({})", block.height(), block.hash());
+
+        true
+    }
+
+    /// Send a ping message to the peer after `PING_SLEEP_IN_SECS` seconds.
+    async fn pong(&self, _message: Pong, peer_ip: SocketAddr, router: &Router<N>) -> bool {
+        // Spawn an asynchronous task for the `Ping` request.
+        let router = router.clone();
+        let latest_height = self.ledger.latest_height();
+        spawn_task!(Self, {
+            // Sleep for the preset time before sending a `Ping` request.
+            tokio::time::sleep(Duration::from_secs(Router::<N>::PING_SLEEP_IN_SECS)).await;
+
+            // Send a `Ping` request to the peer.
+            let message = Message::Ping(Ping {
+                version: Message::<N>::VERSION,
+                fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
+                node_type: Self::NODE_TYPE,
+                block_height: Some(latest_height),
+                status: Self::status().get(),
+            });
+            if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
+                warn!("[Ping] {error}");
+            }
+        });
         true
     }
 
