@@ -18,12 +18,12 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockResponse<N: Network> {
-    pub blocks: Data<Blocks<N>>,
+    pub blocks: Data<RequestedBlocks<N>>,
 }
 
 impl<N: Network> BlockResponse<N> {
     pub fn new(blocks: Vec<Block<N>>) -> Self {
-        Self { blocks: Data::Object(Blocks(blocks)) }
+        Self { blocks: Data::Object(RequestedBlocks(blocks)) }
     }
 }
 
@@ -47,11 +47,13 @@ impl<N: Network> MessageTrait for BlockResponse<N> {
     }
 }
 
+// TODO (raychu86): Add enforcement for maximum number of blocks.
+
 /// Wrapper struct around a vector of blocks.
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Blocks<N: Network>(pub Vec<Block<N>>);
+pub struct RequestedBlocks<N: Network>(pub Vec<Block<N>>);
 
-impl<N: Network> ToBytes for Blocks<N> {
+impl<N: Network> ToBytes for RequestedBlocks<N> {
     #[inline]
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         (self.0.len() as u32).write_le(&mut writer)?;
@@ -63,7 +65,7 @@ impl<N: Network> ToBytes for Blocks<N> {
     }
 }
 
-impl<N: Network> FromBytes for Blocks<N> {
+impl<N: Network> FromBytes for RequestedBlocks<N> {
     #[inline]
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let num_blocks = u32::read_le(&mut reader)? as usize;
