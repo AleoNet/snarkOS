@@ -59,6 +59,7 @@ impl<N: Network> Inbound<N> for Validator<N> {
         true
     }
 
+    /// Attempts to update the ledger with the received blocks.
     async fn block_response(&self, message: BlockResponse<N>, peer_ip: SocketAddr, _router: &Router<N>) -> bool {
         // Deserialize the block response.
         let blocks = match message.blocks.deserialize().await {
