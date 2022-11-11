@@ -19,6 +19,9 @@ edition = "2021"
 [dependencies.anyhow]
 version = "1"
 
+[dependencies.bincode]
+version = "1.0"
+
 [dependencies.async-trait]
 version = "0.1"
 
@@ -29,8 +32,15 @@ version = "0.12"
 version = "0.8"
 default-features = false
 
+[dependencies.reqwest]
+version = "0.11"
+
 [dependencies.serde_json]
 version = "1"
+
+[dependencies.sha2]
+version = "0.10"
+default-features = false
 
 [dependencies.snarkos-account]
 path = "../account"

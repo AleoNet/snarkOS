@@ -2299,9 +2299,12 @@ version = "2.0.2"
 dependencies = [
  "anyhow",
  "async-trait",
+ "bincode 1.3.3",
  "parking_lot",
  "rand",
+ "reqwest",
  "serde_json",
+ "sha2",
  "snarkos-account",
  "snarkos-node-consensus",
  "snarkos-node-executor",
