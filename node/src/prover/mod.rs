@@ -181,7 +181,7 @@ impl<N: Network> Prover<N> {
                             ) {
                                 Ok(proof) => proof,
                                 Err(error) => {
-                                    warn!("Failed to generate valid prover solution: {error}");
+                                    trace!("{error}");
                                     break;
                                 }
                             };
