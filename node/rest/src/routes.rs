@@ -113,6 +113,12 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and(with(self.router.clone()))
             .and_then(Self::get_peers_all);
 
+        // GET /testnet3/peers/all/metrics
+        let get_peers_all_metrics = warp::get()
+            .and(warp::path!("testnet3" / "peers" / "all" / "metrics"))
+            .and(with(self.router.clone()))
+            .and_then(Self::get_peers_all_metrics);
+
         // GET /testnet3/node/address
         let get_node_address = warp::get()
             .and(warp::path!("testnet3" / "node" / "address"))
@@ -203,6 +209,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .or(get_beacons)
             .or(get_peers_count)
             .or(get_peers_all)
+            .or(get_peers_all_metrics)
             .or(get_node_address)
             .or(find_block_hash)
             .or(find_deployment_id)
@@ -315,6 +322,11 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     /// Returns the peers connected to the node.
     async fn get_peers_all(router: Router<N>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&router.connected_peers().await))
+    }
+
+    /// Returns the metrics for peers connected to the node.
+    async fn get_peers_all_metrics(router: Router<N>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&router.connected_metrics().await))
     }
 
     /// Returns the block hash that contains the given `transaction ID`.

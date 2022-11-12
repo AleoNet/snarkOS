@@ -226,6 +226,15 @@ impl<N: Network> Router<N> {
         &self.trusted_peers
     }
 
+    /// Returns the list of metrics for the connected peers.
+    pub async fn connected_metrics(&self) -> Vec<(SocketAddr, NodeType)> {
+        let mut connected_metrics = Vec::new();
+        for (ip, peer) in self.connected_peers.read().await.iter() {
+            connected_metrics.push((*ip, peer.node_type().await));
+        }
+        connected_metrics
+    }
+
     /// Returns the list of connected peers.
     pub async fn connected_peers(&self) -> Vec<SocketAddr> {
         self.connected_peers.read().await.keys().copied().collect()
