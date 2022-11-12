@@ -2359,6 +2359,7 @@ dependencies = [
  "once_cell",
  "parking_lot",
  "rand",
+ "rayon",
  "snarkos-node-store",
  "snarkvm",
  "tracing",
