@@ -66,11 +66,7 @@ impl<N: Network> Inbound<N> for Client<N> {
             self.latest_block.read().await.as_ref().map(|block| block.proof_target()),
         ) {
             // Ensure that the prover solution is valid for the given epoch.
-            match solution.verify(
-                self.coinbase_puzzle.coinbase_verifying_key().unwrap(),
-                &epoch_challenge,
-                proof_target,
-            ) {
+            match solution.verify(self.coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target) {
                 Ok(true) => {
                     // Propagate the `UnconfirmedSolution` to connected beacons.
                     let message = Message::UnconfirmedSolution(message);
