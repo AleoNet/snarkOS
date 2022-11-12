@@ -134,7 +134,10 @@ pub trait Handshake: Executor {
                             }
                         }
                         // TODO (howardwu): Remove this after Phase 2.
-                        if node_type.is_beacon() && peer_ip.ip().to_string() != "159.65.195.225" {
+                        if Self::node_type().is_validator()
+                            && node_type.is_beacon()
+                            && peer_ip.ip().to_string() != "159.65.195.225"
+                        {
                             // Send the disconnect message.
                             outbound_socket
                                 .send(Message::Disconnect(DisconnectReason::ProtocolViolation.into()))
