@@ -20,7 +20,7 @@ use snarkos_node_messages::*;
 use snarkvm::prelude::{Block, Network, ProverSolution, Transaction};
 
 use core::time::Duration;
-use std::{net::SocketAddr, time::SystemTime};
+use std::{net::SocketAddr, sync::atomic::Ordering, time::SystemTime};
 
 #[async_trait]
 pub trait Inbound<N: Network>: Executor {
@@ -48,7 +48,21 @@ pub trait Inbound<N: Network>: Executor {
             Message::PeerResponse(message) => Self::peer_response(message, router).await,
             Message::Ping(message) => Self::ping(message, peer_ip, peer).await,
             Message::Pong(message) => Self::pong(message, peer_ip, router).await,
-            Message::PuzzleRequest(..) => self.puzzle_request(peer_ip, router).await,
+            Message::PuzzleRequest(..) => {
+                // Retrieve the number of puzzle requests in this interval.
+                let num_requests = router.seen_inbound_puzzle_requests.write().await.entry(peer_ip).or_default().clone();
+                // Check if the number of puzzle requests is within the limit.
+                if num_requests.load(Ordering::SeqCst) < Router::<N>::MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL {
+                    // Increment the number of puzzle requests.
+                    num_requests.fetch_add(1, Ordering::SeqCst);
+                    // Process the puzzle request.
+                    self.puzzle_request(peer_ip, router).await
+                } else {
+                    // Peer is not following the protocol.
+                    warn!("Peer {peer_ip} is not following the protocol");
+                    false
+                }
+            },
             Message::PuzzleResponse(message) => self.puzzle_response(message, peer_ip).await,
             Message::UnconfirmedBlock(message) => {
                 // Clone the message.
