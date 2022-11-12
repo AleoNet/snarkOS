@@ -341,7 +341,7 @@ impl<N: Network> Beacon<N> {
                     if let Some(transaction) = beacon_transaction {
                         // Save the unspent records.
                         if let Err(error) = transaction.into_transitions().try_for_each(|transition| {
-                            for (commitment, record) in transition.into_output_records() {
+                            for (commitment, record) in transition.into_records() {
                                 let record = record.decrypt(beacon.account.view_key())?;
                                 if !record.gates().is_zero() {
                                     beacon.unspent_records.write().insert(commitment, record);

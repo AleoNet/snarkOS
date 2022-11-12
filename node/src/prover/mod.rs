@@ -70,12 +70,10 @@ impl<N: Network> Prover<N> {
         };
         // Initialize the router handler.
         router.initialize_handler(node.clone(), router_receiver).await;
-        // Initialize the coinbase puzzle.
-        node.initialize_coinbase_puzzle().await;
-        // Initialize the coinbase puzzle.
-        node.initialize_coinbase_puzzle().await;
-        // Initialize the coinbase puzzle.
-        node.initialize_coinbase_puzzle().await;
+        for _ in 0..3 {
+            // Initialize the coinbase puzzle.
+            node.initialize_coinbase_puzzle().await;
+        }
         // Initialize the signal handler.
         node.handle_signals();
         // Return the node.
@@ -144,26 +142,26 @@ impl<N: Network> Prover<N> {
                     }
                 }
 
-                // Read the latest epoch challenge.
-                let latest_epoch_challenge = prover.latest_epoch_challenge.read().await.clone();
-                // Read the latest block.
-                let latest_block = prover.latest_block.read().await.clone();
+                let prover = prover.clone();
+                spawn_task!(Self, {
+                    // Set the status to `Proving`.
+                    Self::status().update(Status::Proving);
+                    // Increment the number of puzzle instances.
+                    prover.puzzle_instances.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
 
-                // If the latest epoch challenge and latest block exists, then generate a prover solution.
-                if let (Some(epoch_challenge), Some(block)) = (latest_epoch_challenge, latest_block) {
-                    let prover = prover.clone();
-                    spawn_task!(Self, {
-                        // Set the status to `Proving`.
-                        Self::status().update(Status::Proving);
-                        // Increment the number of puzzle instances.
-                        prover.puzzle_instances.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+                    loop {
+                        // Read the latest epoch challenge.
+                        let latest_epoch_challenge = prover.latest_epoch_challenge.read().await.clone();
+                        // Read the latest block.
+                        let latest_block = prover.latest_block.read().await.clone();
 
-                        // Retrieve the latest coinbase target.
-                        let latest_coinbase_target = block.coinbase_target();
-                        // Retrieve the latest proof target.
-                        let latest_proof_target = block.proof_target();
+                        // If the latest epoch challenge and latest block exists, then generate a prover solution.
+                        if let (Some(epoch_challenge), Some(block)) = (latest_epoch_challenge, latest_block) {
+                            // Retrieve the latest coinbase target.
+                            let latest_coinbase_target = block.coinbase_target();
+                            // Retrieve the latest proof target.
+                            let latest_proof_target = block.proof_target();
 
-                        loop {
                             debug!(
                                 "Proving 'CoinbasePuzzle' (Epoch {}, Block {}, Coinbase Target {}, Proof Target {})",
                                 epoch_challenge.epoch_number(),
@@ -216,18 +214,18 @@ impl<N: Network> Prover<N> {
                                     "Prover solution was below the necessary proof target ({prover_solution_target} < {latest_proof_target})"
                                 ),
                             }
+                        } else {
+                            tokio::time::sleep(Duration::from_secs(1)).await;
                         }
+                    }
 
-                        // Set the status to `Ready`.
-                        Self::status().update(Status::Ready);
-                        // Decrement the number of puzzle instances.
-                        prover.puzzle_instances.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
-                        // Sleep briefly to give this instance a chance to clear state.
-                        tokio::time::sleep(Duration::from_millis(50)).await;
-                    });
-                } else {
-                    tokio::time::sleep(Duration::from_secs(1)).await;
-                }
+                    // Set the status to `Ready`.
+                    Self::status().update(Status::Ready);
+                    // Decrement the number of puzzle instances.
+                    prover.puzzle_instances.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
+                    // Sleep briefly to give this instance a chance to clear state.
+                    tokio::time::sleep(Duration::from_millis(50)).await;
+                });
             }
         });
     }
