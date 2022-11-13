@@ -65,6 +65,20 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and(with(self.ledger.clone()))
             .and_then(Self::get_blocks);
 
+        // GET /testnet3/block/{blockHash}
+        let get_block_by_hash = warp::get()
+            .and(warp::path!("testnet3" / "block" / ..))
+            .and(warp::path::param::<N::BlockHash>())
+            .and(with(self.ledger.clone()))
+            .and_then(Self::get_block_by_hash);
+
+        // GET /testnet3/height/{blockHash}
+        let get_block_height_by_hash = warp::get()
+            .and(warp::path!("testnet3" / "height" / ..))
+            .and(warp::path::param::<N::BlockHash>())
+            .and(with(self.ledger.clone()))
+            .and_then(Self::get_block_height_by_hash);
+
         // GET /testnet3/block/{height}/transactions
         let get_block_transactions = warp::get()
             .and(warp::path!("testnet3" / "block" / u32 / "transactions"))
@@ -209,6 +223,8 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .or(latest_state_root)
             .or(get_block)
             .or(get_blocks)
+            .or(get_block_by_hash)
+            .or(get_block_height_by_hash)
             .or(get_block_transactions)
             .or(get_transaction)
             .or(get_memory_pool_transactions)
@@ -280,6 +296,16 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .collect::<Result<Vec<_>, _>>()?;
 
         Ok(reply::json(&blocks))
+    }
+
+    /// Returns the block for the given block hash.
+    async fn get_block_by_hash(hash: N::BlockHash, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.get_block_by_hash(&hash).or_reject()?))
+    }
+
+    /// Returns the block height for the given block hash.
+    async fn get_block_height_by_hash(hash: N::BlockHash, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.get_height(&hash).or_reject()?))
     }
 
     /// Returns the transactions for the given block height.
