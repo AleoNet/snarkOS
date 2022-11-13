@@ -58,6 +58,13 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and(with(self.ledger.clone()))
             .and_then(Self::get_block);
 
+        // GET /testnet3/block/{blockHash}
+        let get_block_by_hash = warp::get()
+            .and(warp::path!("testnet3" / "block" / ..))
+            .and(warp::path::param::<N::BlockHash>())
+            .and(with(self.ledger.clone()))
+            .and_then(Self::get_block_by_hash);
+
         // GET /testnet3/blocks?start={start_height}&end={end_height}
         let get_blocks = warp::get()
             .and(warp::path!("testnet3" / "blocks"))
@@ -208,6 +215,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .or(latest_block)
             .or(latest_state_root)
             .or(get_block)
+            .or(get_block_by_hash)
             .or(get_blocks)
             .or(get_block_transactions)
             .or(get_transaction)
@@ -254,6 +262,11 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     /// Returns the block for the given block height.
     async fn get_block(height: u32, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.get_block(height).or_reject()?))
+    }
+
+    /// Returns the block for the given block hash.
+    async fn get_block_by_hash(hash: N::BlockHash, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.get_block_by_hash(&hash).or_reject()?))
     }
 
     /// Returns the blocks for the given block range.

@@ -53,6 +53,15 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         }
     }
 
+    /// Returns the block for the given block hash.
+    pub fn get_block_by_hash(&self, block_hash: &N::BlockHash) -> Result<Block<N>> {
+        // Retrieve the block.
+        match self.vm.block_store().get_block(block_hash)? {
+            Some(block) => Ok(block),
+            None => bail!("Block '{block_hash}' does not exist in storage"),
+        }
+    }
+
     /// Returns the block hash for the given block height.
     pub fn get_hash(&self, height: u32) -> Result<N::BlockHash> {
         match self.vm.block_store().get_block_hash(height)? {
