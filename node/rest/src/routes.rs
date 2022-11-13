@@ -46,6 +46,12 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and(with(self.ledger.clone()))
             .and_then(Self::latest_block);
 
+        // GET /testnet3/latest/stateRoot
+        let latest_state_root = warp::get()
+            .and(warp::path!("testnet3" / "latest" / "stateRoot"))
+            .and(with(self.ledger.clone()))
+            .and_then(Self::latest_state_root);
+
         // GET /testnet3/block/{height}
         let get_block = warp::get()
             .and(warp::path!("testnet3" / "block" / u32))
@@ -192,6 +198,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and(warp::path!("testnet3" / "transaction" / "broadcast"))
             .and(warp::body::content_length_limit(10 * 1024 * 1024))
             .and(warp::body::json())
+            .and(with(self.consensus.clone()))
             .and(with(self.router.clone()))
             .and_then(Self::transaction_broadcast);
 
@@ -199,6 +206,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         latest_height
             .or(latest_hash)
             .or(latest_block)
+            .or(latest_state_root)
             .or(get_block)
             .or(get_blocks)
             .or(get_block_transactions)
@@ -236,6 +244,11 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     /// Returns the latest block.
     async fn latest_block(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.latest_block()))
+    }
+
+    /// Returns the latest state root.
+    async fn latest_state_root(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.latest_state_root()))
     }
 
     /// Returns the block for the given block height.
@@ -377,7 +390,17 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     }
 
     /// Broadcasts the transaction to the ledger.
-    async fn transaction_broadcast(transaction: Transaction<N>, router: Router<N>) -> Result<impl Reply, Rejection> {
+    async fn transaction_broadcast(
+        transaction: Transaction<N>,
+        consensus: Option<Consensus<N, C>>,
+        router: Router<N>,
+    ) -> Result<impl Reply, Rejection> {
+        // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
+        if let Some(consensus) = consensus {
+            // Add the unconfirmed transaction to the memory pool.
+            consensus.add_unconfirmed_transaction(transaction.clone()).or_reject()?;
+        }
+
         // Broadcast the transaction.
         let message = Message::UnconfirmedTransaction(UnconfirmedTransaction {
             transaction_id: transaction.id(),
