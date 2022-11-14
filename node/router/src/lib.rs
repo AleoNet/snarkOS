@@ -768,7 +768,12 @@ impl<N: Network> Router<N> {
                             break;
                         }
 
-                        executor_clone.outbound(&peer, message, &router, &mut outbound_socket).await
+                        let is_disconnect = matches!(message, Message::Disconnect(..));
+                        executor_clone.outbound(&peer, message, &router, &mut outbound_socket).await;
+
+                        if is_disconnect {
+                            break;
+                        }
                     },
                     result = outbound_socket.next() => match result {
                         // Received a message from the peer.
