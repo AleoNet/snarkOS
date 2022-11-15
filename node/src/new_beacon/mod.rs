@@ -19,7 +19,6 @@ use router::Router;
 
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_executor::NodeType;
 use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::Message;
 use snarkos_node_network::Network;
@@ -29,9 +28,7 @@ use snarkvm::prelude::{Block, Network as CurrentNetwork, PrivateKey};
 
 use anyhow::Result;
 use core::time::Duration;
-use parking_lot::RwLock;
 use std::{
-    collections::HashMap,
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, AtomicU64},
@@ -116,7 +113,6 @@ impl<N: CurrentNetwork> Beacon<N> {
 
 /* Network traits */
 
-use snarkos_node_executor::RawStatus;
 // use snarkos_node_messages::{MessageOrBytes, NoiseCodec, NoiseState, PeerRequest};
 use snarkos_node_messages::{MessageCodec, PeerRequest};
 use snarkos_node_network::{
@@ -126,10 +122,7 @@ use snarkos_node_network::{
     P2P,
 };
 
-use std::{
-    io,
-    time::{Instant, SystemTime},
-};
+use std::io;
 
 use rand::{
     prelude::{IteratorRandom, SliceRandom},
@@ -196,7 +189,7 @@ impl<N: CurrentNetwork> Beacon<N> {
         }
 
         // Ensure the trusted peers are connected.
-        for trusted_peer_addr in self.router().trusted_peers().into_iter() {
+        for trusted_peer_addr in self.router().trusted_peers().iter() {
             if !self.network().is_connected(*trusted_peer_addr) {
                 info!("Connecting to 'trusted peer' {trusted_peer_addr}");
 
@@ -232,39 +225,9 @@ impl<N: CurrentNetwork> Beacon<N> {
     }
 }
 
-// #[derive(Debug, Clone)]
-// struct ConnectionMeta {
-//     side: ConnectionSide,
-//     noise_state: NoiseState,
-//
-//     // TODO(nkls): potentially split this out.
-//     // Peer Meta:
-//     version: u32,
-//     node_type: NodeType,
-//     status: RawStatus,
-//     block_height: Arc<RwLock<u32>>,  // TODO(nkls): this could probably be an atomic.
-//     last_seen: Arc<RwLock<Instant>>, // TODO(nkls): consider the time crate here.
-//     seen_messages: Arc<RwLock<HashMap<(u16, u32), SystemTime>>>,
-// }
-//
-// impl ConnectionMeta {
-//     fn new(side: ConnectionSide, noise_state: NoiseState, version: u32, node_type: NodeType) -> Self {
-//         Self {
-//             side,
-//             noise_state,
-//             version,
-//             node_type,
-//             status: RawStatus::new(),
-//             block_height: Arc::new(RwLock::new(0)),
-//             last_seen: Arc::new(RwLock::new(Instant::now())),
-//             seen_messages: Default::default(),
-//         }
-//     }
-// }
-
 impl<N: CurrentNetwork> P2P for Beacon<N> {
     fn network(&self) -> &Network {
-        &self.router().network()
+        self.router().network()
     }
 }
 
