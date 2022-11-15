@@ -842,14 +842,8 @@ impl<N: Network> Router<N> {
         let target_peer = self.connected_peers.read().await.get(&peer_ip).cloned();
         match target_peer {
             Some(peer) => {
-                let mut disconnecting = matches!(message, Message::Disconnect(..));
-
                 if let Err(error) = peer.send(message).await {
                     trace!("Failed to send message to '{peer_ip}': {error}");
-                    disconnecting = true;
-                }
-
-                if disconnecting {
                     self.connected_peers.write().await.remove(&peer_ip);
                 }
             }
