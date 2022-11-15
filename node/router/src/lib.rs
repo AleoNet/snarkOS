@@ -770,9 +770,13 @@ impl<N: Network> Router<N> {
                             break;
                         }
 
+                        // Determine if this is a disconnect message.
                         let is_disconnect = matches!(message, Message::Disconnect(..));
+
+                        // Handle the outbound message.
                         executor_clone.outbound(&peer, message, &router, &mut outbound_socket).await;
 
+                        // If this was a disconnect message, end this connection.
                         if is_disconnect {
                             break;
                         }
