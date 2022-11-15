@@ -404,13 +404,22 @@ fn test_proof_target() {
 
     for _ in 0..100 {
         // Generate a prover solution.
-        let prover_solution = consensus.coinbase_puzzle.prove(&epoch_challenge, address, rng.gen()).unwrap();
+        let prover_solution = consensus.coinbase_puzzle.prove(&epoch_challenge, address, rng.gen(), None).unwrap();
 
         // Check that the prover solution meets the proof target requirement.
         if prover_solution.to_target().unwrap() >= proof_target {
             assert!(consensus.add_unconfirmed_solution(&prover_solution).is_ok())
         } else {
             assert!(consensus.add_unconfirmed_solution(&prover_solution).is_err())
+        }
+
+        // Generate a prover solution with a minimum proof target.
+        let prover_solution = consensus.coinbase_puzzle.prove(&epoch_challenge, address, rng.gen(), Some(proof_target));
+
+        // Check that the prover solution meets the proof target requirement.
+        if let Ok(prover_solution) = prover_solution {
+            assert!(prover_solution.to_target().unwrap() >= proof_target);
+            assert!(consensus.add_unconfirmed_solution(&prover_solution).is_ok())
         }
     }
 }
@@ -442,7 +451,12 @@ fn test_coinbase_target() {
 
     while cumulative_target < consensus.ledger.latest_coinbase_target() as u128 {
         // Generate a prover solution.
-        let prover_solution = match consensus.coinbase_puzzle.prove(&epoch_challenge, address, rng.gen()) {
+        let prover_solution = match consensus.coinbase_puzzle.prove(
+            &epoch_challenge,
+            address,
+            rng.gen(),
+            Some(consensus.ledger.latest_proof_target()),
+        ) {
             Ok(prover_solution) => prover_solution,
             Err(_) => continue,
         };
