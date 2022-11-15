@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::new_beacon::{router::ConnectionMeta, Beacon};
+use crate::new_beacon::{router::PeerMeta, Beacon};
 use snarkos_node_executor::{NodeType, RawStatus, Status};
 use snarkos_node_messages::{
     ChallengeRequest,
@@ -196,8 +196,8 @@ impl<N: CurrentNetwork> Handshaking for Beacon<N> {
         let peer_type = challenge_request.node_type;
         let peer_status = RawStatus::from_status(challenge_request.status);
 
-        let meta = ConnectionMeta::new(peer_side, peer_listener, peer_version, peer_type, peer_status);
-        self.router().insert_connection(peer_addr, meta);
+        let meta = PeerMeta::new(peer_side, peer_listener, peer_version, peer_type, peer_status);
+        self.router().insert_peer(peer_addr, meta);
 
         Ok(conn)
     }

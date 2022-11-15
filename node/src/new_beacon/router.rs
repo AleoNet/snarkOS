@@ -28,8 +28,8 @@ use time::OffsetDateTime;
 #[derive(Clone)]
 pub struct Router {
     network: Network,
-    /// The map of connection address to connection metadata.
-    connection_meta: Arc<RwLock<HashMap<SocketAddr, ConnectionMeta>>>,
+    /// The map of connection address to peer metadata.
+    current_peers: Arc<RwLock<HashMap<SocketAddr, PeerMeta>>>,
     /// The set of trusted peer listening addresses.
     trusted_peers: Arc<HashSet<SocketAddr>>,
     /// The set of candidate peer listening addresses.
@@ -42,7 +42,7 @@ impl Router {
     pub async fn new() -> Self {
         Self {
             network: Network::new(Default::default()).await.unwrap(),
-            connection_meta: Default::default(),
+            current_peers: Default::default(),
             trusted_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
@@ -53,12 +53,12 @@ impl Router {
         &self.network
     }
 
-    pub fn insert_connection(&self, addr: SocketAddr, meta: ConnectionMeta) {
-        self.connection_meta.write().insert(addr, meta);
+    pub fn insert_peer(&self, addr: SocketAddr, meta: PeerMeta) {
+        self.current_peers.write().insert(addr, meta);
     }
 
-    pub fn remove_connection(&self, addr: SocketAddr) {
-        self.connection_meta.write().remove(&addr);
+    pub fn remove_peer(&self, addr: SocketAddr) {
+        self.current_peers.write().remove(&addr);
     }
 
     pub fn trusted_peers(&self) -> &HashSet<SocketAddr> {
@@ -86,7 +86,7 @@ impl Router {
     }
 
     pub fn connected_beacons(&self) -> Vec<SocketAddr> {
-        self.connection_meta
+        self.current_peers
             .read()
             .iter()
             .filter(|(_addr, meta)| meta.node_type == NodeType::Beacon)
@@ -99,12 +99,9 @@ impl Router {
 // TODO(nkls): split into separate module
 
 #[derive(Debug, Clone)]
-pub struct ConnectionMeta {
+pub struct PeerMeta {
     side: ConnectionSide,
     listening_addr: SocketAddr,
-
-    // TODO(nkls): potentially split this out.
-    // Peer Meta:
     version: u32,
     node_type: NodeType,
     status: RawStatus,
@@ -113,7 +110,7 @@ pub struct ConnectionMeta {
     seen_messages: Arc<RwLock<HashMap<(u16, u32), OffsetDateTime>>>,
 }
 
-impl ConnectionMeta {
+impl PeerMeta {
     pub fn new(
         side: ConnectionSide,
         listening_addr: SocketAddr,
