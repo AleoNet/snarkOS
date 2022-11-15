@@ -152,7 +152,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and_then(Self::find_transition_id);
 
         // GET /testnet3/records/all
-        let records_all = warp::get()
+        let records_all = warp::post()
             .and(warp::path!("testnet3" / "records" / "all"))
             .and(with_auth())
             .untuple_one()
@@ -162,7 +162,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and_then(Self::records_all);
 
         // GET /testnet3/records/spent
-        let records_spent = warp::get()
+        let records_spent = warp::post()
             .and(warp::path!("testnet3" / "records" / "spent"))
             .and(with_auth())
             .untuple_one()
@@ -172,7 +172,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and_then(Self::records_spent);
 
         // GET /testnet3/records/unspent
-        let records_unspent = warp::get()
+        let records_unspent = warp::post()
             .and(warp::path!("testnet3" / "records" / "unspent"))
             .and(with_auth())
             .untuple_one()
