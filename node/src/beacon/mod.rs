@@ -287,7 +287,7 @@ impl<N: Network> Beacon<N> {
                 let transaction = Transaction::execute(
                     beacon.ledger.vm(),
                     beacon.account.private_key(),
-                    &ProgramID::from_str("credits.aleo")?,
+                    ProgramID::from_str("credits.aleo")?,
                     Identifier::from_str("transfer")?,
                     inputs.iter(),
                     None,

@@ -277,7 +277,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         Transaction::execute(
             &self.vm,
             private_key,
-            &ProgramID::from_str("credits.aleo")?,
+            ProgramID::from_str("credits.aleo")?,
             Identifier::from_str("transfer")?,
             inputs.iter(),
             None,
