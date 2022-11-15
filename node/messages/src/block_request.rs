@@ -18,7 +18,9 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockRequest {
+    /// The starting block height (inclusive).
     pub start_block_height: u32,
+    /// The ending block height (inclusive).
     pub end_block_height: u32,
 }
 

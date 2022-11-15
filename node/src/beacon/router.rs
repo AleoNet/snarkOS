@@ -24,6 +24,65 @@ impl<N: Network> Handshake for Beacon<N> {
 
 #[async_trait]
 impl<N: Network> Inbound<N> for Beacon<N> {
+    /// Retrieves the blocks within the block request range, and returns the block response to the peer.
+    async fn block_request(&self, message: BlockRequest, peer_ip: SocketAddr, router: &Router<N>) -> bool {
+        // Ensure the block request is well formed.
+        if message.start_block_height > message.end_block_height {
+            debug!("Invalid BlockRequest received from '{peer_ip}' - start height is greater than end height");
+            return false;
+        }
+
+        // Ensure that the block request is within the proper bounds.
+        if message.end_block_height - message.start_block_height > Self::MAXIMUM_BLOCK_REQUEST {
+            debug!("Invalid BlockRequest received from '{peer_ip}' - exceeds maximum block request");
+            return false;
+        }
+
+        // Retrieve the requested blocks.
+        let blocks = match self.ledger.get_blocks(message.start_block_height, message.end_block_height) {
+            Ok(blocks) => blocks,
+            Err(error) => {
+                error!(
+                    "Failed to retrieve blocks {} to {} from the ledger: {error}",
+                    message.start_block_height, message.end_block_height
+                );
+                return false;
+            }
+        };
+
+        // Send the `BlockResponse` message to the peer.
+        let message = Message::BlockResponse(BlockResponse::new(blocks));
+        if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
+            warn!("[BlockResponse] {}", error);
+        }
+
+        true
+    }
+
+    /// Send a ping message to the peer after `PING_SLEEP_IN_SECS` seconds.
+    async fn pong(&self, _message: Pong, peer_ip: SocketAddr, router: &Router<N>) -> bool {
+        // Spawn an asynchronous task for the `Ping` request.
+        let router = router.clone();
+        let ledger = self.ledger.clone();
+        spawn_task!(Self, {
+            // Sleep for the preset time before sending a `Ping` request.
+            tokio::time::sleep(Duration::from_secs(Router::<N>::PING_SLEEP_IN_SECS)).await;
+
+            // Send a `Ping` request to the peer.
+            let message = Message::Ping(Ping {
+                version: Message::<N>::VERSION,
+                fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
+                node_type: Self::NODE_TYPE,
+                block_height: Some(ledger.latest_height()),
+                status: Self::status().get(),
+            });
+            if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
+                warn!("[Ping] {error}");
+            }
+        });
+        true
+    }
+
     /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
     async fn puzzle_request(&self, peer_ip: SocketAddr, router: &Router<N>) -> bool {
         // Retrieve the latest epoch challenge and latest block.

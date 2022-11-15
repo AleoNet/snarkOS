@@ -55,7 +55,7 @@ use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
 // TODO (raychu86): Move this declaration.
-const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
+pub const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 /// Shorthand for the parent half of the `Router` channel.
 pub type RouterSender<N> = mpsc::Sender<RouterRequest<N>>;
@@ -142,7 +142,7 @@ impl<N: Network> Router<N> {
     /// The maximum number of connection failures permitted by an inbound connecting peer.
     const MAXIMUM_CONNECTION_FAILURES: u32 = 3;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 60; // 1 minute
+    pub const PING_SLEEP_IN_SECS: u64 = 60; // 1 minute
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
@@ -281,6 +281,16 @@ impl<N: Network> Router<N> {
     /// Returns the number of restricted peers.
     pub async fn number_of_restricted_peers(&self) -> usize {
         self.restricted_peers.read().await.len()
+    }
+
+    /// Returns the list of connected peers and their block heights.
+    pub async fn connected_peer_block_heights(&self) -> IndexMap<SocketAddr, u32> {
+        let mut peer_block_heights = IndexMap::new();
+        for (ip, peer) in self.connected_peers.read().await.iter() {
+            peer_block_heights.insert(*ip, *peer.block_height.read().await);
+        }
+
+        peer_block_heights
     }
 
     /// Sends a "PuzzleRequest" to a reliable peer.

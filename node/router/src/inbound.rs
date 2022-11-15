@@ -24,6 +24,9 @@ use std::{net::SocketAddr, sync::atomic::Ordering, time::SystemTime};
 
 #[async_trait]
 pub trait Inbound<N: Network>: Executor {
+    /// The maximum number of blocks that can be requested per `BlockRequest`.
+    const MAXIMUM_BLOCK_REQUEST: u32 = 10;
+
     /// Handles the receiving of a message from a peer. Upon success, returns `true`.
     #[rustfmt::skip]
     async fn inbound(&self, peer: &Peer<N>, message: Message<N>, router: &Router<N>) -> bool {
@@ -33,8 +36,8 @@ pub trait Inbound<N: Network>: Executor {
         // Process the message.
         trace!("Received '{}' from '{peer_ip}'", message.name());
         match message {
-            Message::BlockRequest(message) => Self::block_request(message, peer_ip).await,
-            Message::BlockResponse(message) => Self::block_response(message, peer_ip).await,
+            Message::BlockRequest(message) => self.block_request(message, peer_ip, router).await,
+            Message::BlockResponse(message) => self.block_response(message, peer_ip, router).await,
             Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => {
                 // Peer is not following the protocol.
                 warn!("Peer {peer_ip} is not following the protocol");
@@ -47,7 +50,7 @@ pub trait Inbound<N: Network>: Executor {
             Message::PeerRequest(..) => Self::peer_request(peer_ip, router).await,
             Message::PeerResponse(message) => Self::peer_response(message, router).await,
             Message::Ping(message) => Self::ping(message, peer_ip, peer).await,
-            Message::Pong(message) => Self::pong(message, peer_ip, router).await,
+            Message::Pong(message) => self.pong(message, peer_ip, router).await,
             Message::PuzzleRequest(..) => {
                 // Retrieve the number of puzzle requests in this interval.
                 let num_requests = router.seen_inbound_puzzle_requests.write().await.entry(peer_ip).or_default().clone();
@@ -63,7 +66,7 @@ pub trait Inbound<N: Network>: Executor {
                     false
                 }
             },
-            Message::PuzzleResponse(message) => self.puzzle_response(message, peer_ip).await,
+            Message::PuzzleResponse(message) => self.puzzle_response(message, peer_ip, peer).await,
             Message::UnconfirmedBlock(message) => {
                 // Clone the message.
                 let message_clone = message.clone();
@@ -181,7 +184,7 @@ pub trait Inbound<N: Network>: Executor {
         }
     }
 
-    async fn block_request(_message: BlockRequest, peer_ip: SocketAddr) -> bool {
+    async fn block_request(&self, _message: BlockRequest, peer_ip: SocketAddr, _router: &Router<N>) -> bool {
         // // Ensure the request is within the accepted limits.
         // let number_of_blocks = end_block_height.saturating_sub(start_block_height);
         // if number_of_blocks > Router::<N>::MAXIMUM_BLOCK_REQUEST {
@@ -215,7 +218,7 @@ pub trait Inbound<N: Network>: Executor {
         false
     }
 
-    async fn block_response(_message: BlockResponse<N>, peer_ip: SocketAddr) -> bool {
+    async fn block_response(&self, _message: BlockResponse<N>, peer_ip: SocketAddr, _router: &Router<N>) -> bool {
         // // Perform the deferred non-blocking deserialization of the block.
         // match block.deserialize().await {
         //     Ok(block) => {
@@ -283,6 +286,10 @@ pub trait Inbound<N: Network>: Executor {
         *peer.version.write().await = message.version;
         // Update the node type of the peer.
         *peer.node_type.write().await = message.node_type;
+        // Update the block height of the peer.
+        if let Some(height) = message.block_height {
+            *peer.block_height.write().await = height;
+        }
         // Update the status of the peer.
         *peer.status.write().await = message.status;
 
@@ -300,7 +307,7 @@ pub trait Inbound<N: Network>: Executor {
         true
     }
 
-    async fn pong(_message: Pong, peer_ip: SocketAddr, router: &Router<N>) -> bool {
+    async fn pong(&self, _message: Pong, peer_ip: SocketAddr, router: &Router<N>) -> bool {
         // // Perform the deferred non-blocking deserialization of block locators.
         // let request = match block_locators.deserialize().await {
         //     // Route the `Pong` to the ledger.
@@ -325,6 +332,7 @@ pub trait Inbound<N: Network>: Executor {
                 version: Message::<N>::VERSION,
                 fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
                 node_type: Self::NODE_TYPE,
+                block_height: None,
                 status: Self::status().get(),
             });
             if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
@@ -339,7 +347,7 @@ pub trait Inbound<N: Network>: Executor {
         false
     }
 
-    async fn puzzle_response(&self, _message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
+    async fn puzzle_response(&self, _message: PuzzleResponse<N>, peer_ip: SocketAddr, _peer: &Peer<N>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }

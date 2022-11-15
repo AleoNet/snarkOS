@@ -18,7 +18,13 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockResponse<N: Network> {
-    pub block: Data<Block<N>>,
+    pub blocks: Data<RequestedBlocks<N>>,
+}
+
+impl<N: Network> BlockResponse<N> {
+    pub fn new(blocks: Vec<Block<N>>) -> Self {
+        Self { blocks: Data::Object(RequestedBlocks(blocks)) }
+    }
 }
 
 impl<N: Network> MessageTrait for BlockResponse<N> {
@@ -31,12 +37,43 @@ impl<N: Network> MessageTrait for BlockResponse<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.block.serialize_blocking_into(writer)
+        self.blocks.serialize_blocking_into(writer)
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        Ok(Self { block: Data::Buffer(bytes.freeze()) })
+        Ok(Self { blocks: Data::Buffer(bytes.freeze()) })
+    }
+}
+
+// TODO (raychu86): Add enforcement for maximum number of blocks.
+
+/// Wrapper struct around a vector of blocks.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RequestedBlocks<N: Network>(pub Vec<Block<N>>);
+
+impl<N: Network> ToBytes for RequestedBlocks<N> {
+    #[inline]
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        (self.0.len() as u32).write_le(&mut writer)?;
+        for block in &self.0 {
+            block.write_le(&mut writer)?;
+        }
+
+        Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for RequestedBlocks<N> {
+    #[inline]
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let num_blocks = u32::read_le(&mut reader)? as usize;
+        let mut blocks = Vec::with_capacity(num_blocks);
+        for _ in 0..num_blocks {
+            blocks.push(Block::read_le(&mut reader)?);
+        }
+
+        Ok(Self(blocks))
     }
 }

@@ -53,6 +53,17 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         }
     }
 
+    /// Returns the blocks for the given start block height and end block height.
+    pub fn get_blocks(&self, start_height: u32, end_height: u32) -> Result<Vec<Block<N>>> {
+        // Ensure that the start block height is less than or equal to the end block height.
+        if start_height > end_height {
+            bail!("Start block height ({start_height}) is greater than end block height ({end_height})")
+        }
+
+        // Retrieve the blocks.
+        (start_height..=end_height).map(|height| self.get_block(height)).collect()
+    }
+
     /// Returns the block for the given block hash.
     pub fn get_block_by_hash(&self, block_hash: &N::BlockHash) -> Result<Block<N>> {
         // Retrieve the block.
