@@ -46,7 +46,7 @@ features = ["circuit", "console", "parallel"]
 version = "1"
 
 [dependencies.clap]
-version = "3.2"
+version = "4.0"
 features = ["derive"]
 
 [dependencies.snarkos-account]
