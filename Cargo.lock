@@ -2316,6 +2316,7 @@ version = "2.0.2"
 dependencies = [
  "anyhow",
  "async-trait",
+ "futures-util",
  "parking_lot",
  "rand",
  "serde_json",
@@ -2331,6 +2332,7 @@ dependencies = [
  "snarkvm",
  "time",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 

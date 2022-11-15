@@ -20,6 +20,7 @@ use router::Router;
 
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
+use snarkos_node_executor::{NodeType, RawStatus, Status};
 use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::Message;
 use snarkos_node_network::Network;
@@ -51,11 +52,15 @@ pub struct Beacon<N: CurrentNetwork> {
     rest: Option<Arc<Rest<N, ConsensusDB<N>>>>,
     /// The time it to generate a block.
     block_generation_time: Arc<AtomicU64>,
+    /// The node's current state.
+    status: RawStatus,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
 }
 
 impl<N: CurrentNetwork> Beacon<N> {
+    const NODE_TYPE: NodeType = NodeType::Beacon;
+
     pub async fn new(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
@@ -80,6 +85,7 @@ impl<N: CurrentNetwork> Beacon<N> {
             router: Router::new().await,
             rest: None,
             block_generation_time,
+            status: RawStatus::new(),
             shutdown: Default::default(),
         };
 
@@ -109,6 +115,10 @@ impl<N: CurrentNetwork> Beacon<N> {
 
     fn router(&self) -> &Router {
         &self.router
+    }
+
+    fn status(&self) -> &RawStatus {
+        &self.status
     }
 }
 
