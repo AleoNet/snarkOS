@@ -266,17 +266,21 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         // Initialize an RNG.
         let rng = &mut rand::thread_rng();
 
+        // Prepare the inputs.
+        let inputs = [
+            Value::Record(records.values().next().unwrap().clone()),
+            Value::from_str(&format!("{to}"))?,
+            Value::from_str(&format!("{amount}u64"))?,
+        ];
+
         // Create a new transaction.
         Transaction::execute(
             &self.vm,
             private_key,
-            &ProgramID::from_str("credits.aleo")?,
+            ProgramID::from_str("credits.aleo")?,
             Identifier::from_str("transfer")?,
-            &[
-                Value::Record(records.values().next().unwrap().clone()),
-                Value::from_str(&format!("{to}"))?,
-                Value::from_str(&format!("{amount}u64"))?,
-            ],
+            inputs.iter(),
+            None,
             None,
             rng,
         )
