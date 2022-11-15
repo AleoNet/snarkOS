@@ -774,7 +774,7 @@ impl<N: Network> Router<N> {
                         // Handle the outbound message.
                         executor_clone.outbound(&peer, message, &router, &mut outbound_socket).await;
 
-                        // If this was a disconnect message, end this connection.
+                        // If this was a disconnect message, break this connection.
                         if is_disconnect {
                             break;
                         }
@@ -824,7 +824,11 @@ impl<N: Network> Router<N> {
 
             warn!("[Peer::Disconnect] Peer {peer_ip} has disconnected");
 
-            // // When this is reached, it means the peer has disconnected.
+            // When this is reached, it means the peer has disconnected.
+            if let Err(error) = router.process(RouterRequest::PeerDisconnected(peer_ip)).await {
+                warn!("[PeerDisconnected] {error}");
+            }
+
             // // Route a `Disconnect` to the ledger.
             // if let Err(error) = state.ledger().router()
             //     .send(LedgerRequest::Disconnect(peer_ip, DisconnectReason::PeerHasDisconnected))
