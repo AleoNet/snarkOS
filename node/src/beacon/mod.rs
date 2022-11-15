@@ -277,18 +277,20 @@ impl<N: Network> Beacon<N> {
                 // Prepare the inputs.
                 let to = beacon.account.address();
                 let amount = 1;
+                let inputs = [
+                    Value::Record(record.clone()),
+                    Value::from_str(&format!("{to}"))?,
+                    Value::from_str(&format!("{amount}u64"))?,
+                ];
 
                 // Create a new transaction.
                 let transaction = Transaction::execute(
                     beacon.ledger.vm(),
                     beacon.account.private_key(),
-                    &ProgramID::from_str("credits.aleo")?,
+                    ProgramID::from_str("credits.aleo")?,
                     Identifier::from_str("transfer")?,
-                    &[
-                        Value::Record(record.clone()),
-                        Value::from_str(&format!("{to}"))?,
-                        Value::from_str(&format!("{amount}u64"))?,
-                    ],
+                    inputs.iter(),
+                    None,
                     None,
                     rng,
                 );
@@ -341,7 +343,7 @@ impl<N: Network> Beacon<N> {
                     if let Some(transaction) = beacon_transaction {
                         // Save the unspent records.
                         if let Err(error) = transaction.into_transitions().try_for_each(|transition| {
-                            for (commitment, record) in transition.into_output_records() {
+                            for (commitment, record) in transition.into_records() {
                                 let record = record.decrypt(beacon.account.view_key())?;
                                 if !record.gates().is_zero() {
                                     beacon.unspent_records.write().insert(commitment, record);

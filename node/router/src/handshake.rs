@@ -133,6 +133,17 @@ pub trait Handshake: Executor {
                                 bail!("Unable to reach '{peer_ip}': '{:?}'", error);
                             }
                         }
+                        // TODO (howardwu): Remove this after Phase 2.
+                        if Self::node_type().is_validator()
+                            && node_type.is_beacon()
+                            && peer_ip.ip().to_string() != "159.65.195.225"
+                        {
+                            // Send the disconnect message.
+                            outbound_socket
+                                .send(Message::Disconnect(DisconnectReason::ProtocolViolation.into()))
+                                .await?;
+                            bail!("Dropping {peer_ip} for an invalid node type of {node_type}");
+                        }
                         // Send the challenge response.
                         let message =
                             Message::ChallengeResponse(ChallengeResponse { header: Data::Object(genesis_header) });

@@ -43,7 +43,7 @@ use rand::{prelude::IteratorRandom, rngs::OsRng, Rng};
 use std::{
     collections::HashMap,
     net::SocketAddr,
-    sync::Arc,
+    sync::{atomic::AtomicU8, Arc},
     time::{Duration, Instant, SystemTime},
 };
 use tokio::{
@@ -111,6 +111,8 @@ pub struct Router<N: Network> {
     seen_inbound_connections: Arc<RwLock<IndexMap<SocketAddr, ConnectionStats>>>,
     /// The map of peers to the timestamp of their last outbound connection request.
     seen_outbound_connections: Arc<RwLock<IndexMap<SocketAddr, SystemTime>>>,
+    /// The map of peer IPs to the number of puzzle requests.
+    pub seen_inbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, Arc<AtomicU8>>>>,
     /// The map of block hashes to their last seen timestamp.
     pub seen_inbound_blocks: Arc<RwLock<IndexMap<N::BlockHash, SystemTime>>>,
     /// The map of solution commitments to their last seen timestamp.
@@ -133,6 +135,8 @@ impl<N: Network> Router<N> {
     const HEARTBEAT_IN_SECS: u64 = 9; // 9 seconds
     /// The frequency at which the node sends a puzzle request.
     const PUZZLE_REQUEST_IN_SECS: u64 = N::ANCHOR_TIME as u64;
+    /// The maximum number of puzzle requests per interval.
+    const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: u8 = 10;
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
@@ -169,6 +173,7 @@ impl<N: Network> Router<N> {
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
+            seen_inbound_puzzle_requests: Default::default(),
             seen_inbound_connections: Default::default(),
             seen_outbound_connections: Default::default(),
             seen_inbound_blocks: Default::default(),
@@ -219,6 +224,15 @@ impl<N: Network> Router<N> {
     /// Returns the list of trusted peers.
     pub fn trusted_peers(&self) -> &IndexSet<SocketAddr> {
         &self.trusted_peers
+    }
+
+    /// Returns the list of metrics for the connected peers.
+    pub async fn connected_metrics(&self) -> Vec<(SocketAddr, NodeType)> {
+        let mut connected_metrics = Vec::new();
+        for (ip, peer) in self.connected_peers.read().await.iter() {
+            connected_metrics.push((*ip, peer.node_type().await));
+        }
+        connected_metrics
     }
 
     /// Returns the list of connected peers.
@@ -396,6 +410,8 @@ impl<N: Network> Router<N> {
                 // Sleep for the interval.
                 tokio::time::sleep(Duration::from_secs(Self::RADIO_SILENCE_IN_SECS)).await;
 
+                // Clear the seen puzzle requests.
+                router.seen_inbound_puzzle_requests.write().await.clear();
                 // Clear the seen unconfirmed blocks.
                 router.seen_inbound_blocks.write().await.retain(|_, timestamp| {
                     timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS
@@ -752,7 +768,16 @@ impl<N: Network> Router<N> {
                             break;
                         }
 
-                        executor_clone.outbound(&peer, message, &router, &mut outbound_socket).await
+                        // Determine if this is a disconnect message.
+                        let is_disconnect = matches!(message, Message::Disconnect(..));
+
+                        // Handle the outbound message.
+                        executor_clone.outbound(&peer, message, &router, &mut outbound_socket).await;
+
+                        // If this was a disconnect message, break this connection.
+                        if is_disconnect {
+                            break;
+                        }
                     },
                     result = outbound_socket.next() => match result {
                         // Received a message from the peer.
@@ -799,7 +824,11 @@ impl<N: Network> Router<N> {
 
             warn!("[Peer::Disconnect] Peer {peer_ip} has disconnected");
 
-            // // When this is reached, it means the peer has disconnected.
+            // When this is reached, it means the peer has disconnected.
+            if let Err(error) = router.process(RouterRequest::PeerDisconnected(peer_ip)).await {
+                warn!("[PeerDisconnected] {error}");
+            }
+
             // // Route a `Disconnect` to the ledger.
             // if let Err(error) = state.ledger().router()
             //     .send(LedgerRequest::Disconnect(peer_ip, DisconnectReason::PeerHasDisconnected))

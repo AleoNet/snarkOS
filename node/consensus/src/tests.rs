@@ -170,9 +170,15 @@ function compute:
                 let additional_fee = (credits, 10);
 
                 // Deploy.
-                let transaction =
-                    Transaction::deploy(consensus.ledger.vm(), &caller_private_key, &program, additional_fee, rng)
-                        .unwrap();
+                let transaction = Transaction::deploy(
+                    consensus.ledger.vm(),
+                    &caller_private_key,
+                    &program,
+                    additional_fee,
+                    None,
+                    rng,
+                )
+                .unwrap();
                 // Verify.
                 assert!(consensus.ledger.vm().verify(&transaction));
                 // Return the transaction.
@@ -211,7 +217,7 @@ function compute:
                 let authorization = vm
                     .authorize(
                         &caller_private_key,
-                        &ProgramID::from_str("credits.aleo").unwrap(),
+                        ProgramID::from_str("credits.aleo").unwrap(),
                         Identifier::from_str("transfer").unwrap(),
                         &[
                             Value::<CurrentNetwork>::Record(record),
@@ -224,7 +230,7 @@ function compute:
                 assert_eq!(authorization.len(), 1);
 
                 // Execute.
-                let transaction = Transaction::execute_authorization(vm, authorization, rng).unwrap();
+                let transaction = Transaction::execute_authorization(vm, authorization, None, rng).unwrap();
                 // Verify.
                 assert!(vm.verify(&transaction));
                 // Return the transaction.
@@ -358,13 +364,17 @@ fn test_ledger_execute_many() {
         assert_eq!(records.len(), 1 << (height - 1));
 
         for (_, record) in records {
+            // Prepare the inputs.
+            let inputs =
+                [Value::Record(record.clone()), Value::from_str(&format!("{}u64", ***record.gates() / 2)).unwrap()];
             // Create a new transaction.
             let transaction = Transaction::execute(
                 consensus.ledger.vm(),
                 &private_key,
-                &ProgramID::from_str("credits.aleo").unwrap(),
+                ProgramID::from_str("credits.aleo").unwrap(),
                 Identifier::from_str("split").unwrap(),
-                &[Value::Record(record.clone()), Value::from_str(&format!("{}u64", ***record.gates() / 2)).unwrap()],
+                inputs.iter(),
+                None,
                 None,
                 rng,
             )
@@ -404,13 +414,22 @@ fn test_proof_target() {
 
     for _ in 0..100 {
         // Generate a prover solution.
-        let prover_solution = consensus.coinbase_puzzle.prove(&epoch_challenge, address, rng.gen()).unwrap();
+        let prover_solution = consensus.coinbase_puzzle.prove(&epoch_challenge, address, rng.gen(), None).unwrap();
 
         // Check that the prover solution meets the proof target requirement.
         if prover_solution.to_target().unwrap() >= proof_target {
             assert!(consensus.add_unconfirmed_solution(&prover_solution).is_ok())
         } else {
             assert!(consensus.add_unconfirmed_solution(&prover_solution).is_err())
+        }
+
+        // Generate a prover solution with a minimum proof target.
+        let prover_solution = consensus.coinbase_puzzle.prove(&epoch_challenge, address, rng.gen(), Some(proof_target));
+
+        // Check that the prover solution meets the proof target requirement.
+        if let Ok(prover_solution) = prover_solution {
+            assert!(prover_solution.to_target().unwrap() >= proof_target);
+            assert!(consensus.add_unconfirmed_solution(&prover_solution).is_ok())
         }
     }
 }
@@ -442,7 +461,12 @@ fn test_coinbase_target() {
 
     while cumulative_target < consensus.ledger.latest_coinbase_target() as u128 {
         // Generate a prover solution.
-        let prover_solution = match consensus.coinbase_puzzle.prove(&epoch_challenge, address, rng.gen()) {
+        let prover_solution = match consensus.coinbase_puzzle.prove(
+            &epoch_challenge,
+            address,
+            rng.gen(),
+            Some(consensus.ledger.latest_proof_target()),
+        ) {
             Ok(prover_solution) => prover_solution,
             Err(_) => continue,
         };
