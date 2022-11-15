@@ -19,3 +19,45 @@
 
 pub mod updater;
 pub use updater::*;
+
+#[cfg(target_family = "unix")]
+use colored::*;
+#[cfg(target_family = "unix")]
+use nix::sys::resource::{getrlimit, Resource};
+
+/// Check if process's open files limit is above minimum and warn if not.
+#[cfg(target_family = "unix")]
+pub fn check_open_files_limit(minimum: u64) {
+    // Acquire current limits.
+    match getrlimit(Resource::RLIMIT_NOFILE) {
+        Ok((soft_limit, _)) => {
+            // Check if requirements are met.
+            if soft_limit < minimum {
+                // Warn about too low limit.
+                let warning = [
+                    "⚠️  Warning!".to_owned(),
+                    format!("⚠️  Current open files limit ({soft_limit}) for this process is lower than recommended."),
+                    format!("⚠️  Please raise it to at least {minimum} to ensure correct behavior of the node."),
+                    "⚠️  See `ulimit` command and `/etc/security/limits.conf` for more details.".to_owned(),
+                ]
+                .join("\n")
+                .yellow()
+                .bold();
+                eprintln!("\n{warning}\n");
+            }
+        }
+        Err(err) => {
+            // Warn about unknown limit.
+            let warning = [
+                "⚠️  Warning!".to_owned(),
+                format!("⚠️  Couldn't check process's open files limit due to {err}."),
+                format!("⚠️  Please make sure it's at least {minimum} to ensure correct behavior of the node."),
+                "⚠️  See `ulimit` command and `/etc/security/limits.conf` for more details.".to_owned(),
+            ]
+            .join("\n")
+            .yellow()
+            .bold();
+            eprintln!("\n{warning}\n");
+        }
+    };
+}
