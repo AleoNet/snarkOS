@@ -474,8 +474,6 @@ impl<N: Network> Router<N> {
                 self.connected_peers.write().await.remove(&peer_ip);
                 // Add an entry for this `Peer` in the candidate peers.
                 self.candidate_peers.write().await.insert(peer_ip);
-                // Send a disconnect message to the peer.
-                self.handle_send(peer_ip, Message::Disconnect(DisconnectReason::NoReasonGiven.into())).await;
             }
             RouterRequest::PeerRestricted(peer_ip) => {
                 // Remove an entry for this `Peer` in the connected peers, if it exists.
