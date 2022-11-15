@@ -31,8 +31,7 @@ use snarkvm::prelude::{Block, FromBytes, Network as CurrentNetwork};
 use std::{io, net::SocketAddr};
 
 use futures_util::{sink::SinkExt, TryStreamExt};
-use tokio::net::TcpStream;
-use tokio_util::codec::{Framed, FramedParts};
+use tokio_util::codec::Framed;
 
 const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
@@ -43,25 +42,25 @@ impl<N: CurrentNetwork> Beacon<N> {
         // Ensure the message protocol version is not outdated.
         if version < Message::<N>::VERSION {
             // warn!("Dropping {peer_ip} on version {version} (outdated)");
-            return Some(DisconnectReason::OutdatedClientVersion.into());
+            return Some(DisconnectReason::OutdatedClientVersion);
         }
 
         // Ensure the maximum fork depth is correct.
         if fork_depth != ALEO_MAXIMUM_FORK_DEPTH {
             // warn!("Dropping {peer_ip} for an incorrect maximum fork depth of {fork_depth}");
-            return Some(DisconnectReason::InvalidForkDepth.into());
+            return Some(DisconnectReason::InvalidForkDepth);
         }
 
         // If this node is not a beacon node and is syncing, the peer is a beacon node, and this node is ahead, proceed to disconnect.
         if Self::NODE_TYPE != NodeType::Beacon && self.status().is_syncing() && node_type == NodeType::Beacon {
             // warn!("Dropping {peer_ip} as this node is ahead");
-            return Some(DisconnectReason::YouNeedToSyncFirst.into());
+            return Some(DisconnectReason::YouNeedToSyncFirst);
         }
 
         // If this node is a beacon node, the peer is not a beacon node and is syncing, and the peer is ahead, proceed to disconnect.
         if Self::NODE_TYPE == NodeType::Beacon && node_type != NodeType::Beacon && peer_status == Status::Syncing {
             // warn!("Dropping {peer_ip} as this node is ahead");
-            return Some(DisconnectReason::INeedToSyncFirst.into());
+            return Some(DisconnectReason::INeedToSyncFirst);
         }
 
         None

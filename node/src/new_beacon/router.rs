@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_executor::{NodeType, RawStatus, Status};
+use snarkos_node_executor::{NodeType, RawStatus};
 use snarkos_node_network::{ConnectionSide, Network};
 
 use parking_lot::RwLock;

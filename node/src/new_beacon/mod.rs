@@ -20,7 +20,7 @@ use router::Router;
 
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_executor::{NodeType, RawStatus, Status};
+use snarkos_node_executor::{NodeType, RawStatus};
 use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::Message;
 use snarkos_node_network::Network;
