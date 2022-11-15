@@ -37,12 +37,18 @@ use crossterm::{
     tty::IsTty,
 };
 use std::{
+    fs::File,
     io,
+    path::Path,
     thread,
     time::{Duration, Instant},
 };
 use tokio::sync::mpsc;
-use tracing_subscriber::EnvFilter;
+use tracing_subscriber::{
+    layer::{Layer, SubscriberExt},
+    util::SubscriberInitExt,
+    EnvFilter,
+};
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
@@ -66,9 +72,9 @@ pub struct Display<N: Network> {
 
 impl<N: Network> Display<N> {
     /// Initializes a new display.
-    pub fn start(node: Node<N>, verbosity: u8, nodisplay: bool) -> Result<()> {
+    pub fn start<P: AsRef<Path>>(node: Node<N>, verbosity: u8, nodisplay: bool, logfile: P) -> Result<()> {
         // Initialize the logger.
-        let log_receiver = Self::initialize_logger(verbosity, nodisplay);
+        let log_receiver = Self::initialize_logger(verbosity, nodisplay, logfile);
 
         // If the display is not enabled, render the welcome message.
         if nodisplay {
@@ -114,7 +120,7 @@ impl<N: Network> Display<N> {
 
 impl<N: Network> Display<N> {
     /// Initializes the logger.
-    fn initialize_logger(verbosity: u8, nodisplay: bool) -> mpsc::Receiver<Vec<u8>> {
+    fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile: P) -> mpsc::Receiver<Vec<u8>> {
         match verbosity {
             0 => std::env::set_var("RUST_LOG", "info"),
             1 => std::env::set_var("RUST_LOG", "debug"),
@@ -122,14 +128,20 @@ impl<N: Network> Display<N> {
             _ => std::env::set_var("RUST_LOG", "info"),
         };
 
-        // Filter out undesirable logs.
-        let filter = EnvFilter::from_default_env()
-            .add_directive("mio=off".parse().unwrap())
-            .add_directive("tokio_util=off".parse().unwrap())
-            .add_directive("hyper=off".parse().unwrap())
-            .add_directive("reqwest=off".parse().unwrap())
-            .add_directive("want=off".parse().unwrap())
-            .add_directive("warp=off".parse().unwrap());
+        // Filter out undesirable logs. (unfortunately EnvFilter cannot be cloned)
+        let [filter, filter2] = std::array::from_fn(|_| {
+            EnvFilter::from_default_env()
+                .add_directive("mio=off".parse().unwrap())
+                .add_directive("tokio_util=off".parse().unwrap())
+                .add_directive("hyper=off".parse().unwrap())
+                .add_directive("reqwest=off".parse().unwrap())
+                .add_directive("want=off".parse().unwrap())
+                .add_directive("warp=off".parse().unwrap())
+        });
+
+        // Create a file to write logs to.
+        let logfile =
+            File::options().append(true).create(true).open(logfile).expect("Failed to open the file for writing logs");
 
         // Initialize the log channel.
         let (log_sender, log_receiver) = mpsc::channel(1024);
@@ -141,11 +153,23 @@ impl<N: Network> Display<N> {
         };
 
         // Initialize tracing.
-        let _ = tracing_subscriber::fmt()
-            .with_env_filter(filter)
-            .with_ansi(log_sender.is_none() && io::stdout().is_tty())
-            .with_writer(move || LogWriter::new(&log_sender))
-            .with_target(verbosity == 3)
+        let _ = tracing_subscriber::registry()
+            .with(
+                // Add layer using LogWriter for stdout / terminal
+                tracing_subscriber::fmt::Layer::default()
+                    .with_ansi(log_sender.is_none() && io::stdout().is_tty())
+                    .with_writer(move || LogWriter::new(&log_sender))
+                    .with_target(verbosity == 3)
+                    .with_filter(filter),
+            )
+            .with(
+                // Add layer redirecting logs to the file
+                tracing_subscriber::fmt::Layer::default()
+                    .with_ansi(false)
+                    .with_writer(logfile)
+                    .with_target(verbosity == 3)
+                    .with_filter(filter2),
+            )
             .try_init();
 
         log_receiver
