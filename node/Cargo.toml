@@ -47,6 +47,9 @@ path = "./ledger"
 [dependencies.snarkos-node-messages]
 path = "./messages"
 
+[dependencies.snarkos-node-network]
+path = "./network"
+
 [dependencies.snarkos-node-rest]
 path = "./rest"
 

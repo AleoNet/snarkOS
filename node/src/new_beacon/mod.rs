@@ -117,7 +117,8 @@ impl<N: CurrentNetwork> Beacon<N> {
 /* Network traits */
 
 use snarkos_node_executor::RawStatus;
-use snarkos_node_messages::{MessageOrBytes, NoiseCodec, NoiseState, PeerRequest};
+// use snarkos_node_messages::{MessageOrBytes, NoiseCodec, NoiseState, PeerRequest};
+use snarkos_node_messages::{MessageCodec, PeerRequest};
 use snarkos_node_network::{
     protocols::{Disconnect, Handshake as Handshaking, Reading, Writing},
     Connection,
@@ -223,8 +224,7 @@ impl<N: CurrentNetwork> Beacon<N> {
             if num_connected > 0 {
                 for peer_addr in self.network().connected_addrs().choose_multiple(&mut OsRng::default(), 3) {
                     // Let the error through for now.
-                    let _res =
-                        self.unicast(*peer_addr, MessageOrBytes::Message(Box::new(Message::PeerRequest(PeerRequest))));
+                    let _res = self.unicast(*peer_addr, Message::PeerRequest(PeerRequest));
                     debug_assert!(_res.expect("writing protocol should be enabled").await.is_ok());
                 }
             }
@@ -232,35 +232,35 @@ impl<N: CurrentNetwork> Beacon<N> {
     }
 }
 
-#[derive(Debug, Clone)]
-struct ConnectionMeta {
-    side: ConnectionSide,
-    noise_state: NoiseState,
-
-    // TODO(nkls): potentially split this out.
-    // Peer Meta:
-    version: u32,
-    node_type: NodeType,
-    status: RawStatus,
-    block_height: Arc<RwLock<u32>>,  // TODO(nkls): this could probably be an atomic.
-    last_seen: Arc<RwLock<Instant>>, // TODO(nkls): consider the time crate here.
-    seen_messages: Arc<RwLock<HashMap<(u16, u32), SystemTime>>>,
-}
-
-impl ConnectionMeta {
-    fn new(side: ConnectionSide, noise_state: NoiseState, version: u32, node_type: NodeType) -> Self {
-        Self {
-            side,
-            noise_state,
-            version,
-            node_type,
-            status: RawStatus::new(),
-            block_height: Arc::new(RwLock::new(0)),
-            last_seen: Arc::new(RwLock::new(Instant::now())),
-            seen_messages: Default::default(),
-        }
-    }
-}
+// #[derive(Debug, Clone)]
+// struct ConnectionMeta {
+//     side: ConnectionSide,
+//     noise_state: NoiseState,
+//
+//     // TODO(nkls): potentially split this out.
+//     // Peer Meta:
+//     version: u32,
+//     node_type: NodeType,
+//     status: RawStatus,
+//     block_height: Arc<RwLock<u32>>,  // TODO(nkls): this could probably be an atomic.
+//     last_seen: Arc<RwLock<Instant>>, // TODO(nkls): consider the time crate here.
+//     seen_messages: Arc<RwLock<HashMap<(u16, u32), SystemTime>>>,
+// }
+//
+// impl ConnectionMeta {
+//     fn new(side: ConnectionSide, noise_state: NoiseState, version: u32, node_type: NodeType) -> Self {
+//         Self {
+//             side,
+//             noise_state,
+//             version,
+//             node_type,
+//             status: RawStatus::new(),
+//             block_height: Arc::new(RwLock::new(0)),
+//             last_seen: Arc::new(RwLock::new(Instant::now())),
+//             seen_messages: Default::default(),
+//         }
+//     }
+// }
 
 impl<N: CurrentNetwork> P2P for Beacon<N> {
     fn network(&self) -> &Network {
@@ -287,12 +287,11 @@ impl<N: CurrentNetwork> Handshaking for Beacon<N> {
 
 #[async_trait::async_trait]
 impl<N: CurrentNetwork> Reading for Beacon<N> {
-    type Codec = NoiseCodec;
-    type Message = MessageOrBytes;
+    type Codec = MessageCodec<N>;
+    type Message = Message<N>;
 
     fn codec(&self, addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
-        let noise_state = self.router().noise_state(addr).unwrap();
-        NoiseCodec::new(noise_state)
+        Default::default()
     }
 
     async fn process_message(&self, source: SocketAddr, message: Self::Message) -> io::Result<()> {
@@ -302,12 +301,11 @@ impl<N: CurrentNetwork> Reading for Beacon<N> {
 
 #[async_trait::async_trait]
 impl<N: CurrentNetwork> Writing for Beacon<N> {
-    type Codec = NoiseCodec;
-    type Message = MessageOrBytes;
+    type Codec = MessageCodec<N>;
+    type Message = Message<N>;
 
     fn codec(&self, addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
-        let noise_state = self.router().noise_state(addr).unwrap();
-        NoiseCodec::new(noise_state)
+        Default::default()
     }
 }
 

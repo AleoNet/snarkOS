@@ -22,6 +22,7 @@ extern crate async_trait;
 extern crate tracing;
 
 mod beacon;
+mod new_beacon;
 pub use beacon::*;
 
 mod client;

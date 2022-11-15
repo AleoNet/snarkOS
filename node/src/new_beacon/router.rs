@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_node_executor::{NodeType, RawStatus};
-use snarkos_node_messages::NoiseState;
 use snarkos_node_network::{ConnectionSide, Network};
 
 use parking_lot::RwLock;
@@ -48,10 +47,6 @@ impl Router {
 
     pub fn network(&self) -> &Network {
         &self.network
-    }
-
-    pub fn noise_state(&self, addr: SocketAddr) -> Option<NoiseState> {
-        self.connection_meta.read().get(&addr).map(|meta| meta.noise_state.clone())
     }
 
     pub fn trusted_peers(&self) -> &HashSet<SocketAddr> {
@@ -94,7 +89,6 @@ impl Router {
 #[derive(Debug, Clone)]
 struct ConnectionMeta {
     side: ConnectionSide,
-    noise_state: NoiseState,
 
     // TODO(nkls): potentially split this out.
     // Peer Meta:
@@ -107,10 +101,9 @@ struct ConnectionMeta {
 }
 
 impl ConnectionMeta {
-    fn new(side: ConnectionSide, noise_state: NoiseState, version: u32, node_type: NodeType) -> Self {
+    fn new(side: ConnectionSide, version: u32, node_type: NodeType) -> Self {
         Self {
             side,
-            noise_state,
             version,
             node_type,
             status: RawStatus::new(),

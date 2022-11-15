@@ -1467,6 +1467,9 @@ name = "once_cell"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "86f0b0d4bf799edbc74508c1e8bf170ff5f41238e5f8225603ca7caaae2b7860"
+dependencies = [
+ "parking_lot_core",
+]
 
 [[package]]
 name = "opaque-debug"
@@ -2251,6 +2254,7 @@ dependencies = [
  "snarkos-node-executor",
  "snarkos-node-ledger",
  "snarkos-node-messages",
+ "snarkos-node-network",
  "snarkos-node-rest",
  "snarkos-node-router",
  "snarkos-node-store",
@@ -2320,6 +2324,7 @@ dependencies = [
  "snarkos-node-executor",
  "snarkos-node-ledger",
  "snarkos-node-messages",
+ "snarkos-node-network",
  "snarkos-node-rest",
  "snarkos-node-router",
  "snarkos-node-store",
@@ -2390,6 +2395,20 @@ dependencies = [
  "snarkos-node-executor",
  "snarkvm",
  "snow",
+ "tokio",
+ "tokio-util",
+ "tracing",
+]
+
+[[package]]
+name = "snarkos-node-network"
+version = "2.0.2"
+dependencies = [
+ "async-trait",
+ "bytes",
+ "futures-util",
+ "once_cell",
+ "parking_lot",
  "tokio",
  "tokio-util",
  "tracing",
