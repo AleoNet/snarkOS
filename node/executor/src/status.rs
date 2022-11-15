@@ -53,6 +53,10 @@ impl RawStatus {
         Self(Arc::new(AtomicU8::new(Status::Peering as u8)))
     }
 
+    pub fn from_status(status: Status) -> Self {
+        Self(Arc::new(AtomicU8::new(status as u8)))
+    }
+
     /// Updates the status to the given value.
     pub fn update(&self, status: Status) {
         self.0.store(status as u8, Ordering::SeqCst);

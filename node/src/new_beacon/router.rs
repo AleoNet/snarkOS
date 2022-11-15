@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_executor::{NodeType, RawStatus};
+use snarkos_node_executor::{NodeType, RawStatus, Status};
 use snarkos_node_network::{ConnectionSide, Network};
 
 use parking_lot::RwLock;
@@ -87,8 +87,9 @@ impl Router {
 // TODO(nkls): split into separate module
 
 #[derive(Debug, Clone)]
-struct ConnectionMeta {
+pub struct ConnectionMeta {
     side: ConnectionSide,
+    listening_addr: SocketAddr,
 
     // TODO(nkls): potentially split this out.
     // Peer Meta:
@@ -101,12 +102,19 @@ struct ConnectionMeta {
 }
 
 impl ConnectionMeta {
-    fn new(side: ConnectionSide, version: u32, node_type: NodeType) -> Self {
+    pub fn new(
+        side: ConnectionSide,
+        listening_addr: SocketAddr,
+        version: u32,
+        node_type: NodeType,
+        status: RawStatus,
+    ) -> Self {
         Self {
             side,
+            listening_addr,
             version,
             node_type,
-            status: RawStatus::new(),
+            status,
             block_height: Arc::new(RwLock::new(0)),
             last_seen: Arc::new(RwLock::new(OffsetDateTime::now_utc())),
             seen_messages: Default::default(),
