@@ -28,9 +28,13 @@ use time::OffsetDateTime;
 #[derive(Clone)]
 pub struct Router {
     network: Network,
+    /// The map of connection address to connection metadata.
     connection_meta: Arc<RwLock<HashMap<SocketAddr, ConnectionMeta>>>,
+    /// The set of trusted peer listening addresses.
     trusted_peers: Arc<HashSet<SocketAddr>>,
+    /// The set of candidate peer listening addresses.
     candidate_peers: Arc<RwLock<HashSet<SocketAddr>>>,
+    /// The map of restricted listening addresses to the time they were restricted.
     restricted_peers: Arc<RwLock<HashMap<SocketAddr, OffsetDateTime>>>,
 }
 
@@ -47,6 +51,14 @@ impl Router {
 
     pub fn network(&self) -> &Network {
         &self.network
+    }
+
+    pub fn insert_connection(&self, addr: SocketAddr, meta: ConnectionMeta) {
+        self.connection_meta.write().insert(addr, meta);
+    }
+
+    pub fn remove_connection(&self, addr: SocketAddr) {
+        self.connection_meta.write().remove(&addr);
     }
 
     pub fn trusted_peers(&self) -> &HashSet<SocketAddr> {

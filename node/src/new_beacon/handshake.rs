@@ -196,9 +196,8 @@ impl<N: CurrentNetwork> Handshaking for Beacon<N> {
         let peer_type = challenge_request.node_type;
         let peer_status = RawStatus::from_status(challenge_request.status);
 
-        ConnectionMeta::new(peer_side, peer_listener, peer_version, peer_type, peer_status);
-
-        // TODO(nkls): in future tighten things up with conn.side().
+        let meta = ConnectionMeta::new(peer_side, peer_listener, peer_version, peer_type, peer_status);
+        self.router().insert_connection(peer_addr, meta);
 
         Ok(conn)
     }
