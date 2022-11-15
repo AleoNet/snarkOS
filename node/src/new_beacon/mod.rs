@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+mod handshake;
 mod router;
 use router::Router;
 
@@ -117,7 +118,6 @@ impl<N: CurrentNetwork> Beacon<N> {
 use snarkos_node_messages::{MessageCodec, PeerRequest};
 use snarkos_node_network::{
     protocols::{Disconnect, Handshake as Handshaking, Reading, Writing},
-    Connection,
     ConnectionSide,
     P2P,
 };
@@ -232,23 +232,6 @@ impl<N: CurrentNetwork> P2P for Beacon<N> {
 }
 
 #[async_trait::async_trait]
-impl<N: CurrentNetwork> Handshaking for Beacon<N> {
-    async fn perform_handshake(&self, conn: Connection) -> io::Result<Connection> {
-        let peer_side = conn.side();
-
-        match peer_side {
-            // The peer initiated the connection.
-            ConnectionSide::Initiator => {}
-
-            // The relay initiated the connection.
-            ConnectionSide::Responder => {}
-        }
-
-        Ok(conn)
-    }
-}
-
-#[async_trait::async_trait]
 impl<N: CurrentNetwork> Reading for Beacon<N> {
     type Codec = MessageCodec<N>;
     type Message = Message<N>;
@@ -274,5 +257,7 @@ impl<N: CurrentNetwork> Writing for Beacon<N> {
 
 #[async_trait::async_trait]
 impl<N: CurrentNetwork> Disconnect for Beacon<N> {
-    async fn handle_disconnect(&self, _addr: SocketAddr) {}
+    async fn handle_disconnect(&self, _addr: SocketAddr) {
+        // TODO(nkls): update appropriate peer collections
+    }
 }
