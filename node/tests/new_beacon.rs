@@ -42,10 +42,38 @@ async fn handshake_responder_side() {
     // Spin up a test peer.
     let peer = TestPeer::new(NodeType::Validator).await;
 
-    // Verify the handshake works when the peer initates a connection with the node.
+    // Verify the handshake works when the peer initates a connection with the beacon.
     assert!(
         peer.node()
             .connect(beacon.router().network().listening_addr().expect("beacon listener should exist"))
+            .await
+            .is_ok()
+    );
+}
+
+#[tokio::test]
+async fn handshake_initiator_side() {
+    // Create a beacon instance.
+    let beacon = Beacon::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
+        "127.0.0.1:4133".parse().unwrap(),
+        None,
+        PrivateKey::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
+        &[],
+        None, // Should load the current network's genesis block.
+        None,
+    )
+    .await
+    .expect("couldn't create beacon instance");
+
+    // Spin up a test peer.
+    let peer = TestPeer::new(NodeType::Validator).await;
+
+    // Verify the handshake works when the beacon initiates a connection with the peer.
+    assert!(
+        beacon
+            .router()
+            .network()
+            .connect(peer.node().listening_addr().expect("peer listener should exist"))
             .await
             .is_ok()
     );
