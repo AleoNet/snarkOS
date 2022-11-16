@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 #![forbid(unsafe_code)]
+#![recursion_limit = "256"]
 
 #[macro_use]
 extern crate async_trait;
