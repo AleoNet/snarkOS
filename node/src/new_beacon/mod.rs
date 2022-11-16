@@ -25,7 +25,6 @@ use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::Message;
 use snarkos_node_network::Network;
 use snarkos_node_rest::Rest;
-use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Block, ConsensusStorage, Network as CurrentNetwork, PrivateKey};
 
 use anyhow::Result;
