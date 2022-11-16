@@ -26,7 +26,7 @@ use snarkos_node_messages::{
     MessageCodec,
 };
 use snarkos_node_network::{protocols::Handshake as Handshaking, Connection, ConnectionSide};
-use snarkvm::prelude::{Block, FromBytes, Network as CurrentNetwork};
+use snarkvm::prelude::{Block, ConsensusStorage, FromBytes, Network as CurrentNetwork};
 
 use std::{io, net::SocketAddr};
 
@@ -35,7 +35,7 @@ use tokio_util::codec::Framed;
 
 const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
-impl<N: CurrentNetwork> Beacon<N> {
+impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
     fn verify_challenge_request(&self, message: &ChallengeRequest) -> Option<DisconnectReason> {
         let &ChallengeRequest { version, fork_depth, node_type, status: peer_status, listener_port } = message;
 
@@ -95,7 +95,7 @@ impl<N: CurrentNetwork> Beacon<N> {
 }
 
 #[async_trait::async_trait]
-impl<N: CurrentNetwork> Handshaking for Beacon<N> {
+impl<N: CurrentNetwork, C: ConsensusStorage<N>> Handshaking for Beacon<N, C> {
     async fn perform_handshake(&self, mut conn: Connection) -> io::Result<Connection> {
         let peer_addr = conn.addr();
         let local_addr = self.router().network().listening_addr().expect("listening address should be present");

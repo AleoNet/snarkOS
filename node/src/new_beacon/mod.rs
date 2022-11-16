@@ -16,7 +16,7 @@
 
 mod handshake;
 mod router;
-use router::Router;
+pub use router::{PeerMeta, Router};
 
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
@@ -26,7 +26,7 @@ use snarkos_node_messages::Message;
 use snarkos_node_network::Network;
 use snarkos_node_rest::Rest;
 use snarkos_node_store::ConsensusDB;
-use snarkvm::prelude::{Block, Network as CurrentNetwork, PrivateKey};
+use snarkvm::prelude::{Block, ConsensusStorage, Network as CurrentNetwork, PrivateKey};
 
 use anyhow::Result;
 use core::time::Duration;
@@ -39,17 +39,17 @@ use std::{
 };
 
 #[derive(Clone)]
-pub struct Beacon<N: CurrentNetwork> {
+pub struct Beacon<N: CurrentNetwork, C: ConsensusStorage<N>> {
     /// The account of the .
     account: Account<N>,
     /// The consensus module of the node.
-    consensus: Consensus<N, ConsensusDB<N>>,
+    consensus: Consensus<N, C>,
     /// The ledger of the node.
-    ledger: Ledger<N, ConsensusDB<N>>,
+    ledger: Ledger<N, C>,
     /// The router of the node.
     router: Router,
     /// The REST server of the node.
-    rest: Option<Arc<Rest<N, ConsensusDB<N>>>>,
+    rest: Option<Arc<Rest<N, C>>>,
     /// The time it to generate a block.
     block_generation_time: Arc<AtomicU64>,
     /// The node's current state.
@@ -58,7 +58,7 @@ pub struct Beacon<N: CurrentNetwork> {
     shutdown: Arc<AtomicBool>,
 }
 
-impl<N: CurrentNetwork> Beacon<N> {
+impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
     const NODE_TYPE: NodeType = NodeType::Beacon;
 
     pub async fn new(
@@ -104,16 +104,16 @@ impl<N: CurrentNetwork> Beacon<N> {
     }
 
     /// Returns the ledger.
-    pub fn ledger(&self) -> &Ledger<N, ConsensusDB<N>> {
+    pub fn ledger(&self) -> &Ledger<N, C> {
         &self.ledger
     }
 
     /// Returns the REST server.
-    pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>>>> {
+    pub fn rest(&self) -> &Option<Arc<Rest<N, C>>> {
         &self.rest
     }
 
-    fn router(&self) -> &Router {
+    pub fn router(&self) -> &Router {
         &self.router
     }
 
@@ -143,7 +143,7 @@ const HEARTBEAT_IN_SECS: u64 = 9;
 const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
 const MINIMUM_NUMBER_OF_PEERS: usize = 1;
 
-impl<N: CurrentNetwork> Beacon<N> {
+impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
     pub async fn start_periodic_tasks(&self) {
         let node = self.clone();
         // TODO(nkls): task accounting.
@@ -235,14 +235,14 @@ impl<N: CurrentNetwork> Beacon<N> {
     }
 }
 
-impl<N: CurrentNetwork> P2P for Beacon<N> {
+impl<N: CurrentNetwork, C: ConsensusStorage<N>> P2P for Beacon<N, C> {
     fn network(&self) -> &Network {
         self.router().network()
     }
 }
 
 #[async_trait::async_trait]
-impl<N: CurrentNetwork> Reading for Beacon<N> {
+impl<N: CurrentNetwork, C: ConsensusStorage<N>> Reading for Beacon<N, C> {
     type Codec = MessageCodec<N>;
     type Message = Message<N>;
 
@@ -256,7 +256,7 @@ impl<N: CurrentNetwork> Reading for Beacon<N> {
 }
 
 #[async_trait::async_trait]
-impl<N: CurrentNetwork> Writing for Beacon<N> {
+impl<N: CurrentNetwork, C: ConsensusStorage<N>> Writing for Beacon<N, C> {
     type Codec = MessageCodec<N>;
     type Message = Message<N>;
 
@@ -266,7 +266,7 @@ impl<N: CurrentNetwork> Writing for Beacon<N> {
 }
 
 #[async_trait::async_trait]
-impl<N: CurrentNetwork> Disconnect for Beacon<N> {
+impl<N: CurrentNetwork, C: ConsensusStorage<N>> Disconnect for Beacon<N, C> {
     async fn handle_disconnect(&self, _addr: SocketAddr) {
         // TODO(nkls): update appropriate peer collections
     }
