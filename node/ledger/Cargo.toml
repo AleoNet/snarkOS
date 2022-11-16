@@ -20,6 +20,10 @@ edition = "2021"
 default = [ "parallel" ]
 parallel = [ "rayon" ]
 
+[dependencies.aleo-std]
+version = "0.1.15"
+default-features = false
+
 [dependencies.anyhow]
 version = "1"
 
