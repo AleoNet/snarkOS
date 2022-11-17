@@ -53,6 +53,21 @@ impl Router {
         &self.network
     }
 
+    pub fn is_local_addr(&self, addr: SocketAddr) -> bool {
+        let local_addr = self.network().listening_addr().expect("listening addr must be present");
+        addr == local_addr
+            || (addr.ip().is_unspecified() || addr.ip().is_loopback()) && addr.port() == local_addr.port()
+    }
+
+    pub fn is_connected(&self, addr: SocketAddr) -> bool {
+        self.network().is_connected(addr)
+            || self.current_peers.read().iter().find(|(_, meta)| meta.listening_addr() == addr).is_some()
+    }
+
+    pub fn is_restricted(&self, addr: SocketAddr) -> bool {
+        self.restricted_peers.read().contains_key(&addr)
+    }
+
     pub fn insert_peer(&self, addr: SocketAddr, meta: PeerMeta) {
         self.current_peers.write().insert(addr, meta);
     }
@@ -75,6 +90,18 @@ impl Router {
 
     pub fn remove_candidate_peer(&self, addr: SocketAddr) {
         self.candidate_peers.write().remove(&addr);
+    }
+
+    pub fn insert_candidate_peers(&self, addrs: &[SocketAddr]) {
+        let candidate_peers = self.candidate_peers.write();
+
+        for &addr in addrs {
+            if self.is_local_addr(addr) || self.is_connected(addr) || self.is_restricted(addr) {
+                continue;
+            }
+
+            self.candidate_peers.write().insert(addr);
+        }
     }
 
     pub fn insert_restricted_peer(&self, addr: SocketAddr) {

@@ -254,6 +254,12 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
         Ok(())
     }
 
+    async fn process_peer_response(&self, source: SocketAddr, message: PeerResponse) -> anyhow::Result<()> {
+        self.router().insert_candidate_peers(&message.peers);
+
+        Ok(())
+    }
+
     async fn process_unconfirmed_block(&self, source: SocketAddr, message: UnconfirmedBlock<N>) -> anyhow::Result<()> {
         let message_clone = message.clone();
 
@@ -388,7 +394,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Reading for Beacon<N, C> {
             Message::Pong(pong) => todo!(),
 
             Message::PeerRequest(peer_request) => self.process_peer_request(source, peer_request).await,
-            Message::PeerResponse(peer_response) => todo!(),
+            Message::PeerResponse(peer_response) => self.process_peer_response(source, peer_response).await,
 
             Message::UnconfirmedBlock(unconfirmed_block) => {
                 // TODO(nkls): spawn task.
