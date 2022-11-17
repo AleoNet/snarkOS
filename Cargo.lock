@@ -394,6 +394,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "circular-queue"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1d34327ead1c743a10db339de35fb58957564b99d248a67985c55638b22c59b5"
+dependencies = [
+ "version_check",
+]
+
+[[package]]
 name = "clang-sys"
 version = "1.4.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2332,6 +2341,7 @@ version = "2.0.2"
 dependencies = [
  "anyhow",
  "async-trait",
+ "circular-queue",
  "futures-util",
  "parking_lot",
  "pea2pea",
