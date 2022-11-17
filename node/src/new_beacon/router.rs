@@ -57,8 +57,8 @@ impl Router {
         self.current_peers.write().insert(addr, meta);
     }
 
-    pub fn remove_peer(&self, addr: SocketAddr) {
-        self.current_peers.write().remove(&addr);
+    pub fn remove_peer(&self, addr: SocketAddr) -> Option<PeerMeta> {
+        self.current_peers.write().remove(&addr)
     }
 
     pub fn trusted_peers(&self) -> &HashSet<SocketAddr> {
@@ -128,5 +128,9 @@ impl PeerMeta {
             last_seen: Arc::new(RwLock::new(OffsetDateTime::now_utc())),
             seen_messages: Default::default(),
         }
+    }
+
+    pub fn listening_addr(&self) -> SocketAddr {
+        self.listening_addr
     }
 }

@@ -14,15 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+mod cache;
+mod circular_map;
 mod handshake;
 mod router;
+
+use cache::Cache;
 pub use router::{PeerMeta, Router};
 
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_executor::{NodeType, RawStatus};
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::Message;
+use snarkos_node_messages::{Message, UnconfirmedBlock};
 use snarkos_node_network::Network;
 use snarkos_node_rest::Rest;
 use snarkvm::prelude::{Block, ConsensusStorage, Network as CurrentNetwork, PrivateKey};
@@ -47,6 +51,8 @@ pub struct Beacon<N: CurrentNetwork, C: ConsensusStorage<N>> {
     ledger: Ledger<N, C>,
     /// The router of the node.
     router: Router,
+    /// The cache of network data seen by the node.
+    cache: Cache<N>,
     /// The REST server of the node.
     rest: Option<Arc<Rest<N, C>>>,
     /// The time it to generate a block.
@@ -82,6 +88,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
             consensus,
             ledger,
             router: Router::new().await,
+            cache: Cache::new(),
             rest: None,
             block_generation_time,
             status: RawStatus::new(),
@@ -114,6 +121,10 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
 
     pub fn router(&self) -> &Router {
         &self.router
+    }
+
+    pub fn cache(&self) -> &Cache<N> {
+        &self.cache
     }
 
     fn status(&self) -> &RawStatus {
@@ -232,6 +243,22 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
             }
         }
     }
+
+    async fn process_unconfirmed_block(&self, message: UnconfirmedBlock<N>) -> anyhow::Result<()> {
+        // If the block has been seen before, don't deserialise or propagate the block.
+        if !self.cache().insert_seen_block(message.block_hash) {
+            return Ok(());
+        }
+
+        // Perform the deferred non-blocking deserialisation of the block.
+        let block = message.block.deserialize().await?;
+
+        if message.block_height != block.height() || message.block_hash != block.hash() {
+            anyhow::bail!("deserialized block doesn't match the 'UnconfirmedBlock' header")
+        }
+
+        Ok(())
+    }
 }
 
 impl<N: CurrentNetwork, C: ConsensusStorage<N>> P2P for Beacon<N, C> {
@@ -250,7 +277,39 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Reading for Beacon<N, C> {
     }
 
     async fn process_message(&self, source: SocketAddr, message: Self::Message) -> io::Result<()> {
-        todo!()
+        let result = match message {
+            // Protocol violation, should disconnect.
+            Message::BlockRequest(_)
+            | Message::BlockResponse(_)
+            | Message::ChallengeRequest(_)
+            | Message::ChallengeResponse(_)
+            | Message::PuzzleRequest(_)
+            | Message::PuzzleResponse(_) => todo!(),
+
+            // Valid messages for a beacon to receive.
+            Message::Ping(ping) => todo!(),
+            Message::Pong(pong) => todo!(),
+
+            Message::UnconfirmedBlock(unconfirmed_block) => self.process_unconfirmed_block(unconfirmed_block).await,
+            Message::UnconfirmedSolution(unconfirmed_solution) => todo!(),
+            Message::UnconfirmedTransaction(unconfirmed_transaction) => todo!(),
+
+            _ => todo!(),
+        };
+
+        if let Err(err) = result {
+            warn!("disconnecting '{source}' for the following reason: {err}");
+
+            // TODO(nkls): this can likely be unified in the router.
+            if let Some(meta) = self.router().remove_peer(source) {
+                self.router().insert_restricted_peer(meta.listening_addr());
+            }
+
+            let _res = self.router().network().disconnect(source).await;
+            debug_assert!(_res);
+        }
+
+        Ok(())
     }
 }
 
