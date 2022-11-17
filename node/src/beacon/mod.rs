@@ -95,14 +95,20 @@ impl<N: Network> Beacon<N> {
 
         // Initialize the node account.
         let account = Account::from(private_key)?;
+        lap!(timer, "Initialize the account");
+
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
         lap!(timer, "Initialize the ledger");
+
         // Initialize the consensus.
         let consensus = Consensus::new(ledger.clone())?;
         lap!(timer, "Initialize consensus");
+
         // Initialize the node router.
         let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
+        lap!(timer, "Initialize the router");
+
         // Initialize the REST server.
         let rest = match rest_ip {
             Some(rest_ip) => {
@@ -118,11 +124,13 @@ impl<N: Network> Beacon<N> {
             }
             None => None,
         };
+
         // Initialize the block generation time.
         let block_generation_time = Arc::new(AtomicU64::new(2));
         // Retrieve the unspent records.
         let unspent_records = ledger.find_unspent_records(account.view_key())?;
-        lap!(timer, "Retrieve unspent records");
+        lap!(timer, "Retrieve the unspent records");
+
         // Initialize the node.
         let node = Self {
             account,
@@ -140,7 +148,7 @@ impl<N: Network> Beacon<N> {
         node.initialize_block_production().await;
         // Initialize the signal handler.
         node.handle_signals();
-        lap!(timer, "Initialize handlers");
+        lap!(timer, "Initialize the handlers");
 
         finish!(timer);
         // Return the node.
