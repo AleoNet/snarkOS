@@ -177,36 +177,6 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and(with(self.ledger.clone()))
             .and_then(Self::find_transition_id);
 
-        // GET /testnet3/records/all
-        let records_all = warp::get()
-            .and(warp::path!("testnet3" / "records" / "all"))
-            .and(with_auth())
-            .untuple_one()
-            .and(warp::body::content_length_limit(128))
-            .and(warp::body::json())
-            .and(with(self.ledger.clone()))
-            .and_then(Self::records_all);
-
-        // GET /testnet3/records/spent
-        let records_spent = warp::get()
-            .and(warp::path!("testnet3" / "records" / "spent"))
-            .and(with_auth())
-            .untuple_one()
-            .and(warp::body::content_length_limit(128))
-            .and(warp::body::json())
-            .and(with(self.ledger.clone()))
-            .and_then(Self::records_spent);
-
-        // GET /testnet3/records/unspent
-        let records_unspent = warp::get()
-            .and(warp::path!("testnet3" / "records" / "unspent"))
-            .and(with_auth())
-            .untuple_one()
-            .and(warp::body::content_length_limit(128))
-            .and(warp::body::json())
-            .and(with(self.ledger.clone()))
-            .and_then(Self::records_unspent);
-
         // POST /testnet3/transaction/broadcast
         let transaction_broadcast = warp::post()
             .and(warp::path!("testnet3" / "transaction" / "broadcast"))
@@ -239,9 +209,6 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .or(find_deployment_id)
             .or(find_transaction_id)
             .or(find_transition_id)
-            .or(records_all)
-            .or(records_spent)
-            .or(records_unspent)
             .or(transaction_broadcast)
     }
 }
@@ -389,30 +356,6 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     /// Returns the transition ID that contains the given `input ID` or `output ID`.
     async fn find_transition_id(input_or_output_id: Field<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.find_transition_id(&input_or_output_id).or_reject()?))
-    }
-
-    /// Returns all of the records for the given view key.
-    async fn records_all(view_key: ViewKey<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
-        // Fetch the records using the view key.
-        let records: IndexMap<_, _> = ledger.find_records(&view_key, RecordsFilter::All).or_reject()?.collect();
-        // Return the records.
-        Ok(reply::with_status(reply::json(&records), StatusCode::OK))
-    }
-
-    /// Returns the spent records for the given view key.
-    async fn records_spent(view_key: ViewKey<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
-        // Fetch the records using the view key.
-        let records = ledger.find_records(&view_key, RecordsFilter::Spent).or_reject()?.collect::<IndexMap<_, _>>();
-        // Return the records.
-        Ok(reply::with_status(reply::json(&records), StatusCode::OK))
-    }
-
-    /// Returns the unspent records for the given view key.
-    async fn records_unspent(view_key: ViewKey<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
-        // Fetch the records using the view key.
-        let records = ledger.find_records(&view_key, RecordsFilter::Unspent).or_reject()?.collect::<IndexMap<_, _>>();
-        // Return the records.
-        Ok(reply::with_status(reply::json(&records), StatusCode::OK))
     }
 
     /// Broadcasts the transaction to the ledger.
