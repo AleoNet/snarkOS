@@ -26,7 +26,7 @@ use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_executor::{NodeType, RawStatus};
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::{Message, UnconfirmedBlock};
+use snarkos_node_messages::{Message, UnconfirmedBlock, UnconfirmedSolution, UnconfirmedTransaction};
 use snarkos_node_network::Network;
 use snarkos_node_rest::Rest;
 use snarkvm::prelude::{Block, ConsensusStorage, Network as CurrentNetwork, PrivateKey};
@@ -247,7 +247,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
     async fn process_unconfirmed_block(&self, source: SocketAddr, message: UnconfirmedBlock<N>) -> anyhow::Result<()> {
         let message_clone = message.clone();
 
-        // If the block has been seen before, don't deserialise or propagate the block.
+        // If the block has been seen before, don't deserialise or propagate.
         if !self.cache().insert_seen_block(message.block_hash) {
             return Ok(());
         }
@@ -256,10 +256,11 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
         let block = message.block.deserialize().await?;
 
         if message.block_height != block.height() || message.block_hash != block.hash() {
-            anyhow::bail!("deserialized block doesn't match the 'UnconfirmedBlock' header")
+            anyhow::bail!("deserialized block doesn't match the 'UnconfirmedBlock' message metadata")
         }
 
-        // Propagate the block to all connected peers except the source.
+        // Propagate the block to all connected peers except the source. No need to spin up tasks
+        // for these as they are queued internally.
         for peer_addr in self.router().network().connected_addrs() {
             if peer_addr == source {
                 continue;
@@ -268,6 +269,74 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
             // Block data shouldn't need to be reserialised as we're sending the serialised copy.
             // TODO(nkls): handling errors here is not crucial but would be nice to have.
             let _res = self.unicast(peer_addr, Message::UnconfirmedBlock(message_clone.clone()));
+        }
+
+        Ok(())
+    }
+
+    async fn process_unconfirmed_solution(
+        &self,
+        source: SocketAddr,
+        message: UnconfirmedSolution<N>,
+    ) -> anyhow::Result<()> {
+        let message_clone = message.clone();
+
+        // If the solution has been seen before, don't deserialise or propagate.
+        if !self.cache().insert_seen_solution(message.puzzle_commitment) {
+            return Ok(());
+        }
+
+        // Perform the deferred non-blocking deserialisation of the solution.
+        let solution = message.solution.deserialize().await?;
+
+        if message.puzzle_commitment != solution.commitment() {
+            anyhow::bail!("deserialized solution doesn't match the 'UnconfirmedSolution' message metadata")
+        }
+
+        // Propagate the solution to all connected peers except the source. No need to spin up
+        // tasks for these as they are queued internally.
+        for peer_addr in self.router().network().connected_addrs() {
+            if peer_addr == source {
+                continue;
+            }
+
+            // Solution data shouldn't need to be reserialised as we're sending the serialised copy.
+            // TODO(nkls): handling errors here is not crucial but would be nice to have.
+            let _res = self.unicast(peer_addr, Message::UnconfirmedSolution(message_clone.clone()));
+        }
+
+        Ok(())
+    }
+
+    async fn process_unconfirmed_transaction(
+        &self,
+        source: SocketAddr,
+        message: UnconfirmedTransaction<N>,
+    ) -> anyhow::Result<()> {
+        let message_clone = message.clone();
+
+        // If the transaction has been seen before, don't deserialise or propagate.
+        if !self.cache().insert_seen_transaction(message.transaction_id) {
+            return Ok(());
+        }
+
+        // Perform the deferred non-blocking deserialisation of the transaction.
+        let transaction = message.transaction.deserialize().await?;
+
+        if message.transaction_id != transaction.id() {
+            anyhow::bail!("deserialised transaction doesn't match the 'UnconfirmedTransaction' message metadata")
+        }
+
+        // Propagate the transaction to all connected peers except the source. No need to spin up
+        // tasks for these as they are queued internally.
+        for peer_addr in self.router().network().connected_addrs() {
+            if peer_addr == source {
+                continue;
+            }
+
+            // Transaction data shouldn't need to be reserialised as we're sending the serialised copy.
+            // TODO(nkls): handling errors here is not crucial but would be nice to have.
+            let _res = self.unicast(peer_addr, Message::UnconfirmedTransaction(message_clone.clone()));
         }
 
         Ok(())
@@ -306,10 +375,16 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Reading for Beacon<N, C> {
             Message::Pong(pong) => todo!(),
 
             Message::UnconfirmedBlock(unconfirmed_block) => {
+                // TODO(nkls): spawn task.
                 self.process_unconfirmed_block(source, unconfirmed_block).await
             }
-            Message::UnconfirmedSolution(unconfirmed_solution) => todo!(),
-            Message::UnconfirmedTransaction(unconfirmed_transaction) => todo!(),
+            Message::UnconfirmedSolution(unconfirmed_solution) => {
+                // TODO(nkls): spawn task.
+                self.process_unconfirmed_solution(source, unconfirmed_solution).await
+            }
+            Message::UnconfirmedTransaction(unconfirmed_transaction) => {
+                self.process_unconfirmed_transaction(source, unconfirmed_transaction).await
+            }
 
             _ => todo!(),
         };
