@@ -54,7 +54,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     }
 
     /// Returns the blocks in the given block range.
-    pub fn get_blocks(&self, heights: std::ops::Range<u32>) -> Result<Vec<Block<N>>> {
+    pub fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>> {
         cfg_into_iter!(heights).map(|height| self.get_block(height)).collect()
     }
 

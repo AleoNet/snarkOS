@@ -45,6 +45,7 @@ use snarkvm::{
 
 use aleo_std::prelude::{finish, lap, timer};
 use anyhow::Result;
+use core::ops::Range;
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 use std::{borrow::Cow, sync::Arc};
