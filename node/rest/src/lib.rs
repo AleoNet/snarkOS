@@ -26,15 +26,11 @@ mod routes;
 pub use routes::*;
 
 use snarkos_node_consensus::Consensus;
-use snarkos_node_ledger::{Ledger, RecordsFilter};
+use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
 use snarkos_node_router::{Router, RouterRequest};
 use snarkvm::{
-    console::{
-        account::{Address, ViewKey},
-        program::ProgramID,
-        types::Field,
-    },
+    console::{account::Address, program::ProgramID, types::Field},
     prelude::{cfg_into_iter, Network},
     synthesizer::{ConsensusStorage, Program, Transaction},
 };
@@ -42,11 +38,10 @@ use snarkvm::{
 use anyhow::Result;
 use colored::*;
 use http::header::HeaderName;
-use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::task::JoinHandle;
-use warp::{http::StatusCode, reject, reply, Filter, Rejection, Reply};
+use warp::{reject, reply, Filter, Rejection, Reply};
 
 /// A REST API server for the ledger.
 #[derive(Clone)]
