@@ -26,7 +26,15 @@ use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_executor::{NodeType, RawStatus};
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::{Message, PeerResponse, UnconfirmedBlock, UnconfirmedSolution, UnconfirmedTransaction};
+use snarkos_node_messages::{
+    Message,
+    PeerResponse,
+    Ping,
+    Pong,
+    UnconfirmedBlock,
+    UnconfirmedSolution,
+    UnconfirmedTransaction,
+};
 use snarkos_node_network::Network;
 use snarkos_node_rest::Rest;
 use snarkvm::prelude::{Block, ConsensusStorage, Network as CurrentNetwork, PrivateKey};
@@ -40,6 +48,8 @@ use std::{
         Arc,
     },
 };
+
+const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 #[derive(Clone)]
 pub struct Beacon<N: CurrentNetwork, C: ConsensusStorage<N>> {
@@ -246,6 +256,31 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
 
     /* Message processing */
 
+    async fn process_ping(&self, source: SocketAddr, message: Ping) -> anyhow::Result<()> {
+        // Verify the peer's version.
+        if message.version < Message::<N>::VERSION {
+            anyhow::bail!("outdated protocol version: {}", message.version)
+        }
+
+        // Verify the peer's fork depth.
+        if message.fork_depth != ALEO_MAXIMUM_FORK_DEPTH {
+            anyhow::bail!("incorrect maximum for depth: {}", message.fork_depth)
+        }
+
+        // Update the peer metadata.
+        let set_values = |meta: &mut PeerMeta| {
+            meta.set_version(message.version);
+            meta.set_node_type(message.node_type);
+            meta.set_status(RawStatus::from_status(message.status));
+        };
+        self.router().write_peer_meta(source, set_values);
+
+        let _res = self.unicast(source, Message::Pong(Pong { is_fork: Some(false) }));
+        debug_assert!(_res.expect("writing protocol should be enabled").await.is_ok());
+
+        Ok(())
+    }
+
     async fn process_peer_request(&self, source: SocketAddr, message: PeerRequest) -> anyhow::Result<()> {
         let connected_peers = self.router().connected_peers();
         let _res = self.unicast(source, Message::PeerResponse(PeerResponse { peers: connected_peers }));
@@ -390,7 +425,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Reading for Beacon<N, C> {
             }
 
             // Valid messages for a beacon to receive.
-            Message::Ping(ping) => todo!(),
+            Message::Ping(ping) => self.process_ping(source, ping).await,
             Message::Pong(pong) => todo!(),
 
             Message::PeerRequest(peer_request) => self.process_peer_request(source, peer_request).await,

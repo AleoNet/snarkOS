@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::new_beacon::{router::PeerMeta, Beacon};
+use crate::new_beacon::{router::PeerMeta, Beacon, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_executor::{NodeType, RawStatus, Status};
 use snarkos_node_messages::{
     ChallengeRequest,
@@ -32,8 +32,6 @@ use std::{io, net::SocketAddr};
 
 use futures_util::{sink::SinkExt, TryStreamExt};
 use tokio_util::codec::Framed;
-
-const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
     fn verify_challenge_request(&self, message: &ChallengeRequest) -> Option<DisconnectReason> {

@@ -53,6 +53,15 @@ impl Router {
         &self.network
     }
 
+    pub fn write_peer_meta<F>(&self, addr: SocketAddr, mut write_func: F)
+    where
+        F: FnMut(&mut PeerMeta),
+    {
+        if let Some(meta) = self.current_peers.write().get_mut(&addr) {
+            write_func(meta)
+        }
+    }
+
     pub fn is_local_addr(&self, addr: SocketAddr) -> bool {
         let local_addr = self.network().listening_addr().expect("listening addr must be present");
         addr == local_addr
@@ -170,5 +179,17 @@ impl PeerMeta {
 
     pub fn listening_addr(&self) -> SocketAddr {
         self.listening_addr
+    }
+
+    pub fn set_version(&mut self, version: u32) {
+        self.version = version
+    }
+
+    pub fn set_node_type(&mut self, node_type: NodeType) {
+        self.node_type = node_type
+    }
+
+    pub fn set_status(&mut self, status: RawStatus) {
+        self.status = status
     }
 }
