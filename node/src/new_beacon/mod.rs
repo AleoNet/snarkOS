@@ -244,7 +244,9 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
         }
     }
 
-    async fn process_unconfirmed_block(&self, message: UnconfirmedBlock<N>) -> anyhow::Result<()> {
+    async fn process_unconfirmed_block(&self, source: SocketAddr, message: UnconfirmedBlock<N>) -> anyhow::Result<()> {
+        let message_clone = message.clone();
+
         // If the block has been seen before, don't deserialise or propagate the block.
         if !self.cache().insert_seen_block(message.block_hash) {
             return Ok(());
@@ -255,6 +257,17 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
 
         if message.block_height != block.height() || message.block_hash != block.hash() {
             anyhow::bail!("deserialized block doesn't match the 'UnconfirmedBlock' header")
+        }
+
+        // Propagate the block to all connected peers except the source.
+        for peer_addr in self.router().network().connected_addrs() {
+            if peer_addr == source {
+                continue;
+            }
+
+            // Block data shouldn't need to be reserialised as we're sending the serialised copy.
+            // TODO(nkls): handling errors here is not crucial but would be nice to have.
+            let _res = self.unicast(peer_addr, Message::UnconfirmedBlock(message_clone.clone()));
         }
 
         Ok(())
@@ -284,13 +297,17 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Reading for Beacon<N, C> {
             | Message::ChallengeRequest(_)
             | Message::ChallengeResponse(_)
             | Message::PuzzleRequest(_)
-            | Message::PuzzleResponse(_) => todo!(),
+            | Message::PuzzleResponse(_) => {
+                Err(anyhow::anyhow!("peer sent a message that isn't handled by the beacon"))
+            }
 
             // Valid messages for a beacon to receive.
             Message::Ping(ping) => todo!(),
             Message::Pong(pong) => todo!(),
 
-            Message::UnconfirmedBlock(unconfirmed_block) => self.process_unconfirmed_block(unconfirmed_block).await,
+            Message::UnconfirmedBlock(unconfirmed_block) => {
+                self.process_unconfirmed_block(source, unconfirmed_block).await
+            }
             Message::UnconfirmedSolution(unconfirmed_solution) => todo!(),
             Message::UnconfirmedTransaction(unconfirmed_transaction) => todo!(),
 
