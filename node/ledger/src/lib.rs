@@ -153,8 +153,13 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         lap!(timer, "Initialize ledger state");
 
         // Safety check the existence of every block.
-        cfg_into_iter!((0..=latest_height)).try_for_each(|height| {
-            ledger.get_block(height)?;
+        const BLOCK_RANGE: u32 = 100;
+        // Fetch `BLOCK_RANGE` blocks at a time.
+        let max_index = latest_height.saturating_div(BLOCK_RANGE);
+        cfg_into_iter!((0..=max_index)).try_for_each(|index| {
+            let start_height = index * BLOCK_RANGE;
+            let end_height = std::cmp::min(start_height + BLOCK_RANGE, latest_height).saturating_add(1);
+            ledger.get_blocks(start_height..end_height)?;
             Ok::<_, Error>(())
         })?;
         lap!(timer, "Check existence of {latest_height} blocks");
