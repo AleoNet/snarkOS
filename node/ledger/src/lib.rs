@@ -48,6 +48,7 @@ use anyhow::Result;
 use core::ops::Range;
 use indexmap::IndexMap;
 use parking_lot::RwLock;
+use rand::{prelude::IteratorRandom, rngs::OsRng};
 use std::{borrow::Cow, sync::Arc};
 
 #[cfg(feature = "parallel")]
@@ -153,17 +154,15 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         ledger.current_epoch_challenge = Arc::new(RwLock::new(Some(ledger.get_epoch_challenge(latest_height)?)));
         lap!(timer, "Initialize ledger state");
 
-        // Safety check the existence of every block.
-        const BLOCK_RANGE: u32 = 100;
-        // Fetch `BLOCK_RANGE` blocks at a time.
-        let max_index = latest_height.saturating_div(BLOCK_RANGE);
-        cfg_into_iter!((0..=max_index)).try_for_each(|index| {
-            let start_height = index * BLOCK_RANGE;
-            let end_height = std::cmp::min(start_height + BLOCK_RANGE, latest_height).saturating_add(1);
-            ledger.get_blocks(start_height..end_height)?;
+        // Safety check the existence of `NUM_BLOCKS` random blocks.
+        const NUM_BLOCKS: usize = 1000;
+        let block_heights: Vec<u32> = (0..=latest_height)
+            .choose_multiple(&mut OsRng::default(), core::cmp::min(NUM_BLOCKS, latest_height as usize));
+        cfg_into_iter!(block_heights).try_for_each(|height| {
+            ledger.get_block(height)?;
             Ok::<_, Error>(())
         })?;
-        lap!(timer, "Check existence of {latest_height} blocks");
+        lap!(timer, "Check existence of {NUM_BLOCKS} random blocks");
 
         finish!(timer);
 
