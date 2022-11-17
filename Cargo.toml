@@ -28,7 +28,8 @@ members = [
     "node/messages",
     "node/rest",
     "node/router",
-    "node/store"
+    "node/store",
+    "node/tcp"
 ]
 
 [[bin]]
@@ -73,9 +74,6 @@ path = "./node/ledger"
 [dependencies.snarkos-node-messages]
 path = "./node/messages"
 
-[dependencies.snarkos-node-network]
-path = "./node/network"
-
 [dependencies.snarkos-node-rest]
 path = "./node/rest"
 
@@ -84,6 +82,9 @@ path = "./node/router"
 
 [dependencies.snarkos-node-store]
 path = "./node/store"
+
+[dependencies.snarkos-node-tcp]
+path = "./node/tcp"
 
 [dev-dependencies.rusty-hook]
 version = "0.11.2"

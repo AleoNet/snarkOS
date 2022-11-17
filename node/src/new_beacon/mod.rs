@@ -35,8 +35,8 @@ use snarkos_node_messages::{
     UnconfirmedSolution,
     UnconfirmedTransaction,
 };
-use snarkos_node_network::Network;
 use snarkos_node_rest::Rest;
+use snarkos_node_tcp::Network;
 use snarkvm::prelude::{Block, ConsensusStorage, Network as CurrentNetwork, PrivateKey};
 
 use anyhow::Result;
@@ -146,7 +146,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
 
 // use snarkos_node_messages::{MessageOrBytes, NoiseCodec, NoiseState, PeerRequest};
 use snarkos_node_messages::{MessageCodec, PeerRequest};
-use snarkos_node_network::{
+use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake as Handshaking, Reading, Writing},
     ConnectionSide,
     P2P,

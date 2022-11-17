@@ -54,9 +54,6 @@ path = "./ledger"
 [dependencies.snarkos-node-messages]
 path = "./messages"
 
-[dependencies.snarkos-node-network]
-path = "./network"
-
 [dependencies.snarkos-node-rest]
 path = "./rest"
 
@@ -65,6 +62,9 @@ path = "./router"
 
 [dependencies.snarkos-node-store]
 path = "./store"
+
+[dependencies.snarkos-node-tcp]
+path = "./tcp"
 
 [dependencies.snarkvm]
 workspace = true

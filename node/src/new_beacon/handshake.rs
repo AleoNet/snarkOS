@@ -25,7 +25,7 @@ use snarkos_node_messages::{
     Message,
     MessageCodec,
 };
-use snarkos_node_network::{protocols::Handshake as Handshaking, Connection, ConnectionSide};
+use snarkos_node_tcp::{protocols::Handshake as Handshaking, Connection, ConnectionSide};
 use snarkvm::prelude::{Block, ConsensusStorage, FromBytes, Network as CurrentNetwork};
 
 use std::{io, net::SocketAddr};

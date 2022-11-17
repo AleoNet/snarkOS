@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_node_executor::{NodeType, RawStatus};
-use snarkos_node_network::{ConnectionSide, Network};
+use snarkos_node_tcp::{ConnectionSide, Network};
 
 use parking_lot::RwLock;
 use std::{
