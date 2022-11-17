@@ -61,7 +61,7 @@ impl Router {
 
     pub fn is_connected(&self, addr: SocketAddr) -> bool {
         self.network().is_connected(addr)
-            || self.current_peers.read().iter().find(|(_, meta)| meta.listening_addr() == addr).is_some()
+            || self.current_peers.read().iter().any(|(_, meta)| meta.listening_addr() == addr)
     }
 
     pub fn is_restricted(&self, addr: SocketAddr) -> bool {
