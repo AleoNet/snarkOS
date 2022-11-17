@@ -16,6 +16,14 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
+[features]
+default = [ ]
+timer = [ "aleo-std/timer", "snarkos-node-ledger/timer" ]
+
+[dependencies.aleo-std]
+version = "0.1.15"
+default-features = false
+
 [dependencies.anyhow]
 version = "1"
 
@@ -68,3 +76,9 @@ features = ["rt", "signal"]
 
 [dependencies.tracing]
 version = "0.1"
+
+[dev-dependencies.tokio-test]
+version = "0.4"
+
+[dev-dependencies.rand_chacha]
+version = "0.3.0"

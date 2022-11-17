@@ -125,6 +125,9 @@ name = "aleo-std-timer"
 version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7e4f181fc1a372e8ceff89612e5c9b13f72bff5b066da9f8d6827ae65af492c4"
+dependencies = [
+ "colored",
+]
 
 [[package]]
 name = "anyhow"
@@ -143,6 +146,27 @@ name = "arrayvec"
 version = "0.7.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8da52d66c7071e2e3fa2a1e5c6d088fec47b593032b254f5e980de8ea54454d6"
+
+[[package]]
+name = "async-stream"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "dad5c83079eae9969be7fadefe640a1c566901f05ff91ab221de4b6f68d9507e"
+dependencies = [
+ "async-stream-impl",
+ "futures-core",
+]
+
+[[package]]
+name = "async-stream-impl"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "10f203db73a71dfa2fb6dd22763990fa26f3d2625a6da2da900d23b87d26be27"
+dependencies = [
+ "proc-macro2 1.0.47",
+ "quote 1.0.21",
+ "syn 1.0.103",
+]
 
 [[package]]
 name = "async-trait"
@@ -2310,10 +2334,12 @@ dependencies = [
 name = "snarkos-node"
 version = "2.0.2"
 dependencies = [
+ "aleo-std",
  "anyhow",
  "async-trait",
  "parking_lot",
  "rand",
+ "rand_chacha",
  "serde_json",
  "snarkos-account",
  "snarkos-node-consensus",
@@ -2326,6 +2352,7 @@ dependencies = [
  "snarkvm",
  "time",
  "tokio",
+ "tokio-test",
  "tracing",
 ]
 
@@ -2367,11 +2394,13 @@ dependencies = [
 name = "snarkos-node-ledger"
 version = "2.0.2"
 dependencies = [
+ "aleo-std",
  "anyhow",
  "indexmap",
  "once_cell",
  "parking_lot",
  "rand",
+ "rayon",
  "snarkos-node-store",
  "snarkvm",
  "tracing",
@@ -3296,6 +3325,19 @@ dependencies = [
  "futures-core",
  "pin-project-lite",
  "tokio",
+]
+
+[[package]]
+name = "tokio-test"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "53474327ae5e166530d17f2d956afcb4f8a004de581b3cae10f12006bc8163e3"
+dependencies = [
+ "async-stream",
+ "bytes",
+ "futures-core",
+ "tokio",
+ "tokio-stream",
 ]
 
 [[package]]

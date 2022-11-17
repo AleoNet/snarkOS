@@ -43,9 +43,12 @@ use snarkvm::{
     },
 };
 
+use aleo_std::prelude::{finish, lap, timer};
 use anyhow::Result;
+use core::ops::Range;
 use indexmap::IndexMap;
 use parking_lot::RwLock;
+use rand::{prelude::IteratorRandom, rngs::OsRng};
 use std::{borrow::Cow, sync::Arc};
 
 #[cfg(feature = "parallel")]
@@ -80,21 +83,31 @@ pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
 impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     /// Loads the ledger from storage.
     pub fn load(genesis: Option<Block<N>>, dev: Option<u16>) -> Result<Self> {
+        let timer = timer!("Ledger::load");
+
         // Retrieve the genesis hash.
         let genesis_hash = match genesis {
             Some(ref genesis) => genesis.hash(),
             None => Block::<N>::from_bytes_le(N::genesis_bytes())?.hash(),
         };
+        lap!(timer, "Load genesis hash");
 
         // Initialize the consensus store.
         let store = match ConsensusStore::<N, C>::open(dev) {
             Ok(store) => store,
             _ => bail!("Failed to load ledger (run 'snarkos clean' and try again)"),
         };
+        lap!(timer, "Load consensus store");
+
         // Initialize a new VM.
         let vm = VM::from(store)?;
+        lap!(timer, "Initialize a new VM");
+
         // Initialize the ledger.
         let ledger = Self::from(vm, genesis)?;
+        lap!(timer, "Initialize ledger");
+
+        finish!(timer);
 
         // Ensure the ledger contains the correct genesis block.
         match ledger.contains_block_hash(&genesis_hash)? {
@@ -105,11 +118,14 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Initializes the ledger from storage, with an optional genesis block.
     pub fn from(vm: VM<N, C>, genesis: Option<Block<N>>) -> Result<Self> {
+        let timer = timer!("Ledger::from");
+
         // Load the genesis block.
         let genesis = match genesis {
             Some(genesis) => genesis,
             None => Block::<N>::from_bytes_le(N::genesis_bytes())?,
         };
+        lap!(timer, "Load genesis block");
 
         // Initialize the ledger.
         let mut ledger = Self {
@@ -136,12 +152,19 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         ledger.current_block = Arc::new(RwLock::new(block));
         // Set the current epoch challenge.
         ledger.current_epoch_challenge = Arc::new(RwLock::new(Some(ledger.get_epoch_challenge(latest_height)?)));
+        lap!(timer, "Initialize ledger state");
 
-        // // Safety check the existence of every block.
-        // cfg_into_iter!((0..=latest_height)).try_for_each(|height| {
-        //     ledger.get_block(height)?;
-        //     Ok::<_, Error>(())
-        // })?;
+        // Safety check the existence of `NUM_BLOCKS` random blocks.
+        const NUM_BLOCKS: usize = 1000;
+        let block_heights: Vec<u32> = (0..=latest_height)
+            .choose_multiple(&mut OsRng::default(), core::cmp::min(NUM_BLOCKS, latest_height as usize));
+        cfg_into_iter!(block_heights).try_for_each(|height| {
+            ledger.get_block(height)?;
+            Ok::<_, Error>(())
+        })?;
+        lap!(timer, "Check existence of {NUM_BLOCKS} random blocks");
+
+        finish!(timer);
 
         Ok(ledger)
     }

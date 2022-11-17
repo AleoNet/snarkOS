@@ -46,6 +46,7 @@ use snarkvm::prelude::{
     Zero,
 };
 
+use aleo_std::prelude::{finish, lap, timer};
 use anyhow::{bail, Result};
 use core::{str::FromStr, time::Duration};
 use parking_lot::RwLock;
@@ -90,29 +91,46 @@ impl<N: Network> Beacon<N> {
         genesis: Option<Block<N>>,
         dev: Option<u16>,
     ) -> Result<Self> {
+        let timer = timer!("Beacon::new");
+
         // Initialize the node account.
         let account = Account::from(private_key)?;
+        lap!(timer, "Initialize the account");
+
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
+        lap!(timer, "Initialize the ledger");
+
         // Initialize the consensus.
         let consensus = Consensus::new(ledger.clone())?;
+        lap!(timer, "Initialize consensus");
+
         // Initialize the node router.
         let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
+        lap!(timer, "Initialize the router");
+
         // Initialize the REST server.
         let rest = match rest_ip {
-            Some(rest_ip) => Some(Arc::new(Rest::start(
-                rest_ip,
-                account.address(),
-                Some(consensus.clone()),
-                ledger.clone(),
-                router.clone(),
-            )?)),
+            Some(rest_ip) => {
+                let server = Arc::new(Rest::start(
+                    rest_ip,
+                    account.address(),
+                    Some(consensus.clone()),
+                    ledger.clone(),
+                    router.clone(),
+                )?);
+                lap!(timer, "Initialize REST server");
+                Some(server)
+            }
             None => None,
         };
+
         // Initialize the block generation time.
         let block_generation_time = Arc::new(AtomicU64::new(2));
         // Retrieve the unspent records.
         let unspent_records = ledger.find_unspent_records(account.view_key())?;
+        lap!(timer, "Retrieve the unspent records");
+
         // Initialize the node.
         let node = Self {
             account,
@@ -126,11 +144,13 @@ impl<N: Network> Beacon<N> {
         };
         // Initialize the router handler.
         router.initialize_handler(node.clone(), router_receiver).await;
-
         // Initialize the block production.
         node.initialize_block_production().await;
         // Initialize the signal handler.
         node.handle_signals();
+        lap!(timer, "Initialize the handlers");
+
+        finish!(timer);
         // Return the node.
         Ok(node)
     }
@@ -438,5 +458,49 @@ impl<N: Network> Beacon<N> {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snarkvm::prelude::{ConsensusMemory, ConsensusStore, Testnet3, VM};
+
+    use rand::SeedableRng;
+    use rand_chacha::ChaChaRng;
+
+    type CurrentNetwork = Testnet3;
+
+    /// Use `RUST_MIN_STACK=67108864 cargo test --release profiler --features timer` to run this test.
+    #[ignore]
+    #[tokio::test]
+    async fn test_profiler() -> Result<()> {
+        // Specify the node attributes.
+        let node = SocketAddr::from_str("0.0.0.0:4133").unwrap();
+        let rest = SocketAddr::from_str("0.0.0.0:3033").unwrap();
+
+        let dev = Some(0);
+
+        // Initialize an (insecure) fixed RNG.
+        let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
+        // Initialize the beacon private key.
+        let beacon_private_key = PrivateKey::<CurrentNetwork>::new(&mut rng)?;
+        // Initialize a new VM.
+        let vm = VM::from(ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?)?;
+        // Initialize the genesis block.
+        let genesis = Block::genesis(&vm, &beacon_private_key, &mut rng)?;
+
+        println!("Initializing beacon node...");
+
+        let beacon =
+            Beacon::<CurrentNetwork>::new(node, Some(rest), beacon_private_key, &[], Some(genesis), dev).await.unwrap();
+
+        println!(
+            "Loaded beacon node with {} blocks and {} records",
+            beacon.ledger.latest_height(),
+            beacon.unspent_records.read().len()
+        );
+
+        bail!("\n\nRemember to #[ignore] this test!\n\n")
     }
 }
