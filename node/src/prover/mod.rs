@@ -163,9 +163,8 @@ impl<N: Network> Prover<N> {
                             let latest_proof_target = block.proof_target();
 
                             debug!(
-                                "Proving 'CoinbasePuzzle' (Epoch {}, Block {}, Coinbase Target {}, Proof Target {})",
+                                "Proving 'CoinbasePuzzle' (Epoch {}, Coinbase Target {}, Proof Target {})",
                                 epoch_challenge.epoch_number(),
-                                block.height(),
                                 latest_coinbase_target,
                                 latest_proof_target,
                             );
