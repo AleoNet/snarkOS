@@ -85,12 +85,23 @@ impl Router {
         self.restricted_peers.write().remove(&addr);
     }
 
+    // TODO(nkls): return listening addr instead of conn addr, or both?
+    pub fn connected_peers(&self) -> Vec<SocketAddr> {
+        self.current_peers
+            .read()
+            .iter()
+            .filter(|(_, meta)| meta.node_type != NodeType::Beacon)
+            .map(|(conn_addr, meta)| meta.listening_addr())
+            .collect()
+    }
+
+    // TODO(nkls): return listening addr instead of conn addr, or both?
     pub fn connected_beacons(&self) -> Vec<SocketAddr> {
         self.current_peers
             .read()
             .iter()
-            .filter(|(_addr, meta)| meta.node_type == NodeType::Beacon)
-            .map(|(addr, _meta)| addr)
+            .filter(|(_, meta)| meta.node_type == NodeType::Beacon)
+            .map(|(conn_addr, _meta)| conn_addr)
             .copied()
             .collect()
     }

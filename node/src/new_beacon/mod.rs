@@ -26,7 +26,7 @@ use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_executor::{NodeType, RawStatus};
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::{Message, UnconfirmedBlock, UnconfirmedSolution, UnconfirmedTransaction};
+use snarkos_node_messages::{Message, PeerResponse, UnconfirmedBlock, UnconfirmedSolution, UnconfirmedTransaction};
 use snarkos_node_network::Network;
 use snarkos_node_rest::Rest;
 use snarkvm::prelude::{Block, ConsensusStorage, Network as CurrentNetwork, PrivateKey};
@@ -244,6 +244,16 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
         }
     }
 
+    /* Message processing */
+
+    async fn process_peer_request(&self, source: SocketAddr, message: PeerRequest) -> anyhow::Result<()> {
+        let connected_peers = self.router().connected_peers();
+        let _res = self.unicast(source, Message::PeerResponse(PeerResponse { peers: connected_peers }));
+        debug_assert!(_res.expect("writing protocol should be enabled").await.is_ok());
+
+        Ok(())
+    }
+
     async fn process_unconfirmed_block(&self, source: SocketAddr, message: UnconfirmedBlock<N>) -> anyhow::Result<()> {
         let message_clone = message.clone();
 
@@ -269,6 +279,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
             // Block data shouldn't need to be reserialised as we're sending the serialised copy.
             // TODO(nkls): handling errors here is not crucial but would be nice to have.
             let _res = self.unicast(peer_addr, Message::UnconfirmedBlock(message_clone.clone()));
+            debug_assert!(_res.expect("writing protocol should be enabled").await.is_ok());
         }
 
         Ok(())
@@ -303,6 +314,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
             // Solution data shouldn't need to be reserialised as we're sending the serialised copy.
             // TODO(nkls): handling errors here is not crucial but would be nice to have.
             let _res = self.unicast(peer_addr, Message::UnconfirmedSolution(message_clone.clone()));
+            debug_assert!(_res.expect("writing protocol should be enabled").await.is_ok());
         }
 
         Ok(())
@@ -337,6 +349,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
             // Transaction data shouldn't need to be reserialised as we're sending the serialised copy.
             // TODO(nkls): handling errors here is not crucial but would be nice to have.
             let _res = self.unicast(peer_addr, Message::UnconfirmedTransaction(message_clone.clone()));
+            debug_assert!(_res.expect("writing protocol should be enabled").await.is_ok());
         }
 
         Ok(())
@@ -374,6 +387,9 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Reading for Beacon<N, C> {
             Message::Ping(ping) => todo!(),
             Message::Pong(pong) => todo!(),
 
+            Message::PeerRequest(peer_request) => self.process_peer_request(source, peer_request).await,
+            Message::PeerResponse(peer_response) => todo!(),
+
             Message::UnconfirmedBlock(unconfirmed_block) => {
                 // TODO(nkls): spawn task.
                 self.process_unconfirmed_block(source, unconfirmed_block).await
@@ -383,10 +399,11 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Reading for Beacon<N, C> {
                 self.process_unconfirmed_solution(source, unconfirmed_solution).await
             }
             Message::UnconfirmedTransaction(unconfirmed_transaction) => {
+                // TODO(nkls): spawn task.
                 self.process_unconfirmed_transaction(source, unconfirmed_transaction).await
             }
 
-            _ => todo!(),
+            Message::Disconnect(_) => todo!(),
         };
 
         if let Err(err) = result {
