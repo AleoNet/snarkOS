@@ -22,19 +22,19 @@ use std::{
 #[cfg(doc)]
 use crate::protocols::{self, Handshake, Reading, Writing};
 
-/// The node's configuration. See the source of [`Config::default`] for the defaults.
+/// The Tcp's configuration. See the source of [`Config::default`] for the defaults.
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// A user-friendly identifier of the node. It is visible in the logs, where it allows nodes to be
+    /// A user-friendly identifier of the Tcp. It is visible in the logs, where it allows Tcp instances to be
     /// distinguished more easily if multiple are run at the same time.
     ///
-    /// note: If set to `None`, the node will automatically be assigned a sequential, zero-based numeric identifier.
+    /// note: If set to `None`, Tcp will automatically be assigned a sequential, zero-based numeric identifier.
     pub name: Option<String>,
-    /// The IP address the node's connection listener should bind to.
+    /// The IP address the Tcp's connection listener should bind to.
     ///
-    /// note: If set to `None`, the node will not listen for inbound connections at all.
+    /// note: If set to `None`, the Tcp will not listen for inbound connections at all.
     pub listener_ip: Option<IpAddr>,
-    /// The desired listening port of the node. If [`Config::allow_random_port`] is set to `true`, the node
+    /// The desired listening port of the Tcp. If [`Config::allow_random_port`] is set to `true`, the Tcp
     /// will attempt to bind its listener to a different port if the desired one is not available.
     ///
     /// note: [`Config::listener_ip`] must not be `None` in order for it to have any effect.
@@ -45,9 +45,9 @@ pub struct Config {
     pub allow_random_port: bool,
     /// The list of IO errors considered fatal and causing the connection to be dropped.
     ///
-    /// note: The node needs to implement the [`Reading`] and/or [`Writing`] protocol in order for it to have any effect.
+    /// note: Tcp needs to implement the [`Reading`] and/or [`Writing`] protocol in order for it to have any effect.
     pub fatal_io_errors: Vec<io::ErrorKind>,
-    /// The maximum number of active connections the node can maintain at any given time.
+    /// The maximum number of active connections Tcp can maintain at any given time.
     ///
     /// note: This number can very briefly be breached by 1 in case of inbound connection attempts. It can never be
     /// breached by outbound connection attempts, though.

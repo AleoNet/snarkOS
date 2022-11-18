@@ -73,7 +73,7 @@ impl<T: AsyncWrite + Unpin + Send + Sync> AW for T {}
 pub struct Connection {
     /// The address of the connection.
     addr: SocketAddr,
-    /// The connection's side in relation to the node.
+    /// The connection's side in relation to Tcp.
     side: ConnectionSide,
     /// Available and used only in the [`Handshake`] protocol.
     pub(crate) stream: Option<TcpStream>,
@@ -107,7 +107,7 @@ impl Connection {
     }
 
     /// Returns `ConnectionSide::Initiator` if the associated peer initiated the connection
-    /// and `ConnectionSide::Responder` if the connection request was initiated by the node.
+    /// and `ConnectionSide::Responder` if the connection request was initiated by Tcp.
     pub fn side(&self) -> ConnectionSide {
         self.side
     }

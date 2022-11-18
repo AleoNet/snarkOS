@@ -204,32 +204,32 @@ impl Tcp {
         Ok(node)
     }
 
-    /// Returns the name assigned to the node.
+    /// Returns the name assigned to Tcp.
     #[inline]
     pub fn name(&self) -> &str {
         // safe; can be set as None in Config, but receives a default value on Tcp creation
         self.config.name.as_deref().unwrap()
     }
 
-    /// Returns a reference to the node's config.
+    /// Returns a reference to the Tcp's config.
     #[inline]
     pub fn config(&self) -> &Config {
         &self.config
     }
 
-    /// Returns a reference to the node's stats.
+    /// Returns a reference to the Tcp's stats.
     #[inline]
     pub fn stats(&self) -> &Stats {
         &self.stats
     }
 
-    /// Returns the tracing [`Span`] associated with the node.
+    /// Returns the tracing [`Span`] associated with Tcp.
     #[inline]
     pub fn span(&self) -> &Span {
         &self.span
     }
 
-    /// Returns the node's listening address; returns an error if the node was configured
+    /// Returns the Tcp's listening address; returns an error if Tcp was configured
     /// to not listen for inbound connections.
     pub fn listening_addr(&self) -> io::Result<SocketAddr> {
         self.listening_addr.ok_or_else(|| io::ErrorKind::AddrNotAvailable.into())
@@ -290,7 +290,7 @@ impl Tcp {
     pub async fn connect(&self, addr: SocketAddr) -> io::Result<()> {
         if let Ok(listening_addr) = self.listening_addr() {
             if addr == listening_addr || addr.ip().is_loopback() && addr.port() == listening_addr.port() {
-                error!(parent: self.span(), "can't connect to node's own listening address ({})", addr);
+                error!(parent: self.span(), "can't connect to Tcp's own listening address ({})", addr);
                 return Err(io::ErrorKind::AddrInUse.into());
             }
         }
@@ -347,7 +347,7 @@ impl Tcp {
                 task.abort();
             }
 
-            // if the (owning) node was not the initiator of the connection, it doesn't know the listening address
+            // if the (owning) Tcp was not the initiator of the connection, it doesn't know the listening address
             // of the associated peer, so the related stats are unreliable; the next connection initiated by the
             // peer could be bound to an entirely different port number
             if conn.side() == ConnectionSide::Initiator {
@@ -367,7 +367,7 @@ impl Tcp {
         self.connections.addrs()
     }
 
-    /// Returns a reference to the collection of statistics of node's known peers.
+    /// Returns a reference to the collection of statistics of Tcp's known peers.
     #[inline]
     pub fn known_peers(&self) -> &KnownPeers {
         &self.known_peers
@@ -378,7 +378,7 @@ impl Tcp {
         self.connections.is_connected(addr)
     }
 
-    /// Checks if the node is currently setting up a connection with the provided address.
+    /// Checks if Tcp is currently setting up a connection with the provided address.
     pub fn is_connecting(&self, addr: SocketAddr) -> bool {
         self.connecting.lock().contains(&addr)
     }
@@ -405,7 +405,7 @@ impl Tcp {
         }
     }
 
-    /// Gracefully shuts the node down.
+    /// Gracefully shuts Tcp down.
     pub async fn shut_down(&self) {
         debug!(parent: self.span(), "shutting down");
 
@@ -425,23 +425,23 @@ impl Tcp {
 }
 
 // FIXME: this can probably be done more elegantly
-/// Creates the node's tracing span based on its name.
-fn create_span(node_name: &str) -> Span {
-    let mut span = trace_span!("node", name = node_name);
+/// Creates the Tcp's tracing span based on its name.
+fn create_span(tcp_name: &str) -> Span {
+    let mut span = trace_span!("tcp", name = tcp_name);
     if !span.is_disabled() {
         return span;
     } else {
-        span = debug_span!("node", name = node_name);
+        span = debug_span!("tcp", name = tcp_name);
     }
     if !span.is_disabled() {
         return span;
     } else {
-        span = info_span!("node", name = node_name);
+        span = info_span!("tcp", name = tcp_name);
     }
     if !span.is_disabled() {
         return span;
     } else {
-        span = warn_span!("node", name = node_name);
+        span = warn_span!("tcp", name = tcp_name);
     }
-    if !span.is_disabled() { span } else { error_span!("node", name = node_name) }
+    if !span.is_disabled() { span } else { error_span!("tcp", name = tcp_name) }
 }

@@ -20,7 +20,7 @@ use parking_lot::RwLock;
 
 use crate::Stats;
 
-/// Contains statistics related to node's peers, currently connected or not.
+/// Contains statistics related to Tcp's peers, currently connected or not.
 #[derive(Default)]
 pub struct KnownPeers(RwLock<HashMap<SocketAddr, Arc<Stats>>>);
 

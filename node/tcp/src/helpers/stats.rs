@@ -16,7 +16,7 @@
 
 use std::sync::atomic::{AtomicU64, Ordering::Relaxed};
 
-/// Contains statistics related to a node.
+/// Contains statistics related to Tcp.
 #[derive(Default)]
 pub struct Stats {
     /// The number of all messages sent.
