@@ -27,9 +27,6 @@ pub use helpers::*;
 mod handshake;
 pub use handshake::*;
 
-mod peer;
-pub use peer::*;
-
 mod routes;
 pub use routes::*;
 

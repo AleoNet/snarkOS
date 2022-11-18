@@ -16,3 +16,6 @@
 
 mod cache;
 pub use cache::Cache;
+
+mod peer;
+pub use peer::*;
