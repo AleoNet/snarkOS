@@ -2505,6 +2505,7 @@ dependencies = [
  "serde",
  "snarkos-node-executor",
  "snarkos-node-messages",
+ "snarkos-node-tcp",
  "snarkvm",
  "time",
  "tokio",

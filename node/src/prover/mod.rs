@@ -20,7 +20,7 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedSolution};
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
+use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
 use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
 
 use anyhow::Result;
@@ -56,20 +56,18 @@ impl<N: Network> Prover<N> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the node router.
-        let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
+        let router = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
         let node = Self {
             account,
-            router: router.clone(),
+            router,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
             puzzle_instances: Default::default(),
         };
-        // Initialize the router handler.
-        router.initialize_handler(node.clone(), router_receiver).await;
         for _ in 0..3 {
             // Initialize the coinbase puzzle.
             node.initialize_coinbase_puzzle().await;
@@ -197,16 +195,14 @@ impl<N: Network> Prover<N> {
                                 true => {
                                     info!("Found a Solution (Proof Target {prover_solution_target})");
 
-                                    // Propagate the "UnconfirmedSolution" to the network.
+                                    // Prepare the unconfirmed solution message.
                                     let message = Message::UnconfirmedSolution(UnconfirmedSolution {
                                         puzzle_commitment: prover_solution.commitment(),
                                         solution: Data::Object(prover_solution),
                                     });
-                                    let request = RouterRequest::MessagePropagate(message, vec![]);
-                                    if let Err(error) = prover.router.process(request).await {
-                                        warn!("[UnconfirmedSolution] {error}");
-                                    }
 
+                                    // Propagate the "UnconfirmedSolution" to the network.
+                                    prover.router.propagate(message, vec![]);
                                     break;
                                 }
                                 false => trace!(

@@ -28,7 +28,7 @@ pub use routes::*;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
-use snarkos_node_router::{Router, RouterRequest};
+use snarkos_node_router::Router;
 use snarkvm::{
     console::{account::Address, program::ProgramID, types::Field},
     prelude::{cfg_into_iter, Network},

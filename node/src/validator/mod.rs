@@ -22,7 +22,7 @@ use snarkos_node_executor::{Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
+use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
 use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
 
@@ -66,7 +66,7 @@ impl<N: Network> Validator<N> {
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
         // Initialize the node router.
-        let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
+        let router = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
         // Initialize the REST server.
         let rest = match rest_ip {
             Some(rest_ip) => {
@@ -80,15 +80,13 @@ impl<N: Network> Validator<N> {
         let node = Self {
             account,
             ledger,
-            router: router.clone(),
+            router,
             rest,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
             latest_puzzle_response: Default::default(),
         };
-        // Initialize the router handler.
-        router.initialize_handler(node.clone(), router_receiver).await;
         // Initialize the signal handler.
         node.handle_signals();
         // Return the node.

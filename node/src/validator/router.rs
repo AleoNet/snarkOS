@@ -29,10 +29,7 @@ impl<N: Network> Inbound<N> for Validator<N> {
         // Send the latest puzzle response, if it exists.
         if let Some(puzzle_response) = self.latest_puzzle_response.read().await.clone() {
             // Send the `PuzzleResponse` message to the peer.
-            let message = Message::PuzzleResponse(puzzle_response);
-            if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
-                warn!("[PuzzleResponse] {error}");
-            }
+            router.send(peer_ip, Message::PuzzleResponse(puzzle_response));
         }
         true
     }
@@ -92,14 +89,8 @@ impl<N: Network> Inbound<N> for Validator<N> {
             .await;
 
             match is_valid {
-                Ok(Ok(true)) => {
-                    // Propagate the `UnconfirmedSolution` to connected beacons.
-                    let message = Message::UnconfirmedSolution(message);
-                    let request = RouterRequest::MessagePropagateBeacon(message, vec![peer_ip]);
-                    if let Err(error) = router.process(request).await {
-                        warn!("[UnconfirmedSolution] {error}");
-                    }
-                }
+                // If the solution is valid, propagate the `UnconfirmedSolution` to connected beacons.
+                Ok(Ok(true)) => router.propagate_to_beacons(Message::UnconfirmedSolution(message), vec![peer_ip]),
                 Ok(Ok(false)) | Ok(Err(_)) => {
                     trace!("Invalid prover solution '{}' for the current epoch.", solution.commitment())
                 }

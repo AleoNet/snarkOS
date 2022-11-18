@@ -33,6 +33,12 @@ pub struct Cache<N: Network> {
     seen_inbound_solutions: Arc<RwLock<LinkedHashMap<PuzzleCommitment<N>, OffsetDateTime>>>,
     /// The map of transaction IDs to their last seen timestamp.
     seen_inbound_transactions: Arc<RwLock<LinkedHashMap<N::TransactionID, OffsetDateTime>>>,
+    /// The map of block hashes to their last seen timestamp.
+    seen_outbound_blocks: Arc<RwLock<LinkedHashMap<N::BlockHash, OffsetDateTime>>>,
+    /// The map of solution commitments to their last seen timestamp.
+    seen_outbound_solutions: Arc<RwLock<LinkedHashMap<PuzzleCommitment<N>, OffsetDateTime>>>,
+    /// The map of transaction IDs to their last seen timestamp.
+    seen_outbound_transactions: Arc<RwLock<LinkedHashMap<N::TransactionID, OffsetDateTime>>>,
 }
 
 impl<N: Network> Default for Cache<N> {
@@ -49,22 +55,40 @@ impl<N: Network> Cache<N> {
             seen_inbound_blocks: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_inbound_solutions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_inbound_transactions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
+            seen_outbound_blocks: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
+            seen_outbound_solutions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
+            seen_outbound_transactions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
         }
     }
 
     /// Inserts a block hash into the cache, returning the previously seen timestamp if it existed.
-    pub fn insert_seen_block(&self, hash: N::BlockHash) -> Option<OffsetDateTime> {
+    pub fn insert_inbound_block(&self, hash: N::BlockHash) -> Option<OffsetDateTime> {
         Self::refresh_and_insert(&self.seen_inbound_blocks, hash)
     }
 
     /// Inserts a solution commitment into the cache, returning the previously seen timestamp if it existed.
-    pub fn insert_seen_solution(&self, solution: PuzzleCommitment<N>) -> Option<OffsetDateTime> {
+    pub fn insert_inbound_solution(&self, solution: PuzzleCommitment<N>) -> Option<OffsetDateTime> {
         Self::refresh_and_insert(&self.seen_inbound_solutions, solution)
     }
 
     /// Inserts a transaction ID into the cache, returning the previously seen timestamp if it existed.
-    pub fn insert_seen_transaction(&self, transaction: N::TransactionID) -> Option<OffsetDateTime> {
+    pub fn insert_inbound_transaction(&self, transaction: N::TransactionID) -> Option<OffsetDateTime> {
         Self::refresh_and_insert(&self.seen_inbound_transactions, transaction)
+    }
+
+    /// Inserts a block hash into the cache, returning the previously seen timestamp if it existed.
+    pub fn insert_outbound_block(&self, hash: N::BlockHash) -> Option<OffsetDateTime> {
+        Self::refresh_and_insert(&self.seen_outbound_blocks, hash)
+    }
+
+    /// Inserts a solution commitment into the cache, returning the previously seen timestamp if it existed.
+    pub fn insert_outbound_solution(&self, solution: PuzzleCommitment<N>) -> Option<OffsetDateTime> {
+        Self::refresh_and_insert(&self.seen_outbound_solutions, solution)
+    }
+
+    /// Inserts a transaction ID into the cache, returning the previously seen timestamp if it existed.
+    pub fn insert_outbound_transaction(&self, transaction: N::TransactionID) -> Option<OffsetDateTime> {
+        Self::refresh_and_insert(&self.seen_outbound_transactions, transaction)
     }
 }
 

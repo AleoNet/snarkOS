@@ -67,14 +67,8 @@ impl<N: Network> Inbound<N> for Client<N> {
         ) {
             // Ensure that the prover solution is valid for the given epoch.
             match solution.verify(self.coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target) {
-                Ok(true) => {
-                    // Propagate the `UnconfirmedSolution` to connected beacons.
-                    let message = Message::UnconfirmedSolution(message);
-                    let request = RouterRequest::MessagePropagateBeacon(message, vec![peer_ip]);
-                    if let Err(error) = router.process(request).await {
-                        warn!("[UnconfirmedSolution] {error}");
-                    }
-                }
+                // If the solution is valid, propagate the `UnconfirmedSolution` to connected beacons.
+                Ok(true) => router.propagate_to_beacons(Message::UnconfirmedSolution(message), vec![peer_ip]),
                 Ok(false) | Err(_) => {
                     trace!("Invalid prover solution '{}' for the current epoch.", solution.commitment())
                 }

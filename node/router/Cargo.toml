@@ -60,6 +60,9 @@ path = "../executor"
 [dependencies.snarkos-node-messages]
 path = "../messages"
 
+[dependencies.snarkos-node-tcp]
+path = "../tcp"
+
 [dependencies.snarkvm]
 workspace = true
 

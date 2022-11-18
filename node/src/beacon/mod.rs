@@ -30,7 +30,7 @@ use snarkos_node_messages::{
     UnconfirmedTransaction,
 };
 use snarkos_node_rest::Rest;
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
+use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
 use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{
     Address,
@@ -106,7 +106,7 @@ impl<N: Network> Beacon<N> {
         lap!(timer, "Initialize consensus");
 
         // Initialize the node router.
-        let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
+        let router = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
         lap!(timer, "Initialize the router");
 
         // Initialize the REST server.
@@ -136,14 +136,12 @@ impl<N: Network> Beacon<N> {
             account,
             consensus,
             ledger,
-            router: router.clone(),
+            router,
             rest,
             block_generation_time,
             unspent_records: Arc::new(RwLock::new(unspent_records)),
             shutdown: Default::default(),
         };
-        // Initialize the router handler.
-        router.initialize_handler(node.clone(), router_receiver).await;
         // Initialize the block production.
         node.initialize_block_production().await;
         // Initialize the signal handler.
@@ -453,9 +451,7 @@ impl<N: Network> Beacon<N> {
         });
 
         // Propagate the block to all peers.
-        if let Err(error) = self.router.process(RouterRequest::MessagePropagate(message, vec![])).await {
-            trace!("Failed to broadcast the next block: {error}");
-        }
+        self.router.propagate(message, vec![]);
 
         Ok(())
     }

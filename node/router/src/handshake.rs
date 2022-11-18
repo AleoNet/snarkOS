@@ -14,198 +14,250 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Peer, Router, ALEO_MAXIMUM_FORK_DEPTH};
-use snarkos_node_executor::{Executor, NodeType, Status};
-use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, DisconnectReason, Message, MessageCodec, Ping};
-use snarkvm::prelude::{Block, FromBytes, Network};
+use crate::{Peer, Router, Routes, ALEO_MAXIMUM_FORK_DEPTH};
+use snarkos_node_executor::{NodeType, RawStatus, Status};
+use snarkos_node_messages::{
+    ChallengeRequest,
+    ChallengeResponse,
+    Data,
+    Disconnect,
+    DisconnectReason,
+    Message,
+    MessageCodec,
+};
+use snarkos_node_tcp::{protocols::Handshake, Connection, ConnectionSide, Tcp, P2P};
+use snarkvm::prelude::{error, Block, FromBytes, Network};
 
 use anyhow::{bail, Result};
 use core::time::Duration;
 use futures::SinkExt;
-use tokio::{net::TcpStream, time::timeout};
+use std::{io, net::SocketAddr, time::SystemTime};
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
+impl<N: Network, R: Routes<N>> P2P for Router<N, R> {
+    /// Returns a reference to the TCP instance.
+    fn tcp(&self) -> &Tcp {
+        &self.tcp
+    }
+}
+
 #[async_trait]
-pub trait Handshake: Executor {
-    /// The minimum number of peers required to maintain connections with.
-    const MINIMUM_NUMBER_OF_PEERS: usize = 1;
-    /// The maximum number of peers permitted to maintain connections with.
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
+impl<N: Network, R: Routes<N>> Handshake for Router<N, R> {
+    /// Performs the handshake protocol.
+    async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
+        // Retrieve the peer IP address.
+        let peer_addr = connection.addr();
+        // Retrieve the local IP address.
+        let local_addr = self.tcp().listening_addr().expect("listening address should be present");
 
-    /// Performs the handshake protocol, returning the peer upon success.
-    async fn handshake<N: Network>(router: Router<N>, stream: TcpStream) -> Result<Peer<N>> {
-        // Construct the socket.
-        let mut outbound_socket = Framed::<TcpStream, MessageCodec<N>>::new(stream, Default::default());
+        // Construct the stream.
+        let stream = self.borrow_stream(&mut connection);
+        let mut framed = Framed::new(stream, MessageCodec::<N>::default());
 
-        // Get the IP address of the peer.
-        let mut peer_ip = outbound_socket.get_ref().peer_addr()?;
+        // Ensure the peer is allowed to connect.
+        if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_addr) {
+            return Err(error(format!("{forbidden_message}")));
+        }
+        debug!("Received a connection request from '{peer_addr}'");
 
-        // TODO (howardwu): Make this step more efficient (by not deserializing every time).
-        // Retrieve the genesis block header.
-        let genesis_header = *Block::<N>::from_bytes_le(N::genesis_bytes())?.header();
+        /* Step 1: Send the challenge request. */
 
         // Send a challenge request to the peer.
         let message = Message::<N>::ChallengeRequest(ChallengeRequest {
             version: Message::<N>::VERSION,
             fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
-            node_type: Self::node_type(),
-            status: Self::status().get(),
-            listener_port: router.local_ip().port(),
+            node_type: self.node_type(),
+            status: self.status.get(),
+            listener_port: local_addr.port(),
         });
-        trace!("Sending '{}-A' to '{peer_ip}'", message.name());
-        outbound_socket.send(message).await?;
+        trace!("Sending '{}-A' to '{peer_addr}'", message.name());
+        framed.send(message).await?;
 
-        // Wait for the counterparty challenge request to come in.
-        let (node_type, status) = match outbound_socket.next().await {
-            Some(Ok(message)) => {
-                // Process the message.
-                trace!("Received '{}-B' from '{peer_ip}'", message.name());
-                match message {
-                    Message::ChallengeRequest(ChallengeRequest {
-                        version,
-                        fork_depth,
-                        node_type,
-                        status: peer_status,
-                        listener_port,
-                    }) => {
-                        // Ensure the message protocol version is not outdated.
-                        if version < Message::<N>::VERSION {
-                            warn!("Dropping {peer_ip} on version {version} (outdated)");
+        /* Step 2: Receive the challenge request. */
 
-                            // Send the disconnect message.
-                            outbound_socket
-                                .send(Message::Disconnect(DisconnectReason::OutdatedClientVersion.into()))
-                                .await?;
+        // Listen for the challenge request message.
+        let challenge_request = match framed.try_next().await? {
+            // Received the challenge request message, proceed.
+            Some(Message::ChallengeRequest(data)) => data,
+            // Received a disconnect message, abort.
+            Some(Message::Disconnect(reason)) => return Err(error(format!("'{peer_addr}' disconnected: {reason:?}"))),
+            // Received an unexpected message, abort.
+            _ => return Err(error(format!("'{peer_addr}' did not send a challenge request"))),
+        };
+        trace!("Received '{}-B' from '{peer_addr}'", challenge_request.name());
 
-                            bail!("Dropping {peer_ip} on version {version} (outdated)");
-                        }
-                        // Ensure the maximum fork depth is correct.
-                        if fork_depth != ALEO_MAXIMUM_FORK_DEPTH {
-                            // Send the disconnect message.
-                            outbound_socket
-                                .send(Message::Disconnect(DisconnectReason::InvalidForkDepth.into()))
-                                .await?;
+        // Verify the challenge request.
+        let disconnect_reason = self.verify_challenge_request(peer_addr, &challenge_request);
+        // If a disconnect reason was returned, send the disconnect message and abort.
+        if let Some(reason) = disconnect_reason {
+            trace!("Sending 'Disconnect' to '{peer_addr}'");
+            framed.send(Message::Disconnect(Disconnect { reason: reason.clone() })).await?;
+            return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
+        }
 
-                            bail!("Dropping {peer_ip} for an incorrect maximum fork depth of {fork_depth}");
-                        }
-                        // If this node is not a beacon node and is syncing, the peer is a beacon node, and this node is ahead, proceed to disconnect.
-                        if Self::NODE_TYPE != NodeType::Beacon
-                            && Self::status().is_syncing()
-                            && node_type == NodeType::Beacon
-                        {
-                            // Send the disconnect message.
-                            outbound_socket
-                                .send(Message::Disconnect(DisconnectReason::YouNeedToSyncFirst.into()))
-                                .await?;
+        /* Step 3: Send the challenge response. */
 
-                            bail!("Dropping {peer_ip} as this node is ahead");
-                        }
-                        // If this node is a beacon node, the peer is not a beacon node and is syncing, and the peer is ahead, proceed to disconnect.
-                        if Self::NODE_TYPE == NodeType::Beacon
-                            && node_type != NodeType::Beacon
-                            && peer_status == Status::Syncing
-                        {
-                            // Send the disconnect message.
-                            outbound_socket
-                                .send(Message::Disconnect(DisconnectReason::INeedToSyncFirst.into()))
-                                .await?;
+        // TODO (howardwu): Make this step more efficient (by not deserializing every time).
+        // Retrieve the genesis block header.
+        let genesis_header = *Block::<N>::from_bytes_le(N::genesis_bytes()).map_err(|e| error(e.to_string()))?.header();
+        // Send the challenge response.
+        let message = Message::ChallengeResponse(ChallengeResponse { header: Data::Object(genesis_header) });
+        trace!("Sending '{}-B' to '{peer_addr}'", message.name());
+        framed.send(message).await?;
 
-                            bail!("Dropping {peer_ip} as this node is ahead");
-                        }
-                        // Verify the listener port.
-                        if peer_ip.port() != listener_port {
-                            // Update the peer IP to the listener port.
-                            peer_ip.set_port(listener_port);
+        /* Step 4: Receive the challenge response. */
 
-                            // Ensure the claimed listener port is open.
-                            if let Err(error) = timeout(
-                                Duration::from_millis(Router::<N>::CONNECTION_TIMEOUT_IN_MILLIS),
-                                TcpStream::connect(peer_ip),
-                            )
-                            .await
-                            {
-                                // Send the disconnect message.
-                                let message =
-                                    Message::Disconnect(DisconnectReason::YourPortIsClosed(listener_port).into());
-                                outbound_socket.send(message).await?;
+        // Listen for the challenge response message.
+        let challenge_response = match framed.try_next().await? {
+            // Received the challenge response message, proceed.
+            Some(Message::ChallengeResponse(data)) => data,
+            // Received a disconnect message, abort.
+            Some(Message::Disconnect(reason)) => return Err(error(format!("'{peer_addr}' disconnected: {reason:?}"))),
+            // Received an unexpected message, abort.
+            _ => return Err(error(format!("'{peer_addr}' did not send a challenge response"))),
+        };
+        trace!("Received '{}-A' from '{peer_addr}'", challenge_response.name());
 
-                                bail!("Unable to reach '{peer_ip}': '{:?}'", error);
-                            }
-                        }
-                        // TODO (howardwu): Remove this after Phase 2.
-                        if Self::node_type().is_validator()
-                            && node_type.is_beacon()
-                            && peer_ip.ip().to_string() != "159.65.195.225"
-                        {
-                            // Send the disconnect message.
-                            outbound_socket
-                                .send(Message::Disconnect(DisconnectReason::ProtocolViolation.into()))
-                                .await?;
-                            bail!("Dropping {peer_ip} for an invalid node type of {node_type}");
-                        }
-                        // Send the challenge response.
-                        let message =
-                            Message::ChallengeResponse(ChallengeResponse { header: Data::Object(genesis_header) });
-                        trace!("Sending '{}-B' to '{peer_ip}'", message.name());
-                        outbound_socket.send(message).await?;
+        // Perform the deferred non-blocking deserialization of the block header.
+        let Ok(block_header) = challenge_response.header.deserialize().await else {
+            return Err(error(format!("Handshake with {peer_addr} failed (cannot deserialize the block header)")))
+        };
+        // Verify the challenge response, by checking that the block header matches.
+        if block_header != genesis_header {
+            return Err(error(format!("Handshake with {peer_addr} failed (incorrect block header)")));
+        }
 
-                        (node_type, peer_status)
-                    }
-                    Message::Disconnect(reason) => {
-                        bail!("Peer {peer_ip} disconnected for the following reason: {:?}", reason);
-                    }
-                    message => {
-                        bail!("Expected challenge request, received '{}' from '{peer_ip}'", message.name());
-                    }
-                }
-            }
-            // An error occurred.
-            Some(Err(error)) => bail!("Failed to get challenge request from '{peer_ip}': {:?}", error),
-            // Did not receive anything.
-            None => bail!("Dropped prior to challenge request of {peer_ip}"),
+        /* Step 5: Add the peer to the router. */
+
+        // Prepare the peer.
+        let peer_side = connection.side();
+        let peer_listener = match peer_side {
+            // The peer initiated the connection.
+            ConnectionSide::Initiator => SocketAddr::new(peer_addr.ip(), challenge_request.listener_port),
+            // This node initiated the connection.
+            ConnectionSide::Responder => peer_addr,
+        };
+        let peer_version = challenge_request.version;
+        let peer_type = challenge_request.node_type;
+        let peer_status = RawStatus::from_status(challenge_request.status);
+
+        // Construct the peer.
+        let peer = Peer::new(peer_side, peer_listener, peer_version, peer_type, peer_status);
+        // Insert the connected peer in the router.
+        self.insert_connected_peer(peer);
+
+        info!("Connected to '{peer_listener}'");
+
+        // TODO (howardwu): Send the first ping.
+        // // Send the first `Ping` message to the peer.
+        // let message = Message::Ping(Ping {
+        //     version: Message::<N>::VERSION,
+        //     fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
+        //     node_type: Self::NODE_TYPE,
+        //     status: Self::status().get(),
+        // });
+        // trace!("Sending '{}' to '{peer_ip}'", message.name());
+        // outbound_socket.send(message).await?;
+
+        Ok(connection)
+    }
+}
+
+impl<N: Network, R: Routes<N>> Router<N, R> {
+    /// Ensure the peer is allowed to connect.
+    async fn ensure_peer_is_allowed<E: Handshake>(&self, peer_ip: SocketAddr) -> Result<()> {
+        // Ensure the peer IP is not this node.
+        if self.is_local_ip(&peer_ip) {
+            bail!("Dropping connection request from '{peer_ip}' (attempted to self-connect)")
+        }
+        // Ensure the node does not surpass the maximum number of peer connections.
+        if self.number_of_connected_peers() >= E::MAXIMUM_NUMBER_OF_PEERS {
+            bail!("Dropping connection request from '{peer_ip}' (maximum peers reached)")
+        }
+        // Ensure the node is not already connected to this peer.
+        if self.is_connected(&peer_ip) {
+            bail!("Dropping connection request from '{peer_ip}' (already connected)")
+        }
+        // Ensure the peer is not restricted.
+        if self.is_restricted(&peer_ip) {
+            bail!("Dropping connection request from '{peer_ip}' (restricted)")
+        }
+
+        // Sanitize the port from the peer, if it is a remote IP address.
+        let (peer_lookup, peer_port) = match peer_ip.ip().is_loopback() {
+            // Loopback case - Do not sanitize, merely pass through.
+            true => (peer_ip, peer_ip.port()),
+            // Remote case - Sanitize, storing u16::MAX for the peer IP address to dedup the peer next time.
+            false => (SocketAddr::new(peer_ip.ip(), u16::MAX), peer_ip.port()),
         };
 
-        // Wait for the challenge response to come in.
-        match outbound_socket.next().await {
-            Some(Ok(message)) => {
-                // Process the message.
-                trace!("Received '{}-A' from '{peer_ip}'", message.name());
-                match message {
-                    Message::ChallengeResponse(message) => {
-                        // Perform the deferred non-blocking deserialization of the block header.
-                        let block_header = match message.header.deserialize().await {
-                            Ok(block_header) => block_header,
-                            Err(error) => bail!("Handshake with {peer_ip} failed (incorrect block header): {error}"),
-                        };
-                        match block_header == genesis_header {
-                            true => {
-                                // Send the first `Ping` message to the peer.
-                                let message = Message::Ping(Ping {
-                                    version: Message::<N>::VERSION,
-                                    fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
-                                    node_type: Self::NODE_TYPE,
-                                    status: Self::status().get(),
-                                });
-                                trace!("Sending '{}' to '{peer_ip}'", message.name());
-                                outbound_socket.send(message).await?;
+        // Lock seen_inbound_connections for further processing.
+        let mut seen_inbound_connections = self.seen_inbound_connections.write();
 
-                                // Initialize the peer.
-                                Peer::initialize::<Self>(peer_ip, node_type, status, router, outbound_socket).await
-                            }
-                            false => bail!("Challenge response from '{peer_ip}' failed, received '{block_header}'"),
-                        }
-                    }
-                    Message::Disconnect(reason) => {
-                        bail!("Peer {peer_ip} disconnected for the following reason: {:?}", reason)
-                    }
-                    message => bail!("Expected challenge response, received '{}' from '{peer_ip}'", message.name()),
-                }
-            }
-            // An error occurred.
-            Some(Err(error)) => bail!("Failed to get challenge response from '{peer_ip}': {:?}", error),
-            // Did not receive anything.
-            None => bail!("Failed to get challenge response from '{peer_ip}', peer has disconnected"),
+        // Fetch the inbound tracker entry for this peer.
+        let ((initial_port, num_attempts), last_seen) =
+            seen_inbound_connections.entry(peer_lookup).or_insert(((peer_port, 0), SystemTime::UNIX_EPOCH));
+        let elapsed = last_seen.elapsed().unwrap_or(Duration::MAX).as_secs();
+
+        // Reset the inbound tracker entry for this peer, if the predefined elapsed time has passed.
+        if elapsed > Self::RADIO_SILENCE_IN_SECS {
+            // Reset the initial port for this peer.
+            *initial_port = peer_port;
+            // Reset the number of attempts for this peer.
+            *num_attempts = 0;
+            // Reset the last seen timestamp for this peer.
+            *last_seen = SystemTime::now();
         }
+
+        // Ensure the connecting peer has not surpassed the connection attempt limit.
+        if *num_attempts > Self::MAXIMUM_CONNECTION_FAILURES {
+            drop(seen_inbound_connections);
+            // Restrict the peer.
+            self.insert_restricted_peer(peer_ip);
+            bail!("Dropping connection request from '{peer_ip}' (tried {elapsed} secs ago)")
+        } else {
+            // Update the number of attempts for this peer.
+            *num_attempts += 1;
+            Ok(())
+        }
+    }
+
+    /// Verifies the given challenge request. Returns a disconnect reason if the request is invalid.
+    fn verify_challenge_request(&self, peer_addr: SocketAddr, message: &ChallengeRequest) -> Option<DisconnectReason> {
+        // Retrieve the components of the challenge request.
+        let &ChallengeRequest { version, fork_depth, node_type, status: peer_status, listener_port } = message;
+
+        // Ensure the message protocol version is not outdated.
+        if version < Message::<N>::VERSION {
+            warn!("Dropping {peer_addr} on version {version} (outdated)");
+            return Some(DisconnectReason::OutdatedClientVersion);
+        }
+
+        // Ensure the maximum fork depth is correct.
+        if fork_depth != ALEO_MAXIMUM_FORK_DEPTH {
+            warn!("Dropping {peer_addr} for an incorrect maximum fork depth of {fork_depth}");
+            return Some(DisconnectReason::InvalidForkDepth);
+        }
+
+        // If this node is not a beacon node and is syncing, the peer is a beacon node, and this node is ahead, proceed to disconnect.
+        if self.node_type() != NodeType::Beacon && self.status.is_syncing() && node_type == NodeType::Beacon {
+            warn!("Dropping {peer_addr} as this node is ahead");
+            return Some(DisconnectReason::YouNeedToSyncFirst);
+        }
+
+        // If this node is a beacon node, the peer is not a beacon node and is syncing, and the peer is ahead, proceed to disconnect.
+        if self.node_type() == NodeType::Beacon && node_type != NodeType::Beacon && peer_status == Status::Syncing {
+            warn!("Dropping {peer_addr} as this node is ahead");
+            return Some(DisconnectReason::INeedToSyncFirst);
+        }
+
+        // TODO (howardwu): Remove this after Phase 2.
+        if self.node_type().is_validator() && node_type.is_beacon() && peer_addr.ip().to_string() != "159.65.195.225" {
+            warn!("Dropping {peer_addr} for an invalid node type of {node_type}");
+            return Some(DisconnectReason::ProtocolViolation);
+        }
+
+        None
     }
 }

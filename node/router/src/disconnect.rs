@@ -14,21 +14,19 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#![deny(missing_docs)]
-#![deny(unsafe_code)]
+use crate::{Router, Routes};
+use snarkos_node_tcp::protocols::Disconnect;
+use snarkvm::prelude::Network;
 
-//! **Tcp** is a simple, low-level, and customizable implementation of a TCP stack.
+use std::net::SocketAddr;
 
-mod helpers;
-pub use helpers::*;
-
-pub mod protocols;
-
-mod tcp;
-pub use tcp::Tcp;
-
-/// A trait for objects containing a [`Tcp`]; it is required to implement protocols.
-pub trait P2P {
-    /// Returns a reference to the TCP instance.
-    fn tcp(&self) -> &Tcp;
+#[async_trait]
+impl<N: Network, R: Routes<N>> Disconnect for Router<N, R> {
+    /// Any extra operations to be performed during a disconnect.
+    async fn handle_disconnect(&self, peer_addr: SocketAddr) {
+        // Remove an entry for this `Peer` in the connected peers, if it exists.
+        self.connected_peers.write().remove(&peer_addr);
+        // Add an entry for this `Peer` in the candidate peers.
+        self.candidate_peers.write().insert(peer_addr);
+    }
 }

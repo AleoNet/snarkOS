@@ -370,14 +370,15 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             consensus.add_unconfirmed_transaction(transaction.clone()).or_reject()?;
         }
 
-        // Broadcast the transaction.
+        // Prepare the unconfirmed transaction message.
         let message = Message::UnconfirmedTransaction(UnconfirmedTransaction {
             transaction_id: transaction.id(),
             transaction: Data::Object(transaction),
         });
-        match router.process(RouterRequest::MessagePropagate(message, vec![])).await {
-            Ok(()) => Ok("OK"),
-            Err(error) => Err(reject::custom(RestError::Request(format!("Failed to broadcast transaction: {error}")))),
-        }
+
+        // Broadcast the transaction.
+        router.propagate(message, vec![]);
+
+        Ok("OK")
     }
 }

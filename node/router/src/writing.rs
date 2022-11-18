@@ -14,21 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#![deny(missing_docs)]
-#![deny(unsafe_code)]
+use crate::{Router, Routes};
+use snarkos_node_messages::{Message, MessageCodec};
+use snarkos_node_tcp::{protocols::Writing, ConnectionSide};
+use snarkvm::prelude::Network;
 
-//! **Tcp** is a simple, low-level, and customizable implementation of a TCP stack.
+use std::net::SocketAddr;
 
-mod helpers;
-pub use helpers::*;
+#[async_trait]
+impl<N: Network, R: Routes<N>> Writing for Router<N, R> {
+    type Codec = MessageCodec<N>;
+    type Message = Message<N>;
 
-pub mod protocols;
-
-mod tcp;
-pub use tcp::Tcp;
-
-/// A trait for objects containing a [`Tcp`]; it is required to implement protocols.
-pub trait P2P {
-    /// Returns a reference to the TCP instance.
-    fn tcp(&self) -> &Tcp;
+    /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
+    /// The `side` parameter indicates the connection side **from the node's perspective**.
+    fn codec(&self, _addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
+        Default::default()
+    }
 }

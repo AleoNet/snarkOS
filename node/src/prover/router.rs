@@ -62,10 +62,7 @@ impl<N: Network> Inbound<N> for Prover<N> {
             // If the elapsed time exceeds a multiple of the anchor time, then assist in propagation.
             if elapsed > N::ANCHOR_TIME as i64 * 6 {
                 // Propagate the `UnconfirmedSolution`.
-                let request = RouterRequest::MessagePropagate(Message::UnconfirmedSolution(message), vec![peer_ip]);
-                if let Err(error) = router.process(request).await {
-                    warn!("[UnconfirmedSolution] {error}");
-                }
+                router.propagate(Message::UnconfirmedSolution(message), vec![peer_ip]);
             }
         }
         true

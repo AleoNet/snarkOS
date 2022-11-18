@@ -20,7 +20,7 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{Executor, NodeType};
 use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
+use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
 use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
 
 use anyhow::Result;
@@ -48,19 +48,17 @@ impl<N: Network> Client<N> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the node router.
-        let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
+        let router = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
         let node = Self {
             account,
-            router: router.clone(),
+            router,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
         };
-        // Initialize the router handler.
-        router.initialize_handler(node.clone(), router_receiver).await;
         // Initialize the signal handler.
         node.handle_signals();
         // Return the node.

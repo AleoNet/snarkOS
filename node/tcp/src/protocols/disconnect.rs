@@ -46,11 +46,11 @@ where
             trace!(parent: self_clone.tcp().span(), "spawned the Disconnect handler task");
             tx.send(()).unwrap(); // safe; the channel was just opened
 
-            while let Some((addr, notifier)) = from_node_receiver.recv().await {
+            while let Some((peer_addr, notifier)) = from_node_receiver.recv().await {
                 let self_clone2 = self_clone.clone();
                 tokio::spawn(async move {
                     // perform the specified extra actions
-                    self_clone2.handle_disconnect(addr).await;
+                    self_clone2.handle_disconnect(peer_addr).await;
                     // notify the node that the extra actions have concluded
                     // and that the related connection can be dropped
                     let _ = notifier.send(()); // can't really fail
@@ -71,5 +71,5 @@ where
     /// Any extra actions to be executed during a disconnect; in order to still be able to
     /// communicate with the peer in the usual manner (i.e. via [`Writing`]), only its [`SocketAddr`]
     /// (as opposed to the related [`Connection`] object) is provided as an argument.
-    async fn handle_disconnect(&self, addr: SocketAddr);
+    async fn handle_disconnect(&self, peer_addr: SocketAddr);
 }

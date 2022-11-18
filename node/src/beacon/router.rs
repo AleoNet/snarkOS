@@ -43,11 +43,7 @@ impl<N: Network> Inbound<N> for Beacon<N> {
             (epoch_challenge, block)
         };
         // Send the `PuzzleResponse` message to the peer.
-        let message = Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block: Data::Object(block) });
-        if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
-            warn!("[PuzzleResponse] {}", error);
-        }
-
+        router.send(peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block: Data::Object(block) }));
         true
     }
 
