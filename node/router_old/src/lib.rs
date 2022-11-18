@@ -21,9 +21,6 @@ extern crate async_trait;
 #[macro_use]
 extern crate tracing;
 
-mod helpers;
-pub use helpers::*;
-
 mod handshake;
 pub use handshake::*;
 
@@ -114,10 +111,14 @@ pub struct Router<N: Network> {
     seen_inbound_connections: Arc<RwLock<IndexMap<SocketAddr, ConnectionStats>>>,
     /// The map of peers to the timestamp of their last outbound connection request.
     seen_outbound_connections: Arc<RwLock<IndexMap<SocketAddr, SystemTime>>>,
-    /// The cache.
-    pub cache: Cache<N>,
     /// The map of peer IPs to the number of puzzle requests.
     pub seen_inbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, Arc<AtomicU8>>>>,
+    /// The map of block hashes to their last seen timestamp.
+    pub seen_inbound_blocks: Arc<RwLock<IndexMap<N::BlockHash, SystemTime>>>,
+    /// The map of solution commitments to their last seen timestamp.
+    pub seen_inbound_solutions: Arc<RwLock<IndexMap<PuzzleCommitment<N>, SystemTime>>>,
+    /// The map of transaction IDs to their last seen timestamp.
+    pub seen_inbound_transactions: Arc<RwLock<IndexMap<N::TransactionID, SystemTime>>>,
     /// The map of block hashes to their last seen timestamp.
     pub seen_outbound_blocks: Arc<RwLock<IndexMap<N::BlockHash, SystemTime>>>,
     /// The map of solution commitments to their last seen timestamp.
@@ -172,10 +173,12 @@ impl<N: Network> Router<N> {
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
-            cache: Default::default(),
             seen_inbound_puzzle_requests: Default::default(),
             seen_inbound_connections: Default::default(),
             seen_outbound_connections: Default::default(),
+            seen_inbound_blocks: Default::default(),
+            seen_inbound_solutions: Default::default(),
+            seen_inbound_transactions: Default::default(),
             seen_outbound_blocks: Default::default(),
             seen_outbound_solutions: Default::default(),
             seen_outbound_transactions: Default::default(),
@@ -409,6 +412,18 @@ impl<N: Network> Router<N> {
 
                 // Clear the seen puzzle requests.
                 router.seen_inbound_puzzle_requests.write().await.clear();
+                // Clear the seen unconfirmed blocks.
+                router.seen_inbound_blocks.write().await.retain(|_, timestamp| {
+                    timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS
+                });
+                // Clear the seen unconfirmed solutions.
+                router.seen_inbound_solutions.write().await.retain(|_, timestamp| {
+                    timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS
+                });
+                // Clear the seen unconfirmed transactions.
+                router.seen_inbound_transactions.write().await.retain(|_, timestamp| {
+                    timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS
+                });
                 // Clear the seen unconfirmed blocks.
                 router.seen_outbound_blocks.write().await.retain(|_, timestamp| {
                     timestamp.elapsed().unwrap_or_default().as_secs() <= Self::RADIO_SILENCE_IN_SECS

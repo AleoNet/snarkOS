@@ -20,7 +20,7 @@ use snarkos_node_messages::*;
 use snarkvm::prelude::{Block, Network, ProverSolution, Transaction};
 
 use core::time::Duration;
-use std::{net::SocketAddr, sync::atomic::Ordering};
+use std::{net::SocketAddr, sync::atomic::Ordering, time::SystemTime};
 
 #[async_trait]
 pub trait Inbound<N: Network>: Executor {
@@ -69,10 +69,17 @@ pub trait Inbound<N: Network>: Executor {
                 let message_clone = message.clone();
 
                 // Update the timestamp for the unconfirmed block.
-                let seen_before = router.cache.insert_seen_block(message.block_hash).is_some();
+                let seen_before = router
+                    .seen_inbound_blocks
+                    .write()
+                    .await
+                    .insert(message.block_hash, SystemTime::now())
+                    .is_some();
 
                 // Determine whether to propagate the block.
-                if seen_before {
+                let should_propagate = !seen_before;
+
+                if !should_propagate {
                     trace!("Skipping 'UnconfirmedBlock {}' from '{peer_ip}'", message.block_hash);
                     true
                 } else {
@@ -100,10 +107,17 @@ pub trait Inbound<N: Network>: Executor {
                 let message_clone = message.clone();
 
                 // Update the timestamp for the unconfirmed solution.
-                let seen_before = router.cache.insert_seen_solution(message.puzzle_commitment).is_some();
+                let seen_before = router
+                    .seen_inbound_solutions
+                    .write()
+                    .await
+                    .insert(message.puzzle_commitment, SystemTime::now())
+                    .is_some();
 
                 // Determine whether to propagate the solution.
-                if seen_before {
+                let should_propagate = !seen_before;
+
+                if !should_propagate {
                     trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
                     true
                 } else {
@@ -131,10 +145,17 @@ pub trait Inbound<N: Network>: Executor {
                 let message_clone = message.clone();
 
                 // Update the timestamp for the unconfirmed transaction.
-                let seen_before = router.cache.insert_seen_transaction(message.transaction_id).is_some();
+                let seen_before = router
+                    .seen_inbound_transactions
+                    .write()
+                    .await
+                    .insert(message.transaction_id, SystemTime::now())
+                    .is_some();
 
                 // Determine whether to propagate the transaction.
-                if seen_before {
+                let should_propagate = !seen_before;
+
+                if !should_propagate {
                     trace!("Skipping 'UnconfirmedTransaction {}' from '{peer_ip}'", message.transaction_id);
                     true
                 } else {
