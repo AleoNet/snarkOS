@@ -17,7 +17,7 @@
 #![deny(missing_docs)]
 #![deny(unsafe_code)]
 
-//! **P2P** is a simple, low-level, and customizable implementation of a TCP P2P node.
+//! **Tcp** is a simple, low-level, and customizable implementation of a TCP stack.
 
 mod helpers;
 pub use helpers::*;
@@ -29,6 +29,6 @@ pub use tcp::Tcp;
 
 /// A trait for objects containing a [`Tcp`]; it is required to implement protocols.
 pub trait P2P {
-    /// Returns a clonable reference to the node.
+    /// Returns a clonable reference to the TCP.
     fn tcp(&self) -> &Tcp;
 }
