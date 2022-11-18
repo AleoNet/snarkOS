@@ -24,7 +24,7 @@ use clap::Parser;
 use core::str::FromStr;
 use rand::{seq::SliceRandom, SeedableRng};
 use rand_chacha::ChaChaRng;
-use std::net::SocketAddr;
+use std::{net::SocketAddr, path::PathBuf};
 use tokio::runtime::{self, Runtime};
 
 /// Starts the snarkOS node.
@@ -69,6 +69,9 @@ pub struct Start {
     /// If the flag is set, the node will not render the display.
     #[clap(long)]
     pub nodisplay: bool,
+    /// Specify the path to the file where logs will be stored.
+    #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
+    pub logfile: PathBuf,
 }
 
 impl Start {
@@ -84,7 +87,8 @@ impl Start {
                     // Parse the node from the configurations.
                     let node = cli.parse_node::<Testnet3>().await.expect("Failed to parse the node");
                     // Initialize the display.
-                    Display::start(node, cli.verbosity, cli.nodisplay).expect("Failed to initialize the display");
+                    Display::start(node, cli.verbosity, cli.nodisplay, cli.logfile)
+                        .expect("Failed to initialize the display");
                 }
                 _ => panic!("Invalid network ID specified"),
             };
@@ -184,6 +188,10 @@ impl Start {
                 "157.245.205.209:4133",
                 "134.122.95.106:4133",
                 "161.35.24.55:4133",
+                "138.68.103.139:4133",
+                "207.154.215.49:4133",
+                "46.101.114.158:4133",
+                "138.197.190.94:4133",
             ];
 
             // Include a bootstrap node, as the node is not in development mode.

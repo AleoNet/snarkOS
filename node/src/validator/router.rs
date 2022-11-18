@@ -39,6 +39,7 @@ impl<N: Network> Inbound<N> for Validator<N> {
 
     /// Saves the latest epoch challenge and latest block in the node.
     async fn puzzle_response(&self, message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
+        let serialized_message = message.clone();
         let epoch_challenge = message.epoch_challenge;
         match message.block.deserialize().await {
             Ok(block) => {
@@ -58,10 +59,7 @@ impl<N: Network> Inbound<N> for Validator<N> {
                 // Save the latest block in the node.
                 self.latest_block.write().await.replace(block.clone());
                 // Save the latest puzzle response in the node.
-                self.latest_puzzle_response
-                    .write()
-                    .await
-                    .replace(PuzzleResponse { epoch_challenge, block: Data::Object(block) });
+                self.latest_puzzle_response.write().await.replace(serialized_message);
 
                 trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
                 true
@@ -87,8 +85,14 @@ impl<N: Network> Inbound<N> for Validator<N> {
             self.latest_block.read().await.as_ref().map(|block| block.proof_target()),
         ) {
             // Ensure that the prover solution is valid for the given epoch.
-            match solution.verify(self.coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target) {
-                Ok(true) => {
+            let coinbase_puzzle = self.coinbase_puzzle.clone();
+            let is_valid = tokio::task::spawn_blocking(move || {
+                solution.verify(coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target)
+            })
+            .await;
+
+            match is_valid {
+                Ok(Ok(true)) => {
                     // Propagate the `UnconfirmedSolution` to connected beacons.
                     let message = Message::UnconfirmedSolution(message);
                     let request = RouterRequest::MessagePropagateBeacon(message, vec![peer_ip]);
@@ -96,9 +100,10 @@ impl<N: Network> Inbound<N> for Validator<N> {
                         warn!("[UnconfirmedSolution] {error}");
                     }
                 }
-                Ok(false) | Err(_) => {
+                Ok(Ok(false)) | Ok(Err(_)) => {
                     trace!("Invalid prover solution '{}' for the current epoch.", solution.commitment())
                 }
+                Err(error) => warn!("Failed to verify the prover solution: {error}"),
             }
         }
         true

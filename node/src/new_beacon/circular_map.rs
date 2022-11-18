@@ -15,12 +15,9 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use circular_queue::CircularQueue;
-
 use std::{collections::HashMap, hash::Hash};
 
-///
 /// A helper struct to maintain a bounded number of elements in a map.
-///
 #[derive(Clone, Debug)]
 pub struct CircularMap<K: Clone + PartialEq + Eq + Hash, V: Clone, const N: u32> {
     map: HashMap<K, V>,
@@ -28,45 +25,33 @@ pub struct CircularMap<K: Clone + PartialEq + Eq + Hash, V: Clone, const N: u32>
 }
 
 impl<K: Clone + PartialEq + Eq + Hash, V: Clone, const N: u32> CircularMap<K, V, N> {
-    ///
     /// Initializes a new instance of a circular map, of pre-defined size.
-    ///
     pub fn new() -> Self {
         Self { map: HashMap::with_capacity(N as usize), queue: CircularQueue::with_capacity(N as usize) }
     }
 
-    ///
     /// Returns `true` if the circular map is empty.
-    ///
     pub fn is_empty(&self) -> bool {
         self.map.is_empty()
     }
 
-    ///
     /// Returns the number of key-value pairs in the circular map.
-    ///
     pub fn len(&self) -> usize {
         self.map.len()
     }
 
-    ///
     /// Returns `true` if the given key exists in the circular map.
-    ///
     pub fn contains_key(&self, key: &K) -> bool {
         self.map.contains_key(key)
     }
 
-    ///
     /// Returns the value for the given key from the map, if it exists.
-    ///
     pub fn get(&self, key: &K) -> Option<&V> {
         self.map.get(key)
     }
 
-    ///
     /// Inserts the given key-value pair into the circular map, returning a `bool`
     /// indicating whether the insertion took place.
-    ///
     pub fn insert(&mut self, key: K, value: V) -> bool {
         if !self.contains_key(&key) {
             if let Some(Some(popped)) = self.queue.push(Some(key.clone())) {
@@ -80,9 +65,7 @@ impl<K: Clone + PartialEq + Eq + Hash, V: Clone, const N: u32> CircularMap<K, V,
         }
     }
 
-    ///
     /// Removes the key-value pair for the given key from the circular map.
-    ///
     pub fn remove(&mut self, key: &K) {
         if self.map.remove(key).is_some() {
             for k in self.queue.asc_iter_mut() {
@@ -94,9 +77,7 @@ impl<K: Clone + PartialEq + Eq + Hash, V: Clone, const N: u32> CircularMap<K, V,
         }
     }
 
-    ///
     /// Removes all the entries from the circular map.
-    ///
     pub fn clear(&mut self) {
         self.map.clear();
         self.queue.clear();
