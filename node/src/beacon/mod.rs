@@ -19,7 +19,7 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_executor::{spawn_task_loop, Executor, NodeType, Status};
+use snarkos_node_executor::{spawn_task_loop, Executor, NodeType, RawStatus, Status};
 use snarkos_node_ledger::{Ledger, RecordMap};
 use snarkos_node_messages::{
     Data,
@@ -106,7 +106,7 @@ impl<N: Network> Beacon<N> {
         lap!(timer, "Initialize consensus");
 
         // Initialize the node router.
-        let router = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
+        let router = Router::new(node_ip, NodeType::Beacon, account.address(), trusted_peers).await?;
         lap!(timer, "Initialize the router");
 
         // Initialize the REST server.

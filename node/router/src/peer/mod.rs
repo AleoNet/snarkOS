@@ -18,8 +18,7 @@ use snarkos_node_executor::{NodeType, RawStatus};
 use snarkos_node_tcp::ConnectionSide;
 
 use parking_lot::RwLock;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use std::time::Instant;
+use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Instant};
 
 /// The state for each connected peer.
 #[derive(Clone, Debug)]

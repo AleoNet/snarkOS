@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Peer, Router, Routes, ALEO_MAXIMUM_FORK_DEPTH};
-use snarkos_node_executor::{NodeType, RawStatus, Status};use snarkos_node_messages::MessageTrait;
+use snarkos_node_executor::{NodeType, RawStatus, Status};
 use snarkos_node_messages::{
     ChallengeRequest,
     ChallengeResponse,
@@ -24,6 +24,7 @@ use snarkos_node_messages::{
     DisconnectReason,
     Message,
     MessageCodec,
+    MessageTrait,
 };
 use snarkos_node_tcp::{protocols::Handshake, Connection, ConnectionSide, Tcp, P2P};
 use snarkvm::prelude::{error, Block, FromBytes, Network};
@@ -35,21 +36,20 @@ use std::{io, net::SocketAddr, time::SystemTime};
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
-impl<N: Network, R: Routes<N>> P2P for Router<N, R> {
+impl<N: Network> P2P for Router<N> {
     /// Returns a reference to the TCP instance.
     fn tcp(&self) -> &Tcp {
         &self.tcp
     }
 }
 
-#[async_trait]
-impl<N: Network, R: Routes<N>> Handshake for Router<N, R> {
+impl<N: Network> Router<N> {
     /// Performs the handshake protocol.
-    async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
+    pub async fn handshake(&self, mut connection: Connection) -> io::Result<Connection> {
         // Retrieve the peer IP address.
         let peer_addr = connection.addr();
         // Retrieve the local IP address.
-        let local_addr = self.tcp().listening_addr().expect("listening address should be present");
+        let local_addr = self.tcp.listening_addr().expect("listening address should be present");
 
         // Construct the stream.
         let stream = self.borrow_stream(&mut connection);
@@ -67,7 +67,7 @@ impl<N: Network, R: Routes<N>> Handshake for Router<N, R> {
         let message = Message::<N>::ChallengeRequest(ChallengeRequest {
             version: Message::<N>::VERSION,
             fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
-            node_type: R::NODE_TYPE,
+            node_type: self.node_type,
             status: self.status.get(),
             listener_port: local_addr.port(),
         });
@@ -162,9 +162,7 @@ impl<N: Network, R: Routes<N>> Handshake for Router<N, R> {
 
         Ok(connection)
     }
-}
 
-impl<N: Network, R: Routes<N>> Router<N, R> {
     /// Ensure the peer is allowed to connect.
     fn ensure_peer_is_allowed(&self, peer_ip: SocketAddr) -> Result<()> {
         // Ensure the peer IP is not this node.
@@ -241,19 +239,19 @@ impl<N: Network, R: Routes<N>> Router<N, R> {
         }
 
         // If this node is not a beacon node and is syncing, the peer is a beacon node, and this node is ahead, proceed to disconnect.
-        if R::NODE_TYPE != NodeType::Beacon && self.status.is_syncing() && node_type == NodeType::Beacon {
+        if self.node_type != NodeType::Beacon && self.status.is_syncing() && node_type == NodeType::Beacon {
             warn!("Dropping {peer_addr} as this node is ahead");
             return Some(DisconnectReason::YouNeedToSyncFirst);
         }
 
         // If this node is a beacon node, the peer is not a beacon node and is syncing, and the peer is ahead, proceed to disconnect.
-        if R::NODE_TYPE == NodeType::Beacon && node_type != NodeType::Beacon && peer_status == Status::Syncing {
+        if self.node_type == NodeType::Beacon && node_type != NodeType::Beacon && peer_status == Status::Syncing {
             warn!("Dropping {peer_addr} as this node is ahead");
             return Some(DisconnectReason::INeedToSyncFirst);
         }
 
         // TODO (howardwu): Remove this after Phase 2.
-        if R::NODE_TYPE.is_validator() && node_type.is_beacon() && peer_addr.ip().to_string() != "159.65.195.225" {
+        if self.node_type.is_validator() && node_type.is_beacon() && peer_addr.ip().to_string() != "159.65.195.225" {
             warn!("Dropping {peer_addr} for an invalid node type of {node_type}");
             return Some(DisconnectReason::ProtocolViolation);
         }

@@ -18,7 +18,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_executor::{Executor, NodeType, Status};
+use snarkos_node_executor::{Executor, NodeType, RawStatus, Status};
 use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
@@ -66,7 +66,7 @@ impl<N: Network> Validator<N> {
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
         // Initialize the node router.
-        let router = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
+        let router = Router::new(node_ip, NodeType::Validator, account.address(), trusted_peers).await?;
         // Initialize the REST server.
         let rest = match rest_ip {
             Some(rest_ip) => {
