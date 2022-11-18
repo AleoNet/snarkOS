@@ -108,10 +108,11 @@ impl<N: Network> Router<N> {
         node_type: NodeType,
         address: Address<N>,
         trusted_peers: &[SocketAddr],
+        max_peers: u16,
     ) -> Result<Self> {
         // Initialize the router.
         let router = Self {
-            tcp: Tcp::new(Config::new(node_ip, R::MAXIMUM_NUMBER_OF_PEERS as u16)).await?,
+            tcp: Tcp::new(Config::new(node_ip, max_peers)).await?,
             node_type,
             address,
             status: RawStatus::new(),

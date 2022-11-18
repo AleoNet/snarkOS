@@ -322,17 +322,17 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
 
     /// Returns the number of peers connected to the node.
     async fn get_peers_count(router: Router<N>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&router.number_of_connected_peers().await))
+        Ok(reply::json(&router.number_of_connected_peers()))
     }
 
     /// Returns the peers connected to the node.
     async fn get_peers_all(router: Router<N>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&router.connected_peers().await))
+        Ok(reply::json(&router.connected_peers()))
     }
 
     /// Returns the metrics for peers connected to the node.
     async fn get_peers_all_metrics(router: Router<N>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&router.connected_metrics().await))
+        Ok(reply::json(&router.connected_metrics()))
     }
 
     /// Returns the block hash that contains the given `transaction ID`.

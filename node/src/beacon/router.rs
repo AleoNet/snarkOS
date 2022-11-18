@@ -108,6 +108,10 @@ impl<N: Network> Routes<N> for Beacon<N> {
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 10;
 
+    fn router(&self) -> &Router {
+        self.router
+    }
+
     /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
     async fn puzzle_request(&self, peer_ip: SocketAddr, router: &Router<N>) -> bool {
         // Retrieve the latest epoch challenge and latest block.

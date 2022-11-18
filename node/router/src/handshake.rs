@@ -33,6 +33,7 @@ use anyhow::{bail, Result};
 use core::time::Duration;
 use futures::SinkExt;
 use std::{io, net::SocketAddr, time::SystemTime};
+use tokio::net::TcpStream;
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
@@ -45,14 +46,19 @@ impl<N: Network> P2P for Router<N> {
 
 impl<N: Network> Router<N> {
     /// Performs the handshake protocol.
-    pub async fn handshake(&self, mut connection: Connection) -> io::Result<Connection> {
+    pub async fn handshake(
+        &self,
+        peer_addr: SocketAddr,
+        stream: TcpStream,
+        peer_side: ConnectionSide,
+    ) -> io::Result<()> {
         // Retrieve the peer IP address.
-        let peer_addr = connection.addr();
+        // let peer_addr = connection.addr();
         // Retrieve the local IP address.
         let local_addr = self.tcp.listening_addr().expect("listening address should be present");
 
         // Construct the stream.
-        let stream = self.borrow_stream(&mut connection);
+        // let stream = self.borrow_stream(&mut connection);
         let mut framed = Framed::new(stream, MessageCodec::<N>::default());
 
         // Ensure the peer is allowed to connect.
@@ -131,7 +137,6 @@ impl<N: Network> Router<N> {
         /* Step 5: Add the peer to the router. */
 
         // Prepare the peer.
-        let peer_side = connection.side();
         let peer_listener = match peer_side {
             // The peer initiated the connection.
             ConnectionSide::Initiator => SocketAddr::new(peer_addr.ip(), challenge_request.listener_port),
@@ -160,7 +165,7 @@ impl<N: Network> Router<N> {
         // trace!("Sending '{}' to '{peer_ip}'", message.name());
         // outbound_socket.send(message).await?;
 
-        Ok(connection)
+        Ok(())
     }
 
     /// Ensure the peer is allowed to connect.
@@ -170,7 +175,7 @@ impl<N: Network> Router<N> {
             bail!("Dropping connection request from '{peer_ip}' (attempted to self-connect)")
         }
         // Ensure the node does not surpass the maximum number of peer connections.
-        if self.number_of_connected_peers() >= R::MAXIMUM_NUMBER_OF_PEERS {
+        if self.number_of_connected_peers() >= self.tcp.config().max_connections as usize {
             bail!("Dropping connection request from '{peer_ip}' (maximum peers reached)")
         }
         // Ensure the node is not already connected to this peer.
