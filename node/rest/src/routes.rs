@@ -25,7 +25,7 @@ struct BlockRange {
     end: u32,
 }
 
-impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
+impl<N: Network, C: ConsensusStorage<N>, T: Routes<N>> Rest<N, C, T> {
     /// Initializes the routes, given the ledger and ledger sender.
     pub fn routes(&self) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
         // GET /testnet3/latest/height
@@ -124,19 +124,19 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         // GET /testnet3/peers/count
         let get_peers_count = warp::get()
             .and(warp::path!("testnet3" / "peers" / "count"))
-            .and(with(self.router.clone()))
+            .and(with(self.node.router().clone()))
             .and_then(Self::get_peers_count);
 
         // GET /testnet3/peers/all
         let get_peers_all = warp::get()
             .and(warp::path!("testnet3" / "peers" / "all"))
-            .and(with(self.router.clone()))
+            .and(with(self.node.router().clone()))
             .and_then(Self::get_peers_all);
 
         // GET /testnet3/peers/all/metrics
         let get_peers_all_metrics = warp::get()
             .and(warp::path!("testnet3" / "peers" / "all" / "metrics"))
-            .and(with(self.router.clone()))
+            .and(with(self.node.router().clone()))
             .and_then(Self::get_peers_all_metrics);
 
         // GET /testnet3/node/address
@@ -183,7 +183,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and(warp::body::content_length_limit(10 * 1024 * 1024))
             .and(warp::body::json())
             .and(with(self.consensus.clone()))
-            .and(with(self.router.clone()))
+            .and(with(self.node.clone()))
             .and_then(Self::transaction_broadcast);
 
         // Return the list of routes.
@@ -213,7 +213,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     }
 }
 
-impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
+impl<N: Network, C: ConsensusStorage<N>, T: Routes<N>> Rest<N, C, T> {
     /// Returns the latest block height.
     async fn latest_height(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.latest_height()))
@@ -362,7 +362,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     async fn transaction_broadcast(
         transaction: Transaction<N>,
         consensus: Option<Consensus<N, C>>,
-        router: Router<N>,
+        node: Arc<T>,
     ) -> Result<impl Reply, Rejection> {
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = consensus {
@@ -377,7 +377,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         });
 
         // Broadcast the transaction.
-        router.propagate(message, vec![]);
+        node.propagate(message, vec![]);
 
         Ok("OK")
     }

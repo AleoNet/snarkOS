@@ -20,7 +20,7 @@ use super::*;
 impl<N: Network> Handshake for Prover<N> {}
 
 #[async_trait]
-impl<N: Network> Inbound<N> for Prover<N> {
+impl<N: Network> Routes<N> for Prover<N> {
     /// Saves the latest epoch challenge and latest block in the prover.
     async fn puzzle_response(&self, message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
         let epoch_challenge = message.epoch_challenge;
@@ -68,6 +68,3 @@ impl<N: Network> Inbound<N> for Prover<N> {
         true
     }
 }
-
-#[async_trait]
-impl<N: Network> Outbound for Prover<N> {}

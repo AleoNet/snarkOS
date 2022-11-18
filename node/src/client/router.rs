@@ -20,7 +20,7 @@ use super::*;
 impl<N: Network> Handshake for Client<N> {}
 
 #[async_trait]
-impl<N: Network> Inbound<N> for Client<N> {
+impl<N: Network> Routes<N> for Client<N> {
     /// Saves the latest epoch challenge and latest block in the node.
     async fn puzzle_response(&self, message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
         let epoch_challenge = message.epoch_challenge;
@@ -77,6 +77,3 @@ impl<N: Network> Inbound<N> for Client<N> {
         true
     }
 }
-
-#[async_trait]
-impl<N: Network> Outbound for Client<N> {}

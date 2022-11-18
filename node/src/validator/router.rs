@@ -17,13 +17,13 @@
 use super::*;
 
 #[async_trait]
-impl<N: Network> Handshake for Validator<N> {
-    /// The maximum number of peers permitted to maintain connections with.
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 1_000;
-}
+impl<N: Network> Handshake for Validator<N> {}
 
 #[async_trait]
-impl<N: Network> Inbound<N> for Validator<N> {
+impl<N: Network> Routes<N> for Validator<N> {
+    /// The maximum number of peers permitted to maintain connections with.
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 1_000;
+
     /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
     async fn puzzle_request(&self, peer_ip: SocketAddr, router: &Router<N>) -> bool {
         // Send the latest puzzle response, if it exists.
@@ -100,6 +100,3 @@ impl<N: Network> Inbound<N> for Validator<N> {
         true
     }
 }
-
-#[async_trait]
-impl<N: Network> Outbound for Validator<N> {}

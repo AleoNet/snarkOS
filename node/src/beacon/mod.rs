@@ -30,8 +30,9 @@ use snarkos_node_messages::{
     UnconfirmedTransaction,
 };
 use snarkos_node_rest::Rest;
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
+use snarkos_node_router::Router;
 use snarkos_node_store::ConsensusDB;
+use snarkos_node_tcp::protocols::Handshake;
 use snarkvm::prelude::{
     Address,
     Block,
@@ -72,7 +73,7 @@ pub struct Beacon<N: Network> {
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
-    rest: Option<Arc<Rest<N, ConsensusDB<N>>>>,
+    rest: Option<Arc<Rest<N, ConsensusDB<N>, Self>>>,
     /// The time it to generate a block.
     block_generation_time: Arc<AtomicU64>,
     /// The unspent records.
@@ -159,7 +160,7 @@ impl<N: Network> Beacon<N> {
     }
 
     /// Returns the REST server.
-    pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>>>> {
+    pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>, Self>>> {
         &self.rest
     }
 }

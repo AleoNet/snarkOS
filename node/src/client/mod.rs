@@ -20,7 +20,8 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{Executor, NodeType, RawStatus};
 use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
+use snarkos_node_router::{Router, Routes};
+use snarkos_node_tcp::protocols::Handshake;
 use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
 
 use anyhow::Result;

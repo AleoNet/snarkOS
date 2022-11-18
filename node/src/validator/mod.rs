@@ -22,8 +22,9 @@ use snarkos_node_executor::{Executor, NodeType, RawStatus, Status};
 use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router};
+use snarkos_node_router::{Router, Routes};
 use snarkos_node_store::ConsensusDB;
+use snarkos_node_tcp::protocols::Handshake;
 use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
 
 use anyhow::Result;
@@ -40,7 +41,7 @@ pub struct Validator<N: Network> {
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
-    rest: Option<Arc<Rest<N, ConsensusDB<N>>>>,
+    rest: Option<Arc<Rest<N, ConsensusDB<N>, Self>>>,
     /// The coinbase puzzle.
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The latest epoch challenge.
@@ -99,7 +100,7 @@ impl<N: Network> Validator<N> {
     }
 
     /// Returns the REST server.
-    pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>>>> {
+    pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>, Self>>> {
         &self.rest
     }
 }

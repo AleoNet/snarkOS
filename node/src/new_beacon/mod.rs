@@ -63,8 +63,8 @@ pub struct Beacon<N: CurrentNetwork, C: ConsensusStorage<N>> {
     router: Router,
     /// The cache of network data seen by the node.
     cache: Cache<N>,
-    /// The REST server of the node.
-    rest: Option<Arc<Rest<N, C>>>,
+    // /// The REST server of the node.
+    //rest: Option<Arc<Rest<N, C>>>,
     /// The time it to generate a block.
     block_generation_time: Arc<AtomicU64>,
     /// The node's current state.
@@ -99,7 +99,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
             ledger,
             router: Router::new().await,
             cache: Cache::new(),
-            rest: None,
+            //       rest: None,
             block_generation_time,
             status: RawStatus::new(),
             shutdown: Default::default(),
@@ -125,9 +125,9 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
     }
 
     /// Returns the REST server.
-    pub fn rest(&self) -> &Option<Arc<Rest<N, C>>> {
-        &self.rest
-    }
+    // pub fn rest(&self) -> &Option<Arc<Rest<N, C>>> {
+    //     &self.rest
+    // }
 
     pub fn router(&self) -> &Router {
         &self.router

@@ -16,7 +16,6 @@
 
 use super::*;
 
-use crate::Router;
 use snarkos_node_messages::{DisconnectReason, Message, MessageCodec};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, Writing},
@@ -108,7 +107,7 @@ impl<N: Network> Routes<N> for Beacon<N> {
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 10;
 
-    fn router(&self) -> &Router {
+    fn router(&self) -> &Router<N> {
         self.router
     }
 
