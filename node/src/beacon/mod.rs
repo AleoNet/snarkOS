@@ -150,13 +150,8 @@ impl<N: Network> Beacon<N> {
             unspent_records: Arc::new(RwLock::new(unspent_records)),
             shutdown: Default::default(),
         };
-
-        // Enable the TCP protocols.
-        node.enable_handshake().await;
-        node.enable_reading().await;
-        node.enable_writing().await;
-        node.enable_disconnect().await;
-
+        // Initialize the routes.
+        node.initialize_routes().await;
         // Initialize the block production.
         node.initialize_block_production().await;
         // Initialize the signal handler.

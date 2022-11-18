@@ -165,7 +165,7 @@ impl<N: Network> Router<N> {
             bail!("Dropping connection request from '{peer_ip}' (attempted to self-connect)")
         }
         // Ensure the node does not surpass the maximum number of peer connections.
-        if self.number_of_connected_peers() >= self.tcp.config().max_connections as usize {
+        if self.number_of_connected_peers() >= self.max_connected_peers() {
             bail!("Dropping connection request from '{peer_ip}' (maximum peers reached)")
         }
         // Ensure the node is not already connected to this peer.

@@ -95,13 +95,8 @@ impl<N: Network> Validator<N> {
             latest_block: Default::default(),
             latest_puzzle_response: Default::default(),
         };
-
-        // Enable the TCP protocols.
-        node.enable_handshake().await;
-        node.enable_reading().await;
-        node.enable_writing().await;
-        node.enable_disconnect().await;
-
+        // Initialize the routes.
+        node.initialize_routes().await;
         // Initialize the signal handler.
         node.handle_signals();
         // Return the node.

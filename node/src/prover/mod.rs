@@ -76,15 +76,10 @@ impl<N: Network> Prover<N> {
             latest_block: Default::default(),
             puzzle_instances: Default::default(),
         };
-
-        // Enable the TCP protocols.
-        node.enable_handshake().await;
-        node.enable_reading().await;
-        node.enable_writing().await;
-        node.enable_disconnect().await;
-
+        // Initialize the routes.
+        node.initialize_routes().await;
+        // Initialize the coinbase puzzle.
         for _ in 0..3 {
-            // Initialize the coinbase puzzle.
             node.initialize_coinbase_puzzle().await;
         }
         // Initialize the signal handler.

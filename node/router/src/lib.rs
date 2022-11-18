@@ -60,6 +60,8 @@ type ConnectionStats = ((u16, u32), SystemTime);
 pub struct Router<N: Network> {
     /// The TCP stack.
     tcp: Tcp,
+    /// The local IP address of the node.
+    local_ip: SocketAddr,
     /// The node type.
     node_type: NodeType,
     /// The address of the node.
@@ -106,9 +108,14 @@ impl<N: Network> Router<N> {
         trusted_peers: &[SocketAddr],
         max_peers: u16,
     ) -> Result<Self> {
+        // Initialize the TCP stack.
+        let tcp = Tcp::new(Config::new(node_ip, max_peers)).await?;
+        // Fetch the listening IP address.
+        let local_ip = tcp.listening_addr().expect("The listening address for this node must be present");
         // Initialize the router.
-        let router = Self {
-            tcp: Tcp::new(Config::new(node_ip, max_peers)).await?,
+        Ok(Self {
+            tcp,
+            local_ip,
             node_type,
             address,
             status: RawStatus::new(),
@@ -117,9 +124,7 @@ impl<N: Network> Router<N> {
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             cache: Default::default(),
-        };
-
-        Ok(router)
+        })
     }
 
     /// Returns the status.
@@ -128,8 +133,8 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the IP address of this node.
-    pub fn local_ip(&self) -> SocketAddr {
-        self.tcp.listening_addr().expect("The listening address for this node must be present")
+    pub const fn local_ip(&self) -> SocketAddr {
+        self.local_ip
     }
 
     /// Returns `true` if the given IP is this node.
@@ -149,6 +154,11 @@ impl<N: Network> Router<N> {
             Some(timestamp) => timestamp.elapsed().as_secs() < Self::RADIO_SILENCE_IN_SECS,
             None => false,
         }
+    }
+
+    /// Returns the maximum number of connected peers.
+    pub fn max_connected_peers(&self) -> usize {
+        self.tcp.config().max_connections as usize
     }
 
     /// Returns the number of connected peers.

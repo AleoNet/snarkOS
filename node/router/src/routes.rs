@@ -17,7 +17,10 @@
 use crate::{Cache, Peer, Router, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_executor::{NodeType, RawStatus};
 use snarkos_node_messages::*;
-use snarkos_node_tcp::protocols::{Handshake, Reading, Writing};
+use snarkos_node_tcp::{
+    protocols::{Disconnect, Handshake, Reading, Writing},
+    P2P,
+};
 use snarkvm::prelude::{Block, Network, ProverSolution, Transaction};
 use std::collections::HashMap;
 
@@ -30,7 +33,7 @@ use std::{
 };
 
 #[async_trait]
-pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>> {
+pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<Message = Message<N>> {
     /// The minimum number of peers required to maintain connections with.
     const MINIMUM_NUMBER_OF_PEERS: usize = 1;
     /// The maximum number of peers permitted to maintain connections with.
@@ -40,7 +43,12 @@ pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>
     fn router(&self) -> &Router<N>;
 
     /// Initialize the routes.
-    async fn initialize(&self) {
+    async fn initialize_routes(&self) {
+        // Enable the TCP protocols.
+        self.enable_handshake().await;
+        self.enable_reading().await;
+        self.enable_writing().await;
+        self.enable_disconnect().await;
         // Initialize the heartbeat.
         self.initialize_heartbeat().await;
         // Initialize the puzzle request.
