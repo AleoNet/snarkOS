@@ -22,10 +22,20 @@ use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType, Raw
 use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_router::{Router, Routes};
 use snarkos_node_tcp::protocols::{Disconnect, Handshake, Reading, Writing};
-use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
+use snarkvm::prelude::{
+    Address,
+    Block,
+    CoinbasePuzzle,
+    ConsensusStorage,
+    EpochChallenge,
+    Network,
+    PrivateKey,
+    ProverSolution,
+    ViewKey,
+};
 
 use anyhow::Result;
-use core::time::Duration;
+use core::{marker::PhantomData, time::Duration};
 use rand::Rng;
 use std::{
     net::SocketAddr,
@@ -36,7 +46,7 @@ use tokio::sync::RwLock;
 
 /// A prover is a full node, capable of producing proofs for consensus.
 #[derive(Clone)]
-pub struct Prover<N: Network> {
+pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     /// The account of the node.
     account: Account<N>,
     /// The router of the node.
@@ -49,9 +59,11 @@ pub struct Prover<N: Network> {
     latest_block: Arc<RwLock<Option<Block<N>>>>,
     /// The number of puzzle instances.
     puzzle_instances: Arc<AtomicU8>,
+    /// PhantomData.
+    _phantom: PhantomData<C>,
 }
 
-impl<N: Network> Prover<N> {
+impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Initializes a new prover node.
     pub async fn new(node_ip: SocketAddr, private_key: PrivateKey<N>, trusted_peers: &[SocketAddr]) -> Result<Self> {
         // Initialize the node account.
@@ -75,6 +87,7 @@ impl<N: Network> Prover<N> {
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
             puzzle_instances: Default::default(),
+            _phantom: Default::default(),
         };
         // Initialize the routes.
         node.initialize_routes().await;
@@ -90,7 +103,7 @@ impl<N: Network> Prover<N> {
 }
 
 #[async_trait]
-impl<N: Network> Executor for Prover<N> {
+impl<N: Network, C: ConsensusStorage<N>> Executor for Prover<N, C> {
     /// The node type.
     const NODE_TYPE: NodeType = NodeType::Prover;
 
@@ -110,7 +123,7 @@ impl<N: Network> Executor for Prover<N> {
     }
 }
 
-impl<N: Network> NodeInterface<N> for Prover<N> {
+impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
         Self::NODE_TYPE
@@ -137,7 +150,7 @@ impl<N: Network> NodeInterface<N> for Prover<N> {
     }
 }
 
-impl<N: Network> Prover<N> {
+impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Initialize a new instance of the coinbase puzzle.
     async fn initialize_coinbase_puzzle(&self) {
         let prover = self.clone();

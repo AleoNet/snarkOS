@@ -36,6 +36,7 @@ use snarkos_node_tcp::protocols::{Disconnect, Handshake, Reading, Writing};
 use snarkvm::prelude::{
     Address,
     Block,
+    ConsensusStorage,
     Identifier,
     Network,
     PrivateKey,
@@ -63,13 +64,13 @@ use tokio::time::timeout;
 
 /// A beacon is a full node, capable of producing blocks.
 #[derive(Clone)]
-pub struct Beacon<N: Network> {
+pub struct Beacon<N: Network, C: ConsensusStorage<N>> {
     /// The account of the node.
     account: Account<N>,
     /// The consensus module of the node.
-    consensus: Consensus<N, ConsensusDB<N>>,
+    consensus: Consensus<N, C>,
     /// The ledger of the node.
-    ledger: Ledger<N, ConsensusDB<N>>,
+    ledger: Ledger<N, C>,
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
@@ -82,7 +83,7 @@ pub struct Beacon<N: Network> {
     shutdown: Arc<AtomicBool>,
 }
 
-impl<N: Network> Beacon<N> {
+impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     /// Initializes a new beacon node.
     pub async fn new(
         node_ip: SocketAddr,
@@ -164,7 +165,7 @@ impl<N: Network> Beacon<N> {
     }
 
     /// Returns the ledger.
-    pub fn ledger(&self) -> &Ledger<N, ConsensusDB<N>> {
+    pub fn ledger(&self) -> &Ledger<N, C> {
         &self.ledger
     }
 
@@ -175,7 +176,7 @@ impl<N: Network> Beacon<N> {
 }
 
 #[async_trait]
-impl<N: Network> Executor for Beacon<N> {
+impl<N: Network, C: ConsensusStorage<N>> Executor for Beacon<N, C> {
     /// The node type.
     const NODE_TYPE: NodeType = NodeType::Beacon;
 
@@ -203,7 +204,7 @@ impl<N: Network> Executor for Beacon<N> {
     }
 }
 
-impl<N: Network> NodeInterface<N> for Beacon<N> {
+impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Beacon<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
         Self::NODE_TYPE
@@ -231,7 +232,7 @@ impl<N: Network> NodeInterface<N> for Beacon<N> {
 }
 
 /// A helper method to check if the coinbase target has been met.
-async fn check_for_coinbase<N: Network>(consensus: Consensus<N, ConsensusDB<N>>) {
+async fn check_for_coinbase<N: Network, C: ConsensusStorage<N>>(consensus: Consensus<N, C>) {
     loop {
         // Check if the coinbase target has been met.
         match consensus.is_coinbase_target_met() {
@@ -244,7 +245,7 @@ async fn check_for_coinbase<N: Network>(consensus: Consensus<N, ConsensusDB<N>>)
     }
 }
 
-impl<N: Network> Beacon<N> {
+impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     /// Initialize a new instance of block production.
     async fn initialize_block_production(&self) {
         let beacon = self.clone();
@@ -492,7 +493,6 @@ mod tests {
         // Specify the node attributes.
         let node = SocketAddr::from_str("0.0.0.0:4133").unwrap();
         let rest = SocketAddr::from_str("0.0.0.0:3033").unwrap();
-
         let dev = Some(0);
 
         // Initialize an (insecure) fixed RNG.
@@ -506,8 +506,16 @@ mod tests {
 
         println!("Initializing beacon node...");
 
-        let beacon =
-            Beacon::<CurrentNetwork>::new(node, Some(rest), beacon_private_key, &[], Some(genesis), dev).await.unwrap();
+        let beacon = Beacon::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
+            node,
+            Some(rest),
+            beacon_private_key,
+            &[],
+            Some(genesis),
+            dev,
+        )
+        .await
+        .unwrap();
 
         println!(
             "Loaded beacon node with {} blocks and {} records",

@@ -23,9 +23,18 @@ use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Router, Routes};
-use snarkos_node_store::ConsensusDB;
 use snarkos_node_tcp::protocols::{Disconnect, Handshake, Reading, Writing};
-use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
+use snarkvm::prelude::{
+    Address,
+    Block,
+    CoinbasePuzzle,
+    ConsensusStorage,
+    EpochChallenge,
+    Network,
+    PrivateKey,
+    ProverSolution,
+    ViewKey,
+};
 
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};
@@ -33,11 +42,11 @@ use tokio::sync::RwLock;
 
 /// A validator is a full node, capable of validating blocks.
 #[derive(Clone)]
-pub struct Validator<N: Network> {
+pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     /// The account of the node.
     account: Account<N>,
     /// The ledger of the node.
-    ledger: Ledger<N, ConsensusDB<N>>,
+    ledger: Ledger<N, C>,
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
@@ -52,7 +61,7 @@ pub struct Validator<N: Network> {
     latest_puzzle_response: Arc<RwLock<Option<PuzzleResponse<N>>>>,
 }
 
-impl<N: Network> Validator<N> {
+impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Initializes a new validator node.
     pub async fn new(
         node_ip: SocketAddr,
@@ -104,7 +113,7 @@ impl<N: Network> Validator<N> {
     }
 
     /// Returns the ledger.
-    pub fn ledger(&self) -> &Ledger<N, ConsensusDB<N>> {
+    pub fn ledger(&self) -> &Ledger<N, C> {
         &self.ledger
     }
 
@@ -115,7 +124,7 @@ impl<N: Network> Validator<N> {
 }
 
 #[async_trait]
-impl<N: Network> Executor for Validator<N> {
+impl<N: Network, C: ConsensusStorage<N>> Executor for Validator<N, C> {
     /// The node type.
     const NODE_TYPE: NodeType = NodeType::Validator;
 
@@ -139,7 +148,7 @@ impl<N: Network> Executor for Validator<N> {
     }
 }
 
-impl<N: Network> NodeInterface<N> for Validator<N> {
+impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
         Self::NODE_TYPE

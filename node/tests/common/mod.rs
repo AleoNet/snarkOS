@@ -16,35 +16,35 @@
 
 use snarkos_node_executor::{NodeType, Status};
 use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec};
+use snarkos_node_router::Routes;
+use snarkos_node_tcp::{protocols::Handshake, Config, Connection, Tcp, P2P};
 use snarkvm::prelude::{Block, FromBytes, Network, Testnet3 as CurrentNetwork};
 
+use futures_util::{sink::SinkExt, TryStreamExt};
 use std::{
     io,
     net::{IpAddr, Ipv4Addr},
 };
-
-use futures_util::{sink::SinkExt, TryStreamExt};
-use pea2pea::{protocols::Handshake, Config, Connection, Node, Pea2Pea};
 use tokio_util::codec::Framed;
 
 const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 #[derive(Clone)]
 pub struct TestPeer {
-    node: Node,
+    tcp: Tcp,
     node_type: NodeType,
 }
 
-impl Pea2Pea for TestPeer {
-    fn node(&self) -> &Node {
-        &self.node
+impl P2P for TestPeer {
+    fn tcp(&self) -> &Tcp {
+        &self.tcp
     }
 }
 
 impl TestPeer {
     pub async fn new(node_type: NodeType) -> Self {
         let peer = Self {
-            node: Node::new(Config {
+            tcp: Tcp::new(Config {
                 listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
                 max_connections: 200,
                 ..Default::default()
@@ -70,7 +70,7 @@ impl TestPeer {
 #[async_trait::async_trait]
 impl Handshake for TestPeer {
     async fn perform_handshake(&self, mut conn: Connection) -> io::Result<Connection> {
-        let local_addr = self.node().listening_addr().expect("listening address should be present");
+        let local_ip = self.tcp().listening_addr().expect("listening address should be present");
 
         let stream = self.borrow_stream(&mut conn);
         let mut framed = Framed::new(stream, MessageCodec::<CurrentNetwork>::default());
@@ -87,7 +87,7 @@ impl Handshake for TestPeer {
             fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
             node_type: self.node_type(),
             status: Status::Peering,
-            listener_port: local_addr.port(),
+            listener_port: local_ip.port(),
         });
         framed.send(message).await?;
 

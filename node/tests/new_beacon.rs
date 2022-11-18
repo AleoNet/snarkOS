@@ -17,13 +17,13 @@
 mod common;
 use common::TestPeer;
 
-use snarkos_node::new_beacon::Beacon;
+use snarkos_node::Beacon;
 use snarkos_node_executor::NodeType;
+use snarkos_node_router::Routes;
+use snarkos_node_tcp::P2P;
 use snarkvm::prelude::{ConsensusMemory, PrivateKey, Testnet3 as CurrentNetwork};
 
 use std::str::FromStr;
-
-use pea2pea::Pea2Pea;
 
 #[tokio::test]
 async fn handshake_responder_side() {
@@ -44,10 +44,7 @@ async fn handshake_responder_side() {
 
     // Verify the handshake works when the peer initates a connection with the beacon.
     assert!(
-        peer.node()
-            .connect(beacon.router().tcp().listening_addr().expect("beacon listener should exist"))
-            .await
-            .is_ok()
+        peer.tcp().connect(beacon.router().tcp().listening_addr().expect("beacon listener should exist")).await.is_ok()
     );
 }
 
@@ -70,6 +67,6 @@ async fn handshake_initiator_side() {
 
     // Verify the handshake works when the beacon initiates a connection with the peer.
     assert!(
-        beacon.router().tcp().connect(peer.node().listening_addr().expect("peer listener should exist")).await.is_ok()
+        beacon.router().tcp().connect(peer.tcp().listening_addr().expect("peer listener should exist")).await.is_ok()
     );
 }

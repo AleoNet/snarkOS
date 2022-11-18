@@ -22,15 +22,26 @@ use snarkos_node_executor::{Executor, NodeType, RawStatus, Status};
 use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_router::{Router, Routes};
 use snarkos_node_tcp::protocols::{Disconnect, Handshake, Reading, Writing};
-use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
+use snarkvm::prelude::{
+    Address,
+    Block,
+    CoinbasePuzzle,
+    ConsensusStorage,
+    EpochChallenge,
+    Network,
+    PrivateKey,
+    ProverSolution,
+    ViewKey,
+};
 
 use anyhow::Result;
+use core::marker::PhantomData;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
 
 /// A client node is a full node, capable of querying with the network.
 #[derive(Clone)]
-pub struct Client<N: Network> {
+pub struct Client<N: Network, C: ConsensusStorage<N>> {
     /// The account of the node.
     account: Account<N>,
     /// The router of the node.
@@ -41,9 +52,11 @@ pub struct Client<N: Network> {
     latest_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
     /// The latest block.
     latest_block: Arc<RwLock<Option<Block<N>>>>,
+    /// PhantomData.
+    _phanthom: PhantomData<C>,
 }
 
-impl<N: Network> Client<N> {
+impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
     /// Initializes a new client node.
     pub async fn new(node_ip: SocketAddr, private_key: PrivateKey<N>, trusted_peers: &[SocketAddr]) -> Result<Self> {
         // Initialize the node account.
@@ -66,6 +79,7 @@ impl<N: Network> Client<N> {
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
+            _phanthom: PhantomData,
         };
         // Initialize the routes.
         node.initialize_routes().await;
@@ -77,7 +91,7 @@ impl<N: Network> Client<N> {
 }
 
 #[async_trait]
-impl<N: Network> Executor for Client<N> {
+impl<N: Network, C: ConsensusStorage<N>> Executor for Client<N, C> {
     /// The node type.
     const NODE_TYPE: NodeType = NodeType::Client;
 
@@ -97,7 +111,7 @@ impl<N: Network> Executor for Client<N> {
     }
 }
 
-impl<N: Network> NodeInterface<N> for Client<N> {
+impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Client<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
         Self::NODE_TYPE

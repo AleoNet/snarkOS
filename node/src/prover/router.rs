@@ -31,7 +31,7 @@ use snarkos_node_router::Routes;
 use snarkos_node_tcp::{protocols::Reading, P2P};
 use std::{io, net::SocketAddr, sync::atomic::Ordering, time::Instant};
 
-impl<N: Network> P2P for Prover<N> {
+impl<N: Network, C: ConsensusStorage<N>> P2P for Prover<N, C> {
     /// Returns a reference to the TCP instance.
     fn tcp(&self) -> &Tcp {
         &self.router.tcp()
@@ -39,7 +39,7 @@ impl<N: Network> P2P for Prover<N> {
 }
 
 #[async_trait]
-impl<N: Network> Handshake for Prover<N> {
+impl<N: Network, C: ConsensusStorage<N>> Handshake for Prover<N, C> {
     /// Performs the handshake protocol.
     async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
         let peer_addr = connection.addr();
@@ -52,7 +52,7 @@ impl<N: Network> Handshake for Prover<N> {
 }
 
 #[async_trait]
-impl<N: Network> Disconnect for Prover<N> {
+impl<N: Network, C: ConsensusStorage<N>> Disconnect for Prover<N, C> {
     /// Any extra operations to be performed during a disconnect.
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
         self.router.remove_connected_peer(peer_addr);
@@ -60,7 +60,7 @@ impl<N: Network> Disconnect for Prover<N> {
 }
 
 #[async_trait]
-impl<N: Network> Writing for Prover<N> {
+impl<N: Network, C: ConsensusStorage<N>> Writing for Prover<N, C> {
     type Codec = MessageCodec<N>;
     type Message = Message<N>;
 
@@ -72,7 +72,7 @@ impl<N: Network> Writing for Prover<N> {
 }
 
 #[async_trait]
-impl<N: Network> Reading for Prover<N> {
+impl<N: Network, C: ConsensusStorage<N>> Reading for Prover<N, C> {
     type Codec = MessageCodec<N>;
     type Message = Message<N>;
 
@@ -99,7 +99,7 @@ impl<N: Network> Reading for Prover<N> {
 }
 
 #[async_trait]
-impl<N: Network> Routes<N> for Prover<N> {
+impl<N: Network, C: ConsensusStorage<N>> Routes<N> for Prover<N, C> {
     /// Returns a reference to the router.
     fn router(&self) -> &Router<N> {
         &self.router

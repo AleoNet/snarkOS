@@ -50,15 +50,15 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
         self.enable_writing().await;
         self.enable_disconnect().await;
         // Initialize the heartbeat.
-        self.initialize_heartbeat().await;
+        self.initialize_heartbeat();
         // Initialize the puzzle request.
-        self.initialize_puzzle_request().await;
+        self.initialize_puzzle_request();
         // Initialize the report.
-        self.initialize_report().await;
+        self.initialize_report();
     }
 
     /// Initialize a new instance of the heartbeat.
-    async fn initialize_heartbeat(&self) {
+    fn initialize_heartbeat(&self) {
         let self_clone = self.clone();
         tokio::spawn(async move {
             loop {
@@ -71,7 +71,7 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
     }
 
     /// Initialize a new instance of the puzzle request.
-    async fn initialize_puzzle_request(&self) {
+    fn initialize_puzzle_request(&self) {
         if !self.router().node_type.is_beacon() {
             let self_clone = self.clone();
             tokio::spawn(async move {
@@ -86,7 +86,7 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
     }
 
     /// Initialize a new instance of the report.
-    async fn initialize_report(&self) {
+    fn initialize_report(&self) {
         let self_clone = self.clone();
         tokio::spawn(async move {
             let url = "https://vm.aleo.org/testnet3/report";
@@ -106,7 +106,7 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
     }
 
     /// Sends a "PuzzleRequest" to a reliable peer.
-    async fn send_puzzle_request(&self, node_type: NodeType) {
+    fn send_puzzle_request(&self, node_type: NodeType) {
         // TODO (howardwu): Change this logic for Phase 3.
         // Retrieve a reliable peer.
         let reliable_peer = match node_type.is_validator() {
@@ -287,7 +287,7 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
                 true
             }
             Message::Ping(message) => self.ping(peer_ip, message),
-            Message::Pong(message) => self.pong(peer_ip, message).await,
+            Message::Pong(message) => self.pong(peer_ip, message),
             Message::PuzzleRequest(..) => {
                 // Insert the puzzle request for the peer, and fetch the recent frequency.
                 let frequency = self.router().cache.insert_inbound_puzzle_request(peer_ip);
@@ -517,7 +517,7 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
         true
     }
 
-    async fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool {
+    fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool {
         // // Perform the deferred non-blocking deserialization of block locators.
         // let request = match block_locators.deserialize().await {
         //     // Route the `Pong` to the ledger.

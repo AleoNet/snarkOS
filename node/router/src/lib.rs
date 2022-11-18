@@ -50,9 +50,6 @@ use std::{
 // TODO (raychu86): Move this declaration.
 const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
-/// The first-seen port number, number of attempts, and timestamp of the last inbound connection request.
-type ConnectionStats = ((u16, u32), SystemTime);
-
 #[derive(Clone)]
 pub struct Router<N: Network> {
     /// The TCP stack.
@@ -68,7 +65,7 @@ pub struct Router<N: Network> {
     /// The set of trusted peers.
     trusted_peers: Arc<IndexSet<SocketAddr>>,
     /// The map of connected peer IPs to their peer handlers.
-    pub connected_peers: Arc<RwLock<IndexMap<SocketAddr, Peer>>>,
+    connected_peers: Arc<RwLock<IndexMap<SocketAddr, Peer>>>,
     /// The set of candidate peer IPs.
     candidate_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of restricted peer IPs.

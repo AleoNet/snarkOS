@@ -23,7 +23,6 @@ extern crate async_trait;
 extern crate tracing;
 
 mod beacon;
-pub mod new_beacon;
 pub use beacon::*;
 
 mod client;
@@ -39,6 +38,7 @@ mod traits;
 pub use traits::*;
 
 use snarkos_node_executor::NodeType;
+use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
 
 use anyhow::Result;
@@ -46,13 +46,13 @@ use std::{net::SocketAddr, sync::Arc};
 
 pub enum Node<N: Network> {
     /// A beacon is a full node, capable of producing blocks.
-    Beacon(Arc<Beacon<N>>),
+    Beacon(Arc<Beacon<N, ConsensusDB<N>>>),
     /// A validator is a full node, capable of validating blocks.
-    Validator(Arc<Validator<N>>),
+    Validator(Arc<Validator<N, ConsensusDB<N>>>),
     /// A prover is a full node, capable of producing proofs for consensus.
-    Prover(Arc<Prover<N>>),
+    Prover(Arc<Prover<N, ConsensusDB<N>>>),
     /// A client node is a full node, capable of querying with the network.
-    Client(Arc<Client<N>>),
+    Client(Arc<Client<N, ConsensusDB<N>>>),
 }
 
 impl<N: Network> Node<N> {
