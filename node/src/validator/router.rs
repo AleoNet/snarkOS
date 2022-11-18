@@ -16,8 +16,91 @@
 
 use super::*;
 
+use snarkos_node_messages::{DisconnectReason, Message, MessageCodec};
+use snarkos_node_tcp::{
+    protocols::{Disconnect, Handshake, Writing},
+    Connection,
+    ConnectionSide,
+    Tcp,
+};
+use snarkvm::prelude::Network;
+
+use core::time::Duration;
+use rand::Rng;
+use snarkos_node_router::Routes;
+use snarkos_node_tcp::{protocols::Reading, P2P};
+use std::{io, net::SocketAddr, sync::atomic::Ordering, time::Instant};
+
+impl<N: Network> P2P for Validator<N> {
+    /// Returns a reference to the TCP instance.
+    fn tcp(&self) -> &Tcp {
+        &self.router.tcp()
+    }
+}
+
 #[async_trait]
-impl<N: Network> Handshake for Validator<N> {}
+impl<N: Network> Handshake for Validator<N> {
+    /// Performs the handshake protocol.
+    async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
+        self.router.handshake(&mut connection).await
+    }
+}
+
+#[async_trait]
+impl<N: Network> Disconnect for Validator<N> {
+    /// Any extra operations to be performed during a disconnect.
+    async fn handle_disconnect(&self, peer_addr: SocketAddr) {
+        self.router.insert_disconnected_peer(peer_addr);
+    }
+}
+
+#[async_trait]
+impl<N: Network> Writing for Validator<N> {
+    type Codec = MessageCodec<N>;
+    type Message = Message<N>;
+
+    /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
+    /// The `side` parameter indicates the connection side **from the node's perspective**.
+    fn codec(&self, _addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
+        Default::default()
+    }
+}
+
+#[async_trait]
+impl<N: Network> Reading for Validator<N> {
+    type Codec = MessageCodec<N>;
+    type Message = Message<N>;
+
+    /// Creates a [`Decoder`] used to interpret messages from the network.
+    /// The `side` param indicates the connection side **from the node's perspective**.
+    fn codec(&self, _peer_addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
+        Default::default()
+    }
+
+    /// Processes a message received from the network.
+    async fn process_message(&self, peer_ip: SocketAddr, message: Self::Message) -> io::Result<()> {
+        // Update the timestamp for the received message.
+        self.connected_peers.read().get(&peer_ip).map(|peer| {
+            peer.insert_seen_message(message.id(), rand::thread_rng().gen());
+        });
+
+        // Process the message.
+        let success = self.handle_message(self, peer_ip, message).await;
+
+        // Disconnect if the peer violated the protocol.
+        if !success {
+            warn!("Disconnecting from '{peer_ip}' (violated protocol)");
+            self.send(&self.router, peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
+            // Disconnect from this peer.
+            let _disconnected = self.tcp().disconnect(peer_ip).await;
+            debug_assert!(_disconnected);
+            // Restrict this peer to prevent reconnection.
+            self.insert_restricted_peer(peer_ip);
+        }
+
+        Ok(())
+    }
+}
 
 #[async_trait]
 impl<N: Network> Routes<N> for Validator<N> {
