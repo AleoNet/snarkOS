@@ -18,7 +18,12 @@ use snarkos_node_executor::{NodeType, RawStatus};
 use snarkos_node_tcp::ConnectionSide;
 
 use parking_lot::RwLock;
-use std::{collections::HashMap, net::SocketAddr, sync::Arc, time::Instant};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::{atomic::AtomicU32, Arc},
+    time::Instant,
+};
 
 /// The state for each connected peer.
 #[derive(Clone, Debug)]
@@ -35,12 +40,8 @@ pub struct Peer {
     node_type: NodeType,
     /// The node type of the peer.
     status: RawStatus,
-    /// TODO (nkls): This could probably be an atomic.
     /// The block height of the peer.
-    block_height: Arc<RwLock<u32>>,
-    /// TODO (howardwu): There is no GC on this. Redesign.
-    /// The map of (message ID, random nonce) pairs to their last seen timestamp.
-    seen_messages: Arc<RwLock<HashMap<(u16, u32), Instant>>>,
+    block_height: Arc<AtomicU32>,
 }
 
 impl Peer {
@@ -59,8 +60,7 @@ impl Peer {
             version,
             node_type,
             status,
-            block_height: Arc::new(RwLock::new(0)),
-            seen_messages: Default::default(),
+            block_height: Default::default(),
         }
     }
 
@@ -98,11 +98,6 @@ impl Peer {
     pub fn is_client(&self) -> bool {
         self.node_type.is_client()
     }
-
-    /// Returns the frequency of recent messages.
-    pub fn message_frequency(&self) -> usize {
-        self.seen_messages.read().values().filter(|t| t.elapsed().as_secs() <= 5).count()
-    }
 }
 
 impl Peer {
@@ -124,10 +119,5 @@ impl Peer {
     /// Updates the status.
     pub fn set_status(&mut self, status: RawStatus) {
         self.status = status
-    }
-
-    /// Inserts the given message ID and random nonce pair into the seen messages map.
-    pub fn insert_seen_message(&self, message_id: u16, random_nonce: u32) {
-        self.seen_messages.write().insert((message_id, random_nonce), Instant::now());
     }
 }

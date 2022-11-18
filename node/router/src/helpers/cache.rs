@@ -38,6 +38,8 @@ pub struct Cache<N: Network> {
     /// The map of peer connections to their recent timestamps.
     seen_inbound_connections: Arc<RwLock<IndexMap<IpAddr, VecDeque<OffsetDateTime>>>>,
     /// The map of peer IPs to their recent timestamps.
+    seen_inbound_messages: Arc<RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>>,
+    /// The map of peer IPs to their recent timestamps.
     seen_inbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>>,
     /// The map of block hashes to their last seen timestamp.
     seen_inbound_blocks: Arc<RwLock<LinkedHashMap<N::BlockHash, OffsetDateTime>>>,
@@ -66,7 +68,8 @@ impl<N: Network> Cache<N> {
     /// Initializes a new instance of the cache.
     pub fn new() -> Self {
         Self {
-            seen_inbound_connections: Arc::new(RwLock::new(IndexMap::new())),
+            seen_inbound_connections: Default::default(),
+            seen_inbound_messages: Default::default(),
             seen_inbound_puzzle_requests: Default::default(),
             seen_inbound_blocks: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_inbound_solutions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
@@ -81,6 +84,11 @@ impl<N: Network> Cache<N> {
     /// Inserts a new timestamp for the given peer connection, returning the number of recent connection requests.
     pub fn insert_inbound_connection(&self, peer_ip: IpAddr, interval_in_secs: i64) -> usize {
         Self::retain_and_insert(&self.seen_inbound_connections, peer_ip, interval_in_secs)
+    }
+
+    /// Inserts a new timestamp for the given peer message, returning the number of recent messages.
+    pub fn insert_inbound_message(&self, peer_ip: SocketAddr, interval_in_secs: i64) -> usize {
+        Self::retain_and_insert(&self.seen_inbound_messages, peer_ip, interval_in_secs)
     }
 
     /// Inserts a new timestamp for the given peer IP, returning the number of recent requests.
@@ -146,10 +154,12 @@ impl<N: Network> Cache<N> {
         let mut timestamps = map_write.entry(key).or_default();
         // Fetch the current timestamp.
         let now = OffsetDateTime::now_utc();
-        // Retain only the timestamps that are within the recent interval.
-        timestamps.retain(|timestamp| now - *timestamp < Duration::seconds(interval_in_secs));
         // Insert the new timestamp.
         timestamps.push_back(now);
+        // Retain only the timestamps that are within the recent interval.
+        while timestamps.iter().next().map_or(false, |t| now - *t < Duration::seconds(interval_in_secs)) {
+            timestamps.pop_front();
+        }
         // Return the frequency of recent requests.
         timestamps.len()
     }

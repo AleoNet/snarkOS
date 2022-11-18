@@ -25,6 +25,7 @@ use snarkos_node_messages::{
     Message,
     MessageCodec,
     MessageTrait,
+    Ping,
 };
 use snarkos_node_tcp::{protocols::Handshake, Connection, ConnectionSide, Tcp, P2P};
 use snarkvm::prelude::{error, Block, FromBytes, Header, Network};
@@ -141,19 +142,19 @@ impl<N: Network> Router<N> {
         let peer = Peer::new(peer_side, peer_ip, peer_version, peer_type, peer_status);
         // Insert the connected peer in the router.
         self.insert_connected_peer(peer);
-
         info!("Connected to '{peer_ip}'");
 
-        // TODO (howardwu): Send the first ping.
-        // // Send the first `Ping` message to the peer.
-        // let message = Message::Ping(Ping {
-        //     version: Message::<N>::VERSION,
-        //     fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
-        //     node_type: Self::NODE_TYPE,
-        //     status: Self::status().get(),
-        // });
-        // trace!("Sending '{}' to '{peer_ip}'", message.name());
-        // outbound_socket.send(message).await?;
+        /* Step 6: Send the first ping. */
+
+        // Send the first `Ping` message to the peer.
+        let message = Message::Ping(Ping {
+            version: Message::<N>::VERSION,
+            fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
+            node_type: self.node_type,
+            status: self.status.get(),
+        });
+        trace!("Sending '{}' to '{peer_ip}'", message.name());
+        framed.send(message).await?;
 
         Ok(())
     }

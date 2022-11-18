@@ -251,6 +251,13 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
 
     /// Handles the message from the peer.
     async fn handle_message(&self, peer_ip: SocketAddr, message: Message<N>) -> bool {
+        // Drop the peer, if they have sent more than 50 messages in the last 5 seconds.
+        let num_messages = self.router().cache.insert_inbound_message(peer_ip, 5);
+        if num_messages >= 50 {
+            warn!("Dropping {peer_ip} for spamming messages (num_messages = {num_messages})");
+            return false;
+        }
+
         // Process the message.
         trace!("Received '{}' from '{peer_ip}'", message.name());
         match message {
@@ -635,17 +642,6 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
             let last_seen_elapsed = peer.last_seen().elapsed().as_secs();
             if last_seen_elapsed > Router::<N>::RADIO_SILENCE_IN_SECS {
                 warn!("Peer {peer_ip} has not communicated in {last_seen_elapsed} seconds");
-                // Disconnect from this peer.
-                let _disconnected = self.router().tcp.disconnect(peer_ip).await;
-                debug_assert!(_disconnected);
-                // Restrict this peer to prevent reconnection.
-                self.router().insert_restricted_peer(peer_ip);
-            }
-
-            // Drop the peer, if they have sent more than 50 messages in the last 5 seconds.
-            let frequency = peer.message_frequency();
-            if frequency >= 50 {
-                warn!("Dropping {peer_ip} for spamming messages (frequency = {frequency})");
                 // Disconnect from this peer.
                 let _disconnected = self.router().tcp.disconnect(peer_ip).await;
                 debug_assert!(_disconnected);

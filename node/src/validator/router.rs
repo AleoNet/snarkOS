@@ -84,16 +84,8 @@ impl<N: Network> Reading for Validator<N> {
 
     /// Processes a message received from the network.
     async fn process_message(&self, peer_ip: SocketAddr, message: Self::Message) -> io::Result<()> {
-        // Update the timestamp for the received message.
-        self.router().connected_peers.read().get(&peer_ip).map(|peer| {
-            peer.insert_seen_message(message.id(), rand::thread_rng().gen());
-        });
-
-        // Process the message.
-        let success = self.handle_message(peer_ip, message).await;
-
-        // Disconnect if the peer violated the protocol.
-        if !success {
+        // Process the message. Disconnect if the peer violated the protocol.
+        if !self.handle_message(peer_ip, message).await {
             warn!("Disconnecting from '{peer_ip}' (violated protocol)");
             self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
             // Disconnect from this peer.
@@ -102,7 +94,6 @@ impl<N: Network> Reading for Validator<N> {
             // Restrict this peer to prevent reconnection.
             self.router().insert_restricted_peer(peer_ip);
         }
-
         Ok(())
     }
 }
