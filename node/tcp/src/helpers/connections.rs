@@ -29,48 +29,34 @@ use tokio::{
 #[cfg(doc)]
 use crate::protocols::{Handshake, Reading, Writing};
 
+/// A map of all currently connected addresses to their associated connection.
 #[derive(Default)]
 pub(crate) struct Connections(RwLock<HashMap<SocketAddr, Connection>>);
 
 impl Connections {
+    /// Adds the given connection to the list of active connections.
     pub(crate) fn add(&self, conn: Connection) {
         self.0.write().insert(conn.addr, conn);
     }
 
+    /// Returns `true` if the given address is connected.
     pub(crate) fn is_connected(&self, addr: SocketAddr) -> bool {
         self.0.read().contains_key(&addr)
     }
 
+    /// Removes the connection associated with the given address.
     pub(crate) fn remove(&self, addr: SocketAddr) -> Option<Connection> {
         self.0.write().remove(&addr)
     }
 
+    /// Returns the number of connected addresses.
     pub(crate) fn num_connected(&self) -> usize {
         self.0.read().len()
     }
 
+    /// Returns the list of connected addresses.
     pub(crate) fn addrs(&self) -> Vec<SocketAddr> {
         self.0.read().keys().copied().collect()
-    }
-}
-
-/// Indicates who was the initiator and who was the responder when the connection was established.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ConnectionSide {
-    /// The side that initiated the connection.
-    Initiator,
-    /// The sider that accepted the connection.
-    Responder,
-}
-
-impl Not for ConnectionSide {
-    type Output = Self;
-
-    fn not(self) -> Self::Output {
-        match self {
-            Self::Initiator => Self::Responder,
-            Self::Responder => Self::Initiator,
-        }
     }
 }
 
@@ -83,8 +69,7 @@ pub(crate) trait AW: AsyncWrite + Unpin + Send + Sync {}
 impl<T: AsyncWrite + Unpin + Send + Sync> AW for T {}
 
 /// Created for each active connection; used by the protocols to obtain a handle for
-/// reading and writing, and keeps track of tasks that have been spawned for the purposes
-/// of the connection.
+/// reading and writing, and keeps track of tasks that have been spawned for the connection.
 pub struct Connection {
     /// The address of the connection.
     addr: SocketAddr,
@@ -121,9 +106,29 @@ impl Connection {
         self.addr
     }
 
-    /// Returns `Initiator` if the associated peer initiated the connection
-    /// and `Responder` if the connection request was initiated by the node.
+    /// Returns `ConnectionSide::Initiator` if the associated peer initiated the connection
+    /// and `ConnectionSide::Responder` if the connection request was initiated by the node.
     pub fn side(&self) -> ConnectionSide {
         self.side
+    }
+}
+
+/// Indicates who was the initiator and who was the responder when the connection was established.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum ConnectionSide {
+    /// The side that initiated the connection.
+    Initiator,
+    /// The side that accepted the connection.
+    Responder,
+}
+
+impl Not for ConnectionSide {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Self::Initiator => Self::Responder,
+            Self::Responder => Self::Initiator,
+        }
     }
 }

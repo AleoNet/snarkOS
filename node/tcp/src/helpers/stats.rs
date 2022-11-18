@@ -32,23 +32,6 @@ pub struct Stats {
 }
 
 impl Stats {
-    /// Registers a sent message of the provided `size` in bytes.
-    pub fn register_sent_message(&self, size: usize) {
-        self.msgs_sent.fetch_add(1, Relaxed);
-        self.bytes_sent.fetch_add(size as u64, Relaxed);
-    }
-
-    /// Registers a received message of the provided `size` in bytes.
-    pub fn register_received_message(&self, size: usize) {
-        self.msgs_received.fetch_add(1, Relaxed);
-        self.bytes_received.fetch_add(size as u64, Relaxed);
-    }
-
-    /// Registers a failure.
-    pub fn register_failure(&self) {
-        self.failures.fetch_add(1, Relaxed);
-    }
-
     /// Returns the number of sent messages and their collective size in bytes.
     pub fn sent(&self) -> (u64, u64) {
         let msgs = self.msgs_sent.load(Relaxed);
@@ -68,5 +51,22 @@ impl Stats {
     /// Returns the number of failures.
     pub fn failures(&self) -> u64 {
         self.failures.load(Relaxed)
+    }
+
+    /// Registers a sent message of the provided `size` in bytes.
+    pub fn register_sent_message(&self, size: usize) {
+        self.msgs_sent.fetch_add(1, Relaxed);
+        self.bytes_sent.fetch_add(size as u64, Relaxed);
+    }
+
+    /// Registers a received message of the provided `size` in bytes.
+    pub fn register_received_message(&self, size: usize) {
+        self.msgs_received.fetch_add(1, Relaxed);
+        self.bytes_received.fetch_add(size as u64, Relaxed);
+    }
+
+    /// Registers a failure.
+    pub fn register_failure(&self) {
+        self.failures.fetch_add(1, Relaxed);
     }
 }

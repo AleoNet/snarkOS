@@ -96,7 +96,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
 impl<N: CurrentNetwork, C: ConsensusStorage<N>> Handshaking for Beacon<N, C> {
     async fn perform_handshake(&self, mut conn: Connection) -> io::Result<Connection> {
         let peer_addr = conn.addr();
-        let local_addr = self.router().network().listening_addr().expect("listening address should be present");
+        let local_addr = self.router().tcp().listening_addr().expect("listening address should be present");
 
         let stream = self.borrow_stream(&mut conn);
         let mut framed = Framed::new(stream, MessageCodec::<N>::default());

@@ -27,7 +27,7 @@ use tokio_util::codec::{Encoder, FramedWrite};
 use tracing::*;
 
 #[cfg(doc)]
-use crate::{protocols::Handshake, Config, Network};
+use crate::{protocols::Handshake, Config, Tcp};
 use crate::{
     protocols::{Protocol, ProtocolHandler, ReturnableConnection},
     Connection,
@@ -63,7 +63,7 @@ where
     async fn enable_writing(&self) {
         let (conn_sender, mut conn_receiver) = mpsc::unbounded_channel();
 
-        // the conn_senders are used to send messages from the Network to individual connections
+        // the conn_senders are used to send messages from the Tcp to individual connections
         let conn_senders: WritingSenders = Default::default();
         // procure a clone to create the WritingHandler with
         let senders = conn_senders.clone();
@@ -74,20 +74,20 @@ where
         // the task spawning tasks sending messages to all the streams
         let self_clone = self.clone();
         let writing_task = tokio::spawn(async move {
-            trace!(parent: self_clone.network().span(), "spawned the Writing handler task");
+            trace!(parent: self_clone.tcp().span(), "spawned the Writing handler task");
             tx_writing.send(()).unwrap(); // safe; the channel was just opened
 
-            // these objects are sent from `Network::adapt_stream`
+            // these objects are sent from `Tcp::adapt_stream`
             while let Some(returnable_conn) = conn_receiver.recv().await {
                 self_clone.handle_new_connection(returnable_conn, &conn_senders).await;
             }
         });
         let _ = rx_writing.await;
-        self.network().tasks.lock().push(writing_task);
+        self.tcp().tasks.lock().push(writing_task);
 
-        // register the WritingHandler with the Network
+        // register the WritingHandler with the Tcp
         let hdl = Box::new(WritingHandler { handler: ProtocolHandler(conn_sender), senders });
-        assert!(self.network().protocols.writing.set(hdl).is_ok(), "the Writing protocol was enabled more than once!");
+        assert!(self.tcp().protocols.writing.set(hdl).is_ok(), "the Writing protocol was enabled more than once!");
     }
 
     /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
@@ -106,15 +106,15 @@ where
     /// - [`io::ErrorKind::Unsupported`] if [`Writing::enable_writing`] hadn't been called yet
     fn unicast(&self, addr: SocketAddr, message: Self::Message) -> io::Result<oneshot::Receiver<io::Result<()>>> {
         // access the protocol handler
-        if let Some(handler) = self.network().protocols.writing.get() {
+        if let Some(handler) = self.tcp().protocols.writing.get() {
             // find the message sender for the given address
             if let Some(sender) = handler.senders.read().get(&addr).cloned() {
                 let (msg, delivery) = WrappedMessage::new(Box::new(message));
                 sender
                     .try_send(msg)
                     .map_err(|e| {
-                        error!(parent: self.network().span(), "can't send a message to {}: {}", addr, e);
-                        self.network().stats().register_failure();
+                        error!(parent: self.tcp().span(), "can't send a message to {}: {}", addr, e);
+                        self.tcp().stats().register_failure();
                         io::ErrorKind::Other.into()
                     })
                     .map(|_| delivery)
@@ -129,7 +129,7 @@ where
     /// Broadcasts the provided message to all connected peers. Returns as soon as the message is queued to
     /// be sent to all the peers, without waiting for the actual delivery. This method doesn't provide the
     /// means to check when and if the messages actually get delivered; you can achieve that by calling
-    /// [`Writing::unicast`] for each address returned by [`Network::connected_addrs`].
+    /// [`Writing::unicast`] for each address returned by [`Tcp::connected_addrs`].
     ///
     /// # Errors
     ///
@@ -139,13 +139,13 @@ where
         Self::Message: Clone,
     {
         // access the protocol handler
-        if let Some(handler) = self.network().protocols.writing.get() {
+        if let Some(handler) = self.tcp().protocols.writing.get() {
             let senders = handler.senders.read().clone();
             for (addr, message_sender) in senders {
                 let (msg, _delivery) = WrappedMessage::new(Box::new(message.clone()));
                 let _ = message_sender.try_send(msg).map_err(|e| {
-                    error!(parent: self.network().span(), "can't send a message to {}: {}", addr, e);
-                    self.network().stats().register_failure();
+                    error!(parent: self.tcp().span(), "can't send a message to {}: {}", addr, e);
+                    self.tcp().stats().register_failure();
                 });
             }
 
@@ -208,7 +208,7 @@ impl<W: Writing> WritingInternal for W {
         // the task for writing outbound messages
         let self_clone = self.clone();
         let writer_task = tokio::spawn(async move {
-            let node = self_clone.network();
+            let node = self_clone.tcp();
             trace!(parent: node.span(), "spawned a task for writing messages to {}", addr);
             tx_writer.send(()).unwrap(); // safe; the channel was just opened
 
@@ -241,9 +241,9 @@ impl<W: Writing> WritingInternal for W {
         let _ = rx_writer.await;
         conn.tasks.push(writer_task);
 
-        // return the Connection to the Network, resuming Network::adapt_stream
+        // return the Connection to the Tcp, resuming Tcp::adapt_stream
         if conn_returner.send(Ok(conn)).is_err() {
-            unreachable!("couldn't return a Connection to the Network");
+            unreachable!("couldn't return a Connection to the Tcp");
         }
     }
 }

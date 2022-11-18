@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_node_executor::{NodeType, RawStatus};
-use snarkos_node_tcp::{ConnectionSide, Network};
+use snarkos_node_tcp::{ConnectionSide, Tcp};
 
 use parking_lot::RwLock;
 use std::{
@@ -27,7 +27,7 @@ use time::OffsetDateTime;
 
 #[derive(Clone)]
 pub struct Router {
-    network: Network,
+    tcp: Tcp,
     /// The map of connection address to peer metadata.
     current_peers: Arc<RwLock<HashMap<SocketAddr, PeerMeta>>>,
     /// The set of trusted peer listening addresses.
@@ -41,7 +41,7 @@ pub struct Router {
 impl Router {
     pub async fn new() -> Self {
         Self {
-            network: Network::new(Default::default()).await.unwrap(),
+            tcp: Tcp::new(Default::default()).await.unwrap(),
             current_peers: Default::default(),
             trusted_peers: Default::default(),
             candidate_peers: Default::default(),
@@ -49,8 +49,8 @@ impl Router {
         }
     }
 
-    pub fn network(&self) -> &Network {
-        &self.network
+    pub fn tcp(&self) -> &Tcp {
+        &self.tcp
     }
 
     pub fn write_peer_meta<F>(&self, addr: SocketAddr, mut write_func: F)
@@ -63,14 +63,13 @@ impl Router {
     }
 
     pub fn is_local_addr(&self, addr: SocketAddr) -> bool {
-        let local_addr = self.network().listening_addr().expect("listening addr must be present");
+        let local_addr = self.tcp().listening_addr().expect("listening addr must be present");
         addr == local_addr
             || (addr.ip().is_unspecified() || addr.ip().is_loopback()) && addr.port() == local_addr.port()
     }
 
     pub fn is_connected(&self, addr: SocketAddr) -> bool {
-        self.network().is_connected(addr)
-            || self.current_peers.read().iter().any(|(_, meta)| meta.listening_addr() == addr)
+        self.tcp().is_connected(addr) || self.current_peers.read().iter().any(|(_, meta)| meta.listening_addr() == addr)
     }
 
     pub fn is_restricted(&self, addr: SocketAddr) -> bool {

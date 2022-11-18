@@ -43,7 +43,7 @@ where
         // spawn a background task dedicated to handling disconnect events
         let self_clone = self.clone();
         let disconnect_task = tokio::spawn(async move {
-            trace!(parent: self_clone.network().span(), "spawned the Disconnect handler task");
+            trace!(parent: self_clone.tcp().span(), "spawned the Disconnect handler task");
             tx.send(()).unwrap(); // safe; the channel was just opened
 
             while let Some((addr, notifier)) = from_node_receiver.recv().await {
@@ -58,12 +58,12 @@ where
             }
         });
         let _ = rx.await;
-        self.network().tasks.lock().push(disconnect_task);
+        self.tcp().tasks.lock().push(disconnect_task);
 
-        // register the Disconnect handler with the Network
+        // register the Disconnect handler with the Tcp
         let hdl = Box::new(ProtocolHandler(from_node_sender));
         assert!(
-            self.network().protocols.disconnect.set(hdl).is_ok(),
+            self.tcp().protocols.disconnect.set(hdl).is_ok(),
             "the Disconnect protocol was enabled more than once!"
         );
     }

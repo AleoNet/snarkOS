@@ -36,7 +36,7 @@ use snarkos_node_messages::{
     UnconfirmedTransaction,
 };
 use snarkos_node_rest::Rest;
-use snarkos_node_tcp::Network;
+use snarkos_node_tcp::Tcp;
 use snarkvm::prelude::{Block, ConsensusStorage, Network as CurrentNetwork, PrivateKey};
 
 use anyhow::Result;
@@ -185,12 +185,12 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
 
         // Ensure the node has less than MAX PEERS. This shouldn't be necessary as this is checked
         // in the network upon connection but might as well sanity check it here.
-        let num_excess_peers = self.network().num_connected().saturating_sub(MAXIMUM_NUMBER_OF_PEERS);
+        let num_excess_peers = self.tcp().num_connected().saturating_sub(MAXIMUM_NUMBER_OF_PEERS);
         if num_excess_peers > 0 {
             debug!("Exceeded maximum number of connected peers, disconnecting from {num_excess_peers} peers");
 
             for peer_addr in self
-                .network()
+                .tcp()
                 .connected_addrs()
                 .into_iter()
                 .filter(|peer_addr| !self.router().trusted_peers().contains(peer_addr))
@@ -198,7 +198,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
             {
                 info!("Disconnecting from 'peer' {peer_addr}");
 
-                let _disconnected = self.network().disconnect(peer_addr).await;
+                let _disconnected = self.tcp().disconnect(peer_addr).await;
                 debug_assert!(_disconnected);
             }
         }
@@ -213,29 +213,29 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
             {
                 info!("Disconnecting from 'beacon' {beacon_addr}");
 
-                let _disconnected = self.network().disconnect(beacon_addr).await;
+                let _disconnected = self.tcp().disconnect(beacon_addr).await;
                 debug_assert!(_disconnected);
             }
         }
 
         // Ensure the trusted peers are connected.
         for trusted_peer_addr in self.router().trusted_peers().iter() {
-            if !self.network().is_connected(*trusted_peer_addr) {
+            if !self.tcp().is_connected(*trusted_peer_addr) {
                 info!("Connecting to 'trusted peer' {trusted_peer_addr}");
 
                 // Silence the error if there is any, this isn't a halting case.
-                let _connected = self.network().connect(*trusted_peer_addr).await;
+                let _connected = self.tcp().connect(*trusted_peer_addr).await;
                 debug_assert!(_connected.is_ok());
             }
         }
 
         // Ensure the node has more peers than MIN PEERS.
-        let num_connected = self.network().num_connected();
+        let num_connected = self.tcp().num_connected();
         let num_missing_peers = MINIMUM_NUMBER_OF_PEERS.saturating_sub(num_connected);
 
         if num_missing_peers > 0 {
             for candidate_addr in self.router().candidate_peers().into_iter().take(num_missing_peers) {
-                let connection_succesful = self.network().connect(candidate_addr).await.is_ok();
+                let connection_succesful = self.tcp().connect(candidate_addr).await.is_ok();
                 self.router().remove_candidate_peer(candidate_addr);
 
                 if !connection_succesful {
@@ -245,7 +245,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
 
             // If we have existing peers, request more addresses from them.
             if num_connected > 0 {
-                for peer_addr in self.network().connected_addrs().choose_multiple(&mut OsRng::default(), 3) {
+                for peer_addr in self.tcp().connected_addrs().choose_multiple(&mut OsRng::default(), 3) {
                     // Let the error through for now.
                     let _res = self.unicast(*peer_addr, Message::PeerRequest(PeerRequest));
                     debug_assert!(_res.expect("writing protocol should be enabled").await.is_ok());
@@ -312,7 +312,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
 
         // Propagate the block to all connected peers except the source. No need to spin up tasks
         // for these as they are queued internally.
-        for peer_addr in self.router().network().connected_addrs() {
+        for peer_addr in self.router().tcp().connected_addrs() {
             if peer_addr == source {
                 continue;
             }
@@ -347,7 +347,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
 
         // Propagate the solution to all connected peers except the source. No need to spin up
         // tasks for these as they are queued internally.
-        for peer_addr in self.router().network().connected_addrs() {
+        for peer_addr in self.router().tcp().connected_addrs() {
             if peer_addr == source {
                 continue;
             }
@@ -382,7 +382,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
 
         // Propagate the transaction to all connected peers except the source. No need to spin up
         // tasks for these as they are queued internally.
-        for peer_addr in self.router().network().connected_addrs() {
+        for peer_addr in self.router().tcp().connected_addrs() {
             if peer_addr == source {
                 continue;
             }
@@ -398,8 +398,8 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Beacon<N, C> {
 }
 
 impl<N: CurrentNetwork, C: ConsensusStorage<N>> P2P for Beacon<N, C> {
-    fn network(&self) -> &Network {
-        self.router().network()
+    fn tcp(&self) -> &Tcp {
+        self.router().tcp()
     }
 }
 
@@ -455,7 +455,7 @@ impl<N: CurrentNetwork, C: ConsensusStorage<N>> Reading for Beacon<N, C> {
                 self.router().insert_restricted_peer(meta.listening_addr());
             }
 
-            let _res = self.router().network().disconnect(source).await;
+            let _res = self.router().tcp().disconnect(source).await;
             debug_assert!(_res);
         }
 

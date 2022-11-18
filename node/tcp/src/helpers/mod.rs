@@ -14,21 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-#![deny(missing_docs)]
-#![deny(unsafe_code)]
+mod config;
+pub use config::Config;
 
-//! **P2P** is a simple, low-level, and customizable implementation of a TCP P2P node.
+pub mod connections;
+pub use connections::{Connection, ConnectionSide};
 
-mod helpers;
-pub use helpers::*;
+mod known_peers;
+pub use known_peers::KnownPeers;
 
-pub mod protocols;
-
-mod tcp;
-pub use tcp::Tcp;
-
-/// A trait for objects containing a [`Tcp`]; it is required to implement protocols.
-pub trait P2P {
-    /// Returns a clonable reference to the node.
-    fn tcp(&self) -> &Tcp;
-}
+mod stats;
+pub use stats::Stats;

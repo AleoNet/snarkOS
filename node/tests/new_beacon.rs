@@ -45,7 +45,7 @@ async fn handshake_responder_side() {
     // Verify the handshake works when the peer initates a connection with the beacon.
     assert!(
         peer.node()
-            .connect(beacon.router().network().listening_addr().expect("beacon listener should exist"))
+            .connect(beacon.router().tcp().listening_addr().expect("beacon listener should exist"))
             .await
             .is_ok()
     );
@@ -70,11 +70,6 @@ async fn handshake_initiator_side() {
 
     // Verify the handshake works when the beacon initiates a connection with the peer.
     assert!(
-        beacon
-            .router()
-            .network()
-            .connect(peer.node().listening_addr().expect("peer listener should exist"))
-            .await
-            .is_ok()
+        beacon.router().tcp().connect(peer.node().listening_addr().expect("peer listener should exist")).await.is_ok()
     );
 }

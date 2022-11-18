@@ -31,7 +31,7 @@ use crate::{protocols::Handshake, Config};
 use crate::{
     protocols::{ProtocolHandler, ReturnableConnection},
     ConnectionSide,
-    Network,
+    Tcp,
     P2P,
 };
 
@@ -76,20 +76,20 @@ where
         // the main task spawning per-connection tasks reading messages from their streams
         let self_clone = self.clone();
         let reading_task = tokio::spawn(async move {
-            trace!(parent: self_clone.network().span(), "spawned the Reading handler task");
+            trace!(parent: self_clone.tcp().span(), "spawned the Reading handler task");
             tx_reading.send(()).unwrap(); // safe; the channel was just opened
 
-            // these objects are sent from `Network::adapt_stream`
+            // these objects are sent from `Tcp::adapt_stream`
             while let Some(returnable_conn) = conn_receiver.recv().await {
                 self_clone.handle_new_connection(returnable_conn).await;
             }
         });
         let _ = rx_reading.await;
-        self.network().tasks.lock().push(reading_task);
+        self.tcp().tasks.lock().push(reading_task);
 
-        // register the Reading handler with the Network
+        // register the Reading handler with the Tcp
         let hdl = Box::new(ProtocolHandler(conn_sender));
-        assert!(self.network().protocols.reading.set(hdl).is_ok(), "the Reading protocol was enabled more than once!");
+        assert!(self.tcp().protocols.reading.set(hdl).is_ok(), "the Reading protocol was enabled more than once!");
     }
 
     /// Creates a [`Decoder`] used to interpret messages from the network.
@@ -139,7 +139,7 @@ impl<R: Reading> ReadingInternal for R {
         // the task for processing parsed messages
         let self_clone = self.clone();
         let inbound_processing_task = tokio::spawn(async move {
-            let node = self_clone.network();
+            let node = self_clone.tcp();
             trace!(parent: node.span(), "spawned a task for processing messages from {}", addr);
             tx_processing.send(()).unwrap(); // safe; the channel was just opened
 
@@ -157,7 +157,7 @@ impl<R: Reading> ReadingInternal for R {
         let (tx_reader, rx_reader) = oneshot::channel::<()>();
 
         // the task for reading messages from a stream
-        let node = self.network().clone();
+        let node = self.tcp().clone();
         let reader_task = tokio::spawn(async move {
             trace!(parent: node.span(), "spawned a task for reading messages from {}", addr);
             tx_reader.send(()).unwrap(); // safe; the channel was just opened
@@ -191,9 +191,9 @@ impl<R: Reading> ReadingInternal for R {
         let _ = rx_reader.await;
         conn.tasks.push(reader_task);
 
-        // return the Connection to the Network, resuming Network::adapt_stream
+        // return the Connection to the Tcp, resuming Tcp::adapt_stream
         if conn_returner.send(Ok(conn)).is_err() {
-            unreachable!("couldn't return a Connection to the Network");
+            unreachable!("couldn't return a Connection to the Tcp");
         }
     }
 
@@ -202,14 +202,14 @@ impl<R: Reading> ReadingInternal for R {
         framed: FramedRead<T, Self::Codec>,
         addr: SocketAddr,
     ) -> FramedRead<T, CountingCodec<Self::Codec>> {
-        framed.map_decoder(|codec| CountingCodec { codec, node: self.network().clone(), addr, acc: 0 })
+        framed.map_decoder(|codec| CountingCodec { codec, node: self.tcp().clone(), addr, acc: 0 })
     }
 }
 
 /// A wrapper [`Decoder`] that also counts the inbound messages.
 struct CountingCodec<D: Decoder> {
     codec: D,
-    node: Network,
+    node: Tcp,
     addr: SocketAddr,
     acc: usize,
 }
