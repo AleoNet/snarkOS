@@ -77,9 +77,7 @@ pub struct Router<N: Network> {
     /// The map of peers to their first-seen port number, number of attempts, and timestamp of the last inbound connection request.
     seen_inbound_connections: Arc<RwLock<IndexMap<SocketAddr, ConnectionStats>>>,
     /// The cache.
-    pub cache: Cache<N>,
-    /// The map of peer IPs to the number of puzzle requests.
-    pub seen_inbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, Arc<AtomicU8>>>>,
+    cache: Cache<N>,
 }
 
 #[rustfmt::skip]
@@ -89,7 +87,7 @@ impl<N: Network> Router<N> {
     /// The frequency at which the node sends a puzzle request.
     const PUZZLE_REQUEST_IN_SECS: u64 = N::ANCHOR_TIME as u64;
     /// The maximum number of puzzle requests per interval.
-    const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: u8 = 10;
+    const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: usize = 5;
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
@@ -121,7 +119,6 @@ impl<N: Network> Router<N> {
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             cache: Default::default(),
-            seen_inbound_puzzle_requests: Default::default(),
             seen_inbound_connections: Default::default(),
         };
 

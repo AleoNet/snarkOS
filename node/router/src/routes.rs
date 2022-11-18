@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Peer, Router, ALEO_MAXIMUM_FORK_DEPTH};
+use crate::{Cache, Peer, Router, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_executor::{NodeType, RawStatus};
 use snarkos_node_messages::*;
 use snarkos_node_tcp::protocols::{Handshake, Reading, Writing};
@@ -36,6 +36,7 @@ pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
 
+    /// Returns a reference to the router.
     fn router(&self) -> &Router<N>;
 
     /// Initialize the routes.
@@ -46,8 +47,6 @@ pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>
         self.initialize_puzzle_request().await;
         // Initialize the report.
         self.initialize_report().await;
-        // Initialize the GC.
-        self.initialize_gc().await;
     }
 
     /// Initialize a new instance of the heartbeat.
@@ -98,19 +97,6 @@ pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>
         });
     }
 
-    /// Initialize a new instance of the garbage collector.
-    async fn initialize_gc(&self) {
-        let self_clone = self.clone();
-        tokio::spawn(async move {
-            loop {
-                // Sleep for the interval.
-                tokio::time::sleep(Duration::from_secs(Router::<N>::RADIO_SILENCE_IN_SECS)).await;
-                // Clear the seen puzzle requests.
-                self_clone.router().seen_inbound_puzzle_requests.write().clear();
-            }
-        });
-    }
-
     /// Sends a "PuzzleRequest" to a reliable peer.
     async fn send_puzzle_request(&self, node_type: NodeType) {
         // TODO (howardwu): Change this logic for Phase 3.
@@ -135,7 +121,7 @@ pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>
             return;
         }
         // Ensure the peer is connected before sending.
-        match self.router().connected_peers.read().contains_key(&peer_ip) {
+        match self.router().is_connected(&peer_ip) {
             true => {
                 trace!("Sending '{}' to '{peer_ip}'", message.name());
                 if let Err(error) = self.unicast(peer_ip, message) {
@@ -284,13 +270,10 @@ pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>
             Message::Ping(message) => self.ping(peer_ip, message),
             Message::Pong(message) => self.pong(peer_ip, message).await,
             Message::PuzzleRequest(..) => {
-                // Retrieve the number of puzzle requests in this interval.
-                let num_requests =
-                    self.router().seen_inbound_puzzle_requests.write().entry(peer_ip).or_default().clone();
+                // Insert the puzzle request for the peer, and fetch the recent frequency.
+                let frequency = self.router().cache.insert_inbound_puzzle_request(peer_ip);
                 // Check if the number of puzzle requests is within the limit.
-                if num_requests.load(Ordering::SeqCst) < Router::<N>::MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL {
-                    // Increment the number of puzzle requests.
-                    num_requests.fetch_add(1, Ordering::SeqCst);
+                if frequency < Router::<N>::MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL {
                     // Process the puzzle request.
                     self.puzzle_request(peer_ip).await
                 } else {
@@ -299,7 +282,19 @@ pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>
                     false
                 }
             }
-            Message::PuzzleResponse(message) => self.puzzle_response(message, peer_ip).await,
+            Message::PuzzleResponse(message) => {
+                // Check that this node previously sent a puzzle request to this peer.
+                if self.router().cache.contains_outbound_puzzle_request(&peer_ip) {
+                    // Decrement the number of puzzle requests.
+                    self.router().cache.decrement_outbound_puzzle_requests(peer_ip);
+                    // Process the puzzle response.
+                    self.puzzle_response(peer_ip, message).await
+                } else {
+                    // Peer is not following the protocol.
+                    warn!("Peer {peer_ip} is not following the protocol");
+                    false
+                }
+            }
             Message::UnconfirmedBlock(message) => {
                 // Clone the message.
                 let message_clone = message.clone();
@@ -545,7 +540,7 @@ pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>
         false
     }
 
-    async fn puzzle_response(&self, _message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
+    async fn puzzle_response(&self, peer_ip: SocketAddr, _message: PuzzleResponse<N>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }

@@ -114,7 +114,7 @@ impl<N: Network> Routes<N> for Client<N> {
     }
 
     /// Saves the latest epoch challenge and latest block in the node.
-    async fn puzzle_response(&self, message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
+    async fn puzzle_response(&self, peer_ip: SocketAddr, message: PuzzleResponse<N>) -> bool {
         let epoch_challenge = message.epoch_challenge;
         match message.block.deserialize().await {
             Ok(block) => {
