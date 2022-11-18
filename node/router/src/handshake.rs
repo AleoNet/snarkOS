@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Peer, Router, Routes, ALEO_MAXIMUM_FORK_DEPTH};
-use snarkos_node_executor::{NodeType, RawStatus, Status};
+use snarkos_node_executor::{NodeType, RawStatus, Status};use snarkos_node_messages::MessageTrait;
 use snarkos_node_messages::{
     ChallengeRequest,
     ChallengeResponse,
@@ -67,7 +67,7 @@ impl<N: Network, R: Routes<N>> Handshake for Router<N, R> {
         let message = Message::<N>::ChallengeRequest(ChallengeRequest {
             version: Message::<N>::VERSION,
             fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
-            node_type: self.node_type(),
+            node_type: R::NODE_TYPE,
             status: self.status.get(),
             listener_port: local_addr.port(),
         });
@@ -166,13 +166,13 @@ impl<N: Network, R: Routes<N>> Handshake for Router<N, R> {
 
 impl<N: Network, R: Routes<N>> Router<N, R> {
     /// Ensure the peer is allowed to connect.
-    async fn ensure_peer_is_allowed<E: Handshake>(&self, peer_ip: SocketAddr) -> Result<()> {
+    fn ensure_peer_is_allowed(&self, peer_ip: SocketAddr) -> Result<()> {
         // Ensure the peer IP is not this node.
         if self.is_local_ip(&peer_ip) {
             bail!("Dropping connection request from '{peer_ip}' (attempted to self-connect)")
         }
         // Ensure the node does not surpass the maximum number of peer connections.
-        if self.number_of_connected_peers() >= E::MAXIMUM_NUMBER_OF_PEERS {
+        if self.number_of_connected_peers() >= R::MAXIMUM_NUMBER_OF_PEERS {
             bail!("Dropping connection request from '{peer_ip}' (maximum peers reached)")
         }
         // Ensure the node is not already connected to this peer.
@@ -241,19 +241,19 @@ impl<N: Network, R: Routes<N>> Router<N, R> {
         }
 
         // If this node is not a beacon node and is syncing, the peer is a beacon node, and this node is ahead, proceed to disconnect.
-        if self.node_type() != NodeType::Beacon && self.status.is_syncing() && node_type == NodeType::Beacon {
+        if R::NODE_TYPE != NodeType::Beacon && self.status.is_syncing() && node_type == NodeType::Beacon {
             warn!("Dropping {peer_addr} as this node is ahead");
             return Some(DisconnectReason::YouNeedToSyncFirst);
         }
 
         // If this node is a beacon node, the peer is not a beacon node and is syncing, and the peer is ahead, proceed to disconnect.
-        if self.node_type() == NodeType::Beacon && node_type != NodeType::Beacon && peer_status == Status::Syncing {
+        if R::NODE_TYPE == NodeType::Beacon && node_type != NodeType::Beacon && peer_status == Status::Syncing {
             warn!("Dropping {peer_addr} as this node is ahead");
             return Some(DisconnectReason::INeedToSyncFirst);
         }
 
         // TODO (howardwu): Remove this after Phase 2.
-        if self.node_type().is_validator() && node_type.is_beacon() && peer_addr.ip().to_string() != "159.65.195.225" {
+        if R::NODE_TYPE.is_validator() && node_type.is_beacon() && peer_addr.ip().to_string() != "159.65.195.225" {
             warn!("Dropping {peer_addr} for an invalid node type of {node_type}");
             return Some(DisconnectReason::ProtocolViolation);
         }

@@ -39,7 +39,7 @@ pub use reading::*;
 mod writing;
 pub use writing::*;
 
-use snarkos_node_executor::{Executor, NodeType, RawStatus};
+use snarkos_node_executor::{NodeType, RawStatus};
 use snarkos_node_messages::*;
 use snarkos_node_tcp::{protocols::Writing, Config, Tcp};
 use snarkvm::prelude::{Address, Network};
@@ -54,8 +54,8 @@ use std::{
     sync::{atomic::AtomicU8, Arc},
     time::{Duration, SystemTime},
 };
-use time::OffsetDateTime;
-use tokio_stream::StreamExt;
+use std::marker::PhantomData;
+use std::time::Instant;
 
 // TODO (raychu86): Move this declaration.
 const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
@@ -63,14 +63,12 @@ const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 /// The first-seen port number, number of attempts, and timestamp of the last inbound connection request.
 type ConnectionStats = ((u16, u32), SystemTime);
 
-#[derive(Clone, Debug)]
+#[derive(Clone)]
 pub struct Router<N: Network, R: Routes<N>> {
     /// The TCP stack.
     tcp: Tcp,
     /// The address of the node.
     address: Address<N>,
-    /// The node type.
-    node_type: NodeType,
     /// The node's current state.
     status: RawStatus,
     /// The set of trusted peers.
@@ -80,7 +78,7 @@ pub struct Router<N: Network, R: Routes<N>> {
     /// The set of candidate peer IPs.
     candidate_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of restricted peer IPs.
-    restricted_peers: Arc<RwLock<IndexMap<SocketAddr, OffsetDateTime>>>,
+    restricted_peers: Arc<RwLock<IndexMap<SocketAddr, Instant>>>,
     /// The map of peers to their first-seen port number, number of attempts, and timestamp of the last inbound connection request.
     seen_inbound_connections: Arc<RwLock<IndexMap<SocketAddr, ConnectionStats>>>,
     /// The cache.
@@ -114,13 +112,11 @@ impl<N: Network, R: Routes<N>> Router<N, R> {
         node_ip: SocketAddr,
         address: Address<N>,
         trusted_peers: &[SocketAddr],
-        node_type: NodeType,
     ) -> Result<Self> {
         // Initialize the router.
         let router = Self {
-            tcp: Tcp::new(Config::new(node_ip, R::MAXIMUM_NUMBER_OF_PEERS as u16)),
+            tcp: Tcp::new(Config::new(node_ip, R::MAXIMUM_NUMBER_OF_PEERS as u16)).await?,
             address,
-            node_type,
             status: RawStatus::new(),
             trusted_peers: Arc::new(trusted_peers.iter().copied().collect()),
             connected_peers: Default::default(),
@@ -144,7 +140,7 @@ impl<N: Network, R: Routes<N>> Router<N, R> {
     }
 
     /// Returns the IP address of this node.
-    pub const fn local_ip(&self) -> SocketAddr {
+    pub fn local_ip(&self) -> SocketAddr {
         self.tcp.listening_addr().expect("The listening address for this node must be present")
     }
 
@@ -156,12 +152,12 @@ impl<N: Network, R: Routes<N>> Router<N, R> {
 
     /// Returns `true` if the node is connected to the given IP.
     pub fn is_connected(&self, ip: &SocketAddr) -> bool {
-        self.connected_peers.read().contains_key(&ip)
+        self.connected_peers.read().contains_key(ip)
     }
 
     /// Returns `true` if the given IP is restricted.
     pub fn is_restricted(&self, ip: &SocketAddr) -> bool {
-        match self.restricted_peers.read().get(&ip) {
+        match self.restricted_peers.read().get(ip) {
             Some(timestamp) => timestamp.elapsed().as_secs() < Self::RADIO_SILENCE_IN_SECS,
             None => false,
         }
@@ -264,14 +260,27 @@ impl<N: Network, R: Routes<N>> Router<N, R> {
         // Remove this peer from the candidate peers, if it exists.
         self.candidate_peers.write().remove(&peer_addr);
         // Add the peer to the restricted peers.
-        self.restricted_peers.write().insert(peer_addr, OffsetDateTime::now_utc());
+        self.restricted_peers.write().insert(peer_addr, Instant::now());
+    }
+
+    /// Inserts the disconnected peer into the candidate peers.
+    pub fn insert_disconnected_peer(&self, peer_addr: SocketAddr) {
+        // Remove this peer from the connected peers, if it exists.
+        self.connected_peers.write().remove(&peer_addr);
+        // Add the peer to the candidate peers.
+        self.candidate_peers.write().insert(peer_addr);
     }
 
     /// Updates the connected peer with the given function.
-    pub fn updated_connected_peer<Fn: FnMut(&mut Peer)>(&self, peer_addr: SocketAddr, mut write_fn: Fn) {
+    pub fn update_connected_peer<Fn: FnMut(&mut Peer)>(&self, peer_addr: SocketAddr, mut write_fn: Fn) {
         if let Some(peer) = self.connected_peers.write().get_mut(&peer_addr) {
             write_fn(peer)
         }
+    }
+
+    /// Removes the given address from the candidate peers, if it exists.
+    pub fn remove_candidate_peer(&self, peer_addr: SocketAddr) {
+        self.candidate_peers.write().remove(&peer_addr);
     }
 
     /// Sends a "PuzzleRequest" to a reliable peer.
@@ -433,12 +442,12 @@ impl<N: Network, R: Routes<N>> Router<N, R> {
 
     /// Initialize a new instance of the puzzle request.
     async fn initialize_puzzle_request(&self) {
-        if !self.node_type.is_beacon() {
+        if !R::NODE_TYPE.is_beacon() {
             let router = self.clone();
             tokio::spawn(async move {
                 loop {
                     // Send a "PuzzleRequest".
-                    router.send_puzzle_request(router.node_type).await;
+                    router.send_puzzle_request(R::NODE_TYPE);
                     // Sleep for `Self::PUZZLE_REQUEST_IN_SECS` seconds.
                     tokio::time::sleep(Duration::from_secs(Self::PUZZLE_REQUEST_IN_SECS)).await;
                 }
@@ -455,7 +464,7 @@ impl<N: Network, R: Routes<N>> Router<N, R> {
                 // Prepare the report.
                 let mut report = HashMap::new();
                 report.insert("node_address".to_string(), router.address.to_string());
-                report.insert("node_type".to_string(), router.node_type.to_string());
+                report.insert("node_type".to_string(), R::NODE_TYPE.to_string());
                 // Transmit the report.
                 if reqwest::Client::new().post(url).json(&report).send().await.is_err() {
                     warn!("Failed to send report");
@@ -474,7 +483,7 @@ impl<N: Network, R: Routes<N>> Router<N, R> {
                 // Sleep for the interval.
                 tokio::time::sleep(Duration::from_secs(Self::RADIO_SILENCE_IN_SECS)).await;
                 // Clear the seen puzzle requests.
-                router.seen_inbound_puzzle_requests.write().await.clear();
+                router.seen_inbound_puzzle_requests.write().clear();
             }
         });
     }
@@ -486,7 +495,7 @@ impl<N: Network, R: Routes<N>> Router<N, R> {
         debug!("Peers: {:?}", self.connected_peers());
 
         // TODO (howardwu): Remove this in Phase 3.
-        if self.node_type().is_beacon() {
+        if R::NODE_TYPE.is_beacon() {
             // Proceed to send disconnect requests to these peers.
             for peer_ip in self.connected_peers() {
                 if !self.trusted_peers().contains(&peer_ip) {
@@ -502,16 +511,17 @@ impl<N: Network, R: Routes<N>> Router<N, R> {
         }
 
         // Check if any connected peer is stale.
-        for (peer_ip, peer) in self.connected_peers.read().iter() {
+        let connected_peers = self.connected_peers.read().clone();
+        for (peer_ip, peer) in connected_peers.into_iter() {
             // Disconnect if the peer has not communicated back within the predefined time.
             let last_seen_elapsed = peer.last_seen().elapsed().as_secs();
             if last_seen_elapsed > Self::RADIO_SILENCE_IN_SECS {
                 warn!("Peer {peer_ip} has not communicated in {last_seen_elapsed} seconds");
                 // Disconnect from this peer.
-                let _disconnected = self.tcp.disconnect(*peer_ip).await;
+                let _disconnected = self.tcp.disconnect(peer_ip).await;
                 debug_assert!(_disconnected);
                 // Restrict this peer to prevent reconnection.
-                self.insert_restricted_peer(*peer_ip);
+                self.insert_restricted_peer(peer_ip);
             }
 
             // Drop the peer, if they have sent more than 50 messages in the last 5 seconds.
@@ -519,10 +529,10 @@ impl<N: Network, R: Routes<N>> Router<N, R> {
             if frequency >= 50 {
                 warn!("Dropping {peer_ip} for spamming messages (frequency = {frequency})");
                 // Disconnect from this peer.
-                let _disconnected = self.tcp.disconnect(*peer_ip).await;
+                let _disconnected = self.tcp.disconnect(peer_ip).await;
                 debug_assert!(_disconnected);
                 // Restrict this peer to prevent reconnection.
-                self.insert_restricted_peer(*peer_ip);
+                self.insert_restricted_peer(peer_ip);
             }
         }
 

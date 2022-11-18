@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Peer, Router, ALEO_MAXIMUM_FORK_DEPTH};
-use snarkos_node_executor::{spawn_task, Executor, RawStatus};
+use snarkos_node_executor::{NodeType, RawStatus};
 use snarkos_node_messages::*;
 use snarkvm::prelude::{Block, Network, ProverSolution, Transaction};
 
@@ -23,7 +23,7 @@ use core::time::Duration;
 use rand::Rng;
 use snarkos_node_tcp::{protocols::Reading, ConnectionSide, P2P};
 use std::{io, net::SocketAddr, sync::atomic::Ordering};
-use time::OffsetDateTime;
+use std::time::Instant;
 
 #[async_trait]
 impl<N: Network, R: Routes<N>> Reading for Router<N, R> {
@@ -44,7 +44,7 @@ impl<N: Network, R: Routes<N>> Reading for Router<N, R> {
         });
 
         // Process the message.
-        let success = self.routes.handle_message(self, peer_ip, message).await;
+        let success = self.routes.get().expect("Router must initialize routes").handle_message(self, peer_ip, message).await;
 
         // Disconnect if the peer violated the protocol.
         if !success {
@@ -62,11 +62,13 @@ impl<N: Network, R: Routes<N>> Reading for Router<N, R> {
 }
 
 #[async_trait]
-pub trait Routes<N: Network>: 'static + Clone {
+pub trait Routes<N: Network>: 'static + Clone + Send + Sync {
     /// The minimum number of peers required to maintain connections with.
     const MINIMUM_NUMBER_OF_PEERS: usize = 1;
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
+    /// The node type.
+    const NODE_TYPE: NodeType;
 
     /// Handles the message from the peer.
     async fn handle_message(&self, router: &Router<N, Self>, peer_ip: SocketAddr, message: Message<N>) -> bool {
@@ -94,14 +96,14 @@ pub trait Routes<N: Network>: 'static + Clone {
                 router.insert_candidate_peers(&message.peers);
                 true
             }
-            Message::Ping(message) => Self::ping(self, peer_ip, message),
-            Message::Pong(message) => Self::pong(message, peer_ip, router).await,
+            Message::Ping(message) => Self::ping(router, peer_ip, message),
+            Message::Pong(message) => Self::pong(router, peer_ip, message).await,
             Message::PuzzleRequest(..) => {
                 // Retrieve the number of puzzle requests in this interval.
                 let num_requests =
-                    router.seen_inbound_puzzle_requests.write().await.entry(peer_ip).or_default().clone();
+                    router.seen_inbound_puzzle_requests.write().entry(peer_ip).or_default().clone();
                 // Check if the number of puzzle requests is within the limit.
-                if num_requests.load(Ordering::SeqCst) < Router::<N>::MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL {
+                if num_requests.load(Ordering::SeqCst) < Router::<N, Self>::MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL {
                     // Increment the number of puzzle requests.
                     num_requests.fetch_add(1, Ordering::SeqCst);
                     // Process the puzzle request.
@@ -297,7 +299,7 @@ pub trait Routes<N: Network>: 'static + Clone {
         // Update the connected peer.
         let update_peer = |peer: &mut Peer| {
             // Update the last seen timestamp of the peer.
-            peer.set_last_seen(OffsetDateTime::now_utc());
+            peer.set_last_seen(Instant::now());
             // Update the version of the peer.
             peer.set_version(message.version);
             // Update the node type of the peer.
@@ -319,7 +321,7 @@ pub trait Routes<N: Network>: 'static + Clone {
         true
     }
 
-    async fn pong(_message: Pong, peer_ip: SocketAddr, router: &Router<N, Self>) -> bool {
+    async fn pong(router: &Router<N, Self>, peer_ip: SocketAddr, _message: Pong) -> bool {
         // // Perform the deferred non-blocking deserialization of block locators.
         // let request = match block_locators.deserialize().await {
         //     // Route the `Pong` to the ledger.
@@ -335,16 +337,16 @@ pub trait Routes<N: Network>: 'static + Clone {
 
         // Spawn an asynchronous task for the `Ping` request.
         let router = router.clone();
-        spawn_task!(Self, {
+        tokio::spawn(async move {
             // Sleep for the preset time before sending a `Ping` request.
-            tokio::time::sleep(Duration::from_secs(Router::<N>::PING_SLEEP_IN_SECS)).await;
+            tokio::time::sleep(Duration::from_secs(Router::<N, Self>::PING_SLEEP_IN_SECS)).await;
 
             // Prepare the `Ping` message.
             let message = Message::Ping(Ping {
                 version: Message::<N>::VERSION,
                 fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
-                node_type: router.node_type(),
-                status: router.status().get(),
+                node_type: Self::NODE_TYPE,
+                status: router.status.get(),
             });
 
             // Send a `Ping` message to the peer.

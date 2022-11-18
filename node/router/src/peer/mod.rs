@@ -19,7 +19,7 @@ use snarkos_node_tcp::ConnectionSide;
 
 use parking_lot::RwLock;
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
-use time::OffsetDateTime;
+use std::time::Instant;
 
 /// The state for each connected peer.
 #[derive(Clone, Debug)]
@@ -29,7 +29,7 @@ pub struct Peer {
     /// The IP address of the peer, with the port set to the listener port.
     listening_addr: SocketAddr,
     /// The timestamp of the last message received from this peer.
-    last_seen: Arc<RwLock<OffsetDateTime>>,
+    last_seen: Arc<RwLock<Instant>>,
     /// The message version of the peer.
     version: u32,
     /// The node type of the peer.
@@ -41,7 +41,7 @@ pub struct Peer {
     block_height: Arc<RwLock<u32>>,
     /// TODO (howardwu): There is no GC on this. Redesign.
     /// The map of (message ID, random nonce) pairs to their last seen timestamp.
-    seen_messages: Arc<RwLock<HashMap<(u16, u32), OffsetDateTime>>>,
+    seen_messages: Arc<RwLock<HashMap<(u16, u32), Instant>>>,
 }
 
 impl Peer {
@@ -56,7 +56,7 @@ impl Peer {
         Self {
             side,
             listening_addr,
-            last_seen: Arc::new(RwLock::new(OffsetDateTime::now_utc())),
+            last_seen: Arc::new(RwLock::new(Instant::now())),
             version,
             node_type,
             status,
@@ -71,13 +71,13 @@ impl Peer {
     }
 
     /// Returns the last seen timestamp of the peer.
-    pub fn last_seen(&self) -> OffsetDateTime {
+    pub fn last_seen(&self) -> Instant {
         *self.last_seen.read()
     }
 
     /// Returns the node type.
     pub fn node_type(&self) -> NodeType {
-        *self.node_type
+        self.node_type
     }
 
     /// Returns `true` if the peer is a beacon.
@@ -102,13 +102,13 @@ impl Peer {
 
     /// Returns the frequency of recent messages.
     pub fn message_frequency(&self) -> usize {
-        self.seen_messages.read().values().filter(|t| t.elapsed().unwrap_or_default().as_secs() <= 5).count()
+        self.seen_messages.read().values().filter(|t| t.elapsed().as_secs() <= 5).count()
     }
 }
 
 impl Peer {
     /// Updates the last seen timestamp of the peer.
-    pub fn set_last_seen(&self, last_seen: OffsetDateTime) {
+    pub fn set_last_seen(&self, last_seen: Instant) {
         *self.last_seen.write() = last_seen;
     }
 
@@ -129,6 +129,6 @@ impl Peer {
 
     /// Inserts the given message ID and random nonce pair into the seen messages map.
     pub fn insert_seen_message(&self, message_id: u16, random_nonce: u32) {
-        self.seen_messages.write().insert((message_id, random_nonce), OffsetDateTime::now_utc());
+        self.seen_messages.write().insert((message_id, random_nonce), Instant::now());
     }
 }

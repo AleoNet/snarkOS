@@ -24,9 +24,6 @@ use std::net::SocketAddr;
 impl<N: Network, R: Routes<N>> Disconnect for Router<N, R> {
     /// Any extra operations to be performed during a disconnect.
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
-        // Remove an entry for this `Peer` in the connected peers, if it exists.
-        self.connected_peers.write().remove(&peer_addr);
-        // Add an entry for this `Peer` in the candidate peers.
-        self.candidate_peers.write().insert(peer_addr);
+        self.insert_disconnected_peer(peer_addr);
     }
 }
