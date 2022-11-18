@@ -22,8 +22,8 @@ pub trait NodeInterface<N: Network>: Executor {
     /// Returns the node type.
     fn node_type(&self) -> NodeType;
 
-    /// Returns the node router.
-    fn router(&self) -> &Router<N>;
+    // /// Returns the node router.
+    // fn router(&self) -> &Router<N>;
 
     /// Returns the account private key of the node.
     fn private_key(&self) -> &PrivateKey<N>;

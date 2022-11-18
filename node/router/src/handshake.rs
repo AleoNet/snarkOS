@@ -49,7 +49,7 @@ impl<N: Network> Router<N> {
     pub async fn handshake(
         &self,
         peer_addr: SocketAddr,
-        stream: TcpStream,
+        stream: &mut TcpStream,
         peer_side: ConnectionSide,
     ) -> io::Result<()> {
         // Retrieve the peer IP address.

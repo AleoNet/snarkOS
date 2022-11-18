@@ -42,7 +42,12 @@ impl<N: Network> P2P for Client<N> {
 impl<N: Network> Handshake for Client<N> {
     /// Performs the handshake protocol.
     async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
-        self.router.handshake(&mut connection).await
+        let peer_addr = connection.addr();
+        let conn_side = connection.side();
+        let stream = self.borrow_stream(&mut connection);
+        self.router.handshake(peer_addr, stream, conn_side).await?;
+
+        Ok(connection)
     }
 }
 
@@ -80,22 +85,22 @@ impl<N: Network> Reading for Client<N> {
     /// Processes a message received from the network.
     async fn process_message(&self, peer_ip: SocketAddr, message: Self::Message) -> io::Result<()> {
         // Update the timestamp for the received message.
-        self.connected_peers.read().get(&peer_ip).map(|peer| {
+        self.router().connected_peers.read().get(&peer_ip).map(|peer| {
             peer.insert_seen_message(message.id(), rand::thread_rng().gen());
         });
 
         // Process the message.
-        let success = self.handle_message(self, peer_ip, message).await;
+        let success = self.handle_message(peer_ip, message).await;
 
         // Disconnect if the peer violated the protocol.
         if !success {
             warn!("Disconnecting from '{peer_ip}' (violated protocol)");
-            self.send(&self.router, peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
+            self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
             // Disconnect from this peer.
             let _disconnected = self.tcp().disconnect(peer_ip).await;
             debug_assert!(_disconnected);
             // Restrict this peer to prevent reconnection.
-            self.insert_restricted_peer(peer_ip);
+            self.router().insert_restricted_peer(peer_ip);
         }
 
         Ok(())
@@ -104,6 +109,10 @@ impl<N: Network> Reading for Client<N> {
 
 #[async_trait]
 impl<N: Network> Routes<N> for Client<N> {
+    fn router(&self) -> &Router<N> {
+        &self.router
+    }
+
     /// Saves the latest epoch challenge and latest block in the node.
     async fn puzzle_response(&self, message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
         let epoch_challenge = message.epoch_challenge;
@@ -138,7 +147,6 @@ impl<N: Network> Routes<N> for Client<N> {
     /// Propagates the unconfirmed solution to all connected beacons.
     async fn unconfirmed_solution(
         &self,
-        router: &Router<N>,
         peer_ip: SocketAddr,
         message: UnconfirmedSolution<N>,
         solution: ProverSolution<N>,
@@ -151,7 +159,7 @@ impl<N: Network> Routes<N> for Client<N> {
             // Ensure that the prover solution is valid for the given epoch.
             match solution.verify(self.coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target) {
                 // If the solution is valid, propagate the `UnconfirmedSolution` to connected beacons.
-                Ok(true) => router.propagate_to_beacons(Message::UnconfirmedSolution(message), vec![peer_ip]),
+                Ok(true) => self.propagate_to_beacons(Message::UnconfirmedSolution(message), vec![peer_ip]),
                 Ok(false) | Err(_) => {
                     trace!("Invalid prover solution '{}' for the current epoch.", solution.commitment())
                 }

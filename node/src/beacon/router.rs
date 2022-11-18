@@ -42,7 +42,12 @@ impl<N: Network> P2P for Beacon<N> {
 impl<N: Network> Handshake for Beacon<N> {
     /// Performs the handshake protocol.
     async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
-        self.router.handshake(&mut connection).await
+        let peer_addr = connection.addr();
+        let conn_side = connection.side();
+        let stream = self.borrow_stream(&mut connection);
+        self.router.handshake(peer_addr, stream, conn_side).await?;
+
+        Ok(connection)
     }
 }
 
@@ -80,22 +85,22 @@ impl<N: Network> Reading for Beacon<N> {
     /// Processes a message received from the network.
     async fn process_message(&self, peer_ip: SocketAddr, message: Self::Message) -> io::Result<()> {
         // Update the timestamp for the received message.
-        self.connected_peers.read().get(&peer_ip).map(|peer| {
+        self.router().connected_peers.read().get(&peer_ip).map(|peer| {
             peer.insert_seen_message(message.id(), rand::thread_rng().gen());
         });
 
         // Process the message.
-        let success = self.handle_message(self, peer_ip, message).await;
+        let success = self.handle_message(peer_ip, message).await;
 
         // Disconnect if the peer violated the protocol.
         if !success {
             warn!("Disconnecting from '{peer_ip}' (violated protocol)");
-            self.send(&self.router, peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
+            self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
             // Disconnect from this peer.
             let _disconnected = self.tcp().disconnect(peer_ip).await;
             debug_assert!(_disconnected);
             // Restrict this peer to prevent reconnection.
-            self.insert_restricted_peer(peer_ip);
+            self.router().insert_restricted_peer(peer_ip);
         }
 
         Ok(())
@@ -108,11 +113,11 @@ impl<N: Network> Routes<N> for Beacon<N> {
     const MAXIMUM_NUMBER_OF_PEERS: usize = 10;
 
     fn router(&self) -> &Router<N> {
-        self.router
+        &self.router
     }
 
     /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
-    async fn puzzle_request(&self, peer_ip: SocketAddr, router: &Router<N>) -> bool {
+    async fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
         // Retrieve the latest epoch challenge and latest block.
         let (epoch_challenge, block) = {
             // Retrieve the latest epoch challenge.
@@ -130,14 +135,13 @@ impl<N: Network> Routes<N> for Beacon<N> {
             (epoch_challenge, block)
         };
         // Send the `PuzzleResponse` message to the peer.
-        router.send(peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block: Data::Object(block) }));
+        self.send(peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block: Data::Object(block) }));
         true
     }
 
     /// Adds the unconfirmed solution to the memory pool, and propagates the solution to all peers.
     async fn unconfirmed_solution(
         &self,
-        _router: &Router<N>,
         _peer_ip: SocketAddr,
         _message: UnconfirmedSolution<N>,
         solution: ProverSolution<N>,
@@ -156,9 +160,8 @@ impl<N: Network> Routes<N> for Beacon<N> {
     }
 
     /// Adds the unconfirmed transaction to the memory pool, and propagates the transaction to all peers.
-    async fn unconfirmed_transaction(
+    fn unconfirmed_transaction(
         &self,
-        _router: &Router<N>,
         _peer_ip: SocketAddr,
         _message: UnconfirmedTransaction<N>,
         transaction: Transaction<N>,

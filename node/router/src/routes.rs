@@ -30,7 +30,7 @@ use std::{
 };
 
 #[async_trait]
-pub trait Routes<N: Network>: Clone + Send + Sync + Handshake + Reading + Writing<Message = Message<N>> {
+pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>> {
     /// The minimum number of peers required to maintain connections with.
     const MINIMUM_NUMBER_OF_PEERS: usize = 1;
     /// The maximum number of peers permitted to maintain connections with.
@@ -112,7 +112,7 @@ pub trait Routes<N: Network>: Clone + Send + Sync + Handshake + Reading + Writin
     }
 
     /// Sends a "PuzzleRequest" to a reliable peer.
-    fn send_puzzle_request(&self, node_type: NodeType) {
+    async fn send_puzzle_request(&self, node_type: NodeType) {
         // TODO (howardwu): Change this logic for Phase 3.
         // Retrieve a reliable peer.
         let reliable_peer = match node_type.is_validator() {
@@ -354,7 +354,7 @@ pub trait Routes<N: Network>: Clone + Send + Sync + Handshake + Reading + Writin
                                 false
                             } else {
                                 // Handle the unconfirmed solution.
-                                self.unconfirmed_solution(peer_ip, message_clone, solution)
+                                self.unconfirmed_solution(peer_ip, message_clone, solution).await
                             }
                         }
                         Err(error) => {
@@ -589,7 +589,7 @@ pub trait Routes<N: Network>: Clone + Send + Sync + Handshake + Reading + Writin
         // }
     }
 
-    fn unconfirmed_solution(
+    async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
         message: UnconfirmedSolution<N>,

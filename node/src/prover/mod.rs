@@ -57,7 +57,14 @@ impl<N: Network> Prover<N> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the node router.
-        let router = Router::new(node_ip, NodeType::Prover, account.address(), trusted_peers).await?;
+        let router = Router::new(
+            node_ip,
+            NodeType::Prover,
+            account.address(),
+            trusted_peers,
+            Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+        )
+        .await?;
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
@@ -92,10 +99,10 @@ impl<N: Network> NodeInterface<N> for Prover<N> {
         Self::NODE_TYPE
     }
 
-    /// Returns the node router.
-    fn router(&self) -> &Router<N> {
-        &self.router
-    }
+    // /// Returns the node router.
+    // fn router(&self) -> &Router<N> {
+    //     &self.router
+    // }
 
     /// Returns the account private key of the node.
     fn private_key(&self) -> &PrivateKey<N> {
@@ -120,7 +127,7 @@ impl<N: Network> Prover<N> {
         spawn_task_loop!(Self, {
             loop {
                 // If the node is not connected to any peers, then skip this iteration.
-                if prover.router.number_of_connected_peers().await == 0 {
+                if prover.router.number_of_connected_peers() == 0 {
                     warn!("Skipping an iteration of the prover solution (no connected peers)");
                     tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
                     continue;
@@ -134,7 +141,7 @@ impl<N: Network> Prover<N> {
                     if elapsed > N::ANCHOR_TIME as i64 * 6 {
                         warn!("Skipping an iteration of the prover solution (latest block is stale)");
                         // Send a "PuzzleRequest" to a beacon node.
-                        prover.router.send_puzzle_request(prover.node_type()).await;
+                        prover.send_puzzle_request(prover.node_type());
                         // Sleep for `N::ANCHOR_TIME` seconds.
                         tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
                         continue;
@@ -203,7 +210,7 @@ impl<N: Network> Prover<N> {
                                     });
 
                                     // Propagate the "UnconfirmedSolution" to the network.
-                                    prover.router.propagate(message, vec![]);
+                                    prover.propagate(message, vec![]);
                                     break;
                                 }
                                 false => trace!(

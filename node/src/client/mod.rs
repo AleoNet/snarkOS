@@ -49,12 +49,18 @@ impl<N: Network> Client<N> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the node router.
-        let router = Router::new(node_ip, NodeType::Client, account.address(), trusted_peers).await?;
+        let router = Router::new(
+            node_ip,
+            NodeType::Client,
+            account.address(),
+            trusted_peers,
+            Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+        )
+        .await?;
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
         let node = Self {
-            status: RawStatus::new(),
             account,
             router,
             coinbase_puzzle,
@@ -80,10 +86,10 @@ impl<N: Network> NodeInterface<N> for Client<N> {
         Self::NODE_TYPE
     }
 
-    /// Returns the node router.
-    fn router(&self) -> &Router<N> {
-        &self.router
-    }
+    // /// Returns the node router.
+    // fn router(&self) -> &Router<N> {
+    //     &self.router
+    // }
 
     /// Returns the account private key of the node.
     fn private_key(&self) -> &PrivateKey<N> {

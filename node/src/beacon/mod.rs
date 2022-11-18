@@ -30,7 +30,7 @@ use snarkos_node_messages::{
     UnconfirmedTransaction,
 };
 use snarkos_node_rest::Rest;
-use snarkos_node_router::Router;
+use snarkos_node_router::{Router, Routes};
 use snarkos_node_store::ConsensusDB;
 use snarkos_node_tcp::protocols::Handshake;
 use snarkvm::prelude::{
@@ -73,7 +73,7 @@ pub struct Beacon<N: Network> {
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
-    rest: Option<Arc<Rest<N, ConsensusDB<N>, Self>>>,
+    // rest: Option<Arc<Rest<N, ConsensusDB<N>, Self>>>,
     /// The time it to generate a block.
     block_generation_time: Arc<AtomicU64>,
     /// The unspent records.
@@ -107,24 +107,31 @@ impl<N: Network> Beacon<N> {
         lap!(timer, "Initialize consensus");
 
         // Initialize the node router.
-        let router = Router::new(node_ip, NodeType::Beacon, account.address(), trusted_peers).await?;
+        let router = Router::new(
+            node_ip,
+            NodeType::Beacon,
+            account.address(),
+            trusted_peers,
+            Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+        )
+        .await?;
         lap!(timer, "Initialize the router");
 
         // Initialize the REST server.
-        let rest = match rest_ip {
-            Some(rest_ip) => {
-                let server = Arc::new(Rest::start(
-                    rest_ip,
-                    account.address(),
-                    Some(consensus.clone()),
-                    ledger.clone(),
-                    router.clone(),
-                )?);
-                lap!(timer, "Initialize REST server");
-                Some(server)
-            }
-            None => None,
-        };
+        //  let rest = match rest_ip {
+        //      Some(rest_ip) => {
+        //          let server = Arc::new(Rest::start(
+        //              rest_ip,
+        //              account.address(),
+        //              Some(consensus.clone()),
+        //              ledger.clone(),
+        //              router.clone(),
+        //          )?);
+        //          lap!(timer, "Initialize REST server");
+        //          Some(server)
+        //      }
+        //      None => None,
+        //  };
 
         // Initialize the block generation time.
         let block_generation_time = Arc::new(AtomicU64::new(2));
@@ -138,7 +145,7 @@ impl<N: Network> Beacon<N> {
             consensus,
             ledger,
             router,
-            rest,
+            // rest,
             block_generation_time,
             unspent_records: Arc::new(RwLock::new(unspent_records)),
             shutdown: Default::default(),
@@ -159,10 +166,10 @@ impl<N: Network> Beacon<N> {
         &self.ledger
     }
 
-    /// Returns the REST server.
-    pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>, Self>>> {
-        &self.rest
-    }
+    //  /// Returns the REST server.
+    //  pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>, Self>>> {
+    //      &self.rest
+    //  }
 }
 
 #[async_trait]
@@ -192,10 +199,10 @@ impl<N: Network> NodeInterface<N> for Beacon<N> {
         Self::NODE_TYPE
     }
 
-    /// Returns the node router.
-    fn router(&self) -> &Router<N> {
-        &self.router
-    }
+    // /// Returns the node router.
+    // fn router(&self) -> &Router<N> {
+    //     &self.router
+    // }
 
     /// Returns the account private key of the node.
     fn private_key(&self) -> &PrivateKey<N> {
@@ -452,7 +459,7 @@ impl<N: Network> Beacon<N> {
         });
 
         // Propagate the block to all peers.
-        self.router.propagate(message, vec![]);
+        self.propagate(message, vec![]);
 
         Ok(())
     }

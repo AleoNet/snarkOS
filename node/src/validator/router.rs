@@ -42,7 +42,12 @@ impl<N: Network> P2P for Validator<N> {
 impl<N: Network> Handshake for Validator<N> {
     /// Performs the handshake protocol.
     async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
-        self.router.handshake(&mut connection).await
+        let peer_addr = connection.addr();
+        let conn_side = connection.side();
+        let stream = self.borrow_stream(&mut connection);
+        self.router.handshake(peer_addr, stream, conn_side).await?;
+
+        Ok(connection)
     }
 }
 
@@ -80,22 +85,22 @@ impl<N: Network> Reading for Validator<N> {
     /// Processes a message received from the network.
     async fn process_message(&self, peer_ip: SocketAddr, message: Self::Message) -> io::Result<()> {
         // Update the timestamp for the received message.
-        self.connected_peers.read().get(&peer_ip).map(|peer| {
+        self.router().connected_peers.read().get(&peer_ip).map(|peer| {
             peer.insert_seen_message(message.id(), rand::thread_rng().gen());
         });
 
         // Process the message.
-        let success = self.handle_message(self, peer_ip, message).await;
+        let success = self.handle_message(peer_ip, message).await;
 
         // Disconnect if the peer violated the protocol.
         if !success {
             warn!("Disconnecting from '{peer_ip}' (violated protocol)");
-            self.send(&self.router, peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
+            self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
             // Disconnect from this peer.
             let _disconnected = self.tcp().disconnect(peer_ip).await;
             debug_assert!(_disconnected);
             // Restrict this peer to prevent reconnection.
-            self.insert_restricted_peer(peer_ip);
+            self.router().insert_restricted_peer(peer_ip);
         }
 
         Ok(())
@@ -107,12 +112,16 @@ impl<N: Network> Routes<N> for Validator<N> {
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 1_000;
 
+    fn router(&self) -> &Router<N> {
+        &self.router
+    }
+
     /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
-    async fn puzzle_request(&self, peer_ip: SocketAddr, router: &Router<N>) -> bool {
+    async fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
         // Send the latest puzzle response, if it exists.
         if let Some(puzzle_response) = self.latest_puzzle_response.read().await.clone() {
             // Send the `PuzzleResponse` message to the peer.
-            router.send(peer_ip, Message::PuzzleResponse(puzzle_response));
+            self.send(peer_ip, Message::PuzzleResponse(puzzle_response));
         }
         true
     }
@@ -154,7 +163,6 @@ impl<N: Network> Routes<N> for Validator<N> {
     /// Propagates the unconfirmed solution to all connected beacons.
     async fn unconfirmed_solution(
         &self,
-        router: &Router<N>,
         peer_ip: SocketAddr,
         message: UnconfirmedSolution<N>,
         solution: ProverSolution<N>,
@@ -173,7 +181,7 @@ impl<N: Network> Routes<N> for Validator<N> {
 
             match is_valid {
                 // If the solution is valid, propagate the `UnconfirmedSolution` to connected beacons.
-                Ok(Ok(true)) => router.propagate_to_beacons(Message::UnconfirmedSolution(message), vec![peer_ip]),
+                Ok(Ok(true)) => self.propagate_to_beacons(Message::UnconfirmedSolution(message), vec![peer_ip]),
                 Ok(Ok(false)) | Ok(Err(_)) => {
                     trace!("Invalid prover solution '{}' for the current epoch.", solution.commitment())
                 }

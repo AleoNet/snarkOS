@@ -69,7 +69,7 @@ pub struct Router<N: Network> {
     /// The set of trusted peers.
     trusted_peers: Arc<IndexSet<SocketAddr>>,
     /// The map of connected peer IPs to their peer handlers.
-    connected_peers: Arc<RwLock<IndexMap<SocketAddr, Peer>>>,
+    pub connected_peers: Arc<RwLock<IndexMap<SocketAddr, Peer>>>,
     /// The set of candidate peer IPs.
     candidate_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of restricted peer IPs.

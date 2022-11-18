@@ -41,7 +41,7 @@ pub struct Validator<N: Network> {
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
-    rest: Option<Arc<Rest<N, ConsensusDB<N>, Self>>>,
+    //rest: Option<Arc<Rest<N, ConsensusDB<N>, Self>>>,
     /// The coinbase puzzle.
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The latest epoch challenge.
@@ -67,14 +67,21 @@ impl<N: Network> Validator<N> {
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
         // Initialize the node router.
-        let router = Router::new(node_ip, NodeType::Validator, account.address(), trusted_peers).await?;
+        let router = Router::new(
+            node_ip,
+            NodeType::Validator,
+            account.address(),
+            trusted_peers,
+            Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+        )
+        .await?;
         // Initialize the REST server.
-        let rest = match rest_ip {
-            Some(rest_ip) => {
-                Some(Arc::new(Rest::start(rest_ip, account.address(), None, ledger.clone(), router.clone())?))
-            }
-            None => None,
-        };
+        // let rest = match rest_ip {
+        //     Some(rest_ip) => {
+        //         Some(Arc::new(Rest::start(rest_ip, account.address(), None, ledger.clone(), router.clone())?))
+        //     }
+        //     None => None,
+        // };
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
@@ -82,7 +89,7 @@ impl<N: Network> Validator<N> {
             account,
             ledger,
             router,
-            rest,
+            //    rest,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
@@ -99,10 +106,10 @@ impl<N: Network> Validator<N> {
         &self.ledger
     }
 
-    /// Returns the REST server.
-    pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>, Self>>> {
-        &self.rest
-    }
+    // /// Returns the REST server.
+    // pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>, Self>>> {
+    //     &self.rest
+    // }
 }
 
 #[async_trait]
@@ -132,10 +139,10 @@ impl<N: Network> NodeInterface<N> for Validator<N> {
         Self::NODE_TYPE
     }
 
-    /// Returns the node router.
-    fn router(&self) -> &Router<N> {
-        &self.router
-    }
+    // /// Returns the node router.
+    // fn router(&self) -> &Router<N> {
+    //     &self.router
+    // }
 
     /// Returns the account private key of the node.
     fn private_key(&self) -> &PrivateKey<N> {
