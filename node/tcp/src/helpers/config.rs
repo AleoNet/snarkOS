@@ -16,7 +16,7 @@
 
 use std::{
     io::{self, ErrorKind::*},
-    net::{IpAddr, Ipv4Addr},
+    net::{IpAddr, Ipv4Addr, SocketAddr},
 };
 
 #[cfg(doc)]
@@ -54,7 +54,21 @@ pub struct Config {
     pub max_connections: u16,
 }
 
+impl Config {
+    /// Initializes a new Tcp configuration with a listener address,
+    /// a maximum number of connections, and the default values.
+    pub fn new(listener_address: SocketAddr, max_connections: u16) -> Self {
+        Self {
+            listener_ip: Some(listener_address.ip()),
+            desired_listening_port: Some(listener_address.port()),
+            max_connections,
+            ..Default::default()
+        }
+    }
+}
+
 impl Default for Config {
+    /// Initializes a new Tcp configuration with the default values.
     fn default() -> Self {
         #[cfg(feature = "test")]
         fn default_ip() -> Option<IpAddr> {
