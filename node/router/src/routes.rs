@@ -301,7 +301,6 @@ pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>
 
                 // Update the timestamp for the unconfirmed block.
                 let seen_before = self.router().cache.insert_inbound_block(message.block_hash).is_some();
-
                 // Determine whether to propagate the block.
                 if seen_before {
                     trace!("Skipping 'UnconfirmedBlock {}' from '{peer_ip}'", message.block_hash);
@@ -333,7 +332,6 @@ pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>
 
                 // Update the timestamp for the unconfirmed solution.
                 let seen_before = self.router().cache.insert_inbound_solution(message.puzzle_commitment).is_some();
-
                 // Determine whether to propagate the solution.
                 if seen_before {
                     trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
@@ -365,7 +363,6 @@ pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>
 
                 // Update the timestamp for the unconfirmed transaction.
                 let seen_before = self.router().cache.insert_inbound_transaction(message.transaction_id).is_some();
-
                 // Determine whether to propagate the transaction.
                 if seen_before {
                     trace!("Skipping 'UnconfirmedTransaction {}' from '{peer_ip}'", message.transaction_id);
@@ -624,7 +621,8 @@ pub trait Routes<N: Network>: Handshake + Reading + Writing<Message = Message<N>
 
         // Check if any connected peer is stale.
         let connected_peers = self.router().connected_peers.read().clone();
-        for (peer_ip, peer) in connected_peers.into_iter() {
+        for peer in connected_peers.into_values() {
+            let peer_ip = *peer.ip();
             // Disconnect if the peer has not communicated back within the predefined time.
             let last_seen_elapsed = peer.last_seen().elapsed().as_secs();
             if last_seen_elapsed > Router::<N>::RADIO_SILENCE_IN_SECS {

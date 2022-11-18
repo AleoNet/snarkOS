@@ -22,7 +22,7 @@ use linked_hash_map::LinkedHashMap;
 use parking_lot::RwLock;
 use std::{
     collections::VecDeque,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     sync::{
         atomic::{AtomicU16, Ordering::SeqCst},
         Arc,
@@ -35,6 +35,8 @@ const MAX_CACHE_SIZE: usize = 256;
 
 #[derive(Clone, Debug)]
 pub struct Cache<N: Network> {
+    /// The map of peer connections to their recent timestamps.
+    seen_inbound_connections: Arc<RwLock<IndexMap<IpAddr, VecDeque<OffsetDateTime>>>>,
     /// The map of peer IPs to their recent timestamps.
     seen_inbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>>,
     /// The map of block hashes to their last seen timestamp.
@@ -64,6 +66,7 @@ impl<N: Network> Cache<N> {
     /// Initializes a new instance of the cache.
     pub fn new() -> Self {
         Self {
+            seen_inbound_connections: Arc::new(RwLock::new(IndexMap::new())),
             seen_inbound_puzzle_requests: Default::default(),
             seen_inbound_blocks: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_inbound_solutions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
@@ -75,22 +78,14 @@ impl<N: Network> Cache<N> {
         }
     }
 
-    /// Inserts a new timestamp for the given peer IP, returning the frequency of recent requests.
+    /// Inserts a new timestamp for the given peer connection, returning the number of recent connection requests.
+    pub fn insert_inbound_connection(&self, peer_ip: IpAddr, interval_in_secs: i64) -> usize {
+        Self::retain_and_insert(&self.seen_inbound_connections, peer_ip, interval_in_secs)
+    }
+
+    /// Inserts a new timestamp for the given peer IP, returning the number of recent requests.
     pub fn insert_inbound_puzzle_request(&self, peer_ip: SocketAddr) -> usize {
-        // Acquire a write lock on the map.
-        let mut seen_write = self.seen_inbound_puzzle_requests.write();
-        // Load the entry for the peer IP.
-        let entry = seen_write.entry(peer_ip).or_default();
-
-        // Fetch the timestamp for the interval.
-        let filter_time = OffsetDateTime::now_utc() - Duration::seconds(60);
-        // Retain only the timestamps that are within the recent interval.
-        entry.retain(|timestamp| timestamp > &filter_time);
-
-        // Insert the new timestamp.
-        entry.push_back(OffsetDateTime::now_utc());
-        // Return the frequency of recent requests.
-        entry.len()
+        Self::retain_and_insert(&self.seen_inbound_puzzle_requests, peer_ip, 60)
     }
 
     /// Returns `true` if the cache contains a puzzle request from the given peer.
@@ -140,6 +135,25 @@ impl<N: Network> Cache<N> {
 }
 
 impl<N: Network> Cache<N> {
+    /// Insert a new timestamp for the given key, returning the number of recent entries.
+    fn retain_and_insert<K: Eq + Hash + Clone>(
+        map: &Arc<RwLock<IndexMap<K, VecDeque<OffsetDateTime>>>>,
+        key: K,
+        interval_in_secs: i64,
+    ) -> usize {
+        let mut map_write = map.write();
+        // Load the entry for the key.
+        let mut timestamps = map_write.entry(key).or_default();
+        // Fetch the current timestamp.
+        let now = OffsetDateTime::now_utc();
+        // Retain only the timestamps that are within the recent interval.
+        timestamps.retain(|timestamp| now - *timestamp < Duration::seconds(interval_in_secs));
+        // Insert the new timestamp.
+        timestamps.push_back(now);
+        // Return the frequency of recent requests.
+        timestamps.len()
+    }
+
     /// Increments the key's counter in the map, returning the updated counter.
     fn increment_counter<K: Hash + Eq>(map: &Arc<RwLock<IndexMap<K, Arc<AtomicU16>>>>, key: K) -> u16 {
         // Load the entry for the key, and increment the counter.

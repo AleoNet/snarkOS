@@ -74,8 +74,6 @@ pub struct Router<N: Network> {
     candidate_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of restricted peer IPs.
     restricted_peers: Arc<RwLock<IndexMap<SocketAddr, Instant>>>,
-    /// The map of peers to their first-seen port number, number of attempts, and timestamp of the last inbound connection request.
-    seen_inbound_connections: Arc<RwLock<IndexMap<SocketAddr, ConnectionStats>>>,
     /// The cache.
     cache: Cache<N>,
 }
@@ -91,7 +89,7 @@ impl<N: Network> Router<N> {
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
-    const MAXIMUM_CONNECTION_FAILURES: u32 = 3;
+    const MAXIMUM_CONNECTION_FAILURES: usize = 3;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
     const PING_SLEEP_IN_SECS: u64 = 60; // 1 minute
     /// The duration in seconds after which a connected peer is considered inactive or
@@ -119,7 +117,6 @@ impl<N: Network> Router<N> {
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             cache: Default::default(),
-            seen_inbound_connections: Default::default(),
         };
 
         Ok(router)
@@ -191,29 +188,26 @@ impl<N: Network> Router<N> {
 
     /// Returns the list of metrics for the connected peers.
     pub fn connected_metrics(&self) -> Vec<(SocketAddr, NodeType)> {
-        let mut connected_metrics = Vec::new();
-        for (ip, peer) in self.connected_peers.read().iter() {
-            connected_metrics.push((*ip, peer.node_type()));
-        }
-        connected_metrics
+        self.connected_peers.read().iter().map(|(ip, peer)| (*ip, peer.node_type())).collect()
     }
 
     /// Returns the list of connected peers that are beacons.
     pub fn connected_beacons(&self) -> Vec<SocketAddr> {
-        let mut connected_beacons = Vec::new();
-        for (ip, peer) in self.connected_peers.read().iter() {
-            if peer.is_beacon() {
-                connected_beacons.push(*ip);
-            }
-        }
-        connected_beacons
+        self.connected_peers
+            .read()
+            .iter()
+            .filter_map(|(ip, peer)| match peer.is_beacon() {
+                true => Some(*ip),
+                false => None,
+            })
+            .collect()
     }
 
     /// Returns the list of reliable peers.
     pub fn reliable_peers(&self) -> Vec<SocketAddr> {
-        let mut connected_peers: Vec<_> = self.connected_peers.read().keys().copied().collect();
-        connected_peers.retain(|ip| self.trusted_peers.contains(ip));
-        connected_peers
+        let mut peers = self.connected_peers();
+        peers.retain(|ip| self.trusted_peers.contains(ip));
+        peers
     }
 
     /// Inserts the given peer into the connected peers.
@@ -254,12 +248,17 @@ impl<N: Network> Router<N> {
         self.restricted_peers.write().insert(peer_addr, Instant::now());
     }
 
-    /// Inserts the disconnected peer into the candidate peers.
-    pub fn insert_disconnected_peer(&self, peer_addr: SocketAddr) {
+    /// Removes the connected peer and adds them to the candidate peers.
+    pub fn remove_connected_peer(&self, peer_addr: SocketAddr) {
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().remove(&peer_addr);
         // Add the peer to the candidate peers.
         self.candidate_peers.write().insert(peer_addr);
+    }
+
+    /// Removes the given address from the candidate peers, if it exists.
+    pub fn remove_candidate_peer(&self, peer_addr: SocketAddr) {
+        self.candidate_peers.write().remove(&peer_addr);
     }
 
     /// Updates the connected peer with the given function.
@@ -267,10 +266,5 @@ impl<N: Network> Router<N> {
         if let Some(peer) = self.connected_peers.write().get_mut(&peer_addr) {
             write_fn(peer)
         }
-    }
-
-    /// Removes the given address from the candidate peers, if it exists.
-    pub fn remove_candidate_peer(&self, peer_addr: SocketAddr) {
-        self.candidate_peers.write().remove(&peer_addr);
     }
 }

@@ -55,7 +55,7 @@ impl<N: Network> Handshake for Prover<N> {
 impl<N: Network> Disconnect for Prover<N> {
     /// Any extra operations to be performed during a disconnect.
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
-        self.router.insert_disconnected_peer(peer_addr);
+        self.router.remove_connected_peer(peer_addr);
     }
 }
 
