@@ -112,6 +112,7 @@ impl<N: Network> Routes<N> for Beacon<N> {
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 10;
 
+    /// Returns a reference to the router.
     fn router(&self) -> &Router<N> {
         &self.router
     }

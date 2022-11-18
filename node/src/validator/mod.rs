@@ -24,7 +24,7 @@ use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Router, Routes};
 use snarkos_node_store::ConsensusDB;
-use snarkos_node_tcp::protocols::Handshake;
+use snarkos_node_tcp::protocols::{Disconnect, Handshake, Reading, Writing};
 use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
 
 use anyhow::Result;
@@ -95,6 +95,13 @@ impl<N: Network> Validator<N> {
             latest_block: Default::default(),
             latest_puzzle_response: Default::default(),
         };
+
+        // Enable the TCP protocols.
+        node.enable_handshake().await;
+        node.enable_reading().await;
+        node.enable_writing().await;
+        node.enable_disconnect().await;
+
         // Initialize the signal handler.
         node.handle_signals();
         // Return the node.
@@ -119,13 +126,17 @@ impl<N: Network> Executor for Validator<N> {
 
     /// Disconnects from peers and shuts down the node.
     async fn shut_down(&self) {
-        info!("Shutting down...");
         // Update the node status.
+        info!("Shutting down...");
         Self::status().update(Status::ShuttingDown);
 
+        // Shut down the router.
+        trace!("Shutting down the router...");
+        self.router.shut_down().await;
+
         // Shut down the ledger.
-        trace!("Proceeding to shut down the ledger...");
-        // self.state.ledger().shut_down().await;
+        trace!("Shutting down the ledger...");
+        // self.ledger.shut_down().await;
 
         // Flush the tasks.
         Self::resources().shut_down();

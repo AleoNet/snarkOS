@@ -239,32 +239,37 @@ impl<N: Network> Router<N> {
     }
 
     /// Inserts the given peer into the restricted peers.
-    pub fn insert_restricted_peer(&self, peer_addr: SocketAddr) {
+    pub fn insert_restricted_peer(&self, peer_ip: SocketAddr) {
         // Remove this peer from the connected peers, if it exists.
-        self.connected_peers.write().remove(&peer_addr);
+        self.connected_peers.write().remove(&peer_ip);
         // Remove this peer from the candidate peers, if it exists.
-        self.candidate_peers.write().remove(&peer_addr);
+        self.candidate_peers.write().remove(&peer_ip);
         // Add the peer to the restricted peers.
-        self.restricted_peers.write().insert(peer_addr, Instant::now());
+        self.restricted_peers.write().insert(peer_ip, Instant::now());
     }
 
     /// Removes the connected peer and adds them to the candidate peers.
-    pub fn remove_connected_peer(&self, peer_addr: SocketAddr) {
+    pub fn remove_connected_peer(&self, peer_ip: SocketAddr) {
         // Remove this peer from the connected peers, if it exists.
-        self.connected_peers.write().remove(&peer_addr);
+        self.connected_peers.write().remove(&peer_ip);
         // Add the peer to the candidate peers.
-        self.candidate_peers.write().insert(peer_addr);
+        self.candidate_peers.write().insert(peer_ip);
     }
 
     /// Removes the given address from the candidate peers, if it exists.
-    pub fn remove_candidate_peer(&self, peer_addr: SocketAddr) {
-        self.candidate_peers.write().remove(&peer_addr);
+    pub fn remove_candidate_peer(&self, peer_ip: SocketAddr) {
+        self.candidate_peers.write().remove(&peer_ip);
     }
 
     /// Updates the connected peer with the given function.
-    pub fn update_connected_peer<Fn: FnMut(&mut Peer)>(&self, peer_addr: SocketAddr, mut write_fn: Fn) {
-        if let Some(peer) = self.connected_peers.write().get_mut(&peer_addr) {
+    pub fn update_connected_peer<Fn: FnMut(&mut Peer)>(&self, peer_ip: SocketAddr, mut write_fn: Fn) {
+        if let Some(peer) = self.connected_peers.write().get_mut(&peer_ip) {
             write_fn(peer)
         }
+    }
+
+    /// Shuts down the TCP stack.
+    pub async fn shut_down(&self) {
+        self.tcp.shut_down().await;
     }
 }

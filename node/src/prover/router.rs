@@ -109,6 +109,7 @@ impl<N: Network> Reading for Prover<N> {
 
 #[async_trait]
 impl<N: Network> Routes<N> for Prover<N> {
+    /// Returns a reference to the router.
     fn router(&self) -> &Router<N> {
         &self.router
     }

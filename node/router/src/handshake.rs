@@ -87,10 +87,8 @@ impl<N: Network> Router<N> {
         };
         trace!("Received '{}-B' from '{peer_addr}'", challenge_request.name());
 
-        // Verify the challenge request.
-        let disconnect_reason = self.verify_challenge_request(peer_addr, &challenge_request);
-        // If a disconnect reason was returned, send the disconnect message and abort.
-        if let Some(reason) = disconnect_reason {
+        // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
+        if let Some(reason) = self.verify_challenge_request(peer_addr, &challenge_request) {
             trace!("Sending 'Disconnect' to '{peer_addr}'");
             framed.send(Message::Disconnect(Disconnect { reason: reason.clone() })).await?;
             return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
@@ -119,10 +117,8 @@ impl<N: Network> Router<N> {
         };
         trace!("Received '{}-A' from '{peer_addr}'", challenge_response.name());
 
-        // Verify the challenge response.
-        let disconnect_reason = self.verify_challenge_response(peer_addr, challenge_response, genesis_header).await;
-        // If a disconnect reason was returned, send the disconnect message and abort.
-        if let Some(reason) = disconnect_reason {
+        // Verify the challenge response. If a disconnect reason was returned, send the disconnect message and abort.
+        if let Some(reason) = self.verify_challenge_response(peer_addr, challenge_response, genesis_header).await {
             trace!("Sending 'Disconnect' to '{peer_addr}'");
             framed.send(Message::Disconnect(Disconnect { reason: reason.clone() })).await?;
             return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));

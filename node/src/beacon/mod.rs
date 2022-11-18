@@ -32,7 +32,7 @@ use snarkos_node_messages::{
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Router, Routes};
 use snarkos_node_store::ConsensusDB;
-use snarkos_node_tcp::protocols::Handshake;
+use snarkos_node_tcp::protocols::{Disconnect, Handshake, Reading, Writing};
 use snarkvm::prelude::{
     Address,
     Block,
@@ -150,6 +150,13 @@ impl<N: Network> Beacon<N> {
             unspent_records: Arc::new(RwLock::new(unspent_records)),
             shutdown: Default::default(),
         };
+
+        // Enable the TCP protocols.
+        node.enable_handshake().await;
+        node.enable_reading().await;
+        node.enable_writing().await;
+        node.enable_disconnect().await;
+
         // Initialize the block production.
         node.initialize_block_production().await;
         // Initialize the signal handler.
@@ -179,13 +186,21 @@ impl<N: Network> Executor for Beacon<N> {
 
     /// Disconnects from peers and shuts down the node.
     async fn shut_down(&self) {
-        info!("Shutting down...");
         // Update the node status.
+        info!("Shutting down...");
         Self::status().update(Status::ShuttingDown);
 
-        // Shut down the ledger.
-        trace!("Proceeding to shut down the ledger...");
+        // Shut down the router.
+        trace!("Shutting down the router...");
+        self.router.shut_down().await;
+
+        // Shut down block production.
+        trace!("Shutting down block production...");
         self.shutdown.store(true, Ordering::SeqCst);
+
+        // Shut down the ledger.
+        trace!("Shutting down the ledger...");
+        // self.ledger.shut_down().await;
 
         // Flush the tasks.
         Self::resources().shut_down();

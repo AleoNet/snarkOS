@@ -109,6 +109,7 @@ impl<N: Network> Reading for Client<N> {
 
 #[async_trait]
 impl<N: Network> Routes<N> for Client<N> {
+    /// Returns a reference to the router.
     fn router(&self) -> &Router<N> {
         &self.router
     }
