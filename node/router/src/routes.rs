@@ -125,23 +125,26 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
     /// Sends the given message to specified peer.
     fn send(&self, peer_ip: SocketAddr, message: Message<N>) {
         // Determine whether to send the message.
-        if !self.should_send(&message) {
+        if !self.should_send(peer_ip, &message) {
             return;
         }
         // Ensure the peer is connected before sending.
-        match self.router().is_connected(&peer_ip) {
-            true => {
-                trace!("Sending '{}' to '{peer_ip}'", message.name());
-                if let Err(error) = self.unicast(peer_ip, message) {
-                    trace!("Failed to send message to '{peer_ip}': {error}");
-                }
-            }
-            false => warn!("Attempted to send to a non-connected peer {peer_ip}"),
+        if !self.router().is_connected(&peer_ip) {
+            warn!("Attempted to send to a non-connected peer {peer_ip}");
+            return;
+        }
+        // Retrieve the message name.
+        let name = message.name().to_string();
+        // Send the message to the peer.
+        trace!("Sending '{name}' to '{peer_ip}'");
+        if let Err(error) = self.unicast(peer_ip, message) {
+            trace!("Failed to send '{name}' to '{peer_ip}': {error}");
         }
     }
 
     /// Sends the given message to every connected peer, excluding the sender and any specified peer IPs.
     fn propagate(&self, mut message: Message<N>, excluded_peers: Vec<SocketAddr>) {
+        /// TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         // if let Message::UnconfirmedBlock(ref mut message) = message {
         //     if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
@@ -163,26 +166,24 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
         //     }
         // }
 
-        // Determine whether to send the message.
-        if !self.should_send(&message) {
-            return;
-        }
-        // Iterate through all peers that are not the sender and excluded peers.
-        for peer_ip in self
+        // Prepare the peers to send to.
+        let peers = self
             .router()
             .connected_peers()
             .iter()
             .filter(|peer_ip| !self.router().is_local_ip(peer_ip) && !excluded_peers.contains(peer_ip))
-        {
-            trace!("Sending '{}' to '{peer_ip}'", message.name());
-            if let Err(error) = self.unicast(*peer_ip, message.clone()) {
-                warn!("Failed to send '{}' to '{peer_ip}': {error}", message.name());
-            }
+            .copied()
+            .collect::<Vec<_>>();
+
+        // Iterate through all peers that are not the sender and excluded peers.
+        for peer_ip in peers {
+            self.send(peer_ip, message.clone());
         }
     }
 
     /// Sends the given message to every connected beacon, excluding the sender and any specified beacon IPs.
     fn propagate_to_beacons(&self, mut message: Message<N>, excluded_beacons: Vec<SocketAddr>) {
+        /// TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         // if let Message::UnconfirmedBlock(ref mut message) = message {
         //     if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
@@ -204,28 +205,25 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
         //     }
         // }
 
-        // Determine whether to send the message.
-        if !self.should_send(&message) {
-            return;
-        }
-        // Iterate through all beacons that are not the sender and excluded beacons.
-        for peer_ip in self
+        // Prepare the peers to send to.
+        let peers = self
             .router()
             .connected_beacons()
             .iter()
             .filter(|peer_ip| !self.router().is_local_ip(peer_ip) && !excluded_beacons.contains(peer_ip))
-        {
-            trace!("Sending '{}' to '{peer_ip}'", message.name());
-            if let Err(error) = self.unicast(*peer_ip, message.clone()) {
-                warn!("Failed to send '{}' to '{peer_ip}': {error}", message.name());
-            }
+            .copied()
+            .collect::<Vec<_>>();
+
+        // Iterate through all beacons that are not the sender and excluded beacons.
+        for peer_ip in peers {
+            self.send(peer_ip, message.clone());
         }
     }
 
     /// Returns `true` if the message should be sent.
-    fn should_send(&self, message: &Message<N>) -> bool {
+    fn should_send(&self, peer_ip: SocketAddr, message: &Message<N>) -> bool {
         // Determine whether to send the message.
-        match message {
+        let should_send = match message {
             Message::UnconfirmedBlock(message) => {
                 // Update the timestamp for the unconfirmed block.
                 let seen_before = self.router().cache.insert_outbound_block(message.block_hash).is_some();
@@ -246,7 +244,13 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
             }
             // For all other message types, return `true`.
             _ => true,
+        };
+        // If the message should be sent and the message type is a puzzle request, increment the cache.
+        if should_send && matches!(message, Message::PuzzleRequest(_)) {
+            self.router().cache.increment_outbound_puzzle_requests(peer_ip);
         }
+        // Return whether the message should be sent.
+        should_send
     }
 
     /// Handles the message from the peer.
