@@ -22,6 +22,7 @@ use snarkos_node_tcp::{
 use snarkvm::prelude::Network;
 
 use core::time::Duration;
+use futures::task::SpawnExt;
 
 #[async_trait]
 pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbound<N> + Heartbeat<N> {
@@ -46,7 +47,7 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
     /// Initialize a new instance of the heartbeat.
     fn initialize_heartbeat(&self) {
         let self_clone = self.clone();
-        tokio::spawn(async move {
+        self.router().spawn(async move {
             loop {
                 // Process a heartbeat in the router.
                 self_clone.heartbeat().await;
@@ -60,7 +61,7 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
     fn initialize_puzzle_request(&self) {
         if !self.router().node_type.is_beacon() && Self::PUZZLE_REQUEST_IN_SECS > 0 {
             let self_clone = self.clone();
-            tokio::spawn(async move {
+            self.router().spawn(async move {
                 loop {
                     // Send a "PuzzleRequest".
                     self_clone.send_puzzle_request(self_clone.router().node_type);
@@ -74,7 +75,7 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
     /// Initialize a new instance of the report.
     fn initialize_report(&self) {
         let self_clone = self.clone();
-        tokio::spawn(async move {
+        self.router().spawn(async move {
             let url = "https://vm.aleo.org/testnet3/report";
             loop {
                 // Prepare the report.

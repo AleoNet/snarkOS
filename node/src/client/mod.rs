@@ -117,11 +117,6 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Client<N, C> {
         Self::NODE_TYPE
     }
 
-    // /// Returns the node router.
-    // fn router(&self) -> &Router<N> {
-    //     &self.router
-    // }
-
     /// Returns the account private key of the node.
     fn private_key(&self) -> &PrivateKey<N> {
         self.account.private_key()

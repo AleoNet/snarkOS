@@ -50,11 +50,13 @@ use parking_lot::RwLock;
 use rand::{prelude::IteratorRandom, rngs::OsRng};
 use std::{
     collections::HashMap,
+    future::Future,
     marker::PhantomData,
     net::SocketAddr,
     sync::{atomic::AtomicU8, Arc},
     time::{Duration, Instant, SystemTime},
 };
+use tokio::task::JoinHandle;
 
 // TODO (raychu86): Move this declaration.
 const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
@@ -83,6 +85,8 @@ pub struct Router<N: Network> {
     candidate_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of restricted peer IPs.
     restricted_peers: Arc<RwLock<IndexMap<SocketAddr, Instant>>>,
+    /// The spawned handles.
+    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
 }
 
 impl<N: Network> Router<N> {
@@ -121,6 +125,7 @@ impl<N: Network> Router<N> {
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
+            handles: Default::default(),
         })
     }
 
@@ -322,8 +327,16 @@ impl<N: Network> Router<N> {
         }
     }
 
+    /// Spawns a task with the given future.
+    pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
+        self.handles.write().push(tokio::spawn(future));
+    }
+
     /// Shuts down the TCP stack.
     pub async fn shut_down(&self) {
+        // Abort the tasks.
+        self.handles.read().iter().for_each(|handle| handle.abort());
+        // Close the listener.
         self.tcp.shut_down().await;
     }
 }
