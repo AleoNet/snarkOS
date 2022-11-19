@@ -127,26 +127,32 @@ impl<N: Network> Router<N> {
 
     /// Attempts to connect to the given peer IP.
     pub async fn connect(&self, peer_ip: SocketAddr) {
-        // Attempt to connect to the candidate peer.
-        debug!("Connecting to {peer_ip}...");
-        if let Err(error) = self.tcp.connect(peer_ip).await {
-            warn!("{error}");
-            // Restrict the peer, if the connection was not successful and is not a trusted peer.
-            if !self.trusted_peers.contains(&peer_ip) {
-                self.insert_restricted_peer(peer_ip);
+        let router = self.clone();
+        tokio::spawn(async move {
+            // Attempt to connect to the candidate peer.
+            debug!("Connecting to {peer_ip}...");
+            if let Err(error) = router.tcp.connect(peer_ip).await {
+                warn!("{error}");
+                // Restrict the peer, if the connection was not successful and is not a trusted peer.
+                if !router.trusted_peers.contains(&peer_ip) {
+                    router.insert_restricted_peer(peer_ip);
+                }
             }
-        }
-        // Remove the peer from the candidate peers.
-        self.remove_candidate_peer(peer_ip);
+            // Remove the peer from the candidate peers.
+            router.remove_candidate_peer(peer_ip);
+        });
     }
 
     /// Disconnects from the given peer IP, if the peer is connected.
     pub async fn disconnect(&self, peer_ip: SocketAddr) {
-        // Disconnect from this peer.
-        let _disconnected = self.tcp.disconnect(peer_ip).await;
-        debug_assert!(_disconnected);
-        // Restrict this peer to prevent reconnection.
-        self.insert_restricted_peer(peer_ip);
+        let router = self.clone();
+        tokio::spawn(async move {
+            // Disconnect from this peer.
+            let _disconnected = router.tcp.disconnect(peer_ip).await;
+            debug_assert!(_disconnected);
+            // Restrict this peer to prevent reconnection.
+            router.insert_restricted_peer(peer_ip);
+        });
     }
 
     /// Returns the node type.
