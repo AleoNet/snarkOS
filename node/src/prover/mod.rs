@@ -238,6 +238,12 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         self.puzzle_instances.fetch_add(1, Ordering::SeqCst);
         // Iterate until a prover solution is found.
         loop {
+            // If the Ctrl-C handler registered the signal, stop the prover.
+            if self.shutdown.load(Ordering::Relaxed) {
+                trace!("Shutting down the coinbase puzzle...");
+                break;
+            }
+
             // Perform one iteration of the coinbase puzzle.
             if let Some((prover_solution_target, prover_solution)) = self.coinbase_puzzle_iteration().await {
                 info!("Found a Solution '{}' (Proof Target {prover_solution_target})", prover_solution.commitment());
@@ -255,12 +261,6 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 });
 
                 // Terminate the loop.
-                break;
-            }
-
-            // If the Ctrl-C handler registered the signal, stop the prover.
-            if self.shutdown.load(Ordering::Relaxed) {
-                trace!("Shutting down the coinbase puzzle...");
                 break;
             }
         }
