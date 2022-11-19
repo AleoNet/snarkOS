@@ -73,6 +73,8 @@ pub struct Router<N: Network> {
     status: RawStatus,
     /// The cache.
     cache: Cache<N>,
+    /// The resolver.
+    resolver: Resolver,
     /// The set of trusted peers.
     trusted_peers: Arc<IndexSet<SocketAddr>>,
     /// The map of connected peer IPs to their peer handlers.
@@ -83,20 +85,11 @@ pub struct Router<N: Network> {
     restricted_peers: Arc<RwLock<IndexMap<SocketAddr, Instant>>>,
 }
 
-#[rustfmt::skip]
 impl<N: Network> Router<N> {
-    /// The duration in seconds to sleep in between heartbeat executions.
-    const HEARTBEAT_IN_SECS: u64 = 9; // 9 seconds
-    /// The frequency at which the node sends a puzzle request.
-    const PUZZLE_REQUEST_IN_SECS: u64 = N::ANCHOR_TIME as u64;
-    /// The maximum number of puzzle requests per interval.
-    const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: usize = 5;
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
     const MAXIMUM_CONNECTION_FAILURES: usize = 3;
-    /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 60; // 1 minute
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
@@ -123,6 +116,7 @@ impl<N: Network> Router<N> {
             address,
             status: RawStatus::new(),
             cache: Default::default(),
+            resolver: Default::default(),
             trusted_peers: Arc::new(trusted_peers.iter().copied().collect()),
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
@@ -180,6 +174,11 @@ impl<N: Network> Router<N> {
             Some(timestamp) => timestamp.elapsed().as_secs() < Self::RADIO_SILENCE_IN_SECS,
             None => false,
         }
+    }
+
+    /// Returns the listener IP address of the (ambiguous) peer address.
+    pub fn resolve(&self, peer_addr: &SocketAddr) -> Option<SocketAddr> {
+        self.resolver.get_listener(peer_addr)
     }
 
     /// Returns the maximum number of connected peers.
@@ -251,8 +250,15 @@ impl<N: Network> Router<N> {
         peers
     }
 
+    /// Returns the oldest connected peer.
+    pub fn oldest_connected_peer(&self) -> Option<SocketAddr> {
+        self.connected_peers.read().iter().min_by_key(|(_, peer)| peer.last_seen()).map(|(peer_ip, _)| *peer_ip)
+    }
+
     /// Inserts the given peer into the connected peers.
-    pub fn insert_connected_peer(&self, peer: Peer) {
+    pub fn insert_connected_peer(&self, peer: Peer, peer_addr: SocketAddr) {
+        // Adds a bidirectional map between the listener address and (ambiguous) peer address.
+        self.resolver.insert_peer(peer.ip(), peer_addr);
         // Add an entry for this `Peer` in the connected peers.
         self.connected_peers.write().insert(peer.ip(), peer.clone());
         // Remove this peer from the candidate peers, if it exists.
@@ -291,6 +297,8 @@ impl<N: Network> Router<N> {
 
     /// Removes the connected peer and adds them to the candidate peers.
     pub fn remove_connected_peer(&self, peer_ip: SocketAddr) {
+        // Removes the bidirectional map between the listener address and (ambiguous) peer address.
+        self.resolver.remove_peer(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().remove(&peer_ip);
         // Add the peer to the candidate peers.

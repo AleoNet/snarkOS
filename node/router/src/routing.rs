@@ -25,6 +25,9 @@ use core::time::Duration;
 
 #[async_trait]
 pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbound<N> + Heartbeat<N> {
+    /// The frequency at which the node sends a puzzle request.
+    const PUZZLE_REQUEST_IN_SECS: u64 = N::ANCHOR_TIME as u64;
+
     /// Initialize the routing.
     async fn initialize_routing(&self) {
         // Enable the TCP protocols.
@@ -48,21 +51,21 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
                 // Process a heartbeat in the router.
                 self_clone.heartbeat().await;
                 // Sleep for `HEARTBEAT_IN_SECS` seconds.
-                tokio::time::sleep(Duration::from_secs(Router::<N>::HEARTBEAT_IN_SECS)).await;
+                tokio::time::sleep(Duration::from_secs(Self::HEARTBEAT_IN_SECS)).await;
             }
         });
     }
 
     /// Initialize a new instance of the puzzle request.
     fn initialize_puzzle_request(&self) {
-        if !self.router().node_type.is_beacon() {
+        if !self.router().node_type.is_beacon() && Self::PUZZLE_REQUEST_IN_SECS > 0 {
             let self_clone = self.clone();
             tokio::spawn(async move {
                 loop {
                     // Send a "PuzzleRequest".
                     self_clone.send_puzzle_request(self_clone.router().node_type);
                     // Sleep for `PUZZLE_REQUEST_IN_SECS` seconds.
-                    tokio::time::sleep(Duration::from_secs(Router::<N>::PUZZLE_REQUEST_IN_SECS)).await;
+                    tokio::time::sleep(Duration::from_secs(Self::PUZZLE_REQUEST_IN_SECS)).await;
                 }
             });
         }

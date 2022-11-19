@@ -140,7 +140,7 @@ impl<N: Network> Router<N> {
         // Construct the peer.
         let peer = Peer::new(peer_side, peer_ip, peer_version, peer_type, peer_status);
         // Insert the connected peer in the router.
-        self.insert_connected_peer(peer);
+        self.insert_connected_peer(peer, peer_addr);
         info!("Connected to '{peer_ip}'");
 
         /* Step 6: Send the first ping. */

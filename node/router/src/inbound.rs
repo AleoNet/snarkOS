@@ -40,8 +40,22 @@ use std::{
 
 #[async_trait]
 pub trait Inbound<N: Network>: Reading + Outbound<N> {
+    /// The maximum number of puzzle requests per interval.
+    const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: usize = 5;
+    /// The duration in seconds to sleep in between ping requests with a connected peer.
+    const PING_SLEEP_IN_SECS: u64 = 60; // 1 minute
+
     /// Handles the message from the peer.
-    async fn handle_message(&self, peer_ip: SocketAddr, message: Message<N>) -> bool {
+    async fn handle_message(&self, peer_addr: SocketAddr, message: Message<N>) -> bool {
+        // Retrieve the listener IP for the peer.
+        let peer_ip = match self.router().resolve(&peer_addr) {
+            Some(peer_ip) => peer_ip,
+            None => {
+                warn!("Unable to resolve the (ambiguous) peer address '{peer_addr}'");
+                return false;
+            }
+        };
+
         // Drop the peer, if they have sent more than 50 messages in the last 5 seconds.
         let num_messages = self.router().cache.insert_inbound_message(peer_ip, 5);
         if num_messages >= 50 {
@@ -79,7 +93,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 // Insert the puzzle request for the peer, and fetch the recent frequency.
                 let frequency = self.router().cache.insert_inbound_puzzle_request(peer_ip);
                 // Check if the number of puzzle requests is within the limit.
-                if frequency < Router::<N>::MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL {
+                if frequency < Self::MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL {
                     // Process the puzzle request.
                     self.puzzle_request(peer_ip).await
                 } else {
@@ -322,7 +336,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         let self_clone = self.clone();
         tokio::spawn(async move {
             // Sleep for the preset time before sending a `Ping` request.
-            tokio::time::sleep(Duration::from_secs(Router::<N>::PING_SLEEP_IN_SECS)).await;
+            tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
 
             // Prepare the `Ping` message.
             let message = Message::Ping(Ping {

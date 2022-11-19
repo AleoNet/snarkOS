@@ -124,19 +124,25 @@ impl<N: Network> Display<N> {
         match verbosity {
             0 => std::env::set_var("RUST_LOG", "info"),
             1 => std::env::set_var("RUST_LOG", "debug"),
-            2 | 3 => std::env::set_var("RUST_LOG", "trace"),
+            2 | 3 | 4 => std::env::set_var("RUST_LOG", "trace"),
             _ => std::env::set_var("RUST_LOG", "info"),
         };
 
         // Filter out undesirable logs. (unfortunately EnvFilter cannot be cloned)
         let [filter, filter2] = std::array::from_fn(|_| {
-            EnvFilter::from_default_env()
+            let filter = EnvFilter::from_default_env()
                 .add_directive("mio=off".parse().unwrap())
                 .add_directive("tokio_util=off".parse().unwrap())
                 .add_directive("hyper=off".parse().unwrap())
                 .add_directive("reqwest=off".parse().unwrap())
                 .add_directive("want=off".parse().unwrap())
-                .add_directive("warp=off".parse().unwrap())
+                .add_directive("warp=off".parse().unwrap());
+
+            if verbosity == 4 {
+                filter.add_directive("snarkos_node_tcp=trace".parse().unwrap())
+            } else {
+                filter.add_directive("snarkos_node_tcp=off".parse().unwrap())
+            }
         });
 
         // Create a file to write logs to.

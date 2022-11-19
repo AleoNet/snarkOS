@@ -22,6 +22,8 @@ use rand::{prelude::IteratorRandom, rngs::OsRng};
 
 #[async_trait]
 pub trait Heartbeat<N: Network>: Outbound<N> {
+    /// The duration in seconds to sleep in between heartbeat executions.
+    const HEARTBEAT_IN_SECS: u64 = 9; // 9 seconds
     /// The minimum number of peers required to maintain connections with.
     const MINIMUM_NUMBER_OF_PEERS: usize = 1;
     /// The maximum number of peers permitted to maintain connections with.
@@ -33,19 +35,10 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
 
         // Log the connected peers.
         let connected_peers = self.router().connected_peers();
-        debug!("{} connected peers: {connected_peers:?}", connected_peers.len());
-
-        // TODO (howardwu): Remove this in Phase 3.
-        if self.router().node_type.is_beacon() {
-            // Proceed to send disconnect requests to these peers.
-            for peer_ip in self.router().connected_peers() {
-                if !self.router().trusted_peers().contains(&peer_ip) {
-                    info!("Disconnecting from '{peer_ip}' (exceeded maximum connections)");
-                    self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers.into()));
-                    // Disconnect from this peer.
-                    self.router().disconnect(peer_ip).await;
-                }
-            }
+        match connected_peers.len() {
+            0 => debug!("No connected peers"),
+            1 => debug!("Connected to 1 peer: {connected_peers:?}"),
+            num_connected => debug!("Connected to {num_connected} peers: {connected_peers:?}"),
         }
 
         // Remove the oldest connected peer.
@@ -61,21 +54,17 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     }
 
     /// This function removes the oldest connected peer, to keep the connections fresh.
+    /// This function only triggers if the router is above the minimum number of connected peers.
     async fn remove_oldest_connected_peer(&self) {
-        // Find the oldest connected peer, if one exists.
-        let oldest = self
-            .router()
-            .connected_peers_inner()
-            .into_iter()
-            .min_by_key(|(_, peer)| peer.last_seen())
-            .map(|(peer_ip, _)| peer_ip);
-
-        // Disconnect from the oldest connected peer, if one exists.
-        if let Some(oldest) = oldest {
-            info!("Disconnecting from '{oldest}' (for a periodic refresh of peers)");
-            self.send(oldest, Message::Disconnect(DisconnectReason::PeerRefresh.into()));
-            // Disconnect from this peer.
-            self.router().disconnect(oldest).await;
+        // Check if the router is above the minimum number of connected peers.
+        if self.router().number_of_connected_peers() > Self::MINIMUM_NUMBER_OF_PEERS {
+            // Disconnect from the oldest connected peer, if one exists.
+            if let Some(oldest) = self.router().oldest_connected_peer() {
+                info!("Disconnecting from '{oldest}' (for a periodic refresh of peers)");
+                self.send(oldest, Message::Disconnect(DisconnectReason::PeerRefresh.into()));
+                // Disconnect from this peer.
+                self.router().disconnect(oldest).await;
+            }
         }
     }
 
@@ -144,8 +133,6 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         }
 
         if num_deficient > 0 {
-            trace!("Sending connection requests to {num_deficient} more peers");
-
             // Initialize an RNG.
             let rng = &mut OsRng::default();
 
