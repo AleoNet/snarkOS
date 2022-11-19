@@ -46,8 +46,6 @@ use warp::{reject, reply, Filter, Rejection, Reply};
 /// A REST API server for the ledger.
 #[derive(Clone)]
 pub struct Rest<N: Network, C: ConsensusStorage<N>, R: Routing<N>> {
-    /// The node address.
-    address: Address<N>,
     /// The consensus module.
     consensus: Option<Consensus<N, C>>,
     /// The ledger.
@@ -62,13 +60,12 @@ impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> 
     /// Initializes a new instance of the server.
     pub fn start(
         rest_ip: SocketAddr,
-        address: Address<N>,
         consensus: Option<Consensus<N, C>>,
         ledger: Ledger<N, C>,
         routing: Arc<R>,
     ) -> Result<Self> {
         // Initialize the server.
-        let mut server = Self { address, consensus, ledger, routing, handles: vec![] };
+        let mut server = Self { consensus, ledger, routing, handles: vec![] };
         // Spawn the server.
         server.spawn_server(rest_ip);
         // Return the server.
@@ -106,12 +103,12 @@ impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> 
         });
 
         // Spawn the server.
-        let address = self.address;
+        let address = self.routing.router().address();
         self.handles.push(Arc::new(tokio::spawn(async move {
             println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
 
             if let Ok(jwt_token) = helpers::Claims::new(address).to_jwt_string() {
-                println!("🔑 Your JWT token is: {}\n", jwt_token.bold());
+                println!("🔑 Your JWT token is {}\n", jwt_token.dimmed());
             }
 
             // Start the server.

@@ -74,7 +74,7 @@ pub struct Beacon<N: Network, C: ConsensusStorage<N>> {
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
-    // rest: Option<Arc<Rest<N, ConsensusDB<N>, Self>>>,
+    rest: Option<Arc<Rest<N, C, Self>>>,
     /// The time it to generate a block.
     block_generation_time: Arc<AtomicU64>,
     /// The unspent records.
@@ -118,22 +118,6 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         .await?;
         lap!(timer, "Initialize the router");
 
-        // Initialize the REST server.
-        //  let rest = match rest_ip {
-        //      Some(rest_ip) => {
-        //          let server = Arc::new(Rest::start(
-        //              rest_ip,
-        //              account.address(),
-        //              Some(consensus.clone()),
-        //              ledger.clone(),
-        //              router.clone(),
-        //          )?);
-        //          lap!(timer, "Initialize REST server");
-        //          Some(server)
-        //      }
-        //      None => None,
-        //  };
-
         // Initialize the block generation time.
         let block_generation_time = Arc::new(AtomicU64::new(2));
         // Retrieve the unspent records.
@@ -141,16 +125,23 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         lap!(timer, "Retrieve the unspent records");
 
         // Initialize the node.
-        let node = Self {
+        let mut node = Self {
             account,
-            consensus,
-            ledger,
+            consensus: consensus.clone(),
+            ledger: ledger.clone(),
             router,
-            // rest,
+            rest: None,
             block_generation_time,
             unspent_records: Arc::new(RwLock::new(unspent_records)),
             shutdown: Default::default(),
         };
+
+        // Initialize the REST server.
+        if let Some(rest_ip) = rest_ip {
+            node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?));
+            lap!(timer, "Initialize REST server");
+        }
+
         // Initialize the routing.
         node.initialize_routing().await;
         // Initialize the block production.
@@ -169,10 +160,10 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         &self.ledger
     }
 
-    //  /// Returns the REST server.
-    //  pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>, Self>>> {
-    //      &self.rest
-    //  }
+    /// Returns the REST server.
+    pub fn rest(&self) -> &Option<Arc<Rest<N, C, Self>>> {
+        &self.rest
+    }
 }
 
 #[async_trait]

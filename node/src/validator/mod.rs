@@ -36,6 +36,7 @@ use snarkvm::prelude::{
     ViewKey,
 };
 
+use aleo_std::prelude::lap;
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;
@@ -50,7 +51,7 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
-    //rest: Option<Arc<Rest<N, ConsensusDB<N>, Self>>>,
+    rest: Option<Arc<Rest<N, C, Self>>>,
     /// The coinbase puzzle.
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The latest epoch challenge.
@@ -84,26 +85,26 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
         )
         .await?;
-        // Initialize the REST server.
-        // let rest = match rest_ip {
-        //     Some(rest_ip) => {
-        //         Some(Arc::new(Rest::start(rest_ip, account.address(), None, ledger.clone(), router.clone())?))
-        //     }
-        //     None => None,
-        // };
+
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
-        let node = Self {
+        let mut node = Self {
             account,
-            ledger,
+            ledger: ledger.clone(),
             router,
-            //    rest,
+            rest: None,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
             latest_puzzle_response: Default::default(),
         };
+
+        // Initialize the REST server.
+        if let Some(rest_ip) = rest_ip {
+            node.rest = Some(Arc::new(Rest::start(rest_ip, None, ledger, Arc::new(node.clone()))?));
+        }
+
         // Initialize the routing.
         node.initialize_routing().await;
         // Initialize the signal handler.
@@ -117,10 +118,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         &self.ledger
     }
 
-    // /// Returns the REST server.
-    // pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>, Self>>> {
-    //     &self.rest
-    // }
+    /// Returns the REST server.
+    pub fn rest(&self) -> &Option<Arc<Rest<N, C, Self>>> {
+        &self.rest
+    }
 }
 
 #[async_trait]

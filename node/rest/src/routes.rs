@@ -142,7 +142,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         // GET /testnet3/node/address
         let get_node_address = warp::get()
             .and(warp::path!("testnet3" / "node" / "address"))
-            .and(with(self.address))
+            .and(with(self.routing.router().address()))
             .and_then(|address: Address<N>| async move { Ok::<_, Rejection>(reply::json(&address.to_string())) });
 
         // GET /testnet3/find/blockHash/{transactionID}

@@ -152,6 +152,11 @@ impl<N: Network> Router<N> {
         self.insert_restricted_peer(peer_ip);
     }
 
+    /// Returns the Aleo address of the node.
+    pub fn address(&self) -> Address<N> {
+        self.address
+    }
+
     /// Returns the status.
     pub fn status(&self) -> Status {
         self.status.get()
