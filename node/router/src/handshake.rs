@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Peer, Router, Routing, ALEO_MAXIMUM_FORK_DEPTH};
+use crate::{Peer, Router, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_executor::{NodeType, RawStatus, Status};
 use snarkos_node_messages::{
     ChallengeRequest,
@@ -31,9 +31,8 @@ use snarkos_node_tcp::{protocols::Handshake, Connection, ConnectionSide, Tcp, P2
 use snarkvm::prelude::{error, Block, FromBytes, Header, Network};
 
 use anyhow::{bail, Result};
-use core::time::Duration;
 use futures::SinkExt;
-use std::{io, net::SocketAddr, time::SystemTime};
+use std::{io, net::SocketAddr};
 use tokio::net::TcpStream;
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;

@@ -27,6 +27,15 @@ pub use helpers::*;
 mod handshake;
 pub use handshake::*;
 
+mod heartbeat;
+pub use heartbeat::*;
+
+mod inbound;
+pub use inbound::*;
+
+mod outbound;
+pub use outbound::*;
+
 mod routing;
 pub use routing::*;
 

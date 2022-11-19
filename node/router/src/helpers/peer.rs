@@ -19,7 +19,6 @@ use snarkos_node_tcp::ConnectionSide;
 
 use parking_lot::RwLock;
 use std::{
-    collections::HashMap,
     net::SocketAddr,
     sync::{atomic::AtomicU32, Arc},
     time::Instant,
