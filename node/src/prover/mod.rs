@@ -179,15 +179,15 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             loop {
                 // If the node is not connected to any peers, then skip this iteration.
                 if prover.router.number_of_connected_peers() == 0 {
-                    warn!("Skipping an iteration of the prover solution (no connected peers)");
+                    warn!("Skipping an iteration of the coinbase puzzle (no connected peers)");
                     tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
                     continue;
                 }
 
                 // If the number of instances of the coinbase puzzle exceeds the maximum, then skip this iteration.
                 if prover.puzzle_instances.load(Ordering::SeqCst) >= Self::MAXIMUM_PUZZLE_INSTANCES {
-                    // Sleep for `N::ANCHOR_TIME` seconds.
-                    tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
+                    // Sleep for a brief period of time.
+                    tokio::time::sleep(Duration::from_millis(500)).await;
                     continue;
                 }
 
@@ -198,7 +198,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                     let elapsed = OffsetDateTime::now_utc().unix_timestamp().saturating_sub(latest_timestamp);
                     // If the elapsed time exceeds a multiple of the anchor time, then skip this iteration.
                     if elapsed > N::ANCHOR_TIME as i64 * 6 {
-                        warn!("Skipping an iteration of the prover solution (latest block is stale)");
+                        warn!("Skipping an iteration of the coinbase puzzle (latest block is stale)");
                         // Send a "PuzzleRequest" to a beacon node.
                         prover.send_puzzle_request();
                         // Sleep for `N::ANCHOR_TIME` seconds.
