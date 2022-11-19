@@ -44,7 +44,7 @@ use rand::Rng;
 use std::{
     net::SocketAddr,
     sync::{
-        atomic::{AtomicU8, Ordering},
+        atomic::{AtomicBool, AtomicU8, Ordering},
         Arc,
     },
 };
@@ -68,6 +68,8 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     puzzle_instances: Arc<AtomicU8>,
     /// The spawned handles.
     handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
+    /// The shutdown signal.
+    shutdown: Arc<AtomicBool>,
     /// PhantomData.
     _phantom: PhantomData<C>,
 }
@@ -103,6 +105,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             latest_block: Default::default(),
             puzzle_instances: Default::default(),
             handles: Default::default(),
+            shutdown: Default::default(),
             _phantom: Default::default(),
         };
         // Initialize the routing.
@@ -126,6 +129,10 @@ impl<N: Network, C: ConsensusStorage<N>> Executor for Prover<N, C> {
         // Update the node status.
         info!("Shutting down...");
         Self::status().update(Status::ShuttingDown);
+
+        // Shut down the coinbase puzzle.
+        trace!("Shutting down the coinbase puzzle...");
+        self.shutdown.store(true, Ordering::SeqCst);
 
         // Abort the tasks.
         trace!("Shutting down the prover...");
@@ -207,6 +214,12 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                     }
                 }
 
+                // If the Ctrl-C handler registered the signal, stop the prover.
+                if prover.shutdown.load(Ordering::Relaxed) {
+                    trace!("Shutting down the coinbase puzzle...");
+                    break;
+                }
+
                 // Execute the coinbase puzzle.
                 let prover = prover.clone();
                 tokio::spawn(async move { prover.coinbase_puzzle_loop().await });
@@ -241,6 +254,12 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 });
 
                 // Terminate the loop.
+                break;
+            }
+
+            // If the Ctrl-C handler registered the signal, stop the prover.
+            if self.shutdown.load(Ordering::Relaxed) {
+                trace!("Shutting down the coinbase puzzle...");
                 break;
             }
         }
