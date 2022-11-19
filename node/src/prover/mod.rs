@@ -37,7 +37,7 @@ use snarkvm::prelude::{
     ViewKey,
 };
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use colored::Colorize;
 use core::{marker::PhantomData, time::Duration};
 use rand::Rng;
@@ -180,10 +180,12 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Initialize a new instance of the coinbase puzzle.
     async fn initialize_coinbase_puzzle(&self) {
-        let prover = self.clone();
-        self.handles.write().await.push(tokio::spawn(async move {
-            prover.coinbase_puzzle_loop().await;
-        }));
+        for _ in 0..self.max_puzzle_instances {
+            let prover = self.clone();
+            self.handles.write().await.push(tokio::spawn(async move {
+                prover.coinbase_puzzle_loop().await;
+            }));
+        }
     }
 
     /// Executes an instance of the coinbase puzzle.
@@ -266,7 +268,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             .dimmed()
         );
 
-        info!("\n\nNUM INSTANCES - {}\n\n", self.puzzle_instances.load(std::sync::atomic::Ordering::SeqCst));
+        trace!("\n\nNUM INSTANCES - {}\n\n", self.puzzle_instances.load(std::sync::atomic::Ordering::SeqCst));
         // Compute the prover solution.
         let result = self
             .coinbase_puzzle
