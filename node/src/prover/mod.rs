@@ -65,6 +65,8 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     latest_block: Arc<RwLock<Option<Block<N>>>>,
     /// The number of puzzle instances.
     puzzle_instances: Arc<AtomicU8>,
+    /// The maximum number of puzzle instances.
+    max_puzzle_instances: u8,
     /// The spawned handles.
     handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
@@ -95,6 +97,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         .await?;
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
+        // Compute the maximum number of puzzle instances.
+        let max_puzzle_instances = num_cpus::get().saturating_sub(2).min(8).max(1);
         // Initialize the node.
         let node = Self {
             account,
@@ -103,6 +107,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
             puzzle_instances: Default::default(),
+            max_puzzle_instances: u8::try_from(max_puzzle_instances)?,
             handles: Default::default(),
             shutdown: Default::default(),
             _phantom: Default::default(),
@@ -172,9 +177,6 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
-    /// The maximum number of puzzle instances at any given time.
-    const MAXIMUM_PUZZLE_INSTANCES: u8 = 4;
-
     /// Initialize a new instance of the coinbase puzzle.
     async fn initialize_coinbase_puzzle(&self) {
         let prover = self.clone();
@@ -188,7 +190,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 }
 
                 // If the number of instances of the coinbase puzzle exceeds the maximum, then skip this iteration.
-                if prover.puzzle_instances.load(Ordering::SeqCst) >= Self::MAXIMUM_PUZZLE_INSTANCES {
+                if prover.puzzle_instances.load(Ordering::SeqCst) >= prover.max_puzzle_instances {
                     // Sleep for a brief period of time.
                     tokio::time::sleep(Duration::from_millis(500)).await;
                     continue;

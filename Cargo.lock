@@ -2374,6 +2374,7 @@ dependencies = [
  "async-trait",
  "circular-queue",
  "futures-util",
+ "num_cpus",
  "parking_lot",
  "pea2pea",
  "rand",

@@ -37,6 +37,9 @@ version = "0.2"
 version = "0.3"
 features = ["sink"]
 
+[dependencies.num_cpus]
+version = "1"
+
 [dependencies.parking_lot]
 version = "0.12"
 
