@@ -40,6 +40,7 @@ use snarkvm::prelude::{
 use anyhow::Result;
 use colored::Colorize;
 use core::{marker::PhantomData, time::Duration};
+use parking_lot::RwLock;
 use rand::Rng;
 use std::{
     net::SocketAddr,
@@ -49,7 +50,7 @@ use std::{
     },
 };
 use time::OffsetDateTime;
-use tokio::{sync::RwLock, task::JoinHandle};
+use tokio::task::JoinHandle;
 
 /// A prover is a full node, capable of producing proofs for consensus.
 #[derive(Clone)]
@@ -138,7 +139,7 @@ impl<N: Network, C: ConsensusStorage<N>> Executor for Prover<N, C> {
 
         // Abort the tasks.
         trace!("Shutting down the prover...");
-        self.handles.read().await.iter().for_each(|handle| handle.abort());
+        self.handles.read().iter().for_each(|handle| handle.abort());
 
         // Shut down the router.
         trace!("Shutting down the router...");
@@ -182,7 +183,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     async fn initialize_coinbase_puzzle(&self) {
         for _ in 0..self.max_puzzle_instances {
             let prover = self.clone();
-            self.handles.write().await.push(tokio::spawn(async move {
+            self.handles.write().push(tokio::spawn(async move {
                 prover.coinbase_puzzle_loop().await;
             }));
         }
@@ -206,9 +207,9 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             }
 
             // Read the latest epoch challenge.
-            let latest_epoch_challenge = self.latest_epoch_challenge.read().await.clone();
+            let latest_epoch_challenge = self.latest_epoch_challenge.read().clone();
             // Read the latest block.
-            let latest_block = self.latest_block.read().await.clone();
+            let latest_block = self.latest_block.read().clone();
 
             // If the latest block timestamp exceeds a multiple of the anchor time, then skip this iteration.
             if let Some(latest_timestamp) = latest_block.as_ref().map(|block| block.timestamp()) {

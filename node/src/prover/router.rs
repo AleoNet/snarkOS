@@ -112,9 +112,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
                 let block_height = block.height();
 
                 // Save the latest epoch challenge in the prover.
-                self.latest_epoch_challenge.write().await.replace(epoch_challenge);
+                self.latest_epoch_challenge.write().replace(epoch_challenge);
                 // Save the latest block in the prover.
-                self.latest_block.write().await.replace(block);
+                self.latest_block.write().replace(block);
 
                 trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
                 true
@@ -135,9 +135,10 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
         message: UnconfirmedSolution<N>,
         _solution: ProverSolution<N>,
     ) -> bool {
-        if let Some(block) = self.latest_block.read().await.as_ref() {
+        let last_coinbase_timestamp = self.latest_block.read().as_ref().map(|block| block.last_coinbase_timestamp());
+        if let Some(last_coinbase_timestamp) = last_coinbase_timestamp {
             // Compute the elapsed time since the last coinbase block.
-            let elapsed = OffsetDateTime::now_utc().unix_timestamp().saturating_sub(block.last_coinbase_timestamp());
+            let elapsed = OffsetDateTime::now_utc().unix_timestamp().saturating_sub(last_coinbase_timestamp);
             // If the elapsed time exceeds a multiple of the anchor time, then assist in propagation.
             if elapsed > N::ANCHOR_TIME as i64 * 6 {
                 // Propagate the `UnconfirmedSolution`.
