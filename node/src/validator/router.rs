@@ -33,7 +33,7 @@ use std::{io, net::SocketAddr, sync::atomic::Ordering, time::Instant};
 impl<N: Network, C: ConsensusStorage<N>> P2P for Validator<N, C> {
     /// Returns a reference to the TCP instance.
     fn tcp(&self) -> &Tcp {
-        &self.router.tcp()
+        self.router.tcp()
     }
 }
 
