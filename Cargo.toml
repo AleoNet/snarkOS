@@ -23,7 +23,6 @@ members = [
     "display",
     "node",
     "node/consensus",
-    "node/executor",
     "node/ledger",
     "node/messages",
     "node/rest",
@@ -64,9 +63,6 @@ path = "./node"
 
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"
-
-[dependencies.snarkos-node-executor]
-path = "./node/executor"
 
 [dependencies.snarkos-node-ledger]
 path = "./node/ledger"

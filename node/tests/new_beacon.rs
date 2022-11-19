@@ -18,7 +18,7 @@ mod common;
 use common::TestPeer;
 
 use snarkos_node::Beacon;
-use snarkos_node_executor::NodeType;
+use snarkos_node_messages::NodeType;
 use snarkos_node_router::Outbound;
 use snarkos_node_tcp::P2P;
 use snarkvm::prelude::{ConsensusMemory, PrivateKey, Testnet3 as CurrentNetwork};

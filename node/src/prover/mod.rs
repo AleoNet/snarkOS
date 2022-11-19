@@ -18,8 +18,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_executor::{Executor, NodeType, Status};
-use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedSolution};
+use snarkos_node_messages::{Data, Message, NodeType, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, Reading, Writing},
@@ -41,7 +40,7 @@ use anyhow::Result;
 use colored::Colorize;
 use core::{marker::PhantomData, time::Duration};
 use parking_lot::RwLock;
-use rand::Rng;
+use rand::{rngs::OsRng, CryptoRng, Rng};
 use std::{
     net::SocketAddr,
     sync::{
@@ -100,7 +99,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Compute the maximum number of puzzle instances.
-        let max_puzzle_instances = num_cpus::get().saturating_sub(3).min(5).max(1);
+        let max_puzzle_instances = num_cpus::get().saturating_sub(2).min(6).max(1);
         // Initialize the node.
         let node = Self {
             account,
@@ -126,31 +125,6 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
 }
 
 #[async_trait]
-impl<N: Network, C: ConsensusStorage<N>> Executor for Prover<N, C> {
-    /// Disconnects from peers and shuts down the node.
-    async fn shut_down(&self) {
-        // Update the node status.
-        info!("Shutting down...");
-        Self::status().update(Status::ShuttingDown);
-
-        // Shut down the coinbase puzzle.
-        trace!("Shutting down the coinbase puzzle...");
-        self.shutdown.store(true, Ordering::SeqCst);
-
-        // Abort the tasks.
-        trace!("Shutting down the prover...");
-        self.handles.read().iter().for_each(|handle| handle.abort());
-
-        // Shut down the router.
-        trace!("Shutting down the router...");
-        self.router.shut_down().await;
-
-        // Flush the tasks.
-        Self::resources().shut_down();
-        trace!("Node has shut down.");
-    }
-}
-
 impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
@@ -176,6 +150,24 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
     fn is_dev(&self) -> bool {
         self.router.is_dev()
     }
+
+    /// Shuts down the node.
+    async fn shut_down(&self) {
+        info!("Shutting down...");
+
+        // Shut down the coinbase puzzle.
+        trace!("Shutting down the coinbase puzzle...");
+        self.shutdown.store(true, Ordering::SeqCst);
+
+        // Abort the tasks.
+        trace!("Shutting down the prover...");
+        self.handles.read().iter().for_each(|handle| handle.abort());
+
+        // Shut down the router.
+        self.router.shut_down().await;
+
+        info!("Node has shut down.");
+    }
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
@@ -200,7 +192,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             }
 
             // If the number of instances of the coinbase puzzle exceeds the maximum, then skip this iteration.
-            if self.puzzle_instances.load(Ordering::SeqCst) >= self.max_puzzle_instances {
+            if self.num_puzzle_instances() > self.max_puzzle_instances {
                 // Sleep for a brief period of time.
                 tokio::time::sleep(Duration::from_millis(500)).await;
                 continue;
@@ -208,11 +200,15 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
 
             // Read the latest epoch challenge.
             let latest_epoch_challenge = self.latest_epoch_challenge.read().clone();
-            // Read the latest block.
-            let latest_block = self.latest_block.read().clone();
+            // Read the latest state.
+            let latest_state = self
+                .latest_block
+                .read()
+                .as_ref()
+                .map(|block| (block.timestamp(), block.coinbase_target(), block.proof_target()));
 
             // If the latest block timestamp exceeds a multiple of the anchor time, then skip this iteration.
-            if let Some(latest_timestamp) = latest_block.as_ref().map(|block| block.timestamp()) {
+            if let Some((latest_timestamp, _, _)) = latest_state {
                 // Compute the elapsed time since the latest block.
                 let elapsed = OffsetDateTime::now_utc().unix_timestamp().saturating_sub(latest_timestamp);
                 // If the elapsed time exceeds a multiple of the anchor time, then skip this iteration.
@@ -226,13 +222,21 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 }
             }
 
-            // If the latest epoch challenge and latest block exists, then proceed to generate a prover solution.
-            if let (Some(challenge), Some(block)) = (latest_epoch_challenge, latest_block) {
+            // If the latest epoch challenge and latest state exists, then proceed to generate a prover solution.
+            if let (Some(challenge), Some((_, coinbase_target, proof_target))) = (latest_epoch_challenge, latest_state)
+            {
                 // Execute the coinbase puzzle.
                 let prover = self.clone();
-                match tokio::task::spawn_blocking(move || prover.coinbase_puzzle_iteration(challenge, block)).await {
-                    Ok(_) => (),
-                    Err(error) => error!("Failed to generate a prover solution: {error}"),
+                let result = tokio::task::spawn_blocking(move || {
+                    prover.coinbase_puzzle_iteration(challenge, coinbase_target, proof_target, &mut OsRng)
+                })
+                .await;
+
+                // If the prover found a solution, then broadcast it.
+                if let Ok(Some((solution_target, solution))) = result {
+                    info!("Found a Solution '{}' (Proof Target {solution_target})", solution.commitment());
+                    // Broadcast the prover solution.
+                    self.broadcast_prover_solution(solution);
                 }
             } else {
                 // Otherwise, sleep for a brief period of time, to await for puzzle state.
@@ -248,58 +252,65 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     }
 
     /// Performs one iteration of the coinbase puzzle.
-    fn coinbase_puzzle_iteration(
+    fn coinbase_puzzle_iteration<R: Rng + CryptoRng>(
         &self,
         epoch_challenge: EpochChallenge<N>,
-        block: Block<N>,
+        coinbase_target: u64,
+        proof_target: u64,
+        rng: &mut R,
     ) -> Option<(u64, ProverSolution<N>)> {
-        // Set the status to `Proving`.
-        Self::status().update(Status::Proving);
-        // Increment the number of puzzle instances.
-        self.puzzle_instances.fetch_add(1, Ordering::SeqCst);
+        // Increment the puzzle instances.
+        self.increment_puzzle_instances();
 
         trace!(
             "Proving 'CoinbasePuzzle' {}",
             format!(
-                "(Epoch {}, Coinbase Target {}, Proof Target {})",
+                "(Epoch {}, Coinbase Target {coinbase_target}, Proof Target {proof_target})",
                 epoch_challenge.epoch_number(),
-                block.coinbase_target(),
-                block.proof_target()
             )
             .dimmed()
         );
 
-        trace!("\n\nNUM INSTANCES - {}\n\n", self.puzzle_instances.load(std::sync::atomic::Ordering::SeqCst));
         // Compute the prover solution.
         let result = self
             .coinbase_puzzle
-            .prove(&epoch_challenge, self.address(), rand::thread_rng().gen(), Some(block.proof_target()))
+            .prove(&epoch_challenge, self.address(), rng.gen(), Some(proof_target))
             .ok()
-            .and_then(|solution| solution.to_target().ok().map(|target| (target, solution)));
+            .and_then(|solution| solution.to_target().ok().map(|solution_target| (solution_target, solution)));
 
-        // Set the status to `Ready`.
-        Self::status().update(Status::Ready);
-        // Decrement the number of puzzle instances.
-        self.puzzle_instances.fetch_sub(1, Ordering::SeqCst);
-
-        // If the prover found a solution, then broadcast it.
-        if let Some((prover_solution_target, prover_solution)) = result {
-            info!("Found a Solution '{}' (Proof Target {prover_solution_target})", prover_solution.commitment());
-
-            // Broadcast the prover solution.
-            let prover = self.clone();
-            tokio::spawn(async move {
-                // Prepare the unconfirmed solution message.
-                let message = Message::UnconfirmedSolution(UnconfirmedSolution {
-                    puzzle_commitment: prover_solution.commitment(),
-                    solution: Data::Object(prover_solution),
-                });
-                // Propagate the "UnconfirmedSolution" to the network.
-                prover.propagate(message, vec![]);
-            });
-        }
-
+        // Decrement the puzzle instances.
+        self.decrement_puzzle_instances();
         // Return the result.
         result
+    }
+
+    /// Broadcasts the prover solution to the network.
+    fn broadcast_prover_solution(&self, prover_solution: ProverSolution<N>) {
+        // Prepare the unconfirmed solution message.
+        let message = Message::UnconfirmedSolution(UnconfirmedSolution {
+            puzzle_commitment: prover_solution.commitment(),
+            solution: Data::Object(prover_solution),
+        });
+        // Propagate the "UnconfirmedSolution" to the network.
+        self.propagate(message, vec![]);
+    }
+
+    /// Returns the current number of puzzle instances.
+    fn num_puzzle_instances(&self) -> u8 {
+        self.puzzle_instances.load(Ordering::SeqCst)
+    }
+
+    /// Increments the number of puzzle instances.
+    fn increment_puzzle_instances(&self) {
+        self.puzzle_instances.fetch_add(1, Ordering::SeqCst);
+        #[cfg(debug_assertions)]
+        trace!("Number of Instances - {}", self.num_puzzle_instances());
+    }
+
+    /// Decrements the number of puzzle instances.
+    fn decrement_puzzle_instances(&self) {
+        self.puzzle_instances.fetch_sub(1, Ordering::SeqCst);
+        #[cfg(debug_assertions)]
+        trace!("Number of Instances - {}", self.num_puzzle_instances());
     }
 }

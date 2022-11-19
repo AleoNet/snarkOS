@@ -35,9 +35,6 @@ version = "1"
 [dependencies.serde]
 version = "1"
 
-[dependencies.snarkos-node-executor]
-path = "../executor"
-
 [dependencies.snarkvm]
 workspace = true
 

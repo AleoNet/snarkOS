@@ -19,11 +19,11 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_executor::{spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_ledger::{Ledger, RecordMap};
 use snarkos_node_messages::{
     Data,
     Message,
+    NodeType,
     PuzzleResponse,
     UnconfirmedBlock,
     UnconfirmedSolution,
@@ -62,7 +62,7 @@ use std::{
     },
 };
 use time::OffsetDateTime;
-use tokio::time::timeout;
+use tokio::{task::JoinHandle, time::timeout};
 
 /// A beacon is a full node, capable of producing blocks.
 #[derive(Clone)]
@@ -81,6 +81,8 @@ pub struct Beacon<N: Network, C: ConsensusStorage<N>> {
     block_generation_time: Arc<AtomicU64>,
     /// The unspent records.
     unspent_records: Arc<RwLock<RecordMap<N>>>,
+    /// The spawned handles.
+    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
 }
@@ -136,6 +138,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
             rest: None,
             block_generation_time,
             unspent_records: Arc::new(RwLock::new(unspent_records)),
+            handles: Default::default(),
             shutdown: Default::default(),
         };
 
@@ -169,31 +172,6 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
 }
 
 #[async_trait]
-impl<N: Network, C: ConsensusStorage<N>> Executor for Beacon<N, C> {
-    /// Disconnects from peers and shuts down the node.
-    async fn shut_down(&self) {
-        // Update the node status.
-        info!("Shutting down...");
-        Self::status().update(Status::ShuttingDown);
-
-        // Shut down the router.
-        trace!("Shutting down the router...");
-        self.router.shut_down().await;
-
-        // Shut down block production.
-        trace!("Shutting down block production...");
-        self.shutdown.store(true, Ordering::SeqCst);
-
-        // Shut down the ledger.
-        trace!("Shutting down the ledger...");
-        // self.ledger.shut_down().await;
-
-        // Flush the tasks.
-        Self::resources().shut_down();
-        trace!("Node has shut down.");
-    }
-}
-
 impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Beacon<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
@@ -219,6 +197,28 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Beacon<N, C> {
     fn is_dev(&self) -> bool {
         self.router.is_dev()
     }
+
+    /// Shuts down the node.
+    async fn shut_down(&self) {
+        info!("Shutting down...");
+
+        // Shut down block production.
+        trace!("Shutting down block production...");
+        self.shutdown.store(true, Ordering::SeqCst);
+
+        // Abort the tasks.
+        trace!("Shutting down the beacon...");
+        self.handles.read().iter().for_each(|handle| handle.abort());
+
+        // Shut down the router.
+        self.router.shut_down().await;
+
+        // Shut down the ledger.
+        trace!("Shutting down the ledger...");
+        // self.ledger.shut_down().await;
+
+        info!("Node has shut down.");
+    }
 }
 
 /// A helper method to check if the coinbase target has been met.
@@ -239,7 +239,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     /// Initialize a new instance of block production.
     async fn initialize_block_production(&self) {
         let beacon = self.clone();
-        spawn_task_loop!(Self, {
+        self.handles.write().push(tokio::spawn(async move {
             // Expected time per block.
             const ROUND_TIME: u64 = 15; // 15 seconds per block
 
@@ -280,7 +280,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                     break;
                 }
             }
-        });
+        }));
     }
 
     /// Produces the next block and propagates it to all peers.

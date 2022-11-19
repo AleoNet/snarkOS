@@ -18,9 +18,8 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_executor::{Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::{PuzzleResponse, UnconfirmedSolution};
+use snarkos_node_messages::{NodeType, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::{
@@ -127,27 +126,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 }
 
 #[async_trait]
-impl<N: Network, C: ConsensusStorage<N>> Executor for Validator<N, C> {
-    /// Disconnects from peers and shuts down the node.
-    async fn shut_down(&self) {
-        // Update the node status.
-        info!("Shutting down...");
-        Self::status().update(Status::ShuttingDown);
-
-        // Shut down the router.
-        trace!("Shutting down the router...");
-        self.router.shut_down().await;
-
-        // Shut down the ledger.
-        trace!("Shutting down the ledger...");
-        // self.ledger.shut_down().await;
-
-        // Flush the tasks.
-        Self::resources().shut_down();
-        trace!("Node has shut down.");
-    }
-}
-
 impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
@@ -172,5 +150,19 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
     /// Returns `true` if the node is in development mode.
     fn is_dev(&self) -> bool {
         self.router.is_dev()
+    }
+
+    /// Shuts down the node.
+    async fn shut_down(&self) {
+        info!("Shutting down...");
+
+        // Shut down the router.
+        self.router.shut_down().await;
+
+        // Shut down the ledger.
+        trace!("Shutting down the ledger...");
+        // self.ledger.shut_down().await;
+
+        info!("Node has shut down.");
     }
 }

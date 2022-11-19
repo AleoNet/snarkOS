@@ -14,8 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_executor::{NodeType, Status};
-use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec};
+use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, NodeType, Status};
 use snarkos_node_tcp::{protocols::Handshake, Config, Connection, Tcp, P2P};
 use snarkvm::prelude::{Block, FromBytes, Network, Testnet3 as CurrentNetwork};
 

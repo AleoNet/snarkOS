@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Peer, Router, ALEO_MAXIMUM_FORK_DEPTH};
-use snarkos_node_executor::{NodeType, RawStatus, Status};
 use snarkos_node_messages::{
     ChallengeRequest,
     ChallengeResponse,
@@ -25,7 +24,10 @@ use snarkos_node_messages::{
     Message,
     MessageCodec,
     MessageTrait,
+    NodeType,
     Ping,
+    RawStatus,
+    Status,
 };
 use snarkos_node_tcp::{ConnectionSide, Tcp, P2P};
 use snarkvm::prelude::{error, Block, FromBytes, Header, Network};

@@ -2306,7 +2306,6 @@ dependencies = [
  "snarkos-display",
  "snarkos-node",
  "snarkos-node-consensus",
- "snarkos-node-executor",
  "snarkos-node-ledger",
  "snarkos-node-messages",
  "snarkos-node-rest",
@@ -2383,7 +2382,6 @@ dependencies = [
  "serde_json",
  "snarkos-account",
  "snarkos-node-consensus",
- "snarkos-node-executor",
  "snarkos-node-ledger",
  "snarkos-node-messages",
  "snarkos-node-rest",
@@ -2417,22 +2415,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "snarkos-node-executor"
-version = "2.0.2"
-dependencies = [
- "anyhow",
- "async-trait",
- "indexmap",
- "num_cpus",
- "once_cell",
- "rayon",
- "serde",
- "tokio",
- "tracing",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "snarkos-node-ledger"
 version = "2.0.2"
 dependencies = [
@@ -2458,7 +2440,6 @@ dependencies = [
  "kadmium",
  "rayon",
  "serde",
- "snarkos-node-executor",
  "snarkvm",
  "snow",
  "tokio",
@@ -2505,7 +2486,6 @@ dependencies = [
  "rand",
  "reqwest",
  "serde",
- "snarkos-node-executor",
  "snarkos-node-messages",
  "snarkos-node-tcp",
  "snarkvm",

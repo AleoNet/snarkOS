@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Outbound, Peer, ALEO_MAXIMUM_FORK_DEPTH};
-use snarkos_node_executor::RawStatus;
 use snarkos_node_messages::{
     BlockRequest,
     BlockResponse,
@@ -25,6 +24,7 @@ use snarkos_node_messages::{
     Ping,
     Pong,
     PuzzleResponse,
+    RawStatus,
     UnconfirmedBlock,
     UnconfirmedSolution,
     UnconfirmedTransaction,

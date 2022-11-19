@@ -37,7 +37,7 @@ pub use validator::*;
 mod traits;
 pub use traits::*;
 
-use snarkos_node_executor::NodeType;
+use snarkos_node_messages::NodeType;
 use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
 

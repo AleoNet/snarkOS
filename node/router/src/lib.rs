@@ -39,7 +39,7 @@ pub use outbound::*;
 mod routing;
 pub use routing::*;
 
-use snarkos_node_executor::{NodeType, RawStatus, Status};
+use snarkos_node_messages::{NodeType, RawStatus, Status};
 use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network};
 
@@ -379,8 +379,11 @@ impl<N: Network> Router<N> {
         self.handles.write().push(tokio::spawn(future));
     }
 
-    /// Shuts down the TCP stack.
+    /// Shuts down the router.
     pub async fn shut_down(&self) {
+        trace!("Shutting down the router...");
+        // Update the node status.
+        self.status.update(Status::ShuttingDown);
         // Abort the tasks.
         self.handles.read().iter().for_each(|handle| handle.abort());
         // Close the listener.

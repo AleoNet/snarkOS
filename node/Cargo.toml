@@ -59,9 +59,6 @@ path = "../account"
 [dependencies.snarkos-node-consensus]
 path = "./consensus"
 
-[dependencies.snarkos-node-executor]
-path = "./executor"
-
 [dependencies.snarkos-node-ledger]
 path = "./ledger"
 
