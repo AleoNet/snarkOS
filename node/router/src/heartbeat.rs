@@ -18,10 +18,7 @@ use crate::{Outbound, Router};
 use snarkos_node_messages::{DisconnectReason, Message, PeerRequest};
 use snarkvm::prelude::Network;
 
-use rand::{
-    prelude::{IteratorRandom, SliceRandom},
-    rngs::OsRng,
-};
+use rand::{prelude::IteratorRandom, rngs::OsRng};
 
 #[async_trait]
 pub trait Heartbeat<N: Network>: Outbound<N> {
@@ -161,7 +158,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             // Initialize an RNG.
             let rng = &mut OsRng::default();
             // Attempt to connect to a bootstrap peer.
-            for peer_ip in self.router().bootstrap_peers().into_iter().choose(rng) {
+            if let Some(peer_ip) = self.router().bootstrap_peers().into_iter().choose(rng) {
                 self.router().connect(peer_ip).await;
             }
         }
