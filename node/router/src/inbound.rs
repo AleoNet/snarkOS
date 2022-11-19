@@ -45,8 +45,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// The duration in seconds to sleep in between ping requests with a connected peer.
     const PING_SLEEP_IN_SECS: u64 = 60; // 1 minute
 
-    /// Handles the message from the peer.
-    async fn handle_message(&self, peer_addr: SocketAddr, message: Message<N>) -> bool {
+    /// Handles the inbound message from the peer.
+    async fn inbound(&self, peer_addr: SocketAddr, message: Message<N>) -> bool {
         // Retrieve the listener IP for the peer.
         let peer_ip = match self.router().resolve_to_listener(&peer_addr) {
             Some(peer_ip) => peer_ip,
@@ -55,6 +55,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 return false;
             }
         };
+
+        // Update the last seen timestamp of the peer.
+        self.router().update_connected_peer(peer_ip, |peer: &mut Peer| {
+            peer.set_last_seen(Instant::now());
+        });
 
         // Drop the peer, if they have sent more than 50 messages in the last 5 seconds.
         let num_messages = self.router().cache.insert_inbound_message(peer_ip, 5);
@@ -294,7 +299,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // }
 
         // Update the connected peer.
-        let update_peer = |peer: &mut Peer| {
+        self.router().update_connected_peer(peer_ip, |peer: &mut Peer| {
             // Update the last seen timestamp of the peer.
             peer.set_last_seen(Instant::now());
             // Update the version of the peer.
@@ -303,8 +308,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             peer.set_node_type(message.node_type);
             // Update the status of the peer.
             peer.set_status(RawStatus::from_status(message.status));
-        };
-        self.router().update_connected_peer(peer_ip, update_peer);
+        });
 
         // // Determine if the peer is on a fork (or unknown).
         // let is_fork = match state.ledger().reader().get_block_hash(peer.block_height) {

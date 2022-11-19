@@ -84,7 +84,7 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Prover<N, C> {
     /// Processes a message received from the network.
     async fn process_message(&self, peer_ip: SocketAddr, message: Self::Message) -> io::Result<()> {
         // Process the message. Disconnect if the peer violated the protocol.
-        if !self.handle_message(peer_ip, message).await {
+        if !self.inbound(peer_ip, message).await {
             warn!("Disconnecting from '{peer_ip}' (violated protocol)");
             self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
             // Disconnect from this peer.
