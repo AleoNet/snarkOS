@@ -259,7 +259,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
 
         // If the latest epoch challenge and latest block exists, then generate a prover solution.
         if let (Some(epoch_challenge), Some(block)) = (latest_epoch_challenge, latest_block) {
-            debug!(
+            trace!(
                 "Proving 'CoinbasePuzzle' (Epoch {}, Coinbase Target {}, Proof Target {})",
                 epoch_challenge.epoch_number(),
                 block.coinbase_target(),
