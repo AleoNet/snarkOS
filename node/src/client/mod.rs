@@ -21,7 +21,10 @@ use snarkos_account::Account;
 use snarkos_node_executor::{Executor, NodeType, RawStatus, Status};
 use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
-use snarkos_node_tcp::protocols::{Disconnect, Handshake, Reading, Writing};
+use snarkos_node_tcp::{
+    protocols::{Disconnect, Handshake, Reading, Writing},
+    P2P,
+};
 use snarkvm::prelude::{
     Address,
     Block,

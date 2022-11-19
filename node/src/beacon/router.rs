@@ -17,6 +17,7 @@
 use super::*;
 
 use snarkos_node_messages::{DisconnectReason, Message, MessageCodec};
+use snarkos_node_router::Routing;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, Writing},
     Connection,
@@ -25,12 +26,7 @@ use snarkos_node_tcp::{
 };
 use snarkvm::prelude::Network;
 
-use core::time::Duration;
-use futures_util::SinkExt;
-use rand::Rng;
-use snarkos_node_router::Routing;
-use snarkos_node_tcp::{protocols::Reading, P2P};
-use std::{io, net::SocketAddr, sync::atomic::Ordering, time::Instant};
+use std::{io, net::SocketAddr};
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Beacon<N, C> {
     /// Returns a reference to the TCP instance.

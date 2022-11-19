@@ -39,11 +39,3 @@ macro_rules! spawn_task_loop {
     // Spawns a new task, without a task ID, using a custom executor.
     ($E:ident, $logic:expr) => {{ $crate::spawn_task!($E, None, { $logic }) }};
 }
-
-#[macro_export]
-macro_rules! spawn_task_away {
-    ($logic:block) => {{ tokio::task::spawn(async move { $logic }) }};
-
-    // Spawns a new task, with a task ID, using a custom executor.
-    ($logic:expr) => {{ $crate::spawn_task!({ $logic }) }};
-}

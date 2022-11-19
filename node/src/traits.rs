@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_node_executor::{Executor, NodeType};
-use snarkos_node_router::{Router, Routing};
+use snarkos_node_router::Routing;
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 pub trait NodeInterface<N: Network>: Executor + Routing<N> {

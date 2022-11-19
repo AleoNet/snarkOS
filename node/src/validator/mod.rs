@@ -23,7 +23,10 @@ use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
-use snarkos_node_tcp::protocols::{Disconnect, Handshake, Reading, Writing};
+use snarkos_node_tcp::{
+    protocols::{Disconnect, Handshake, Reading, Writing},
+    P2P,
+};
 use snarkvm::prelude::{
     Address,
     Block,
@@ -36,7 +39,6 @@ use snarkvm::prelude::{
     ViewKey,
 };
 
-use aleo_std::prelude::lap;
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::RwLock;

@@ -19,7 +19,7 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_executor::{spawn_task_loop, Executor, NodeType, RawStatus, Status};
+use snarkos_node_executor::{spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_ledger::{Ledger, RecordMap};
 use snarkos_node_messages::{
     Data,
@@ -32,7 +32,10 @@ use snarkos_node_messages::{
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_store::ConsensusDB;
-use snarkos_node_tcp::protocols::{Disconnect, Handshake, Reading, Writing};
+use snarkos_node_tcp::{
+    protocols::{Disconnect, Handshake, Reading, Writing},
+    P2P,
+};
 use snarkvm::prelude::{
     Address,
     Block,
