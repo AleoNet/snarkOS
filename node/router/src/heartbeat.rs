@@ -157,40 +157,14 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
 
     /// This function keeps the number of bootstrap peers within the allowed range.
     async fn handle_bootstrap_peers(&self) {
-        // If the node is in development mode, do not bootstrap.
-        if self.router().is_dev() {
-            return;
-        }
-
-        // TODO (howardwu): Change this for Phase 3.
-        // Prepare the bootstrap.
-        let bootstrap = [
-            SocketAddr::from_str("164.92.111.59:4133").unwrap(),
-            SocketAddr::from_str("159.223.204.96:4133").unwrap(),
-            SocketAddr::from_str("167.71.219.176:4133").unwrap(),
-            SocketAddr::from_str("157.245.205.209:4133").unwrap(),
-            SocketAddr::from_str("134.122.95.106:4133").unwrap(),
-            SocketAddr::from_str("161.35.24.55:4133").unwrap(),
-            SocketAddr::from_str("138.68.103.139:4133").unwrap(),
-            SocketAddr::from_str("207.154.215.49:4133").unwrap(),
-            SocketAddr::from_str("46.101.114.158:4133").unwrap(),
-            SocketAddr::from_str("138.197.190.94:4133").unwrap(),
-        ];
-
         // Find the connected bootstrap peers.
-        let mut connected_bootstrap = Vec::with_capacity(10);
-        for bootstrap_ip in bootstrap {
-            if self.router().is_connected(&bootstrap_ip) {
-                connected_bootstrap.push(bootstrap_ip);
-            }
-        }
-
+        let connected_bootstrap = self.router().connected_bootstrap_peers();
         // If there are not enough connected bootstrap peers, connect to more.
         if connected_bootstrap.is_empty() {
             // Initialize an RNG.
             let rng = &mut OsRng::default();
             // Attempt to connect to a bootstrap peer.
-            self.router().connect(*bootstrap.choose(rng).unwrap()).await;
+            self.router().connect(*self.router().bootstrap_peers().choose(rng).unwrap()).await;
         }
 
         // Determine if the node is connected to more beacons than allowed.

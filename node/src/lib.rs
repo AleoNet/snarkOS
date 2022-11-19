@@ -141,7 +141,7 @@ impl<N: Network> Node<N> {
     }
 
     /// Returns `true` if the node is in development mode.
-    fn is_dev(&self) -> bool {
+    pub fn is_dev(&self) -> bool {
         match self {
             Self::Beacon(node) => node.is_dev(),
             Self::Validator(node) => node.is_dev(),

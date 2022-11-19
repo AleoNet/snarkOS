@@ -40,22 +40,14 @@ mod routing;
 pub use routing::*;
 
 use snarkos_node_executor::{NodeType, RawStatus, Status};
-use snarkos_node_messages::*;
-use snarkos_node_tcp::{protocols::Writing, Config, Tcp};
+use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network};
 
 use anyhow::Result;
+use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::RwLock;
-use rand::{prelude::IteratorRandom, rngs::OsRng};
-use std::{
-    collections::HashMap,
-    future::Future,
-    marker::PhantomData,
-    net::SocketAddr,
-    sync::{atomic::AtomicU8, Arc},
-    time::{Duration, Instant, SystemTime},
-};
+use std::{future::Future, net::SocketAddr, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 // TODO (raychu86): Move this declaration.
@@ -251,6 +243,39 @@ impl<N: Network> Router<N> {
         &self.trusted_peers
     }
 
+    /// Returns the list of bootstrap peers.
+    pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
+        // If the node is in development mode, return an empty list of bootstrap peers.
+        if self.is_dev {
+            vec![SocketAddr::from(([127, 0, 0, 1], 4130))]
+        } else {
+            // TODO (howardwu): Change this for Phase 3.
+            vec![
+                SocketAddr::from_str("164.92.111.59:4133").unwrap(),
+                SocketAddr::from_str("159.223.204.96:4133").unwrap(),
+                SocketAddr::from_str("167.71.219.176:4133").unwrap(),
+                SocketAddr::from_str("157.245.205.209:4133").unwrap(),
+                SocketAddr::from_str("134.122.95.106:4133").unwrap(),
+                SocketAddr::from_str("161.35.24.55:4133").unwrap(),
+                SocketAddr::from_str("138.68.103.139:4133").unwrap(),
+                SocketAddr::from_str("207.154.215.49:4133").unwrap(),
+                SocketAddr::from_str("46.101.114.158:4133").unwrap(),
+                SocketAddr::from_str("138.197.190.94:4133").unwrap(),
+            ]
+        }
+    }
+
+    /// Returns the list of connected bootstrap peers.
+    pub fn connected_bootstrap_peers(&self) -> Vec<SocketAddr> {
+        let mut connected_bootstrap = Vec::new();
+        for bootstrap_ip in self.bootstrap_peers() {
+            if self.is_connected(&bootstrap_ip) {
+                connected_bootstrap.push(bootstrap_ip);
+            }
+        }
+        connected_bootstrap
+    }
+
     /// Returns the list of metrics for the connected peers.
     pub fn connected_metrics(&self) -> Vec<(SocketAddr, NodeType)> {
         self.connected_peers.read().iter().map(|(ip, peer)| (*ip, peer.node_type())).collect()
@@ -266,13 +291,6 @@ impl<N: Network> Router<N> {
                 false => None,
             })
             .collect()
-    }
-
-    /// Returns the list of reliable peers.
-    pub fn reliable_peers(&self) -> Vec<SocketAddr> {
-        let mut peers = self.connected_peers();
-        peers.retain(|ip| self.trusted_peers.contains(ip));
-        peers
     }
 
     /// Returns the oldest connected peer.

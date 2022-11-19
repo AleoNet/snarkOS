@@ -32,7 +32,6 @@ use snarkos_node_messages::{
 use snarkos_node_tcp::protocols::Reading;
 use snarkvm::prelude::{Block, Network, ProverSolution, Transaction};
 
-use futures::SinkExt;
 use std::{
     net::SocketAddr,
     time::{Duration, Instant},

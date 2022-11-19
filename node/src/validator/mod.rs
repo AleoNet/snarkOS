@@ -20,7 +20,7 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{Executor, NodeType, RawStatus, Status};
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
+use snarkos_node_messages::{PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::{

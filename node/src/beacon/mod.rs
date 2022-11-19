@@ -31,7 +31,6 @@ use snarkos_node_messages::{
 };
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
-use snarkos_node_store::ConsensusDB;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, Reading, Writing},
     P2P,

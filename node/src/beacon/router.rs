@@ -18,13 +18,7 @@ use super::*;
 
 use snarkos_node_messages::{DisconnectReason, Message, MessageCodec};
 use snarkos_node_router::Routing;
-use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake, Writing},
-    Connection,
-    ConnectionSide,
-    Tcp,
-};
-use snarkvm::prelude::Network;
+use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 
 use std::{io, net::SocketAddr};
 

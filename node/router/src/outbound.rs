@@ -26,20 +26,20 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     /// Returns a reference to the router.
     fn router(&self) -> &Router<N>;
 
-    /// Sends a "PuzzleRequest" to a reliable peer.
+    /// Sends a "PuzzleRequest" to a bootstrap peer.
     fn send_puzzle_request(&self) {
         // TODO (howardwu): Change this logic for Phase 3.
-        // Retrieve a reliable peer.
-        let reliable_peer = match self.router().node_type.is_validator() {
+        // Retrieve a bootstrap peer.
+        let bootstrap_ip = match self.router().node_type.is_validator() {
             true => self.router().connected_beacons().first().copied(),
-            false => self.router().reliable_peers().first().copied(),
+            false => self.router().connected_bootstrap_peers().first().copied(),
         };
-        // If a reliable peer exists, send a "PuzzleRequest" to it.
-        if let Some(reliable_peer) = reliable_peer {
-            // Send the "PuzzleRequest" to the reliable peer.
-            self.send(reliable_peer, Message::PuzzleRequest(PuzzleRequest));
+        // If a bootstrap peer exists, send a "PuzzleRequest" to it.
+        if let Some(bootstrap_ip) = bootstrap_ip {
+            // Send the "PuzzleRequest" to the bootstrap peer.
+            self.send(bootstrap_ip, Message::PuzzleRequest(PuzzleRequest));
         } else {
-            warn!("[PuzzleRequest] There are no reliable peers available yet");
+            warn!("No bootstrap peers were found");
         }
     }
 
