@@ -18,7 +18,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType, RawStatus, Status};
+use snarkos_node_executor::{Executor, NodeType, RawStatus, Status};
 use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::protocols::{Disconnect, Handshake, Reading, Writing};
@@ -39,7 +39,10 @@ use core::{marker::PhantomData, time::Duration};
 use rand::Rng;
 use std::{
     net::SocketAddr,
-    sync::{atomic::AtomicU8, Arc},
+    sync::{
+        atomic::{AtomicU8, Ordering},
+        Arc,
+    },
 };
 use time::OffsetDateTime;
 use tokio::sync::RwLock;
@@ -92,9 +95,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         // Initialize the routing.
         node.initialize_routing().await;
         // Initialize the coinbase puzzle.
-        for _ in 0..3 {
-            node.initialize_coinbase_puzzle().await;
-        }
+        node.initialize_coinbase_puzzle().await;
         // Initialize the signal handler.
         node.handle_signals();
         // Return the node.
@@ -146,14 +147,24 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
+    /// The maximum number of puzzle instances at any given time.
+    const MAXIMUM_PUZZLE_INSTANCES: u8 = 4;
+
     /// Initialize a new instance of the coinbase puzzle.
     async fn initialize_coinbase_puzzle(&self) {
         let prover = self.clone();
-        spawn_task_loop!(Self, {
+        tokio::spawn(async move {
             loop {
                 // If the node is not connected to any peers, then skip this iteration.
                 if prover.router.number_of_connected_peers() == 0 {
                     warn!("Skipping an iteration of the prover solution (no connected peers)");
+                    tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
+                    continue;
+                }
+
+                // If the number of instances of the coinbase puzzle exceeds the maximum, then skip this iteration.
+                if prover.puzzle_instances.load(Ordering::SeqCst) >= Self::MAXIMUM_PUZZLE_INSTANCES {
+                    // Sleep for `N::ANCHOR_TIME` seconds.
                     tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
                     continue;
                 }
@@ -166,95 +177,85 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                     if elapsed > N::ANCHOR_TIME as i64 * 6 {
                         warn!("Skipping an iteration of the prover solution (latest block is stale)");
                         // Send a "PuzzleRequest" to a beacon node.
-                        prover.send_puzzle_request(prover.node_type());
+                        prover.send_puzzle_request();
                         // Sleep for `N::ANCHOR_TIME` seconds.
                         tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
                         continue;
                     }
                 }
 
+                // Execute the coinbase puzzle.
                 let prover = prover.clone();
-                spawn_task!(Self, {
-                    // Set the status to `Proving`.
-                    Self::status().update(Status::Proving);
-                    // Increment the number of puzzle instances.
-                    prover.puzzle_instances.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
-
-                    loop {
-                        // Read the latest epoch challenge.
-                        let latest_epoch_challenge = prover.latest_epoch_challenge.read().await.clone();
-                        // Read the latest block.
-                        let latest_block = prover.latest_block.read().await.clone();
-
-                        // If the latest epoch challenge and latest block exists, then generate a prover solution.
-                        if let (Some(epoch_challenge), Some(block)) = (latest_epoch_challenge, latest_block) {
-                            // Retrieve the latest coinbase target.
-                            let latest_coinbase_target = block.coinbase_target();
-                            // Retrieve the latest proof target.
-                            let latest_proof_target = block.proof_target();
-
-                            debug!(
-                                "Proving 'CoinbasePuzzle' (Epoch {}, Coinbase Target {}, Proof Target {})",
-                                epoch_challenge.epoch_number(),
-                                latest_coinbase_target,
-                                latest_proof_target,
-                            );
-
-                            // Construct a prover solution.
-                            let prover_solution = match prover.coinbase_puzzle.prove(
-                                &epoch_challenge,
-                                prover.address(),
-                                rand::thread_rng().gen(),
-                                Some(latest_proof_target),
-                            ) {
-                                Ok(proof) => proof,
-                                Err(error) => {
-                                    trace!("{error}");
-                                    break;
-                                }
-                            };
-
-                            // Fetch the prover solution target.
-                            let prover_solution_target = match prover_solution.to_target() {
-                                Ok(target) => target,
-                                Err(error) => {
-                                    warn!("Failed to fetch prover solution target: {error}");
-                                    break;
-                                }
-                            };
-
-                            // Ensure that the prover solution target is sufficient.
-                            match prover_solution_target >= latest_proof_target {
-                                true => {
-                                    info!("Found a Solution (Proof Target {prover_solution_target})");
-
-                                    // Prepare the unconfirmed solution message.
-                                    let message = Message::UnconfirmedSolution(UnconfirmedSolution {
-                                        puzzle_commitment: prover_solution.commitment(),
-                                        solution: Data::Object(prover_solution),
-                                    });
-
-                                    // Propagate the "UnconfirmedSolution" to the network.
-                                    prover.propagate(message, vec![]);
-                                    break;
-                                }
-                                false => trace!(
-                                    "Prover solution was below the necessary proof target ({prover_solution_target} < {latest_proof_target})"
-                                ),
-                            }
-                        } else {
-                            tokio::time::sleep(Duration::from_secs(1)).await;
-                        }
-                    }
-
-                    // Set the status to `Ready`.
-                    Self::status().update(Status::Ready);
-                    // Decrement the number of puzzle instances.
-                    prover.puzzle_instances.fetch_sub(1, std::sync::atomic::Ordering::SeqCst);
-                    // Sleep briefly to give this instance a chance to clear state.
-                    tokio::time::sleep(Duration::from_millis(50)).await;
-                });
+                tokio::spawn(async move { prover.coinbase_puzzle_loop().await });
+                // Sleep briefly to give this instance a chance to clear state.
+                tokio::time::sleep(Duration::from_millis(50)).await;
             }
         });
+    }
+
+    /// Executes an instance of the coinbase puzzle.
+    async fn coinbase_puzzle_loop(&self) {
+        // Set the status to `Proving`.
+        Self::status().update(Status::Proving);
+        // Increment the number of puzzle instances.
+        self.puzzle_instances.fetch_add(1, Ordering::SeqCst);
+        // Iterate until a prover solution is found.
+        loop {
+            // Perform one iteration of the coinbase puzzle.
+            if let Some((prover_solution_target, prover_solution)) = self.coinbase_puzzle_iteration().await {
+                info!("Found a Solution '{}' (Proof Target {prover_solution_target})", prover_solution.commitment());
+
+                // Broadcast the prover solution.
+                let prover = self.clone();
+                tokio::spawn(async move {
+                    // Prepare the unconfirmed solution message.
+                    let message = Message::UnconfirmedSolution(UnconfirmedSolution {
+                        puzzle_commitment: prover_solution.commitment(),
+                        solution: Data::Object(prover_solution),
+                    });
+                    // Propagate the "UnconfirmedSolution" to the network.
+                    prover.propagate(message, vec![]);
+                });
+
+                // Terminate the loop.
+                break;
+            }
+        }
+        // Set the status to `Ready`.
+        Self::status().update(Status::Ready);
+        // Decrement the number of puzzle instances.
+        self.puzzle_instances.fetch_sub(1, Ordering::SeqCst);
+    }
+
+    /// Performs one iteration of the coinbase puzzle.
+    async fn coinbase_puzzle_iteration(&self) -> Option<(u64, ProverSolution<N>)> {
+        // Read the latest epoch challenge.
+        let latest_epoch_challenge = self.latest_epoch_challenge.read().await.clone();
+        // Read the latest block.
+        let latest_block = self.latest_block.read().await.clone();
+
+        // If the latest epoch challenge and latest block exists, then generate a prover solution.
+        if let (Some(epoch_challenge), Some(block)) = (latest_epoch_challenge, latest_block) {
+            debug!(
+                "Proving 'CoinbasePuzzle' (Epoch {}, Coinbase Target {}, Proof Target {})",
+                epoch_challenge.epoch_number(),
+                block.coinbase_target(),
+                block.proof_target(),
+            );
+
+            // Compute the prover solution.
+            match self.coinbase_puzzle.prove(
+                &epoch_challenge,
+                self.address(),
+                rand::thread_rng().gen(),
+                Some(block.proof_target()),
+            ) {
+                Ok(solution) => solution.to_target().ok().map(|solution_target| (solution_target, solution)),
+                _ => None,
+            }
+        } else {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+            None
+        }
     }
 }

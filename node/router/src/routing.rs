@@ -64,7 +64,7 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
             self.router().spawn(async move {
                 loop {
                     // Send a "PuzzleRequest".
-                    self_clone.send_puzzle_request(self_clone.router().node_type);
+                    self_clone.send_puzzle_request();
                     // Sleep for `PUZZLE_REQUEST_IN_SECS` seconds.
                     tokio::time::sleep(Duration::from_secs(Self::PUZZLE_REQUEST_IN_SECS)).await;
                 }

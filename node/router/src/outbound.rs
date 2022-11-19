@@ -27,10 +27,10 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     fn router(&self) -> &Router<N>;
 
     /// Sends a "PuzzleRequest" to a reliable peer.
-    fn send_puzzle_request(&self, node_type: NodeType) {
+    fn send_puzzle_request(&self) {
         // TODO (howardwu): Change this logic for Phase 3.
         // Retrieve a reliable peer.
-        let reliable_peer = match node_type.is_validator() {
+        let reliable_peer = match self.router().node_type.is_validator() {
             true => self.router().connected_beacons().first().copied(),
             false => self.router().reliable_peers().first().copied(),
         };

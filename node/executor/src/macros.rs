@@ -15,40 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 #[macro_export]
-macro_rules! spawn_task {
-    // Spawns a new task, with a task ID, using a custom executor.
-    ($E:ident, $logic:block) => {{
-        // Procure a resource ID for the task, as it may terminate at any time.
-        let resource_id = $E::resources().procure_id();
-
-        // Initialize a handler for the task.
-        let (router, handler) = tokio::sync::oneshot::channel();
-
-        // Register the task with the environment.
-        $E::resources().register_task(
-            Some(resource_id),
-            tokio::task::spawn(async move {
-                // Notify the outer function that the task is ready.
-                let _ = router.send(());
-
-                let result = $logic;
-
-                // Unregister the task from the environment.
-                $E::resources().deregister(resource_id);
-
-                result
-            }),
-        );
-
-        // Wait until the task is ready.
-        let _ = handler.await;
-    }};
-
-    // Spawns a new task, with a task ID, using a custom executor.
-    ($E:ident, $logic:expr) => {{ $crate::spawn_task!($E, { $logic }) }};
-}
-
-#[macro_export]
 macro_rules! spawn_task_loop {
     // Spawns a new task, without a task ID, using a custom executor.
     ($E:ident, $logic:block) => {{
