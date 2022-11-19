@@ -64,7 +64,7 @@ pub struct Start {
     pub norest: bool,
 
     /// Specify the verbosity of the node [options: 0, 1, 2, 3, 4]
-    #[clap(default_value = "2", long = "verbosity")]
+    #[clap(default_value = "1", long = "verbosity")]
     pub verbosity: u8,
     /// If the flag is set, the node will not render the display.
     #[clap(long)]
