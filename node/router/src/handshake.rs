@@ -239,9 +239,12 @@ impl<N: Network> Router<N> {
         let ChallengeResponse { header } = message;
 
         // Perform the deferred non-blocking deserialization of the block header.
-        let Ok(block_header) = header.deserialize().await else {
-            warn!("Handshake with {peer_addr} failed (cannot deserialize the block header)");
-            return Some(DisconnectReason::InvalidChallengeResponse);
+        let block_header = match header.deserialize().await {
+            Ok(block_header) => block_header,
+            Err(_) => {
+                warn!("Handshake with {peer_addr} failed (cannot deserialize the block header)");
+                return Some(DisconnectReason::InvalidChallengeResponse);
+            }
         };
 
         // Verify the challenge response, by checking that the block header matches.
