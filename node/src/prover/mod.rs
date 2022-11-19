@@ -38,6 +38,7 @@ use snarkvm::prelude::{
 };
 
 use anyhow::Result;
+use colored::Colorize;
 use core::{marker::PhantomData, time::Duration};
 use rand::Rng;
 use std::{
@@ -277,10 +278,14 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         // If the latest epoch challenge and latest block exists, then generate a prover solution.
         if let (Some(epoch_challenge), Some(block)) = (latest_epoch_challenge, latest_block) {
             trace!(
-                "Proving 'CoinbasePuzzle' (Epoch {}, Coinbase Target {}, Proof Target {})",
-                epoch_challenge.epoch_number(),
-                block.coinbase_target(),
-                block.proof_target(),
+                "Proving 'CoinbasePuzzle' {}",
+                format!(
+                    "(Epoch {}, Coinbase Target {}, Proof Target {})",
+                    epoch_challenge.epoch_number(),
+                    block.coinbase_target(),
+                    block.proof_target()
+                )
+                .dimmed()
             );
 
             // Compute the prover solution.
