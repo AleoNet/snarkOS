@@ -120,9 +120,6 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Executor for Prover<N, C> {
-    /// The node type.
-    const NODE_TYPE: NodeType = NodeType::Prover;
-
     /// Disconnects from peers and shuts down the node.
     async fn shut_down(&self) {
         // Update the node status.
@@ -150,7 +147,7 @@ impl<N: Network, C: ConsensusStorage<N>> Executor for Prover<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
-        Self::NODE_TYPE
+        self.router.node_type()
     }
 
     /// Returns the account private key of the node.

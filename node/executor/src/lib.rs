@@ -40,14 +40,6 @@ use std::sync::Arc;
 
 #[async_trait]
 pub trait Executor: 'static + Clone + Send + Sync {
-    /// The node type.
-    const NODE_TYPE: NodeType;
-
-    /// Returns the node type.
-    fn node_type() -> NodeType {
-        Self::NODE_TYPE
-    }
-
     /// Returns the status of the node.
     fn status() -> &'static RawStatus {
         static STATUS: OnceCell<RawStatus> = OnceCell::new();

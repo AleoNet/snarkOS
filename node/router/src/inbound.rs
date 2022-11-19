@@ -345,8 +345,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             let message = Message::Ping(Ping {
                 version: Message::<N>::VERSION,
                 fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
-                node_type: self_clone.router().node_type,
-                status: self_clone.router().status.get(),
+                node_type: self_clone.router().node_type(),
+                status: self_clone.router().status(),
             });
 
             // Send a `Ping` message to the peer.

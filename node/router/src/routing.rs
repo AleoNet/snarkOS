@@ -59,7 +59,7 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
     /// TODO (howardwu): Change this for Phase 3.
     /// Initialize a new instance of the puzzle request.
     fn initialize_puzzle_request(&self) {
-        if self.router().node_type.is_prover() && Self::PUZZLE_REQUEST_IN_SECS > 0 {
+        if self.router().node_type().is_prover() && Self::PUZZLE_REQUEST_IN_SECS > 0 {
             let self_clone = self.clone();
             self.router().spawn(async move {
                 loop {
@@ -70,7 +70,7 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
                 }
             });
         }
-        if !self.router().node_type.is_beacon() && Self::PUZZLE_REQUEST_IN_SECS > 0 {
+        if !self.router().node_type().is_beacon() && Self::PUZZLE_REQUEST_IN_SECS > 0 {
             let self_clone = self.clone();
             self.router().spawn(async move {
                 loop {
@@ -91,8 +91,8 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
             loop {
                 // Prepare the report.
                 let mut report = std::collections::HashMap::new();
-                report.insert("node_address".to_string(), self_clone.router().address.to_string());
-                report.insert("node_type".to_string(), self_clone.router().node_type.to_string());
+                report.insert("node_address".to_string(), self_clone.router().address().to_string());
+                report.insert("node_type".to_string(), self_clone.router().node_type().to_string());
                 // Transmit the report.
                 if reqwest::Client::new().post(url).json(&report).send().await.is_err() {
                     warn!("Failed to send report");

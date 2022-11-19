@@ -149,8 +149,13 @@ impl<N: Network> Router<N> {
         self.insert_restricted_peer(peer_ip);
     }
 
+    /// Returns the node type.
+    pub const fn node_type(&self) -> NodeType {
+        self.node_type
+    }
+
     /// Returns the Aleo address of the node.
-    pub fn address(&self) -> Address<N> {
+    pub const fn address(&self) -> Address<N> {
         self.address
     }
 

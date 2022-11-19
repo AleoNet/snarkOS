@@ -128,9 +128,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Executor for Validator<N, C> {
-    /// The node type.
-    const NODE_TYPE: NodeType = NodeType::Validator;
-
     /// Disconnects from peers and shuts down the node.
     async fn shut_down(&self) {
         // Update the node status.
@@ -154,7 +151,7 @@ impl<N: Network, C: ConsensusStorage<N>> Executor for Validator<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
-        Self::NODE_TYPE
+        self.router.node_type()
     }
 
     /// Returns the account private key of the node.

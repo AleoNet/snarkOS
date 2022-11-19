@@ -101,9 +101,6 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Executor for Client<N, C> {
-    /// The node type.
-    const NODE_TYPE: NodeType = NodeType::Client;
-
     /// Disconnects from peers and shuts down the node.
     async fn shut_down(&self) {
         // Update the node status.
@@ -123,7 +120,7 @@ impl<N: Network, C: ConsensusStorage<N>> Executor for Client<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Client<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
-        Self::NODE_TYPE
+        self.router.node_type()
     }
 
     /// Returns the account private key of the node.

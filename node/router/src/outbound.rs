@@ -29,7 +29,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     fn send_puzzle_request(&self) {
         // TODO (howardwu): Change this logic for Phase 3.
         // Retrieve a bootstrap peer.
-        let bootstrap_ip = match self.router().node_type.is_validator() {
+        let bootstrap_ip = match self.router().node_type().is_validator() {
             true => self.router().connected_beacons().first().copied(),
             false => self.router().connected_bootstrap_peers().first().copied(),
         };
