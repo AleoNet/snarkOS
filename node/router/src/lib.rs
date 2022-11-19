@@ -250,9 +250,12 @@ impl<N: Network> Router<N> {
 
     /// Returns the list of bootstrap peers.
     pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
-        // If the node is in development mode, return an empty list of bootstrap peers.
         if self.is_dev {
-            vec![SocketAddr::from(([127, 0, 0, 1], 4130))]
+            // In development mode, connect to the dedicated local beacon.
+            match self.node_type.is_beacon() {
+                true => vec![],
+                false => vec![SocketAddr::from(([127, 0, 0, 1], 4130))],
+            }
         } else {
             // TODO (howardwu): Change this for Phase 3.
             vec![

@@ -161,7 +161,9 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             // Initialize an RNG.
             let rng = &mut OsRng::default();
             // Attempt to connect to a bootstrap peer.
-            self.router().connect(*self.router().bootstrap_peers().choose(rng).unwrap()).await;
+            for peer_ip in self.router().bootstrap_peers().into_iter().choose(rng) {
+                self.router().connect(peer_ip).await;
+            }
         }
 
         // Determine if the node is connected to more beacons than allowed.
