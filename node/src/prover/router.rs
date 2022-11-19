@@ -18,17 +18,16 @@ use super::*;
 
 use snarkos_node_messages::{DisconnectReason, Message, MessageCodec};
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake, Writing},
+    protocols::{Disconnect, Handshake, Reading, Writing},
     Connection,
     ConnectionSide,
     Tcp,
+    P2P,
 };
 use snarkvm::prelude::Network;
 
 use core::time::Duration;
 use rand::Rng;
-use snarkos_node_router::Routes;
-use snarkos_node_tcp::{protocols::Reading, P2P};
 use std::{io, net::SocketAddr, sync::atomic::Ordering, time::Instant};
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Prover<N, C> {
@@ -89,22 +88,27 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Prover<N, C> {
             warn!("Disconnecting from '{peer_ip}' (violated protocol)");
             self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
             // Disconnect from this peer.
-            let _disconnected = self.tcp().disconnect(peer_ip).await;
-            debug_assert!(_disconnected);
-            // Restrict this peer to prevent reconnection.
-            self.router().insert_restricted_peer(peer_ip);
+            self.router().disconnect(peer_ip).await;
         }
         Ok(())
     }
 }
 
 #[async_trait]
-impl<N: Network, C: ConsensusStorage<N>> Routes<N> for Prover<N, C> {
+impl<N: Network, C: ConsensusStorage<N>> Routing<N> for Prover<N, C> {}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Heartbeat<N> for Prover<N, C> {}
+
+impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Prover<N, C> {
     /// Returns a reference to the router.
     fn router(&self) -> &Router<N> {
         &self.router
     }
+}
 
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
     /// Saves the latest epoch challenge and latest block in the prover.
     async fn puzzle_response(&self, peer_ip: SocketAddr, message: PuzzleResponse<N>) -> bool {
         let epoch_challenge = message.epoch_challenge;

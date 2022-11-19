@@ -30,7 +30,7 @@ use snarkos_node_messages::{
     UnconfirmedTransaction,
 };
 use snarkos_node_rest::Rest;
-use snarkos_node_router::{Router, Routes};
+use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_store::ConsensusDB;
 use snarkos_node_tcp::protocols::{Disconnect, Handshake, Reading, Writing};
 use snarkvm::prelude::{
@@ -151,8 +151,8 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
             unspent_records: Arc::new(RwLock::new(unspent_records)),
             shutdown: Default::default(),
         };
-        // Initialize the routes.
-        node.initialize_routes().await;
+        // Initialize the routing.
+        node.initialize_routing().await;
         // Initialize the block production.
         node.initialize_block_production().await;
         // Initialize the signal handler.

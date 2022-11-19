@@ -16,7 +16,7 @@
 
 use snarkos_node_executor::{NodeType, Status};
 use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec};
-use snarkos_node_router::Routes;
+use snarkos_node_router::Routing;
 use snarkos_node_tcp::{protocols::Handshake, Config, Connection, Tcp, P2P};
 use snarkvm::prelude::{Block, FromBytes, Network, Testnet3 as CurrentNetwork};
 

@@ -22,7 +22,7 @@ use snarkos_node_executor::{Executor, NodeType, RawStatus, Status};
 use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
-use snarkos_node_router::{Router, Routes};
+use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::protocols::{Disconnect, Handshake, Reading, Writing};
 use snarkvm::prelude::{
     Address,
@@ -104,8 +104,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             latest_block: Default::default(),
             latest_puzzle_response: Default::default(),
         };
-        // Initialize the routes.
-        node.initialize_routes().await;
+        // Initialize the routing.
+        node.initialize_routing().await;
         // Initialize the signal handler.
         node.handle_signals();
         // Return the node.

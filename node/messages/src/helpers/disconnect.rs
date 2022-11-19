@@ -35,6 +35,8 @@ pub enum DisconnectReason {
     OutdatedClientVersion,
     /// Dropping a dead connection.
     PeerHasDisconnected,
+    /// Dropping a connection for a periodic refresh.
+    PeerRefresh,
     /// The node is shutting down.
     ShuttingDown,
     /// The sync node has served its purpose.

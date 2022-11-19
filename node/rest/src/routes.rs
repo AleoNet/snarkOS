@@ -25,7 +25,7 @@ struct BlockRange {
     end: u32,
 }
 
-impl<N: Network, C: ConsensusStorage<N>, T: Routes<N>> Rest<N, C, T> {
+impl<N: Network, C: ConsensusStorage<N>, T: Routing<N>> Rest<N, C, T> {
     /// Initializes the routes, given the ledger and ledger sender.
     pub fn routes(&self) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
         // GET /testnet3/latest/height
@@ -213,7 +213,7 @@ impl<N: Network, C: ConsensusStorage<N>, T: Routes<N>> Rest<N, C, T> {
     }
 }
 
-impl<N: Network, C: ConsensusStorage<N>, T: Routes<N>> Rest<N, C, T> {
+impl<N: Network, C: ConsensusStorage<N>, T: Routing<N>> Rest<N, C, T> {
     /// Returns the latest block height.
     async fn latest_height(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.latest_height()))

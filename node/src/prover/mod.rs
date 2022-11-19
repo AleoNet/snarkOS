@@ -20,7 +20,7 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_executor::{spawn_task, spawn_task_loop, Executor, NodeType, RawStatus, Status};
 use snarkos_node_messages::{Data, Message, PuzzleResponse, UnconfirmedSolution};
-use snarkos_node_router::{Router, Routes};
+use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::protocols::{Disconnect, Handshake, Reading, Writing};
 use snarkvm::prelude::{
     Address,
@@ -89,8 +89,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             puzzle_instances: Default::default(),
             _phantom: Default::default(),
         };
-        // Initialize the routes.
-        node.initialize_routes().await;
+        // Initialize the routing.
+        node.initialize_routing().await;
         // Initialize the coinbase puzzle.
         for _ in 0..3 {
             node.initialize_coinbase_puzzle().await;

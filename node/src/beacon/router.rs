@@ -26,8 +26,9 @@ use snarkos_node_tcp::{
 use snarkvm::prelude::Network;
 
 use core::time::Duration;
+use futures_util::SinkExt;
 use rand::Rng;
-use snarkos_node_router::Routes;
+use snarkos_node_router::Routing;
 use snarkos_node_tcp::{protocols::Reading, P2P};
 use std::{io, net::SocketAddr, sync::atomic::Ordering, time::Instant};
 
@@ -89,25 +90,30 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Beacon<N, C> {
             warn!("Disconnecting from '{peer_ip}' (violated protocol)");
             self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
             // Disconnect from this peer.
-            let _disconnected = self.tcp().disconnect(peer_ip).await;
-            debug_assert!(_disconnected);
-            // Restrict this peer to prevent reconnection.
-            self.router().insert_restricted_peer(peer_ip);
+            self.router().disconnect(peer_ip).await;
         }
         Ok(())
     }
 }
 
 #[async_trait]
-impl<N: Network, C: ConsensusStorage<N>> Routes<N> for Beacon<N, C> {
+impl<N: Network, C: ConsensusStorage<N>> Routing<N> for Beacon<N, C> {}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Heartbeat<N> for Beacon<N, C> {
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 10;
+}
 
+impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Beacon<N, C> {
     /// Returns a reference to the router.
     fn router(&self) -> &Router<N> {
         &self.router
     }
+}
 
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
     /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
     async fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
         // Retrieve the latest epoch challenge and latest block.

@@ -28,7 +28,7 @@ pub use routes::*;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
-use snarkos_node_router::{Router, Routes};
+use snarkos_node_router::{Router, Routing};
 use snarkvm::{
     console::{account::Address, program::ProgramID, types::Field},
     prelude::{cfg_into_iter, Network},
@@ -45,7 +45,7 @@ use warp::{reject, reply, Filter, Rejection, Reply};
 
 /// A REST API server for the ledger.
 #[derive(Clone)]
-pub struct Rest<N: Network, C: ConsensusStorage<N>, T: Routes<N>> {
+pub struct Rest<N: Network, C: ConsensusStorage<N>, T: Routing<N>> {
     /// The node address.
     address: Address<N>,
     /// The consensus module.
@@ -57,7 +57,7 @@ pub struct Rest<N: Network, C: ConsensusStorage<N>, T: Routes<N>> {
     handles: Vec<Arc<JoinHandle<()>>>,
 }
 
-impl<N: Network, C: 'static + ConsensusStorage<N>, T: Routes<N>> Rest<N, C, T> {
+impl<N: Network, C: 'static + ConsensusStorage<N>, T: Routing<N>> Rest<N, C, T> {
     /// Initializes a new instance of the server.
     pub fn start(
         rest_ip: SocketAddr,
@@ -75,7 +75,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>, T: Routes<N>> Rest<N, C, T> {
     }
 }
 
-impl<N: Network, C: ConsensusStorage<N>, T: Routes<N>> Rest<N, C, T> {
+impl<N: Network, C: ConsensusStorage<N>, T: Routing<N>> Rest<N, C, T> {
     /// Returns the ledger.
     pub const fn ledger(&self) -> &Ledger<N, C> {
         &self.ledger
@@ -87,7 +87,7 @@ impl<N: Network, C: ConsensusStorage<N>, T: Routes<N>> Rest<N, C, T> {
     }
 }
 
-impl<N: Network, C: 'static + ConsensusStorage<N>, T: Routes<N>> Rest<N, C, T> {
+impl<N: Network, C: 'static + ConsensusStorage<N>, T: Routing<N>> Rest<N, C, T> {
     /// Initializes the server.
     fn spawn_server(&mut self, rest_ip: SocketAddr) {
         let cors = warp::cors()

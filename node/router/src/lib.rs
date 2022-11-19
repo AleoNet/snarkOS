@@ -27,8 +27,8 @@ pub use helpers::*;
 mod handshake;
 pub use handshake::*;
 
-mod routes;
-pub use routes::*;
+mod routing;
+pub use routing::*;
 
 use snarkos_node_executor::{NodeType, RawStatus, Status};
 use snarkos_node_messages::*;
@@ -62,6 +62,8 @@ pub struct Router<N: Network> {
     address: Address<N>,
     /// The node's current state.
     status: RawStatus,
+    /// The cache.
+    cache: Cache<N>,
     /// The set of trusted peers.
     trusted_peers: Arc<IndexSet<SocketAddr>>,
     /// The map of connected peer IPs to their peer handlers.
@@ -70,8 +72,6 @@ pub struct Router<N: Network> {
     candidate_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of restricted peer IPs.
     restricted_peers: Arc<RwLock<IndexMap<SocketAddr, Instant>>>,
-    /// The cache.
-    cache: Cache<N>,
 }
 
 #[rustfmt::skip]
@@ -113,12 +113,35 @@ impl<N: Network> Router<N> {
             node_type,
             address,
             status: RawStatus::new(),
+            cache: Default::default(),
             trusted_peers: Arc::new(trusted_peers.iter().copied().collect()),
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
-            cache: Default::default(),
         })
+    }
+
+    /// Attempts to connect to the given peer IP.
+    pub async fn connect(&self, peer_ip: SocketAddr) {
+        // Attempt to connect to the candidate peer.
+        if let Err(error) = self.tcp.connect(peer_ip).await {
+            warn!("Failed to connect to '{peer_ip}': {error}");
+            // Restrict the peer, if the connection was not successful and is not a trusted peer.
+            if !self.trusted_peers.contains(&peer_ip) {
+                self.insert_restricted_peer(peer_ip);
+            }
+        }
+        // Remove the peer from the candidate peers.
+        self.remove_candidate_peer(peer_ip);
+    }
+
+    /// Disconnects from the given peer IP, if the peer is connected.
+    pub async fn disconnect(&self, peer_ip: SocketAddr) {
+        // Disconnect from this peer.
+        let _disconnected = self.tcp.disconnect(peer_ip).await;
+        debug_assert!(_disconnected);
+        // Restrict this peer to prevent reconnection.
+        self.insert_restricted_peer(peer_ip);
     }
 
     /// Returns the status.
@@ -170,6 +193,11 @@ impl<N: Network> Router<N> {
         self.restricted_peers.read().len()
     }
 
+    /// Returns the list of connected peers with their peer objects.
+    pub fn connected_peers_inner(&self) -> IndexMap<SocketAddr, Peer> {
+        self.connected_peers.read().clone()
+    }
+
     /// Returns the list of connected peers.
     pub fn connected_peers(&self) -> Vec<SocketAddr> {
         self.connected_peers.read().keys().copied().collect()
@@ -217,11 +245,11 @@ impl<N: Network> Router<N> {
     /// Inserts the given peer into the connected peers.
     pub fn insert_connected_peer(&self, peer: Peer) {
         // Add an entry for this `Peer` in the connected peers.
-        self.connected_peers.write().insert(*peer.ip(), peer.clone());
+        self.connected_peers.write().insert(peer.ip(), peer.clone());
         // Remove this peer from the candidate peers, if it exists.
-        self.candidate_peers.write().remove(peer.ip());
+        self.candidate_peers.write().remove(&peer.ip());
         // Remove this peer from the restricted peers, if it exists.
-        self.restricted_peers.write().remove(peer.ip());
+        self.restricted_peers.write().remove(&peer.ip());
     }
 
     /// Inserts the given peer IPs to the set of candidate peers.

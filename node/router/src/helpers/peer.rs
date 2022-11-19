@@ -65,8 +65,8 @@ impl Peer {
     }
 
     /// Returns the IP address of the peer, with the port set to the listener port.
-    pub fn ip(&self) -> &SocketAddr {
-        &self.listening_addr
+    pub fn ip(&self) -> SocketAddr {
+        self.listening_addr
     }
 
     /// Returns the last seen timestamp of the peer.

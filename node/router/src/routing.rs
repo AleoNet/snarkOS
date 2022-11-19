@@ -33,17 +33,9 @@ use std::{
 };
 
 #[async_trait]
-pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<Message = Message<N>> {
-    /// The minimum number of peers required to maintain connections with.
-    const MINIMUM_NUMBER_OF_PEERS: usize = 1;
-    /// The maximum number of peers permitted to maintain connections with.
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
-
-    /// Returns a reference to the router.
-    fn router(&self) -> &Router<N>;
-
-    /// Initialize the routes.
-    async fn initialize_routes(&self) {
+pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbound<N> + Heartbeat<N> {
+    /// Initialize the routing.
+    async fn initialize_routing(&self) {
         // Enable the TCP protocols.
         self.enable_handshake().await;
         self.enable_reading().await;
@@ -104,155 +96,10 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
             }
         });
     }
+}
 
-    /// Sends a "PuzzleRequest" to a reliable peer.
-    fn send_puzzle_request(&self, node_type: NodeType) {
-        // TODO (howardwu): Change this logic for Phase 3.
-        // Retrieve a reliable peer.
-        let reliable_peer = match node_type.is_validator() {
-            true => self.router().connected_beacons().first().copied(),
-            false => self.router().reliable_peers().first().copied(),
-        };
-        // If a reliable peer exists, send a "PuzzleRequest" to it.
-        if let Some(reliable_peer) = reliable_peer {
-            // Send the "PuzzleRequest" to the reliable peer.
-            self.send(reliable_peer, Message::PuzzleRequest(PuzzleRequest));
-        } else {
-            warn!("[PuzzleRequest] There are no reliable peers available yet");
-        }
-    }
-
-    /// Sends the given message to specified peer.
-    fn send(&self, peer_ip: SocketAddr, message: Message<N>) {
-        // Determine whether to send the message.
-        if !self.should_send(peer_ip, &message) {
-            return;
-        }
-        // Ensure the peer is connected before sending.
-        if !self.router().is_connected(&peer_ip) {
-            warn!("Attempted to send to a non-connected peer {peer_ip}");
-            return;
-        }
-        // Retrieve the message name.
-        let name = message.name().to_string();
-        // Send the message to the peer.
-        trace!("Sending '{name}' to '{peer_ip}'");
-        if let Err(error) = self.unicast(peer_ip, message) {
-            trace!("Failed to send '{name}' to '{peer_ip}': {error}");
-        }
-    }
-
-    /// Sends the given message to every connected peer, excluding the sender and any specified peer IPs.
-    fn propagate(&self, mut message: Message<N>, excluded_peers: Vec<SocketAddr>) {
-        /// TODO (howardwu): Serialize large messages once only.
-        // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
-        // if let Message::UnconfirmedBlock(ref mut message) = message {
-        //     if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
-        //         let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
-        //     } else {
-        //         error!("Block serialization is bugged");
-        //     }
-        // } else if let Message::UnconfirmedSolution(ref mut message) = message {
-        //     if let Ok(serialized_solution) = Data::serialize(message.solution.clone()).await {
-        //         let _ = std::mem::replace(&mut message.solution, Data::Buffer(serialized_solution));
-        //     } else {
-        //         error!("Solution serialization is bugged");
-        //     }
-        // } else if let Message::UnconfirmedTransaction(ref mut message) = message {
-        //     if let Ok(serialized_transaction) = Data::serialize(message.transaction.clone()).await {
-        //         let _ = std::mem::replace(&mut message.transaction, Data::Buffer(serialized_transaction));
-        //     } else {
-        //         error!("Transaction serialization is bugged");
-        //     }
-        // }
-
-        // Prepare the peers to send to.
-        let peers = self
-            .router()
-            .connected_peers()
-            .iter()
-            .filter(|peer_ip| !self.router().is_local_ip(peer_ip) && !excluded_peers.contains(peer_ip))
-            .copied()
-            .collect::<Vec<_>>();
-
-        // Iterate through all peers that are not the sender and excluded peers.
-        for peer_ip in peers {
-            self.send(peer_ip, message.clone());
-        }
-    }
-
-    /// Sends the given message to every connected beacon, excluding the sender and any specified beacon IPs.
-    fn propagate_to_beacons(&self, mut message: Message<N>, excluded_beacons: Vec<SocketAddr>) {
-        /// TODO (howardwu): Serialize large messages once only.
-        // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
-        // if let Message::UnconfirmedBlock(ref mut message) = message {
-        //     if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
-        //         let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
-        //     } else {
-        //         error!("Block serialization is bugged");
-        //     }
-        // } else if let Message::UnconfirmedSolution(ref mut message) = message {
-        //     if let Ok(serialized_solution) = Data::serialize(message.solution.clone()).await {
-        //         let _ = std::mem::replace(&mut message.solution, Data::Buffer(serialized_solution));
-        //     } else {
-        //         error!("Solution serialization is bugged");
-        //     }
-        // } else if let Message::UnconfirmedTransaction(ref mut message) = message {
-        //     if let Ok(serialized_transaction) = Data::serialize(message.transaction.clone()).await {
-        //         let _ = std::mem::replace(&mut message.transaction, Data::Buffer(serialized_transaction));
-        //     } else {
-        //         error!("Transaction serialization is bugged");
-        //     }
-        // }
-
-        // Prepare the peers to send to.
-        let peers = self
-            .router()
-            .connected_beacons()
-            .iter()
-            .filter(|peer_ip| !self.router().is_local_ip(peer_ip) && !excluded_beacons.contains(peer_ip))
-            .copied()
-            .collect::<Vec<_>>();
-
-        // Iterate through all beacons that are not the sender and excluded beacons.
-        for peer_ip in peers {
-            self.send(peer_ip, message.clone());
-        }
-    }
-
-    /// Returns `true` if the message should be sent.
-    fn should_send(&self, peer_ip: SocketAddr, message: &Message<N>) -> bool {
-        // Determine whether to send the message.
-        let should_send = match message {
-            Message::UnconfirmedBlock(message) => {
-                // Update the timestamp for the unconfirmed block.
-                let seen_before = self.router().cache.insert_outbound_block(message.block_hash).is_some();
-                // Determine whether to send the block.
-                !seen_before
-            }
-            Message::UnconfirmedSolution(message) => {
-                // Update the timestamp for the unconfirmed solution.
-                let seen_before = self.router().cache.insert_outbound_solution(message.puzzle_commitment).is_some();
-                // Determine whether to send the solution.
-                !seen_before
-            }
-            Message::UnconfirmedTransaction(message) => {
-                // Update the timestamp for the unconfirmed transaction.
-                let seen_before = self.router().cache.insert_outbound_transaction(message.transaction_id).is_some();
-                // Determine whether to send the transaction.
-                !seen_before
-            }
-            // For all other message types, return `true`.
-            _ => true,
-        };
-        // If the message should be sent and the message type is a puzzle request, increment the cache.
-        if should_send && matches!(message, Message::PuzzleRequest(_)) {
-            self.router().cache.increment_outbound_puzzle_requests(peer_ip);
-        }
-        // Return whether the message should be sent.
-        should_send
-    }
-
+#[async_trait]
+pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// Handles the message from the peer.
     async fn handle_message(&self, peer_ip: SocketAddr, message: Message<N>) -> bool {
         // Drop the peer, if they have sent more than 50 messages in the last 5 seconds.
@@ -617,10 +464,175 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
         self.propagate(Message::UnconfirmedTransaction(message), vec![peer_ip]);
         true
     }
+}
+
+pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
+    /// Returns a reference to the router.
+    fn router(&self) -> &Router<N>;
+
+    /// Sends a "PuzzleRequest" to a reliable peer.
+    fn send_puzzle_request(&self, node_type: NodeType) {
+        // TODO (howardwu): Change this logic for Phase 3.
+        // Retrieve a reliable peer.
+        let reliable_peer = match node_type.is_validator() {
+            true => self.router().connected_beacons().first().copied(),
+            false => self.router().reliable_peers().first().copied(),
+        };
+        // If a reliable peer exists, send a "PuzzleRequest" to it.
+        if let Some(reliable_peer) = reliable_peer {
+            // Send the "PuzzleRequest" to the reliable peer.
+            self.send(reliable_peer, Message::PuzzleRequest(PuzzleRequest));
+        } else {
+            warn!("[PuzzleRequest] There are no reliable peers available yet");
+        }
+    }
+
+    /// Sends the given message to specified peer.
+    fn send(&self, peer_ip: SocketAddr, message: Message<N>) {
+        // Determine whether to send the message.
+        if !self.should_send(peer_ip, &message) {
+            return;
+        }
+        // Ensure the peer is connected before sending.
+        if !self.router().is_connected(&peer_ip) {
+            warn!("Attempted to send to a non-connected peer {peer_ip}");
+            return;
+        }
+        // Retrieve the message name.
+        let name = message.name().to_string();
+        // Send the message to the peer.
+        trace!("Sending '{name}' to '{peer_ip}'");
+        if let Err(error) = self.unicast(peer_ip, message) {
+            trace!("Failed to send '{name}' to '{peer_ip}': {error}");
+        }
+    }
+
+    /// Sends the given message to every connected peer, excluding the sender and any specified peer IPs.
+    fn propagate(&self, mut message: Message<N>, excluded_peers: Vec<SocketAddr>) {
+        /// TODO (howardwu): Serialize large messages once only.
+        // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
+        // if let Message::UnconfirmedBlock(ref mut message) = message {
+        //     if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
+        //         let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
+        //     } else {
+        //         error!("Block serialization is bugged");
+        //     }
+        // } else if let Message::UnconfirmedSolution(ref mut message) = message {
+        //     if let Ok(serialized_solution) = Data::serialize(message.solution.clone()).await {
+        //         let _ = std::mem::replace(&mut message.solution, Data::Buffer(serialized_solution));
+        //     } else {
+        //         error!("Solution serialization is bugged");
+        //     }
+        // } else if let Message::UnconfirmedTransaction(ref mut message) = message {
+        //     if let Ok(serialized_transaction) = Data::serialize(message.transaction.clone()).await {
+        //         let _ = std::mem::replace(&mut message.transaction, Data::Buffer(serialized_transaction));
+        //     } else {
+        //         error!("Transaction serialization is bugged");
+        //     }
+        // }
+
+        // Prepare the peers to send to.
+        let peers = self
+            .router()
+            .connected_peers()
+            .iter()
+            .filter(|peer_ip| !self.router().is_local_ip(peer_ip) && !excluded_peers.contains(peer_ip))
+            .copied()
+            .collect::<Vec<_>>();
+
+        // Iterate through all peers that are not the sender and excluded peers.
+        for peer_ip in peers {
+            self.send(peer_ip, message.clone());
+        }
+    }
+
+    /// Sends the given message to every connected beacon, excluding the sender and any specified beacon IPs.
+    fn propagate_to_beacons(&self, mut message: Message<N>, excluded_beacons: Vec<SocketAddr>) {
+        /// TODO (howardwu): Serialize large messages once only.
+        // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
+        // if let Message::UnconfirmedBlock(ref mut message) = message {
+        //     if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
+        //         let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
+        //     } else {
+        //         error!("Block serialization is bugged");
+        //     }
+        // } else if let Message::UnconfirmedSolution(ref mut message) = message {
+        //     if let Ok(serialized_solution) = Data::serialize(message.solution.clone()).await {
+        //         let _ = std::mem::replace(&mut message.solution, Data::Buffer(serialized_solution));
+        //     } else {
+        //         error!("Solution serialization is bugged");
+        //     }
+        // } else if let Message::UnconfirmedTransaction(ref mut message) = message {
+        //     if let Ok(serialized_transaction) = Data::serialize(message.transaction.clone()).await {
+        //         let _ = std::mem::replace(&mut message.transaction, Data::Buffer(serialized_transaction));
+        //     } else {
+        //         error!("Transaction serialization is bugged");
+        //     }
+        // }
+
+        // Prepare the peers to send to.
+        let peers = self
+            .router()
+            .connected_beacons()
+            .iter()
+            .filter(|peer_ip| !self.router().is_local_ip(peer_ip) && !excluded_beacons.contains(peer_ip))
+            .copied()
+            .collect::<Vec<_>>();
+
+        // Iterate through all beacons that are not the sender and excluded beacons.
+        for peer_ip in peers {
+            self.send(peer_ip, message.clone());
+        }
+    }
+
+    /// Returns `true` if the message should be sent.
+    fn should_send(&self, peer_ip: SocketAddr, message: &Message<N>) -> bool {
+        // Determine whether to send the message.
+        let should_send = match message {
+            Message::UnconfirmedBlock(message) => {
+                // Update the timestamp for the unconfirmed block.
+                let seen_before = self.router().cache.insert_outbound_block(message.block_hash).is_some();
+                // Determine whether to send the block.
+                !seen_before
+            }
+            Message::UnconfirmedSolution(message) => {
+                // Update the timestamp for the unconfirmed solution.
+                let seen_before = self.router().cache.insert_outbound_solution(message.puzzle_commitment).is_some();
+                // Determine whether to send the solution.
+                !seen_before
+            }
+            Message::UnconfirmedTransaction(message) => {
+                // Update the timestamp for the unconfirmed transaction.
+                let seen_before = self.router().cache.insert_outbound_transaction(message.transaction_id).is_some();
+                // Determine whether to send the transaction.
+                !seen_before
+            }
+            // For all other message types, return `true`.
+            _ => true,
+        };
+        // If the message should be sent and the message type is a puzzle request, increment the cache.
+        if should_send && matches!(message, Message::PuzzleRequest(_)) {
+            self.router().cache.increment_outbound_puzzle_requests(peer_ip);
+        }
+        // Return whether the message should be sent.
+        should_send
+    }
+}
+
+#[async_trait]
+pub trait Heartbeat<N: Network>: Outbound<N> {
+    /// The minimum number of peers required to maintain connections with.
+    const MINIMUM_NUMBER_OF_PEERS: usize = 1;
+    /// The maximum number of peers permitted to maintain connections with.
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
 
     /// Handles the heartbeat request.
     async fn heartbeat(&self) {
-        debug!("Peers: {:?}", self.router().connected_peers());
+        assert!(Self::MINIMUM_NUMBER_OF_PEERS <= Self::MAXIMUM_NUMBER_OF_PEERS);
+
+        // Log the connected peers.
+        let connected_peers = self.router().connected_peers();
+        debug!("{} connected peers: {connected_peers:?}", connected_peers.len());
 
         // TODO (howardwu): Remove this in Phase 3.
         if self.router().node_type.is_beacon() {
@@ -630,112 +642,131 @@ pub trait Routes<N: Network>: P2P + Disconnect + Handshake + Reading + Writing<M
                     info!("Disconnecting from '{peer_ip}' (exceeded maximum connections)");
                     self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers.into()));
                     // Disconnect from this peer.
-                    let _disconnected = self.router().tcp.disconnect(peer_ip).await;
-                    debug_assert!(_disconnected);
-                    // Restrict this peer to prevent reconnection.
-                    self.router().insert_restricted_peer(peer_ip);
+                    self.router().disconnect(peer_ip).await;
                 }
             }
         }
 
+        // Remove the oldest connected peer.
+        self.remove_oldest_connected_peer().await;
+        // Remove any stale connected peers.
+        self.remove_stale_connected_peers().await;
+        // Keep the number of connected beacons within the allowed range.
+        self.handle_connected_beacons().await;
+        // Keep the number of connected peers within the allowed range.
+        self.handle_connected_peers().await;
+        // Keep the trusted peers connected.
+        self.handle_trusted_peers().await;
+    }
+
+    /// This function removes the oldest connected peer, to keep the connections fresh.
+    async fn remove_oldest_connected_peer(&self) {
+        // Find the oldest connected peer, if one exists.
+        let oldest = self
+            .router()
+            .connected_peers_inner()
+            .into_iter()
+            .min_by_key(|(_, peer)| peer.last_seen())
+            .map(|(peer_ip, _)| peer_ip);
+
+        // Disconnect from the oldest connected peer, if one exists.
+        if let Some(oldest) = oldest {
+            info!("Disconnecting from '{oldest}' (for a periodic refresh of peers)");
+            self.send(oldest, Message::Disconnect(DisconnectReason::PeerRefresh.into()));
+            // Disconnect from this peer.
+            self.router().disconnect(oldest).await;
+        }
+    }
+
+    /// This function removes any connected peers that have not communicated within the predefined time.
+    async fn remove_stale_connected_peers(&self) {
         // Check if any connected peer is stale.
-        let connected_peers = self.router().connected_peers.read().clone();
-        for peer in connected_peers.into_values() {
-            let peer_ip = *peer.ip();
+        for peer in self.router().connected_peers_inner().into_values() {
             // Disconnect if the peer has not communicated back within the predefined time.
-            let last_seen_elapsed = peer.last_seen().elapsed().as_secs();
-            if last_seen_elapsed > Router::<N>::RADIO_SILENCE_IN_SECS {
-                warn!("Peer {peer_ip} has not communicated in {last_seen_elapsed} seconds");
+            let elapsed = peer.last_seen().elapsed().as_secs();
+            if elapsed > Router::<N>::RADIO_SILENCE_IN_SECS {
+                warn!("Peer {} has not communicated in {elapsed} seconds", peer.ip());
                 // Disconnect from this peer.
-                let _disconnected = self.router().tcp.disconnect(peer_ip).await;
-                debug_assert!(_disconnected);
-                // Restrict this peer to prevent reconnection.
-                self.router().insert_restricted_peer(peer_ip);
+                self.router().disconnect(peer.ip()).await;
             }
         }
+    }
 
-        // Compute the number of excess peers.
-        let num_excess_peers = self.router().number_of_connected_peers().saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS);
-        // Ensure the number of connected peers is below the maximum threshold.
-        if num_excess_peers > 0 {
-            debug!("Exceeded maximum number of connected peers, disconnecting from {num_excess_peers} peers");
+    /// This function keeps the number of connected beacons within the allowed range.
+    async fn handle_connected_beacons(&self) {
+        // Determine if the node is connected to more beacons than allowed.
+        let connected_beacons = self.router().connected_beacons();
+        let num_surplus = connected_beacons.len().saturating_sub(1);
+        if num_surplus > 0 {
+            // Initialize an RNG.
+            let rng = &mut OsRng::default();
+            // Proceed to send disconnect requests to these beacons.
+            for peer_ip in connected_beacons.into_iter().choose_multiple(rng, num_surplus) {
+                info!("Disconnecting from 'beacon' {peer_ip} (exceeded maximum beacons)");
+                self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers.into()));
+                // Disconnect from this peer.
+                self.router().disconnect(peer_ip).await;
+            }
+        }
+    }
+
+    /// This function keeps the number of connected peers within the allowed range.
+    async fn handle_connected_peers(&self) {
+        // Obtain the number of connected peers.
+        let num_connected = self.router().number_of_connected_peers();
+        // Compute the number of surplus peers.
+        let num_surplus = num_connected.saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS);
+        // Compute the number of deficit peers.
+        let num_deficient = Self::MINIMUM_NUMBER_OF_PEERS.saturating_sub(num_connected);
+
+        if num_surplus > 0 {
+            debug!("Exceeded maximum number of connected peers, disconnecting from {num_surplus} peers");
+
+            // Initialize an RNG.
+            let rng = &mut OsRng::default();
+
             // Determine the peers to disconnect from.
             let peer_ips_to_disconnect = self
                 .router()
                 .connected_peers()
                 .into_iter()
-                .filter(
-                    |peer_ip| /* !E::beacon_nodes().contains(&peer_ip) && */ !self.router().trusted_peers().contains(peer_ip),
-                )
-                .take(num_excess_peers);
+                .filter(|peer_ip| !self.router().trusted_peers().contains(peer_ip))
+                .choose_multiple(rng, num_surplus);
 
             // Proceed to send disconnect requests to these peers.
             for peer_ip in peer_ips_to_disconnect {
                 info!("Disconnecting from '{peer_ip}' (exceeded maximum connections)");
                 self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers.into()));
                 // Disconnect from this peer.
-                let _disconnected = self.router().tcp.disconnect(peer_ip).await;
-                debug_assert!(_disconnected);
-                // Restrict this peer to prevent reconnection.
-                self.router().insert_restricted_peer(peer_ip);
+                self.router().disconnect(peer_ip).await;
             }
         }
 
-        // TODO (howardwu): This logic can be optimized and unified with the context around it.
-        // Determine if the node is connected to more sync nodes than allowed.
-        let connected_beacons = self.router().connected_beacons();
-        let num_excess_beacons = connected_beacons.len().saturating_sub(1);
-        if num_excess_beacons > 0 {
-            debug!("Exceeded maximum number of beacons");
+        if num_deficient > 0 {
+            trace!("Sending connection requests to {num_deficient} more peers");
 
-            // Proceed to send disconnect requests to these peers.
-            for peer_ip in connected_beacons.iter().copied().choose_multiple(&mut OsRng::default(), num_excess_beacons)
-            {
-                info!("Disconnecting from 'beacon' {peer_ip} (exceeded maximum connections)");
-                self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers.into()));
-                // Disconnect from this peer.
-                let _disconnected = self.router().tcp.disconnect(peer_ip).await;
-                debug_assert!(_disconnected);
-                // Restrict this peer to prevent reconnection.
-                self.router().insert_restricted_peer(peer_ip);
+            // Initialize an RNG.
+            let rng = &mut OsRng::default();
+
+            // Attempt to connect to more peers.
+            for peer_ip in self.router().candidate_peers().into_iter().choose_multiple(rng, num_deficient) {
+                self.router().connect(peer_ip).await;
+            }
+            // Request more peers from the connected peers.
+            for peer_ip in self.router().connected_peers().into_iter().choose_multiple(rng, 3) {
+                self.send(peer_ip, Message::PeerRequest(PeerRequest));
             }
         }
+    }
 
+    /// This function attempts to connect to any disconnected trusted peers.
+    async fn handle_trusted_peers(&self) {
         // Ensure that the trusted nodes are connected.
         for peer_ip in self.router().trusted_peers() {
             // If the peer is not connected, attempt to connect to it.
             if !self.router().is_connected(peer_ip) {
                 // Attempt to connect to the trusted peer.
-                if let Err(error) = self.router().tcp.connect(*peer_ip).await {
-                    warn!("Failed to connect to trusted peer '{peer_ip}': {error}");
-                }
-            }
-        }
-
-        // Obtain the number of connected peers.
-        let num_connected = self.router().number_of_connected_peers();
-        let num_to_connect_with = Self::MINIMUM_NUMBER_OF_PEERS.saturating_sub(num_connected);
-        // Request more peers if the number of connected peers is below the threshold.
-        if num_to_connect_with > 0 {
-            trace!("Sending requests for more peer connections");
-
-            // Request more peers from the connected peers.
-            for candidate_addr in self.router().candidate_peers().into_iter().take(num_to_connect_with) {
-                // Attempt to connect to the candidate peer.
-                let connection_succesful = self.router().tcp.connect(candidate_addr).await.is_ok();
-                // Remove the peer from the candidate peers.
-                self.router().remove_candidate_peer(candidate_addr);
-                // Restrict the peer if the connection was not successful.
-                if !connection_succesful {
-                    self.router().insert_restricted_peer(candidate_addr);
-                }
-            }
-
-            // If we have connected peers, request more addresses from them.
-            if num_connected > 0 {
-                for peer_ip in self.router().connected_peers().iter().choose_multiple(&mut OsRng::default(), 3) {
-                    self.send(*peer_ip, Message::PeerRequest(PeerRequest));
-                }
+                self.router().connect(*peer_ip).await;
             }
         }
     }
