@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Outbound, Peer, Router, ALEO_MAXIMUM_FORK_DEPTH};
+use crate::{Outbound, Peer, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_executor::RawStatus;
 use snarkos_node_messages::{
     BlockRequest,

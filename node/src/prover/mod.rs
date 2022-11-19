@@ -39,6 +39,7 @@ use snarkvm::prelude::{
 
 use anyhow::Result;
 use core::{marker::PhantomData, time::Duration};
+use parking_lot::RwLock;
 use rand::Rng;
 use std::{
     net::SocketAddr,
@@ -48,7 +49,7 @@ use std::{
     },
 };
 use time::OffsetDateTime;
-use tokio::{sync::RwLock, task::JoinHandle};
+use tokio::task::JoinHandle;
 
 /// A prover is a full node, capable of producing proofs for consensus.
 #[derive(Clone)]
@@ -126,6 +127,10 @@ impl<N: Network, C: ConsensusStorage<N>> Executor for Prover<N, C> {
         info!("Shutting down...");
         Self::status().update(Status::ShuttingDown);
 
+        // Abort the tasks.
+        trace!("Shutting down the prover...");
+        self.handles.read().iter().for_each(|handle| handle.abort());
+
         // Shut down the router.
         trace!("Shutting down the router...");
         self.router.shut_down().await;
@@ -170,7 +175,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Initialize a new instance of the coinbase puzzle.
     async fn initialize_coinbase_puzzle(&self) {
         let prover = self.clone();
-        tokio::spawn(async move {
+        self.handles.write().push(tokio::spawn(async move {
             loop {
                 // If the node is not connected to any peers, then skip this iteration.
                 if prover.router.number_of_connected_peers() == 0 {
@@ -187,9 +192,10 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 }
 
                 // If the latest block timestamp exceeds a multiple of the anchor time, then skip this iteration.
-                if let Some(latest_block) = prover.latest_block.read().await.as_ref() {
+                let latest_timestamp = prover.latest_block.read().as_ref().map(|block| block.timestamp());
+                if let Some(latest_timestamp) = latest_timestamp {
                     // Compute the elapsed time since the latest block.
-                    let elapsed = OffsetDateTime::now_utc().unix_timestamp().saturating_sub(latest_block.timestamp());
+                    let elapsed = OffsetDateTime::now_utc().unix_timestamp().saturating_sub(latest_timestamp);
                     // If the elapsed time exceeds a multiple of the anchor time, then skip this iteration.
                     if elapsed > N::ANCHOR_TIME as i64 * 6 {
                         warn!("Skipping an iteration of the prover solution (latest block is stale)");
@@ -207,7 +213,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 // Sleep briefly to give this instance a chance to clear state.
                 tokio::time::sleep(Duration::from_millis(50)).await;
             }
-        });
+        }));
     }
 
     /// Executes an instance of the coinbase puzzle.
@@ -247,9 +253,9 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Performs one iteration of the coinbase puzzle.
     async fn coinbase_puzzle_iteration(&self) -> Option<(u64, ProverSolution<N>)> {
         // Read the latest epoch challenge.
-        let latest_epoch_challenge = self.latest_epoch_challenge.read().await.clone();
+        let latest_epoch_challenge = self.latest_epoch_challenge.read().clone();
         // Read the latest block.
-        let latest_block = self.latest_block.read().await.clone();
+        let latest_block = self.latest_block.read().clone();
 
         // If the latest epoch challenge and latest block exists, then generate a prover solution.
         if let (Some(epoch_challenge), Some(block)) = (latest_epoch_challenge, latest_block) {

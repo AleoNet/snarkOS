@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Heartbeat, Inbound, Outbound, Router};
+use crate::{Heartbeat, Inbound, Outbound};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake},
     P2P,
@@ -64,7 +64,7 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
             self.router().spawn(async move {
                 loop {
                     // Handle the bootstrap peers.
-                    self_clone.handle_bootstrap_peers();
+                    self_clone.handle_bootstrap_peers().await;
                     // Sleep for brief period.
                     tokio::time::sleep(Duration::from_millis(2500)).await;
                 }

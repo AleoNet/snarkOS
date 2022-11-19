@@ -18,13 +18,10 @@ use crate::{Outbound, Router};
 use snarkos_node_messages::{DisconnectReason, Message, PeerRequest};
 use snarkvm::prelude::Network;
 
-use anyhow::bail;
-use core::str::FromStr;
 use rand::{
     prelude::{IteratorRandom, SliceRandom},
     rngs::OsRng,
 };
-use std::net::SocketAddr;
 
 #[async_trait]
 pub trait Heartbeat<N: Network>: Outbound<N> {

@@ -28,6 +28,7 @@ use std::{
 #[derive(Clone, Debug)]
 pub struct Peer {
     /// The connection side of the peer.
+    #[allow(dead_code)]
     side: ConnectionSide,
     /// The IP address of the peer, with the port set to the listener port.
     listening_addr: SocketAddr,
@@ -40,6 +41,7 @@ pub struct Peer {
     /// The node type of the peer.
     status: RawStatus,
     /// The block height of the peer.
+    #[allow(dead_code)]
     block_height: Arc<AtomicU32>,
 }
 

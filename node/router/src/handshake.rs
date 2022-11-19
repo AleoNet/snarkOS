@@ -27,7 +27,7 @@ use snarkos_node_messages::{
     MessageTrait,
     Ping,
 };
-use snarkos_node_tcp::{protocols::Handshake, Connection, ConnectionSide, Tcp, P2P};
+use snarkos_node_tcp::{ConnectionSide, Tcp, P2P};
 use snarkvm::prelude::{error, Block, FromBytes, Header, Network};
 
 use anyhow::{bail, Result};
@@ -193,7 +193,7 @@ impl<N: Network> Router<N> {
     /// Verifies the given challenge request. Returns a disconnect reason if the request is invalid.
     fn verify_challenge_request(&self, peer_addr: SocketAddr, message: &ChallengeRequest) -> Option<DisconnectReason> {
         // Retrieve the components of the challenge request.
-        let &ChallengeRequest { version, fork_depth, node_type, status: peer_status, listener_port } = message;
+        let &ChallengeRequest { version, fork_depth, node_type, status: peer_status, listener_port: _ } = message;
 
         // Ensure the message protocol version is not outdated.
         if version < Message::<N>::VERSION {

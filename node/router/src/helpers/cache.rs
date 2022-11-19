@@ -151,7 +151,7 @@ impl<N: Network> Cache<N> {
     ) -> usize {
         let mut map_write = map.write();
         // Load the entry for the key.
-        let mut timestamps = map_write.entry(key).or_default();
+        let timestamps = map_write.entry(key).or_default();
         // Fetch the current timestamp.
         let now = OffsetDateTime::now_utc();
         // Insert the new timestamp.

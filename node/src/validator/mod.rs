@@ -18,7 +18,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_executor::{Executor, NodeType, RawStatus, Status};
+use snarkos_node_executor::{Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;

@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::Router;
-use snarkos_node_executor::NodeType;
 use snarkos_node_messages::{Message, PuzzleRequest};
 use snarkos_node_tcp::protocols::Writing;
 use snarkvm::prelude::Network;
@@ -38,8 +37,6 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         if let Some(bootstrap_ip) = bootstrap_ip {
             // Send the "PuzzleRequest" to the bootstrap peer.
             self.send(bootstrap_ip, Message::PuzzleRequest(PuzzleRequest));
-        } else {
-            warn!("No bootstrap peers were found");
         }
     }
 
@@ -70,8 +67,8 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     }
 
     /// Sends the given message to every connected peer, excluding the sender and any specified peer IPs.
-    fn propagate(&self, mut message: Message<N>, excluded_peers: Vec<SocketAddr>) {
-        /// TODO (howardwu): Serialize large messages once only.
+    fn propagate(&self, message: Message<N>, excluded_peers: Vec<SocketAddr>) {
+        // TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         // if let Message::UnconfirmedBlock(ref mut message) = message {
         //     if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
@@ -109,8 +106,8 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     }
 
     /// Sends the given message to every connected beacon, excluding the sender and any specified beacon IPs.
-    fn propagate_to_beacons(&self, mut message: Message<N>, excluded_beacons: Vec<SocketAddr>) {
-        /// TODO (howardwu): Serialize large messages once only.
+    fn propagate_to_beacons(&self, message: Message<N>, excluded_beacons: Vec<SocketAddr>) {
+        // TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         // if let Message::UnconfirmedBlock(ref mut message) = message {
         //     if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
