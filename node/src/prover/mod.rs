@@ -99,7 +99,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Compute the maximum number of puzzle instances.
-        let max_puzzle_instances = num_cpus::get().saturating_sub(3).min(8).max(1);
+        let max_puzzle_instances = num_cpus::get().saturating_sub(3).min(5).max(1);
         // Initialize the node.
         let node = Self {
             account,
