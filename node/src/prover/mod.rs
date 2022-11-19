@@ -221,7 +221,9 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
 
                 // Execute the coinbase puzzle.
                 let prover = prover.clone();
-                tokio::spawn(async move { prover.coinbase_puzzle_loop().await });
+                tokio::spawn(async move {
+                    Self::executor_pool().install(|| async move { prover.coinbase_puzzle_loop().await }).await;
+                });
                 // Sleep briefly to give this instance a chance to clear state.
                 tokio::time::sleep(Duration::from_millis(50)).await;
             }
