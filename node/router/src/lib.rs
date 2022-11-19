@@ -128,7 +128,7 @@ impl<N: Network> Router<N> {
     /// Attempts to connect to the given peer IP.
     pub async fn connect(&self, peer_ip: SocketAddr) {
         // Attempt to connect to the candidate peer.
-        debug!("Sending a connection request to {peer_ip}...");
+        debug!("Connecting to {peer_ip}...");
         if let Err(error) = self.tcp.connect(peer_ip).await {
             warn!("{error}");
             // Restrict the peer, if the connection was not successful and is not a trusted peer.
