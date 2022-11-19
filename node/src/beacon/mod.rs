@@ -114,6 +114,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
             account.address(),
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            dev.is_some(),
         )
         .await?;
         lap!(timer, "Initialize the router");
@@ -141,7 +142,6 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
             node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?));
             lap!(timer, "Initialize REST server");
         }
-
         // Initialize the routing.
         node.initialize_routing().await;
         // Initialize the block production.
@@ -214,6 +214,11 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Beacon<N, C> {
     /// Returns the account address of the node.
     fn address(&self) -> Address<N> {
         self.account.address()
+    }
+
+    /// Returns `true` if the node is in development mode.
+    fn is_dev(&self) -> bool {
+        self.router.is_dev()
     }
 }
 

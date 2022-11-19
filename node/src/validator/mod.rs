@@ -83,6 +83,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             account.address(),
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            dev.is_some(),
         )
         .await?;
 
@@ -104,7 +105,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         if let Some(rest_ip) = rest_ip {
             node.rest = Some(Arc::new(Rest::start(rest_ip, None, ledger, Arc::new(node.clone()))?));
         }
-
         // Initialize the routing.
         node.initialize_routing().await;
         // Initialize the signal handler.
@@ -168,5 +168,10 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
     /// Returns the account address of the node.
     fn address(&self) -> Address<N> {
         self.account.address()
+    }
+
+    /// Returns `true` if the node is in development mode.
+    fn is_dev(&self) -> bool {
+        self.router.is_dev()
     }
 }

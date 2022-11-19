@@ -87,6 +87,8 @@ pub struct Router<N: Network> {
     restricted_peers: Arc<RwLock<IndexMap<SocketAddr, Instant>>>,
     /// The spawned handles.
     handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
+    /// The boolean flag for the development mode.
+    is_dev: bool,
 }
 
 impl<N: Network> Router<N> {
@@ -107,6 +109,7 @@ impl<N: Network> Router<N> {
         address: Address<N>,
         trusted_peers: &[SocketAddr],
         max_peers: u16,
+        is_dev: bool,
     ) -> Result<Self> {
         // Initialize the TCP stack.
         let tcp = Tcp::new(Config::new(node_ip, max_peers)).await?;
@@ -126,6 +129,7 @@ impl<N: Network> Router<N> {
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             handles: Default::default(),
+            is_dev,
         })
     }
 
@@ -160,6 +164,11 @@ impl<N: Network> Router<N> {
     /// Returns the status.
     pub fn status(&self) -> Status {
         self.status.get()
+    }
+
+    /// Returns `true` if the node is in development mode.
+    pub const fn is_dev(&self) -> bool {
+        self.is_dev
     }
 
     /// Returns the IP address of this node.

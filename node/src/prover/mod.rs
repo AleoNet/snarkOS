@@ -45,7 +45,7 @@ use std::{
     },
 };
 use time::OffsetDateTime;
-use tokio::sync::RwLock;
+use tokio::{sync::RwLock, task::JoinHandle};
 
 /// A prover is a full node, capable of producing proofs for consensus.
 #[derive(Clone)]
@@ -62,13 +62,20 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     latest_block: Arc<RwLock<Option<Block<N>>>>,
     /// The number of puzzle instances.
     puzzle_instances: Arc<AtomicU8>,
+    /// The spawned handles.
+    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
     /// PhantomData.
     _phantom: PhantomData<C>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Initializes a new prover node.
-    pub async fn new(node_ip: SocketAddr, private_key: PrivateKey<N>, trusted_peers: &[SocketAddr]) -> Result<Self> {
+    pub async fn new(
+        node_ip: SocketAddr,
+        private_key: PrivateKey<N>,
+        trusted_peers: &[SocketAddr],
+        dev: Option<u16>,
+    ) -> Result<Self> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the node router.
@@ -78,6 +85,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             account.address(),
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            dev.is_some(),
         )
         .await?;
         // Load the coinbase puzzle.
@@ -90,6 +98,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
             puzzle_instances: Default::default(),
+            handles: Default::default(),
             _phantom: Default::default(),
         };
         // Initialize the routing.
@@ -143,6 +152,11 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
     /// Returns the account address of the node.
     fn address(&self) -> Address<N> {
         self.account.address()
+    }
+
+    /// Returns `true` if the node is in development mode.
+    fn is_dev(&self) -> bool {
+        self.router.is_dev()
     }
 }
 

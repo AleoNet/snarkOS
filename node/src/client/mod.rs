@@ -53,12 +53,17 @@ pub struct Client<N: Network, C: ConsensusStorage<N>> {
     /// The latest block.
     latest_block: Arc<RwLock<Option<Block<N>>>>,
     /// PhantomData.
-    _phanthom: PhantomData<C>,
+    _phantom: PhantomData<C>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
     /// Initializes a new client node.
-    pub async fn new(node_ip: SocketAddr, private_key: PrivateKey<N>, trusted_peers: &[SocketAddr]) -> Result<Self> {
+    pub async fn new(
+        node_ip: SocketAddr,
+        private_key: PrivateKey<N>,
+        trusted_peers: &[SocketAddr],
+        dev: Option<u16>,
+    ) -> Result<Self> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the node router.
@@ -68,6 +73,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             account.address(),
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            dev.is_some(),
         )
         .await?;
         // Load the coinbase puzzle.
@@ -79,7 +85,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
-            _phanthom: PhantomData,
+            _phantom: PhantomData,
         };
         // Initialize the routing.
         node.initialize_routing().await;
@@ -130,5 +136,10 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Client<N, C> {
     /// Returns the account address of the node.
     fn address(&self) -> Address<N> {
         self.account.address()
+    }
+
+    /// Returns `true` if the node is in development mode.
+    fn is_dev(&self) -> bool {
+        self.router.is_dev()
     }
 }

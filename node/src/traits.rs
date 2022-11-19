@@ -30,4 +30,7 @@ pub trait NodeInterface<N: Network>: Executor + Routing<N> {
 
     /// Returns the account address of the node.
     fn address(&self) -> Address<N>;
+
+    /// Returns `true` if the node is in development mode.
+    fn is_dev(&self) -> bool;
 }
