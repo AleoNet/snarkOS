@@ -48,7 +48,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// Handles the message from the peer.
     async fn handle_message(&self, peer_addr: SocketAddr, message: Message<N>) -> bool {
         // Retrieve the listener IP for the peer.
-        let peer_ip = match self.router().resolve(&peer_addr) {
+        let peer_ip = match self.router().resolve_to_listener(&peer_addr) {
             Some(peer_ip) => peer_ip,
             None => {
                 warn!("Unable to resolve the (ambiguous) peer address '{peer_addr}'");

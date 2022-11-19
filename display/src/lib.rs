@@ -138,7 +138,7 @@ impl<N: Network> Display<N> {
                 .add_directive("want=off".parse().unwrap())
                 .add_directive("warp=off".parse().unwrap());
 
-            if verbosity == 4 {
+            if verbosity > 3 {
                 filter.add_directive("snarkos_node_tcp=trace".parse().unwrap())
             } else {
                 filter.add_directive("snarkos_node_tcp=off".parse().unwrap())
@@ -165,7 +165,7 @@ impl<N: Network> Display<N> {
                 tracing_subscriber::fmt::Layer::default()
                     .with_ansi(log_sender.is_none() && io::stdout().is_tty())
                     .with_writer(move || LogWriter::new(&log_sender))
-                    .with_target(verbosity == 3)
+                    .with_target(verbosity > 2)
                     .with_filter(filter),
             )
             .with(
@@ -173,7 +173,7 @@ impl<N: Network> Display<N> {
                 tracing_subscriber::fmt::Layer::default()
                     .with_ansi(false)
                     .with_writer(logfile)
-                    .with_target(verbosity == 3)
+                    .with_target(verbosity > 2)
                     .with_filter(filter2),
             )
             .try_init();

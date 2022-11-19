@@ -44,6 +44,11 @@ impl Resolver {
         self.to_listener.read().get(peer_addr).copied()
     }
 
+    /// Returns the (ambiguous) peer address for the given listener address, if it exists.
+    pub fn get_ambiguous(&self, peer_ip: &SocketAddr) -> Option<SocketAddr> {
+        self.from_listener.read().get(peer_ip).copied()
+    }
+
     /// Inserts a bidirectional mapping of the listener address and the (ambiguous) peer address.
     pub fn insert_peer(&self, listener_ip: SocketAddr, peer_addr: SocketAddr) {
         self.from_listener.write().insert(listener_ip, peer_addr);

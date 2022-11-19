@@ -128,7 +128,7 @@ impl<N: Network> Router<N> {
     pub async fn connect(&self, peer_ip: SocketAddr) {
         // Attempt to connect to the candidate peer.
         if let Err(error) = self.tcp.connect(peer_ip).await {
-            warn!("Failed to connect to '{peer_ip}': {error}");
+            warn!("{error}");
             // Restrict the peer, if the connection was not successful and is not a trusted peer.
             if !self.trusted_peers.contains(&peer_ip) {
                 self.insert_restricted_peer(peer_ip);
@@ -176,9 +176,14 @@ impl<N: Network> Router<N> {
         }
     }
 
-    /// Returns the listener IP address of the (ambiguous) peer address.
-    pub fn resolve(&self, peer_addr: &SocketAddr) -> Option<SocketAddr> {
+    /// Returns the listener IP address from the (ambiguous) peer address.
+    pub fn resolve_to_listener(&self, peer_addr: &SocketAddr) -> Option<SocketAddr> {
         self.resolver.get_listener(peer_addr)
+    }
+
+    /// Returns the (ambiguous) peer address from the listener IP address.
+    pub fn resolve_to_ambiguous(&self, peer_ip: &SocketAddr) -> Option<SocketAddr> {
+        self.resolver.get_ambiguous(peer_ip)
     }
 
     /// Returns the maximum number of connected peers.

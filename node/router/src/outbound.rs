@@ -56,10 +56,16 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         }
         // Retrieve the message name.
         let name = message.name().to_string();
-        // Send the message to the peer.
-        trace!("Sending '{name}' to '{peer_ip}'");
-        if let Err(error) = self.unicast(peer_ip, message) {
-            trace!("Failed to send '{name}' to '{peer_ip}': {error}");
+        // Resolve the listener IP to the (ambiguous) peer address.
+        match self.router().resolve_to_ambiguous(&peer_ip) {
+            Some(peer_addr) => {
+                // Send the message to the peer.
+                trace!("Sending '{name}' to '{peer_ip}'");
+                if let Err(error) = self.unicast(peer_addr, message) {
+                    trace!("Failed to send '{name}' to '{peer_ip}': {error}");
+                }
+            }
+            None => warn!("Unable to resolve the listener IP address '{peer_ip}'"),
         }
     }
 
