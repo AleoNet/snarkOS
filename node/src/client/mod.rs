@@ -38,8 +38,8 @@ use snarkvm::prelude::{
 
 use anyhow::Result;
 use core::marker::PhantomData;
+use parking_lot::RwLock;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::sync::RwLock;
 
 /// A client node is a full node, capable of querying with the network.
 #[derive(Clone)]

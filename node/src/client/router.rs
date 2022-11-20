@@ -103,34 +103,25 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Client<N, C> {
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
     /// Saves the latest epoch challenge and latest block in the node.
-    async fn puzzle_response(&self, peer_ip: SocketAddr, message: PuzzleResponse<N>) -> bool {
-        let epoch_challenge = message.epoch_challenge;
-        match message.block.deserialize().await {
-            Ok(block) => {
-                // Retrieve the epoch number.
-                let epoch_number = epoch_challenge.epoch_number();
-                // Retrieve the block height.
-                let block_height = block.height();
+    fn puzzle_response(&self, peer_ip: SocketAddr, message: PuzzleResponse<N>, block: Block<N>) -> bool {
+        // Retrieve the epoch number.
+        let epoch_number = message.epoch_challenge.epoch_number();
+        // Retrieve the block height.
+        let block_height = block.height();
 
-                info!(
-                    "Current(Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
-                    block.coinbase_target(),
-                    block.proof_target()
-                );
+        info!(
+            "Current(Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
+            block.coinbase_target(),
+            block.proof_target()
+        );
 
-                // Save the latest epoch challenge in the node.
-                self.latest_epoch_challenge.write().await.replace(epoch_challenge);
-                // Save the latest block in the node.
-                self.latest_block.write().await.replace(block);
+        // Save the latest epoch challenge in the node.
+        self.latest_epoch_challenge.write().replace(message.epoch_challenge);
+        // Save the latest block in the node.
+        self.latest_block.write().replace(block);
 
-                trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
-                true
-            }
-            Err(error) => {
-                error!("Failed to deserialize the puzzle response from '{peer_ip}': {error}");
-                false
-            }
-        }
+        trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
+        true
     }
 
     /// Propagates the unconfirmed solution to all connected beacons.
@@ -140,18 +131,26 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         message: UnconfirmedSolution<N>,
         solution: ProverSolution<N>,
     ) -> bool {
-        // Read the latest epoch challenge and latest proof target.
-        if let (Some(epoch_challenge), Some(proof_target)) = (
-            self.latest_epoch_challenge.read().await.clone(),
-            self.latest_block.read().await.as_ref().map(|block| block.proof_target()),
-        ) {
+        // Retrieve the latest epoch challenge.
+        let epoch_challenge = self.latest_epoch_challenge.read().clone();
+        // Retrieve the latest proof target.
+        let proof_target = self.latest_block.read().as_ref().map(|block| block.proof_target());
+
+        if let (Some(epoch_challenge), Some(proof_target)) = (epoch_challenge, proof_target) {
             // Ensure that the prover solution is valid for the given epoch.
-            match solution.verify(self.coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target) {
+            let coinbase_puzzle = self.coinbase_puzzle.clone();
+            let is_valid = tokio::task::spawn_blocking(move || {
+                solution.verify(coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target)
+            })
+            .await;
+
+            match is_valid {
                 // If the solution is valid, propagate the `UnconfirmedSolution` to connected beacons.
-                Ok(true) => self.propagate_to_beacons(Message::UnconfirmedSolution(message), vec![peer_ip]),
-                Ok(false) | Err(_) => {
-                    trace!("Invalid prover solution '{}' for the current epoch.", solution.commitment())
+                Ok(Ok(true)) => self.propagate_to_beacons(Message::UnconfirmedSolution(message), vec![peer_ip]),
+                Ok(Ok(false)) | Ok(Err(_)) => {
+                    trace!("Invalid prover solution '{}' for the proof target.", solution.commitment())
                 }
+                Err(error) => warn!("Failed to verify the prover solution: {error}"),
             }
         }
         true

@@ -101,29 +101,26 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Prover<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
-    /// Saves the latest epoch challenge and latest block in the prover.
-    async fn puzzle_response(&self, peer_ip: SocketAddr, message: PuzzleResponse<N>) -> bool {
-        let epoch_challenge = message.epoch_challenge;
-        match message.block.deserialize().await {
-            Ok(block) => {
-                // Retrieve the epoch number.
-                let epoch_number = epoch_challenge.epoch_number();
-                // Retrieve the block height.
-                let block_height = block.height();
+    /// Saves the latest epoch challenge and latest block in the node.
+    fn puzzle_response(&self, peer_ip: SocketAddr, message: PuzzleResponse<N>, block: Block<N>) -> bool {
+        // Retrieve the epoch number.
+        let epoch_number = message.epoch_challenge.epoch_number();
+        // Retrieve the block height.
+        let block_height = block.height();
 
-                // Save the latest epoch challenge in the prover.
-                self.latest_epoch_challenge.write().replace(epoch_challenge);
-                // Save the latest block in the prover.
-                self.latest_block.write().replace(block);
+        info!(
+            "Current(Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
+            block.coinbase_target(),
+            block.proof_target()
+        );
 
-                trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
-                true
-            }
-            Err(error) => {
-                error!("Failed to deserialize the puzzle response from '{peer_ip}': {error}");
-                false
-            }
-        }
+        // Save the latest epoch challenge in the node.
+        self.latest_epoch_challenge.write().replace(message.epoch_challenge);
+        // Save the latest block in the node.
+        self.latest_block.write().replace(block);
+
+        trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
+        true
     }
 
     /// If the last coinbase timestamp exceeds a multiple of the anchor time,

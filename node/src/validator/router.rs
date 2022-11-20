@@ -115,37 +115,27 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
     }
 
     /// Saves the latest epoch challenge and latest block in the node.
-    async fn puzzle_response(&self, peer_ip: SocketAddr, message: PuzzleResponse<N>) -> bool {
-        let serialized_message = message.clone();
-        let epoch_challenge = message.epoch_challenge;
-        match message.block.deserialize().await {
-            Ok(block) => {
-                // Retrieve the epoch number.
-                let epoch_number = epoch_challenge.epoch_number();
-                // Retrieve the block height.
-                let block_height = block.height();
+    fn puzzle_response(&self, peer_ip: SocketAddr, message: PuzzleResponse<N>, block: Block<N>) -> bool {
+        // Retrieve the epoch number.
+        let epoch_number = message.epoch_challenge.epoch_number();
+        // Retrieve the block height.
+        let block_height = block.height();
 
-                info!(
-                    "Current(Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
-                    block.coinbase_target(),
-                    block.proof_target()
-                );
+        info!(
+            "Current(Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
+            block.coinbase_target(),
+            block.proof_target()
+        );
 
-                // Save the latest epoch challenge in the node.
-                self.latest_epoch_challenge.write().replace(epoch_challenge.clone());
-                // Save the latest block in the node.
-                self.latest_block.write().replace(block.clone());
-                // Save the latest puzzle response in the node.
-                self.latest_puzzle_response.write().replace(serialized_message);
+        // Save the latest epoch challenge in the node.
+        self.latest_epoch_challenge.write().replace(message.epoch_challenge.clone());
+        // Save the latest block in the node.
+        self.latest_block.write().replace(block);
+        // Save the latest puzzle response in the node.
+        self.latest_puzzle_response.write().replace(message);
 
-                trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
-                true
-            }
-            Err(error) => {
-                error!("Failed to deserialize the puzzle response from '{peer_ip}': {error}");
-                false
-            }
-        }
+        trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
+        true
     }
 
     /// Propagates the unconfirmed solution to all connected beacons.

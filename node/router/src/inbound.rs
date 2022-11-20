@@ -123,8 +123,16 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
                 // Decrement the number of puzzle requests.
                 self.router().cache.decrement_outbound_puzzle_requests(peer_ip);
+
+                // Clone the message.
+                let message_clone = message.clone();
+                // Perform the deferred non-blocking deserialization of the block.
+                let block = match message.block.deserialize().await {
+                    Ok(block) => block,
+                    Err(error) => bail!("[PuzzleResponse] {error}"),
+                };
                 // Process the puzzle response.
-                match self.puzzle_response(peer_ip, message).await {
+                match self.puzzle_response(peer_ip, message_clone, block) {
                     true => Ok(()),
                     false => bail!("Peer {peer_ip} sent an invalid puzzle response"),
                 }
@@ -349,7 +357,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         false
     }
 
-    async fn puzzle_response(&self, peer_ip: SocketAddr, _message: PuzzleResponse<N>) -> bool {
+    fn puzzle_response(&self, peer_ip: SocketAddr, _message: PuzzleResponse<N>, _block: Block<N>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }
