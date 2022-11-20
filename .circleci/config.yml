@@ -276,7 +276,7 @@ jobs:
   verify-windows:
     executor:
       name: windows/default
-      size: 2xlarge
+      size: xlarge
     environment:
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     parameters:
