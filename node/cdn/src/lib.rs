@@ -20,4 +20,4 @@
 extern crate tracing;
 
 mod blocks;
-pub use blocks::load_blocks;
+pub use blocks::{load_blocks, sync_ledger_with_cdn};

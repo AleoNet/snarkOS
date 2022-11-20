@@ -113,7 +113,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         lap!(timer, "Initialize consensus");
 
         // Initialize the CDN.
-        snarkos_node_cdn::load_blocks(cdn, ledger.clone()).await;
+        snarkos_node_cdn::sync_ledger_with_cdn(cdn, ledger.clone()).await;
 
         // Initialize the node router.
         let router = Router::new(
