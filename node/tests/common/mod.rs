@@ -16,7 +16,7 @@
 
 use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, NodeType, Status};
 use snarkos_node_tcp::{protocols::Handshake, Config, Connection, Tcp, P2P};
-use snarkvm::prelude::{Block, FromBytes, Network, Testnet3 as CurrentNetwork};
+use snarkvm::prelude::{Address, Block, FromBytes, Network, Testnet3 as CurrentNetwork};
 
 use futures_util::{sink::SinkExt, TryStreamExt};
 use std::{
@@ -31,6 +31,7 @@ const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 pub struct TestPeer {
     tcp: Tcp,
     node_type: NodeType,
+    address: Address<CurrentNetwork>,
 }
 
 impl P2P for TestPeer {
@@ -40,7 +41,7 @@ impl P2P for TestPeer {
 }
 
 impl TestPeer {
-    pub async fn new(node_type: NodeType) -> Self {
+    pub async fn new(node_type: NodeType, address: Address<CurrentNetwork>) -> Self {
         let peer = Self {
             tcp: Tcp::new(Config {
                 listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
@@ -50,6 +51,7 @@ impl TestPeer {
             .await
             .expect("couldn't create test peer"),
             node_type,
+            address,
         };
 
         peer.enable_handshake().await;
@@ -62,6 +64,10 @@ impl TestPeer {
 
     pub fn node_type(&self) -> NodeType {
         self.node_type
+    }
+
+    pub fn address(&self) -> Address<CurrentNetwork> {
+        self.address
     }
 }
 
@@ -85,6 +91,7 @@ impl Handshake for TestPeer {
             fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
             node_type: self.node_type(),
             status: Status::Peering,
+            address: self.address(),
             listener_port: local_ip.port(),
         });
         framed.send(message).await?;

@@ -17,7 +17,7 @@
 mod common;
 use common::TestPeer;
 
-use snarkos_node::Beacon;
+use snarkos_node::{Beacon, NodeInterface};
 use snarkos_node_messages::NodeType;
 use snarkos_node_router::Outbound;
 use snarkos_node_tcp::P2P;
@@ -40,7 +40,7 @@ async fn handshake_responder_side() {
     .expect("couldn't create beacon instance");
 
     // Spin up a test peer.
-    let peer = TestPeer::new(NodeType::Validator).await;
+    let peer = TestPeer::new(NodeType::Validator, beacon.address()).await;
 
     // Verify the handshake works when the peer initates a connection with the beacon.
     assert!(
@@ -63,7 +63,7 @@ async fn handshake_initiator_side() {
     .expect("couldn't create beacon instance");
 
     // Spin up a test peer.
-    let peer = TestPeer::new(NodeType::Validator).await;
+    let peer = TestPeer::new(NodeType::Validator, beacon.address()).await;
 
     // Verify the handshake works when the beacon initiates a connection with the peer.
     assert!(

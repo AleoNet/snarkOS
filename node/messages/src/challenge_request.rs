@@ -17,15 +17,16 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ChallengeRequest {
+pub struct ChallengeRequest<N: Network> {
     pub version: u32,
     pub fork_depth: u32,
     pub node_type: NodeType,
     pub status: Status,
+    pub address: Address<N>,
     pub listener_port: u16,
 }
 
-impl MessageTrait for ChallengeRequest {
+impl<N: Network> MessageTrait for ChallengeRequest<N> {
     /// Returns the message name.
     #[inline]
     fn name(&self) -> &str {
@@ -37,14 +38,15 @@ impl MessageTrait for ChallengeRequest {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
         Ok(bincode::serialize_into(
             writer,
-            &(self.version, self.fork_depth, self.node_type, self.status, self.listener_port),
+            &(self.version, self.fork_depth, self.node_type, self.status, self.address, self.listener_port),
         )?)
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let (version, fork_depth, node_type, status, listener_port) = bincode::deserialize_from(&mut bytes.reader())?;
-        Ok(Self { version, fork_depth, node_type, status, listener_port })
+        let (version, fork_depth, node_type, status, address, listener_port) =
+            bincode::deserialize_from(&mut bytes.reader())?;
+        Ok(Self { version, fork_depth, node_type, status, address, listener_port })
     }
 }

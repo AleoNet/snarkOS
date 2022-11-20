@@ -71,7 +71,8 @@ impl<N: Network> Router<N> {
             fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
             node_type: self.node_type,
             status: self.status.get(),
-            listener_port: self.local_ip().port(),
+            address: self.address,
+            listener_port: self.local_ip.port(),
         });
         trace!("Sending '{}-A' to '{peer_addr}'", message.name());
         framed.send(message).await?;
@@ -138,9 +139,10 @@ impl<N: Network> Router<N> {
         let peer_version = challenge_request.version;
         let peer_type = challenge_request.node_type;
         let peer_status = RawStatus::from_status(challenge_request.status);
+        let peer_address = challenge_request.address;
 
         // Construct the peer.
-        let peer = Peer::new(peer_side, peer_ip, peer_version, peer_type, peer_status);
+        let peer = Peer::new(peer_ip, peer_version, peer_type, peer_status, peer_address);
         // Insert the connected peer in the router.
         self.insert_connected_peer(peer, peer_addr);
         info!("Connected to '{peer_ip}'");
@@ -194,31 +196,36 @@ impl<N: Network> Router<N> {
     }
 
     /// Verifies the given challenge request. Returns a disconnect reason if the request is invalid.
-    fn verify_challenge_request(&self, peer_addr: SocketAddr, message: &ChallengeRequest) -> Option<DisconnectReason> {
+    fn verify_challenge_request(
+        &self,
+        peer_addr: SocketAddr,
+        message: &ChallengeRequest<N>,
+    ) -> Option<DisconnectReason> {
         // Retrieve the components of the challenge request.
-        let &ChallengeRequest { version, fork_depth, node_type, status: peer_status, listener_port: _ } = message;
+        let &ChallengeRequest { version, fork_depth, node_type, status: peer_status, address: _, listener_port: _ } =
+            message;
 
         // Ensure the message protocol version is not outdated.
         if version < Message::<N>::VERSION {
-            warn!("Dropping {peer_addr} on version {version} (outdated)");
+            warn!("Dropping '{peer_addr}' on version {version} (outdated)");
             return Some(DisconnectReason::OutdatedClientVersion);
         }
 
         // Ensure the maximum fork depth is correct.
         if fork_depth != ALEO_MAXIMUM_FORK_DEPTH {
-            warn!("Dropping {peer_addr} for an incorrect maximum fork depth of {fork_depth}");
+            warn!("Dropping '{peer_addr}' for an incorrect maximum fork depth of {fork_depth}");
             return Some(DisconnectReason::InvalidForkDepth);
         }
 
-        // If this node is not a beacon node and is syncing, the peer is a beacon node, and this node is ahead, proceed to disconnect.
+        // If this node is not a beacon and is syncing, the peer is a beacon, and this node is ahead, proceed to disconnect.
         if self.node_type != NodeType::Beacon && self.status.is_syncing() && node_type == NodeType::Beacon {
-            warn!("Dropping {peer_addr} as this node is ahead");
+            warn!("Dropping '{peer_addr}' as this node is ahead");
             return Some(DisconnectReason::YouNeedToSyncFirst);
         }
 
-        // If this node is a beacon node, the peer is not a beacon node and is syncing, and the peer is ahead, proceed to disconnect.
+        // If this node is a beacon, the peer is not a beacon and is syncing, proceed to disconnect.
         if self.node_type == NodeType::Beacon && node_type != NodeType::Beacon && peer_status == Status::Syncing {
-            warn!("Dropping {peer_addr} as this node is ahead");
+            warn!("Dropping '{peer_addr}' as this node is ahead");
             return Some(DisconnectReason::INeedToSyncFirst);
         }
 
@@ -228,7 +235,7 @@ impl<N: Network> Router<N> {
             && node_type.is_beacon()
             && peer_addr.ip().to_string() != "159.65.195.225"
         {
-            warn!("Dropping {peer_addr} for an invalid node type of {node_type}");
+            warn!("Dropping '{peer_addr}' for an invalid node type of {node_type}");
             return Some(DisconnectReason::ProtocolViolation);
         }
 
@@ -249,14 +256,14 @@ impl<N: Network> Router<N> {
         let block_header = match header.deserialize().await {
             Ok(block_header) => block_header,
             Err(_) => {
-                warn!("Handshake with {peer_addr} failed (cannot deserialize the block header)");
+                warn!("Handshake with '{peer_addr}' failed (cannot deserialize the block header)");
                 return Some(DisconnectReason::InvalidChallengeResponse);
             }
         };
 
         // Verify the challenge response, by checking that the block header matches.
         if block_header != genesis_header {
-            warn!("Handshake with {peer_addr} failed (incorrect block header)");
+            warn!("Handshake with '{peer_addr}' failed (incorrect block header)");
             return Some(DisconnectReason::InvalidChallengeResponse);
         }
 

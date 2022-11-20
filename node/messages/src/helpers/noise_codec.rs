@@ -277,6 +277,7 @@ impl Decoder for NoiseCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use snarkvm::prelude::{Address, Group, TestRng, Uniform};
 
     use crate::{
         BlockRequest,
@@ -351,11 +352,14 @@ mod tests {
 
     #[test]
     fn challenge_request_roundtrip() {
+        let rng = &mut TestRng::default();
+
         let challenge_request = MessageOrBytes::Message(Box::new(Message::ChallengeRequest(ChallengeRequest {
             version: 0,
             fork_depth: 0,
             node_type: NodeType::Client,
             status: Status::Ready,
+            address: Address::new(Group::rand(rng)),
             listener_port: 0,
         })));
 

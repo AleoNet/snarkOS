@@ -72,7 +72,7 @@ pub struct Router<N: Network> {
     /// The set of trusted peers.
     trusted_peers: Arc<IndexSet<SocketAddr>>,
     /// The map of connected peer IPs to their peer handlers.
-    connected_peers: Arc<RwLock<IndexMap<SocketAddr, Peer>>>,
+    connected_peers: Arc<RwLock<IndexMap<SocketAddr, Peer<N>>>>,
     /// The set of candidate peer IPs.
     candidate_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of restricted peer IPs.
@@ -230,7 +230,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the list of connected peers with their peer objects.
-    pub fn connected_peers_inner(&self) -> IndexMap<SocketAddr, Peer> {
+    pub fn connected_peers_inner(&self) -> IndexMap<SocketAddr, Peer<N>> {
         self.connected_peers.read().clone()
     }
 
@@ -313,7 +313,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Inserts the given peer into the connected peers.
-    pub fn insert_connected_peer(&self, peer: Peer, peer_addr: SocketAddr) {
+    pub fn insert_connected_peer(&self, peer: Peer<N>, peer_addr: SocketAddr) {
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.insert_peer(peer.ip(), peer_addr);
         // Add an entry for this `Peer` in the connected peers.
@@ -352,6 +352,11 @@ impl<N: Network> Router<N> {
         self.restricted_peers.write().insert(peer_ip, Instant::now());
     }
 
+    /// Updates the connected peer with the given function.
+    pub fn update_connected_peer<Fn: FnMut(&mut Peer<N>)>(&self, peer_ip: SocketAddr, mut write_fn: Fn) {
+        self.connected_peers.write().get_mut(&peer_ip).map(|peer| write_fn(peer));
+    }
+
     /// Removes the connected peer and adds them to the candidate peers.
     pub fn remove_connected_peer(&self, peer_ip: SocketAddr) {
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
@@ -365,13 +370,6 @@ impl<N: Network> Router<N> {
     /// Removes the given address from the candidate peers, if it exists.
     pub fn remove_candidate_peer(&self, peer_ip: SocketAddr) {
         self.candidate_peers.write().remove(&peer_ip);
-    }
-
-    /// Updates the connected peer with the given function.
-    pub fn update_connected_peer<Fn: FnMut(&mut Peer)>(&self, peer_ip: SocketAddr, mut write_fn: Fn) {
-        if let Some(peer) = self.connected_peers.write().get_mut(&peer_ip) {
-            write_fn(peer)
-        }
     }
 
     /// Spawns a task with the given future.

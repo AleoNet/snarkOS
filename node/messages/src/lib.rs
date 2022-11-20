@@ -66,6 +66,7 @@ pub use unconfirmed_transaction::UnconfirmedTransaction;
 
 use snarkvm::prelude::{
     error,
+    Address,
     Block,
     EpochChallenge,
     FromBytes,
@@ -100,7 +101,7 @@ pub trait MessageTrait {
 pub enum Message<N: Network> {
     BlockRequest(BlockRequest),
     BlockResponse(BlockResponse<N>),
-    ChallengeRequest(ChallengeRequest),
+    ChallengeRequest(ChallengeRequest<N>),
     ChallengeResponse(ChallengeResponse<N>),
     Disconnect(Disconnect),
     PeerRequest(PeerRequest),

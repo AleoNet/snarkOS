@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_node_messages::{NodeType, RawStatus};
-use snarkos_node_tcp::ConnectionSide;
+use snarkvm::prelude::{Address, Network};
 
 use parking_lot::RwLock;
 use std::{
@@ -29,12 +29,9 @@ use std::{
 
 /// The state for each connected peer.
 #[derive(Clone, Debug)]
-pub struct Peer {
-    /// The connection side of the peer.
-    #[allow(dead_code)]
-    side: ConnectionSide,
+pub struct Peer<N: Network> {
     /// The IP address of the peer, with the port set to the listener port.
-    listening_addr: SocketAddr,
+    peer_ip: SocketAddr,
     /// The timestamp of the last message received from this peer.
     last_seen: Arc<RwLock<Instant>>,
     /// The message version of the peer.
@@ -43,33 +40,35 @@ pub struct Peer {
     node_type: NodeType,
     /// The node type of the peer.
     status: RawStatus,
+    /// The Aleo address of the peer.
+    address: Address<N>,
     /// The block height of the peer.
     block_height: Arc<AtomicU32>,
 }
 
-impl Peer {
+impl<N: Network> Peer<N> {
     /// Initializes a new instance of `Peer`.
     pub fn new(
-        side: ConnectionSide,
-        listening_addr: SocketAddr,
+        listening_ip: SocketAddr,
         version: u32,
         node_type: NodeType,
         status: RawStatus,
+        address: Address<N>,
     ) -> Self {
         Self {
-            side,
-            listening_addr,
+            peer_ip: listening_ip,
             last_seen: Arc::new(RwLock::new(Instant::now())),
             version,
             node_type,
             status,
             block_height: Default::default(),
+            address,
         }
     }
 
     /// Returns the IP address of the peer, with the port set to the listener port.
-    pub fn ip(&self) -> SocketAddr {
-        self.listening_addr
+    pub const fn ip(&self) -> SocketAddr {
+        self.peer_ip
     }
 
     /// Returns the last seen timestamp of the peer.
@@ -77,33 +76,38 @@ impl Peer {
         *self.last_seen.read()
     }
 
+    /// Returns the Aleo address of the peer.
+    pub const fn address(&self) -> Address<N> {
+        self.address
+    }
+
     /// Returns the node type.
-    pub fn node_type(&self) -> NodeType {
+    pub const fn node_type(&self) -> NodeType {
         self.node_type
     }
 
     /// Returns `true` if the peer is a beacon.
-    pub fn is_beacon(&self) -> bool {
+    pub const fn is_beacon(&self) -> bool {
         self.node_type.is_beacon()
     }
 
     /// Returns `true` if the peer is a validator.
-    pub fn is_validator(&self) -> bool {
+    pub const fn is_validator(&self) -> bool {
         self.node_type.is_validator()
     }
 
     /// Returns `true` if the peer is a prover.
-    pub fn is_prover(&self) -> bool {
+    pub const fn is_prover(&self) -> bool {
         self.node_type.is_prover()
     }
 
     /// Returns `true` if the peer is a client.
-    pub fn is_client(&self) -> bool {
+    pub const fn is_client(&self) -> bool {
         self.node_type.is_client()
     }
 }
 
-impl Peer {
+impl<N: Network> Peer<N> {
     /// Updates the last seen timestamp of the peer.
     pub fn set_last_seen(&self, last_seen: Instant) {
         *self.last_seen.write() = last_seen;

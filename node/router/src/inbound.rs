@@ -54,7 +54,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         };
 
         // Update the last seen timestamp of the peer.
-        self.router().update_connected_peer(peer_ip, |peer: &mut Peer| {
+        self.router().update_connected_peer(peer_ip, |peer: &mut Peer<N>| {
             peer.set_last_seen(Instant::now());
         });
 
@@ -295,7 +295,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // }
 
         // Update the connected peer.
-        self.router().update_connected_peer(peer_ip, |peer: &mut Peer| {
+        self.router().update_connected_peer(peer_ip, |peer: &mut Peer<N>| {
             // Update the last seen timestamp of the peer.
             peer.set_last_seen(Instant::now());
             // Update the version of the peer.
