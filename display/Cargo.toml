@@ -19,9 +19,6 @@ edition = "2021"
 [dependencies.anyhow]
 version = "1"
 
-[dependencies.colored]
-version = "2.0"
-
 [dependencies.crossterm]
 version = "0.25"
 
@@ -34,13 +31,6 @@ workspace = true
 [dependencies.tokio]
 version = "1.21"
 features = ["rt"]
-
-[dependencies.tracing]
-version = "0.1"
-
-[dependencies.tracing-subscriber]
-version = "0.3"
-features = [ "env-filter" ]
 
 [dependencies.tui]
 version = "0.19"

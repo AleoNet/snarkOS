@@ -16,7 +16,7 @@
 
 use snarkos_account::Account;
 use snarkos_display::Display;
-use snarkos_node::Node;
+use snarkos_node::{Node, NodeType};
 use snarkvm::prelude::{Block, ConsensusMemory, ConsensusStore, Network, PrivateKey, Testnet3, VM};
 
 use anyhow::{bail, Result};
@@ -81,6 +81,8 @@ pub struct Start {
 impl Start {
     /// Starts the snarkOS node.
     pub fn parse(self) -> Result<String> {
+        // Initialize the logger.
+        let log_receiver = crate::helpers::initialize_logger(self.verbosity, self.nodisplay, self.logfile.clone());
         // Initialize the runtime.
         Self::runtime().block_on(async move {
             // Clone the configurations.
@@ -88,25 +90,8 @@ impl Start {
             // Parse the network.
             match cli.network {
                 3 => {
-                    // Initialize the logger.
-                    let log_receiver =
-                        Display::<Testnet3>::initialize_logger(cli.verbosity, cli.nodisplay, cli.logfile.clone());
-
                     // Parse the node from the configurations.
                     let node = cli.parse_node::<Testnet3>().await.expect("Failed to parse the node");
-
-                    // If the display is not enabled, render the welcome message.
-                    if cli.nodisplay {
-                        // Print the Aleo address.
-                        println!("🪪 Your Aleo address is {}.\n", node.address().to_string().bold());
-                        // Print the node type and network.
-                        println!(
-                            "🧭 Starting {} on {}.\n",
-                            node.node_type().description().bold(),
-                            Testnet3::NAME.bold()
-                        );
-                    }
-
                     // If the display is enabled, render the display.
                     if !cli.nodisplay {
                         // Initialize the display.
@@ -163,7 +148,8 @@ impl Start {
         }
     }
 
-    /// Updates the configurations if the node is in development mode.
+    /// Updates the configurations if the node is in development mode, and returns the
+    /// alternative genesis block if the node is in development mode.
     fn parse_development<N: Network>(&mut self, trusted_peers: &mut Vec<SocketAddr>) -> Result<Option<Block<N>>> {
         // If `--dev` is set, assume the dev nodes are initialized from 0 to `dev`,
         // and add each of them to the trusted peers. In addition, set the node IP to `4130 + dev`,
@@ -198,8 +184,8 @@ impl Start {
             // A helper method to set the account private key in the node type.
             let sample_account = |node: &mut Option<String>, is_beacon: bool| -> Result<()> {
                 let account = match is_beacon {
-                    true => Account::<N>::from(beacon_private_key)?,
-                    false => Account::<N>::sample()?,
+                    true => Account::<N>::try_from(beacon_private_key)?,
+                    false => Account::<N>::new(&mut rand::thread_rng())?,
                 };
                 *node = Some(account.private_key().to_string());
                 println!(
@@ -227,11 +213,24 @@ impl Start {
         }
     }
 
+    /// Returns the node account and node type, from the given configurations.
+    fn parse_account<N: Network>(&self) -> Result<(Account<N>, NodeType)> {
+        // Ensures only one of the four flags is set. If no flags are set, defaults to a client node.
+        match (&self.beacon, &self.validator, &self.prover, &self.client) {
+            (Some(private_key), None, None, None) => Ok((Account::<N>::from_str(private_key)?, NodeType::Beacon)),
+            (None, Some(private_key), None, None) => Ok((Account::<N>::from_str(private_key)?, NodeType::Validator)),
+            (None, None, Some(private_key), None) => Ok((Account::<N>::from_str(private_key)?, NodeType::Prover)),
+            (None, None, None, Some(private_key)) => Ok((Account::<N>::from_str(private_key)?, NodeType::Client)),
+            (None, None, None, None) => Ok((Account::<N>::new(&mut rand::thread_rng())?, NodeType::Client)),
+            _ => bail!("Unsupported node configuration"),
+        }
+    }
+
     /// Returns the node type corresponding to the given configurations.
     #[rustfmt::skip]
     async fn parse_node<N: Network>(&mut self) -> Result<Node<N>> {
         // Print the welcome.
-        println!("{}", Display::<N>::welcome_message());
+        println!("{}", crate::helpers::welcome_message());
 
         // Parse the trusted IPs to connect to.
         let mut trusted_peers = self.parse_trusted_peers()?;
@@ -248,14 +247,27 @@ impl Start {
             false => Some(self.rest),
         };
 
-        // Ensures only one of the four flags is set. If no flags are set, defaults to a client node.
-        match (&self.beacon, &self.validator, &self.prover, &self.client) {
-            (Some(private_key), None, None, None) => Node::new_beacon(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, cdn, self.dev).await,
-            (None, Some(private_key), None, None) => Node::new_validator(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, cdn, self.dev).await,
-            (None, None, Some(private_key), None) => Node::new_prover(self.node, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, self.dev).await,
-            (None, None, None, Some(private_key)) => Node::new_client(self.node, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, self.dev).await,
-            (None, None, None, None) => Node::new_client(self.node, PrivateKey::<N>::new(&mut rand::thread_rng())?, &trusted_peers, self.dev).await,
-            _ => bail!("Unsupported node configuration"),
+        // Parse the node account and node type.
+        let (account, node_type) = self.parse_account::<N>()?;
+
+        // If the display is not enabled, render the welcome message.
+        if self.nodisplay {
+            // Print the Aleo address.
+            println!("🪪 Your Aleo address is {}.\n", account.address().to_string().bold());
+            // Print the node type and network.
+            println!(
+                "🧭 Starting {} on {}.\n",
+                node_type.description().bold(),
+                N::NAME.bold()
+            );
+        }
+
+        // Initialize the node.
+        match node_type {
+            NodeType::Beacon => Node::new_beacon(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
+            NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, self.dev).await,
+            NodeType::Client => Node::new_client(self.node, account, &trusted_peers, self.dev).await,
         }
     }
 

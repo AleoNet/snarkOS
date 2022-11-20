@@ -39,22 +39,18 @@ const NETWORK_ID: u16 = 3;
 const PHASE: &str = "phase2";
 
 /// Loads blocks from a CDN into the ledger.
-///
 /// This function will safely and silently fail to prevent the node from crashing.
-/// If no `cdn` base URL is provided, the function will return early without performing any action.
-pub async fn sync_ledger_with_cdn<N: Network, C: ConsensusStorage<N>>(cdn: Option<String>, ledger: Ledger<N, C>) {
+pub async fn sync_ledger_with_cdn<N: Network, C: ConsensusStorage<N>>(base_url: &str, ledger: Ledger<N, C>) {
     // Fetch the node height.
     let start_height = ledger.latest_height() + 1;
     // Load the blocks from the CDN into the ledger.
-    load_blocks(cdn, start_height, None, move |block: Block<N>| ledger.add_next_block(&block)).await;
+    load_blocks(base_url, start_height, None, move |block: Block<N>| ledger.add_next_block(&block)).await;
 }
 
 /// Loads blocks from a CDN and process them with the given function.
-///
 /// This function will safely and silently fail to prevent the node from crashing.
-/// If no `cdn` base URL is provided, the function will return early without performing any action.
 pub async fn load_blocks<N: Network>(
-    cdn: Option<String>,
+    base_url: &str,
     start_height: u32,
     end_height: Option<u32>,
     process: impl FnMut(Block<N>) -> Result<()> + Clone + Send + Sync + 'static,
@@ -64,14 +60,8 @@ pub async fn load_blocks<N: Network>(
         return;
     }
 
-    // If the CDN is not specified, return.
-    let base_url = match cdn {
-        Some(base_url) => base_url,
-        None => return,
-    };
-
     // Fetch the CDN height.
-    let cdn_height = match cdn_height::<BLOCKS_PER_FILE>(&base_url).await {
+    let cdn_height = match cdn_height::<BLOCKS_PER_FILE>(base_url).await {
         Ok(cdn_height) => cdn_height,
         Err(error) => {
             warn!("{error}");
@@ -129,7 +119,7 @@ pub async fn load_blocks<N: Network>(
 
                 // Download the blocks with an exponential backoff retry policy.
                 let client_clone = client.clone();
-                let base_url_clone = base_url.clone();
+                let base_url_clone = base_url.to_string();
                 let failed_clone = failed.clone();
                 handle_dispatch_error(move || {
                     let ctx = ctx.clone();
@@ -344,8 +334,6 @@ mod tests {
     const TEST_BASE_URL: &str = "https://vm.aleo.org/api";
 
     fn check_load_blocks(start: u32, end: Option<u32>, expected: usize) {
-        let cdn = Some(TEST_BASE_URL.to_string());
-
         let blocks = Arc::new(RwLock::new(Vec::new()));
         let blocks_clone = blocks.clone();
         let process = move |block: Block<CurrentNetwork>| {
@@ -355,7 +343,7 @@ mod tests {
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            load_blocks(cdn, start, end, process).await;
+            load_blocks(TEST_BASE_URL, start, end, process).await;
             assert_eq!(blocks.read().len(), expected);
             // Check they are sequential.
             for (i, block) in blocks.read().iter().enumerate() {

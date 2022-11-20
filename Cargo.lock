@@ -2339,6 +2339,7 @@ dependencies = [
  "anyhow",
  "clap",
  "colored",
+ "crossterm",
  "num_cpus",
  "parking_lot",
  "rand",
@@ -2353,6 +2354,7 @@ dependencies = [
  "snarkvm",
  "thiserror",
  "tokio",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -2360,13 +2362,10 @@ name = "snarkos-display"
 version = "2.0.2"
 dependencies = [
  "anyhow",
- "colored",
  "crossterm",
  "snarkos-node",
  "snarkvm",
  "tokio",
- "tracing",
- "tracing-subscriber",
  "tui",
 ]
 

@@ -92,17 +92,13 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     pub async fn new(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
-        private_key: PrivateKey<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Option<Block<N>>,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
         let timer = timer!("Beacon::new");
-
-        // Initialize the node account.
-        let account = Account::from(private_key)?;
-        lap!(timer, "Initialize the account");
 
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
@@ -111,9 +107,6 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         // Initialize the consensus.
         let consensus = Consensus::new(ledger.clone())?;
         lap!(timer, "Initialize consensus");
-
-        // Initialize the CDN.
-        snarkos_node_cdn::sync_ledger_with_cdn(cdn, ledger.clone()).await;
 
         // Initialize the node router.
         let router = Router::new(
@@ -146,10 +139,21 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
             shutdown: Default::default(),
         };
 
+        // The following order must be preserved:
+        //  1. Initialize the REST server.
+        //  2. Initialize the CDN.
+        //  3. Initialize the routing.
+        //  4. Initialize block production.
+
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?));
+            node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger.clone(), Arc::new(node.clone()))?));
             lap!(timer, "Initialize REST server");
+        }
+        // Initialize the CDN.
+        if let Some(base_url) = cdn {
+            snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger).await;
+            lap!(timer, "Initialize the CDN");
         }
         // Initialize the routing.
         node.initialize_routing().await;
@@ -491,19 +495,19 @@ mod tests {
 
         // Initialize an (insecure) fixed RNG.
         let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
-        // Initialize the beacon private key.
-        let beacon_private_key = PrivateKey::<CurrentNetwork>::new(&mut rng)?;
+        // Initialize the beacon account.
+        let beacon_account = Account::<CurrentNetwork>::new(&mut rng).unwrap();
         // Initialize a new VM.
         let vm = VM::from(ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?)?;
         // Initialize the genesis block.
-        let genesis = Block::genesis(&vm, &beacon_private_key, &mut rng)?;
+        let genesis = Block::genesis(&vm, beacon_account.private_key(), &mut rng)?;
 
         println!("Initializing beacon node...");
 
         let beacon = Beacon::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
             node,
             Some(rest),
-            beacon_private_key,
+            beacon_account,
             &[],
             Some(genesis),
             None,

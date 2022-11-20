@@ -30,6 +30,9 @@ features = ["derive"]
 [dependencies.colored]
 version = "2"
 
+[dependencies.crossterm]
+version = "0.25"
+
 [dependencies.num_cpus]
 version = "1"
 
@@ -75,3 +78,6 @@ version = "1.0"
 version = "1.21"
 features = ["rt"]
 
+[dependencies.tracing-subscriber]
+version = "0.3"
+features = [ "env-filter" ]

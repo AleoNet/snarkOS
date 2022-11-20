@@ -68,18 +68,14 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     pub async fn new(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
-        private_key: PrivateKey<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Option<Block<N>>,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        // Initialize the node account.
-        let account = Account::from(private_key)?;
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
-        // Initialize the CDN.
-        snarkos_node_cdn::sync_ledger_with_cdn(cdn, ledger.clone()).await;
 
         // Initialize the node router.
         let router = Router::new(
@@ -106,9 +102,18 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             latest_puzzle_response: Default::default(),
         };
 
+        // The following order must be preserved:
+        //  1. Initialize the REST server.
+        //  2. Initialize the CDN.
+        //  3. Initialize the routing.
+
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Arc::new(Rest::start(rest_ip, None, ledger, Arc::new(node.clone()))?));
+            node.rest = Some(Arc::new(Rest::start(rest_ip, None, ledger.clone(), Arc::new(node.clone()))?));
+        }
+        // Initialize the CDN.
+        if let Some(base_url) = cdn {
+            snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger).await;
         }
         // Initialize the routing.
         node.initialize_routing().await;
