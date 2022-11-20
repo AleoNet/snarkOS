@@ -153,6 +153,7 @@ impl<N: Network> Router<N> {
             fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
             node_type: self.node_type,
             status: self.status.get(),
+            block_height: None,
         });
         trace!("Sending '{}' to '{peer_ip}'", message.name());
         framed.send(message).await?;

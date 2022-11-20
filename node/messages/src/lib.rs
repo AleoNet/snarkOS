@@ -111,7 +111,7 @@ pub enum Message<N: Network> {
 
 impl<N: Network> Message<N> {
     /// The version of the network protocol; it can be incremented in order to force users to update.
-    pub const VERSION: u32 = 3;
+    pub const VERSION: u32 = 4;
 
     /// Returns the message name.
     #[inline]

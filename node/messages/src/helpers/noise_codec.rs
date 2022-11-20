@@ -343,10 +343,8 @@ mod tests {
 
     #[test]
     fn block_request_roundtrip() {
-        let block_request = MessageOrBytes::Message(Box::new(Message::BlockRequest(BlockRequest {
-            start_block_height: 0,
-            end_block_height: 100,
-        })));
+        let block_request =
+            MessageOrBytes::Message(Box::new(Message::BlockRequest(BlockRequest { start_height: 0, end_height: 100 })));
 
         assert_roundtrip(block_request);
     }
@@ -392,6 +390,7 @@ mod tests {
             fork_depth: 0,
             node_type: NodeType::Client,
             status: Status::Ready,
+            block_height: Some(0),
         })));
 
         assert_roundtrip(ping)

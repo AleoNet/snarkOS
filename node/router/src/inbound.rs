@@ -40,6 +40,8 @@ use std::{
 
 #[async_trait]
 pub trait Inbound<N: Network>: Reading + Outbound<N> {
+    /// The maximum number of blocks that can be requested per `BlockRequest`.
+    const MAXIMUM_BLOCK_REQUEST: u32 = 10;
     /// The maximum number of puzzle requests per interval.
     const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: usize = 5;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
@@ -304,6 +306,10 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             peer.set_node_type(message.node_type);
             // Update the status of the peer.
             peer.set_status(RawStatus::from_status(message.status));
+            // Update the block height of the peer.
+            if let Some(block_height) = message.block_height {
+                peer.set_block_height(block_height);
+            }
         });
 
         // // Determine if the peer is on a fork (or unknown).
@@ -344,6 +350,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
                 node_type: self_clone.router().node_type(),
                 status: self_clone.router().status(),
+                block_height: None,
             });
 
             // Send a `Ping` message to the peer.

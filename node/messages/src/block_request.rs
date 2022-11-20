@@ -18,8 +18,10 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockRequest {
-    pub start_block_height: u32,
-    pub end_block_height: u32,
+    /// The starting block height (inclusive).
+    pub start_height: u32,
+    /// The ending block height (exclusive).
+    pub end_height: u32,
 }
 
 impl MessageTrait for BlockRequest {
@@ -32,7 +34,7 @@ impl MessageTrait for BlockRequest {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(writer, &(self.start_block_height, self.end_block_height))?)
+        Ok(bincode::serialize_into(writer, &(self.start_height, self.end_height))?)
     }
 
     /// Deserializes the given buffer into a message.
@@ -40,8 +42,8 @@ impl MessageTrait for BlockRequest {
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
         Ok(Self {
-            start_block_height: bincode::deserialize_from(&mut reader)?,
-            end_block_height: bincode::deserialize_from(&mut reader)?,
+            start_height: bincode::deserialize_from(&mut reader)?,
+            end_height: bincode::deserialize_from(&mut reader)?,
         })
     }
 }

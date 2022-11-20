@@ -20,7 +20,10 @@ use snarkos_node_tcp::ConnectionSide;
 use parking_lot::RwLock;
 use std::{
     net::SocketAddr,
-    sync::{atomic::AtomicU32, Arc},
+    sync::{
+        atomic::{AtomicU32, Ordering},
+        Arc,
+    },
     time::Instant,
 };
 
@@ -41,7 +44,6 @@ pub struct Peer {
     /// The node type of the peer.
     status: RawStatus,
     /// The block height of the peer.
-    #[allow(dead_code)]
     block_height: Arc<AtomicU32>,
 }
 
@@ -120,5 +122,10 @@ impl Peer {
     /// Updates the status.
     pub fn set_status(&mut self, status: RawStatus) {
         self.status = status
+    }
+
+    /// Updates the block height.
+    pub fn set_block_height(&self, block_height: u32) {
+        self.block_height.store(block_height, Ordering::SeqCst);
     }
 }
