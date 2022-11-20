@@ -18,8 +18,10 @@ use crate::Router;
 use snarkos_node_messages::{Message, PuzzleRequest};
 use snarkos_node_tcp::protocols::Writing;
 use snarkvm::prelude::Network;
+use std::io;
 
 use std::net::SocketAddr;
+use tokio::sync::oneshot;
 
 pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     /// Returns a reference to the router.
@@ -41,28 +43,30 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     }
 
     /// Sends the given message to specified peer.
-    fn send(&self, peer_ip: SocketAddr, message: Message<N>) {
+    ///
+    /// This function returns as soon as the message is queued to be sent,
+    /// without waiting for the actual delivery; instead, the caller is provided with a [`oneshot::Receiver`]
+    /// which can be used to determine when and whether the message has been delivered.
+    fn send(&self, peer_ip: SocketAddr, message: Message<N>) -> Option<oneshot::Receiver<io::Result<()>>> {
         // Determine whether to send the message.
         if !self.should_send(peer_ip, &message) {
-            return;
+            return None;
         }
         // Ensure the peer is connected before sending.
         if !self.router().is_connected(&peer_ip) {
             warn!("Attempted to send to a non-connected peer {peer_ip}");
-            return;
+            return None;
         }
         // Retrieve the message name.
         let name = message.name().to_string();
         // Resolve the listener IP to the (ambiguous) peer address.
-        match self.router().resolve_to_ambiguous(&peer_ip) {
-            Some(peer_addr) => {
-                // Send the message to the peer.
-                trace!("Sending '{name}' to '{peer_ip}'");
-                if let Err(error) = self.unicast(peer_addr, message) {
-                    trace!("Failed to send '{name}' to '{peer_ip}': {error}");
-                }
-            }
-            None => warn!("Unable to resolve the listener IP address '{peer_ip}'"),
+        if let Some(peer_addr) = self.router().resolve_to_ambiguous(&peer_ip) {
+            // Send the message to the peer.
+            trace!("Sending '{name}' to '{peer_ip}'");
+            self.unicast(peer_addr, message).map_err(|e| warn!("Failed to send '{name}' to '{peer_ip}': {e}")).ok()
+        } else {
+            warn!("Unable to resolve the listener IP address '{peer_ip}'");
+            None
         }
     }
 

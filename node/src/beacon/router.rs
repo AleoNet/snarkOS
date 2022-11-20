@@ -76,8 +76,8 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Beacon<N, C> {
     /// Processes a message received from the network.
     async fn process_message(&self, peer_ip: SocketAddr, message: Self::Message) -> io::Result<()> {
         // Process the message. Disconnect if the peer violated the protocol.
-        if !self.inbound(peer_ip, message).await {
-            warn!("Disconnecting from '{peer_ip}' (violated protocol)");
+        if let Err(error) = self.inbound(peer_ip, message).await {
+            warn!("Disconnecting from '{peer_ip}' - {error}");
             self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
             // Disconnect from this peer.
             self.router().disconnect(peer_ip).await;
