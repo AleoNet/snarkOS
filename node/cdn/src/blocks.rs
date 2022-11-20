@@ -114,8 +114,11 @@ pub async fn load_blocks<N: Network>(
                 // Prepare the end height.
                 let end = start + BLOCKS_PER_FILE;
 
+                // If the sync *has not* failed, log the progress.
                 let ctx = format!("blocks {start} to {end}");
-                debug!("Requesting {ctx} (of {cdn_end})");
+                if !failed.load(Ordering::SeqCst) {
+                    debug!("Requesting {ctx} (of {cdn_end})");
+                }
 
                 // Download the blocks with an exponential backoff retry policy.
                 let client_clone = client.clone();
