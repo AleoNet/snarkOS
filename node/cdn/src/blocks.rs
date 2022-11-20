@@ -30,34 +30,37 @@ use std::{
     time::{Duration, Instant},
 };
 
+/// The number of blocks per file.
+const BLOCKS_PER_FILE: u32 = 50;
+/// The supported network.
+const NETWORK_ID: u16 = 3;
+/// TODO (howardwu): Change this with Phase 3.
+/// The current phase.
+const PHASE: &str = "phase2";
+
 /// Loads blocks from a CDN into the ledger.
 ///
 /// This function will safely and silently fail to prevent the node from crashing.
-/// If no `cdn` URL is provided, the function will return early without performing any action.
+/// If no `cdn` base URL is provided, the function will return early without performing any action.
 pub async fn sync_ledger_with_cdn<N: Network, C: ConsensusStorage<N>>(cdn: Option<String>, ledger: Ledger<N, C>) {
     // Fetch the node height.
-    let start_height = ledger.latest_height();
+    let start_height = ledger.latest_height() + 1;
     // Load the blocks from the CDN into the ledger.
-    load_blocks(cdn, start_height, move |block: Block<N>| ledger.add_next_block(&block)).await;
+    load_blocks(cdn, start_height, None, move |block: Block<N>| ledger.add_next_block(&block)).await;
 }
 
 /// Loads blocks from a CDN and process them with the given function.
 ///
 /// This function will safely and silently fail to prevent the node from crashing.
-/// If no `cdn` URL is provided, the function will return early without performing any action.
+/// If no `cdn` base URL is provided, the function will return early without performing any action.
 pub async fn load_blocks<N: Network>(
     cdn: Option<String>,
     start_height: u32,
-    process: impl Fn(Block<N>) -> Result<()> + Clone + Send + Sync + 'static,
+    end_height: Option<u32>,
+    process: impl FnMut(Block<N>) -> Result<()> + Clone + Send + Sync + 'static,
 ) {
-    /// The number of blocks per file.
-    const BLOCKS_PER_FILE: u32 = 50;
-    /// TODO (howardwu): Change this with Phase 3.
-    /// The current phase.
-    const PHASE: &str = "phase2";
-
-    // If the network is not Aleo Testnet 3, return (other networks are not supported yet).
-    if N::ID != 3 {
+    // If the network is not supported, return.
+    if N::ID != NETWORK_ID {
         return;
     }
 
@@ -76,6 +79,21 @@ pub async fn load_blocks<N: Network>(
         }
     };
 
+    // If the end height is not specified, set it to the CDN height.
+    let end_height = end_height.unwrap_or(cdn_height);
+
+    // If the CDN height is less than the start height, return.
+    if cdn_height < start_height {
+        return;
+    }
+    // If the end height is less than the start height, return.
+    if end_height < start_height {
+        return;
+    }
+
+    // If the end height is greater than the CDN height, set the end height to the CDN height.
+    let end_height = if end_height > cdn_height { cdn_height } else { end_height };
+
     // Start a timer.
     let timer = Instant::now();
 
@@ -83,8 +101,8 @@ pub async fn load_blocks<N: Network>(
     if cdn_height > start_height + BLOCKS_PER_FILE {
         // Compute the CDN start height rounded down to the nearest multiple.
         let cdn_start = start_height - (start_height % BLOCKS_PER_FILE);
-        // Set the CDN end height to the CDN height.
-        let cdn_end = cdn_height;
+        // Set the CDN end height to the given end height.
+        let cdn_end = end_height;
         // Construct the CDN range.
         let cdn_range = cdn_start..cdn_end;
 
@@ -149,8 +167,8 @@ pub async fn load_blocks<N: Network>(
                     }
                 };
 
-                // Only retain blocks that are above the start height.
-                blocks.retain(|block| block.height() > start_height);
+                // Only retain blocks that are at or above the start height.
+                blocks.retain(|block| block.height() >= start_height);
 
                 #[cfg(debug_assertions)]
                 // Ensure the blocks are in order by height.
@@ -161,7 +179,7 @@ pub async fn load_blocks<N: Network>(
                 }
 
                 // Use blocking tasks, as deserialization and adding blocks are expensive operations.
-                let process_clone = process.clone();
+                let mut process_clone = process.clone();
                 let cdn_range_clone = cdn_range.clone();
                 let failed_clone = failed.clone();
                 let result = tokio::task::spawn_blocking(move || {
@@ -181,7 +199,7 @@ pub async fn load_blocks<N: Network>(
                         }
                     }
                     // Log the progress.
-                    log_progress::<BLOCKS_PER_FILE>(timer, curr_height, cdn_range_clone, "block");
+                    log_progress::<BLOCKS_PER_FILE>(timer, curr_height, &cdn_range_clone, "block");
                 }).await;
 
                 // If the sync failed, set the failed flag.
@@ -250,7 +268,7 @@ async fn cdn_get<T: 'static + DeserializeOwned + Send>(client: Client, url: &str
 fn log_progress<const OBJECTS_PER_FILE: u32>(
     timer: Instant,
     current_index: u32,
-    cdn_range: Range<u32>,
+    cdn_range: &Range<u32>,
     object_name: &str,
 ) {
     // Prepare the CDN start and end heights.
@@ -301,4 +319,128 @@ where
     }
 
     retry(default_backoff(), || async { func().await.map_err(from_anyhow_err) }).await
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        blocks::{cdn_get, cdn_height, handle_dispatch_error, log_progress, BLOCKS_PER_FILE},
+        load_blocks,
+    };
+    use snarkvm::prelude::{Block, Testnet3};
+
+    use anyhow::{anyhow, Result};
+    use parking_lot::RwLock;
+    use std::{
+        sync::{
+            atomic::{AtomicUsize, Ordering},
+            Arc,
+        },
+        time::Instant,
+    };
+
+    type CurrentNetwork = Testnet3;
+
+    const TEST_BASE_URL: &str = "https://vm.aleo.org/api";
+
+    fn check_load_blocks(start: u32, end: Option<u32>, expected: usize) {
+        let cdn = Some(TEST_BASE_URL.to_string());
+
+        let blocks = Arc::new(RwLock::new(Vec::new()));
+        let blocks_clone = blocks.clone();
+        let process = move |block: Block<CurrentNetwork>| {
+            blocks_clone.write().push(block);
+            Ok(())
+        };
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            load_blocks(cdn, start, end, process).await;
+            assert_eq!(blocks.read().len(), expected);
+            // Check they are sequential.
+            for (i, block) in blocks.read().iter().enumerate() {
+                assert_eq!(block.height(), start + i as u32);
+            }
+        });
+    }
+
+    #[test]
+    fn test_load_blocks_0_to_50() {
+        let start_height = 0;
+        let end_height = Some(50);
+        check_load_blocks(start_height, end_height, 50);
+    }
+
+    #[test]
+    fn test_load_blocks_50_to_100() {
+        let start_height = 50;
+        let end_height = Some(100);
+        check_load_blocks(start_height, end_height, 50);
+    }
+
+    #[test]
+    fn test_cdn_height() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let height = cdn_height::<BLOCKS_PER_FILE>(TEST_BASE_URL).await.unwrap();
+            assert!(height > 0);
+        });
+    }
+
+    #[test]
+    fn test_cdn_get() {
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        rt.block_on(async {
+            let client = reqwest::Client::new();
+            let height =
+                cdn_get::<u32>(client, &format!("{TEST_BASE_URL}/testnet3/latest/height"), "height").await.unwrap();
+            assert!(height > 0);
+        });
+    }
+
+    #[test]
+    fn test_log_progress() {
+        // This test sanity checks that basic arithmetic is correct (i.e. no divide by zero, etc.).
+        let timer = Instant::now();
+        let cdn_range = &(0..100);
+        let object_name = "blocks";
+        log_progress::<10>(timer, 0, cdn_range, object_name);
+        log_progress::<10>(timer, 10, cdn_range, object_name);
+        log_progress::<10>(timer, 20, cdn_range, object_name);
+        log_progress::<10>(timer, 30, cdn_range, object_name);
+        log_progress::<10>(timer, 40, cdn_range, object_name);
+        log_progress::<10>(timer, 50, cdn_range, object_name);
+        log_progress::<10>(timer, 60, cdn_range, object_name);
+        log_progress::<10>(timer, 70, cdn_range, object_name);
+        log_progress::<10>(timer, 80, cdn_range, object_name);
+        log_progress::<10>(timer, 90, cdn_range, object_name);
+        log_progress::<10>(timer, 100, cdn_range, object_name);
+    }
+
+    #[test]
+    fn test_handle_dispatch_error() {
+        let counter = AtomicUsize::new(0);
+
+        let result: Result<()> = tokio_test::block_on(handle_dispatch_error(|| async {
+            counter.fetch_add(1, Ordering::SeqCst);
+            Err(anyhow!("test error"))
+        }));
+
+        assert!(result.is_err());
+        assert!(counter.load(Ordering::SeqCst) >= 10);
+    }
+
+    #[test]
+    fn test_handle_dispatch_error_success() {
+        let counter = AtomicUsize::new(0);
+
+        let result = tokio_test::block_on(handle_dispatch_error(|| async {
+            counter.fetch_add(1, Ordering::SeqCst);
+            Ok(42)
+        }));
+
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap(), 42);
+        assert_eq!(counter.load(Ordering::SeqCst), 1);
+    }
 }

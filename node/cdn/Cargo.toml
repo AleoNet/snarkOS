@@ -57,3 +57,9 @@ features = ["rt"]
 
 [dependencies.tracing]
 version = "0.1"
+
+[dev-dependencies.parking_lot]
+version = "0.12"
+
+[dev-dependencies.tokio-test]
+version = "0.4"
