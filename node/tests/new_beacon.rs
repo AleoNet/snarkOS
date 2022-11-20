@@ -34,6 +34,7 @@ async fn handshake_responder_side() {
         PrivateKey::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
         None, // Should load the current network's genesis block.
+        None, // No CDN.
         None,
     )
     .await
@@ -57,6 +58,7 @@ async fn handshake_initiator_side() {
         PrivateKey::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
         None, // Should load the current network's genesis block.
+        None, // No CDN.
         None,
     )
     .await

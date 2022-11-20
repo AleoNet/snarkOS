@@ -95,6 +95,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
         genesis: Option<Block<N>>,
+        cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
         let timer = timer!("Beacon::new");
@@ -502,6 +503,7 @@ mod tests {
             beacon_private_key,
             &[],
             Some(genesis),
+            None,
             dev,
         )
         .await

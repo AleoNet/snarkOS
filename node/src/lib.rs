@@ -63,9 +63,10 @@ impl<N: Network> Node<N> {
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
         genesis: Option<Block<N>>,
+        cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Beacon(Arc::new(Beacon::new(node_ip, rest_ip, private_key, trusted_peers, genesis, dev).await?)))
+        Ok(Self::Beacon(Arc::new(Beacon::new(node_ip, rest_ip, private_key, trusted_peers, genesis, cdn, dev).await?)))
     }
 
     /// Initializes a new validator node.
@@ -75,9 +76,12 @@ impl<N: Network> Node<N> {
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
         genesis: Option<Block<N>>,
+        cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Validator(Arc::new(Validator::new(node_ip, rest_ip, private_key, trusted_peers, genesis, dev).await?)))
+        Ok(Self::Validator(Arc::new(
+            Validator::new(node_ip, rest_ip, private_key, trusted_peers, genesis, cdn, dev).await?,
+        )))
     }
 
     /// Initializes a new prover node.

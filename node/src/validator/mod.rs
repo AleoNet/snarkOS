@@ -71,12 +71,15 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
         genesis: Option<Block<N>>,
+        cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the node account.
         let account = Account::from(private_key)?;
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
+        // Initialize the
+
         // Initialize the node router.
         let router = Router::new(
             node_ip,

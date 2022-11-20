@@ -69,6 +69,9 @@ pub struct Start {
     /// If the flag is set, the node will not render the display.
     #[clap(long)]
     pub nodisplay: bool,
+    /// Enables the node to prefetch initial blocks from a CDN.
+    #[clap(default_value = "https://vm.aleo.org/api", long = "cdn")]
+    pub cdn: String,
     /// Specify the path to the file where logs will be stored.
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
     pub logfile: PathBuf,
@@ -117,6 +120,26 @@ impl Start {
                     }
                 })
                 .collect()),
+        }
+    }
+
+    /// Returns the CDN to prefetch initial blocks from, from the given configurations.
+    fn parse_cdn(&self) -> Option<String> {
+        // Disable CDN if:
+        //  1. The node is in development mode.
+        //  2. The user has explicitly disabled CDN.
+        //  3. The node is a client (no need to sync).
+        //  4. The node is a prover (no need to sync).
+        if self.dev.is_some() || self.cdn.is_empty() || self.client.is_some() || self.prover.is_some() {
+            None
+        }
+        // Check for an edge case, where the node defaults to a client.
+        else if let (None, None, None, None) = (&self.beacon, &self.validator, &self.prover, &self.client) {
+            None
+        }
+        // Enable the CDN otherwise.
+        else {
+            Some(self.cdn.clone())
         }
     }
 
@@ -193,6 +216,9 @@ impl Start {
         // Parse the trusted IPs to connect to.
         let mut trusted_peers = self.parse_trusted_peers()?;
 
+        // Parse the CDN.
+        let cdn = self.parse_cdn();
+
         // Parse the development configurations, and determine the genesis block.
         let genesis = self.parse_development::<N>(&mut trusted_peers)?;
 
@@ -204,8 +230,8 @@ impl Start {
 
         // Ensures only one of the four flags is set. If no flags are set, defaults to a client node.
         match (&self.beacon, &self.validator, &self.prover, &self.client) {
-            (Some(private_key), None, None, None) => Node::new_beacon(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, self.dev).await,
-            (None, Some(private_key), None, None) => Node::new_validator(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, self.dev).await,
+            (Some(private_key), None, None, None) => Node::new_beacon(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, cdn, self.dev).await,
+            (None, Some(private_key), None, None) => Node::new_validator(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, cdn, self.dev).await,
             (None, None, Some(private_key), None) => Node::new_prover(self.node, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, self.dev).await,
             (None, None, None, Some(private_key)) => Node::new_client(self.node, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, self.dev).await,
             (None, None, None, None) => Node::new_client(self.node, PrivateKey::<N>::new(&mut rand::thread_rng())?, &trusted_peers, self.dev).await,
@@ -266,6 +292,97 @@ mod tests {
             SocketAddr::from_str("1.2.3.4:5").unwrap(),
             SocketAddr::from_str("6.7.8.9:0").unwrap()
         ]);
+    }
+
+    #[test]
+    fn test_parse_cdn() {
+        // Beacon (Prod)
+        let config = Start::try_parse_from(["snarkos", "--beacon", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_some());
+        let config = Start::try_parse_from(["snarkos", "--beacon", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_some());
+        let config = Start::try_parse_from(["snarkos", "--beacon", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Beacon (Dev)
+        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Validator (Prod)
+        let config = Start::try_parse_from(["snarkos", "--validator", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_some());
+        let config = Start::try_parse_from(["snarkos", "--validator", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_some());
+        let config = Start::try_parse_from(["snarkos", "--validator", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Validator (Dev)
+        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Prover (Prod)
+        let config = Start::try_parse_from(["snarkos", "--prover", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--prover", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--prover", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Prover (Dev)
+        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Client (Prod)
+        let config = Start::try_parse_from(["snarkos", "--client", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--client", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--client", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Client (Dev)
+        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--client", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--client", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--client", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Default (Prod)
+        let config = Start::try_parse_from(["snarkos"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Default (Dev)
+        let config = Start::try_parse_from(["snarkos", "--dev", "0"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
     }
 
     #[test]
