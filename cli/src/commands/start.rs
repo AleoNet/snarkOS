@@ -22,7 +22,7 @@ use snarkvm::prelude::{Block, ConsensusMemory, ConsensusStore, Network, PrivateK
 use anyhow::{bail, Result};
 use clap::Parser;
 use core::str::FromStr;
-use rand::{seq::SliceRandom, SeedableRng};
+use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::runtime::{self, Runtime};
@@ -63,7 +63,7 @@ pub struct Start {
     #[clap(long)]
     pub norest: bool,
 
-    /// Specify the verbosity of the node [options: 0, 1, 2, 3]
+    /// Specify the verbosity of the node [options: 0, 1, 2, 3, 4]
     #[clap(default_value = "2", long = "verbosity")]
     pub verbosity: u8,
     /// If the flag is set, the node will not render the display.
@@ -180,26 +180,6 @@ impl Start {
 
             Ok(Some(genesis))
         } else {
-            // Prepare the bootstrap.
-            let bootstrap = [
-                "164.92.111.59:4133",
-                "159.223.204.96:4133",
-                "167.71.219.176:4133",
-                "157.245.205.209:4133",
-                "134.122.95.106:4133",
-                "161.35.24.55:4133",
-                "138.68.103.139:4133",
-                "207.154.215.49:4133",
-                "46.101.114.158:4133",
-                "138.197.190.94:4133",
-            ];
-
-            // Include a bootstrap node, as the node is not in development mode.
-            match bootstrap.choose(&mut rand::thread_rng()) {
-                Some(ip) => trusted_peers.push(SocketAddr::from_str(ip)?),
-                None => bail!("Failed to choose a bootstrap node"),
-            }
-
             Ok(None)
         }
     }
@@ -226,9 +206,9 @@ impl Start {
         match (&self.beacon, &self.validator, &self.prover, &self.client) {
             (Some(private_key), None, None, None) => Node::new_beacon(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, self.dev).await,
             (None, Some(private_key), None, None) => Node::new_validator(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, self.dev).await,
-            (None, None, Some(private_key), None) => Node::new_prover(self.node, PrivateKey::<N>::from_str(private_key)?, &trusted_peers).await,
-            (None, None, None, Some(private_key)) => Node::new_client(self.node, PrivateKey::<N>::from_str(private_key)?, &trusted_peers).await,
-            (None, None, None, None) => Node::new_client(self.node, PrivateKey::<N>::new(&mut rand::thread_rng())?, &trusted_peers).await,
+            (None, None, Some(private_key), None) => Node::new_prover(self.node, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, self.dev).await,
+            (None, None, None, Some(private_key)) => Node::new_client(self.node, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, self.dev).await,
+            (None, None, None, None) => Node::new_client(self.node, PrivateKey::<N>::new(&mut rand::thread_rng())?, &trusted_peers, self.dev).await,
             _ => bail!("Unsupported node configuration"),
         }
     }

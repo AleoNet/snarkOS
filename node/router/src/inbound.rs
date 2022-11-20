@@ -14,174 +14,205 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Peer, Router, RouterRequest, ALEO_MAXIMUM_FORK_DEPTH};
-use snarkos_node_executor::{spawn_task, Executor};
-use snarkos_node_messages::*;
+use crate::{Outbound, Peer, ALEO_MAXIMUM_FORK_DEPTH};
+use snarkos_node_messages::{
+    BlockRequest,
+    BlockResponse,
+    DisconnectReason,
+    Message,
+    PeerResponse,
+    Ping,
+    Pong,
+    PuzzleResponse,
+    RawStatus,
+    UnconfirmedBlock,
+    UnconfirmedSolution,
+    UnconfirmedTransaction,
+};
+use snarkos_node_tcp::protocols::Reading;
 use snarkvm::prelude::{Block, Network, ProverSolution, Transaction};
 
-use core::time::Duration;
-use std::{net::SocketAddr, sync::atomic::Ordering, time::SystemTime};
+use anyhow::{bail, Result};
+use std::{
+    net::SocketAddr,
+    time::{Duration, Instant},
+};
 
 #[async_trait]
-pub trait Inbound<N: Network>: Executor {
-    /// Handles the receiving of a message from a peer. Upon success, returns `true`.
-    #[rustfmt::skip]
-    async fn inbound(&self, peer: &Peer<N>, message: Message<N>, router: &Router<N>) -> bool {
-        // Retrieve the peer IP.
-        let peer_ip = *peer.ip();
+pub trait Inbound<N: Network>: Reading + Outbound<N> {
+    /// The maximum number of puzzle requests per interval.
+    const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: usize = 5;
+    /// The duration in seconds to sleep in between ping requests with a connected peer.
+    const PING_SLEEP_IN_SECS: u64 = 60; // 1 minute
+
+    /// Handles the inbound message from the peer.
+    async fn inbound(&self, peer_addr: SocketAddr, message: Message<N>) -> Result<()> {
+        // Retrieve the listener IP for the peer.
+        let peer_ip = match self.router().resolve_to_listener(&peer_addr) {
+            Some(peer_ip) => peer_ip,
+            None => bail!("Unable to resolve the (ambiguous) peer address '{peer_addr}'"),
+        };
+
+        // Update the last seen timestamp of the peer.
+        self.router().update_connected_peer(peer_ip, |peer: &mut Peer| {
+            peer.set_last_seen(Instant::now());
+        });
+
+        // Drop the peer, if they have sent more than 50 messages in the last 5 seconds.
+        let num_messages = self.router().cache.insert_inbound_message(peer_ip, 5);
+        if num_messages >= 50 {
+            bail!("Dropping {peer_ip} for spamming messages (num_messages = {num_messages})")
+        }
+
+        trace!("Received '{}' from '{peer_ip}'", message.name());
 
         // Process the message.
-        trace!("Received '{}' from '{peer_ip}'", message.name());
         match message {
-            Message::BlockRequest(message) => Self::block_request(message, peer_ip).await,
-            Message::BlockResponse(message) => Self::block_response(message, peer_ip).await,
+            Message::BlockRequest(message) => match self.block_request(peer_ip, message) {
+                true => Ok(()),
+                false => bail!("Peer {peer_ip} sent an invalid block request"),
+            },
+            Message::BlockResponse(message) => match self.block_response(peer_ip, message) {
+                true => Ok(()),
+                false => bail!("Peer {peer_ip} sent an invalid block response"),
+            },
             Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => {
-                // Peer is not following the protocol.
-                warn!("Peer {peer_ip} is not following the protocol");
-                false
+                // Disconnect as the peer is not following the protocol.
+                bail!("Peer {peer_ip} is not following the protocol")
             }
             Message::Disconnect(message) => {
-                debug!("Disconnecting peer {peer_ip} for the following reason: {:?}", message.reason);
-                false
+                bail!("Disconnecting peer {peer_ip} for the following reason: {:?}", message.reason)
             }
-            Message::PeerRequest(..) => Self::peer_request(peer_ip, router).await,
-            Message::PeerResponse(message) => Self::peer_response(message, router).await,
-            Message::Ping(message) => Self::ping(message, peer_ip, peer).await,
-            Message::Pong(message) => Self::pong(message, peer_ip, router).await,
-            Message::PuzzleRequest(..) => {
-                // Retrieve the number of puzzle requests in this interval.
-                let num_requests = router.seen_inbound_puzzle_requests.write().await.entry(peer_ip).or_default().clone();
-                // Check if the number of puzzle requests is within the limit.
-                if num_requests.load(Ordering::SeqCst) < Router::<N>::MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL {
-                    // Increment the number of puzzle requests.
-                    num_requests.fetch_add(1, Ordering::SeqCst);
-                    // Process the puzzle request.
-                    self.puzzle_request(peer_ip, router).await
-                } else {
-                    // Peer is not following the protocol.
-                    warn!("Peer {peer_ip} is not following the protocol");
-                    false
-                }
+            Message::PeerRequest(..) => {
+                // Retrieve the connected peers.
+                let peers = self.router().connected_peers();
+                // Send a `PeerResponse` message to the peer.
+                self.send(peer_ip, Message::PeerResponse(PeerResponse { peers }));
+                Ok(())
+            }
+            Message::PeerResponse(message) => {
+                // Adds the given peer IPs to the list of candidate peers.
+                self.router().insert_candidate_peers(&message.peers);
+                Ok(())
+            }
+            Message::Ping(message) => match self.ping(peer_ip, message) {
+                true => Ok(()),
+                false => bail!("Peer {peer_ip} sent an invalid ping"),
             },
-            Message::PuzzleResponse(message) => self.puzzle_response(message, peer_ip).await,
+            Message::Pong(message) => match self.pong(peer_ip, message) {
+                true => Ok(()),
+                false => bail!("Peer {peer_ip} sent an invalid pong"),
+            },
+            Message::PuzzleRequest(..) => {
+                // Insert the puzzle request for the peer, and fetch the recent frequency.
+                let frequency = self.router().cache.insert_inbound_puzzle_request(peer_ip);
+                // Check if the number of puzzle requests is within the limit.
+                if frequency > Self::MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL {
+                    bail!("Peer {peer_ip} is not following the protocol (excessive puzzle requests)")
+                }
+                // Process the puzzle request.
+                match self.puzzle_request(peer_ip) {
+                    true => Ok(()),
+                    false => bail!("Peer {peer_ip} sent an invalid puzzle request"),
+                }
+            }
+            Message::PuzzleResponse(message) => {
+                // Check that this node previously sent a puzzle request to this peer.
+                if !self.router().cache.contains_outbound_puzzle_request(&peer_ip) {
+                    bail!("Peer {peer_ip} is not following the protocol (unexpected puzzle response)")
+                }
+                // Decrement the number of puzzle requests.
+                self.router().cache.decrement_outbound_puzzle_requests(peer_ip);
+
+                // Clone the message.
+                let message_clone = message.clone();
+                // Perform the deferred non-blocking deserialization of the block.
+                let block = match message.block.deserialize().await {
+                    Ok(block) => block,
+                    Err(error) => bail!("[PuzzleResponse] {error}"),
+                };
+                // Process the puzzle response.
+                match self.puzzle_response(peer_ip, message_clone, block) {
+                    true => Ok(()),
+                    false => bail!("Peer {peer_ip} sent an invalid puzzle response"),
+                }
+            }
             Message::UnconfirmedBlock(message) => {
                 // Clone the message.
                 let message_clone = message.clone();
-
                 // Update the timestamp for the unconfirmed block.
-                let seen_before = router
-                    .seen_inbound_blocks
-                    .write()
-                    .await
-                    .insert(message.block_hash, SystemTime::now())
-                    .is_some();
-
+                let seen_before = self.router().cache.insert_inbound_block(message.block_hash).is_some();
                 // Determine whether to propagate the block.
-                let should_propagate = !seen_before;
-
-                if !should_propagate {
-                    trace!("Skipping 'UnconfirmedBlock {}' from '{peer_ip}'", message.block_hash);
-                    true
-                } else {
-                    // Perform the deferred non-blocking deserialization of the block.
-                    match message.block.deserialize().await {
-                        Ok(block) => {
-                            // Check that the block parameters match.
-                            if message.block_height != block.height() || message.block_hash != block.hash() {
-                                // Peer is not following the protocol.
-                                warn!("Peer {peer_ip} is not following the 'UnconfirmedBlock' protocol");
-                                return false;
-                            }
-                            // Handle the unconfirmed block.
-                            self.unconfirmed_block(router, peer_ip, message_clone, block).await
-                        }
-                        Err(error) => {
-                            warn!("[UnconfirmedBlock] {error}");
-                            true
-                        },
-                    }
+                if seen_before {
+                    bail!("Skipping 'UnconfirmedBlock' from '{peer_ip}'")
                 }
-            },
+                // Perform the deferred non-blocking deserialization of the block.
+                let block = match message.block.deserialize().await {
+                    Ok(block) => block,
+                    Err(error) => bail!("[UnconfirmedBlock] {error}"),
+                };
+                // Check that the block parameters match.
+                if message.block_height != block.height() || message.block_hash != block.hash() {
+                    bail!("Peer {peer_ip} is not following the 'UnconfirmedBlock' protocol")
+                }
+                // Handle the unconfirmed block.
+                match self.unconfirmed_block(peer_ip, message_clone, block) {
+                    true => Ok(()),
+                    false => bail!("Peer {peer_ip} sent an invalid unconfirmed block"),
+                }
+            }
             Message::UnconfirmedSolution(message) => {
                 // Clone the message.
                 let message_clone = message.clone();
-
                 // Update the timestamp for the unconfirmed solution.
-                let seen_before = router
-                    .seen_inbound_solutions
-                    .write()
-                    .await
-                    .insert(message.puzzle_commitment, SystemTime::now())
-                    .is_some();
-
+                let seen_before = self.router().cache.insert_inbound_solution(message.puzzle_commitment).is_some();
                 // Determine whether to propagate the solution.
-                let should_propagate = !seen_before;
-
-                if !should_propagate {
-                    trace!("Skipping 'UnconfirmedSolution' from '{peer_ip}'");
-                    true
-                } else {
-                    // Perform the deferred non-blocking deserialization of the solution.
-                    match message.solution.deserialize().await {
-                        Ok(solution) => {
-                            // Check that the solution parameters match.
-                            if message.puzzle_commitment != solution.commitment() {
-                                // Peer is not following the protocol.
-                                warn!("Peer {peer_ip} is not following the 'UnconfirmedSolution' protocol");
-                                return false;
-                            }
-                            // Handle the unconfirmed solution.
-                            self.unconfirmed_solution(router, peer_ip, message_clone, solution).await
-                        }
-                        Err(error) => {
-                            warn!("[UnconfirmedSolution] {error}");
-                            true
-                        },
-                    }
+                if seen_before {
+                    bail!("Skipping 'UnconfirmedSolution' from '{peer_ip}'")
                 }
-            },
+                // Perform the deferred non-blocking deserialization of the solution.
+                let solution = match message.solution.deserialize().await {
+                    Ok(solution) => solution,
+                    Err(error) => bail!("[UnconfirmedSolution] {error}"),
+                };
+                // Check that the solution parameters match.
+                if message.puzzle_commitment != solution.commitment() {
+                    bail!("Peer {peer_ip} is not following the 'UnconfirmedSolution' protocol")
+                }
+                // Handle the unconfirmed solution.
+                match self.unconfirmed_solution(peer_ip, message_clone, solution).await {
+                    true => Ok(()),
+                    false => bail!("Peer {peer_ip} sent an invalid unconfirmed solution"),
+                }
+            }
             Message::UnconfirmedTransaction(message) => {
                 // Clone the message.
                 let message_clone = message.clone();
-
                 // Update the timestamp for the unconfirmed transaction.
-                let seen_before = router
-                    .seen_inbound_transactions
-                    .write()
-                    .await
-                    .insert(message.transaction_id, SystemTime::now())
-                    .is_some();
-
+                let seen_before = self.router().cache.insert_inbound_transaction(message.transaction_id).is_some();
                 // Determine whether to propagate the transaction.
-                let should_propagate = !seen_before;
-
-                if !should_propagate {
-                    trace!("Skipping 'UnconfirmedTransaction {}' from '{peer_ip}'", message.transaction_id);
-                    true
-                } else {
-                    // Perform the deferred non-blocking deserialization of the transaction.
-                    match message.transaction.deserialize().await {
-                        Ok(transaction) => {
-                            // Check that the transaction parameters match.
-                            if message.transaction_id != transaction.id() {
-                                // Peer is not following the protocol.
-                                warn!("Peer {peer_ip} is not following the 'UnconfirmedTransaction' protocol");
-                                return false;
-                            }
-                            // Handle the unconfirmed transaction.
-                            self.unconfirmed_transaction(router, peer_ip, message_clone, transaction).await
-                        }
-                        Err(error) => {
-                            warn!("[UnconfirmedTransaction] {error}");
-                            true
-                        },
-                    }
+                if seen_before {
+                    bail!("Skipping 'UnconfirmedTransaction' from '{peer_ip}'")
+                }
+                // Perform the deferred non-blocking deserialization of the transaction.
+                let transaction = match message.transaction.deserialize().await {
+                    Ok(transaction) => transaction,
+                    Err(error) => bail!("[UnconfirmedTransaction] {error}"),
+                };
+                // Check that the transaction parameters match.
+                if message.transaction_id != transaction.id() {
+                    bail!("Peer {peer_ip} is not following the 'UnconfirmedTransaction' protocol")
+                }
+                // Handle the unconfirmed transaction.
+                match self.unconfirmed_transaction(peer_ip, message_clone, transaction) {
+                    true => Ok(()),
+                    false => bail!("Peer {peer_ip} sent an invalid unconfirmed transaction"),
                 }
             }
         }
     }
 
-    async fn block_request(_message: BlockRequest, peer_ip: SocketAddr) -> bool {
+    fn block_request(&self, peer_ip: SocketAddr, _message: BlockRequest) -> bool {
         // // Ensure the request is within the accepted limits.
         // let number_of_blocks = end_block_height.saturating_sub(start_block_height);
         // if number_of_blocks > Router::<N>::MAXIMUM_BLOCK_REQUEST {
@@ -215,7 +246,7 @@ pub trait Inbound<N: Network>: Executor {
         false
     }
 
-    async fn block_response(_message: BlockResponse<N>, peer_ip: SocketAddr) -> bool {
+    fn block_response(&self, peer_ip: SocketAddr, _message: BlockResponse<N>) -> bool {
         // // Perform the deferred non-blocking deserialization of the block.
         // match block.deserialize().await {
         //     Ok(block) => {
@@ -233,23 +264,7 @@ pub trait Inbound<N: Network>: Executor {
         false
     }
 
-    async fn peer_request(peer_ip: SocketAddr, router: &Router<N>) -> bool {
-        // Send a `PeerResponse` message.
-        if let Err(error) = router.process(RouterRequest::SendPeerResponse(peer_ip)).await {
-            warn!("[PeerRequest] {error}");
-        }
-        true
-    }
-
-    async fn peer_response(message: PeerResponse, router: &Router<N>) -> bool {
-        // Adds the given peer IPs to the list of candidate peers.
-        if let Err(error) = router.process(RouterRequest::ReceivePeerResponse(message.peers)).await {
-            warn!("[PeerResponse] {error}");
-        }
-        true
-    }
-
-    async fn ping(message: Ping, peer_ip: SocketAddr, peer: &Peer<N>) -> bool {
+    fn ping(&self, peer_ip: SocketAddr, message: Ping) -> bool {
         // Ensure the message protocol version is not outdated.
         if message.version < Message::<N>::VERSION {
             warn!("Dropping {peer_ip} on version {} (outdated)", message.version);
@@ -279,12 +294,17 @@ pub trait Inbound<N: Network>: Executor {
         //     Err(error) => warn!("[Ping] {}", error),
         // }
 
-        // Update the version of the peer.
-        *peer.version.write().await = message.version;
-        // Update the node type of the peer.
-        *peer.node_type.write().await = message.node_type;
-        // Update the status of the peer.
-        *peer.status.write().await = message.status;
+        // Update the connected peer.
+        self.router().update_connected_peer(peer_ip, |peer: &mut Peer| {
+            // Update the last seen timestamp of the peer.
+            peer.set_last_seen(Instant::now());
+            // Update the version of the peer.
+            peer.set_version(message.version);
+            // Update the node type of the peer.
+            peer.set_node_type(message.node_type);
+            // Update the status of the peer.
+            peer.set_status(RawStatus::from_status(message.status));
+        });
 
         // // Determine if the peer is on a fork (or unknown).
         // let is_fork = match state.ledger().reader().get_block_hash(peer.block_height) {
@@ -294,13 +314,11 @@ pub trait Inbound<N: Network>: Executor {
         let is_fork = Some(false);
 
         // Send a `Pong` message to the peer.
-        if let Err(error) = peer.send(Message::Pong(Pong { is_fork })).await {
-            warn!("[Pong] {error}");
-        }
+        self.send(peer_ip, Message::Pong(Pong { is_fork }));
         true
     }
 
-    async fn pong(_message: Pong, peer_ip: SocketAddr, router: &Router<N>) -> bool {
+    fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool {
         // // Perform the deferred non-blocking deserialization of block locators.
         // let request = match block_locators.deserialize().await {
         //     // Route the `Pong` to the ledger.
@@ -315,47 +333,38 @@ pub trait Inbound<N: Network>: Executor {
         // }
 
         // Spawn an asynchronous task for the `Ping` request.
-        let router = router.clone();
-        spawn_task!(Self, {
+        let self_clone = self.clone();
+        tokio::spawn(async move {
             // Sleep for the preset time before sending a `Ping` request.
-            tokio::time::sleep(Duration::from_secs(Router::<N>::PING_SLEEP_IN_SECS)).await;
+            tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
 
-            // Send a `Ping` request to the peer.
+            // Prepare the `Ping` message.
             let message = Message::Ping(Ping {
                 version: Message::<N>::VERSION,
                 fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
-                node_type: Self::NODE_TYPE,
-                status: Self::status().get(),
+                node_type: self_clone.router().node_type(),
+                status: self_clone.router().status(),
             });
-            if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
-                warn!("[Ping] {error}");
-            }
+
+            // Send a `Ping` message to the peer.
+            self_clone.send(peer_ip, message);
         });
         true
     }
 
-    async fn puzzle_request(&self, peer_ip: SocketAddr, _router: &Router<N>) -> bool {
+    fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }
 
-    async fn puzzle_response(&self, _message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
+    fn puzzle_response(&self, peer_ip: SocketAddr, _message: PuzzleResponse<N>, _block: Block<N>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }
 
-    async fn unconfirmed_block(
-        &self,
-        router: &Router<N>,
-        peer_ip: SocketAddr,
-        message: UnconfirmedBlock<N>,
-        _block: Block<N>,
-    ) -> bool {
+    fn unconfirmed_block(&self, peer_ip: SocketAddr, message: UnconfirmedBlock<N>, _block: Block<N>) -> bool {
         // Propagate the `UnconfirmedBlock`.
-        let request = RouterRequest::MessagePropagate(Message::UnconfirmedBlock(message), vec![peer_ip]);
-        if let Err(error) = router.process(request).await {
-            warn!("[UnconfirmedBlock] {error}");
-        }
+        self.propagate(Message::UnconfirmedBlock(message), vec![peer_ip]);
         true
 
         // // Ensure the unconfirmed block is at least within 2 blocks of the latest block height,
@@ -394,24 +403,19 @@ pub trait Inbound<N: Network>: Executor {
 
     async fn unconfirmed_solution(
         &self,
-        router: &Router<N>,
         peer_ip: SocketAddr,
         message: UnconfirmedSolution<N>,
         solution: ProverSolution<N>,
     ) -> bool;
 
-    async fn unconfirmed_transaction(
+    fn unconfirmed_transaction(
         &self,
-        router: &Router<N>,
         peer_ip: SocketAddr,
         message: UnconfirmedTransaction<N>,
         _transaction: Transaction<N>,
     ) -> bool {
         // Propagate the `UnconfirmedTransaction`.
-        let request = RouterRequest::MessagePropagate(Message::UnconfirmedTransaction(message), vec![peer_ip]);
-        if let Err(error) = router.process(request).await {
-            warn!("[UnconfirmedTransaction] {error}");
-        }
+        self.propagate(Message::UnconfirmedTransaction(message), vec![peer_ip]);
         true
     }
 }

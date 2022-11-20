@@ -14,20 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod codec;
-pub use codec::MessageCodec;
+#![deny(missing_docs)]
+#![deny(unsafe_code)]
 
-#[allow(unused)]
-mod noise_codec;
+//! **Tcp** is a simple, low-level, and customizable implementation of a TCP stack.
 
-mod data;
-pub use data::Data;
+mod helpers;
+pub use helpers::*;
 
-mod disconnect;
-pub use disconnect::DisconnectReason;
+pub mod protocols;
 
-mod node_type;
-pub use node_type::*;
+mod tcp;
+pub use tcp::Tcp;
 
-mod status;
-pub use status::*;
+/// A trait for objects containing a [`Tcp`]; it is required to implement protocols.
+pub trait P2P {
+    /// Returns a reference to the TCP instance.
+    fn tcp(&self) -> &Tcp;
+}
