@@ -105,7 +105,7 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Beacon<N, C> {
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
     /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
-    async fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
+    fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
         // Retrieve the latest epoch challenge and latest block.
         let (epoch_challenge, block) = {
             // Retrieve the latest epoch challenge.

@@ -111,7 +111,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     bail!("Peer {peer_ip} is not following the protocol (excessive puzzle requests)")
                 }
                 // Process the puzzle request.
-                match self.puzzle_request(peer_ip).await {
+                match self.puzzle_request(peer_ip) {
                     true => Ok(()),
                     false => bail!("Peer {peer_ip} sent an invalid puzzle request"),
                 }
@@ -344,7 +344,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         true
     }
 
-    async fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
+    fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }

@@ -39,8 +39,8 @@ use snarkvm::prelude::{
 };
 
 use anyhow::Result;
+use parking_lot::RwLock;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::sync::RwLock;
 
 /// A validator is a full node, capable of validating blocks.
 #[derive(Clone)]

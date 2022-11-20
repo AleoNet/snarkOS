@@ -105,9 +105,9 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Validator<N, C> {
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
     /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
-    async fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
+    fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
         // Send the latest puzzle response, if it exists.
-        if let Some(puzzle_response) = self.latest_puzzle_response.read().await.clone() {
+        if let Some(puzzle_response) = self.latest_puzzle_response.read().clone() {
             // Send the `PuzzleResponse` message to the peer.
             self.send(peer_ip, Message::PuzzleResponse(puzzle_response));
         }
@@ -132,11 +132,11 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
                 );
 
                 // Save the latest epoch challenge in the node.
-                self.latest_epoch_challenge.write().await.replace(epoch_challenge.clone());
+                self.latest_epoch_challenge.write().replace(epoch_challenge.clone());
                 // Save the latest block in the node.
-                self.latest_block.write().await.replace(block.clone());
+                self.latest_block.write().replace(block.clone());
                 // Save the latest puzzle response in the node.
-                self.latest_puzzle_response.write().await.replace(serialized_message);
+                self.latest_puzzle_response.write().replace(serialized_message);
 
                 trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
                 true
@@ -155,11 +155,12 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         message: UnconfirmedSolution<N>,
         solution: ProverSolution<N>,
     ) -> bool {
-        // Read the latest epoch challenge and latest proof target.
-        if let (Some(epoch_challenge), Some(proof_target)) = (
-            self.latest_epoch_challenge.read().await.clone(),
-            self.latest_block.read().await.as_ref().map(|block| block.proof_target()),
-        ) {
+        // Retrieve the latest epoch challenge.
+        let epoch_challenge = self.latest_epoch_challenge.read().clone();
+        // Retrieve the latest proof target.
+        let proof_target = self.latest_block.read().as_ref().map(|block| block.proof_target());
+
+        if let (Some(epoch_challenge), Some(proof_target)) = (epoch_challenge, proof_target) {
             // Ensure that the prover solution is valid for the given epoch.
             let coinbase_puzzle = self.coinbase_puzzle.clone();
             let is_valid = tokio::task::spawn_blocking(move || {
@@ -171,7 +172,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
                 // If the solution is valid, propagate the `UnconfirmedSolution` to connected beacons.
                 Ok(Ok(true)) => self.propagate_to_beacons(Message::UnconfirmedSolution(message), vec![peer_ip]),
                 Ok(Ok(false)) | Ok(Err(_)) => {
-                    trace!("Invalid prover solution '{}' for the current epoch.", solution.commitment())
+                    trace!("Invalid prover solution '{}' for the proof target.", solution.commitment())
                 }
                 Err(error) => warn!("Failed to verify the prover solution: {error}"),
             }
