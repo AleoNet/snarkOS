@@ -22,6 +22,7 @@ members = [
     "cli",
     "display",
     "node",
+    "node/cdn",
     "node/consensus",
     "node/ledger",
     "node/messages",
@@ -60,6 +61,9 @@ path = "./display"
 
 [dependencies.snarkos-node]
 path = "./node"
+
+[dependencies.snarkos-node-cdn]
+path = "./node/cdn"
 
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"

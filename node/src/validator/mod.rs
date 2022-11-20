@@ -78,7 +78,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let account = Account::from(private_key)?;
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
-        // Initialize the
+        // Initialize the CDN.
+        snarkos_node_cdn::load_blocks(cdn, ledger.clone()).await;
 
         // Initialize the node router.
         let router = Router::new(

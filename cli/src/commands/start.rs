@@ -21,6 +21,7 @@ use snarkvm::prelude::{Block, ConsensusMemory, ConsensusStore, Network, PrivateK
 
 use anyhow::{bail, Result};
 use clap::Parser;
+use colored::Colorize;
 use core::str::FromStr;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
@@ -87,11 +88,30 @@ impl Start {
             // Parse the network.
             match cli.network {
                 3 => {
+                    // Initialize the logger.
+                    let log_receiver =
+                        Display::<Testnet3>::initialize_logger(cli.verbosity, cli.nodisplay, cli.logfile.clone());
+
                     // Parse the node from the configurations.
                     let node = cli.parse_node::<Testnet3>().await.expect("Failed to parse the node");
-                    // Initialize the display.
-                    Display::start(node, cli.verbosity, cli.nodisplay, cli.logfile)
-                        .expect("Failed to initialize the display");
+
+                    // If the display is not enabled, render the welcome message.
+                    if cli.nodisplay {
+                        // Print the Aleo address.
+                        println!("🪪 Your Aleo address is {}.\n", node.address().to_string().bold());
+                        // Print the node type and network.
+                        println!(
+                            "🧭 Starting {} on {}.\n",
+                            node.node_type().description().bold(),
+                            Testnet3::NAME.bold()
+                        );
+                    }
+
+                    // If the display is enabled, render the display.
+                    if !cli.nodisplay {
+                        // Initialize the display.
+                        Display::start(node, log_receiver).expect("Failed to initialize the display");
+                    }
                 }
                 _ => panic!("Invalid network ID specified"),
             };

@@ -29,7 +29,6 @@ use snarkos_node::Node;
 use snarkvm::prelude::Network;
 
 use anyhow::Result;
-use colored::*;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -43,7 +42,7 @@ use std::{
     thread,
     time::{Duration, Instant},
 };
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, mpsc::Receiver};
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
@@ -72,46 +71,33 @@ pub struct Display<N: Network> {
 
 impl<N: Network> Display<N> {
     /// Initializes a new display.
-    pub fn start<P: AsRef<Path>>(node: Node<N>, verbosity: u8, nodisplay: bool, logfile: P) -> Result<()> {
-        // Initialize the logger.
-        let log_receiver = Self::initialize_logger(verbosity, nodisplay, logfile);
+    pub fn start(node: Node<N>, log_receiver: Receiver<Vec<u8>>) -> Result<()> {
+        // Initialize the display.
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = Terminal::new(backend)?;
 
-        // If the display is not enabled, render the welcome message.
-        if nodisplay {
-            // Print the Aleo address.
-            println!("🪪 Your Aleo address is {}.\n", node.address().to_string().bold());
-            // Print the node type and network.
-            println!("🧭 Starting {} on {}.\n", node.node_type().description().bold(), N::NAME.bold());
-        }
-        // If the display is enabled, render the display.
-        else {
-            // Initialize the display.
-            enable_raw_mode()?;
-            let mut stdout = io::stdout();
-            execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-            let backend = CrosstermBackend::new(stdout);
-            let mut terminal = Terminal::new(backend)?;
+        // Initialize the display.
+        let mut display = Self {
+            node,
+            tick_rate: Duration::from_secs(1),
+            tabs: Tabs::new(PAGES.to_vec()),
+            logs: Logs::new(log_receiver),
+        };
 
-            // Initialize the display.
-            let mut display = Self {
-                node,
-                tick_rate: Duration::from_secs(1),
-                tabs: Tabs::new(PAGES.to_vec()),
-                logs: Logs::new(log_receiver),
-            };
+        // Render the display.
+        let res = display.render(&mut terminal);
 
-            // Render the display.
-            let res = display.render(&mut terminal);
+        // Terminate the display.
+        disable_raw_mode()?;
+        execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+        terminal.show_cursor()?;
 
-            // Terminate the display.
-            disable_raw_mode()?;
-            execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
-            terminal.show_cursor()?;
-
-            // Exit.
-            if let Err(err) = res {
-                println!("{err:?}")
-            }
+        // Exit.
+        if let Err(err) = res {
+            println!("{err:?}")
         }
 
         Ok(())
@@ -120,7 +106,7 @@ impl<N: Network> Display<N> {
 
 impl<N: Network> Display<N> {
     /// Initializes the logger.
-    fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile: P) -> mpsc::Receiver<Vec<u8>> {
+    pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile: P) -> mpsc::Receiver<Vec<u8>> {
         match verbosity {
             0 => std::env::set_var("RUST_LOG", "info"),
             1 => std::env::set_var("RUST_LOG", "debug"),
