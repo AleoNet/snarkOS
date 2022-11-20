@@ -38,17 +38,17 @@ pub async fn sync_ledger_with_cdn<N: Network, C: ConsensusStorage<N>>(cdn: Optio
     // Fetch the node height.
     let start_height = ledger.latest_height();
     // Load the blocks from the CDN into the ledger.
-    load_blocks(cdn, start_height, ledger).await;
+    load_blocks(cdn, start_height, move |block: Block<N>| ledger.add_next_block(&block)).await;
 }
 
-/// Loads blocks from a CDN into the ledger.
+/// Loads blocks from a CDN and process them with the given function.
 ///
 /// This function will safely and silently fail to prevent the node from crashing.
 /// If no `cdn` URL is provided, the function will return early without performing any action.
-pub async fn load_blocks<N: Network, C: ConsensusStorage<N>>(
+pub async fn load_blocks<N: Network>(
     cdn: Option<String>,
     start_height: u32,
-    ledger: Ledger<N, C>,
+    process: impl Fn(Block<N>) -> Result<()> + Clone + Send + Sync + 'static,
 ) {
     /// The number of blocks per file.
     const BLOCKS_PER_FILE: u32 = 50;
@@ -76,15 +76,6 @@ pub async fn load_blocks<N: Network, C: ConsensusStorage<N>>(
         }
     };
 
-    // Create a Client to maintain a connection pool throughout the sync.
-    let client = match Client::builder().build() {
-        Ok(client) => client,
-        Err(error) => {
-            warn!("Failed to create a CDN request client: {error}");
-            return;
-        }
-    };
-
     // Start a timer.
     let timer = Instant::now();
 
@@ -96,6 +87,15 @@ pub async fn load_blocks<N: Network, C: ConsensusStorage<N>>(
         let cdn_end = cdn_height;
         // Construct the CDN range.
         let cdn_range = cdn_start..cdn_end;
+
+        // Create a Client to maintain a connection pool throughout the sync.
+        let client = match Client::builder().build() {
+            Ok(client) => client,
+            Err(error) => {
+                warn!("Failed to create a CDN request client: {error}");
+                return;
+            }
+        };
 
         // An atomic boolean to indicate if the sync failed.
         // This is a hack to ensure the future does not panic.
@@ -161,8 +161,8 @@ pub async fn load_blocks<N: Network, C: ConsensusStorage<N>>(
                 }
 
                 // Use blocking tasks, as deserialization and adding blocks are expensive operations.
+                let process_clone = process.clone();
                 let cdn_range_clone = cdn_range.clone();
-                let ledger_clone = ledger.clone();
                 let failed_clone = failed.clone();
                 let result = tokio::task::spawn_blocking(move || {
                     // Fetch the last height in the blocks.
@@ -170,9 +170,12 @@ pub async fn load_blocks<N: Network, C: ConsensusStorage<N>>(
 
                     // Process each of the blocks.
                     for block in blocks {
+                        // Retrieve the block height.
+                        let block_height = block.height();
+
                         // If the sync failed, set the failed flag, and return.
-                        if let Err(error) = ledger_clone.add_next_block(&block) {
-                            warn!("Failed to process block {}: {error}", block.height());
+                        if let Err(error) = process_clone(block) {
+                            warn!("Failed to process block {block_height}: {error}");
                             failed_clone.store(true, Ordering::SeqCst);
                             return;
                         }
