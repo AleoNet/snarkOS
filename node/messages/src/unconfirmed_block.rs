@@ -44,7 +44,7 @@ impl<N: Network> MessageTrait for UnconfirmedBlock<N> {
         let mut reader = bytes.reader();
         Ok(Self {
             block_height: bincode::deserialize_from(&mut reader)?,
-            block_hash: bincode::deserialize_from(&mut reader)?,
+            block_hash: N::BlockHash::read_le(&mut reader)?,
             block: Data::Buffer(reader.into_inner().freeze()),
         })
     }

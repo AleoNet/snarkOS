@@ -40,8 +40,6 @@ use std::{
 
 #[async_trait]
 pub trait Inbound<N: Network>: Reading + Outbound<N> {
-    /// The maximum number of blocks that can be requested per `BlockRequest`.
-    const MAXIMUM_BLOCK_REQUEST: u32 = 10;
     /// The maximum number of puzzle requests per interval.
     const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: usize = 5;
     /// The duration in seconds to sleep in between ping requests with a connected peer.

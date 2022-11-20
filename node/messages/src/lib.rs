@@ -65,6 +65,7 @@ mod unconfirmed_transaction;
 pub use unconfirmed_transaction::UnconfirmedTransaction;
 
 use snarkvm::prelude::{
+    error,
     Block,
     EpochChallenge,
     FromBytes,
@@ -78,7 +79,11 @@ use snarkvm::prelude::{
 
 use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
-use std::{io::Write, net::SocketAddr};
+use std::{
+    io::{Read, Result as IoResult, Write},
+    net::SocketAddr,
+    ops::Deref,
+};
 
 pub trait MessageTrait {
     /// Returns the message name.
