@@ -47,7 +47,7 @@ pub enum Command {
     #[clap(name = "clean")]
     Clean(Clean),
     #[clap(name = "start")]
-    Start(Start),
+    Start(Box<Start>),
     #[clap(name = "update")]
     Update(Update),
 }
