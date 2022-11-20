@@ -110,12 +110,11 @@ pub async fn load_blocks<N: Network, C: ConsensusStorage<N>>(
                 debug!("Requesting {ctx} (of {cdn_end})");
 
                 // Download the blocks with an exponential backoff retry policy.
-                let ctx_clone = ctx.clone();
                 let client_clone = client.clone();
                 let base_url_clone = base_url.clone();
                 let failed_clone = failed.clone();
                 handle_dispatch_error(move || {
-                    let ctx = ctx_clone.clone();
+                    let ctx = ctx.clone();
                     let client = client_clone.clone();
                     let base_url = base_url_clone.clone();
                     let failed = failed_clone.clone();
