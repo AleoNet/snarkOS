@@ -167,8 +167,8 @@ pub async fn load_blocks<N: Network>(
                     }
                 };
 
-                // Only retain blocks that are at or above the start height.
-                blocks.retain(|block| block.height() >= start_height);
+                // Only retain blocks that are at or above the start height and below the end height.
+                blocks.retain(|block| block.height() >= start_height && block.height() < end_height);
 
                 #[cfg(debug_assertions)]
                 // Ensure the blocks are in order by height.
@@ -376,6 +376,13 @@ mod tests {
         let start_height = 50;
         let end_height = Some(100);
         check_load_blocks(start_height, end_height, 50);
+    }
+
+    #[test]
+    fn test_load_blocks_0_to_123() {
+        let start_height = 0;
+        let end_height = Some(123);
+        check_load_blocks(start_height, end_height, 123);
     }
 
     #[test]
