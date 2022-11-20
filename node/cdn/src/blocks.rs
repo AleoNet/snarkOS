@@ -386,6 +386,13 @@ mod tests {
     }
 
     #[test]
+    fn test_load_blocks_46_to_234() {
+        let start_height = 46;
+        let end_height = Some(234);
+        check_load_blocks(start_height, end_height, 188);
+    }
+
+    #[test]
     fn test_cdn_height() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
