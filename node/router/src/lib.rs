@@ -353,8 +353,8 @@ impl<N: Network> Router<N> {
     }
 
     /// Updates the connected peer with the given function.
-    pub fn update_connected_peer<Fn: FnMut(&mut Peer<N>)>(&self, peer_ip: SocketAddr, mut write_fn: Fn) {
-        self.connected_peers.write().get_mut(&peer_ip).map(|peer| write_fn(peer));
+    pub fn update_connected_peer<Fn: FnMut(&mut Peer<N>)>(&self, peer_ip: SocketAddr, write_fn: Fn) {
+        self.connected_peers.write().get_mut(&peer_ip).map(write_fn);
     }
 
     /// Removes the connected peer and adds them to the candidate peers.
