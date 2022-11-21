@@ -132,6 +132,15 @@ commands:
       - run: rustup toolchain install nightly-x86_64-unknown-linux-gnu
 
 jobs:
+  integration:
+    docker:
+      - image: cimg/rust:1.65
+    resource_class: 2xlarge
+    steps:
+      - run_serial:
+          workspace_member: .integration
+          cache_key: snarkos-integration-cache
+
   snarkos:
     docker:
       - image: cimg/rust:1.65

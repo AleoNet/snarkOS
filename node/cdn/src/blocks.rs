@@ -21,12 +21,10 @@ use anyhow::{anyhow, bail, Result};
 use colored::Colorize;
 use core::ops::Range;
 use futures::{Future, StreamExt};
+use parking_lot::RwLock;
 use reqwest::Client;
 use std::{
-    sync::{
-        atomic::{AtomicBool, Ordering},
-        Arc,
-    },
+    sync::Arc,
     time::{Duration, Instant},
 };
 
@@ -39,168 +37,190 @@ const NETWORK_ID: u16 = 3;
 const PHASE: &str = "phase2";
 
 /// Loads blocks from a CDN into the ledger.
-/// This function will safely and silently fail to prevent the node from crashing.
-pub async fn sync_ledger_with_cdn<N: Network, C: ConsensusStorage<N>>(base_url: &str, ledger: Ledger<N, C>) {
+///
+/// On success, this function returns the completed block height.
+/// On failure, this function returns the last successful block height (if any), along with the error.
+pub async fn sync_ledger_with_cdn<N: Network, C: ConsensusStorage<N>>(
+    base_url: &str,
+    ledger: Ledger<N, C>,
+) -> Result<u32, (u32, anyhow::Error)> {
     // Fetch the node height.
     let start_height = ledger.latest_height() + 1;
     // Load the blocks from the CDN into the ledger.
-    load_blocks(base_url, start_height, None, move |block: Block<N>| ledger.add_next_block(&block)).await;
+    load_blocks(base_url, start_height, None, move |block: Block<N>| ledger.add_next_block(&block)).await
 }
 
 /// Loads blocks from a CDN and process them with the given function.
-/// This function will safely and silently fail to prevent the node from crashing.
+///
+/// On success, this function returns the completed block height.
+/// On failure, this function returns the last successful block height (if any), along with the error.
 pub async fn load_blocks<N: Network>(
     base_url: &str,
     start_height: u32,
     end_height: Option<u32>,
     process: impl FnMut(Block<N>) -> Result<()> + Clone + Send + Sync + 'static,
-) {
+) -> Result<u32, (u32, anyhow::Error)> {
     // If the network is not supported, return.
     if N::ID != NETWORK_ID {
-        return;
+        return Err((start_height, anyhow!("The network ({}) is not supported", N::ID)));
     }
 
     // Fetch the CDN height.
     let cdn_height = match cdn_height::<BLOCKS_PER_FILE>(base_url).await {
         Ok(cdn_height) => cdn_height,
-        Err(error) => {
-            warn!("{error}");
-            return;
-        }
+        Err(error) => return Err((start_height, error)),
     };
+    // If the CDN height is less than the start height, return.
+    if cdn_height < start_height {
+        return Err((
+            start_height,
+            anyhow!("The given start height ({start_height}) must be less than the CDN height ({cdn_height})"),
+        ));
+    }
 
     // If the end height is not specified, set it to the CDN height.
     let end_height = end_height.unwrap_or(cdn_height);
-
-    // If the CDN height is less than the start height, return.
-    if cdn_height < start_height {
-        return;
-    }
-    // If the end height is less than the start height, return.
-    if end_height < start_height {
-        return;
-    }
-
     // If the end height is greater than the CDN height, set the end height to the CDN height.
     let end_height = if end_height > cdn_height { cdn_height } else { end_height };
+    // If the end height is less than the start height, return.
+    if end_height < start_height {
+        return Err((
+            start_height,
+            anyhow!("The given end height ({end_height}) must be less than the start height ({start_height})"),
+        ));
+    }
+
+    // Compute the CDN start height rounded down to the nearest multiple.
+    let cdn_start = start_height - (start_height % BLOCKS_PER_FILE);
+    // Set the CDN end height to the given end height.
+    let cdn_end = end_height;
+    // Construct the CDN range.
+    let cdn_range = cdn_start..cdn_end;
+    // If the CDN range is empty, return.
+    if cdn_range.is_empty() {
+        return Ok(cdn_end);
+    }
+
+    // Create a Client to maintain a connection pool throughout the sync.
+    let client = match Client::builder().build() {
+        Ok(client) => client,
+        Err(error) => return Err((start_height, anyhow!("Failed to create a CDN request client: {error}"))),
+    };
+
+    // A tracker for the completed block height.
+    let completed_height: Arc<RwLock<u32>> = Arc::new(RwLock::new(start_height));
+    // A tracker to indicate if the sync failed.
+    let failed: Arc<RwLock<Option<anyhow::Error>>> = Default::default();
 
     // Start a timer.
     let timer = Instant::now();
 
-    // Sync the node to the CDN height.
-    if cdn_height > start_height + BLOCKS_PER_FILE {
-        // Compute the CDN start height rounded down to the nearest multiple.
-        let cdn_start = start_height - (start_height % BLOCKS_PER_FILE);
-        // Set the CDN end height to the given end height.
-        let cdn_end = end_height;
-        // Construct the CDN range.
-        let cdn_range = cdn_start..cdn_end;
+    futures::stream::iter(cdn_range.clone().step_by(BLOCKS_PER_FILE as usize))
+        .map(|start| {
+            // Prepare the end height.
+            let end = start + BLOCKS_PER_FILE;
 
-        // Create a Client to maintain a connection pool throughout the sync.
-        let client = match Client::builder().build() {
-            Ok(client) => client,
-            Err(error) => {
-                warn!("Failed to create a CDN request client: {error}");
+            // If the sync *has not* failed, log the progress.
+            let ctx = format!("blocks {start} to {end}");
+            if failed.read().is_none() {
+                debug!("Requesting {ctx} (of {cdn_end})");
+            }
+
+            // Download the blocks with an exponential backoff retry policy.
+            let client_clone = client.clone();
+            let base_url_clone = base_url.to_string();
+            let failed_clone = failed.clone();
+            handle_dispatch_error(move || {
+                let ctx = ctx.clone();
+                let client = client_clone.clone();
+                let base_url = base_url_clone.clone();
+                let failed = failed_clone.clone();
+                async move {
+                    // If the sync failed, return with an empty vector.
+                    if failed.read().is_some() {
+                        return std::future::ready(Ok(vec![])).await
+                    }
+                    // Prepare the URL.
+                    let blocks_url = format!("{base_url}/testnet3/blocks/{PHASE}/{start}.{end}.blocks");
+                    // Fetch the blocks.
+                    let blocks: Vec<Block<N>> = cdn_get(client, &blocks_url, &ctx).await?;
+                    // Return the blocks.
+                    std::future::ready(Ok(blocks)).await
+                }
+            })
+        })
+        .buffered(64) // The number of concurrent requests.
+        .for_each(|result| async {
+            // If the sync previously failed, return early.
+            if failed.read().is_some() {
                 return;
             }
-        };
 
-        // An atomic boolean to indicate if the sync failed.
-        // This is a hack to ensure the future does not panic.
-        let failed = Arc::new(AtomicBool::new(false));
-
-        futures::stream::iter(cdn_range.clone().step_by(BLOCKS_PER_FILE as usize))
-            .map(|start| {
-                // Prepare the end height.
-                let end = start + BLOCKS_PER_FILE;
-
-                // If the sync *has not* failed, log the progress.
-                let ctx = format!("blocks {start} to {end}");
-                if !failed.load(Ordering::SeqCst) {
-                    debug!("Requesting {ctx} (of {cdn_end})");
-                }
-
-                // Download the blocks with an exponential backoff retry policy.
-                let client_clone = client.clone();
-                let base_url_clone = base_url.to_string();
-                let failed_clone = failed.clone();
-                handle_dispatch_error(move || {
-                    let ctx = ctx.clone();
-                    let client = client_clone.clone();
-                    let base_url = base_url_clone.clone();
-                    let failed = failed_clone.clone();
-                    async move {
-                        // If the sync failed, return with an empty vector.
-                        if failed.load(Ordering::SeqCst) {
-                            return std::future::ready(Ok(vec![])).await
-                        }
-                        // Prepare the URL.
-                        let blocks_url = format!("{base_url}/testnet3/blocks/{PHASE}/{start}.{end}.blocks");
-                        // Fetch the blocks.
-                        let blocks: Vec<Block<N>> = cdn_get(client, &blocks_url, &ctx).await?;
-                        // Return the blocks.
-                        std::future::ready(Ok(blocks)).await
-                    }
-                })
-            })
-            .buffered(64) // The number of concurrent requests.
-            .for_each(|result| async {
-                // If the sync previously failed, return early.
-                if failed.load(Ordering::SeqCst) {
+            // Unwrap the blocks.
+            let mut blocks = match result {
+                Ok(blocks) => blocks,
+                Err(error) => {
+                    failed.write().replace(error);
                     return;
                 }
+            };
 
-                // Unwrap the blocks.
-                let mut blocks = match result {
-                    Ok(blocks) => blocks,
-                    Err(error) => {
-                        warn!("{error}");
-                        failed.store(true, Ordering::SeqCst);
+            // Only retain blocks that are at or above the start height and below the end height.
+            blocks.retain(|block| block.height() >= start_height && block.height() < end_height);
+
+            #[cfg(debug_assertions)]
+            // Ensure the blocks are in order by height.
+            for (i, block) in blocks.iter().enumerate() {
+                if i > 0 {
+                    assert_eq!(block.height(), blocks[i - 1].height() + 1);
+                }
+            }
+
+            // Use blocking tasks, as deserialization and adding blocks are expensive operations.
+            let mut process_clone = process.clone();
+            let cdn_range_clone = cdn_range.clone();
+            let completed_height_clone = completed_height.clone();
+            let failed_clone = failed.clone();
+            let result = tokio::task::spawn_blocking(move || {
+                // Fetch the last height in the blocks.
+                let curr_height = blocks.last().map(|block| block.height()).unwrap_or(start_height);
+
+                // Process each of the blocks.
+                for block in blocks {
+                    // Retrieve the block height.
+                    let block_height = block.height();
+
+                    // If the sync failed, set the failed flag, and return.
+                    if let Err(error) = process_clone(block) {
+                        let error = anyhow!("Failed to process block {block_height}: {error}");
+                        failed_clone.write().replace(error);
                         return;
                     }
-                };
 
-                // Only retain blocks that are at or above the start height and below the end height.
-                blocks.retain(|block| block.height() >= start_height && block.height() < end_height);
-
-                #[cfg(debug_assertions)]
-                // Ensure the blocks are in order by height.
-                for (i, block) in blocks.iter().enumerate() {
-                    if i > 0 {
-                        assert_eq!(block.height(), blocks[i - 1].height() + 1);
-                    }
+                    // On success, update the completed height.
+                    *completed_height_clone.write() = block_height;
                 }
 
-                // Use blocking tasks, as deserialization and adding blocks are expensive operations.
-                let mut process_clone = process.clone();
-                let cdn_range_clone = cdn_range.clone();
-                let failed_clone = failed.clone();
-                let result = tokio::task::spawn_blocking(move || {
-                    // Fetch the last height in the blocks.
-                    let curr_height = blocks.last().map(|block| block.height()).unwrap_or(start_height);
+                // Log the progress.
+                log_progress::<BLOCKS_PER_FILE>(timer, curr_height, &cdn_range_clone, "block");
+            }).await;
 
-                    // Process each of the blocks.
-                    for block in blocks {
-                        // Retrieve the block height.
-                        let block_height = block.height();
+            // If the sync failed, set the failed flag.
+            if let Err(error) = result {
+                let error = anyhow!("Failed to process blocks: {error}");
+                failed.write().replace(error);
+            }
+        })
+        .await;
 
-                        // If the sync failed, set the failed flag, and return.
-                        if let Err(error) = process_clone(block) {
-                            warn!("Failed to process block {block_height}: {error}");
-                            failed_clone.store(true, Ordering::SeqCst);
-                            return;
-                        }
-                    }
-                    // Log the progress.
-                    log_progress::<BLOCKS_PER_FILE>(timer, curr_height, &cdn_range_clone, "block");
-                }).await;
-
-                // If the sync failed, set the failed flag.
-                if result.is_err() {
-                    failed.store(true, Ordering::SeqCst);
-                }
-            })
-            .await;
+    // Retrieve the successfully completed height (does not include failed blocks).
+    let completed = *completed_height.read();
+    // Return the result.
+    match Arc::try_unwrap(failed).unwrap().into_inner() {
+        // If the sync failed, return the completed height along with the error.
+        Some(error) => Err((completed, error)),
+        // Otherwise, return the completed height.
+        None => Ok(completed),
     }
 }
 
@@ -346,8 +366,11 @@ mod tests {
 
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            load_blocks(TEST_BASE_URL, start, end, process).await;
+            let completed_height = load_blocks(TEST_BASE_URL, start, end, process).await.unwrap();
             assert_eq!(blocks.read().len(), expected);
+            if expected > 0 {
+                assert_eq!(blocks.read().last().unwrap().height(), completed_height);
+            }
             // Check they are sequential.
             for (i, block) in blocks.read().iter().enumerate() {
                 assert_eq!(block.height(), start + i as u32);

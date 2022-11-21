@@ -29,7 +29,8 @@ members = [
     "node/rest",
     "node/router",
     "node/store",
-    "node/tcp"
+    "node/tcp",
+    ".integration",
 ]
 
 [[bin]]

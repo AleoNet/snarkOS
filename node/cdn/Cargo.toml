@@ -18,7 +18,7 @@ edition = "2021"
 
 [features]
 default = [ "parallel" ]
-parallel = [ "rayon", "snarkvm/parallel" ]
+parallel = [ "rayon", "snarkvm/parallel", "snarkos-node-ledger/parallel" ]
 
 [dependencies.anyhow]
 version = "1"
@@ -35,6 +35,9 @@ version = "2"
 
 [dependencies.futures]
 version = "0.3"
+
+[dependencies.parking_lot]
+version = "0.12"
 
 [dependencies.reqwest]
 version = "0.11"
@@ -57,9 +60,6 @@ features = ["rt"]
 
 [dependencies.tracing]
 version = "0.1"
-
-[dev-dependencies.parking_lot]
-version = "0.12"
 
 [dev-dependencies.tokio-test]
 version = "0.4"

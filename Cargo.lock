@@ -2370,6 +2370,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-integration"
+version = "2.0.2"
+dependencies = [
+ "snarkos-node-cdn",
+ "snarkos-node-ledger",
+ "snarkvm",
+ "tokio",
+]
+
+[[package]]
 name = "snarkos-node"
 version = "2.0.2"
 dependencies = [

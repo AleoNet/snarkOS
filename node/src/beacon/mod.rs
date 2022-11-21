@@ -152,7 +152,17 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         }
         // Initialize the CDN.
         if let Some(base_url) = cdn {
-            snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger).await;
+            // Sync the ledger with the CDN.
+            let result = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await;
+            // If the sync failed, check the integrity of the ledger.
+            if let Err((completed_height, error)) = result {
+                warn!("{error}");
+                debug!("Synced the ledger up to block {completed_height}");
+                // TODO (howardwu): Find a way to resolve integrity failures.
+                if let Err(error) = ledger.get_block(completed_height) {
+                    bail!("Failed to retrieve block {completed_height} from the ledger: {error}");
+                }
+            }
             lap!(timer, "Initialize the CDN");
         }
         // Initialize the routing.
