@@ -300,6 +300,7 @@ workflows:
 
   main-workflow:
     jobs:
+      - integration
       - snarkos
       - account
       - cli
