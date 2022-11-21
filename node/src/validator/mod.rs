@@ -27,6 +27,7 @@ use snarkos_node_tcp::{
     P2P,
 };
 use snarkvm::prelude::{
+    cow_to_copied,
     Address,
     Block,
     CoinbasePuzzle,
@@ -115,13 +116,30 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
             let result = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await;
+
+            // TODO (howardwu): Find a way to resolve integrity failures.
             // If the sync failed, check the integrity of the ledger.
             if let Err((completed_height, error)) = result {
                 warn!("{error}");
                 debug!("Synced the ledger up to block {completed_height}");
-                // TODO (howardwu): Find a way to resolve integrity failures.
-                if let Err(error) = ledger.get_block(completed_height) {
-                    bail!("Failed to retrieve block {completed_height} from the ledger: {error}");
+
+                // Retrieve the latest height, according to the ledger.
+                let node_height = cow_to_copied!(ledger.vm().block_store().heights().max().unwrap_or_default());
+                // Check the integrity of the latest height.
+                if node_height != completed_height {
+                    bail!("The latest height in the ledger does not match the sync process")
+                }
+
+                // Fetch the latest block from the ledger.
+                if let Err(err) = ledger.get_block(node_height) {
+                    // If the latest block is not found, return an error.
+                    match dev {
+                        Some(id) => error!(
+                            "Attention: Storage corruption detected! Run `snarkos clean --dev {id}` to reset storage"
+                        ),
+                        None => error!("Attention: Storage corruption detected! Run `snarkos clean` to reset storage"),
+                    }
+                    return Err(err);
                 }
             }
         }

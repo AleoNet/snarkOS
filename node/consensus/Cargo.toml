@@ -43,9 +43,6 @@ optional = true
 [dependencies.snarkos-node-ledger]
 path = "../ledger"
 
-[dependencies.snarkos-node-store]
-path = "../store"
-
 [dependencies.snarkvm]
 workspace = true
 

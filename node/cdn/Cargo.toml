@@ -18,7 +18,7 @@ edition = "2021"
 
 [features]
 default = [ "parallel" ]
-parallel = [ "rayon", "snarkvm/parallel", "snarkos-node-ledger/parallel" ]
+parallel = [ "snarkvm/parallel", "snarkos-node-ledger/parallel" ]
 
 [dependencies.anyhow]
 version = "1"
@@ -41,10 +41,6 @@ version = "0.12"
 
 [dependencies.reqwest]
 version = "0.11"
-
-[dependencies.rayon]
-version = "1"
-optional = true
 
 [dependencies.snarkos-node-ledger]
 path = "../ledger"

@@ -2555,7 +2555,6 @@ dependencies = [
  "colored",
  "futures",
  "parking_lot",
- "rayon",
  "reqwest",
  "snarkos-node-ledger",
  "snarkvm",
@@ -2575,7 +2574,6 @@ dependencies = [
  "rand",
  "rayon",
  "snarkos-node-ledger",
- "snarkos-node-store",
  "snarkvm",
  "time",
  "tracing",
@@ -2593,7 +2591,6 @@ dependencies = [
  "parking_lot",
  "rand",
  "rayon",
- "snarkos-node-store",
  "snarkvm",
  "tracing",
 ]
