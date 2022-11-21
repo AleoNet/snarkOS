@@ -27,6 +27,19 @@ use rand_chacha::ChaChaRng;
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::runtime::{self, Runtime};
 
+/// Recommended minimum value of 'open files' limit for beacon node.
+///
+/// Beacon should be able to handle at least 1000 concurrent connections,
+/// each requiring 2 sockets.
+#[cfg(target_family = "unix")]
+const RECOMMENDED_MIN_NOFILES_LIMIT_BEACON: u64 = 2048;
+/// Recommended minimum value of 'open files' limit for validator node.
+///
+/// Validator should be able to handle at least 500 concurrent connections,
+/// each requiring 2 sockets.
+#[cfg(target_family = "unix")]
+const RECOMMENDED_MIN_NOFILES_LIMIT_VALIDATOR: u64 = 1024;
+
 /// Starts the snarkOS node.
 #[derive(Clone, Debug, Parser)]
 pub struct Start {
@@ -204,8 +217,18 @@ impl Start {
 
         // Ensures only one of the four flags is set. If no flags are set, defaults to a client node.
         match (&self.beacon, &self.validator, &self.prover, &self.client) {
-            (Some(private_key), None, None, None) => Node::new_beacon(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, self.dev).await,
-            (None, Some(private_key), None, None) => Node::new_validator(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, self.dev).await,
+            (Some(private_key), None, None, None) => {
+                // Warn if open files limit is lower than recommended.
+                #[cfg(target_family = "unix")]
+                crate::helpers::check_open_files_limit(RECOMMENDED_MIN_NOFILES_LIMIT_BEACON);
+                Node::new_beacon(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, self.dev).await
+            },
+            (None, Some(private_key), None, None) => {
+                // Warn if open files limit is lower than recommended.
+                #[cfg(target_family = "unix")]
+                crate::helpers::check_open_files_limit(RECOMMENDED_MIN_NOFILES_LIMIT_VALIDATOR);
+                Node::new_validator(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, self.dev).await
+            }
             (None, None, Some(private_key), None) => Node::new_prover(self.node, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, self.dev).await,
             (None, None, None, Some(private_key)) => Node::new_client(self.node, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, self.dev).await,
             (None, None, None, None) => Node::new_client(self.node, PrivateKey::<N>::new(&mut rand::thread_rng())?, &trusted_peers, self.dev).await,
