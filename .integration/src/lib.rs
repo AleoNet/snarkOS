@@ -22,11 +22,14 @@ mod tests {
     use snarkos_node_ledger::Ledger;
     use snarkvm::prelude::{Block, ConsensusMemory, FromBytes, Network, Testnet3};
 
+    use tracing_test::traced_test;
+
     type CurrentNetwork = Testnet3;
 
     const TEST_BASE_URL: &str = "https://vm.aleo.org/api";
 
     #[test]
+    #[traced_test]
     fn test_sync_ledger_with_cdn_0_to_tip() {
         // Initialize the genesis block.
         let genesis = Block::<CurrentNetwork>::read_le(CurrentNetwork::genesis_bytes()).unwrap();
