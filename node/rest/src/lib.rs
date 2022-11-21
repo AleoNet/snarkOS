@@ -36,7 +36,6 @@ use snarkvm::{
 };
 
 use anyhow::Result;
-use colored::*;
 use http::header::HeaderName;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};

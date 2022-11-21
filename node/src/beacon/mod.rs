@@ -52,7 +52,7 @@ use snarkvm::prelude::{
 };
 
 use aleo_std::prelude::{finish, lap, timer};
-use anyhow::{anyhow, bail, Result};
+use anyhow::{bail, Result};
 use core::{str::FromStr, time::Duration};
 use parking_lot::RwLock;
 use std::{
@@ -105,6 +105,41 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         let ledger = Ledger::load(genesis, dev)?;
         lap!(timer, "Initialize the ledger");
 
+        // Initialize the CDN.
+        if let Some(base_url) = cdn {
+            // Sync the ledger with the CDN.
+            let result = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await;
+
+            // TODO (howardwu): Find a way to resolve integrity failures.
+            // If the sync failed, check the integrity of the ledger.
+            if let Err((completed_height, error)) = result {
+                warn!("{error}");
+                debug!("Synced the ledger up to block {completed_height}");
+
+                // A helper to log instructions to recover.
+                let log_error = |dev| match dev {
+                    Some(id) => error!("Storage corruption detected! Run `snarkos clean --dev {id}` to reset storage"),
+                    None => error!("Storage corruption detected! Run `snarkos clean` to reset storage"),
+                };
+
+                // Retrieve the latest height, according to the ledger.
+                let node_height = cow_to_copied!(ledger.vm().block_store().heights().max().unwrap_or_default());
+                // Check the integrity of the latest height.
+                if node_height != completed_height {
+                    log_error(dev);
+                    bail!("The latest height in the ledger does not match the sync process")
+                }
+
+                // Fetch the latest block from the ledger.
+                if let Err(err) = ledger.get_block(node_height) {
+                    log_error(dev);
+                    return Err(err);
+                }
+            }
+
+            lap!(timer, "Initialize the CDN");
+        }
+
         // Initialize the consensus.
         let consensus = Consensus::new(ledger.clone())?;
         lap!(timer, "Initialize consensus");
@@ -140,50 +175,10 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
             shutdown: Default::default(),
         };
 
-        // The following order must be preserved:
-        //  1. Initialize the REST server.
-        //  2. Initialize the CDN.
-        //  3. Initialize the routing.
-        //  4. Initialize block production.
-
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
             node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger.clone(), Arc::new(node.clone()))?));
             lap!(timer, "Initialize REST server");
-        }
-        // Initialize the CDN.
-        if let Some(base_url) = cdn {
-            // Sync the ledger with the CDN.
-            let result = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await;
-
-            // TODO (howardwu): Find a way to resolve integrity failures.
-            // If the sync failed, check the integrity of the ledger.
-            if let Err((completed_height, error)) = result {
-                warn!("{error}");
-                debug!("Synced the ledger up to block {completed_height}");
-
-                // A helper to log instructions to recover.
-                let log_error = |dev| match dev {
-                    Some(id) => error!("Storage corruption detected! Run `snarkos clean --dev {id}` to reset storage"),
-                    None => error!("Storage corruption detected! Run `snarkos clean` to reset storage"),
-                };
-
-                // Retrieve the latest height, according to the ledger.
-                let node_height = cow_to_copied!(ledger.vm().block_store().heights().max().unwrap_or_default());
-                // Check the integrity of the latest height.
-                if node_height != completed_height {
-                    log_error(dev);
-                    bail!("The latest height in the ledger does not match the sync process")
-                }
-
-                // Fetch the latest block from the ledger.
-                if let Err(err) = ledger.get_block(node_height) {
-                    log_error(dev);
-                    return Err(err);
-                }
-            }
-
-            lap!(timer, "Initialize the CDN");
         }
         // Initialize the routing.
         node.initialize_routing().await;

@@ -77,7 +77,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     ) -> Result<Self> {
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
-
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
@@ -110,6 +109,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 }
             }
         }
+
         // Initialize the node router.
         let router = Router::new(
             node_ip,
@@ -134,11 +134,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             latest_block: Default::default(),
             latest_puzzle_response: Default::default(),
         };
-
-        // The following order must be preserved:
-        //  1. Initialize the REST server.
-        //  2. Initialize the CDN.
-        //  3. Initialize the routing.
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {

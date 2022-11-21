@@ -19,9 +19,6 @@ edition = "2021"
 [dependencies.anyhow]
 version = "1"
 
-[dependencies.colored]
-version = "2.0"
-
 [dependencies.http]
 version = "0.2"
 
