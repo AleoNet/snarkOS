@@ -39,7 +39,7 @@ fn jwt_secret() -> &'static Vec<u8> {
 
 /// The Json web token claims.
 #[derive(Debug, Deserialize, Serialize)]
-pub(crate) struct Claims {
+pub struct Claims {
     /// The subject (user).
     sub: String,
     /// The UTC timestamp the token was issued at.
