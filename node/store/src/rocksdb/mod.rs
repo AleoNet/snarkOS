@@ -95,7 +95,7 @@ impl Database for RocksDB {
                 let rocksdb = {
                     options.increase_parallelism(2);
                     options.create_if_missing(true);
-                    options.set_max_open_files(1024);
+                    options.set_max_open_files(512);
                     Arc::new(rocksdb::DB::open(&options, primary)?)
                 };
 
