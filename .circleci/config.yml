@@ -134,8 +134,8 @@ commands:
 jobs:
   snarkos:
     docker:
-      - image: cimg/rust:1.64
-    resource_class: xlarge
+      - image: cimg/rust:1.65
+    resource_class: 2xlarge
     steps:
       - run_serial:
           workspace_member: .
@@ -143,7 +143,7 @@ jobs:
 
   account:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - run_serial:
@@ -152,7 +152,7 @@ jobs:
 
   cli:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - run_serial:
@@ -161,7 +161,7 @@ jobs:
 
   display:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - run_serial:
@@ -170,8 +170,8 @@ jobs:
 
   node:
     docker:
-      - image: cimg/rust:1.64
-    resource_class: xlarge
+      - image: cimg/rust:1.65
+    resource_class: 2xlarge
     steps:
       - run_serial:
           workspace_member: node
@@ -179,25 +179,16 @@ jobs:
 
   node-consensus:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: 2xlarge
     steps:
       - run_serial:
           workspace_member: node/consensus
           cache_key: snarkos-node-consensus-cache
 
-  node-executor:
-    docker:
-      - image: cimg/rust:1.64
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/executor
-          cache_key: snarkos-node-executor-cache
-
   node-ledger:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -206,7 +197,7 @@ jobs:
 
   node-messages:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - run_serial:
@@ -215,7 +206,7 @@ jobs:
 
   node-rest:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - run_serial:
@@ -224,7 +215,7 @@ jobs:
 
   node-router:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - run_serial:
@@ -233,8 +224,8 @@ jobs:
 
   node-store:
     docker:
-      - image: cimg/rust:1.64
-    resource_class: xlarge
+      - image: cimg/rust:1.65
+    resource_class: 2xlarge
     steps:
       - run_serial:
           workspace_member: node/store
@@ -242,7 +233,7 @@ jobs:
 
   check-fmt:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - checkout
@@ -258,7 +249,7 @@ jobs:
 
   check-clippy:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: 2xlarge
     steps:
       - checkout
@@ -297,7 +288,6 @@ workflows:
       - display
       - node
       - node-consensus
-      - node-executor
       - node-ledger
       - node-messages
       - node-rest

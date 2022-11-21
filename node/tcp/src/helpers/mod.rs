@@ -14,20 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod codec;
-pub use codec::MessageCodec;
+mod config;
+pub use config::Config;
 
-#[allow(unused)]
-mod noise_codec;
+pub mod connections;
+pub use connections::{Connection, ConnectionSide};
 
-mod data;
-pub use data::Data;
+mod known_peers;
+pub use known_peers::KnownPeers;
 
-mod disconnect;
-pub use disconnect::DisconnectReason;
-
-mod node_type;
-pub use node_type::*;
-
-mod status;
-pub use status::*;
+mod stats;
+pub use stats::Stats;

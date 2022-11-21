@@ -37,7 +37,8 @@ pub use validator::*;
 mod traits;
 pub use traits::*;
 
-use snarkos_node_executor::NodeType;
+use snarkos_node_messages::NodeType;
+use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
 
 use anyhow::Result;
@@ -45,13 +46,13 @@ use std::{net::SocketAddr, sync::Arc};
 
 pub enum Node<N: Network> {
     /// A beacon is a full node, capable of producing blocks.
-    Beacon(Arc<Beacon<N>>),
+    Beacon(Arc<Beacon<N, ConsensusDB<N>>>),
     /// A validator is a full node, capable of validating blocks.
-    Validator(Arc<Validator<N>>),
+    Validator(Arc<Validator<N, ConsensusDB<N>>>),
     /// A prover is a full node, capable of producing proofs for consensus.
-    Prover(Arc<Prover<N>>),
+    Prover(Arc<Prover<N, ConsensusDB<N>>>),
     /// A client node is a full node, capable of querying with the network.
-    Client(Arc<Client<N>>),
+    Client(Arc<Client<N, ConsensusDB<N>>>),
 }
 
 impl<N: Network> Node<N> {
@@ -84,8 +85,9 @@ impl<N: Network> Node<N> {
         node_ip: SocketAddr,
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
+        dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Prover(Arc::new(Prover::new(node_ip, private_key, trusted_peers).await?)))
+        Ok(Self::Prover(Arc::new(Prover::new(node_ip, private_key, trusted_peers, dev).await?)))
     }
 
     /// Initializes a new client node.
@@ -93,8 +95,9 @@ impl<N: Network> Node<N> {
         node_ip: SocketAddr,
         private_key: PrivateKey<N>,
         trusted_peers: &[SocketAddr],
+        dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Client(Arc::new(Client::new(node_ip, private_key, trusted_peers).await?)))
+        Ok(Self::Client(Arc::new(Client::new(node_ip, private_key, trusted_peers, dev).await?)))
     }
 
     /// Returns the node type.
@@ -134,6 +137,16 @@ impl<N: Network> Node<N> {
             Self::Validator(node) => node.address(),
             Self::Prover(node) => node.address(),
             Self::Client(node) => node.address(),
+        }
+    }
+
+    /// Returns `true` if the node is in development mode.
+    pub fn is_dev(&self) -> bool {
+        match self {
+            Self::Beacon(node) => node.is_dev(),
+            Self::Validator(node) => node.is_dev(),
+            Self::Prover(node) => node.is_dev(),
+            Self::Client(node) => node.is_dev(),
         }
     }
 }

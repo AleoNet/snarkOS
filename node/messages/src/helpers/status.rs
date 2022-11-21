@@ -30,12 +30,12 @@ pub enum Status {
     Ready = 0,
     /// The node is connecting to the minimum number of required peers.
     Peering,
-    /// The node is proving the coinbase puzzle.
-    Proving,
     /// The node is syncing blocks with a connected peer.
     Syncing,
     /// The node is terminating and shutting down.
     ShuttingDown,
+    /// The node is in an unknown state.
+    Unknown,
 }
 
 impl fmt::Display for Status {
@@ -53,6 +53,10 @@ impl RawStatus {
         Self(Arc::new(AtomicU8::new(Status::Peering as u8)))
     }
 
+    pub fn from_status(status: Status) -> Self {
+        Self(Arc::new(AtomicU8::new(status as u8)))
+    }
+
     /// Updates the status to the given value.
     pub fn update(&self, status: Status) {
         self.0.store(status as u8, Ordering::SeqCst);
@@ -63,10 +67,9 @@ impl RawStatus {
         match self.0.load(Ordering::SeqCst) {
             0 => Status::Ready,
             1 => Status::Peering,
-            2 => Status::Proving,
-            3 => Status::Syncing,
-            4 => Status::ShuttingDown,
-            _ => unreachable!("Invalid status code"),
+            2 => Status::Syncing,
+            3 => Status::ShuttingDown,
+            _ => Status::Unknown,
         }
     }
 
@@ -80,14 +83,14 @@ impl RawStatus {
         self.get() == Status::Peering
     }
 
-    /// Returns `true` if the node is currently proving.
-    pub fn is_proving(&self) -> bool {
-        self.get() == Status::Proving
-    }
-
     /// Returns `true` if the node is currently syncing.
     pub fn is_syncing(&self) -> bool {
         self.get() == Status::Syncing
+    }
+
+    /// Returns `true` if the node is shutting down.
+    pub fn is_shutting_down(&self) -> bool {
+        self.get() == Status::ShuttingDown
     }
 }
 
