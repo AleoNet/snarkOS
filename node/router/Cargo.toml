@@ -26,7 +26,7 @@ version = "0.1"
 version = "1.0"
 
 [dependencies.bytes]
-version = "1.0.0"
+version = "1.3.0"
 
 [dependencies.futures]
 version = "0.3.21"
