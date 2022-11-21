@@ -29,7 +29,7 @@ mod tests {
     #[test]
     fn test_sync_ledger_with_cdn_0_to_tip() {
         // Initialize the genesis block.
-        let genesis = Block::<CurrentNetwork>::read_le(&*CurrentNetwork::genesis_bytes()).unwrap();
+        let genesis = Block::<CurrentNetwork>::read_le(CurrentNetwork::genesis_bytes()).unwrap();
         // Initialize the ledger.
         let ledger = Ledger::<_, ConsensusMemory<_>>::load(Some(genesis), None).unwrap();
         // Perform the sync.
