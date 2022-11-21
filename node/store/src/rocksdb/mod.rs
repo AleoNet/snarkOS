@@ -93,10 +93,8 @@ impl Database for RocksDB {
 
                 let primary = aleo_std::aleo_ledger_dir(network_id, dev);
                 let rocksdb = {
-                    options.increase_parallelism(8);
+                    options.increase_parallelism(2);
                     options.create_if_missing(true);
-                    options.set_max_open_files(512);
-                    options.set_max_file_opening_threads(8);
                     Arc::new(rocksdb::DB::open(&options, primary)?)
                 };
 
