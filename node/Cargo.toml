@@ -30,9 +30,6 @@ version = "1"
 [dependencies.async-trait]
 version = "0.1"
 
-[dependencies.circular-queue]
-version = "0.2"
-
 [dependencies.colored]
 version = "2"
 
