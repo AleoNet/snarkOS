@@ -149,7 +149,7 @@ pub async fn load_blocks<N: Network>(
                 }
             })
         })
-        .buffered(64) // The number of concurrent requests.
+        .buffered(32) // The number of concurrent requests.
         .for_each(|result| async {
             // If the sync previously failed, return early.
             if failed.read().is_some() {

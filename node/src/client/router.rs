@@ -110,7 +110,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         let block_height = block.height();
 
         info!(
-            "Current(Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
+            "Coinbase Puzzle (Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
             block.coinbase_target(),
             block.proof_target()
         );
