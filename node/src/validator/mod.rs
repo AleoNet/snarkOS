@@ -123,22 +123,23 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 warn!("{error}");
                 debug!("Synced the ledger up to block {completed_height}");
 
+                // A helper to log instructions to recover.
+                let log_error = |dev| match dev {
+                    Some(id) => error!("Storage corruption detected! Run `snarkos clean --dev {id}` to reset storage"),
+                    None => error!("Storage corruption detected! Run `snarkos clean` to reset storage"),
+                };
+
                 // Retrieve the latest height, according to the ledger.
                 let node_height = cow_to_copied!(ledger.vm().block_store().heights().max().unwrap_or_default());
                 // Check the integrity of the latest height.
                 if node_height != completed_height {
+                    log_error(dev);
                     bail!("The latest height in the ledger does not match the sync process")
                 }
 
                 // Fetch the latest block from the ledger.
                 if let Err(err) = ledger.get_block(node_height) {
-                    // If the latest block is not found, return an error.
-                    match dev {
-                        Some(id) => error!(
-                            "Attention: Storage corruption detected! Run `snarkos clean --dev {id}` to reset storage"
-                        ),
-                        None => error!("Attention: Storage corruption detected! Run `snarkos clean` to reset storage"),
-                    }
+                    log_error(dev);
                     return Err(err);
                 }
             }
