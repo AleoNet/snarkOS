@@ -177,7 +177,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger.clone(), Arc::new(node.clone()))?));
+            node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?));
             lap!(timer, "Initialize REST server");
         }
         // Initialize the routing.

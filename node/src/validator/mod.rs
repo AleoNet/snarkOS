@@ -137,7 +137,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Arc::new(Rest::start(rest_ip, None, ledger.clone(), Arc::new(node.clone()))?));
+            node.rest = Some(Arc::new(Rest::start(rest_ip, None, ledger, Arc::new(node.clone()))?));
         }
         // Initialize the routing.
         node.initialize_routing().await;
