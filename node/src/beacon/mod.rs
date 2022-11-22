@@ -36,7 +36,6 @@ use snarkos_node_tcp::{
     P2P,
 };
 use snarkvm::prelude::{
-    cow_to_copied,
     Address,
     Block,
     ConsensusStorage,
