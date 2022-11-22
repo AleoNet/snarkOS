@@ -28,6 +28,15 @@ use rand_chacha::ChaChaRng;
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::runtime::{self, Runtime};
 
+/// The recommended minimum number of 'open files' limit for a beacon.
+/// Beacons should be able to handle at least 1000 concurrent connections, each requiring 2 sockets.
+#[cfg(target_family = "unix")]
+const RECOMMENDED_MIN_NOFILES_LIMIT_BEACON: u64 = 2048;
+/// The recommended minimum number of 'open files' limit for a validator.
+/// Validators should be able to handle at least 500 concurrent connections, each requiring 2 sockets.
+#[cfg(target_family = "unix")]
+const RECOMMENDED_MIN_NOFILES_LIMIT_VALIDATOR: u64 = 1024;
+
 /// Starts the snarkOS node.
 #[derive(Clone, Debug, Parser)]
 pub struct Start {
@@ -268,6 +277,17 @@ impl Start {
                     println!("🔑 Your one-time JWT token is {}\n", jwt_token.dimmed());
                 }
             }
+        }
+
+        // If the node is a beacon, check if the open files limit is lower than recommended.
+        if node_type.is_beacon() {
+            #[cfg(target_family = "unix")]
+            crate::helpers::check_open_files_limit(RECOMMENDED_MIN_NOFILES_LIMIT_BEACON);
+        }
+        // If the node is a validator, check if the open files limit is lower than recommended.
+        if node_type.is_validator() {
+            #[cfg(target_family = "unix")]
+            crate::helpers::check_open_files_limit(RECOMMENDED_MIN_NOFILES_LIMIT_VALIDATOR);
         }
 
         // Initialize the node.
