@@ -16,16 +16,96 @@
 
 use super::*;
 
+use snarkos_node_messages::{DisconnectReason, Message, MessageCodec};
+use snarkos_node_router::Routing;
+use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
+
+use std::{io, net::SocketAddr};
+
+impl<N: Network, C: ConsensusStorage<N>> P2P for Beacon<N, C> {
+    /// Returns a reference to the TCP instance.
+    fn tcp(&self) -> &Tcp {
+        self.router.tcp()
+    }
+}
+
 #[async_trait]
-impl<N: Network> Handshake for Beacon<N> {
+impl<N: Network, C: ConsensusStorage<N>> Handshake for Beacon<N, C> {
+    /// Performs the handshake protocol.
+    async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
+        let peer_addr = connection.addr();
+        let conn_side = connection.side();
+        let stream = self.borrow_stream(&mut connection);
+        self.router.handshake(peer_addr, stream, conn_side).await?;
+
+        Ok(connection)
+    }
+}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Disconnect for Beacon<N, C> {
+    /// Any extra operations to be performed during a disconnect.
+    async fn handle_disconnect(&self, peer_addr: SocketAddr) {
+        self.router.remove_connected_peer(peer_addr);
+    }
+}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Writing for Beacon<N, C> {
+    type Codec = MessageCodec<N>;
+    type Message = Message<N>;
+
+    /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
+    /// The `side` parameter indicates the connection side **from the node's perspective**.
+    fn codec(&self, _addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
+        Default::default()
+    }
+}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Reading for Beacon<N, C> {
+    type Codec = MessageCodec<N>;
+    type Message = Message<N>;
+
+    /// Creates a [`Decoder`] used to interpret messages from the network.
+    /// The `side` param indicates the connection side **from the node's perspective**.
+    fn codec(&self, _peer_addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
+        Default::default()
+    }
+
+    /// Processes a message received from the network.
+    async fn process_message(&self, peer_ip: SocketAddr, message: Self::Message) -> io::Result<()> {
+        // Process the message. Disconnect if the peer violated the protocol.
+        if let Err(error) = self.inbound(peer_ip, message).await {
+            warn!("Disconnecting from '{peer_ip}' - {error}");
+            self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
+            // Disconnect from this peer.
+            self.router().disconnect(peer_ip).await;
+        }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Routing<N> for Beacon<N, C> {}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Heartbeat<N> for Beacon<N, C> {
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 10;
 }
 
+impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Beacon<N, C> {
+    /// Returns a reference to the router.
+    fn router(&self) -> &Router<N> {
+        &self.router
+    }
+}
+
 #[async_trait]
-impl<N: Network> Inbound<N> for Beacon<N> {
+impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
     /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
-    async fn puzzle_request(&self, peer_ip: SocketAddr, router: &Router<N>) -> bool {
+    fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
         // Retrieve the latest epoch challenge and latest block.
         let (epoch_challenge, block) = {
             // Retrieve the latest epoch challenge.
@@ -43,18 +123,13 @@ impl<N: Network> Inbound<N> for Beacon<N> {
             (epoch_challenge, block)
         };
         // Send the `PuzzleResponse` message to the peer.
-        let message = Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block: Data::Object(block) });
-        if let Err(error) = router.process(RouterRequest::MessageSend(peer_ip, message)).await {
-            warn!("[PuzzleResponse] {}", error);
-        }
-
+        self.send(peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block: Data::Object(block) }));
         true
     }
 
     /// Adds the unconfirmed solution to the memory pool, and propagates the solution to all peers.
     async fn unconfirmed_solution(
         &self,
-        _router: &Router<N>,
         _peer_ip: SocketAddr,
         _message: UnconfirmedSolution<N>,
         solution: ProverSolution<N>,
@@ -73,9 +148,8 @@ impl<N: Network> Inbound<N> for Beacon<N> {
     }
 
     /// Adds the unconfirmed transaction to the memory pool, and propagates the transaction to all peers.
-    async fn unconfirmed_transaction(
+    fn unconfirmed_transaction(
         &self,
-        _router: &Router<N>,
         _peer_ip: SocketAddr,
         _message: UnconfirmedTransaction<N>,
         transaction: Transaction<N>,
@@ -93,6 +167,3 @@ impl<N: Network> Inbound<N> for Beacon<N> {
         true
     }
 }
-
-#[async_trait]
-impl<N: Network> Outbound for Beacon<N> {}

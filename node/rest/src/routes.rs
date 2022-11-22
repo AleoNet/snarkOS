@@ -25,7 +25,7 @@ struct BlockRange {
     end: u32,
 }
 
-impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
+impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     /// Initializes the routes, given the ledger and ledger sender.
     pub fn routes(&self) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
         // GET /testnet3/latest/height
@@ -124,25 +124,25 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         // GET /testnet3/peers/count
         let get_peers_count = warp::get()
             .and(warp::path!("testnet3" / "peers" / "count"))
-            .and(with(self.router.clone()))
+            .and(with(self.routing.router().clone()))
             .and_then(Self::get_peers_count);
 
         // GET /testnet3/peers/all
         let get_peers_all = warp::get()
             .and(warp::path!("testnet3" / "peers" / "all"))
-            .and(with(self.router.clone()))
+            .and(with(self.routing.router().clone()))
             .and_then(Self::get_peers_all);
 
         // GET /testnet3/peers/all/metrics
         let get_peers_all_metrics = warp::get()
             .and(warp::path!("testnet3" / "peers" / "all" / "metrics"))
-            .and(with(self.router.clone()))
+            .and(with(self.routing.router().clone()))
             .and_then(Self::get_peers_all_metrics);
 
         // GET /testnet3/node/address
         let get_node_address = warp::get()
             .and(warp::path!("testnet3" / "node" / "address"))
-            .and(with(self.address))
+            .and(with(self.routing.router().address()))
             .and_then(|address: Address<N>| async move { Ok::<_, Rejection>(reply::json(&address.to_string())) });
 
         // GET /testnet3/find/blockHash/{transactionID}
@@ -177,43 +177,13 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .and(with(self.ledger.clone()))
             .and_then(Self::find_transition_id);
 
-        // GET /testnet3/records/all
-        let records_all = warp::get()
-            .and(warp::path!("testnet3" / "records" / "all"))
-            .and(with_auth())
-            .untuple_one()
-            .and(warp::body::content_length_limit(128))
-            .and(warp::body::json())
-            .and(with(self.ledger.clone()))
-            .and_then(Self::records_all);
-
-        // GET /testnet3/records/spent
-        let records_spent = warp::get()
-            .and(warp::path!("testnet3" / "records" / "spent"))
-            .and(with_auth())
-            .untuple_one()
-            .and(warp::body::content_length_limit(128))
-            .and(warp::body::json())
-            .and(with(self.ledger.clone()))
-            .and_then(Self::records_spent);
-
-        // GET /testnet3/records/unspent
-        let records_unspent = warp::get()
-            .and(warp::path!("testnet3" / "records" / "unspent"))
-            .and(with_auth())
-            .untuple_one()
-            .and(warp::body::content_length_limit(128))
-            .and(warp::body::json())
-            .and(with(self.ledger.clone()))
-            .and_then(Self::records_unspent);
-
         // POST /testnet3/transaction/broadcast
         let transaction_broadcast = warp::post()
             .and(warp::path!("testnet3" / "transaction" / "broadcast"))
             .and(warp::body::content_length_limit(10 * 1024 * 1024))
             .and(warp::body::json())
             .and(with(self.consensus.clone()))
-            .and(with(self.router.clone()))
+            .and(with(self.routing.clone()))
             .and_then(Self::transaction_broadcast);
 
         // Return the list of routes.
@@ -239,14 +209,11 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             .or(find_deployment_id)
             .or(find_transaction_id)
             .or(find_transition_id)
-            .or(records_all)
-            .or(records_spent)
-            .or(records_unspent)
             .or(transaction_broadcast)
     }
 }
 
-impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
+impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     /// Returns the latest block height.
     async fn latest_height(ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
         Ok(reply::json(&ledger.latest_height()))
@@ -355,17 +322,17 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
 
     /// Returns the number of peers connected to the node.
     async fn get_peers_count(router: Router<N>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&router.number_of_connected_peers().await))
+        Ok(reply::json(&router.number_of_connected_peers()))
     }
 
     /// Returns the peers connected to the node.
     async fn get_peers_all(router: Router<N>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&router.connected_peers().await))
+        Ok(reply::json(&router.connected_peers()))
     }
 
     /// Returns the metrics for peers connected to the node.
     async fn get_peers_all_metrics(router: Router<N>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&router.connected_metrics().await))
+        Ok(reply::json(&router.connected_metrics()))
     }
 
     /// Returns the block hash that contains the given `transaction ID`.
@@ -391,35 +358,11 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
         Ok(reply::json(&ledger.find_transition_id(&input_or_output_id).or_reject()?))
     }
 
-    /// Returns all of the records for the given view key.
-    async fn records_all(view_key: ViewKey<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
-        // Fetch the records using the view key.
-        let records: IndexMap<_, _> = ledger.find_records(&view_key, RecordsFilter::All).or_reject()?.collect();
-        // Return the records.
-        Ok(reply::with_status(reply::json(&records), StatusCode::OK))
-    }
-
-    /// Returns the spent records for the given view key.
-    async fn records_spent(view_key: ViewKey<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
-        // Fetch the records using the view key.
-        let records = ledger.find_records(&view_key, RecordsFilter::Spent).or_reject()?.collect::<IndexMap<_, _>>();
-        // Return the records.
-        Ok(reply::with_status(reply::json(&records), StatusCode::OK))
-    }
-
-    /// Returns the unspent records for the given view key.
-    async fn records_unspent(view_key: ViewKey<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
-        // Fetch the records using the view key.
-        let records = ledger.find_records(&view_key, RecordsFilter::Unspent).or_reject()?.collect::<IndexMap<_, _>>();
-        // Return the records.
-        Ok(reply::with_status(reply::json(&records), StatusCode::OK))
-    }
-
     /// Broadcasts the transaction to the ledger.
     async fn transaction_broadcast(
         transaction: Transaction<N>,
         consensus: Option<Consensus<N, C>>,
-        router: Router<N>,
+        routing: Arc<R>,
     ) -> Result<impl Reply, Rejection> {
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = consensus {
@@ -427,14 +370,15 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
             consensus.add_unconfirmed_transaction(transaction.clone()).or_reject()?;
         }
 
-        // Broadcast the transaction.
+        // Prepare the unconfirmed transaction message.
         let message = Message::UnconfirmedTransaction(UnconfirmedTransaction {
             transaction_id: transaction.id(),
             transaction: Data::Object(transaction),
         });
-        match router.process(RouterRequest::MessagePropagate(message, vec![])).await {
-            Ok(()) => Ok("OK"),
-            Err(error) => Err(reject::custom(RestError::Request(format!("Failed to broadcast transaction: {error}")))),
-        }
+
+        // Broadcast the transaction.
+        routing.propagate(message, vec![]);
+
+        Ok("OK")
     }
 }

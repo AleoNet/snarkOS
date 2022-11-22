@@ -23,7 +23,7 @@ version = "1"
 version = "1.0"
 
 [dependencies.bytes]
-version = "1.0.0"
+version = "1"
 
 [dependencies.kadmium]
 version = "0.6.0"
@@ -35,9 +35,6 @@ version = "1"
 [dependencies.serde]
 version = "1"
 
-[dependencies.snarkos-node-executor]
-path = "../executor"
-
 [dependencies.snarkvm]
 workspace = true
 
@@ -45,7 +42,7 @@ workspace = true
 version = "0.9.0"
 
 [dependencies.tokio]
-version = "1.21"
+version = "1.22"
 features = [
   "io-util",
   "macros",

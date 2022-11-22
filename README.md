@@ -162,9 +162,10 @@ USAGE:
 OPTIONS:
         --beacon <BEACON>          Specify this as a beacon, with the given account private key for this node
         --client <CLIENT>          Specify this as a client, with an optional account private key for this node
-        --connect <CONNECT>        Specify the IP address and port of a peer to connect to
+        --connect <CONNECT>        Specify the IP address and port of a peer to connect to [default: ]
         --dev <DEV>                Enables development mode, specify a unique ID for this node
     -h, --help                     Print help information
+        --logfile <LOGFILE>        Specify the path to the file where logs will be stored [default: /tmp/snarkos.log]
         --network <NETWORK>        Specify the network of this node [default: 3]
         --node <NODE>              Specify the IP address and port for the node server [default: 0.0.0.0:4133]
         --nodisplay                If the flag is set, the node will not render the display

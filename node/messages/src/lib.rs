@@ -64,7 +64,6 @@ pub use unconfirmed_solution::UnconfirmedSolution;
 mod unconfirmed_transaction;
 pub use unconfirmed_transaction::UnconfirmedTransaction;
 
-use snarkos_node_executor::{NodeType, Status};
 use snarkvm::prelude::{
     Block,
     EpochChallenge,

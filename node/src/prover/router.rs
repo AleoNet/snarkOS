@@ -16,34 +16,111 @@
 
 use super::*;
 
-#[async_trait]
-impl<N: Network> Handshake for Prover<N> {}
+use snarkos_node_messages::{DisconnectReason, Message, MessageCodec};
+use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
+use snarkvm::prelude::Network;
+
+use std::{io, net::SocketAddr};
+
+impl<N: Network, C: ConsensusStorage<N>> P2P for Prover<N, C> {
+    /// Returns a reference to the TCP instance.
+    fn tcp(&self) -> &Tcp {
+        self.router.tcp()
+    }
+}
 
 #[async_trait]
-impl<N: Network> Inbound<N> for Prover<N> {
-    /// Saves the latest epoch challenge and latest block in the prover.
-    async fn puzzle_response(&self, message: PuzzleResponse<N>, peer_ip: SocketAddr) -> bool {
-        let epoch_challenge = message.epoch_challenge;
-        match message.block.deserialize().await {
-            Ok(block) => {
-                // Retrieve the epoch number.
-                let epoch_number = epoch_challenge.epoch_number();
-                // Retrieve the block height.
-                let block_height = block.height();
+impl<N: Network, C: ConsensusStorage<N>> Handshake for Prover<N, C> {
+    /// Performs the handshake protocol.
+    async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
+        let peer_addr = connection.addr();
+        let conn_side = connection.side();
+        let stream = self.borrow_stream(&mut connection);
+        self.router.handshake(peer_addr, stream, conn_side).await?;
 
-                // Save the latest epoch challenge in the prover.
-                self.latest_epoch_challenge.write().await.replace(epoch_challenge);
-                // Save the latest block in the prover.
-                self.latest_block.write().await.replace(block);
+        Ok(connection)
+    }
+}
 
-                trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
-                true
-            }
-            Err(error) => {
-                error!("Failed to deserialize the puzzle response from '{peer_ip}': {error}");
-                false
-            }
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Disconnect for Prover<N, C> {
+    /// Any extra operations to be performed during a disconnect.
+    async fn handle_disconnect(&self, peer_addr: SocketAddr) {
+        self.router.remove_connected_peer(peer_addr);
+    }
+}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Writing for Prover<N, C> {
+    type Codec = MessageCodec<N>;
+    type Message = Message<N>;
+
+    /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
+    /// The `side` parameter indicates the connection side **from the node's perspective**.
+    fn codec(&self, _addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
+        Default::default()
+    }
+}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Reading for Prover<N, C> {
+    type Codec = MessageCodec<N>;
+    type Message = Message<N>;
+
+    /// Creates a [`Decoder`] used to interpret messages from the network.
+    /// The `side` param indicates the connection side **from the node's perspective**.
+    fn codec(&self, _peer_addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
+        Default::default()
+    }
+
+    /// Processes a message received from the network.
+    async fn process_message(&self, peer_ip: SocketAddr, message: Self::Message) -> io::Result<()> {
+        // Process the message. Disconnect if the peer violated the protocol.
+        if let Err(error) = self.inbound(peer_ip, message).await {
+            warn!("Disconnecting from '{peer_ip}' - {error}");
+            self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
+            // Disconnect from this peer.
+            self.router().disconnect(peer_ip).await;
         }
+        Ok(())
+    }
+}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Routing<N> for Prover<N, C> {}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Heartbeat<N> for Prover<N, C> {}
+
+impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Prover<N, C> {
+    /// Returns a reference to the router.
+    fn router(&self) -> &Router<N> {
+        &self.router
+    }
+}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
+    /// Saves the latest epoch challenge and latest block in the node.
+    fn puzzle_response(&self, peer_ip: SocketAddr, message: PuzzleResponse<N>, block: Block<N>) -> bool {
+        // Retrieve the epoch number.
+        let epoch_number = message.epoch_challenge.epoch_number();
+        // Retrieve the block height.
+        let block_height = block.height();
+
+        info!(
+            "Coinbase Puzzle (Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
+            block.coinbase_target(),
+            block.proof_target()
+        );
+
+        // Save the latest epoch challenge in the node.
+        self.latest_epoch_challenge.write().replace(message.epoch_challenge);
+        // Save the latest block in the node.
+        self.latest_block.write().replace(block);
+
+        trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
+        true
     }
 
     /// If the last coinbase timestamp exceeds a multiple of the anchor time,
@@ -51,26 +128,20 @@ impl<N: Network> Inbound<N> for Prover<N> {
     /// Otherwise, the prover will ignore the message.
     async fn unconfirmed_solution(
         &self,
-        router: &Router<N>,
         peer_ip: SocketAddr,
         message: UnconfirmedSolution<N>,
         _solution: ProverSolution<N>,
     ) -> bool {
-        if let Some(block) = self.latest_block.read().await.as_ref() {
+        let last_coinbase_timestamp = self.latest_block.read().as_ref().map(|block| block.last_coinbase_timestamp());
+        if let Some(last_coinbase_timestamp) = last_coinbase_timestamp {
             // Compute the elapsed time since the last coinbase block.
-            let elapsed = OffsetDateTime::now_utc().unix_timestamp().saturating_sub(block.last_coinbase_timestamp());
+            let elapsed = OffsetDateTime::now_utc().unix_timestamp().saturating_sub(last_coinbase_timestamp);
             // If the elapsed time exceeds a multiple of the anchor time, then assist in propagation.
             if elapsed > N::ANCHOR_TIME as i64 * 6 {
                 // Propagate the `UnconfirmedSolution`.
-                let request = RouterRequest::MessagePropagate(Message::UnconfirmedSolution(message), vec![peer_ip]);
-                if let Err(error) = router.process(request).await {
-                    warn!("[UnconfirmedSolution] {error}");
-                }
+                self.propagate(Message::UnconfirmedSolution(message), vec![peer_ip]);
             }
         }
         true
     }
 }
-
-#[async_trait]
-impl<N: Network> Outbound for Prover<N> {}

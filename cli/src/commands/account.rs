@@ -14,12 +14,17 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use anyhow::Result;
+use snarkvm::console::{
+    account::PrivateKey,
+    prelude::{Environment, Uniform},
+    types::Field,
+};
+
+use anyhow::{anyhow, Result};
 use clap::Parser;
-use num_bigint::BigInt;
+use core::str::FromStr;
 use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
-use snarkvm::prelude::PrivateKey;
 
 type Network = snarkvm::prelude::Testnet3;
 
@@ -30,7 +35,7 @@ pub enum Account {
     New {
         /// Seed the RNG with a numeric value
         #[clap(short = 's', long)]
-        seed: Option<BigInt>,
+        seed: Option<String>,
     },
 }
 
@@ -38,18 +43,20 @@ impl Account {
     pub fn parse(self) -> Result<String> {
         match self {
             Self::New { seed } => {
-                // Sample a new Aleo account.
-                let account = snarkos_account::Account::from(match seed {
-                    Some(bigint) => {
-                        let mut bytes = bigint.to_bytes_be().1;
-                        bytes.truncate(32);
-                        bytes.resize(32, 0);
-                        let seed: [u8; 32] =
-                            bytes.try_into().expect("Invalid seed: Failed to convert the seed into a 32 bytes number.");
-                        PrivateKey::<Network>::new(&mut ChaChaRng::from_seed(seed))?
-                    }
-                    None => PrivateKey::new(&mut rand::thread_rng())?,
-                })?;
+                // Recover the seed.
+                let seed = match seed {
+                    // Recover the field element deterministically.
+                    Some(seed) => Field::new(
+                        <Network as Environment>::Field::from_str(&seed).map_err(|e| anyhow!("Invalid seed - {e}"))?,
+                    ),
+                    // Sample a random field element.
+                    None => Field::rand(&mut ChaChaRng::from_entropy()),
+                };
+                // Recover the private key from the seed as a field element.
+                let private_key = PrivateKey::try_from(seed)
+                    .map_err(|_| anyhow!("Failed to convert the seed into a valid private key"))?;
+                // Construct the account.
+                let account = snarkos_account::Account::<Network>::try_from(private_key)?;
                 // Print the new Aleo account.
                 Ok(account.to_string())
             }
@@ -60,9 +67,8 @@ impl Account {
 #[cfg(test)]
 mod tests {
     use crate::commands::Account;
+
     use colored::Colorize;
-    use num_bigint::{BigInt, ToBigInt};
-    use std::str::FromStr;
 
     #[test]
     fn test_new() {
@@ -74,21 +80,21 @@ mod tests {
 
     #[test]
     fn test_new_seeded() {
-        let seed = 1231275789u64.to_bigint();
+        let seed = Some(1231275789u64.to_string());
         let mut expected = format!(
             " {:>12}  {}\n",
             "Private Key".cyan().bold(),
-            "APrivateKey1zkp9t1en6qJauvSGGngoEvFSeER2T7A9Yx6NbGxMqEoxMjT"
+            "APrivateKey1zkp2n22c19hNdGF8wuEoQcuiyuWbquY6up4CtG5DYKqPX2X"
         );
         expected += &format!(
             " {:>12}  {}\n",
             "View Key".cyan().bold(),
-            "AViewKey1cWek62tM1kaHqDqwFBK6dZwYHaKeN8DZ6A82v9AEJiCj"
+            "AViewKey1pNxZHn79XVJ4D2WG5Vn2YWsAzf5wzAs3dAuQtUAmUFF7"
         );
         expected += &format!(
             " {:>12}  {}",
             "Address".cyan().bold(),
-            "aleo17h3hthqzctgc5s847pw7c4zmxqce8dxzsmwr3tp7umxcegl9vgrqz2khpg"
+            "aleo1uxl69laseuv3876ksh8k0nd7tvpgjt6ccrgccedpjk9qwyfensxst9ftg5"
         );
         let account = Account::New { seed };
         let actual = account.parse().unwrap();
@@ -97,22 +103,21 @@ mod tests {
 
     #[test]
     fn test_new_seeded_with_256bits_input() {
-        let seed =
-            BigInt::from_str("38868010450269069756484274649022187108349082664538872491798902858296683054657").ok();
+        let seed = Some("38868010450269069756484274649022187108349082664538872491798902858296683054657".to_string());
         let mut expected = format!(
             " {:>12}  {}\n",
             "Private Key".cyan().bold(),
-            "APrivateKey1zkp9hECGeW7orKTdzfeZdY8GSXDbiFQxBZZsJZzeGhDBeUo"
+            "APrivateKey1zkp61PAYmrYEKLtRWeWhUoDpFnGLNuHrCciSqN49T86dw3p"
         );
         expected += &format!(
             " {:>12}  {}\n",
             "View Key".cyan().bold(),
-            "AViewKey1f1cZnyFi2gtPrG8veomDBJz5r945LhE5NutnSeVak5wm"
+            "AViewKey1eYEGtb78FVg38SSYyzAeXnBdnWCba5t5YxUxtkTtvNAE"
         );
         expected += &format!(
             " {:>12}  {}",
             "Address".cyan().bold(),
-            "aleo1wympy5rs4jrhrqe0lmptsst6efv45ec4pwq37xe2h8sg4ask8yystp95vj"
+            "aleo1zecnqchckrzw7dlsyf65g6z5le2rmys403ecwmcafrag0e030yxqrnlg8j"
         );
         let account = Account::New { seed };
         let actual = account.parse().unwrap();

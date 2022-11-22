@@ -16,6 +16,15 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
+[features]
+default = [ "parallel" ]
+parallel = [ "rayon" ]
+timer = [ "aleo-std/timer" ]
+
+[dependencies.aleo-std]
+version = "0.1.15"
+default-features = false
+
 [dependencies.anyhow]
 version = "1"
 
@@ -32,8 +41,9 @@ version = "0.12"
 [dependencies.rand]
 version = "0.8"
 
-[dependencies.snarkos-node-store]
-path = "../store"
+[dependencies.rayon]
+version = "1"
+optional = true
 
 [dependencies.snarkvm]
 workspace = true

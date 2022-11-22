@@ -26,54 +26,45 @@ mod routes;
 pub use routes::*;
 
 use snarkos_node_consensus::Consensus;
-use snarkos_node_ledger::{Ledger, RecordsFilter};
+use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
-use snarkos_node_router::{Router, RouterRequest};
+use snarkos_node_router::{Router, Routing};
 use snarkvm::{
-    console::{
-        account::{Address, ViewKey},
-        program::ProgramID,
-        types::Field,
-    },
+    console::{account::Address, program::ProgramID, types::Field},
     prelude::{cfg_into_iter, Network},
     synthesizer::{ConsensusStorage, Program, Transaction},
 };
 
 use anyhow::Result;
-use colored::*;
 use http::header::HeaderName;
-use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::task::JoinHandle;
-use warp::{http::StatusCode, reject, reply, Filter, Rejection, Reply};
+use warp::{reject, reply, Filter, Rejection, Reply};
 
 /// A REST API server for the ledger.
 #[derive(Clone)]
-pub struct Rest<N: Network, C: ConsensusStorage<N>> {
-    /// The node address.
-    address: Address<N>,
+pub struct Rest<N: Network, C: ConsensusStorage<N>, R: Routing<N>> {
     /// The consensus module.
     consensus: Option<Consensus<N, C>>,
     /// The ledger.
     ledger: Ledger<N, C>,
-    /// The router.
-    router: Router<N>,
+    /// The node (routing).
+    routing: Arc<R>,
     /// The server handles.
     handles: Vec<Arc<JoinHandle<()>>>,
 }
 
-impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
+impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     /// Initializes a new instance of the server.
     pub fn start(
         rest_ip: SocketAddr,
-        address: Address<N>,
         consensus: Option<Consensus<N, C>>,
         ledger: Ledger<N, C>,
-        router: Router<N>,
+        routing: Arc<R>,
     ) -> Result<Self> {
         // Initialize the server.
-        let mut server = Self { address, consensus, ledger, router, handles: vec![] };
+        let mut server = Self { consensus, ledger, routing, handles: vec![] };
         // Spawn the server.
         server.spawn_server(rest_ip);
         // Return the server.
@@ -81,7 +72,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
     }
 }
 
-impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
+impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     /// Returns the ledger.
     pub const fn ledger(&self) -> &Ledger<N, C> {
         &self.ledger
@@ -93,7 +84,7 @@ impl<N: Network, C: ConsensusStorage<N>> Rest<N, C> {
     }
 }
 
-impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
+impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     /// Initializes the server.
     fn spawn_server(&mut self, rest_ip: SocketAddr) {
         let cors = warp::cors()
@@ -111,14 +102,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>> Rest<N, C> {
         });
 
         // Spawn the server.
-        let address = self.address;
         self.handles.push(Arc::new(tokio::spawn(async move {
-            println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
-
-            if let Ok(jwt_token) = helpers::Claims::new(address).to_jwt_string() {
-                println!("JSON Web Token: {}\n", jwt_token);
-            }
-
             // Start the server.
             warp::serve(routes.with(cors).with(custom_log)).run(rest_ip).await
         })))
