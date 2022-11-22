@@ -80,12 +80,10 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Initializes a new prover node.
     pub async fn new(
         node_ip: SocketAddr,
-        private_key: PrivateKey<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
-        // Initialize the node account.
-        let account = Account::from(private_key)?;
         // Initialize the node router.
         let router = Router::new(
             node_ip,

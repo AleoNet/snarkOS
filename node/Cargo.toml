@@ -53,6 +53,9 @@ version = "1"
 [dependencies.snarkos-account]
 path = "../account"
 
+[dependencies.snarkos-node-cdn]
+path = "./cdn"
+
 [dependencies.snarkos-node-consensus]
 path = "./consensus"
 

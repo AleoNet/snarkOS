@@ -14,8 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-// pub mod ledger;
-// pub use ledger::*;
+mod log_writer;
+use log_writer::*;
+
+pub mod logger;
+pub use logger::*;
 
 pub mod updater;
 pub use updater::*;

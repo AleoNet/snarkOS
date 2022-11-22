@@ -92,20 +92,27 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     pub async fn new(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
-        private_key: PrivateKey<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Option<Block<N>>,
+        cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
         let timer = timer!("Beacon::new");
 
-        // Initialize the node account.
-        let account = Account::from(private_key)?;
-        lap!(timer, "Initialize the account");
-
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
         lap!(timer, "Initialize the ledger");
+
+        // Initialize the CDN.
+        if let Some(base_url) = cdn {
+            // Sync the ledger with the CDN.
+            if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
+                crate::helpers::log_clean_error(dev);
+                return Err(error);
+            }
+            lap!(timer, "Initialize the CDN");
+        }
 
         // Initialize the consensus.
         let consensus = Consensus::new(ledger.clone())?;
@@ -487,21 +494,22 @@ mod tests {
 
         // Initialize an (insecure) fixed RNG.
         let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
-        // Initialize the beacon private key.
-        let beacon_private_key = PrivateKey::<CurrentNetwork>::new(&mut rng)?;
+        // Initialize the beacon account.
+        let beacon_account = Account::<CurrentNetwork>::new(&mut rng).unwrap();
         // Initialize a new VM.
         let vm = VM::from(ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?)?;
         // Initialize the genesis block.
-        let genesis = Block::genesis(&vm, &beacon_private_key, &mut rng)?;
+        let genesis = Block::genesis(&vm, beacon_account.private_key(), &mut rng)?;
 
         println!("Initializing beacon node...");
 
         let beacon = Beacon::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
             node,
             Some(rest),
-            beacon_private_key,
+            beacon_account,
             &[],
             Some(genesis),
+            None,
             dev,
         )
         .await

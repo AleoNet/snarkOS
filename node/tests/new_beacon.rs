@@ -17,11 +17,12 @@
 mod common;
 use common::TestPeer;
 
+use snarkos_account::Account;
 use snarkos_node::Beacon;
 use snarkos_node_messages::NodeType;
 use snarkos_node_router::Outbound;
 use snarkos_node_tcp::P2P;
-use snarkvm::prelude::{ConsensusMemory, PrivateKey, Testnet3 as CurrentNetwork};
+use snarkvm::prelude::{ConsensusMemory, Testnet3 as CurrentNetwork};
 
 use std::str::FromStr;
 
@@ -31,9 +32,10 @@ async fn handshake_responder_side() {
     let beacon = Beacon::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
         "127.0.0.1:4133".parse().unwrap(),
         None,
-        PrivateKey::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
+        Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
         None, // Should load the current network's genesis block.
+        None, // No CDN.
         None,
     )
     .await
@@ -54,9 +56,10 @@ async fn handshake_initiator_side() {
     let beacon = Beacon::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
         "127.0.0.1:4133".parse().unwrap(),
         None,
-        PrivateKey::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
+        Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
         None, // Should load the current network's genesis block.
+        None, // No CDN.
         None,
     )
     .await

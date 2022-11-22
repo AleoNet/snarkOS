@@ -16,9 +16,6 @@
 
 #![forbid(unsafe_code)]
 
-mod log_writer;
-use log_writer::*;
-
 mod pages;
 use pages::*;
 
@@ -29,26 +26,17 @@ use snarkos_node::Node;
 use snarkvm::prelude::Network;
 
 use anyhow::Result;
-use colored::*;
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
-    tty::IsTty,
 };
 use std::{
-    fs::File,
     io,
-    path::Path,
     thread,
     time::{Duration, Instant},
 };
-use tokio::sync::mpsc;
-use tracing_subscriber::{
-    layer::{Layer, SubscriberExt},
-    util::SubscriberInitExt,
-    EnvFilter,
-};
+use tokio::sync::mpsc::Receiver;
 use tui::{
     backend::{Backend, CrosstermBackend},
     layout::{Constraint, Direction, Layout},
@@ -72,46 +60,33 @@ pub struct Display<N: Network> {
 
 impl<N: Network> Display<N> {
     /// Initializes a new display.
-    pub fn start<P: AsRef<Path>>(node: Node<N>, verbosity: u8, nodisplay: bool, logfile: P) -> Result<()> {
-        // Initialize the logger.
-        let log_receiver = Self::initialize_logger(verbosity, nodisplay, logfile);
+    pub fn start(node: Node<N>, log_receiver: Receiver<Vec<u8>>) -> Result<()> {
+        // Initialize the display.
+        enable_raw_mode()?;
+        let mut stdout = io::stdout();
+        execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+        let backend = CrosstermBackend::new(stdout);
+        let mut terminal = Terminal::new(backend)?;
 
-        // If the display is not enabled, render the welcome message.
-        if nodisplay {
-            // Print the Aleo address.
-            println!("🪪 Your Aleo address is {}.\n", node.address().to_string().bold());
-            // Print the node type and network.
-            println!("🧭 Starting {} on {}.\n", node.node_type().description().bold(), N::NAME.bold());
-        }
-        // If the display is enabled, render the display.
-        else {
-            // Initialize the display.
-            enable_raw_mode()?;
-            let mut stdout = io::stdout();
-            execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
-            let backend = CrosstermBackend::new(stdout);
-            let mut terminal = Terminal::new(backend)?;
+        // Initialize the display.
+        let mut display = Self {
+            node,
+            tick_rate: Duration::from_secs(1),
+            tabs: Tabs::new(PAGES.to_vec()),
+            logs: Logs::new(log_receiver),
+        };
 
-            // Initialize the display.
-            let mut display = Self {
-                node,
-                tick_rate: Duration::from_secs(1),
-                tabs: Tabs::new(PAGES.to_vec()),
-                logs: Logs::new(log_receiver),
-            };
+        // Render the display.
+        let res = display.render(&mut terminal);
 
-            // Render the display.
-            let res = display.render(&mut terminal);
+        // Terminate the display.
+        disable_raw_mode()?;
+        execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+        terminal.show_cursor()?;
 
-            // Terminate the display.
-            disable_raw_mode()?;
-            execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
-            terminal.show_cursor()?;
-
-            // Exit.
-            if let Err(err) = res {
-                println!("{err:?}")
-            }
+        // Exit.
+        if let Err(err) = res {
+            println!("{err:?}")
         }
 
         Ok(())
@@ -119,68 +94,6 @@ impl<N: Network> Display<N> {
 }
 
 impl<N: Network> Display<N> {
-    /// Initializes the logger.
-    fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile: P) -> mpsc::Receiver<Vec<u8>> {
-        match verbosity {
-            0 => std::env::set_var("RUST_LOG", "info"),
-            1 => std::env::set_var("RUST_LOG", "debug"),
-            2 | 3 | 4 => std::env::set_var("RUST_LOG", "trace"),
-            _ => std::env::set_var("RUST_LOG", "info"),
-        };
-
-        // Filter out undesirable logs. (unfortunately EnvFilter cannot be cloned)
-        let [filter, filter2] = std::array::from_fn(|_| {
-            let filter = EnvFilter::from_default_env()
-                .add_directive("mio=off".parse().unwrap())
-                .add_directive("tokio_util=off".parse().unwrap())
-                .add_directive("hyper=off".parse().unwrap())
-                .add_directive("reqwest=off".parse().unwrap())
-                .add_directive("want=off".parse().unwrap())
-                .add_directive("warp=off".parse().unwrap());
-
-            if verbosity > 3 {
-                filter.add_directive("snarkos_node_tcp=trace".parse().unwrap())
-            } else {
-                filter.add_directive("snarkos_node_tcp=off".parse().unwrap())
-            }
-        });
-
-        // Create a file to write logs to.
-        let logfile =
-            File::options().append(true).create(true).open(logfile).expect("Failed to open the file for writing logs");
-
-        // Initialize the log channel.
-        let (log_sender, log_receiver) = mpsc::channel(1024);
-
-        // Initialize the log sender.
-        let log_sender = match nodisplay {
-            true => None,
-            false => Some(log_sender),
-        };
-
-        // Initialize tracing.
-        let _ = tracing_subscriber::registry()
-            .with(
-                // Add layer using LogWriter for stdout / terminal
-                tracing_subscriber::fmt::Layer::default()
-                    .with_ansi(log_sender.is_none() && io::stdout().is_tty())
-                    .with_writer(move || LogWriter::new(&log_sender))
-                    .with_target(verbosity > 2)
-                    .with_filter(filter),
-            )
-            .with(
-                // Add layer redirecting logs to the file
-                tracing_subscriber::fmt::Layer::default()
-                    .with_ansi(false)
-                    .with_writer(logfile)
-                    .with_target(verbosity > 2)
-                    .with_filter(filter2),
-            )
-            .try_init();
-
-        log_receiver
-    }
-
     /// Renders the display.
     fn render<B: Backend>(&mut self, terminal: &mut Terminal<B>) -> io::Result<()> {
         let mut last_tick = Instant::now();
@@ -263,31 +176,5 @@ impl<N: Network> Display<N> {
             1 => self.logs.draw(f, chunks[1]),
             _ => unreachable!(),
         };
-    }
-
-    /// Returns the welcome message as a string.
-    pub fn welcome_message() -> String {
-        use colored::*;
-
-        let mut output = String::new();
-        output += &r#"
-
-         ╦╬╬╬╬╬╦
-        ╬╬╬╬╬╬╬╬╬                    ▄▄▄▄        ▄▄▄
-       ╬╬╬╬╬╬╬╬╬╬╬                  ▐▓▓▓▓▌       ▓▓▓
-      ╬╬╬╬╬╬╬╬╬╬╬╬╬                ▐▓▓▓▓▓▓▌      ▓▓▓     ▄▄▄▄▄▄       ▄▄▄▄▄▄
-     ╬╬╬╬╬╬╬╬╬╬╬╬╬╬╬              ▐▓▓▓  ▓▓▓▌     ▓▓▓   ▄▓▓▀▀▀▀▓▓▄   ▐▓▓▓▓▓▓▓▓▌
-    ╬╬╬╬╬╬╬╜ ╙╬╬╬╬╬╬╬            ▐▓▓▓▌  ▐▓▓▓▌    ▓▓▓  ▐▓▓▓▄▄▄▄▓▓▓▌ ▐▓▓▓    ▓▓▓▌
-   ╬╬╬╬╬╬╣     ╠╬╬╬╬╬╬           ▓▓▓▓▓▓▓▓▓▓▓▓    ▓▓▓  ▐▓▓▀▀▀▀▀▀▀▀▘ ▐▓▓▓    ▓▓▓▌
-  ╬╬╬╬╬╬╣       ╠╬╬╬╬╬╬         ▓▓▓▓▌    ▐▓▓▓▓   ▓▓▓   ▀▓▓▄▄▄▄▓▓▀   ▐▓▓▓▓▓▓▓▓▌
- ╬╬╬╬╬╬╣         ╠╬╬╬╬╬╬       ▝▀▀▀▀      ▀▀▀▀▘  ▀▀▀     ▀▀▀▀▀▀       ▀▀▀▀▀▀
-╚╬╬╬╬╬╩           ╩╬╬╬╬╩
-
-
-"#
-        .white()
-        .bold();
-        output += &"👋 Welcome to Aleo! We thank you for running a node and supporting privacy.\n".bold();
-        output
     }
 }

@@ -1,0 +1,42 @@
+[package]
+name = "snarkos-integration"
+version = "2.0.2"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A integration testing suite for a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "GPL-3.0"
+edition = "2021"
+
+[features]
+default = [ "parallel" ]
+parallel = [ "snarkos-node-cdn/parallel", "snarkos-node-ledger/parallel" ]
+
+[dev-dependencies.snarkos-node-cdn]
+path = "../node/cdn"
+
+[dev-dependencies.snarkos-node-ledger]
+path = "../node/ledger"
+
+[dev-dependencies.snarkvm]
+workspace = true
+default-features = false
+features = ["synthesizer"]
+
+[dev-dependencies.tokio]
+version = "1.21"
+features = ["rt"]
+
+[dev-dependencies.tracing]
+version = "0.1"
+
+[dev-dependencies.tracing-test]
+version = "0.1"

@@ -34,10 +34,14 @@ pub use prover::*;
 mod validator;
 pub use validator::*;
 
+mod helpers;
+
 mod traits;
 pub use traits::*;
 
-use snarkos_node_messages::NodeType;
+pub use snarkos_node_messages::NodeType;
+
+use snarkos_account::Account;
 use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
 
@@ -60,44 +64,48 @@ impl<N: Network> Node<N> {
     pub async fn new_beacon(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
-        private_key: PrivateKey<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Option<Block<N>>,
+        cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Beacon(Arc::new(Beacon::new(node_ip, rest_ip, private_key, trusted_peers, genesis, dev).await?)))
+        Ok(Self::Beacon(Arc::new(Beacon::new(node_ip, rest_ip, account, trusted_peers, genesis, cdn, dev).await?)))
     }
 
     /// Initializes a new validator node.
     pub async fn new_validator(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
-        private_key: PrivateKey<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Option<Block<N>>,
+        cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Validator(Arc::new(Validator::new(node_ip, rest_ip, private_key, trusted_peers, genesis, dev).await?)))
+        Ok(Self::Validator(Arc::new(
+            Validator::new(node_ip, rest_ip, account, trusted_peers, genesis, cdn, dev).await?,
+        )))
     }
 
     /// Initializes a new prover node.
     pub async fn new_prover(
         node_ip: SocketAddr,
-        private_key: PrivateKey<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Prover(Arc::new(Prover::new(node_ip, private_key, trusted_peers, dev).await?)))
+        Ok(Self::Prover(Arc::new(Prover::new(node_ip, account, trusted_peers, dev).await?)))
     }
 
     /// Initializes a new client node.
     pub async fn new_client(
         node_ip: SocketAddr,
-        private_key: PrivateKey<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Client(Arc::new(Client::new(node_ip, private_key, trusted_peers, dev).await?)))
+        Ok(Self::Client(Arc::new(Client::new(node_ip, account, trusted_peers, dev).await?)))
     }
 
     /// Returns the node type.

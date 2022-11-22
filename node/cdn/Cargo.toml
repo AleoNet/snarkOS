@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-node-consensus"
+name = "snarkos-node-cdn"
 version = "2.0.2"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "A node consensus for a decentralized operating system"
+description = "A CDN client for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
@@ -18,39 +18,44 @@ edition = "2021"
 
 [features]
 default = [ "parallel" ]
-parallel = [ "rayon" ]
+parallel = [ "snarkvm/parallel", "snarkos-node-ledger/parallel" ]
 
 [dependencies.anyhow]
 version = "1"
 
-[dependencies.indexmap]
-version = "1.9"
-features = [ "rayon" ]
+[dependencies.backoff]
+version = "0.4"
+features = [ "tokio" ]
 
-[dependencies.once_cell]
-version = "1.13"
+[dependencies.bincode]
+version = "1.0"
+
+[dependencies.colored]
+version = "2"
+
+[dependencies.futures]
+version = "0.3"
 
 [dependencies.parking_lot]
 version = "0.12"
 
-[dependencies.rand]
-version = "0.8"
-
-[dependencies.rayon]
-version = "1"
-optional = true
+[dependencies.reqwest]
+version = "0.11"
 
 [dependencies.snarkos-node-ledger]
 path = "../ledger"
 
 [dependencies.snarkvm]
 workspace = true
+default-features = false
+features = ["synthesizer"]
 
-[dependencies.time]
-version = "0.3"
+[dependencies.tokio]
+version = "1.21"
+features = ["rt"]
 
 [dependencies.tracing]
 version = "0.1"
 
-[dev-dependencies.tracing-test]
-version = "0.2"
+[dev-dependencies.tokio-test]
+version = "0.4"

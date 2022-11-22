@@ -14,8 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm::prelude::PrivateKey;
-
 use anyhow::Result;
 use clap::Parser;
 use rand::SeedableRng;
@@ -39,9 +37,9 @@ impl Account {
         match self {
             Self::New { seed } => {
                 // Sample a new Aleo account.
-                let account = snarkos_account::Account::from(match seed {
-                    Some(seed) => PrivateKey::<Network>::new(&mut ChaChaRng::seed_from_u64(seed))?,
-                    None => PrivateKey::new(&mut rand::thread_rng())?,
+                let account = snarkos_account::Account::<Network>::new(&mut match seed {
+                    Some(seed) => ChaChaRng::seed_from_u64(seed),
+                    None => ChaChaRng::from_entropy(),
                 })?;
                 // Print the new Aleo account.
                 Ok(account.to_string())
