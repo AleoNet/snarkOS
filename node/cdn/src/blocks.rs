@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_node_ledger::Ledger;
-use snarkvm::prelude::{Block, ConsensusStorage, DeserializeOwned, Network};
+use snarkvm::prelude::{cow_to_copied, Block, ConsensusStorage, DeserializeOwned, Network};
 
 use anyhow::{anyhow, bail, Result};
 use colored::Colorize;
@@ -47,7 +47,30 @@ pub async fn sync_ledger_with_cdn<N: Network, C: ConsensusStorage<N>>(
     // Fetch the node height.
     let start_height = ledger.latest_height() + 1;
     // Load the blocks from the CDN into the ledger.
-    load_blocks(base_url, start_height, None, move |block: Block<N>| ledger.add_next_block(&block)).await
+    let ledger_clone = ledger.clone();
+    let result =
+        load_blocks(base_url, start_height, None, move |block: Block<N>| ledger_clone.add_next_block(&block)).await;
+
+    // TODO (howardwu): Find a way to resolve integrity failures.
+    // If the sync failed, check the integrity of the ledger.
+    if let Err((completed_height, error)) = &result {
+        warn!("{error}");
+        debug!("Synced the ledger up to block {completed_height}");
+
+        // Retrieve the latest height, according to the ledger.
+        let node_height = cow_to_copied!(ledger.vm().block_store().heights().max().unwrap_or_default());
+        // Check the integrity of the latest height.
+        if &node_height != completed_height {
+            return Err((*completed_height, anyhow!("The ledger height does not match the last sync height")));
+        }
+
+        // Fetch the latest block from the ledger.
+        if let Err(err) = ledger.get_block(node_height) {
+            return Err((*completed_height, err));
+        }
+    }
+
+    result
 }
 
 /// Loads blocks from a CDN and process them with the given function.

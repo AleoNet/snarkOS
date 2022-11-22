@@ -34,6 +34,8 @@ pub use prover::*;
 mod validator;
 pub use validator::*;
 
+mod helpers;
+
 mod traits;
 pub use traits::*;
 

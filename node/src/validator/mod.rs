@@ -80,33 +80,9 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
-            let result = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await;
-
-            // TODO (howardwu): Find a way to resolve integrity failures.
-            // If the sync failed, check the integrity of the ledger.
-            if let Err((completed_height, error)) = result {
-                warn!("{error}");
-                debug!("Synced the ledger up to block {completed_height}");
-
-                // A helper to log instructions to recover.
-                let log_error = |dev| match dev {
-                    Some(id) => error!("Storage corruption detected! Run `snarkos clean --dev {id}` to reset storage"),
-                    None => error!("Storage corruption detected! Run `snarkos clean` to reset storage"),
-                };
-
-                // Retrieve the latest height, according to the ledger.
-                let node_height = cow_to_copied!(ledger.vm().block_store().heights().max().unwrap_or_default());
-                // Check the integrity of the latest height.
-                if node_height != completed_height {
-                    log_error(dev);
-                    bail!("The latest height in the ledger does not match the sync process")
-                }
-
-                // Fetch the latest block from the ledger.
-                if let Err(err) = ledger.get_block(node_height) {
-                    log_error(dev);
-                    return Err(err);
-                }
+            if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
+                crate::helpers::log_clean_error(dev);
+                return Err(error);
             }
         }
 
