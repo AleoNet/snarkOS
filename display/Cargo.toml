@@ -32,7 +32,7 @@ path = "../node"
 workspace = true
 
 [dependencies.tokio]
-version = "1.21"
+version = "1.22"
 features = ["rt"]
 
 [dependencies.tracing]
