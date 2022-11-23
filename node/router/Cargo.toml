@@ -36,6 +36,9 @@ features = [ "thread-pool" ]
 version = "1.9"
 features = ["rayon"]
 
+[dependencies.itertools]
+version = "0.10"
+
 [dependencies.linked-hash-map]
 version = "0.5"
 

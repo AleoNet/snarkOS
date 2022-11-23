@@ -2667,6 +2667,7 @@ dependencies = [
  "bytes",
  "futures",
  "indexmap",
+ "itertools",
  "linked-hash-map",
  "once_cell",
  "parking_lot",
