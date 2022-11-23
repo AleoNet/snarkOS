@@ -303,7 +303,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 peer.set_status(RawStatus::from_status(message.status));
             })
         {
-            warn!("[Ping] {}", error);
+            warn!("[Ping] {error}");
             return false;
         }
 

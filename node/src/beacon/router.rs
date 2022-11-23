@@ -19,9 +19,9 @@ use super::*;
 use snarkos_node_messages::{DisconnectReason, Message, MessageCodec, Ping};
 use snarkos_node_router::{Routing, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
+use snarkvm::prelude::error;
 
 use futures_util::sink::SinkExt;
-use snarkvm::prelude::error;
 use std::{io, net::SocketAddr};
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Beacon<N, C> {
