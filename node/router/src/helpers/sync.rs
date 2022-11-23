@@ -30,7 +30,7 @@ const CHECKPOINT_INTERVAL: u32 = 10_000; // 10,000 block intervals
 
 /// The assumed structure (in order of block height) is: `\[ checkpoints || locators || height \]`
 #[derive(Clone, Debug)]
-pub(crate) struct Sync<N: Network> {
+pub struct Sync<N: Network> {
     /// The map of peer IPs to their last known block height.
     heights: Arc<RwLock<IndexMap<SocketAddr, u32>>>,
     /// The map of peer IPs to their block locators.
@@ -122,7 +122,7 @@ impl<N: Network> Sync<N> {
     /// 6. The given height is the last block locator.
     fn check_block_locators(height: u32, locators: &IndexMap<u32, N::BlockHash>) -> Result<u32> {
         // Ensure the number of locators is at least 1.
-        if locators.len() < 1 {
+        if locators.is_empty() {
             bail!("Block locators must contain at least 1 entry")
         }
         // Ensure the number of locators is at most NUM_LOCATORS.
@@ -149,7 +149,7 @@ impl<N: Network> Sync<N> {
         }
 
         // If the last height is below NUM_LOCATORS, ensure the number of locators matches the last height.
-        if last_height < NUM_LOCATORS as u32 && locators.len() != last_height {
+        if last_height < NUM_LOCATORS as u32 && locators.len() as u32 != last_height {
             bail!("As the last height is below {NUM_LOCATORS}, the number of block locators must match the height")
         }
         // Otherwise ensure the number of locators matches NUM_LOCATORS.
