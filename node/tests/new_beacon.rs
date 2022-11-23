@@ -15,22 +15,16 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 mod common;
-use common::TestPeer;
 
 use snarkos_account::Account;
-use snarkos_node::Beacon;
-use snarkos_node_messages::NodeType;
-use snarkos_node_router::Outbound;
-use snarkos_node_tcp::P2P;
+use snarkos_node::{Beacon, Validator};
 use snarkvm::prelude::{ConsensusMemory, Testnet3 as CurrentNetwork};
 
 use std::str::FromStr;
 
-#[tokio::test]
-async fn handshake_responder_side() {
-    // Create a beacon instance.
-    let beacon = Beacon::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
-        "127.0.0.1:4133".parse().unwrap(),
+async fn beacon() -> Beacon<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
+    Beacon::new(
+        "127.0.0.1:0".parse().unwrap(),
         None,
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
@@ -39,22 +33,12 @@ async fn handshake_responder_side() {
         None,
     )
     .await
-    .expect("couldn't create beacon instance");
-
-    // Spin up a test peer.
-    let peer = TestPeer::new(NodeType::Validator).await;
-
-    // Verify the handshake works when the peer initates a connection with the beacon.
-    assert!(
-        peer.tcp().connect(beacon.router().tcp().listening_addr().expect("beacon listener should exist")).await.is_ok()
-    );
+    .expect("couldn't create beacon instance")
 }
 
-#[tokio::test]
-async fn handshake_initiator_side() {
-    // Create a beacon instance.
-    let beacon = Beacon::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
-        "127.0.0.1:4133".parse().unwrap(),
+async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
+    Validator::new(
+        "127.0.0.1:0".parse().unwrap(),
         None,
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
@@ -63,13 +47,92 @@ async fn handshake_initiator_side() {
         None,
     )
     .await
-    .expect("couldn't create beacon instance");
+    .expect("couldn't create beacon instance")
+}
 
-    // Spin up a test peer.
-    let peer = TestPeer::new(NodeType::Validator).await;
+macro_rules! test_handshake {
+    ($($node_type:tt -> $peer_type:ident),*) => {
+        mod handshake_initiator_side {
+            use snarkos_node_tcp::P2P;
 
-    // Verify the handshake works when the beacon initiates a connection with the peer.
-    assert!(
-        beacon.router().tcp().connect(peer.tcp().listening_addr().expect("peer listener should exist")).await.is_ok()
-    );
+            $(
+                #[tokio::test]
+                async fn $peer_type () {
+
+                    let node = $crate::$node_type().await;
+
+                    // Spin up a test peer.
+                    let peer = $crate::common::TestPeer::$peer_type().await;
+
+                    // Verify the handshake works when the node initiates a connection with the peer.
+                    assert!(
+                        node.tcp().connect(peer.tcp().listening_addr().expect("node listener should exist")).await.is_ok()
+                    );
+                }
+
+            )*
+        }
+
+    };
+
+    ($($node_type:tt <- $peer_type:ident),*) => {
+        mod handshake_responder_side {
+            use snarkos_node_tcp::P2P;
+            use snarkos_node_router::Outbound;
+
+            $(
+                #[tokio::test]
+                async fn $peer_type () {
+
+                    let node = $crate::$node_type().await;
+
+                    // Spin up a test peer.
+                    let peer = $crate::common::TestPeer::$peer_type().await;
+
+                    // Verify the handshake works when the peer initiates a connection with the node.
+                    assert!(
+                        peer.tcp().connect(node.router().tcp().listening_addr().expect("node listener should exist")).await.is_ok()
+                    );
+                }
+
+            )*
+        }
+
+    };
+}
+
+mod beacon {
+    // Initiator side.
+    test_handshake! {
+        beacon -> beacon,
+        beacon -> client,
+        beacon -> validator,
+        beacon -> prover
+    }
+
+    // Responder side.
+    test_handshake! {
+        beacon <- beacon,
+        beacon <- client,
+        beacon <- validator,
+        beacon <- prover
+    }
+}
+
+mod validator {
+    // Initiator side.
+    test_handshake! {
+        validator -> beacon,
+        validator -> client,
+        validator -> validator,
+        validator -> prover
+    }
+
+    // Responder side.
+    test_handshake! {
+        validator <- beacon,
+        validator <- client,
+        validator <- validator,
+        validator <- prover
+    }
 }

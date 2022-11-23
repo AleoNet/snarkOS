@@ -29,6 +29,7 @@ const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 #[derive(Clone)]
 pub struct TestPeer {
+    // TODO: should be using pea2pea directly (to keep impls separate)
     tcp: Tcp,
     node_type: NodeType,
 }
@@ -40,6 +41,22 @@ impl P2P for TestPeer {
 }
 
 impl TestPeer {
+    pub async fn beacon() -> Self {
+        Self::new(NodeType::Beacon).await
+    }
+
+    pub async fn client() -> Self {
+        Self::new(NodeType::Client).await
+    }
+
+    pub async fn prover() -> Self {
+        Self::new(NodeType::Prover).await
+    }
+
+    pub async fn validator() -> Self {
+        Self::new(NodeType::Validator).await
+    }
+
     pub async fn new(node_type: NodeType) -> Self {
         let peer = Self {
             tcp: Tcp::new(Config {
