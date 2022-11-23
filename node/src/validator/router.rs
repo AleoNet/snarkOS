@@ -16,13 +16,13 @@
 
 use super::*;
 
-use snarkos_node_messages::{DisconnectReason, Message, MessageCodec, Ping};
+use snarkos_node_messages::{DisconnectReason, Message, MessageCodec, Ping, Pong};
 use snarkos_node_router::ALEO_MAXIMUM_FORK_DEPTH;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{error, Network};
 
 use futures_util::sink::SinkExt;
-use std::{io, net::SocketAddr};
+use std::{io, net::SocketAddr, time::Duration};
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Validator<N, C> {
     /// Returns a reference to the TCP instance.
@@ -103,7 +103,7 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Validator<N, C> {
             warn!("Disconnecting from '{peer_ip}' - {error}");
             self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
             // Disconnect from this peer.
-            self.router().disconnect(peer_ip).await;
+            self.router().disconnect(peer_ip);
         }
         Ok(())
     }
@@ -112,7 +112,6 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Validator<N, C> {
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Routing<N> for Validator<N, C> {}
 
-#[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Heartbeat<N> for Validator<N, C> {
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 1_000;
@@ -127,6 +126,23 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Validator<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
+    /// Sleeps for a period and then sends a `Ping` message to the peer.
+    fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool {
+        // Spawn an asynchronous task for the `Ping` request.
+        let self_clone = self.clone();
+        tokio::spawn(async move {
+            // Sleep for the preset time before sending a `Ping` request.
+            tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
+            // Retrieve the block locators.
+            match crate::helpers::get_block_locators(&self_clone.ledger) {
+                // Send a `Ping` message to the peer.
+                Ok(block_locators) => self_clone.send_ping(peer_ip, Some(block_locators)),
+                Err(e) => error!("Failed to get block locators: {e}"),
+            }
+        });
+        true
+    }
+
     /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
         // Send the latest puzzle response, if it exists.

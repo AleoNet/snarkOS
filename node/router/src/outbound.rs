@@ -77,7 +77,14 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         if let Some(peer_addr) = self.router().resolve_to_ambiguous(&peer_ip) {
             // Send the message to the peer.
             trace!("Sending '{name}' to '{peer_ip}'");
-            self.unicast(peer_addr, message).map_err(|e| warn!("Failed to send '{name}' to '{peer_ip}': {e}")).ok()
+            let result = self.unicast(peer_addr, message);
+            // If the message was unable to be sent, disconnect.
+            if let Err(e) = &result {
+                warn!("Failed to send '{name}' to '{peer_ip}': {e}");
+                debug!("Disconnecting from '{peer_ip}'");
+                self.router().disconnect(peer_ip);
+            }
+            result.ok()
         } else {
             warn!("Unable to resolve the listener IP address '{peer_ip}'");
             None

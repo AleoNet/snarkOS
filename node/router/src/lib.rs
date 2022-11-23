@@ -129,7 +129,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Attempts to connect to the given peer IP.
-    pub async fn connect(&self, peer_ip: SocketAddr) {
+    pub fn connect(&self, peer_ip: SocketAddr) {
         let router = self.clone();
         tokio::spawn(async move {
             // Attempt to connect to the candidate peer.
@@ -147,7 +147,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Disconnects from the given peer IP, if the peer is connected.
-    pub async fn disconnect(&self, peer_ip: SocketAddr) {
+    pub fn disconnect(&self, peer_ip: SocketAddr) {
         let router = self.clone();
         tokio::spawn(async move {
             // Disconnect from this peer.

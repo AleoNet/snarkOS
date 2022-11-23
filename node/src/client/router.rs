@@ -94,7 +94,7 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Client<N, C> {
             warn!("Disconnecting from '{peer_ip}' - {error}");
             self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
             // Disconnect from this peer.
-            self.router().disconnect(peer_ip).await;
+            self.router().disconnect(peer_ip);
         }
         Ok(())
     }
@@ -103,7 +103,6 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Client<N, C> {
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Routing<N> for Client<N, C> {}
 
-#[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Heartbeat<N> for Client<N, C> {}
 
 impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Client<N, C> {
