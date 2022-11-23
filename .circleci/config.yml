@@ -19,6 +19,8 @@ commands:
             $ProgressPreference = "SilentlyContinue"
             Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
             & C:\rustup-init.exe -y --default-toolchain "stable-x86_64-pc-windows-msvc" --no-modify-path --profile minimal
+            choco install llvm -y
+            refreshenv
             $env:Path += ";C:\Users\circleci\.cargo\bin"
             rustc -Vv
             cargo --version
@@ -323,7 +325,7 @@ workflows:
             parameters:
               workspace_member: [
                 account,
-#                cli,
-#                display
-#                node
+                cli,
+                display,
+                node
               ]
