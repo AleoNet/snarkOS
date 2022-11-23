@@ -106,7 +106,7 @@ pub enum Message<N: Network> {
     Disconnect(Disconnect),
     PeerRequest(PeerRequest),
     PeerResponse(PeerResponse),
-    Ping(Ping),
+    Ping(Ping<N>),
     Pong(Pong),
     PuzzleRequest(PuzzleRequest),
     PuzzleResponse(PuzzleResponse<N>),

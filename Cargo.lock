@@ -2546,6 +2546,7 @@ dependencies = [
  "async-trait",
  "colored",
  "futures-util",
+ "indexmap",
  "num_cpus",
  "parking_lot",
  "pea2pea",

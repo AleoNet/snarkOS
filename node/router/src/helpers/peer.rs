@@ -18,14 +18,7 @@ use snarkos_node_messages::{NodeType, RawStatus};
 use snarkvm::prelude::{Address, Network};
 
 use parking_lot::RwLock;
-use std::{
-    net::SocketAddr,
-    sync::{
-        atomic::{AtomicU32, Ordering},
-        Arc,
-    },
-    time::Instant,
-};
+use std::{net::SocketAddr, sync::Arc, time::Instant};
 
 /// The state for each connected peer.
 #[derive(Clone, Debug)]
@@ -42,8 +35,6 @@ pub struct Peer<N: Network> {
     status: RawStatus,
     /// The Aleo address of the peer.
     address: Address<N>,
-    /// The block height of the peer.
-    block_height: Arc<AtomicU32>,
 }
 
 impl<N: Network> Peer<N> {
@@ -61,7 +52,6 @@ impl<N: Network> Peer<N> {
             version,
             node_type,
             status,
-            block_height: Default::default(),
             address,
         }
     }
@@ -126,10 +116,5 @@ impl<N: Network> Peer<N> {
     /// Updates the status.
     pub fn set_status(&mut self, status: RawStatus) {
         self.status = status
-    }
-
-    /// Updates the block height.
-    pub fn set_block_height(&self, block_height: u32) {
-        self.block_height.store(block_height, Ordering::SeqCst);
     }
 }

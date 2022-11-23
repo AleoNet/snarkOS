@@ -18,6 +18,7 @@ use snarkvm::prelude::Network;
 
 use anyhow::{bail, Result};
 use indexmap::IndexMap;
+use serde::{Deserialize, Serialize};
 
 /// The number of recent blocks (near tip).
 pub const NUM_RECENTS: usize = 100; // 100 blocks
@@ -26,7 +27,7 @@ pub const RECENT_INTERVAL: u32 = 1; // 1 block intervals
 /// The interval between block checkpoints.
 pub const CHECKPOINT_INTERVAL: u32 = 10_000; // 10,000 block intervals
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct BlockLocators<N: Network> {
     /// The map of recent blocks.
     pub recents: IndexMap<u32, N::BlockHash>,

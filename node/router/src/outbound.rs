@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Router;
-use snarkos_node_messages::{Message, PuzzleRequest};
+use crate::{Router, ALEO_MAXIMUM_FORK_DEPTH};
+use snarkos_node_messages::{BlockLocators, Message, Ping, PuzzleRequest};
 use snarkos_node_tcp::protocols::Writing;
 use snarkvm::prelude::Network;
 use std::io;
@@ -26,6 +26,20 @@ use tokio::sync::oneshot;
 pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     /// Returns a reference to the router.
     fn router(&self) -> &Router<N>;
+
+    /// Sends a "Ping" message to the given peer.
+    fn send_ping(&self, peer_ip: SocketAddr, block_locators: Option<BlockLocators<N>>) {
+        self.send(
+            peer_ip,
+            Message::Ping(Ping::<N> {
+                version: Message::<N>::VERSION,
+                fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
+                node_type: self.router().node_type(),
+                status: self.router().status(),
+                block_locators,
+            }),
+        );
+    }
 
     /// Sends a "PuzzleRequest" to a bootstrap peer.
     fn send_puzzle_request(&self) {

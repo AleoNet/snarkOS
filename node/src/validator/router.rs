@@ -19,7 +19,7 @@ use super::*;
 use snarkos_node_messages::{DisconnectReason, Message, MessageCodec, Ping};
 use snarkos_node_router::ALEO_MAXIMUM_FORK_DEPTH;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::Network;
+use snarkvm::prelude::{error, Network};
 
 use futures_util::sink::SinkExt;
 use std::{io, net::SocketAddr};
@@ -41,13 +41,22 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Validator<N, C> {
         let stream = self.borrow_stream(&mut connection);
         let (peer_ip, mut framed) = self.router.handshake(peer_addr, stream, conn_side).await?;
 
+        // Retrieve the block locators.
+        let block_locators = match crate::helpers::get_block_locators(&self.ledger) {
+            Ok(block_locators) => Some(block_locators),
+            Err(e) => {
+                error!("Failed to get block locators: {e}");
+                return Err(error(format!("Failed to get block locators: {e}")));
+            }
+        };
+
         // Send the first `Ping` message to the peer.
-        let message = Message::Ping(Ping {
+        let message = Message::Ping(Ping::<N> {
             version: Message::<N>::VERSION,
             fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
             node_type: self.node_type(),
             status: self.status(),
-            block_height: Some(self.ledger.latest_height()),
+            block_locators,
         });
         trace!("Sending '{}' to '{peer_ip}'", message.name());
         framed.send(message).await?;

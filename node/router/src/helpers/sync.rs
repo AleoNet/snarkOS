@@ -77,8 +77,8 @@ impl<N: Network> Sync<N> {
     }
 
     /// Removes the peer, if they exist.
-    pub fn remove_peer(&self, peer_ip: SocketAddr) {
+    pub fn remove_peer(&self, peer_ip: &SocketAddr) {
         // Remove the locators entry for the given peer IP.
-        self.locators.write().remove(&peer_ip);
+        self.locators.write().remove(peer_ip);
     }
 }

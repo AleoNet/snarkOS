@@ -39,11 +39,11 @@ pub use outbound::*;
 mod routing;
 pub use routing::*;
 
-use snarkos_node_messages::{NodeType, RawStatus, Status};
+use snarkos_node_messages::{BlockLocators, NodeType, RawStatus, Status};
 use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::RwLock;
@@ -69,6 +69,8 @@ pub struct Router<N: Network> {
     cache: Cache<N>,
     /// The resolver.
     resolver: Resolver,
+    /// The sync module.
+    sync: Sync<N>,
     /// The set of trusted peers.
     trusted_peers: Arc<IndexSet<SocketAddr>>,
     /// The map of connected peer IPs to their peer handlers.
@@ -116,6 +118,7 @@ impl<N: Network> Router<N> {
             status: RawStatus::new(),
             cache: Default::default(),
             resolver: Default::default(),
+            sync: Default::default(),
             trusted_peers: Arc::new(trusted_peers.iter().copied().collect()),
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
@@ -352,15 +355,40 @@ impl<N: Network> Router<N> {
         self.restricted_peers.write().insert(peer_ip, Instant::now());
     }
 
-    /// Updates the connected peer with the given function.
-    pub fn update_connected_peer<Fn: FnMut(&mut Peer<N>)>(&self, peer_ip: SocketAddr, write_fn: Fn) {
-        self.connected_peers.write().get_mut(&peer_ip).map(write_fn);
+    /// Updates the connected peer with the given block locators and function.
+    pub fn update_connected_peer<Fn: FnMut(&mut Peer<N>)>(
+        &self,
+        peer_ip: SocketAddr,
+        block_locators: &Option<BlockLocators<N>>,
+        mut write_fn: Fn,
+    ) -> Result<()> {
+        // Retrieve the peer.
+        if let Some(peer) = self.connected_peers.write().get_mut(&peer_ip) {
+            // If the peer is a beacon or validator, ensure there are block locators.
+            if (peer.is_beacon() || peer.is_validator()) && block_locators.is_none() {
+                bail!("Peer '{peer_ip}' is a beacon or validator, but no block locators were provided")
+            }
+            // If the peer is a prover or client, ensure there are no block locators.
+            if (peer.is_prover() || peer.is_client()) && block_locators.is_some() {
+                bail!("Peer '{peer_ip}' is a prover or client, but block locators were provided")
+            }
+
+            // If block locators were provided, then update the peer in the sync module.
+            if let Some(block_locators) = block_locators {
+                self.sync.update_peer(peer_ip, block_locators.clone())?;
+            }
+            // Lastly, update the peer with the given function.
+            write_fn(peer);
+        }
+        Ok(())
     }
 
     /// Removes the connected peer and adds them to the candidate peers.
     pub fn remove_connected_peer(&self, peer_ip: SocketAddr) {
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.remove_peer(&peer_ip);
+        // Removes the peer from the sync module.
+        self.sync.remove_peer(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().remove(&peer_ip);
         // Add the peer to the candidate peers.

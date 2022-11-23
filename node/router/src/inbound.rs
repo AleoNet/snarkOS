@@ -53,11 +53,6 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             None => bail!("Unable to resolve the (ambiguous) peer address '{peer_addr}'"),
         };
 
-        // Update the last seen timestamp of the peer.
-        self.router().update_connected_peer(peer_ip, |peer: &mut Peer<N>| {
-            peer.set_last_seen(Instant::now());
-        });
-
         // Drop the peer, if they have sent more than 50 messages in the last 5 seconds.
         let num_messages = self.router().cache.insert_inbound_message(peer_ip, 5);
         if num_messages >= 50 {
@@ -264,7 +259,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         false
     }
 
-    fn ping(&self, peer_ip: SocketAddr, message: Ping) -> bool {
+    fn ping(&self, peer_ip: SocketAddr, message: Ping<N>) -> bool {
         // Ensure the message protocol version is not outdated.
         if message.version < Message::<N>::VERSION {
             warn!("Dropping {peer_ip} on version {} (outdated)", message.version);
@@ -275,6 +270,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             warn!("Dropping {peer_ip} for an incorrect maximum fork depth of {}", message.fork_depth);
             return false;
         }
+
         // // Perform the deferred non-blocking deserialization of the block header.
         // match block_header.deserialize().await {
         //     Ok(block_header) => {
@@ -295,20 +291,21 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // }
 
         // Update the connected peer.
-        self.router().update_connected_peer(peer_ip, |peer: &mut Peer<N>| {
-            // Update the last seen timestamp of the peer.
-            peer.set_last_seen(Instant::now());
-            // Update the version of the peer.
-            peer.set_version(message.version);
-            // Update the node type of the peer.
-            peer.set_node_type(message.node_type);
-            // Update the status of the peer.
-            peer.set_status(RawStatus::from_status(message.status));
-            // Update the block height of the peer.
-            if let Some(block_height) = message.block_height {
-                peer.set_block_height(block_height);
-            }
-        });
+        if let Err(error) =
+            self.router().update_connected_peer(peer_ip, &message.block_locators, |peer: &mut Peer<N>| {
+                // Update the last seen timestamp of the peer.
+                peer.set_last_seen(Instant::now());
+                // Update the version of the peer.
+                peer.set_version(message.version);
+                // Update the node type of the peer.
+                peer.set_node_type(message.node_type);
+                // Update the status of the peer.
+                peer.set_status(RawStatus::from_status(message.status));
+            })
+        {
+            warn!("[Ping] {}", error);
+            return false;
+        }
 
         // // Determine if the peer is on a fork (or unknown).
         // let is_fork = match state.ledger().reader().get_block_hash(peer.block_height) {
@@ -341,18 +338,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         tokio::spawn(async move {
             // Sleep for the preset time before sending a `Ping` request.
             tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
-
-            // Prepare the `Ping` message.
-            let message = Message::Ping(Ping {
-                version: Message::<N>::VERSION,
-                fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
-                node_type: self_clone.router().node_type(),
-                status: self_clone.router().status(),
-                block_height: None,
-            });
-
             // Send a `Ping` message to the peer.
-            self_clone.send(peer_ip, message);
+            self_clone.send_ping(peer_ip, None);
         });
         true
     }
