@@ -80,12 +80,10 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Initializes a new prover node.
     pub async fn new(
         node_ip: SocketAddr,
-        private_key: PrivateKey<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
-        // Initialize the node account.
-        let account = Account::from(private_key)?;
         // Initialize the node router.
         let router = Router::new(
             node_ip,
@@ -99,7 +97,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Compute the maximum number of puzzle instances.
-        let max_puzzle_instances = num_cpus::get().saturating_sub(2).min(6).max(1);
+        let max_puzzle_instances = num_cpus::get().saturating_sub(2).clamp(1, 6);
         // Initialize the node.
         let node = Self {
             account,

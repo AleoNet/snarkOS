@@ -18,7 +18,6 @@
 
 use snarkvm::{console::types::Field, prelude::*};
 
-use ::rand::thread_rng;
 use colored::*;
 use core::fmt;
 
@@ -33,34 +32,10 @@ pub struct Account<N: Network> {
     address: Address<N>,
 }
 
-impl<N: Network> FromStr for Account<N> {
-    type Err = anyhow::Error;
-
-    /// Initializes a new account from a private key string.
-    fn from_str(private_key: &str) -> Result<Self, Self::Err> {
-        Self::from(FromStr::from_str(private_key)?)
-    }
-}
-
 impl<N: Network> Account<N> {
-    /// Initializes a new account.
-    pub fn from(private_key: PrivateKey<N>) -> Result<Self> {
-        Ok(Self { private_key, view_key: ViewKey::try_from(&private_key)?, address: Address::try_from(&private_key)? })
-    }
-
     /// Samples a new account.
-    pub fn sample() -> Result<Self> {
-        Self::from(PrivateKey::new(&mut thread_rng())?)
-    }
-
-    /// Signs a given message.
-    pub fn sign(&self, message: &[Field<N>]) -> Result<Signature<N>> {
-        Signature::sign(&self.private_key, message, &mut thread_rng())
-    }
-
-    /// Verifies a given message and signature.
-    pub fn verify(&self, message: &[Field<N>], signature: &Signature<N>) -> bool {
-        signature.verify(&self.address, message)
+    pub fn new<R: Rng + CryptoRng>(rng: &mut R) -> Result<Self> {
+        Self::try_from(PrivateKey::new(rng)?)
     }
 
     /// Returns the account private key.
@@ -79,6 +54,94 @@ impl<N: Network> Account<N> {
     }
 }
 
+impl<N: Network> Account<N> {
+    /// Returns a signature for the given message (as field elements), using the account private key.
+    pub fn sign<R: Rng + CryptoRng>(&self, message: &[Field<N>], rng: &mut R) -> Result<Signature<N>> {
+        Signature::sign(&self.private_key, message, rng)
+    }
+
+    /// Returns a signature for the given message (as bytes), using the account private key.
+    pub fn sign_bytes<R: Rng + CryptoRng>(&self, message: &[u8], rng: &mut R) -> Result<Signature<N>> {
+        Signature::sign_bytes(&self.private_key, message, rng)
+    }
+
+    /// Returns a signature for the given message (as bits), using the account private key.
+    pub fn sign_bits<R: Rng + CryptoRng>(&self, message: &[bool], rng: &mut R) -> Result<Signature<N>> {
+        Signature::sign_bits(&self.private_key, message, rng)
+    }
+
+    /// Verifies a signature for the given message (as fields), using the account address.
+    pub fn verify(&self, message: &[Field<N>], signature: &Signature<N>) -> bool {
+        signature.verify(&self.address, message)
+    }
+
+    /// Verifies a signature for the given message (as bytes), using the account address.
+    pub fn verify_bytes(&self, message: &[u8], signature: &Signature<N>) -> bool {
+        signature.verify_bytes(&self.address, message)
+    }
+
+    /// Verifies a signature for the given message (as bits), using the account address.
+    pub fn verify_bits(&self, message: &[bool], signature: &Signature<N>) -> bool {
+        signature.verify_bits(&self.address, message)
+    }
+}
+
+impl<N: Network> TryFrom<PrivateKey<N>> for Account<N> {
+    type Error = Error;
+
+    /// Initializes a new account from a private key.
+    fn try_from(private_key: PrivateKey<N>) -> Result<Self, Self::Error> {
+        Self::try_from(&private_key)
+    }
+}
+
+impl<N: Network> TryFrom<&PrivateKey<N>> for Account<N> {
+    type Error = Error;
+
+    /// Initializes a new account from a private key.
+    fn try_from(private_key: &PrivateKey<N>) -> Result<Self, Self::Error> {
+        let view_key = ViewKey::try_from(private_key)?;
+        let address = view_key.to_address();
+        Ok(Self { private_key: *private_key, view_key, address })
+    }
+}
+
+impl<N: Network> TryFrom<String> for Account<N> {
+    type Error = Error;
+
+    /// Initializes a new account from a private key string.
+    fn try_from(private_key: String) -> Result<Self, Self::Error> {
+        Self::try_from(&private_key)
+    }
+}
+
+impl<N: Network> TryFrom<&String> for Account<N> {
+    type Error = Error;
+
+    /// Initializes a new account from a private key string.
+    fn try_from(private_key: &String) -> Result<Self, Self::Error> {
+        Self::from_str(private_key.as_str())
+    }
+}
+
+impl<N: Network> TryFrom<&str> for Account<N> {
+    type Error = Error;
+
+    /// Initializes a new account from a private key string.
+    fn try_from(private_key: &str) -> Result<Self, Self::Error> {
+        Self::from_str(private_key)
+    }
+}
+
+impl<N: Network> FromStr for Account<N> {
+    type Err = Error;
+
+    /// Initializes a new account from a private key string.
+    fn from_str(private_key: &str) -> Result<Self, Self::Err> {
+        Self::try_from(PrivateKey::from_str(private_key)?)
+    }
+}
+
 impl<N: Network> Display for Account<N> {
     /// Renders the account as a string.
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
@@ -92,5 +155,49 @@ impl<N: Network> Display for Account<N> {
             "Address".cyan().bold(),
             self.address
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snarkvm::prelude::Testnet3;
+
+    type CurrentNetwork = Testnet3;
+
+    #[test]
+    fn test_sign() {
+        // Initialize the RNG.
+        let mut rng = TestRng::default();
+        // Prepare the account and message.
+        let account = Account::<CurrentNetwork>::new(&mut rng).unwrap();
+        let message = vec![Field::rand(&mut rng); 10];
+        // Sign and verify.
+        let signature = account.sign(&message, &mut rng).unwrap();
+        assert!(account.verify(&message, &signature));
+    }
+
+    #[test]
+    fn test_sign_bytes() {
+        // Initialize the RNG.
+        let mut rng = TestRng::default();
+        // Prepare the account and message.
+        let account = Account::<CurrentNetwork>::new(&mut rng).unwrap();
+        let message = (0..10).map(|_| rng.gen::<u8>()).collect::<Vec<u8>>();
+        // Sign and verify.
+        let signature = account.sign_bytes(&message, &mut rng).unwrap();
+        assert!(account.verify_bytes(&message, &signature));
+    }
+
+    #[test]
+    fn test_sign_bits() {
+        // Initialize the RNG.
+        let mut rng = TestRng::default();
+        // Prepare the account and message.
+        let account = Account::<CurrentNetwork>::new(&mut rng).unwrap();
+        let message = (0..10).map(|_| rng.gen::<bool>()).collect::<Vec<bool>>();
+        // Sign and verify.
+        let signature = account.sign_bits(&message, &mut rng).unwrap();
+        assert!(account.verify_bits(&message, &signature));
     }
 }

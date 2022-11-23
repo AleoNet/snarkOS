@@ -36,7 +36,6 @@ use snarkvm::{
 };
 
 use anyhow::Result;
-use colored::*;
 use http::header::HeaderName;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
@@ -103,14 +102,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> 
         });
 
         // Spawn the server.
-        let address = self.routing.router().address();
         self.handles.push(Arc::new(tokio::spawn(async move {
-            println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
-
-            if let Ok(jwt_token) = helpers::Claims::new(address).to_jwt_string() {
-                println!("🔑 Your JWT token is {}\n", jwt_token.dimmed());
-            }
-
             // Start the server.
             warp::serve(routes.with(cors).with(custom_log)).run(rest_ip).await
         })))

@@ -68,15 +68,23 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     pub async fn new(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
-        private_key: PrivateKey<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Option<Block<N>>,
+        cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        // Initialize the node account.
-        let account = Account::from(private_key)?;
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
+        // Initialize the CDN.
+        if let Some(base_url) = cdn {
+            // Sync the ledger with the CDN.
+            if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
+                crate::helpers::log_clean_error(dev);
+                return Err(error);
+            }
+        }
+
         // Initialize the node router.
         let router = Router::new(
             node_ip,
