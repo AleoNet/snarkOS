@@ -16,10 +16,12 @@
 
 use super::*;
 
-use snarkos_node_messages::{DisconnectReason, Message, MessageCodec};
+use snarkos_node_messages::{DisconnectReason, Message, MessageCodec, Ping};
+use snarkos_node_router::ALEO_MAXIMUM_FORK_DEPTH;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::Network;
 
+use futures_util::sink::SinkExt;
 use std::{io, net::SocketAddr};
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Prover<N, C> {
@@ -33,10 +35,22 @@ impl<N: Network, C: ConsensusStorage<N>> P2P for Prover<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> Handshake for Prover<N, C> {
     /// Performs the handshake protocol.
     async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
+        // Perform the handshake.
         let peer_addr = connection.addr();
         let conn_side = connection.side();
         let stream = self.borrow_stream(&mut connection);
-        self.router.handshake(peer_addr, stream, conn_side).await?;
+        let (peer_ip, mut framed) = self.router.handshake(peer_addr, stream, conn_side).await?;
+
+        // Send the first `Ping` message to the peer.
+        let message = Message::Ping(Ping {
+            version: Message::<N>::VERSION,
+            fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
+            node_type: self.node_type(),
+            status: self.status(),
+            block_height: None,
+        });
+        trace!("Sending '{}' to '{peer_ip}'", message.name());
+        framed.send(message).await?;
 
         Ok(connection)
     }

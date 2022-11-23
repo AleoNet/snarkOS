@@ -51,7 +51,7 @@ use std::{future::Future, net::SocketAddr, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 // TODO (raychu86): Move this declaration.
-const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
+pub const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 #[derive(Clone)]
 pub struct Router<N: Network> {

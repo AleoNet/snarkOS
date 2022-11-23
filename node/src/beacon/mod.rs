@@ -25,6 +25,7 @@ use snarkos_node_messages::{
     Message,
     NodeType,
     PuzzleResponse,
+    Status,
     UnconfirmedBlock,
     UnconfirmedSolution,
     UnconfirmedTransaction,
@@ -183,6 +184,11 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Beacon<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
         self.router.node_type()
+    }
+
+    /// Returns the node status.
+    fn status(&self) -> Status {
+        self.router.status()
     }
 
     /// Returns the account private key of the node.

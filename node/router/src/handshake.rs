@@ -25,7 +25,6 @@ use snarkos_node_messages::{
     MessageCodec,
     MessageTrait,
     NodeType,
-    Ping,
     RawStatus,
     Status,
 };
@@ -48,12 +47,12 @@ impl<N: Network> P2P for Router<N> {
 
 impl<N: Network> Router<N> {
     /// Performs the handshake protocol.
-    pub async fn handshake(
-        &self,
+    pub async fn handshake<'a>(
+        &'a self,
         peer_addr: SocketAddr,
-        stream: &mut TcpStream,
+        stream: &'a mut TcpStream,
         peer_side: ConnectionSide,
-    ) -> io::Result<()> {
+    ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, MessageCodec<N>>)> {
         // Construct the stream.
         let mut framed = Framed::new(stream, MessageCodec::<N>::default());
 
@@ -147,20 +146,7 @@ impl<N: Network> Router<N> {
         self.insert_connected_peer(peer, peer_addr);
         info!("Connected to '{peer_ip}'");
 
-        /* Step 6: Send the first ping. */
-
-        // Send the first `Ping` message to the peer.
-        let message = Message::Ping(Ping {
-            version: Message::<N>::VERSION,
-            fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
-            node_type: self.node_type,
-            status: self.status.get(),
-            block_height: None,
-        });
-        trace!("Sending '{}' to '{peer_ip}'", message.name());
-        framed.send(message).await?;
-
-        Ok(())
+        Ok((peer_ip, framed))
     }
 
     /// Ensure the peer is allowed to connect.
