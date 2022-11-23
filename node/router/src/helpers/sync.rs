@@ -41,12 +41,17 @@ impl<N: Network> Sync<N> {
         Self { locators: Default::default() }
     }
 
+    /// Returns the block height of the given peer IP.
+    pub fn get_height(&self, peer_ip: &SocketAddr) -> Option<u32> {
+        self.locators.read().get(peer_ip).map(|locators| locators.height())
+    }
+
     /// Returns the list of peers with their heights, sorted by height (descending).
     pub fn get_peers_by_height(&self) -> Vec<(SocketAddr, u32)> {
         self.locators
             .read()
             .iter()
-            .map(|(peer_ip, locators)| (*peer_ip, locators.latest_height()))
+            .map(|(peer_ip, locators)| (*peer_ip, locators.height()))
             .sorted_by(|(_, a), (_, b)| b.cmp(a))
             .collect()
     }
@@ -101,7 +106,7 @@ impl<N: Network> BlockLocators<N> {
     }
 
     /// Returns the latest height.
-    pub fn latest_height(&self) -> u32 {
+    pub fn height(&self) -> u32 {
         self.recents.keys().last().copied().unwrap_or_default()
     }
 
