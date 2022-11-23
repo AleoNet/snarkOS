@@ -24,11 +24,6 @@ pub struct BlockRequest {
     pub end_height: u32,
 }
 
-impl BlockRequest {
-    /// The maximum number of blocks that can be requested per `BlockRequest`.
-    pub const MAXIMUM_NUMBER_OF_BLOCKS: u8 = 10;
-}
-
 impl MessageTrait for BlockRequest {
     /// Returns the message name.
     #[inline]

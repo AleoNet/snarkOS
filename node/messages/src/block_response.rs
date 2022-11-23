@@ -45,6 +45,11 @@ impl<N: Network> MessageTrait for BlockResponse<N> {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DataBlocks<N: Network>(pub Vec<Block<N>>);
 
+impl<N: Network> DataBlocks<N> {
+    /// The maximum number of blocks that can be sent in a single message.
+    pub const MAXIMUM_NUMBER_OF_BLOCKS: u8 = 10;
+}
+
 impl<N: Network> Deref for DataBlocks<N> {
     type Target = Vec<Block<N>>;
 
@@ -61,7 +66,7 @@ impl<N: Network> ToBytes for DataBlocks<N> {
         // Prepare the number of blocks.
         let num_blocks = self.0.len() as u8;
         // Ensure that the number of blocks is within the allowed range.
-        if num_blocks > BlockRequest::MAXIMUM_NUMBER_OF_BLOCKS {
+        if num_blocks > Self::MAXIMUM_NUMBER_OF_BLOCKS {
             return Err(error("Block response exceeds maximum number of blocks"));
         }
         // Write the number of blocks.
@@ -78,7 +83,7 @@ impl<N: Network> FromBytes for DataBlocks<N> {
         // Read the number of blocks.
         let num_blocks = u8::read_le(&mut reader)?;
         // Ensure that the number of blocks is within the allowed range.
-        if num_blocks > BlockRequest::MAXIMUM_NUMBER_OF_BLOCKS {
+        if num_blocks > Self::MAXIMUM_NUMBER_OF_BLOCKS {
             return Err(error("Block response exceeds maximum number of blocks"));
         }
         // Read the blocks.
