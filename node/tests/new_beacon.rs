@@ -14,13 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+#![recursion_limit = "256"]
+
 mod common;
+use common::TestPeer;
 
 use snarkos_account::Account;
-use snarkos_node::{Beacon, Validator};
+use snarkos_node::{Beacon, Client, Prover, Validator};
+use snarkos_node_tcp::P2P;
 use snarkvm::prelude::{ConsensusMemory, Testnet3 as CurrentNetwork};
 
-use std::str::FromStr;
+use pea2pea::Pea2Pea;
+
+use std::{io, net::SocketAddr, str::FromStr};
+
+/* Node constructors */
 
 async fn beacon() -> Beacon<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
     Beacon::new(
@@ -50,51 +58,101 @@ async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNetwork
     .expect("couldn't create beacon instance")
 }
 
-macro_rules! test_handshake {
-    ($($node_type:tt -> $peer_type:ident),*) => {
-        mod handshake_initiator_side {
-            use snarkos_node_tcp::P2P;
+// Trait to unify Pea2Pea and P2P traits.
+#[async_trait::async_trait]
+trait Connect {
+    fn listening_addr(&self) -> SocketAddr;
 
-            $(
-                #[tokio::test]
-                async fn $peer_type () {
+    async fn connect(&self, target: SocketAddr) -> io::Result<()>;
+}
 
-                    let node = $crate::$node_type().await;
-
-                    // Spin up a test peer.
-                    let peer = $crate::common::TestPeer::$peer_type().await;
-
-                    // Verify the handshake works when the node initiates a connection with the peer.
-                    assert!(
-                        node.tcp().connect(peer.tcp().listening_addr().expect("node listener should exist")).await.is_ok()
-                    );
+// Implement the `Connect` trait for each node type.
+macro_rules! impl_connect {
+    ($($node_type:ident),*) => {
+        $(
+            #[async_trait::async_trait]
+            impl Connect for $node_type<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
+                fn listening_addr(&self) -> SocketAddr {
+                    self.tcp().listening_addr().expect("node listener should exist")
                 }
 
+                async fn connect(&self, target: SocketAddr) -> io::Result<()>
+                where
+                    Self: P2P,
+                {
+                    self.tcp().connect(target).await
+                }
+            }
+        )*
+    };
+}
+
+impl_connect!(Beacon, Client, Prover, Validator);
+
+// Implement the `Connect` trait for the test peer.
+#[async_trait::async_trait]
+impl Connect for TestPeer
+where
+    Self: Pea2Pea,
+{
+    fn listening_addr(&self) -> SocketAddr {
+        self.node().listening_addr().expect("node listener should exist")
+    }
+
+    async fn connect(&self, target: SocketAddr) -> io::Result<()> {
+        self.node().connect(target).await
+    }
+}
+
+/* Test case */
+
+// Asserts a succesful connection was created from initiator to responder.
+async fn assert_connect<T, U>(initiator: T, responder: U)
+where
+    T: Connect,
+    U: Connect,
+{
+    assert!(initiator.connect(responder.listening_addr()).await.is_ok())
+}
+
+// Macro to simply construct handshake cases.
+// Syntax:
+// - (full_node -> test_peer): full node initiates a handshake to the test peer (synthetic node).
+// - (full_node <- test_peer): full node receives a handshake initiated by the test peer.
+//
+// Test naming: full_node::handshake_<initiator or responder>_side::test_peer.
+macro_rules! test_handshake {
+    ($node_type:ident, $peer_type:ident, $is_initiator:expr) => {
+        #[tokio::test]
+        async fn $peer_type () {
+
+            // Spin up a full node.
+            let node = $crate::$node_type().await;
+
+            // Spin up a test peer (synthetic node).
+            let peer = $crate::common::TestPeer::$peer_type().await;
+
+            if $is_initiator {
+                $crate::assert_connect(node, peer).await;
+            } else {
+                $crate::assert_connect(peer, node).await;
+            };
+        }
+    };
+
+    ($($node_type:ident -> $peer_type:ident),*) => {
+        mod handshake_initiator_side {
+            $(
+                test_handshake!($node_type, $peer_type, true);
             )*
         }
 
     };
 
-    ($($node_type:tt <- $peer_type:ident),*) => {
+    ($($node_type:ident <- $peer_type:ident),*) => {
         mod handshake_responder_side {
-            use snarkos_node_tcp::P2P;
-            use snarkos_node_router::Outbound;
-
             $(
-                #[tokio::test]
-                async fn $peer_type () {
-
-                    let node = $crate::$node_type().await;
-
-                    // Spin up a test peer.
-                    let peer = $crate::common::TestPeer::$peer_type().await;
-
-                    // Verify the handshake works when the peer initiates a connection with the node.
-                    assert!(
-                        peer.tcp().connect(node.router().tcp().listening_addr().expect("node listener should exist")).await.is_ok()
-                    );
-                }
-
+                test_handshake!($node_type, $peer_type, false);
             )*
         }
 
@@ -102,7 +160,7 @@ macro_rules! test_handshake {
 }
 
 mod beacon {
-    // Initiator side.
+    // Initiator side (full node connects to full node).
     test_handshake! {
         beacon -> beacon,
         beacon -> client,
@@ -110,7 +168,7 @@ mod beacon {
         beacon -> prover
     }
 
-    // Responder side.
+    // Responder side (synthetic peer connects to full node).
     test_handshake! {
         beacon <- beacon,
         beacon <- client,
@@ -120,7 +178,7 @@ mod beacon {
 }
 
 mod validator {
-    // Initiator side.
+    // Initiator side (full node connects to full node).
     test_handshake! {
         validator -> beacon,
         validator -> client,
@@ -128,7 +186,7 @@ mod validator {
         validator -> prover
     }
 
-    // Responder side.
+    // Responder side (synthetic peer connects to full node).
     test_handshake! {
         validator <- beacon,
         validator <- client,
