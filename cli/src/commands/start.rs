@@ -449,6 +449,12 @@ mod tests {
     fn test_parse_development() {
         let prod_genesis = Block::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
 
+        let mut trusted_peers = vec![];
+        let mut config = Start::try_parse_from(["snarkos"].iter()).unwrap();
+        let candidate_genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
+        assert_eq!(trusted_peers.len(), 0);
+        assert_eq!(candidate_genesis, prod_genesis);
+
         let _config = Start::try_parse_from(["snarkos", "--dev", ""].iter()).unwrap_err();
 
         // Remove this for Phase 3.

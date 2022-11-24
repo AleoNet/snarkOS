@@ -355,17 +355,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     }
 
     /// Sleeps for a period and then sends a `Ping` message to the peer.
-    fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool {
-        // Spawn an asynchronous task for the `Ping` request.
-        let self_clone = self.clone();
-        tokio::spawn(async move {
-            // Sleep for the preset time before sending a `Ping` request.
-            tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
-            // Send a `Ping` message to the peer.
-            self_clone.send_ping(peer_ip, None);
-        });
-        true
-    }
+    fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool;
 
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
@@ -416,6 +406,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // }
     }
 
+    /// Handles an `UnconfirmedBlock` message.
     async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
