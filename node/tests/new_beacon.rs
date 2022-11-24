@@ -182,7 +182,7 @@ macro_rules! test_handshake {
 }
 
 mod beacon {
-    // Initiator side (full node connects to full node).
+    // Initiator side (full node connects to synthetic peer).
     test_handshake! {
         beacon -> beacon,
         beacon -> client,
@@ -200,7 +200,7 @@ mod beacon {
 }
 
 mod client {
-    // Initiator side (full node connects to full node).
+    // Initiator side (full node connects to synthetic peer).
     test_handshake! {
         client -> beacon,
         client -> client,
@@ -218,7 +218,7 @@ mod client {
 }
 
 mod prover {
-    // Initiator side (full node connects to full node).
+    // Initiator side (full node connects to synthetic peer).
     test_handshake! {
         prover -> beacon,
         prover -> client,
@@ -236,7 +236,7 @@ mod prover {
 }
 
 mod validator {
-    // Initiator side (full node connects to full node).
+    // Initiator side (full node connects to synthetic peer).
     test_handshake! {
         validator -> beacon,
         validator -> client,
