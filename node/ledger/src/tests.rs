@@ -46,6 +46,10 @@ pub(crate) mod test_helpers {
     }
 }
 
+fn sample_genesis_block() -> Block<CurrentNetwork> {
+    Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap()
+}
+
 #[test]
 fn test_load() {
     let rng = &mut TestRng::default();
@@ -58,7 +62,7 @@ fn test_load() {
     let genesis = Block::genesis(&VM::from(store).unwrap(), &private_key, rng).unwrap();
 
     // Initialize the ledger with the genesis block.
-    let ledger = CurrentLedger::load(Some(genesis.clone()), None).unwrap();
+    let ledger = CurrentLedger::load(genesis.clone(), None).unwrap();
     assert_eq!(ledger.latest_hash(), genesis.hash());
     assert_eq!(ledger.latest_height(), genesis.height());
     assert_eq!(ledger.latest_round(), genesis.round());
@@ -66,21 +70,19 @@ fn test_load() {
 }
 
 #[test]
-fn test_from() {
+fn test_load_unchecked() {
     // Load the genesis block.
-    let genesis = Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
+    let genesis = sample_genesis_block();
 
-    // Initialize the VM.
-    let vm = VM::from(ConsensusStore::<_, ConsensusMemory<_>>::open(None).unwrap()).unwrap();
-    // Initialize the ledger without the genesis block.
-    let ledger = CurrentLedger::from(vm, None).unwrap();
+    // Initialize the ledger without checks.
+    let ledger = CurrentLedger::load_unchecked(genesis.clone(), None).unwrap();
     assert_eq!(ledger.latest_hash(), genesis.hash());
     assert_eq!(ledger.latest_height(), genesis.height());
     assert_eq!(ledger.latest_round(), genesis.round());
     assert_eq!(ledger.latest_block(), genesis);
 
     // Initialize the ledger with the genesis block.
-    let ledger = CurrentLedger::load(Some(genesis.clone()), None).unwrap();
+    let ledger = CurrentLedger::load(genesis.clone(), None).unwrap();
     assert_eq!(ledger.latest_hash(), genesis.hash());
     assert_eq!(ledger.latest_height(), genesis.height());
     assert_eq!(ledger.latest_round(), genesis.round());
@@ -90,14 +92,15 @@ fn test_from() {
 #[test]
 fn test_state_path() {
     // Load the genesis block.
-    let genesis = Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
+    let genesis = sample_genesis_block();
     // Initialize the ledger with the genesis block.
-    let ledger = CurrentLedger::load(Some(genesis), None).unwrap();
+    let ledger = CurrentLedger::load(genesis.clone(), None).unwrap();
     // Retrieve the genesis block.
-    let genesis = ledger.get_block(0).unwrap();
+    let block = ledger.get_block(0).unwrap();
+    assert_eq!(genesis, block);
 
     // Construct the state path.
-    let commitments = genesis.transactions().commitments().collect::<Vec<_>>();
+    let commitments = block.transactions().commitments().collect::<Vec<_>>();
     let commitment = commitments[0];
 
     let _state_path = ledger.get_state_path_for_commitment(commitment).unwrap();

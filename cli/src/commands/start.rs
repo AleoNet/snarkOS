@@ -17,7 +17,7 @@
 use snarkos_account::Account;
 use snarkos_display::Display;
 use snarkos_node::{Node, NodeType};
-use snarkvm::prelude::{Block, ConsensusMemory, ConsensusStore, Network, PrivateKey, Testnet3, VM};
+use snarkvm::prelude::{Block, ConsensusMemory, ConsensusStore, FromBytes, Network, PrivateKey, Testnet3, VM};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -158,8 +158,8 @@ impl Start {
     }
 
     /// Updates the configurations if the node is in development mode, and returns the
-    /// alternative genesis block if the node is in development mode.
-    fn parse_development<N: Network>(&mut self, trusted_peers: &mut Vec<SocketAddr>) -> Result<Option<Block<N>>> {
+    /// alternative genesis block if the node is in development mode. Otherwise, returns the actual genesis block.
+    fn parse_development<N: Network>(&mut self, trusted_peers: &mut Vec<SocketAddr>) -> Result<Block<N>> {
         // If `--dev` is set, assume the dev nodes are initialized from 0 to `dev`,
         // and add each of them to the trusted peers. In addition, set the node IP to `4130 + dev`,
         // and the REST IP to `3030 + dev`.
@@ -216,9 +216,9 @@ impl Start {
                 sample_account(&mut self.client, false)?;
             }
 
-            Ok(Some(genesis))
+            Ok(genesis)
         } else {
-            Ok(None)
+            Block::from_bytes_le(N::genesis_bytes())
         }
     }
 
@@ -294,8 +294,8 @@ impl Start {
         match node_type {
             NodeType::Beacon => Node::new_beacon(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
             NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
-            NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, self.dev).await,
-            NodeType::Client => Node::new_client(self.node, account, &trusted_peers, self.dev).await,
+            NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
+            NodeType::Client => Node::new_client(self.node, account, &trusted_peers, genesis, self.dev).await,
         }
     }
 
@@ -447,6 +447,8 @@ mod tests {
 
     #[test]
     fn test_parse_development() {
+        let prod_genesis = Block::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
+
         let _config = Start::try_parse_from(["snarkos", "--dev", ""].iter()).unwrap_err();
 
         // Remove this for Phase 3.
@@ -463,7 +465,7 @@ mod tests {
         assert!(config.validator.is_none());
         assert!(config.prover.is_none());
         assert!(config.client.is_none());
-        assert!(expected_genesis.is_some());
+        assert_ne!(expected_genesis, prod_genesis);
 
         let mut trusted_peers = vec![];
         let mut config = Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", ""].iter()).unwrap();

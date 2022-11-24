@@ -39,7 +39,8 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Validator<N, C> {
         let peer_addr = connection.addr();
         let conn_side = connection.side();
         let stream = self.borrow_stream(&mut connection);
-        let (peer_ip, mut framed) = self.router.handshake(peer_addr, stream, conn_side).await?;
+        let genesis_header = self.ledger.get_header(0).map_err(|e| error(format!("{e}")))?;
+        let (peer_ip, mut framed) = self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
 
         // Retrieve the block locators.
         let block_locators = match crate::helpers::get_block_locators(&self.ledger) {
