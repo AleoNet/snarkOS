@@ -88,12 +88,12 @@ impl<N: Network> Sync<N> {
             .collect()
     }
 
-    /// Inserts a canonical block hash for the given block height.
+    /// Inserts a canonical block hash for the given block height, overriding an existing entry if it exists.
     pub fn insert_canon_locator(&self, height: u32, hash: N::BlockHash) {
         self.canon.write().insert(height, hash);
     }
 
-    /// Inserts the block locators as canonical.
+    /// Inserts the block locators as canonical, overriding any existing entries.
     pub fn insert_canon_locators(&self, locators: BlockLocators<N>) -> Result<()> {
         // Ensure the given block locators are well-formed.
         locators.ensure_is_valid()?;
