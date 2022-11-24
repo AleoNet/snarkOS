@@ -70,10 +70,10 @@ use tokio::{task::JoinHandle, time::timeout};
 pub struct Beacon<N: Network, C: ConsensusStorage<N>> {
     /// The account of the node.
     account: Account<N>,
-    /// The consensus module of the node.
-    consensus: Consensus<N, C>,
     /// The ledger of the node.
     ledger: Ledger<N, C>,
+    /// The consensus module of the node.
+    consensus: Consensus<N, C>,
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
@@ -140,8 +140,8 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         // Initialize the node.
         let mut node = Self {
             account,
-            consensus: consensus.clone(),
             ledger: ledger.clone(),
+            consensus: consensus.clone(),
             router,
             rest: None,
             block_generation_time,

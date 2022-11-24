@@ -32,8 +32,6 @@ pub struct Sync<N: Network> {
     locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
     /// The map of block requests to the received blocks.
     _candidates: Arc<RwLock<BTreeMap<u32, CandidateBlock<N>>>>,
-    /// The map of unconfirmed block hashes to the received blocks.
-    unconfirmed_blocks: Arc<RwLock<IndexMap<N::BlockHash, CandidateBlock<N>>>>,
 }
 
 impl<N: Network> Default for Sync<N> {
@@ -46,7 +44,7 @@ impl<N: Network> Default for Sync<N> {
 impl<N: Network> Sync<N> {
     /// Initializes a new instance of the sync pool.
     pub fn new() -> Self {
-        Self { locators: Default::default(), _candidates: Default::default(), unconfirmed_blocks: Default::default() }
+        Self { locators: Default::default(), _candidates: Default::default() }
     }
 
     /// Returns the block height of the given peer IP.
@@ -62,15 +60,6 @@ impl<N: Network> Sync<N> {
             .map(|(peer_ip, locators)| (*peer_ip, locators.height()))
             .sorted_by(|(_, a), (_, b)| b.cmp(a))
             .collect()
-    }
-
-    /// Inserts the unconfirmed block into the sync pool.
-    pub fn insert_unconfirmed_block(&self, block: Block<N>, peer_ip: SocketAddr) {
-        // Ensure the block is not already in the sync pool.
-        if !self.unconfirmed_blocks.read().contains_key(&block.hash()) {
-            // Insert the block into the sync pool.
-            self.unconfirmed_blocks.write().insert(block.hash(), (block, peer_ip));
-        }
     }
 
     /// Updates the block locators for the given peer IP.

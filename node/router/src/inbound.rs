@@ -372,21 +372,16 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         false
     }
 
+    /// TODO (howardwu): Consider deprecating this message type.
     /// Broadcasts the `UnconfirmedBlock` message to all connected peers within the fork depth of the given block.
     fn unconfirmed_block(&self, peer_ip: SocketAddr, serialized: UnconfirmedBlock<N>, block: Block<N>) -> bool {
         // Retrieve the connected peers by height.
-        let mut peers = self.router().sync.get_peers_by_height();
+        let mut peers = self.router().sync().get_peers_by_height();
         // Retain the peers that 1) not the sender, and 2) are within the fork depth of the given unconfirmed block.
         peers.retain(|(ip, height)| *ip != peer_ip && *height < block.height() + ALEO_MAXIMUM_FORK_DEPTH);
 
-        // If there are peers, insert the unconfirmed block to the sync pool.
+        // Broadcast the `UnconfirmedBlock` to the peers.
         if !peers.is_empty() {
-            // If this node is not syncing, insert the unconfirmed block to the sync pool.
-            if !self.router().status().is_syncing() {
-                // Add the unconfirmed block to the sync pool.
-                self.router().sync.insert_unconfirmed_block(block, peer_ip);
-            }
-            // Broadcast the `UnconfirmedBlock` to the peers.
             for (peer_ip, _) in peers {
                 self.send(peer_ip, Message::UnconfirmedBlock(serialized.clone()));
             }

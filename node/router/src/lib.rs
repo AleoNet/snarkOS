@@ -184,6 +184,11 @@ impl<N: Network> Router<N> {
         self.status.get()
     }
 
+    /// Returns the sync pool.
+    pub fn sync(&self) -> &Sync<N> {
+        &self.sync
+    }
+
     /// Returns `true` if the node is in development mode.
     pub const fn is_dev(&self) -> bool {
         self.is_dev
