@@ -16,7 +16,7 @@
 
 use snarkvm::prelude::{has_duplicates, Network};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
@@ -205,7 +205,7 @@ impl<N: Network> BlockLocators<N> {
     /// 4. The block checkpoints are in the correct order.
     fn check_block_checkpoints(checkpoints: &IndexMap<u32, N::BlockHash>) -> Result<u32> {
         // Ensure the block checkpoints are not empty.
-        assert!(!checkpoints.is_empty());
+        ensure!(!checkpoints.is_empty(), "There must be at least 1 block checkpoint");
 
         // Ensure the given checkpoints increment in height, and at the correct interval.
         let mut last_height = 0;

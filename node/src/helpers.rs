@@ -38,7 +38,7 @@ pub fn get_block_locators<N: Network, C: ConsensusStorage<N>>(ledger: &Ledger<N,
     let mut checkpoints = IndexMap::with_capacity((latest_height % CHECKPOINT_INTERVAL).try_into()?);
 
     // Retrieve the checkpoint block hashes.
-    for height in (0..latest_height).step_by(CHECKPOINT_INTERVAL as usize) {
+    for height in (0..=latest_height).step_by(CHECKPOINT_INTERVAL as usize) {
         checkpoints.insert(height, ledger.get_hash(height)?);
     }
 

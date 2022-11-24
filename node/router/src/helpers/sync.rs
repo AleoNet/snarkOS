@@ -18,24 +18,32 @@ use snarkos_node_messages::BlockLocators;
 use snarkvm::prelude::{Block, Network};
 
 use anyhow::{bail, Result};
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use parking_lot::RwLock;
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
 
+/// A tuple of the block hash, previous block hash (optional), and peer IPs.
+pub type RequestHashFromPeers<N> = (<N as Network>::BlockHash, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);
+
 #[derive(Clone, Debug)]
 pub struct Sync<N: Network> {
-    /// The canonical map of block heights to block hashes.
+    /// The canonical map of block height to block hash.
     /// This map is a linearly-increasing map of block heights to block hashes,
     /// updated solely from candidate blocks (not from block locators, to ensure there are no forks).
     canon: Arc<RwLock<BTreeMap<u32, N::BlockHash>>>,
-    /// The map of peer IPs to their block locators.
+    /// The map of peer IP to their block locators.
     /// This map is updated from block locators, and is used to determine which blocks to request from peers.
     /// The block locators are guaranteed to be consistent with the canonical map,
     /// and with every other peer's block locators.
     locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
-    /// The map of block requests to the received blocks.
+
+    /// The map of block height to the expected block hash and peer IPs.
+    requests: Arc<RwLock<BTreeMap<u32, RequestHashFromPeers<N>>>>,
+    /// The map of block height to the received blocks.
     candidates: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
+    /// The map of block height to the success blocks.
+    success: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
 }
 
 impl<N: Network> Default for Sync<N> {
@@ -48,7 +56,13 @@ impl<N: Network> Default for Sync<N> {
 impl<N: Network> Sync<N> {
     /// Initializes a new instance of the sync pool.
     pub fn new() -> Self {
-        Self { canon: Default::default(), locators: Default::default(), candidates: Default::default() }
+        Self {
+            canon: Default::default(),
+            locators: Default::default(),
+            requests: Default::default(),
+            candidates: Default::default(),
+            success: Default::default(),
+        }
     }
 
     /// Returns the canonical block hash for the given block height, if it exists.
@@ -71,39 +85,99 @@ impl<N: Network> Sync<N> {
             .collect()
     }
 
-    /// Inserts the candidate blocks.
-    pub fn insert_candidate_blocks(&self, peer_ip: SocketAddr, candidate_blocks: Vec<Block<N>>) -> Result<()> {
-        // Retrieve the block locators for the given peer IP.
-        let locators = match self.locators.read().get(&peer_ip) {
-            Some(locators) => locators.clone(),
-            None => bail!("Missing block locators for '{peer_ip}'"),
-        };
-
-        let mut candidates = self.candidates.write();
-        for block in candidate_blocks {
-            // Check the candidate block hash against the canonical map.
-            if let Some(hash) = self.canon.read().get(&block.height()) {
-                if hash != &block.hash() {
-                    bail!("Received a block from '{peer_ip}' with an incorrect block hash (canon mismatch)");
-                }
-            }
-            // Check the candidate block hash against the known block locators of this peer.
-            if let Some(hash) = locators.get_hash(block.height()) {
-                if hash != block.hash() {
-                    bail!("Received a block from '{peer_ip}' with an incorrect block hash (locator mismatch)");
-                }
-            }
-            // If the candidate block height already exists, check that the candidate block hash is the same.
-            if let Some(candidate_block) = candidates.get(&block.height()) {
-                if candidate_block.hash() != block.hash() {
-                    bail!("Received a block from '{peer_ip}' with an incorrect block hash (candidate mismatch)");
-                }
-            }
-            // Update the canonical map.
-            self.canon.write().insert(block.height(), block.hash());
-            // Insert the candidate block.
-            candidates.insert(block.height(), block);
+    /// Inserts a block request for the given height.
+    pub fn insert_request(
+        &self,
+        height: u32,
+        hash: N::BlockHash,
+        previous_hash: Option<N::BlockHash>,
+        peer_ips: IndexSet<SocketAddr>,
+    ) -> Result<()> {
+        // Ensure the block height is not already canon.
+        if self.canon.read().contains_key(&height) {
+            bail!("Failed to add block request, as block {height} already exists in the canon map");
         }
+        // Ensure the block height is not already requested.
+        if self.requests.read().contains_key(&height) {
+            bail!("Failed to add block request, as block {height} already exists in the requests map");
+        }
+        // Ensure the block height is not already a candidate.
+        if self.candidates.read().contains_key(&height) {
+            bail!("Failed to add block request, as block {height} already exists in the candidates map");
+        }
+        // Ensure the block height is not already a success.
+        if self.success.read().contains_key(&height) {
+            bail!("Failed to add block request, as block {height} already exists in the success map");
+        }
+        // Insert the block request.
+        self.requests.write().insert(height, (hash, previous_hash, peer_ips));
+        Ok(())
+    }
+
+    /// Inserts the given candidate block, after checking that the request was made, and the
+    /// expected block hash matches. On success, this function also removes the peer IP from the requests map.
+    pub fn insert_candidate_block(&self, peer_ip: SocketAddr, block: Block<N>) -> Result<()> {
+        let candidate_height = block.height();
+
+        // Ensure the canonical map does not contain the candidate block.
+        if self.canon.read().contains_key(&candidate_height) {
+            bail!("The canonical map already contains the candidate block")
+        }
+
+        // Declare a boolean flag to determine if the request is complete.
+        let is_request_complete;
+
+        // Retrieve the request entry for the candidate block.
+        if let Some((expected_hash, expected_previous_hash, peer_ips)) =
+            self.requests.write().get_mut(&candidate_height)
+        {
+            // Ensure the sync pool requested this block from the given peer.
+            if !peer_ips.contains(&peer_ip) {
+                bail!("The sync pool did not request block {candidate_height} from '{peer_ip}'")
+            }
+            // Ensure the candidate block hash matches the expected hash.
+            if block.hash() != *expected_hash {
+                bail!("The block hash for candidate block {candidate_height} from '{peer_ip}' is incorrect")
+            }
+            // Ensure the previous block hash matches if it exists.
+            if let Some(expected_previous_hash) = expected_previous_hash {
+                if block.previous_hash() != *expected_previous_hash {
+                    bail!("The previous block hash in candidate block {candidate_height} from '{peer_ip}' is incorrect")
+                }
+            }
+            // Remove the request entry for this peer IP.
+            peer_ips.remove(&peer_ip);
+            // Update whether the request is complete.
+            is_request_complete = peer_ips.is_empty();
+        } else {
+            bail!("The sync pool did not request block {candidate_height}")
+        }
+
+        // Acquire a write lock on the candidates map.
+        let mut candidates_write = self.candidates.write();
+
+        // Insert the candidate block into the candidates map.
+        if let Some(existing_block) = candidates_write.insert(candidate_height, block.clone()) {
+            // If the candidate block was already present, ensure it is the same block.
+            if block != existing_block {
+                // If the candidate block is different, remove this entry from the candidates map.
+                candidates_write.remove(&candidate_height);
+                bail!("Candidate block {candidate_height} is malformed");
+            }
+        }
+
+        // If there are no more peer IPs for this request, remove the request entry,
+        // and move the candidate block to the success map and update the canonical map.
+        if is_request_complete {
+            // Remove the request entry.
+            self.requests.write().remove(&candidate_height);
+            // Move the candidate block to the success map and update the canonical map.
+            if let Some(block) = candidates_write.remove(&candidate_height) {
+                self.canon.write().insert(block.height(), block.hash());
+                self.success.write().insert(block.height(), block);
+            }
+        }
+
         Ok(())
     }
 
@@ -171,5 +245,11 @@ impl<N: Network> Sync<N> {
     pub fn remove_peer(&self, peer_ip: &SocketAddr) {
         // Remove the locators entry for the given peer IP.
         self.locators.write().remove(peer_ip);
+    }
+
+    /// Removes the successful block for the given height, returning the block if it exists.
+    pub fn remove_successful_block(&self, height: u32) -> Option<Block<N>> {
+        // Remove the success entry for the given height.
+        self.success.write().remove(&height)
     }
 }

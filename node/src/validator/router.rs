@@ -128,22 +128,28 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Validator<N, C> {
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
     /// Handles a `BlockResponse` message.
-    fn block_response(&self, peer_ip: SocketAddr, _blocks: Vec<Block<N>>) -> bool {
-        // // Perform the deferred non-blocking deserialization of the block.
-        // match block.deserialize().await {
-        //     Ok(block) => {
-        //         // Route the `BlockResponse` to the ledger.
-        //         if let Err(error) = state.ledger().router().send(LedgerRequest::BlockResponse(peer_ip, block)).await {
-        //             warn!("[BlockResponse] {}", error);
-        //         }
-        //     },
-        //     // Route the `Failure` to the ledger.
-        //     Err(error) => if let Err(error) = state.ledger().router().send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
-        //         warn!("[Failure] {}", error);
-        //     }
-        // }
-        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
-        false
+    fn block_response(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> bool {
+        // Insert the candidate blocks into the sync pool.
+        for block in blocks {
+            if let Err(error) = self.router().sync().insert_candidate_block(peer_ip, block) {
+                warn!("{error}");
+                return false;
+            }
+        }
+
+        // Retrieve the latest block height.
+        let mut latest_height = self.ledger.latest_height();
+        // Try to advance the ledger with the sync pool.
+        while let Some(block) = self.router().sync().remove_successful_block(latest_height + 1) {
+            // Attempt to advance to the next block.
+            if let Err(error) = self.consensus.advance_to_next_block(&block) {
+                warn!("{error}");
+                break;
+            }
+            // Increment the latest height.
+            latest_height += 1;
+        }
+        true
     }
 
     /// Sleeps for a period and then sends a `Ping` message to the peer.
