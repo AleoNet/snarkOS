@@ -32,7 +32,7 @@ use snarkos_node_messages::{
 use snarkos_node_tcp::protocols::Reading;
 use snarkvm::prelude::{Block, Network, ProverSolution, Transaction};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use std::{
     net::SocketAddr,
     time::{Duration, Instant},
@@ -56,7 +56,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // Drop the peer, if they have sent more than 50 messages in the last 5 seconds.
         let num_messages = self.router().cache.insert_inbound_message(peer_ip, 5);
         if num_messages >= 50 {
-            bail!("Dropping {peer_ip} for spamming messages (num_messages = {num_messages})")
+            bail!("Dropping '{peer_ip}' for spamming messages (num_messages = {num_messages})")
         }
 
         trace!("Received '{}' from '{peer_ip}'", message.name());
@@ -65,18 +65,53 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         match message {
             Message::BlockRequest(message) => match self.block_request(peer_ip, message) {
                 true => Ok(()),
-                false => bail!("Peer {peer_ip} sent an invalid block request"),
+                false => bail!("Peer '{peer_ip}' sent an invalid block request"),
             },
-            Message::BlockResponse(message) => match self.block_response(peer_ip, message) {
-                true => Ok(()),
-                false => bail!("Peer {peer_ip} sent an invalid block response"),
-            },
+            Message::BlockResponse(message) => {
+                let request = message.request;
+
+                // Check that this node previously sent a block request to this peer.
+                if !self.router().cache.contains_outbound_block_request(&peer_ip, &request) {
+                    bail!("Peer '{peer_ip}' is not following the protocol (unexpected block response)")
+                }
+                // Remove the block request.
+                self.router().cache.remove_outbound_block_request(peer_ip, &request);
+
+                // Clone the message.
+                let message_clone = message.clone();
+                // Perform the deferred non-blocking deserialization of the blocks.
+                let blocks = match message.blocks.deserialize().await {
+                    Ok(blocks) => blocks,
+                    Err(error) => bail!("[PuzzleResponse] {error}"),
+                };
+
+                // Ensure the blocks are not empty.
+                ensure!(!blocks.is_empty(), "Peer '{peer_ip}' sent an empty block response (request = {request})");
+                // Check that the blocks are sequentially ordered.
+                if !blocks.windows(2).all(|w| w[0].height() + 1 == w[1].height()) {
+                    bail!("Peer '{peer_ip}' sent an invalid block response (blocks are not sequentially ordered)")
+                }
+
+                // Retrieve the start (inclusive) and end (exclusive) block height.
+                let start_height = blocks.first().map(|b| b.height()).unwrap_or(0);
+                let end_height = 1 + blocks.last().map(|b| b.height()).unwrap_or(0);
+                // Check that the range matches the block request.
+                if start_height != request.start_height || end_height != request.end_height {
+                    bail!("Peer '{peer_ip}' sent an invalid block response (range does not match the block request)")
+                }
+
+                // Process the block response.
+                match self.block_response(peer_ip, message_clone, &blocks) {
+                    true => Ok(()),
+                    false => bail!("Peer '{peer_ip}' sent an invalid block response"),
+                }
+            }
             Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => {
                 // Disconnect as the peer is not following the protocol.
-                bail!("Peer {peer_ip} is not following the protocol")
+                bail!("Peer '{peer_ip}' is not following the protocol")
             }
             Message::Disconnect(message) => {
-                bail!("Disconnecting peer {peer_ip} for the following reason: {:?}", message.reason)
+                bail!("Disconnecting peer '{peer_ip}' for the following reason: {:?}", message.reason)
             }
             Message::PeerRequest(..) => {
                 // Retrieve the connected peers.
@@ -92,29 +127,29 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             }
             Message::Ping(message) => match self.ping(peer_ip, message) {
                 true => Ok(()),
-                false => bail!("Peer {peer_ip} sent an invalid ping"),
+                false => bail!("Peer '{peer_ip}' sent an invalid ping"),
             },
             Message::Pong(message) => match self.pong(peer_ip, message) {
                 true => Ok(()),
-                false => bail!("Peer {peer_ip} sent an invalid pong"),
+                false => bail!("Peer '{peer_ip}' sent an invalid pong"),
             },
             Message::PuzzleRequest(..) => {
                 // Insert the puzzle request for the peer, and fetch the recent frequency.
                 let frequency = self.router().cache.insert_inbound_puzzle_request(peer_ip);
                 // Check if the number of puzzle requests is within the limit.
                 if frequency > Self::MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL {
-                    bail!("Peer {peer_ip} is not following the protocol (excessive puzzle requests)")
+                    bail!("Peer '{peer_ip}' is not following the protocol (excessive puzzle requests)")
                 }
                 // Process the puzzle request.
                 match self.puzzle_request(peer_ip) {
                     true => Ok(()),
-                    false => bail!("Peer {peer_ip} sent an invalid puzzle request"),
+                    false => bail!("Peer '{peer_ip}' sent an invalid puzzle request"),
                 }
             }
             Message::PuzzleResponse(message) => {
                 // Check that this node previously sent a puzzle request to this peer.
                 if !self.router().cache.contains_outbound_puzzle_request(&peer_ip) {
-                    bail!("Peer {peer_ip} is not following the protocol (unexpected puzzle response)")
+                    bail!("Peer '{peer_ip}' is not following the protocol (unexpected puzzle response)")
                 }
                 // Decrement the number of puzzle requests.
                 self.router().cache.decrement_outbound_puzzle_requests(peer_ip);
@@ -129,7 +164,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 // Process the puzzle response.
                 match self.puzzle_response(peer_ip, message_clone, block) {
                     true => Ok(()),
-                    false => bail!("Peer {peer_ip} sent an invalid puzzle response"),
+                    false => bail!("Peer '{peer_ip}' sent an invalid puzzle response"),
                 }
             }
             Message::UnconfirmedBlock(message) => {
@@ -148,12 +183,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 };
                 // Check that the block parameters match.
                 if message.block_height != block.height() || message.block_hash != block.hash() {
-                    bail!("Peer {peer_ip} is not following the 'UnconfirmedBlock' protocol")
+                    bail!("Peer '{peer_ip}' is not following the 'UnconfirmedBlock' protocol")
                 }
                 // Handle the unconfirmed block.
                 match self.unconfirmed_block(peer_ip, message_clone, block) {
                     true => Ok(()),
-                    false => bail!("Peer {peer_ip} sent an invalid unconfirmed block"),
+                    false => bail!("Peer '{peer_ip}' sent an invalid unconfirmed block"),
                 }
             }
             Message::UnconfirmedSolution(message) => {
@@ -172,12 +207,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 };
                 // Check that the solution parameters match.
                 if message.puzzle_commitment != solution.commitment() {
-                    bail!("Peer {peer_ip} is not following the 'UnconfirmedSolution' protocol")
+                    bail!("Peer '{peer_ip}' is not following the 'UnconfirmedSolution' protocol")
                 }
                 // Handle the unconfirmed solution.
                 match self.unconfirmed_solution(peer_ip, message_clone, solution).await {
                     true => Ok(()),
-                    false => bail!("Peer {peer_ip} sent an invalid unconfirmed solution"),
+                    false => bail!("Peer '{peer_ip}' sent an invalid unconfirmed solution"),
                 }
             }
             Message::UnconfirmedTransaction(message) => {
@@ -196,12 +231,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 };
                 // Check that the transaction parameters match.
                 if message.transaction_id != transaction.id() {
-                    bail!("Peer {peer_ip} is not following the 'UnconfirmedTransaction' protocol")
+                    bail!("Peer '{peer_ip}' is not following the 'UnconfirmedTransaction' protocol")
                 }
                 // Handle the unconfirmed transaction.
                 match self.unconfirmed_transaction(peer_ip, message_clone, transaction) {
                     true => Ok(()),
-                    false => bail!("Peer {peer_ip} sent an invalid unconfirmed transaction"),
+                    false => bail!("Peer '{peer_ip}' sent an invalid unconfirmed transaction"),
                 }
             }
         }
@@ -241,7 +276,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         false
     }
 
-    fn block_response(&self, peer_ip: SocketAddr, _message: BlockResponse<N>) -> bool {
+    fn block_response(&self, peer_ip: SocketAddr, _message: BlockResponse<N>, _blocks: &[Block<N>]) -> bool {
         // // Perform the deferred non-blocking deserialization of the block.
         // match block.deserialize().await {
         //     Ok(block) => {
@@ -262,12 +297,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     fn ping(&self, peer_ip: SocketAddr, message: Ping<N>) -> bool {
         // Ensure the message protocol version is not outdated.
         if message.version < Message::<N>::VERSION {
-            warn!("Dropping {peer_ip} on version {} (outdated)", message.version);
+            warn!("Dropping '{peer_ip}' on version {} (outdated)", message.version);
             return false;
         }
         // Ensure the maximum fork depth is correct.
         if message.fork_depth != ALEO_MAXIMUM_FORK_DEPTH {
-            warn!("Dropping {peer_ip} for an incorrect maximum fork depth of {}", message.fork_depth);
+            warn!("Dropping '{peer_ip}' for an incorrect maximum fork depth of {}", message.fork_depth);
             return false;
         }
 

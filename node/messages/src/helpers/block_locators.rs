@@ -123,7 +123,9 @@ impl<N: Network> BlockLocators<N> {
         }
 
         // If the `last_recent_height` is below NUM_RECENTS, ensure the genesis hash matches in both maps.
-        if last_recent_height < NUM_RECENTS as u32 && recents.get(&0).copied().unwrap_or_default() != checkpoints.get(&0).copied().unwrap_or_default() {
+        if last_recent_height < NUM_RECENTS as u32
+            && recents.get(&0).copied().unwrap_or_default() != checkpoints.get(&0).copied().unwrap_or_default()
+        {
             bail!("Recent genesis hash and checkpoint genesis hash mismatch at height {last_recent_height}")
         }
 

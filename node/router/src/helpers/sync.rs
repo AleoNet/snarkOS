@@ -15,18 +15,23 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use snarkos_node_messages::BlockLocators;
-use snarkvm::prelude::Network;
+use snarkvm::prelude::{Block, Network};
 
 use anyhow::Result;
 use indexmap::IndexMap;
 use itertools::Itertools;
 use parking_lot::RwLock;
-use std::{net::SocketAddr, sync::Arc};
+use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
+
+/// The candidate block alongside the peer IP who sent it.
+pub type CandidateBlock<N> = (Block<N>, SocketAddr);
 
 #[derive(Clone, Debug)]
 pub struct Sync<N: Network> {
     /// The map of peer IPs to their block locators.
     locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
+    /// The map of block requests to the received blocks.
+    _candidates: Arc<RwLock<BTreeMap<u32, CandidateBlock<N>>>>,
 }
 
 impl<N: Network> Default for Sync<N> {
@@ -39,7 +44,7 @@ impl<N: Network> Default for Sync<N> {
 impl<N: Network> Sync<N> {
     /// Initializes a new instance of the sync module.
     pub fn new() -> Self {
-        Self { locators: Default::default() }
+        Self { locators: Default::default(), _candidates: Default::default() }
     }
 
     /// Returns the block height of the given peer IP.

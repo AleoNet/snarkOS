@@ -194,10 +194,19 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
             // For all other message types, return `true`.
             _ => true,
         };
-        // If the message should be sent and the message type is a puzzle request, increment the cache.
-        if should_send && matches!(message, Message::PuzzleRequest(_)) {
-            self.router().cache.increment_outbound_puzzle_requests(peer_ip);
+
+        // If the message should be sent, check if we need to cache the outbound message.
+        if should_send {
+            // If the message type is a block request, add it to the cache.
+            if let Message::BlockRequest(request) = message {
+                self.router().cache.insert_outbound_block_request(peer_ip, *request);
+            }
+            // If the message type is a puzzle request, increment the cache.
+            if matches!(message, Message::PuzzleRequest(_)) {
+                self.router().cache.increment_outbound_puzzle_requests(peer_ip);
+            }
         }
+
         // Return whether the message should be sent.
         should_send
     }
