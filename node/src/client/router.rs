@@ -16,13 +16,13 @@
 
 use super::*;
 
-use snarkos_node_messages::{DisconnectReason, MessageCodec, Ping};
+use snarkos_node_messages::{DisconnectReason, MessageCodec, Ping, Pong};
 use snarkos_node_router::{Routing, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::Network;
 
 use futures_util::sink::SinkExt;
-use std::{io, net::SocketAddr};
+use std::{io, net::SocketAddr, time::Duration};
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Client<N, C> {
     /// Returns a reference to the TCP instance.
@@ -115,6 +115,19 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Client<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
+    /// Sleeps for a period and then sends a `Ping` message to the peer.
+    fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool {
+        // Spawn an asynchronous task for the `Ping` request.
+        let self_clone = self.clone();
+        tokio::spawn(async move {
+            // Sleep for the preset time before sending a `Ping` request.
+            tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
+            // Send a `Ping` message to the peer.
+            self_clone.send_ping(peer_ip, None);
+        });
+        true
+    }
+
     /// Saves the latest epoch challenge and latest block in the node.
     fn puzzle_response(&self, peer_ip: SocketAddr, message: PuzzleResponse<N>, block: Block<N>) -> bool {
         // Retrieve the epoch number.
