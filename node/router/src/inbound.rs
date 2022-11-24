@@ -17,7 +17,6 @@
 use crate::{Outbound, Peer, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_messages::{
     BlockRequest,
-    BlockResponse,
     DisconnectReason,
     Message,
     PeerResponse,
@@ -40,7 +39,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// The maximum number of puzzle requests per interval.
     const MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL: usize = 5;
     /// The duration in seconds to sleep in between ping requests with a connected peer.
-    const PING_SLEEP_IN_SECS: u64 = 60; // 1 minute
+    const PING_SLEEP_IN_SECS: u64 = 15; // 15 seconds
 
     /// Handles the inbound message from the peer.
     async fn inbound(&self, peer_addr: SocketAddr, message: Message<N>) -> Result<()> {
@@ -74,8 +73,6 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 // Remove the block request.
                 self.router().cache.remove_outbound_block_request(peer_ip, &request);
 
-                // Clone the message.
-                let message_clone = message.clone();
                 // Perform the deferred non-blocking deserialization of the blocks.
                 let blocks = match message.blocks.deserialize().await {
                     Ok(blocks) => blocks,
@@ -98,7 +95,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
 
                 // Process the block response.
-                match self.block_response(peer_ip, message_clone, &blocks) {
+                match self.block_response(peer_ip, blocks.0) {
                     true => Ok(()),
                     false => bail!("Peer '{peer_ip}' sent an invalid block response"),
                 }
@@ -273,23 +270,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         false
     }
 
-    fn block_response(&self, peer_ip: SocketAddr, _message: BlockResponse<N>, _blocks: &[Block<N>]) -> bool {
-        // // Perform the deferred non-blocking deserialization of the block.
-        // match block.deserialize().await {
-        //     Ok(block) => {
-        //         // Route the `BlockResponse` to the ledger.
-        //         if let Err(error) = state.ledger().router().send(LedgerRequest::BlockResponse(peer_ip, block)).await {
-        //             warn!("[BlockResponse] {}", error);
-        //         }
-        //     },
-        //     // Route the `Failure` to the ledger.
-        //     Err(error) => if let Err(error) = state.ledger().router().send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
-        //         warn!("[Failure] {}", error);
-        //     }
-        // }
-        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
-        false
-    }
+    /// Handles a `BlockResponse` message.
+    fn block_response(&self, peer_ip: SocketAddr, _blocks: Vec<Block<N>>) -> bool;
 
     fn ping(&self, peer_ip: SocketAddr, message: Ping<N>) -> bool {
         // Ensure the message protocol version is not outdated.
@@ -308,50 +290,57 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             return false;
         }
 
-        // // Perform the deferred non-blocking deserialization of the block header.
-        // match block_header.deserialize().await {
-        //     Ok(block_header) => {
-        //         // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
-        //         if E::NODE_TYPE != NodeType::Beacon
-        //             && E::status().is_syncing()
-        //             && node_type == NodeType::Beacon
-        //             && state.ledger().reader().latest_cumulative_weight() > block_header.cumulative_weight()
-        //         {
-        //             trace!("Disconnecting from {} (ahead of sync node)", peer_ip);
-        //             break;
-        //         }
-        //
-        //         // Update peer's block height.
-        //         peer.block_height = block_header.height();
-        //     }
-        //     Err(error) => warn!("[Ping] {}", error),
+        // // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
+        // if E::NODE_TYPE != NodeType::Beacon
+        //     && E::status().is_syncing()
+        //     && node_type == NodeType::Beacon
+        //     && state.ledger().reader().latest_cumulative_weight() > block_header.cumulative_weight()
+        // {
+        //     trace!("Disconnecting from {} (ahead of sync node)", peer_ip);
+        //     break;
         // }
 
+        // If the peer is a beacon or validator, ensure there are block locators.
+        if (message.node_type.is_beacon() || message.node_type.is_validator()) && message.block_locators.is_none() {
+            warn!("Peer '{peer_ip}' is a beacon or validator, but no block locators were provided");
+            return false;
+        }
+        // If the peer is a prover or client, ensure there are no block locators.
+        if (message.node_type.is_prover() || message.node_type.is_client()) && message.block_locators.is_some() {
+            warn!("Peer '{peer_ip}' is a prover or client, but block locators were provided");
+            return false;
+        }
+        // If block locators were provided, then update the peer in the sync pool.
+        if let Some(block_locators) = message.block_locators {
+            // Check the block locators are valid, and update the peer in the sync pool.
+            if let Err(disconnect_peers) = self.router().sync().update_locators(peer_ip, block_locators) {
+                // On failure, disconnect the returned peer IPs.
+                for disconnect_ip in disconnect_peers {
+                    debug!(
+                        "Disconnecting '{disconnect_ip}' for the following reason - {:?}",
+                        DisconnectReason::ProtocolViolation
+                    );
+                    self.router().disconnect(disconnect_ip);
+                }
+                return false;
+            }
+        }
+
         // Update the connected peer.
-        if let Err(error) = self.router().update_connected_peer(
-            peer_ip,
-            message.node_type,
-            &message.block_locators,
-            |peer: &mut Peer<N>| {
-                // Update the version of the peer.
-                peer.set_version(message.version);
-                // Update the node type of the peer.
-                peer.set_node_type(message.node_type);
-                // Update the status of the peer.
-                peer.set_status(RawStatus::from_status(message.status));
-                // Update the last seen timestamp of the peer.
-                peer.set_last_seen(Instant::now());
-            },
-        ) {
+        if let Err(error) = self.router().update_connected_peer(peer_ip, message.node_type, |peer: &mut Peer<N>| {
+            // Update the version of the peer.
+            peer.set_version(message.version);
+            // Update the node type of the peer.
+            peer.set_node_type(message.node_type);
+            // Update the status of the peer.
+            peer.set_status(RawStatus::from_status(message.status));
+            // Update the last seen timestamp of the peer.
+            peer.set_last_seen(Instant::now());
+        }) {
             warn!("[Ping] {error}");
             return false;
         }
 
-        // // Determine if the peer is on a fork (or unknown).
-        // let is_fork = match state.ledger().reader().get_block_hash(peer.block_height) {
-        //     Ok(expected_block_hash) => Some(expected_block_hash != block_hash),
-        //     Err(_) => None,
-        // };
         let is_fork = Some(false);
 
         // Send a `Pong` message to the peer.

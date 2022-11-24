@@ -127,6 +127,25 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Validator<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
+    /// Handles a `BlockResponse` message.
+    fn block_response(&self, peer_ip: SocketAddr, _blocks: Vec<Block<N>>) -> bool {
+        // // Perform the deferred non-blocking deserialization of the block.
+        // match block.deserialize().await {
+        //     Ok(block) => {
+        //         // Route the `BlockResponse` to the ledger.
+        //         if let Err(error) = state.ledger().router().send(LedgerRequest::BlockResponse(peer_ip, block)).await {
+        //             warn!("[BlockResponse] {}", error);
+        //         }
+        //     },
+        //     // Route the `Failure` to the ledger.
+        //     Err(error) => if let Err(error) = state.ledger().router().send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
+        //         warn!("[Failure] {}", error);
+        //     }
+        // }
+        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
+        false
+    }
+
     /// Sleeps for a period and then sends a `Ping` message to the peer.
     fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool {
         // Spawn an asynchronous task for the `Ping` request.

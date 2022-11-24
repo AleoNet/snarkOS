@@ -115,6 +115,12 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Client<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
+    /// Handles a `BlockResponse` message.
+    fn block_response(&self, peer_ip: SocketAddr, _blocks: Vec<Block<N>>) -> bool {
+        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
+        false
+    }
+
     /// Sleeps for a period and then sends a `Ping` message to the peer.
     fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool {
         // Spawn an asynchronous task for the `Ping` request.

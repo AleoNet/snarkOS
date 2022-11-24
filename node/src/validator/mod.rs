@@ -18,6 +18,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
+use snarkos_node_consensus::Consensus;
 use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{NodeType, PuzzleResponse, Status, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
@@ -49,6 +50,8 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     account: Account<N>,
     /// The ledger of the node.
     ledger: Ledger<N, C>,
+    /// The consensus module of the node.
+    consensus: Consensus<N, C>,
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
@@ -84,6 +87,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 return Err(error);
             }
         }
+        // Initialize the consensus.
+        let consensus = Consensus::new(ledger.clone())?;
 
         // Initialize the node router.
         let router = Router::new(
@@ -102,6 +107,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let mut node = Self {
             account,
             ledger: ledger.clone(),
+            consensus: consensus.clone(),
             router,
             rest: None,
             coinbase_puzzle,
@@ -112,7 +118,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Arc::new(Rest::start(rest_ip, None, ledger, Arc::new(node.clone()))?));
+            node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?));
         }
         // Initialize the routing.
         node.initialize_routing().await;

@@ -42,8 +42,13 @@ impl<N: Network> BlockLocators<N> {
     }
 
     /// Returns the latest height.
-    pub fn height(&self) -> u32 {
+    pub fn latest_height(&self) -> u32 {
         self.recents.keys().last().copied().unwrap_or_default()
+    }
+
+    /// Returns the block hash for the given block height, if it exists.
+    pub fn get_hash(&self, height: u32) -> Option<N::BlockHash> {
+        self.recents.get(&height).copied().or_else(|| self.checkpoints.get(&height).copied())
     }
 
     /// Returns `true` if the block locators are well-formed.

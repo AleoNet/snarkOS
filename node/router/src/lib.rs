@@ -39,7 +39,7 @@ pub use outbound::*;
 mod routing;
 pub use routing::*;
 
-use snarkos_node_messages::{BlockLocators, NodeType, RawStatus, Status};
+use snarkos_node_messages::{NodeType, RawStatus, Status};
 use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network};
 
@@ -365,12 +365,11 @@ impl<N: Network> Router<N> {
         self.restricted_peers.write().insert(peer_ip, Instant::now());
     }
 
-    /// Updates the connected peer with the given block locators and function.
+    /// Updates the connected peer with the given function.
     pub fn update_connected_peer<Fn: FnMut(&mut Peer<N>)>(
         &self,
         peer_ip: SocketAddr,
         node_type: NodeType,
-        block_locators: &Option<BlockLocators<N>>,
         mut write_fn: Fn,
     ) -> Result<()> {
         // Retrieve the peer.
@@ -379,20 +378,6 @@ impl<N: Network> Router<N> {
             // Ensure the node type has not changed.
             if peer.node_type() != node_type {
                 bail!("Peer '{peer_ip}' has changed node types from {} to {node_type}", peer.node_type())
-            }
-
-            // If the peer is a beacon or validator, ensure there are block locators.
-            if (peer.is_beacon() || peer.is_validator()) && block_locators.is_none() {
-                bail!("Peer '{peer_ip}' is a beacon or validator, but no block locators were provided")
-            }
-            // If the peer is a prover or client, ensure there are no block locators.
-            if (peer.is_prover() || peer.is_client()) && block_locators.is_some() {
-                bail!("Peer '{peer_ip}' is a prover or client, but block locators were provided")
-            }
-
-            // If block locators were provided, then update the peer in the sync pool.
-            if let Some(block_locators) = block_locators {
-                self.sync.update_peer(peer_ip, block_locators.clone())?;
             }
             // Lastly, update the peer with the given function.
             write_fn(peer);
