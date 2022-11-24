@@ -63,7 +63,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     /// which can be used to determine when and whether the message has been delivered.
     fn send(&self, peer_ip: SocketAddr, message: Message<N>) -> Option<oneshot::Receiver<io::Result<()>>> {
         // Determine whether to send the message.
-        if !self.should_send(peer_ip, &message) {
+        if !self.should_send(&message) {
             return None;
         }
         // Ensure the peer is connected before sending.
@@ -75,6 +75,14 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         let name = message.name().to_string();
         // Resolve the listener IP to the (ambiguous) peer address.
         if let Some(peer_addr) = self.router().resolve_to_ambiguous(&peer_ip) {
+            // If the message type is a block request, add it to the cache.
+            if let Message::BlockRequest(request) = message {
+                self.router().cache.insert_outbound_block_request(peer_ip, request);
+            }
+            // If the message type is a puzzle request, increment the cache.
+            if matches!(message, Message::PuzzleRequest(_)) {
+                self.router().cache.increment_outbound_puzzle_requests(peer_ip);
+            }
             // Send the message to the peer.
             trace!("Sending '{name}' to '{peer_ip}'");
             let result = self.unicast(peer_addr, message);
@@ -170,9 +178,9 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     }
 
     /// Returns `true` if the message should be sent.
-    fn should_send(&self, peer_ip: SocketAddr, message: &Message<N>) -> bool {
+    fn should_send(&self, message: &Message<N>) -> bool {
         // Determine whether to send the message.
-        let should_send = match message {
+        match message {
             Message::UnconfirmedBlock(message) => {
                 // Update the timestamp for the unconfirmed block.
                 let seen_before = self.router().cache.insert_outbound_block(message.block_hash).is_some();
@@ -193,21 +201,6 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
             }
             // For all other message types, return `true`.
             _ => true,
-        };
-
-        // If the message should be sent, check if we need to cache the outbound message.
-        if should_send {
-            // If the message type is a block request, add it to the cache.
-            if let Message::BlockRequest(request) = message {
-                self.router().cache.insert_outbound_block_request(peer_ip, *request);
-            }
-            // If the message type is a puzzle request, increment the cache.
-            if matches!(message, Message::PuzzleRequest(_)) {
-                self.router().cache.increment_outbound_puzzle_requests(peer_ip);
-            }
         }
-
-        // Return whether the message should be sent.
-        should_send
     }
 }
