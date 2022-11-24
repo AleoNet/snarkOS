@@ -29,7 +29,7 @@ use snarkos_node_messages::{
     Status,
 };
 use snarkos_node_tcp::{ConnectionSide, Tcp, P2P};
-use snarkvm::prelude::{error, Block, FromBytes, Header, Network};
+use snarkvm::prelude::{error, Header, Network};
 
 use anyhow::{bail, Result};
 use futures::SinkExt;
@@ -52,6 +52,7 @@ impl<N: Network> Router<N> {
         peer_addr: SocketAddr,
         stream: &'a mut TcpStream,
         peer_side: ConnectionSide,
+        genesis_header: Header<N>,
     ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, MessageCodec<N>>)> {
         // Construct the stream.
         let mut framed = Framed::new(stream, MessageCodec::<N>::default());
@@ -98,9 +99,6 @@ impl<N: Network> Router<N> {
 
         /* Step 3: Send the challenge response. */
 
-        // TODO (howardwu): Make this step more efficient (by not deserializing every time).
-        // Retrieve the genesis block header.
-        let genesis_header = *Block::<N>::from_bytes_le(N::genesis_bytes()).map_err(|e| error(e.to_string()))?.header();
         // Send the challenge response.
         let message = Message::ChallengeResponse(ChallengeResponse { header: Data::Object(genesis_header) });
         trace!("Sending '{}-B' to '{peer_addr}'", message.name());

@@ -39,7 +39,8 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Prover<N, C> {
         let peer_addr = connection.addr();
         let conn_side = connection.side();
         let stream = self.borrow_stream(&mut connection);
-        let (peer_ip, mut framed) = self.router.handshake(peer_addr, stream, conn_side).await?;
+        let genesis_header = *self.genesis.header();
+        let (peer_ip, mut framed) = self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
 
         // Send the first `Ping` message to the peer.
         let message = Message::Ping(Ping::<N> {
