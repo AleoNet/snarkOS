@@ -41,6 +41,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the block for the given block height.
     pub fn get_block(&self, height: u32) -> Result<Block<N>> {
+        // If the height is 0, return the genesis block.
+        if height == 0 {
+            return Ok(self.genesis.clone());
+        }
         // Retrieve the block hash.
         let block_hash = match self.vm.block_store().get_block_hash(height)? {
             Some(block_hash) => block_hash,
@@ -94,6 +98,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the block header for the given block height.
     pub fn get_header(&self, height: u32) -> Result<Header<N>> {
+        // If the height is 0, return the genesis block header.
+        if height == 0 {
+            return Ok(*self.genesis.header());
+        }
         // Retrieve the block hash.
         let block_hash = match self.vm.block_store().get_block_hash(height)? {
             Some(block_hash) => block_hash,
@@ -108,6 +116,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the block transactions for the given block height.
     pub fn get_transactions(&self, height: u32) -> Result<Transactions<N>> {
+        // If the height is 0, return the genesis block transactions.
+        if height == 0 {
+            return Ok(self.genesis.transactions().clone());
+        }
         // Retrieve the block hash.
         let block_hash = match self.vm.block_store().get_block_hash(height)? {
             Some(block_hash) => block_hash,

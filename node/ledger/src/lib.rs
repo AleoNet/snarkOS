@@ -74,6 +74,8 @@ pub enum RecordsFilter<N: Network> {
 pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
     /// The VM state.
     vm: VM<N, C>,
+    /// The genesis block.
+    genesis: Block<N>,
     /// The current block.
     current_block: Arc<RwLock<Block<N>>>,
     /// The current epoch challenge.
@@ -131,6 +133,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         // Initialize the ledger.
         let mut ledger = Self {
             vm,
+            genesis: genesis.clone(),
             current_block: Arc::new(RwLock::new(genesis.clone())),
             current_epoch_challenge: Default::default(),
         };
