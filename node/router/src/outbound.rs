@@ -63,40 +63,37 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     /// which can be used to determine when and whether the message has been delivered.
     fn send(&self, peer_ip: SocketAddr, message: Message<N>) -> Option<oneshot::Receiver<io::Result<()>>> {
         // Determine whether to send the message.
-        if !self.should_send(&message) {
+        if !self.can_send(peer_ip, &message) {
             return None;
         }
-        // Ensure the peer is connected before sending.
-        if !self.router().is_connected(&peer_ip) {
-            warn!("Attempted to send to a non-connected peer {peer_ip}");
-            return None;
+        // Resolve the listener IP to the (ambiguous) peer address.
+        let peer_addr = match self.router().resolve_to_ambiguous(&peer_ip) {
+            Some(peer_addr) => peer_addr,
+            None => {
+                warn!("Unable to resolve the listener IP address '{peer_ip}'");
+                return None;
+            }
+        };
+        // If the message type is a block request, add it to the cache.
+        if let Message::BlockRequest(request) = message {
+            self.router().cache.insert_outbound_block_request(peer_ip, request);
+        }
+        // If the message type is a puzzle request, increment the cache.
+        if matches!(message, Message::PuzzleRequest(_)) {
+            self.router().cache.increment_outbound_puzzle_requests(peer_ip);
         }
         // Retrieve the message name.
         let name = message.name().to_string();
-        // Resolve the listener IP to the (ambiguous) peer address.
-        if let Some(peer_addr) = self.router().resolve_to_ambiguous(&peer_ip) {
-            // If the message type is a block request, add it to the cache.
-            if let Message::BlockRequest(request) = message {
-                self.router().cache.insert_outbound_block_request(peer_ip, request);
-            }
-            // If the message type is a puzzle request, increment the cache.
-            if matches!(message, Message::PuzzleRequest(_)) {
-                self.router().cache.increment_outbound_puzzle_requests(peer_ip);
-            }
-            // Send the message to the peer.
-            trace!("Sending '{name}' to '{peer_ip}'");
-            let result = self.unicast(peer_addr, message);
-            // If the message was unable to be sent, disconnect.
-            if let Err(e) = &result {
-                warn!("Failed to send '{name}' to '{peer_ip}': {e}");
-                debug!("Disconnecting from '{peer_ip}'");
-                self.router().disconnect(peer_ip);
-            }
-            result.ok()
-        } else {
-            warn!("Unable to resolve the listener IP address '{peer_ip}'");
-            None
+        // Send the message to the peer.
+        trace!("Sending '{name}' to '{peer_ip}'");
+        let result = self.unicast(peer_addr, message);
+        // If the message was unable to be sent, disconnect.
+        if let Err(e) = &result {
+            warn!("Failed to send '{name}' to '{peer_ip}': {e}");
+            debug!("Disconnecting from '{peer_ip}'");
+            self.router().disconnect(peer_ip);
         }
+        result.ok()
     }
 
     /// Sends the given message to every connected peer, excluding the sender and any specified peer IPs.
@@ -177,8 +174,13 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         }
     }
 
-    /// Returns `true` if the message should be sent.
-    fn should_send(&self, message: &Message<N>) -> bool {
+    /// Returns `true` if the message can be sent.
+    fn can_send(&self, peer_ip: SocketAddr, message: &Message<N>) -> bool {
+        // Ensure the peer is connected before sending.
+        if !self.router().is_connected(&peer_ip) {
+            warn!("Attempted to send to a non-connected peer {peer_ip}");
+            return false;
+        }
         // Determine whether to send the message.
         match message {
             Message::UnconfirmedBlock(message) => {

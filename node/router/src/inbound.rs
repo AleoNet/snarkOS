@@ -33,10 +33,7 @@ use snarkos_node_tcp::protocols::Reading;
 use snarkvm::prelude::{Block, Network, ProverSolution, Transaction};
 
 use anyhow::{bail, ensure, Result};
-use std::{
-    net::SocketAddr,
-    time::{Duration, Instant},
-};
+use std::{net::SocketAddr, time::Instant};
 
 #[async_trait]
 pub trait Inbound<N: Network>: Reading + Outbound<N> {
