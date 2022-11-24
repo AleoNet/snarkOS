@@ -140,16 +140,6 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
     fn block_request(&self, peer_ip: SocketAddr, message: BlockRequest) -> bool {
         let BlockRequest { start_height, end_height } = &message;
 
-        // Ensure the block request is well-formed.
-        if start_height >= end_height {
-            warn!("Received a block request from '{peer_ip}' with an invalid range ({start_height}..{end_height})");
-            return false;
-        }
-        // Ensure that the block request is within the allowed bounds.
-        if end_height - start_height > DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as u32 {
-            warn!("Received a block request from '{peer_ip}' with an excessive range ({start_height}..{end_height})");
-            return false;
-        }
         // Retrieve the blocks within the requested range.
         let blocks = match self.ledger.get_blocks(*start_height..*end_height) {
             Ok(blocks) => Data::Object(DataBlocks(blocks)),

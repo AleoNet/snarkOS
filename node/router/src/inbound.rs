@@ -17,6 +17,7 @@
 use crate::{Outbound, Peer, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_messages::{
     BlockRequest,
+    DataBlocks,
     DisconnectReason,
     Message,
     PeerResponse,
@@ -59,10 +60,23 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
         // Process the message.
         match message {
-            Message::BlockRequest(message) => match self.block_request(peer_ip, message) {
-                true => Ok(()),
-                false => bail!("Peer '{peer_ip}' sent an invalid block request"),
-            },
+            Message::BlockRequest(message) => {
+                let BlockRequest { start_height, end_height } = &message;
+
+                // Ensure the block request is well-formed.
+                if start_height >= end_height {
+                    bail!("Block request from '{peer_ip}' has an invalid range ({start_height}..{end_height})")
+                }
+                // Ensure that the block request is within the allowed bounds.
+                if end_height - start_height > DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as u32 {
+                    bail!("Block request from '{peer_ip}' has an excessive range ({start_height}..{end_height})")
+                }
+
+                match self.block_request(peer_ip, message) {
+                    true => Ok(()),
+                    false => bail!("Peer '{peer_ip}' sent an invalid block request"),
+                }
+            }
             Message::BlockResponse(message) => {
                 let request = message.request;
 
