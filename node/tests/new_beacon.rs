@@ -144,8 +144,9 @@ where
 //
 // Test naming: full_node::handshake_<initiator or responder>_side::test_peer.
 macro_rules! test_handshake {
-    ($node_type:ident, $peer_type:ident, $is_initiator:expr) => {
+    ($node_type:ident, $peer_type:ident, $is_initiator:expr, $($attr:meta)?) => {
         #[tokio::test]
+        $(#[$attr])?
         async fn $peer_type () {
 
             // Spin up a full node.
@@ -162,19 +163,19 @@ macro_rules! test_handshake {
         }
     };
 
-    ($($node_type:ident -> $peer_type:ident),*) => {
+    ($($node_type:ident -> $peer_type:ident $(= $attr:meta)?),*) => {
         mod handshake_initiator_side {
             $(
-                test_handshake!($node_type, $peer_type, true);
+                test_handshake!($node_type, $peer_type, true, $($attr)?);
             )*
         }
 
     };
 
-    ($($node_type:ident <- $peer_type:ident),*) => {
+    ($($node_type:ident <- $peer_type:ident $(= $attr:meta)?),*) => {
         mod handshake_responder_side {
             $(
-                test_handshake!($node_type, $peer_type, false);
+                test_handshake!($node_type, $peer_type, false, $($attr)?);
             )*
         }
 
@@ -238,7 +239,7 @@ mod prover {
 mod validator {
     // Initiator side (full node connects to synthetic peer).
     test_handshake! {
-        validator -> beacon,
+        validator -> beacon = should_panic,
         validator -> client,
         validator -> validator,
         validator -> prover
@@ -246,7 +247,7 @@ mod validator {
 
     // Responder side (synthetic peer connects to full node).
     test_handshake! {
-        validator <- beacon,
+        validator <- beacon = should_panic,
         validator <- client,
         validator <- validator,
         validator <- prover
