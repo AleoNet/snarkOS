@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkvm::prelude::Network;
+use snarkvm::prelude::{has_duplicates, Network};
 
 use anyhow::{bail, Result};
 use indexmap::IndexMap;
@@ -108,17 +108,32 @@ impl<N: Network> BlockLocators<N> {
 
     /// Checks that the block locators are well-formed.
     pub fn check_block_locators(
-        recents: &IndexMap<u32, <N as Network>::BlockHash>,
-        checkpoints: &IndexMap<u32, <N as Network>::BlockHash>,
+        recents: &IndexMap<u32, N::BlockHash>,
+        checkpoints: &IndexMap<u32, N::BlockHash>,
     ) -> Result<()> {
         // Ensure the recent blocks are well-formed.
         let last_recent_height = Self::check_recent_blocks(recents)?;
         // Ensure the block checkpoints are well-formed.
         let last_checkpoint_height = Self::check_block_checkpoints(checkpoints)?;
+
         // Ensure the `last_recent_height` is at or above `last_checkpoint_height - NUM_RECENTS`.
         let threshold = last_checkpoint_height.saturating_sub(NUM_RECENTS as u32);
         if last_recent_height < threshold {
             bail!("Recent height ({last_recent_height}) cannot be below checkpoint threshold ({threshold})")
+        }
+
+        // If the `last_recent_height` is below NUM_RECENTS, ensure the genesis hash matches in both maps.
+        if last_recent_height < NUM_RECENTS as u32 && recents.get(&0).copied().unwrap_or_default() != checkpoints.get(&0).copied().unwrap_or_default() {
+            bail!("Recent genesis hash and checkpoint genesis hash mismatch at height {last_recent_height}")
+        }
+
+        // If the `last_recent_height` overlaps with a checkpoint, ensure the block hashes match.
+        if let Some(last_checkpoint_hash) = checkpoints.get(&last_recent_height) {
+            if let Some(last_recent_hash) = recents.get(&last_recent_height) {
+                if last_checkpoint_hash != last_recent_hash {
+                    bail!("Recent block hash and checkpoint hash mismatch at height {last_recent_height}")
+                }
+            }
         }
         Ok(())
     }
@@ -166,6 +181,11 @@ impl<N: Network> BlockLocators<N> {
             bail!("Number of recent blocks must match {NUM_RECENTS}")
         }
 
+        // Ensure the block hashes are unique.
+        if has_duplicates(recents.values()) {
+            bail!("Recent block hashes must be unique")
+        }
+
         Ok(last_height)
     }
 
@@ -176,7 +196,7 @@ impl<N: Network> BlockLocators<N> {
     /// 2. The block checkpoints are at the correct interval.
     /// 3. The block checkpoints are at the correct height.
     /// 4. The block checkpoints are in the correct order.
-    fn check_block_checkpoints(checkpoints: &IndexMap<u32, <N as Network>::BlockHash>) -> Result<u32> {
+    fn check_block_checkpoints(checkpoints: &IndexMap<u32, N::BlockHash>) -> Result<u32> {
         // Ensure the block checkpoints are not empty.
         assert!(!checkpoints.is_empty());
 
@@ -193,6 +213,11 @@ impl<N: Network> BlockLocators<N> {
                 bail!("Block checkpoints must increment by {CHECKPOINT_INTERVAL}")
             }
             last_height = *current_height;
+        }
+
+        // Ensure the block hashes are unique.
+        if has_duplicates(checkpoints.values()) {
+            bail!("Block checkpoints must be unique")
         }
 
         Ok(last_height)
@@ -213,7 +238,7 @@ mod tests {
         for height in heights {
             let mut recents = IndexMap::new();
             for i in 0..NUM_RECENTS as u32 {
-                recents.insert(height + i, Default::default());
+                recents.insert(height + i, (Field::<CurrentNetwork>::from_u32(height + i)).into());
 
                 let block_locators = BlockLocators::<CurrentNetwork>::new(recents.clone(), checkpoints.clone());
                 if height == 0 && recents.len() < NUM_RECENTS {
@@ -228,7 +253,10 @@ mod tests {
                 }
             }
             // Ensure NUM_RECENTS + 1 is not valid.
-            recents.insert(height + NUM_RECENTS as u32, Default::default());
+            recents.insert(
+                height + NUM_RECENTS as u32,
+                (Field::<CurrentNetwork>::from_u32(height + NUM_RECENTS as u32)).into(),
+            );
             let block_locators = BlockLocators::<CurrentNetwork>::new(recents.clone(), checkpoints.clone());
             block_locators.ensure_is_valid().unwrap_err();
         }
@@ -244,10 +272,7 @@ mod tests {
         for height in heights {
             let mut recents = IndexMap::new();
             for i in 0..NUM_RECENTS as u32 {
-                // We make the block hash a unique number to ensure consistency is tested.
-                let dummy_hash: <CurrentNetwork as Network>::BlockHash =
-                    (Field::<CurrentNetwork>::from_u32(height + i)).into();
-                recents.insert(height + i, dummy_hash);
+                recents.insert(height + i, (Field::<CurrentNetwork>::from_u32(height + i)).into());
 
                 let block_locators = BlockLocators::<CurrentNetwork>::new(recents.clone(), checkpoints.clone());
                 block_locators.ensure_is_consistent_with(&block_locators).unwrap();
@@ -270,47 +295,74 @@ mod tests {
 
     #[test]
     fn test_ensure_is_valid() {
-        // Ensure an empty block locators is not valid.
-        let block_locators = BlockLocators::<CurrentNetwork>::new(Default::default(), Default::default());
-        block_locators.ensure_is_valid().unwrap_err();
+        let zero: <CurrentNetwork as Network>::BlockHash = (Field::<CurrentNetwork>::from_u32(0)).into();
+        let one: <CurrentNetwork as Network>::BlockHash = (Field::<CurrentNetwork>::from_u32(1)).into();
+        let checkpoint_1: <CurrentNetwork as Network>::BlockHash =
+            (Field::<CurrentNetwork>::from_u32(CHECKPOINT_INTERVAL)).into();
 
         // Ensure genesis block locators is valid.
-        let block_locators = BlockLocators::<CurrentNetwork>::new(
-            IndexMap::from([(0, Default::default())]),
-            IndexMap::from([(0, Default::default())]),
-        );
+        let block_locators =
+            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero)]), IndexMap::from([(0, zero)]));
         block_locators.ensure_is_valid().unwrap();
 
         // Ensure block locators with two recent blocks is valid.
-        let block_locators = BlockLocators::<CurrentNetwork>::new(
-            IndexMap::from([(0, Default::default()), (1, Default::default())]),
-            IndexMap::from([(0, Default::default())]),
-        );
+        let block_locators =
+            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero), (1, one)]), IndexMap::from([(0, zero)]));
         block_locators.ensure_is_valid().unwrap();
 
         // Ensure the first NUM_RECENT blocks are valid.
-        let checkpoints = IndexMap::from([(0, Default::default())]);
+        let checkpoints = IndexMap::from([(0, zero)]);
         let mut recents = IndexMap::new();
         for i in 0..NUM_RECENTS {
-            recents.insert(i as u32, Default::default());
+            recents.insert(i as u32, (Field::<CurrentNetwork>::from_u32(i as u32)).into());
             let block_locators = BlockLocators::<CurrentNetwork>::new(recents.clone(), checkpoints.clone());
             block_locators.ensure_is_valid().unwrap();
         }
         // Ensure NUM_RECENTS + 1 is not valid.
-        recents.insert(NUM_RECENTS as u32, Default::default());
+        recents.insert(NUM_RECENTS as u32, (Field::<CurrentNetwork>::from_u32(NUM_RECENTS as u32)).into());
         let block_locators = BlockLocators::<CurrentNetwork>::new(recents.clone(), checkpoints);
         block_locators.ensure_is_valid().unwrap_err();
 
         // Ensure block locators before the second checkpoint are valid.
-        let checkpoints = IndexMap::from([(0, Default::default())]);
+        let checkpoints = IndexMap::from([(0, zero)]);
         check_is_valid(checkpoints, 0..(CHECKPOINT_INTERVAL - NUM_RECENTS as u32));
 
         // Ensure the block locators after the second checkpoint are valid.
-        let checkpoints = IndexMap::from([(0, Default::default()), (CHECKPOINT_INTERVAL, Default::default())]);
+        let checkpoints = IndexMap::from([(0, zero), (CHECKPOINT_INTERVAL, checkpoint_1)]);
         check_is_valid(
             checkpoints,
             (CHECKPOINT_INTERVAL - NUM_RECENTS as u32)..(CHECKPOINT_INTERVAL * 2 - NUM_RECENTS as u32),
         );
+    }
+
+    #[test]
+    fn test_ensure_is_valid_fails() {
+        let zero: <CurrentNetwork as Network>::BlockHash = (Field::<CurrentNetwork>::from_u32(0)).into();
+        let one: <CurrentNetwork as Network>::BlockHash = (Field::<CurrentNetwork>::from_u32(1)).into();
+
+        // Ensure an empty block locators is not valid.
+        let block_locators = BlockLocators::<CurrentNetwork>::new(Default::default(), Default::default());
+        block_locators.ensure_is_valid().unwrap_err();
+
+        // Ensure internally-mismatching genesis block locators is valid.
+        let block_locators =
+            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero)]), IndexMap::from([(0, one)]));
+        block_locators.ensure_is_valid().unwrap_err();
+
+        // Ensure internally-mismatching genesis block locators is valid.
+        let block_locators =
+            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, one)]), IndexMap::from([(0, zero)]));
+        block_locators.ensure_is_valid().unwrap_err();
+
+        // Ensure internally-mismatching block locators with two recent blocks is valid.
+        let block_locators =
+            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, one), (1, zero)]), IndexMap::from([(0, zero)]));
+        block_locators.ensure_is_valid().unwrap_err();
+
+        // Ensure duplicate recent block hashes are not valid.
+        let block_locators =
+            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero), (1, zero)]), IndexMap::from([(0, zero)]));
+        block_locators.ensure_is_valid().unwrap_err();
     }
 
     #[test]

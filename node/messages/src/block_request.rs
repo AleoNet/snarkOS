@@ -16,7 +16,7 @@
 
 use super::*;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct BlockRequest {
     /// The starting block height (inclusive).
     pub start_height: u32,
@@ -45,5 +45,11 @@ impl MessageTrait for BlockRequest {
             start_height: bincode::deserialize_from(&mut reader)?,
             end_height: bincode::deserialize_from(&mut reader)?,
         })
+    }
+}
+
+impl Display for BlockRequest {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        write!(f, "{}..{}", self.start_height, self.end_height)
     }
 }

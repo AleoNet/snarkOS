@@ -18,6 +18,9 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockResponse<N: Network> {
+    /// The original block request.
+    pub request: BlockRequest,
+    /// The blocks.
     pub blocks: Data<DataBlocks<N>>,
 }
 
@@ -31,13 +34,20 @@ impl<N: Network> MessageTrait for BlockResponse<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+        self.request.serialize(writer)?;
         self.blocks.serialize_blocking_into(writer)
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        Ok(Self { blocks: Data::Buffer(bytes.freeze()) })
+        let mut reader = bytes.reader();
+        let request = BlockRequest {
+            start_height: bincode::deserialize_from(&mut reader)?,
+            end_height: bincode::deserialize_from(&mut reader)?,
+        };
+        let blocks = Data::Buffer(reader.into_inner().freeze());
+        Ok(Self { request, blocks })
     }
 }
 

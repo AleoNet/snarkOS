@@ -81,6 +81,8 @@ use snarkvm::prelude::{
 use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
 use std::{
+    fmt,
+    fmt::{Display, Formatter},
     io::{Read, Result as IoResult, Write},
     net::SocketAddr,
     ops::Deref,
