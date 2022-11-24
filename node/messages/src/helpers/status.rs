@@ -38,6 +38,33 @@ pub enum Status {
     Unknown,
 }
 
+impl Status {
+    /// Returns `true` if the node is ready.
+    pub const fn is_ready(&self) -> bool {
+        matches!(self, Status::Ready)
+    }
+
+    /// Returns `true` if the node is peering.
+    pub const fn is_peering(&self) -> bool {
+        matches!(self, Status::Peering)
+    }
+
+    /// Returns `true` if the node is syncing.
+    pub const fn is_syncing(&self) -> bool {
+        matches!(self, Status::Syncing)
+    }
+
+    /// Returns `true` if the node is shutting down.
+    pub const fn is_shutting_down(&self) -> bool {
+        matches!(self, Status::ShuttingDown)
+    }
+
+    /// Returns `true` if the node is in an unknown state.
+    pub const fn is_unknown(&self) -> bool {
+        matches!(self, Status::Unknown)
+    }
+}
+
 impl fmt::Display for Status {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{self:?}")

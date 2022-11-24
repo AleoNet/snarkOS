@@ -24,7 +24,6 @@ use snarkos_node_messages::{
     Ping,
     Pong,
     PuzzleResponse,
-    RawStatus,
     UnconfirmedBlock,
     UnconfirmedSolution,
     UnconfirmedTransaction,
@@ -302,6 +301,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             warn!("Dropping '{peer_ip}' for an incorrect maximum fork depth of {}", message.fork_depth);
             return false;
         }
+        // Ensure the peer status is known.
+        if message.status.is_unknown() {
+            warn!("Dropping '{peer_ip}' for an unknown status");
+            return false;
+        }
 
         // // Perform the deferred non-blocking deserialization of the block header.
         // match block_header.deserialize().await {
@@ -323,18 +327,20 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // }
 
         // Update the connected peer.
-        if let Err(error) =
-            self.router().update_connected_peer(peer_ip, &message.block_locators, |peer: &mut Peer<N>| {
-                // Update the last seen timestamp of the peer.
-                peer.set_last_seen(Instant::now());
+        if let Err(error) = self.router().update_connected_peer(
+            peer_ip,
+            message.node_type,
+            message.status,
+            &message.block_locators,
+            |peer: &mut Peer<N>| {
                 // Update the version of the peer.
                 peer.set_version(message.version);
                 // Update the node type of the peer.
                 peer.set_node_type(message.node_type);
-                // Update the status of the peer.
-                peer.set_status(RawStatus::from_status(message.status));
-            })
-        {
+                // Update the last seen timestamp of the peer.
+                peer.set_last_seen(Instant::now());
+            },
+        ) {
             warn!("[Ping] {error}");
             return false;
         }

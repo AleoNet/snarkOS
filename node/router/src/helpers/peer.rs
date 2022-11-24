@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_messages::{NodeType, RawStatus};
+use snarkos_node_messages::NodeType;
 use snarkvm::prelude::{Address, Network};
 
 use parking_lot::RwLock;
@@ -25,45 +25,25 @@ use std::{net::SocketAddr, sync::Arc, time::Instant};
 pub struct Peer<N: Network> {
     /// The IP address of the peer, with the port set to the listener port.
     peer_ip: SocketAddr,
-    /// The timestamp of the last message received from this peer.
-    last_seen: Arc<RwLock<Instant>>,
+    /// The Aleo address of the peer.
+    address: Address<N>,
     /// The message version of the peer.
     version: u32,
     /// The node type of the peer.
     node_type: NodeType,
-    /// The node type of the peer.
-    status: RawStatus,
-    /// The Aleo address of the peer.
-    address: Address<N>,
+    /// The timestamp of the last message received from this peer.
+    last_seen: Arc<RwLock<Instant>>,
 }
 
 impl<N: Network> Peer<N> {
     /// Initializes a new instance of `Peer`.
-    pub fn new(
-        listening_ip: SocketAddr,
-        version: u32,
-        node_type: NodeType,
-        status: RawStatus,
-        address: Address<N>,
-    ) -> Self {
-        Self {
-            peer_ip: listening_ip,
-            last_seen: Arc::new(RwLock::new(Instant::now())),
-            version,
-            node_type,
-            status,
-            address,
-        }
+    pub fn new(listening_ip: SocketAddr, address: Address<N>, version: u32, node_type: NodeType) -> Self {
+        Self { peer_ip: listening_ip, address, version, node_type, last_seen: Arc::new(RwLock::new(Instant::now())) }
     }
 
     /// Returns the IP address of the peer, with the port set to the listener port.
     pub const fn ip(&self) -> SocketAddr {
         self.peer_ip
-    }
-
-    /// Returns the last seen timestamp of the peer.
-    pub fn last_seen(&self) -> Instant {
-        *self.last_seen.read()
     }
 
     /// Returns the Aleo address of the peer.
@@ -95,14 +75,14 @@ impl<N: Network> Peer<N> {
     pub const fn is_client(&self) -> bool {
         self.node_type.is_client()
     }
+
+    /// Returns the last seen timestamp of the peer.
+    pub fn last_seen(&self) -> Instant {
+        *self.last_seen.read()
+    }
 }
 
 impl<N: Network> Peer<N> {
-    /// Updates the last seen timestamp of the peer.
-    pub fn set_last_seen(&self, last_seen: Instant) {
-        *self.last_seen.write() = last_seen;
-    }
-
     /// Updates the version.
     pub fn set_version(&mut self, version: u32) {
         self.version = version
@@ -113,8 +93,8 @@ impl<N: Network> Peer<N> {
         self.node_type = node_type
     }
 
-    /// Updates the status.
-    pub fn set_status(&mut self, status: RawStatus) {
-        self.status = status
+    /// Updates the last seen timestamp of the peer.
+    pub fn set_last_seen(&self, last_seen: Instant) {
+        *self.last_seen.write() = last_seen;
     }
 }
