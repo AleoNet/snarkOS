@@ -44,6 +44,28 @@ async fn beacon() -> Beacon<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
     .expect("couldn't create beacon instance")
 }
 
+async fn client() -> Client<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
+    Client::new(
+        "127.0.0.1:0".parse().unwrap(),
+        Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
+        &[],
+        None,
+    )
+    .await
+    .expect("couldn't create client instance")
+}
+
+async fn prover() -> Prover<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
+    Prover::new(
+        "127.0.0.1:0".parse().unwrap(),
+        Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
+        &[],
+        None,
+    )
+    .await
+    .expect("couldn't create prover instance")
+}
+
 async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
     Validator::new(
         "127.0.0.1:0".parse().unwrap(),
@@ -55,7 +77,7 @@ async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNetwork
         None,
     )
     .await
-    .expect("couldn't create beacon instance")
+    .expect("couldn't create validator instance")
 }
 
 // Trait to unify Pea2Pea and P2P traits.
@@ -174,6 +196,42 @@ mod beacon {
         beacon <- client,
         beacon <- validator,
         beacon <- prover
+    }
+}
+
+mod client {
+    // Initiator side (full node connects to full node).
+    test_handshake! {
+        client -> beacon,
+        client -> client,
+        client -> validator,
+        client -> prover
+    }
+
+    // Responder side (synthetic peer connects to full node).
+    test_handshake! {
+        client <- beacon,
+        client <- client,
+        client <- validator,
+        client <- prover
+    }
+}
+
+mod prover {
+    // Initiator side (full node connects to full node).
+    test_handshake! {
+        prover -> beacon,
+        prover -> client,
+        prover -> validator,
+        prover -> prover
+    }
+
+    // Responder side (synthetic peer connects to full node).
+    test_handshake! {
+        prover <- beacon,
+        prover <- client,
+        prover <- validator,
+        prover <- prover
     }
 }
 
