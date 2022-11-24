@@ -70,7 +70,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         rest_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
-        genesis: Option<Block<N>>,
+        genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {

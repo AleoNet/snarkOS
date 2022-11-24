@@ -22,9 +22,16 @@ use snarkos_node::{Beacon, NodeInterface};
 use snarkos_node_messages::NodeType;
 use snarkos_node_router::Outbound;
 use snarkos_node_tcp::P2P;
-use snarkvm::prelude::{ConsensusMemory, Testnet3 as CurrentNetwork};
+use snarkvm::prelude::{Block, ConsensusMemory, FromBytes, Network, Testnet3};
 
 use std::str::FromStr;
+
+type CurrentNetwork = Testnet3;
+
+/// Loads the current network's genesis block.
+fn sample_genesis_block() -> Block<CurrentNetwork> {
+    Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap()
+}
 
 #[tokio::test]
 async fn handshake_responder_side() {
@@ -34,7 +41,7 @@ async fn handshake_responder_side() {
         None,
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
-        None, // Should load the current network's genesis block.
+        sample_genesis_block(),
         None, // No CDN.
         None,
     )
@@ -58,7 +65,7 @@ async fn handshake_initiator_side() {
         None,
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
-        None, // Should load the current network's genesis block.
+        sample_genesis_block(),
         None, // No CDN.
         None,
     )

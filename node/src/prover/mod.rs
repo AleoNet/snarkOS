@@ -58,6 +58,8 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     account: Account<N>,
     /// The router of the node.
     router: Router<N>,
+    /// The genesis block.
+    genesis: Block<N>,
     /// The coinbase puzzle.
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The latest epoch challenge.
@@ -82,6 +84,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         node_ip: SocketAddr,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
+        genesis: Block<N>,
         dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the node router.
@@ -102,6 +105,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         let node = Self {
             account,
             router,
+            genesis,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),

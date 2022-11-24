@@ -66,7 +66,7 @@ impl<N: Network> Node<N> {
         rest_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
-        genesis: Option<Block<N>>,
+        genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
@@ -79,7 +79,7 @@ impl<N: Network> Node<N> {
         rest_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
-        genesis: Option<Block<N>>,
+        genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
@@ -93,9 +93,10 @@ impl<N: Network> Node<N> {
         node_ip: SocketAddr,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
+        genesis: Block<N>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Prover(Arc::new(Prover::new(node_ip, account, trusted_peers, dev).await?)))
+        Ok(Self::Prover(Arc::new(Prover::new(node_ip, account, trusted_peers, genesis, dev).await?)))
     }
 
     /// Initializes a new client node.
@@ -103,9 +104,10 @@ impl<N: Network> Node<N> {
         node_ip: SocketAddr,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
+        genesis: Block<N>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Client(Arc::new(Client::new(node_ip, account, trusted_peers, dev).await?)))
+        Ok(Self::Client(Arc::new(Client::new(node_ip, account, trusted_peers, genesis, dev).await?)))
     }
 
     /// Returns the node type.

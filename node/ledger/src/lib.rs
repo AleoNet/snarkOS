@@ -82,15 +82,40 @@ pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
 
 impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     /// Loads the ledger from storage.
-    pub fn load(genesis: Option<Block<N>>, dev: Option<u16>) -> Result<Self> {
+    pub fn load(genesis: Block<N>, dev: Option<u16>) -> Result<Self> {
         let timer = timer!("Ledger::load");
 
         // Retrieve the genesis hash.
-        let genesis_hash = match genesis {
-            Some(ref genesis) => genesis.hash(),
-            None => Block::<N>::from_bytes_le(N::genesis_bytes())?.hash(),
-        };
-        lap!(timer, "Load genesis hash");
+        let genesis_hash = genesis.hash();
+        // Initialize the ledger.
+        let ledger = Self::load_unchecked(genesis, dev)?;
+
+        // Ensure the ledger contains the correct genesis block.
+        if !ledger.contains_block_hash(&genesis_hash)? {
+            bail!("Incorrect genesis block (run 'snarkos clean' and try again)")
+        }
+
+        // Retrieve the latest height.
+        let latest_height =
+            *ledger.vm.block_store().heights().max().ok_or_else(|| anyhow!("Failed to load blocks from the ledger"))?;
+
+        // Safety check the existence of `NUM_BLOCKS` random blocks.
+        const NUM_BLOCKS: usize = 1000;
+        let block_heights: Vec<u32> = (0..=latest_height)
+            .choose_multiple(&mut OsRng::default(), core::cmp::min(NUM_BLOCKS, latest_height as usize));
+        cfg_into_iter!(block_heights).try_for_each(|height| {
+            ledger.get_block(height)?;
+            Ok::<_, Error>(())
+        })?;
+        lap!(timer, "Check existence of {NUM_BLOCKS} random blocks");
+
+        finish!(timer);
+        Ok(ledger)
+    }
+
+    /// Loads the ledger from storage, without performing integrity checks.
+    pub fn load_unchecked(genesis: Block<N>, dev: Option<u16>) -> Result<Self> {
+        let timer = timer!("Ledger::load_unchecked");
 
         // Initialize the consensus store.
         let store = match ConsensusStore::<N, C>::open(dev) {
@@ -104,30 +129,6 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         lap!(timer, "Initialize a new VM");
 
         // Initialize the ledger.
-        let ledger = Self::from(vm, genesis)?;
-        lap!(timer, "Initialize ledger");
-
-        finish!(timer);
-
-        // Ensure the ledger contains the correct genesis block.
-        match ledger.contains_block_hash(&genesis_hash)? {
-            true => Ok(ledger),
-            false => bail!("Incorrect genesis block (run 'snarkos clean' and try again)"),
-        }
-    }
-
-    /// Initializes the ledger from storage, with an optional genesis block.
-    pub fn from(vm: VM<N, C>, genesis: Option<Block<N>>) -> Result<Self> {
-        let timer = timer!("Ledger::from");
-
-        // Load the genesis block.
-        let genesis = match genesis {
-            Some(genesis) => genesis,
-            None => Block::<N>::from_bytes_le(N::genesis_bytes())?,
-        };
-        lap!(timer, "Load genesis block");
-
-        // Initialize the ledger.
         let mut ledger = Self {
             vm,
             current_block: Arc::new(RwLock::new(genesis.clone())),
@@ -139,6 +140,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
             // Add the genesis block.
             ledger.add_next_block(&genesis)?;
         }
+        lap!(timer, "Initialize genesis");
 
         // Retrieve the latest height.
         let latest_height =
@@ -152,20 +154,9 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         ledger.current_block = Arc::new(RwLock::new(block));
         // Set the current epoch challenge.
         ledger.current_epoch_challenge = Arc::new(RwLock::new(Some(ledger.get_epoch_challenge(latest_height)?)));
-        lap!(timer, "Initialize ledger state");
-
-        // Safety check the existence of `NUM_BLOCKS` random blocks.
-        const NUM_BLOCKS: usize = 1000;
-        let block_heights: Vec<u32> = (0..=latest_height)
-            .choose_multiple(&mut OsRng::default(), core::cmp::min(NUM_BLOCKS, latest_height as usize));
-        cfg_into_iter!(block_heights).try_for_each(|height| {
-            ledger.get_block(height)?;
-            Ok::<_, Error>(())
-        })?;
-        lap!(timer, "Check existence of {NUM_BLOCKS} random blocks");
+        lap!(timer, "Initialize ledger");
 
         finish!(timer);
-
         Ok(ledger)
     }
 

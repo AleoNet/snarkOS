@@ -95,7 +95,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         rest_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
-        genesis: Option<Block<N>>,
+        genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
@@ -514,7 +514,7 @@ mod tests {
             Some(rest),
             beacon_account,
             &[],
-            Some(genesis),
+            genesis,
             None,
             dev,
         )
