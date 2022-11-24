@@ -38,11 +38,11 @@ pub struct Sync<N: Network> {
     /// The block locators are consistent with the canonical map and every other peer's block locators.
     locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
     /// The map of block height to the expected block hash and peer IPs.
+    /// Each entry is removed when its corresponding entry in the responses map is removed.
     requests: Arc<RwLock<BTreeMap<u32, RequestHashFromPeers<N>>>>,
     /// The map of block height to the received blocks.
+    /// Removing an entry from this map must remove the corresponding entry from the requests map.
     responses: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
-    /// The map of block height to the success blocks.
-    success: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
 }
 
 impl<N: Network> Default for Sync<N> {
@@ -60,7 +60,6 @@ impl<N: Network> Sync<N> {
             locators: Default::default(),
             requests: Default::default(),
             responses: Default::default(),
-            success: Default::default(),
         }
     }
 
@@ -70,7 +69,7 @@ impl<N: Network> Sync<N> {
     }
 
     /// Returns the canonical block hash for the given block height, if it exists.
-    pub fn get_hash(&self, height: u32) -> Option<N::BlockHash> {
+    pub fn get_canon_hash(&self, height: u32) -> Option<N::BlockHash> {
         self.canon.read().get(&height).copied()
     }
 
@@ -87,6 +86,11 @@ impl<N: Network> Sync<N> {
             .map(|(peer_ip, locators)| (*peer_ip, locators.latest_height()))
             .sorted_by(|(_, a), (_, b)| b.cmp(a))
             .collect()
+    }
+
+    /// Inserts a canonical block hash for the given block height.
+    pub fn insert_canon(&self, height: u32, hash: N::BlockHash) {
+        self.canon.write().insert(height, hash);
     }
 
     /// Inserts a block request for the given height.
@@ -109,17 +113,13 @@ impl<N: Network> Sync<N> {
         if self.responses.read().contains_key(&height) {
             bail!("Failed to add block request, as block {height} exists in the responses map");
         }
-        // Ensure the block height is not already successful.
-        if self.success.read().contains_key(&height) {
-            bail!("Failed to add block request, as block {height} exists in the success map");
-        }
         // Insert the block request.
         self.requests.write().insert(height, (hash, previous_hash, peer_ips));
         Ok(())
     }
 
-    /// Inserts the given block, after checking that the request exists and the response is well-formed.
-    /// On success, this function also removes the peer IP from the requests map, and moves the block to the success map.
+    /// Inserts the given block response, after checking that the request exists and the response is well-formed.
+    /// On success, this function removes the peer IP from the requests map.
     /// On failure, this function removes all block requests from the given peer IP.
     pub fn insert_block_response(&self, peer_ip: SocketAddr, block: Block<N>) -> Result<()> {
         // Retrieve the block height.
@@ -128,11 +128,6 @@ impl<N: Network> Sync<N> {
         // Ensure the block height is not already canon. This should never happen.
         if self.canon.read().contains_key(&height) {
             error!("Failed to add block {height} (response) from '{peer_ip}', as it exists in the canon map");
-            return Ok(());
-        }
-        // Ensure the block height is not already successful. This should never happen.
-        if self.success.read().contains_key(&height) {
-            error!("Failed to add block {height} (response) from '{peer_ip}', as it exists in the success map");
             return Ok(());
         }
 
@@ -146,10 +141,6 @@ impl<N: Network> Sync<N> {
         // Remove the peer IP from the request entry.
         self.remove_block_request(&peer_ip, height);
 
-        // Determine if the request is complete.
-        let is_request_complete =
-            self.requests.read().get(&height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(false);
-
         // Acquire the write lock on the responses map.
         let mut responses = self.responses.write();
         // Insert the candidate block into the responses map.
@@ -161,18 +152,6 @@ impl<N: Network> Sync<N> {
                 // Remove all block requests to the peer.
                 self.remove_block_requests(&peer_ip);
                 bail!("Candidate block {height} from '{peer_ip}' is malformed");
-            }
-        }
-
-        // If there are no more peer IPs for this request, remove the request entry,
-        // and move the candidate block to the success map and update the canonical map.
-        if is_request_complete {
-            // Clear the block request for the height.
-            self.clear_block_request(height);
-            // Move the candidate block to the success map and update the canonical map.
-            if let Some(block) = responses.remove(&height) {
-                self.canon.write().insert(block.height(), block.hash());
-                self.success.write().insert(block.height(), block);
             }
         }
 
@@ -224,16 +203,20 @@ impl<N: Network> Sync<N> {
         });
     }
 
-    /// Removes the successful block for the given height, returning the block if it exists.
-    pub fn remove_successful_block(&self, height: u32) -> Option<Block<N>> {
-        // Remove the success entry for the given height.
-        self.success.write().remove(&height)
-    }
+    /// Removes and returns the block response for the given height, if the request is complete.
+    pub fn remove_block_response(&self, height: u32) -> Option<Block<N>> {
+        // Determine if the request is complete.
+        let is_request_complete =
+            self.requests.read().get(&height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(false);
 
-    /// Clears the block request for the given height.
-    pub fn clear_block_request(&self, height: u32) {
+        // If the request is not complete, return early.
+        if !is_request_complete {
+            return None;
+        }
         // Remove the request entry for the given height.
         self.requests.write().remove(&height);
+        // Remove the response entry for the given height.
+        self.responses.write().remove(&height)
     }
 }
 

@@ -247,8 +247,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                         tokio::time::sleep(Duration::from_secs(1)).await;
                         continue;
                     }
-                    let hash = validator.router.sync().get_hash(latest_height + 1);
-                    let previous_hash = validator.router.sync().get_hash(latest_height);
+                    let hash = validator.router.sync().get_canon_hash(latest_height + 1);
+                    let previous_hash = validator.router.sync().get_canon_hash(latest_height);
                     if let Err(error) =
                         validator
                             .router

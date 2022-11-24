@@ -167,7 +167,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         // Retrieve the latest block height.
         let mut latest_height = self.ledger.latest_height();
         // Try to advance the ledger with the sync pool.
-        while let Some(block) = self.router().sync().remove_successful_block(latest_height + 1) {
+        while let Some(block) = self.router().sync().remove_block_response(latest_height + 1) {
             // Check the next block.
             if let Err(error) = self.consensus.check_next_block(&block) {
                 warn!("The next block ({}) is invalid - {error}", block.height());
@@ -178,6 +178,8 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
                 warn!("{error}");
                 break;
             }
+            // Insert the height and hash as canon in the sync pool.
+            self.router().sync().insert_canon(block.height(), block.hash());
             // Increment the latest height.
             latest_height += 1;
         }
