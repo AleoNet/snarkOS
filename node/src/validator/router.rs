@@ -158,7 +158,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
     fn block_response(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> bool {
         // Insert the candidate blocks into the sync pool.
         for block in blocks {
-            if let Err(error) = self.router().sync().insert_candidate_block(peer_ip, block) {
+            if let Err(error) = self.router().sync().insert_block_response(peer_ip, block) {
                 warn!("{error}");
                 return false;
             }

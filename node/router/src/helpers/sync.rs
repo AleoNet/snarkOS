@@ -23,8 +23,9 @@ use itertools::Itertools;
 use parking_lot::RwLock;
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
 
-/// A tuple of the block hash, previous block hash (optional), and peer IPs.
-pub type RequestHashFromPeers<N> = (<N as Network>::BlockHash, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);
+/// A tuple of the block hash (optional), previous block hash (optional), and peer IPs.
+pub type RequestHashFromPeers<N> =
+    (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);
 
 #[derive(Clone, Debug)]
 pub struct Sync<N: Network> {
@@ -33,15 +34,13 @@ pub struct Sync<N: Network> {
     /// updated solely from candidate blocks (not from block locators, to ensure there are no forks).
     canon: Arc<RwLock<BTreeMap<u32, N::BlockHash>>>,
     /// The map of peer IP to their block locators.
-    /// This map is updated from block locators, and is used to determine which blocks to request from peers.
-    /// The block locators are guaranteed to be consistent with the canonical map,
-    /// and with every other peer's block locators.
+    /// This map is used to determine which blocks to request from peers.
+    /// The block locators are consistent with the canonical map and every other peer's block locators.
     locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
-
     /// The map of block height to the expected block hash and peer IPs.
     requests: Arc<RwLock<BTreeMap<u32, RequestHashFromPeers<N>>>>,
     /// The map of block height to the received blocks.
-    candidates: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
+    responses: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
     /// The map of block height to the success blocks.
     success: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
 }
@@ -60,9 +59,14 @@ impl<N: Network> Sync<N> {
             canon: Default::default(),
             locators: Default::default(),
             requests: Default::default(),
-            candidates: Default::default(),
+            responses: Default::default(),
             success: Default::default(),
         }
+    }
+
+    /// Returns `true` if a request for the given block height exists.
+    pub fn contains_request(&self, height: u32) -> bool {
+        self.requests.read().contains_key(&height)
     }
 
     /// Returns the canonical block hash for the given block height, if it exists.
@@ -86,93 +90,87 @@ impl<N: Network> Sync<N> {
     }
 
     /// Inserts a block request for the given height.
-    pub fn insert_request(
+    pub fn insert_block_request(
         &self,
         height: u32,
-        hash: N::BlockHash,
+        hash: Option<N::BlockHash>,
         previous_hash: Option<N::BlockHash>,
         peer_ips: IndexSet<SocketAddr>,
     ) -> Result<()> {
         // Ensure the block height is not already canon.
         if self.canon.read().contains_key(&height) {
-            bail!("Failed to add block request, as block {height} already exists in the canon map");
+            bail!("Failed to add block request, as block {height} exists in the canon map");
         }
         // Ensure the block height is not already requested.
         if self.requests.read().contains_key(&height) {
-            bail!("Failed to add block request, as block {height} already exists in the requests map");
+            bail!("Failed to add block request, as block {height} exists in the requests map");
         }
-        // Ensure the block height is not already a candidate.
-        if self.candidates.read().contains_key(&height) {
-            bail!("Failed to add block request, as block {height} already exists in the candidates map");
+        // Ensure the block height is not already responded.
+        if self.responses.read().contains_key(&height) {
+            bail!("Failed to add block request, as block {height} exists in the responses map");
         }
-        // Ensure the block height is not already a success.
+        // Ensure the block height is not already successful.
         if self.success.read().contains_key(&height) {
-            bail!("Failed to add block request, as block {height} already exists in the success map");
+            bail!("Failed to add block request, as block {height} exists in the success map");
         }
         // Insert the block request.
         self.requests.write().insert(height, (hash, previous_hash, peer_ips));
         Ok(())
     }
 
-    /// Inserts the given candidate block, after checking that the request was made, and the
-    /// expected block hash matches. On success, this function also removes the peer IP from the requests map.
-    pub fn insert_candidate_block(&self, peer_ip: SocketAddr, block: Block<N>) -> Result<()> {
-        let candidate_height = block.height();
+    /// Inserts the given block, after checking that the request exists and the response is well-formed.
+    /// On success, this function also removes the peer IP from the requests map, and moves the block to the success map.
+    /// On failure, this function removes all block requests from the given peer IP.
+    pub fn insert_block_response(&self, peer_ip: SocketAddr, block: Block<N>) -> Result<()> {
+        // Retrieve the block height.
+        let height = block.height();
 
-        // Ensure the canonical map does not contain the candidate block.
-        if self.canon.read().contains_key(&candidate_height) {
-            bail!("The canonical map already contains the candidate block")
+        // Ensure the block height is not already canon. This should never happen.
+        if self.canon.read().contains_key(&height) {
+            error!("Failed to add block {height} (response) from '{peer_ip}', as it exists in the canon map");
+            return Ok(());
+        }
+        // Ensure the block height is not already successful. This should never happen.
+        if self.success.read().contains_key(&height) {
+            error!("Failed to add block {height} (response) from '{peer_ip}', as it exists in the success map");
+            return Ok(());
         }
 
-        // Declare a boolean flag to determine if the request is complete.
-        let is_request_complete;
-
-        // Retrieve the request entry for the candidate block.
-        if let Some((expected_hash, expected_previous_hash, peer_ips)) =
-            self.requests.write().get_mut(&candidate_height)
-        {
-            // Ensure the sync pool requested this block from the given peer.
-            if !peer_ips.contains(&peer_ip) {
-                bail!("The sync pool did not request block {candidate_height} from '{peer_ip}'")
-            }
-            // Ensure the candidate block hash matches the expected hash.
-            if block.hash() != *expected_hash {
-                bail!("The block hash for candidate block {candidate_height} from '{peer_ip}' is incorrect")
-            }
-            // Ensure the previous block hash matches if it exists.
-            if let Some(expected_previous_hash) = expected_previous_hash {
-                if block.previous_hash() != *expected_previous_hash {
-                    bail!("The previous block hash in candidate block {candidate_height} from '{peer_ip}' is incorrect")
-                }
-            }
-            // Remove the request entry for this peer IP.
-            peer_ips.remove(&peer_ip);
-            // Update whether the request is complete.
-            is_request_complete = peer_ips.is_empty();
-        } else {
-            bail!("The sync pool did not request block {candidate_height}")
+        // Ensure the block (response) from the peer is well-formed. On failure, remove all block requests to the peer.
+        if let Err(error) = self.check_block_response(&peer_ip, &block) {
+            // Remove all block requests to the peer.
+            self.remove_block_requests(&peer_ip);
+            return Err(error);
         }
 
-        // Acquire a write lock on the candidates map.
-        let mut candidates_write = self.candidates.write();
+        // Remove the peer IP from the request entry.
+        self.remove_block_request(&peer_ip, height);
 
-        // Insert the candidate block into the candidates map.
-        if let Some(existing_block) = candidates_write.insert(candidate_height, block.clone()) {
+        // Determine if the request is complete.
+        let is_request_complete =
+            self.requests.read().get(&height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(false);
+
+        // Acquire the write lock on the responses map.
+        let mut responses = self.responses.write();
+        // Insert the candidate block into the responses map.
+        if let Some(existing_block) = responses.insert(height, block.clone()) {
             // If the candidate block was already present, ensure it is the same block.
             if block != existing_block {
-                // If the candidate block is different, remove this entry from the candidates map.
-                candidates_write.remove(&candidate_height);
-                bail!("Candidate block {candidate_height} is malformed");
+                // Remove the candidate block.
+                responses.remove(&height);
+                // Remove all block requests to the peer.
+                self.remove_block_requests(&peer_ip);
+                bail!("Candidate block {height} from '{peer_ip}' is malformed");
             }
         }
 
         // If there are no more peer IPs for this request, remove the request entry,
         // and move the candidate block to the success map and update the canonical map.
         if is_request_complete {
-            // Remove the request entry.
-            self.requests.write().remove(&candidate_height);
+            // Clear the block request for the height.
+            self.clear_block_request(height);
             // Move the candidate block to the success map and update the canonical map.
-            if let Some(block) = candidates_write.remove(&candidate_height) {
+            if let Some(block) = responses.remove(&height) {
                 self.canon.write().insert(block.height(), block.hash());
                 self.success.write().insert(block.height(), block);
             }
@@ -181,37 +179,129 @@ impl<N: Network> Sync<N> {
         Ok(())
     }
 
-    /// Checks the given block locators against the canonical map and block locators of all peers.
+    /// Updates the block locators for the given peer IP.
     /// This function ensures all peers share a consistent view of the ledger.
     /// On failure, this function returns a list of peer IPs to disconnect.
-    pub fn check_locators(&self, peer_ip: SocketAddr, locators: BlockLocators<N>) -> Result<(), Vec<SocketAddr>> {
+    pub fn update_peer_locators(&self, peer_ip: SocketAddr, locators: BlockLocators<N>) -> Result<(), Vec<SocketAddr>> {
         // If the locators match the existing locators for the peer, return early.
         if self.locators.read().get(&peer_ip) == Some(&locators) {
             return Ok(());
         }
 
-        // Ensure the given block locators are well-formed.
+        // Ensure the given block locators are valid. If not, remove any requests to the peer, and return early.
+        if let Err(disconnect_ips) = self.check_locators(peer_ip, locators.clone()) {
+            // Remove any requests to the peer.
+            disconnect_ips.iter().for_each(|disconnect_ip| self.remove_block_requests(disconnect_ip));
+            // Return the error.
+            return Err(disconnect_ips);
+        }
+
+        // Update the locators entry for the given peer IP.
+        self.locators.write().entry(peer_ip).or_insert(locators);
+
+        Ok(())
+    }
+
+    /// Removes the block locators for the peer, if they exist.
+    pub fn remove_peer_locators(&self, peer_ip: &SocketAddr) {
+        // Remove the locators entry for the given peer IP.
+        self.locators.write().remove(peer_ip);
+    }
+
+    /// Removes the block request for the given peer IP, if it exists.
+    pub fn remove_block_request(&self, peer_ip: &SocketAddr, height: u32) {
+        // Remove the peer IP from the request entry.
+        if let Some((_, _, peer_ips)) = self.requests.write().get_mut(&height) {
+            peer_ips.remove(peer_ip);
+        }
+    }
+
+    /// Removes all block requests for the given peer IP.
+    pub fn remove_block_requests(&self, peer_ip: &SocketAddr) {
+        // Remove the peer IP from the requests map.
+        self.requests.write().values_mut().for_each(|(_, _, peer_ips)| {
+            peer_ips.remove(peer_ip);
+        });
+    }
+
+    /// Removes the successful block for the given height, returning the block if it exists.
+    pub fn remove_successful_block(&self, height: u32) -> Option<Block<N>> {
+        // Remove the success entry for the given height.
+        self.success.write().remove(&height)
+    }
+
+    /// Clears the block request for the given height.
+    pub fn clear_block_request(&self, height: u32) {
+        // Remove the request entry for the given height.
+        self.requests.write().remove(&height);
+    }
+}
+
+impl<N: Network> Sync<N> {
+    /// Checks the given block (response) from a peer against the expected block hash and previous block hash.
+    fn check_block_response(&self, peer_ip: &SocketAddr, block: &Block<N>) -> Result<()> {
+        // Retrieve the block height.
+        let height = block.height();
+
+        // Retrieve the request entry for the candidate block.
+        if let Some((expected_hash, expected_previous_hash, peer_ips)) = self.requests.read().get(&height) {
+            // Ensure the candidate block hash matches the expected hash.
+            if let Some(expected_hash) = expected_hash {
+                if block.hash() != *expected_hash {
+                    bail!("The block hash for candidate block {height} from '{peer_ip}' is incorrect")
+                }
+            }
+            // Ensure the previous block hash matches if it exists.
+            if let Some(expected_previous_hash) = expected_previous_hash {
+                if block.previous_hash() != *expected_previous_hash {
+                    bail!("The previous block hash in candidate block {height} from '{peer_ip}' is incorrect")
+                }
+            }
+            // Ensure the sync pool requested this block from the given peer.
+            if !peer_ips.contains(peer_ip) {
+                bail!("The sync pool did not request block {height} from '{peer_ip}'")
+            }
+            Ok(())
+        } else {
+            bail!("The sync pool did not request block {height}")
+        }
+    }
+
+    /// Checks the given block locators against the canonical map and block locators of all peers.
+    /// This function ensures all peers share a consistent view of the ledger.
+    /// On failure, this function returns a list of peer IPs to disconnect.
+    fn check_locators(&self, peer_ip: SocketAddr, locators: BlockLocators<N>) -> Result<(), Vec<SocketAddr>> {
+        // If the locators match the existing locators for the peer, return early.
+        if self.locators.read().get(&peer_ip) == Some(&locators) {
+            return Ok(());
+        }
+
+        // Ensure the given block locators are well-formed, or disconnect the peer.
         if let Err(error) = locators.ensure_is_valid() {
             warn!("Received invalid block locators from '{peer_ip}': {error}");
             return Err(vec![peer_ip]);
         }
 
-        // Ensure the block locators are consistent with the canonical map.
-        let canon = self.canon.read();
+        // Clone the canonical map.
+        let canon = self.canon.read().clone();
         if !canon.is_empty() {
-            for (height, hash) in locators.checkpoints.iter().chain(locators.recents.iter()) {
+            // Iterate through every checkpoint and recent locator (which may include overlaps).
+            locators.checkpoints.iter().chain(&locators.recents).try_for_each(|(height, hash)| {
+                // Ensure the block locators are consistent with the canonical map.
                 if let Some(canon_hash) = canon.get(height) {
+                    // If the block locators are inconsistent, disconnect the peer.
                     if canon_hash != hash {
-                        warn!("'{peer_ip}' has an inconsistent block hash at block {height}");
+                        warn!("Received inconsistent block locators from '{peer_ip}'");
                         return Err(vec![peer_ip]);
                     }
                 }
-            }
+                Ok(())
+            })?;
         }
-        drop(canon);
 
         // Ensure the locators are consistent with the block locators of every peer (including itself).
         for (other_ip, other_locators) in self.locators.read().iter() {
+            // If the locators are inconsistent, disconnect the peer.
             if let Err(error) = locators.ensure_is_consistent_with(other_locators) {
                 warn!("Inconsistent block locators between '{peer_ip}' and '{other_ip}': {error}");
                 match peer_ip == *other_ip {
@@ -222,34 +312,5 @@ impl<N: Network> Sync<N> {
         }
 
         Ok(())
-    }
-
-    /// Updates the block locators for the given peer IP.
-    /// This function ensures all peers share a consistent view of the ledger.
-    /// On failure, this function returns a list of peer IPs to disconnect.
-    pub fn update_locators(&self, peer_ip: SocketAddr, locators: BlockLocators<N>) -> Result<(), Vec<SocketAddr>> {
-        // If the locators match the existing locators for the peer, return early.
-        if self.locators.read().get(&peer_ip) == Some(&locators) {
-            return Ok(());
-        }
-
-        // Ensure the given block locators are valid.
-        self.check_locators(peer_ip, locators.clone())?;
-        // Update the locators entry for the given peer IP.
-        self.locators.write().entry(peer_ip).or_insert(locators);
-
-        Ok(())
-    }
-
-    /// Removes the block locators for the peer, if they exist.
-    pub fn remove_peer(&self, peer_ip: &SocketAddr) {
-        // Remove the locators entry for the given peer IP.
-        self.locators.write().remove(peer_ip);
-    }
-
-    /// Removes the successful block for the given height, returning the block if it exists.
-    pub fn remove_successful_block(&self, height: u32) -> Option<Block<N>> {
-        // Remove the success entry for the given height.
-        self.success.write().remove(&height)
     }
 }

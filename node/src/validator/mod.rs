@@ -20,7 +20,7 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::{NodeType, PuzzleResponse, Status, UnconfirmedSolution};
+use snarkos_node_messages::{BlockRequest, Message, NodeType, PuzzleResponse, Status, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::{
@@ -40,8 +40,17 @@ use snarkvm::prelude::{
 };
 
 use anyhow::Result;
+use indexmap::indexset;
 use parking_lot::RwLock;
-use std::{net::SocketAddr, sync::Arc};
+use std::{
+    net::SocketAddr,
+    sync::{
+        atomic::{AtomicBool, Ordering},
+        Arc,
+    },
+    time::Duration,
+};
+use tokio::task::JoinHandle;
 
 /// A validator is a full node, capable of validating blocks.
 #[derive(Clone)]
@@ -64,6 +73,10 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     latest_block: Arc<RwLock<Option<Block<N>>>>,
     /// The latest puzzle response.
     latest_puzzle_response: Arc<RwLock<Option<PuzzleResponse<N>>>>,
+    /// The spawned handles.
+    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
+    /// The shutdown signal.
+    shutdown: Arc<AtomicBool>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
@@ -114,12 +127,16 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
             latest_puzzle_response: Default::default(),
+            handles: Default::default(),
+            shutdown: Default::default(),
         };
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
             node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?));
         }
+        // Initialize the sync pool.
+        node.initialize_sync().await;
         // Initialize the routing.
         node.initialize_routing().await;
         // Initialize the signal handler.
@@ -175,6 +192,14 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
     async fn shut_down(&self) {
         info!("Shutting down...");
 
+        // Shut down the sync pool.
+        trace!("Shutting down the sync pool...");
+        self.shutdown.store(true, Ordering::SeqCst);
+
+        // Abort the tasks.
+        trace!("Shutting down the validator...");
+        self.handles.read().iter().for_each(|handle| handle.abort());
+
         // Shut down the router.
         self.router.shut_down().await;
 
@@ -183,5 +208,68 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
         // self.ledger.shut_down().await;
 
         info!("Node has shut down.");
+    }
+}
+
+impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
+    /// TODO: THIS IS A DUMMY IMPLEMENTATION. DO NOT USE.
+    async fn initialize_sync(&self) {
+        let validator = self.clone();
+        self.handles.write().push(tokio::spawn(async move {
+            // Expected time per block.
+            const ROUND_TIME: u64 = 15; // 15 seconds per block
+
+            // Produce blocks.
+            loop {
+                // If the Ctrl-C handler registered the signal, stop the node.
+                if validator.shutdown.load(Ordering::Relaxed) {
+                    info!("Shutting down block production");
+                    break;
+                }
+
+                // Retrieve the latest block height.
+                let latest_height = validator.ledger.latest_height();
+                // Retrieve the peers with their heights.
+                let peers_by_height = validator.router.sync().get_peers_by_height();
+
+                if peers_by_height.is_empty() {
+                    // Wait for a bit.
+                    tokio::time::sleep(Duration::from_secs(ROUND_TIME)).await;
+                    continue;
+                }
+
+                // Retrieve the first peer (the one with the highest height).
+                let (peer_ip, peer_height) = peers_by_height.first().unwrap();
+
+                // Check if the peer is ahead of us.
+                if peer_height > &latest_height {
+                    if validator.router.sync().contains_request(latest_height + 1) {
+                        tokio::time::sleep(Duration::from_secs(1)).await;
+                        continue;
+                    }
+                    let hash = validator.router.sync().get_hash(latest_height + 1);
+                    let previous_hash = validator.router.sync().get_hash(latest_height);
+                    if let Err(error) =
+                        validator
+                            .router
+                            .sync()
+                            .insert_block_request(latest_height + 1, hash, previous_hash, indexset![*peer_ip])
+                    {
+                        error!("Failed to insert sync request: {}", error);
+                        // Wait for a bit.
+                        tokio::time::sleep(Duration::from_secs(ROUND_TIME)).await;
+                    } else {
+                        info!("Syncing with peer {}...", peer_ip);
+                        validator.send(
+                            *peer_ip,
+                            Message::BlockRequest(BlockRequest {
+                                start_height: latest_height + 1,
+                                end_height: latest_height + 2,
+                            }),
+                        );
+                    }
+                }
+            }
+        }));
     }
 }

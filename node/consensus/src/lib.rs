@@ -295,6 +295,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             self.memory_pool.clear_invalid_solutions(self);
         }
 
+        info!("Advanced to block {}", block.height());
+
         Ok(())
     }
 

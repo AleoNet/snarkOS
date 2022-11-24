@@ -390,7 +390,7 @@ impl<N: Network> Router<N> {
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.remove_peer(&peer_ip);
         // Removes the peer from the sync pool.
-        self.sync.remove_peer(&peer_ip);
+        self.sync.remove_peer_locators(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().remove(&peer_ip);
         // Add the peer to the candidate peers.

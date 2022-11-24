@@ -296,7 +296,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // If block locators were provided, then update the peer in the sync pool.
         if let Some(block_locators) = message.block_locators {
             // Check the block locators are valid, and update the peer in the sync pool.
-            if let Err(disconnect_peers) = self.router().sync().update_locators(peer_ip, block_locators) {
+            if let Err(disconnect_peers) = self.router().sync().update_peer_locators(peer_ip, block_locators) {
                 // On failure, disconnect the returned peer IPs.
                 for disconnect_ip in disconnect_peers {
                     debug!(
