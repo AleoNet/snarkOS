@@ -155,6 +155,7 @@ macro_rules! test_handshake {
             // Spin up a test peer (synthetic node).
             let peer = $crate::common::TestPeer::$peer_type().await;
 
+            // Sets up the connection direction as described above.
             if $is_initiator {
                 $crate::assert_connect(node, peer).await;
             } else {
@@ -163,6 +164,7 @@ macro_rules! test_handshake {
         }
     };
 
+    // Initiator side.
     ($($node_type:ident -> $peer_type:ident $(= $attr:meta)?),*) => {
         mod handshake_initiator_side {
             $(
@@ -172,6 +174,7 @@ macro_rules! test_handshake {
 
     };
 
+    // Responder side.
     ($($node_type:ident <- $peer_type:ident $(= $attr:meta)?),*) => {
         mod handshake_responder_side {
             $(
