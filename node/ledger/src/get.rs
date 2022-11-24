@@ -82,6 +82,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the block hash for the given block height.
     pub fn get_hash(&self, height: u32) -> Result<N::BlockHash> {
+        // If the height is 0, return the genesis block hash.
+        if height == 0 {
+            return Ok(self.genesis.hash());
+        }
         match self.vm.block_store().get_block_hash(height)? {
             Some(block_hash) => Ok(block_hash),
             None => bail!("Missing block hash for block {height}"),
@@ -90,6 +94,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the previous block hash for the given block height.
     pub fn get_previous_hash(&self, height: u32) -> Result<N::BlockHash> {
+        // If the height is 0, return the default block hash.
+        if height == 0 {
+            return Ok(N::BlockHash::default());
+        }
         match self.vm.block_store().get_previous_block_hash(height)? {
             Some(previous_hash) => Ok(previous_hash),
             None => bail!("Missing previous block hash for block {height}"),
@@ -151,6 +159,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the block coinbase solution for the given block height.
     pub fn get_coinbase(&self, height: u32) -> Result<Option<CoinbaseSolution<N>>> {
+        // If the height is 0, return the genesis block coinbase.
+        if height == 0 {
+            return Ok(self.genesis.coinbase().cloned());
+        }
         // Retrieve the block hash.
         let block_hash = match self.vm.block_store().get_block_hash(height)? {
             Some(block_hash) => block_hash,
@@ -162,6 +174,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the block signature for the given block height.
     pub fn get_signature(&self, height: u32) -> Result<Signature<N>> {
+        // If the height is 0, return the genesis block signature.
+        if height == 0 {
+            return Ok(*self.genesis.signature());
+        }
         // Retrieve the block hash.
         let block_hash = match self.vm.block_store().get_block_hash(height)? {
             Some(block_hash) => block_hash,
