@@ -26,7 +26,7 @@ mod block_request;
 pub use block_request::BlockRequest;
 
 mod block_response;
-pub use block_response::BlockResponse;
+pub use block_response::{BlockResponse, DataBlocks};
 
 mod challenge_request;
 pub use challenge_request::ChallengeRequest;

@@ -16,7 +16,17 @@
 
 use super::*;
 
-use snarkos_node_messages::{DisconnectReason, Message, MessageCodec, Ping, Pong};
+use snarkos_node_messages::{
+    BlockRequest,
+    BlockResponse,
+    Data,
+    DataBlocks,
+    DisconnectReason,
+    Message,
+    MessageCodec,
+    Ping,
+    Pong,
+};
 use snarkos_node_router::ALEO_MAXIMUM_FORK_DEPTH;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{error, Network};
@@ -127,6 +137,33 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Validator<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
+    /// Retrieves the blocks within the block request range, and returns the block response to the peer.
+    fn block_request(&self, peer_ip: SocketAddr, message: BlockRequest) -> bool {
+        let BlockRequest { start_height, end_height } = &message;
+
+        // Ensure the block request is well-formed.
+        if start_height >= end_height {
+            warn!("Received a block request from '{peer_ip}' with an invalid range ({start_height}..{end_height})");
+            return false;
+        }
+        // Ensure that the block request is within the allowed bounds.
+        if end_height - start_height > DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as u32 {
+            warn!("Received a block request from '{peer_ip}' with an excessive range ({start_height}..{end_height})");
+            return false;
+        }
+        // Retrieve the blocks within the requested range.
+        let blocks = match self.ledger.get_blocks(*start_height..*end_height) {
+            Ok(blocks) => Data::Object(DataBlocks(blocks)),
+            Err(error) => {
+                error!("Failed to retrieve blocks {start_height} to {end_height} from the ledger - {error}");
+                return false;
+            }
+        };
+        // Send the `BlockResponse` message to the peer.
+        self.send(peer_ip, Message::BlockResponse(BlockResponse { request: message, blocks }));
+        true
+    }
+
     /// Handles a `BlockResponse` message.
     fn block_response(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> bool {
         // Insert the candidate blocks into the sync pool.
@@ -141,6 +178,11 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         let mut latest_height = self.ledger.latest_height();
         // Try to advance the ledger with the sync pool.
         while let Some(block) = self.router().sync().remove_successful_block(latest_height + 1) {
+            // Check the next block.
+            if let Err(error) = self.consensus.check_next_block(&block) {
+                warn!("The next block ({}) is invalid - {error}", block.height());
+                break;
+            }
             // Attempt to advance to the next block.
             if let Err(error) = self.consensus.advance_to_next_block(&block) {
                 warn!("{error}");

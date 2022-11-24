@@ -16,7 +16,7 @@
 
 use super::*;
 
-use snarkos_node_messages::{DisconnectReason, Message, MessageCodec, Ping, Pong};
+use snarkos_node_messages::{BlockRequest, DisconnectReason, Message, MessageCodec, Ping, Pong};
 use snarkos_node_router::ALEO_MAXIMUM_FORK_DEPTH;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::Network;
@@ -115,6 +115,12 @@ impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Prover<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
+    /// Handles a `BlockRequest` message.
+    fn block_request(&self, peer_ip: SocketAddr, _message: BlockRequest) -> bool {
+        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
+        false
+    }
+
     /// Handles a `BlockResponse` message.
     fn block_response(&self, peer_ip: SocketAddr, _blocks: Vec<Block<N>>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);

@@ -236,39 +236,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         }
     }
 
-    fn block_request(&self, peer_ip: SocketAddr, _message: BlockRequest) -> bool {
-        // // Ensure the request is within the accepted limits.
-        // let number_of_blocks = end_block_height.saturating_sub(start_block_height);
-        // if number_of_blocks > Router::<N>::MAXIMUM_BLOCK_REQUEST {
-        //     // Route a `Failure` to the ledger.
-        //     let failure = format!("Attempted to request {} blocks", number_of_blocks);
-        //     if let Err(error) = state.ledger().router().send(LedgerRequest::Failure(peer_ip, failure)).await {
-        //         warn!("[Failure] {}", error);
-        //     }
-        //     continue;
-        // }
-        // // Retrieve the requested blocks.
-        // let blocks = match state.ledger().reader().get_blocks(start_block_height, end_block_height) {
-        //     Ok(blocks) => blocks,
-        //     Err(error) => {
-        //         // Route a `Failure` to the ledger.
-        //         if let Err(error) = state.ledger().router().send(LedgerRequest::Failure(peer_ip, format!("{}", error))).await {
-        //             warn!("[Failure] {}", error);
-        //         }
-        //         continue;
-        //     }
-        // };
-        // // Send a `BlockResponse` message for each block to the peer.
-        // for block in blocks {
-        //     debug!("Sending 'BlockResponse {}' to {}", block.height(), peer_ip);
-        //     if let Err(error) = peer.outbound_socket.send(Message::BlockResponse(Data::Object(block))).await {
-        //         warn!("[BlockResponse] {}", error);
-        //         break;
-        //     }
-        // }
-        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
-        false
-    }
+    /// Handles a `BlockRequest` message.
+    fn block_request(&self, peer_ip: SocketAddr, _message: BlockRequest) -> bool;
 
     /// Handles a `BlockResponse` message.
     fn block_response(&self, peer_ip: SocketAddr, _blocks: Vec<Block<N>>) -> bool;
