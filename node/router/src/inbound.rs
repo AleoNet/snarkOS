@@ -348,7 +348,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// Broadcasts the `UnconfirmedBlock` message to all connected peers within the fork depth of the given block.
     fn unconfirmed_block(&self, peer_ip: SocketAddr, serialized: UnconfirmedBlock<N>, block: Block<N>) -> bool {
         // Retrieve the connected peers by height.
-        let mut peers = self.router().sync().get_peers_by_height();
+        let mut peers = self.router().sync().get_sync_peers_by_height();
         // Retain the peers that 1) not the sender, and 2) are within the fork depth of the given unconfirmed block.
         peers.retain(|(ip, height)| *ip != peer_ip && *height < block.height() + ALEO_MAXIMUM_FORK_DEPTH);
 

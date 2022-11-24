@@ -79,7 +79,7 @@ impl<N: Network> Sync<N> {
     }
 
     /// Returns the list of peers with their heights, sorted by height (descending).
-    pub fn get_peers_by_height(&self) -> Vec<(SocketAddr, u32)> {
+    pub fn get_sync_peers_by_height(&self) -> Vec<(SocketAddr, u32)> {
         self.locators
             .read()
             .iter()
@@ -89,8 +89,19 @@ impl<N: Network> Sync<N> {
     }
 
     /// Inserts a canonical block hash for the given block height.
-    pub fn insert_canon(&self, height: u32, hash: N::BlockHash) {
+    pub fn insert_canon_locator(&self, height: u32, hash: N::BlockHash) {
         self.canon.write().insert(height, hash);
+    }
+
+    /// Inserts the block locators as canonical.
+    pub fn insert_canon_locators(&self, locators: BlockLocators<N>) -> Result<()> {
+        // Ensure the given block locators are well-formed.
+        locators.ensure_is_valid()?;
+        // Insert the block locators into canon.
+        for (height, hash) in locators.checkpoints.into_iter().chain(locators.recents.into_iter()) {
+            self.canon.write().insert(height, hash);
+        }
+        Ok(())
     }
 
     /// Inserts a block request for the given height.

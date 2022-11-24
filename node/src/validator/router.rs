@@ -179,7 +179,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
                 break;
             }
             // Insert the height and hash as canon in the sync pool.
-            self.router().sync().insert_canon(block.height(), block.hash());
+            self.router().sync().insert_canon_locator(block.height(), block.hash());
             // Increment the latest height.
             latest_height += 1;
         }

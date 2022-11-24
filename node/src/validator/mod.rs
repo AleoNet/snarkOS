@@ -219,6 +219,12 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             // Expected time per block.
             const ROUND_TIME: u64 = 15; // 15 seconds per block
 
+            validator
+                .router
+                .sync()
+                .insert_canon_locators(crate::helpers::get_block_locators(&validator.ledger).unwrap())
+                .unwrap();
+
             // Produce blocks.
             loop {
                 // If the Ctrl-C handler registered the signal, stop the node.
@@ -230,7 +236,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 // Retrieve the latest block height.
                 let latest_height = validator.ledger.latest_height();
                 // Retrieve the peers with their heights.
-                let peers_by_height = validator.router.sync().get_peers_by_height();
+                let peers_by_height = validator.router.sync().get_sync_peers_by_height();
 
                 if peers_by_height.is_empty() {
                     // Wait for a bit.
