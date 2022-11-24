@@ -129,9 +129,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
     }
 
     /// Saves the latest epoch challenge and latest block in the node.
-    fn puzzle_response(&self, peer_ip: SocketAddr, message: PuzzleResponse<N>, block: Block<N>) -> bool {
+    fn puzzle_response(&self, peer_ip: SocketAddr, serialized: PuzzleResponse<N>, block: Block<N>) -> bool {
         // Retrieve the epoch number.
-        let epoch_number = message.epoch_challenge.epoch_number();
+        let epoch_number = serialized.epoch_challenge.epoch_number();
         // Retrieve the block height.
         let block_height = block.height();
 
@@ -142,7 +142,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         );
 
         // Save the latest epoch challenge in the node.
-        self.latest_epoch_challenge.write().replace(message.epoch_challenge);
+        self.latest_epoch_challenge.write().replace(serialized.epoch_challenge);
         // Save the latest block in the node.
         self.latest_block.write().replace(block);
 
@@ -154,7 +154,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
     async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
-        message: UnconfirmedSolution<N>,
+        serialized: UnconfirmedSolution<N>,
         solution: ProverSolution<N>,
     ) -> bool {
         // Retrieve the latest epoch challenge.
@@ -172,7 +172,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
 
             match is_valid {
                 // If the solution is valid, propagate the `UnconfirmedSolution` to connected beacons.
-                Ok(Ok(true)) => self.propagate_to_beacons(Message::UnconfirmedSolution(message), vec![peer_ip]),
+                Ok(Ok(true)) => self.propagate_to_beacons(Message::UnconfirmedSolution(serialized), vec![peer_ip]),
                 Ok(Ok(false)) | Ok(Err(_)) => {
                     trace!("Invalid prover solution '{}' for the proof target.", solution.commitment())
                 }

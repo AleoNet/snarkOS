@@ -72,7 +72,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     /// This function removes any connected peers that have not communicated within the predefined time.
     fn remove_stale_connected_peers(&self) {
         // Check if any connected peer is stale.
-        for peer in self.router().connected_peers_inner().into_values() {
+        for peer in self.router().get_connected_peers() {
             // Disconnect if the peer has not communicated back within the predefined time.
             let elapsed = peer.last_seen().elapsed().as_secs();
             if elapsed > Router::<N>::RADIO_SILENCE_IN_SECS {

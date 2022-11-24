@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_messages::{BlockLocators, Status};
+use snarkos_node_messages::BlockLocators;
 use snarkvm::prelude::{Block, Network};
 
 use anyhow::{bail, Result};
@@ -28,25 +28,25 @@ pub type CandidateBlock<N> = (Block<N>, SocketAddr);
 
 #[derive(Clone, Debug)]
 pub struct Sync<N: Network> {
-    /// The map of peer IPs to their status.
-    statuses: Arc<RwLock<IndexMap<SocketAddr, Status>>>,
     /// The map of peer IPs to their block locators.
     locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
     /// The map of block requests to the received blocks.
     _candidates: Arc<RwLock<BTreeMap<u32, CandidateBlock<N>>>>,
+    /// The map of unconfirmed block hashes to the received blocks.
+    unconfirmed_blocks: Arc<RwLock<IndexMap<N::BlockHash, CandidateBlock<N>>>>,
 }
 
 impl<N: Network> Default for Sync<N> {
-    /// Initializes a new instance of the sync module.
+    /// Initializes a new instance of the sync pool.
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl<N: Network> Sync<N> {
-    /// Initializes a new instance of the sync module.
+    /// Initializes a new instance of the sync pool.
     pub fn new() -> Self {
-        Self { statuses: Default::default(), locators: Default::default(), _candidates: Default::default() }
+        Self { locators: Default::default(), _candidates: Default::default(), unconfirmed_blocks: Default::default() }
     }
 
     /// Returns the block height of the given peer IP.
@@ -64,9 +64,18 @@ impl<N: Network> Sync<N> {
             .collect()
     }
 
-    /// Updates the status and block locators for the given peer IP.
+    /// Inserts the unconfirmed block into the sync pool.
+    pub fn insert_unconfirmed_block(&self, block: Block<N>, peer_ip: SocketAddr) {
+        // Ensure the block is not already in the sync pool.
+        if !self.unconfirmed_blocks.read().contains_key(&block.hash()) {
+            // Insert the block into the sync pool.
+            self.unconfirmed_blocks.write().insert(block.hash(), (block, peer_ip));
+        }
+    }
+
+    /// Updates the block locators for the given peer IP.
     /// This function ensures all peers share a consistent view of the ledger.
-    pub fn update_peer(&self, peer_ip: SocketAddr, status: Status, locators: BlockLocators<N>) -> Result<()> {
+    pub fn update_peer(&self, peer_ip: SocketAddr, locators: BlockLocators<N>) -> Result<()> {
         // Ensure the given block locators are well-formed.
         locators.ensure_is_valid()?;
 
@@ -78,9 +87,6 @@ impl<N: Network> Sync<N> {
                 bail!("Inconsistent block locators between '{peer_ip}' and '{other_peer_ip}': {error}")
             }
         }
-
-        // Update the peer status.
-        self.statuses.write().entry(peer_ip).or_insert(status);
         // Update the locators entry for the given peer IP.
         locators_write.entry(peer_ip).or_insert(locators);
 
@@ -89,8 +95,6 @@ impl<N: Network> Sync<N> {
 
     /// Removes the peer, if they exist.
     pub fn remove_peer(&self, peer_ip: &SocketAddr) {
-        // Remove the status entry for the given peer IP.
-        self.statuses.write().remove(peer_ip);
         // Remove the locators entry for the given peer IP.
         self.locators.write().remove(peer_ip);
     }

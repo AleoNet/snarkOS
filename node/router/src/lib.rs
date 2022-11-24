@@ -69,7 +69,7 @@ pub struct Router<N: Network> {
     cache: Cache<N>,
     /// The resolver.
     resolver: Resolver,
-    /// The sync module.
+    /// The sync pool.
     sync: Sync<N>,
     /// The set of trusted peers.
     trusted_peers: Arc<IndexSet<SocketAddr>>,
@@ -158,6 +158,17 @@ impl<N: Network> Router<N> {
         });
     }
 
+    /// Returns the IP address of this node.
+    pub const fn local_ip(&self) -> SocketAddr {
+        self.local_ip
+    }
+
+    /// Returns `true` if the given IP is this node.
+    pub fn is_local_ip(&self, ip: &SocketAddr) -> bool {
+        *ip == self.local_ip()
+            || (ip.ip().is_unspecified() || ip.ip().is_loopback()) && ip.port() == self.local_ip().port()
+    }
+
     /// Returns the node type.
     pub const fn node_type(&self) -> NodeType {
         self.node_type
@@ -178,15 +189,14 @@ impl<N: Network> Router<N> {
         self.is_dev
     }
 
-    /// Returns the IP address of this node.
-    pub const fn local_ip(&self) -> SocketAddr {
-        self.local_ip
+    /// Returns the listener IP address from the (ambiguous) peer address.
+    pub fn resolve_to_listener(&self, peer_addr: &SocketAddr) -> Option<SocketAddr> {
+        self.resolver.get_listener(peer_addr)
     }
 
-    /// Returns `true` if the given IP is this node.
-    pub fn is_local_ip(&self, ip: &SocketAddr) -> bool {
-        *ip == self.local_ip()
-            || (ip.ip().is_unspecified() || ip.ip().is_loopback()) && ip.port() == self.local_ip().port()
+    /// Returns the (ambiguous) peer address from the listener IP address.
+    pub fn resolve_to_ambiguous(&self, peer_ip: &SocketAddr) -> Option<SocketAddr> {
+        self.resolver.get_ambiguous(peer_ip)
     }
 
     /// Returns `true` if the node is connected to the given IP.
@@ -200,16 +210,6 @@ impl<N: Network> Router<N> {
             Some(timestamp) => timestamp.elapsed().as_secs() < Self::RADIO_SILENCE_IN_SECS,
             None => false,
         }
-    }
-
-    /// Returns the listener IP address from the (ambiguous) peer address.
-    pub fn resolve_to_listener(&self, peer_addr: &SocketAddr) -> Option<SocketAddr> {
-        self.resolver.get_listener(peer_addr)
-    }
-
-    /// Returns the (ambiguous) peer address from the listener IP address.
-    pub fn resolve_to_ambiguous(&self, peer_ip: &SocketAddr) -> Option<SocketAddr> {
-        self.resolver.get_ambiguous(peer_ip)
     }
 
     /// Returns the maximum number of connected peers.
@@ -232,9 +232,14 @@ impl<N: Network> Router<N> {
         self.restricted_peers.read().len()
     }
 
-    /// Returns the list of connected peers with their peer objects.
-    pub fn connected_peers_inner(&self) -> IndexMap<SocketAddr, Peer<N>> {
-        self.connected_peers.read().clone()
+    /// Returns the connected peer given the peer IP, if it exists.
+    pub fn get_connected_peer(&self, ip: &SocketAddr) -> Option<Peer<N>> {
+        self.connected_peers.read().get(ip).cloned()
+    }
+
+    /// Returns the connected peers.
+    pub fn get_connected_peers(&self) -> Vec<Peer<N>> {
+        self.connected_peers.read().values().cloned().collect()
     }
 
     /// Returns the list of connected peers.
@@ -360,7 +365,6 @@ impl<N: Network> Router<N> {
         &self,
         peer_ip: SocketAddr,
         node_type: NodeType,
-        status: Status,
         block_locators: &Option<BlockLocators<N>>,
         mut write_fn: Fn,
     ) -> Result<()> {
@@ -381,9 +385,9 @@ impl<N: Network> Router<N> {
                 bail!("Peer '{peer_ip}' is a prover or client, but block locators were provided")
             }
 
-            // If block locators were provided, then update the peer in the sync module.
+            // If block locators were provided, then update the peer in the sync pool.
             if let Some(block_locators) = block_locators {
-                self.sync.update_peer(peer_ip, status, block_locators.clone())?;
+                self.sync.update_peer(peer_ip, block_locators.clone())?;
             }
             // Lastly, update the peer with the given function.
             write_fn(peer);
@@ -395,7 +399,7 @@ impl<N: Network> Router<N> {
     pub fn remove_connected_peer(&self, peer_ip: SocketAddr) {
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.remove_peer(&peer_ip);
-        // Removes the peer from the sync module.
+        // Removes the peer from the sync pool.
         self.sync.remove_peer(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().remove(&peer_ip);

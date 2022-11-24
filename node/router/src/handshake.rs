@@ -25,6 +25,7 @@ use snarkos_node_messages::{
     MessageCodec,
     MessageTrait,
     NodeType,
+    RawStatus,
     Status,
 };
 use snarkos_node_tcp::{ConnectionSide, Tcp, P2P};
@@ -135,9 +136,10 @@ impl<N: Network> Router<N> {
         let peer_address = challenge_request.address;
         let peer_version = challenge_request.version;
         let peer_type = challenge_request.node_type;
+        let peer_status = RawStatus::from_status(challenge_request.status);
 
         // Construct the peer.
-        let peer = Peer::new(peer_ip, peer_address, peer_version, peer_type);
+        let peer = Peer::new(peer_ip, peer_address, peer_version, peer_type, peer_status);
         // Insert the connected peer in the router.
         self.insert_connected_peer(peer, peer_addr);
         info!("Connected to '{peer_ip}'");
