@@ -225,7 +225,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 .insert_canon_locators(crate::helpers::get_block_locators(&validator.ledger).unwrap())
                 .unwrap();
 
-            // Produce blocks.
             loop {
                 // If the Ctrl-C handler registered the signal, stop the node.
                 if validator.shutdown.load(Ordering::Relaxed) {
@@ -233,48 +232,64 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                     break;
                 }
 
-                // Retrieve the latest block height.
-                let latest_height = validator.ledger.latest_height();
-                // Retrieve the peers with their heights.
-                let peers_by_height = validator.router.sync().get_sync_peers_by_height();
+                let block_requests = validator.router.sync().prepare_block_requests();
+                trace!("{:?} block requests", block_requests.len());
+                for (height, (hash, previous_hash, sync_ips)) in block_requests {
+                    validator.router.sync().insert_block_request(height, hash, previous_hash, sync_ips.clone());
 
-                if peers_by_height.is_empty() {
-                    // Wait for a bit.
-                    tokio::time::sleep(Duration::from_secs(ROUND_TIME)).await;
-                    continue;
-                }
-
-                // Retrieve the first peer (the one with the highest height).
-                let (peer_ip, peer_height) = peers_by_height.first().unwrap();
-
-                // Check if the peer is ahead of us.
-                if peer_height > &latest_height {
-                    if validator.router.sync().contains_request(latest_height + 1) {
-                        tokio::time::sleep(Duration::from_secs(1)).await;
-                        continue;
-                    }
-                    let hash = validator.router.sync().get_canon_hash(latest_height + 1);
-                    let previous_hash = validator.router.sync().get_canon_hash(latest_height);
-                    if let Err(error) =
-                        validator
-                            .router
-                            .sync()
-                            .insert_block_request(latest_height + 1, hash, previous_hash, indexset![*peer_ip])
-                    {
-                        error!("Failed to insert sync request: {}", error);
-                        // Wait for a bit.
-                        tokio::time::sleep(Duration::from_secs(ROUND_TIME)).await;
-                    } else {
-                        info!("Syncing with peer {}...", peer_ip);
+                    for sync_ip in sync_ips {
+                        info!("Requesting block {height} from '{sync_ip}' ()");
                         validator.send(
-                            *peer_ip,
-                            Message::BlockRequest(BlockRequest {
-                                start_height: latest_height + 1,
-                                end_height: latest_height + 2,
-                            }),
+                            sync_ip,
+                            Message::BlockRequest(BlockRequest { start_height: height, end_height: height + 1 }),
                         );
                     }
                 }
+
+                tokio::time::sleep(Duration::from_secs(1)).await;
+
+                // // Retrieve the latest block height.
+                // let latest_height = validator.ledger.latest_height();
+                // // Retrieve the peers with their heights.
+                // let peers_by_height = validator.router.sync().get_sync_peers_by_height();
+                //
+                // if peers_by_height.is_empty() {
+                //     // Wait for a bit.
+                //     tokio::time::sleep(Duration::from_secs(ROUND_TIME)).await;
+                //     continue;
+                // }
+                //
+                // // Retrieve the first peer (the one with the highest height).
+                // let (peer_ip, peer_height) = peers_by_height.first().unwrap();
+                //
+                // // Check if the peer is ahead of us.
+                // if peer_height > &latest_height {
+                //     if validator.router.sync().contains_request(latest_height + 1) {
+                //         tokio::time::sleep(Duration::from_secs(1)).await;
+                //         continue;
+                //     }
+                //     let hash = validator.router.sync().get_canon_hash(latest_height + 1);
+                //     let previous_hash = validator.router.sync().get_canon_hash(latest_height);
+                //     if let Err(error) =
+                //         validator
+                //             .router
+                //             .sync()
+                //             .insert_block_request(latest_height + 1, hash, previous_hash, indexset![*peer_ip])
+                //     {
+                //         error!("Failed to insert sync request: {}", error);
+                //         // Wait for a bit.
+                //         tokio::time::sleep(Duration::from_secs(ROUND_TIME)).await;
+                //     } else {
+                //         info!("Syncing with peer {}...", peer_ip);
+                //         validator.send(
+                //             *peer_ip,
+                //             Message::BlockRequest(BlockRequest {
+                //                 start_height: latest_height + 1,
+                //                 end_height: latest_height + 2,
+                //             }),
+                //         );
+                //     }
+                // }
             }
         }));
     }

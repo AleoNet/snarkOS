@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Outbound, Router};
+use crate::{Outbound, Router, REDUNDANCY_FACTOR};
 use snarkos_node_messages::{DisconnectReason, Message, PeerRequest};
 use snarkvm::prelude::Network;
 
@@ -24,13 +24,13 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     /// The duration in seconds to sleep in between heartbeat executions.
     const HEARTBEAT_IN_SECS: u64 = 9; // 9 seconds
     /// The minimum number of peers required to maintain connections with.
-    const MINIMUM_NUMBER_OF_PEERS: usize = 2;
+    const MINIMUM_NUMBER_OF_PEERS: usize = 3;
     /// The maximum number of peers permitted to maintain connections with.
     const MAXIMUM_NUMBER_OF_PEERS: usize = 21;
 
     /// Handles the heartbeat request.
     fn heartbeat(&self) {
-        assert!(Self::MINIMUM_NUMBER_OF_PEERS <= Self::MAXIMUM_NUMBER_OF_PEERS);
+        self.safety_check_minimum_number_of_peers();
 
         // Log the connected peers.
         let connected_peers = self.router().connected_peers();
@@ -52,6 +52,17 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         self.handle_bootstrap_peers();
         // Keep the trusted peers connected.
         self.handle_trusted_peers();
+    }
+
+    /// TODO (howardwu): Consider checking minimum number of beacons and validators, to exclude clients and provers.
+    /// This function performs safety checks on the setting for the minimum number of peers.
+    fn safety_check_minimum_number_of_peers(&self) {
+        assert!(Self::MINIMUM_NUMBER_OF_PEERS <= Self::MAXIMUM_NUMBER_OF_PEERS);
+        // If the node is not in development mode, and is a beacon or validator, check its minimum number of peers.
+        let is_beacon_or_validator = self.router().node_type().is_beacon() || self.router().node_type().is_validator();
+        if !self.router().is_dev() && is_beacon_or_validator && Self::MINIMUM_NUMBER_OF_PEERS < 2 * REDUNDANCY_FACTOR {
+            warn!("Caution - please raise the minimum number of peers to be above {}", 2 * REDUNDANCY_FACTOR);
+        }
     }
 
     /// This function removes the oldest connected peer, to keep the connections fresh.
@@ -101,6 +112,9 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         }
     }
 
+    /// TODO (howardwu): If the node is a beacon, keep the beacons, and keep 0 clients and provers.
+    ///  If the node is a validator, keep REDUNDANCY_FACTOR beacons.
+    ///  If the node is a client or prover, keep 0 beacons.
     /// This function keeps the number of connected peers within the allowed range.
     fn handle_connected_peers(&self) {
         // Obtain the number of connected peers.

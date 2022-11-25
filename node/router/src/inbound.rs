@@ -296,15 +296,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // If block locators were provided, then update the peer in the sync pool.
         if let Some(block_locators) = message.block_locators {
             // Check the block locators are valid, and update the peer in the sync pool.
-            if let Err(disconnect_peers) = self.router().sync().update_peer_locators(peer_ip, block_locators) {
-                // On failure, disconnect the returned peer IPs.
-                for disconnect_ip in disconnect_peers {
-                    debug!(
-                        "Disconnecting '{disconnect_ip}' for the following reason - {:?}",
-                        DisconnectReason::ProtocolViolation
-                    );
-                    self.router().disconnect(disconnect_ip);
-                }
+            if let Err(error) = self.router().sync().update_peer_locators(peer_ip, block_locators) {
+                warn!("Peer '{peer_ip}' sent invalid block locators: {error}");
                 return false;
             }
         }
@@ -347,17 +340,17 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// TODO (howardwu): Consider deprecating this message type.
     /// Broadcasts the `UnconfirmedBlock` message to all connected peers within the fork depth of the given block.
     fn unconfirmed_block(&self, peer_ip: SocketAddr, serialized: UnconfirmedBlock<N>, block: Block<N>) -> bool {
-        // Retrieve the connected peers by height.
-        let mut peers = self.router().sync().get_sync_peers_by_height();
-        // Retain the peers that 1) not the sender, and 2) are within the fork depth of the given unconfirmed block.
-        peers.retain(|(ip, height)| *ip != peer_ip && *height < block.height() + ALEO_MAXIMUM_FORK_DEPTH);
-
-        // Broadcast the `UnconfirmedBlock` to the peers.
-        if !peers.is_empty() {
-            for (peer_ip, _) in peers {
-                self.send(peer_ip, Message::UnconfirmedBlock(serialized.clone()));
-            }
-        }
+        // // Retrieve the connected peers by height.
+        // let mut peers = self.router().sync().get_sync_peers_by_height();
+        // // Retain the peers that 1) not the sender, and 2) are within the fork depth of the given unconfirmed block.
+        // peers.retain(|(ip, height)| *ip != peer_ip && *height < block.height() + ALEO_MAXIMUM_FORK_DEPTH);
+        //
+        // // Broadcast the `UnconfirmedBlock` to the peers.
+        // if !peers.is_empty() {
+        //     for (peer_ip, _) in peers {
+        //         self.send(peer_ip, Message::UnconfirmedBlock(serialized.clone()));
+        //     }
+        // }
         true
     }
 

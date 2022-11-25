@@ -39,19 +39,20 @@ pub use outbound::*;
 mod routing;
 pub use routing::*;
 
-use snarkos_node_messages::{NodeType, RawStatus, Status};
+use snarkos_node_messages::{NodeType, RawStatus, Status, NUM_RECENTS};
 use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network};
 
 use anyhow::{bail, Result};
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
+use itertools::Itertools;
 use parking_lot::RwLock;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 // TODO (raychu86): Move this declaration.
-pub const ALEO_MAXIMUM_FORK_DEPTH: u32 = 0;
+pub const ALEO_MAXIMUM_FORK_DEPTH: u32 = (NUM_RECENTS as u32).saturating_sub(1);
 
 #[derive(Clone)]
 pub struct Router<N: Network> {
@@ -118,7 +119,7 @@ impl<N: Network> Router<N> {
             status: RawStatus::new(),
             cache: Default::default(),
             resolver: Default::default(),
-            sync: Default::default(),
+            sync: Sync::new(local_ip),
             trusted_peers: Arc::new(trusted_peers.iter().copied().collect()),
             connected_peers: Default::default(),
             candidate_peers: Default::default(),

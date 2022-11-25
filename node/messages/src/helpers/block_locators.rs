@@ -19,6 +19,7 @@ use snarkvm::prelude::{has_duplicates, Network};
 use anyhow::{bail, ensure, Result};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
+use std::collections::{btree_map::IntoIter, BTreeMap};
 
 /// The number of recent blocks (near tip).
 pub const NUM_RECENTS: usize = 100; // 100 blocks
@@ -35,14 +36,26 @@ pub struct BlockLocators<N: Network> {
     pub checkpoints: IndexMap<u32, N::BlockHash>,
 }
 
+impl<N: Network> IntoIterator for BlockLocators<N> {
+    type IntoIter = IntoIter<u32, N::BlockHash>;
+    type Item = (u32, N::BlockHash);
+
+    // TODO (howardwu): Consider using `BTreeMap::from_par_iter` if it is more performant.
+    //  Check by sorting 300-1000 items and comparing the performance.
+    //  (https://docs.rs/indexmap/latest/indexmap/map/struct.IndexMap.html#method.from_par_iter)
+    fn into_iter(self) -> Self::IntoIter {
+        BTreeMap::from_iter(self.checkpoints.into_iter().chain(self.recents.into_iter())).into_iter()
+    }
+}
+
 impl<N: Network> BlockLocators<N> {
     /// Initializes a new instance of the block locators.
     pub fn new(recents: IndexMap<u32, N::BlockHash>, checkpoints: IndexMap<u32, N::BlockHash>) -> Self {
         Self { recents, checkpoints }
     }
 
-    /// Returns the latest height.
-    pub fn latest_height(&self) -> u32 {
+    /// Returns the latest locator height.
+    pub fn latest_locator_height(&self) -> u32 {
         self.recents.keys().last().copied().unwrap_or_default()
     }
 
