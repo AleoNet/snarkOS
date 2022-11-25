@@ -27,8 +27,13 @@ pub struct BlockRequest {
 impl MessageTrait for BlockRequest {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> &str {
-        "BlockRequest"
+    fn name(&self) -> String {
+        let start = self.start_height;
+        let end = self.end_height;
+        match start + 1 == end {
+            true => format!("BlockRequest {start}"),
+            false => format!("BlockRequest {start}..{end}"),
+        }
     }
 
     /// Serializes the message into the buffer.

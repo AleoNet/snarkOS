@@ -26,8 +26,8 @@ pub struct UnconfirmedBlock<N: Network> {
 impl<N: Network> MessageTrait for UnconfirmedBlock<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> &str {
-        "UnconfirmedBlock"
+    fn name(&self) -> String {
+        "UnconfirmedBlock".to_string()
     }
 
     /// Serializes the message into the buffer.

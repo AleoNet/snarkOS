@@ -28,8 +28,8 @@ pub struct Ping<N: Network> {
 impl<N: Network> MessageTrait for Ping<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> &str {
-        "Ping"
+    fn name(&self) -> String {
+        "Ping".to_string()
     }
 
     /// Serializes the message into the buffer.

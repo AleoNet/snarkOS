@@ -25,8 +25,8 @@ pub struct PuzzleResponse<N: Network> {
 impl<N: Network> MessageTrait for PuzzleResponse<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> &str {
-        "PuzzleResponse"
+    fn name(&self) -> String {
+        "PuzzleResponse".to_string()
     }
 
     /// Serializes the message into the buffer.

@@ -238,7 +238,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                     validator.router.sync().insert_block_request(height, hash, previous_hash, sync_ips.clone());
 
                     for sync_ip in sync_ips {
-                        info!("Requesting block {height} from '{sync_ip}' ()");
                         validator.send(
                             sync_ip,
                             Message::BlockRequest(BlockRequest { start_height: height, end_height: height + 1 }),

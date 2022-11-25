@@ -24,8 +24,8 @@ pub struct Disconnect {
 impl MessageTrait for Disconnect {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> &str {
-        "Disconnect"
+    fn name(&self) -> String {
+        "Disconnect".to_string()
     }
 
     /// Serializes the message into the buffer.

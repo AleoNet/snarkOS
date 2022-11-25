@@ -90,7 +90,7 @@ use std::{
 
 pub trait MessageTrait {
     /// Returns the message name.
-    fn name(&self) -> &str;
+    fn name(&self) -> String;
     /// Serializes the message into the buffer.
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()>;
     /// Deserializes the given buffer into a message.
@@ -123,7 +123,7 @@ impl<N: Network> Message<N> {
 
     /// Returns the message name.
     #[inline]
-    pub fn name(&self) -> &str {
+    pub fn name(&self) -> String {
         match self {
             Self::BlockRequest(message) => message.name(),
             Self::BlockResponse(message) => message.name(),

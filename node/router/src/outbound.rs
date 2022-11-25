@@ -83,7 +83,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
             self.router().cache.increment_outbound_puzzle_requests(peer_ip);
         }
         // Retrieve the message name.
-        let name = message.name().to_string();
+        let name = message.name();
         // Send the message to the peer.
         trace!("Sending '{name}' to '{peer_ip}'");
         let result = self.unicast(peer_addr, message);

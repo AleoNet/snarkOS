@@ -29,8 +29,8 @@ pub struct ChallengeRequest<N: Network> {
 impl<N: Network> MessageTrait for ChallengeRequest<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> &str {
-        "ChallengeRequest"
+    fn name(&self) -> String {
+        "ChallengeRequest".to_string()
     }
 
     /// Serializes the message into the buffer.

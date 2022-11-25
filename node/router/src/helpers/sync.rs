@@ -59,7 +59,7 @@ pub struct Sync<N: Network> {
     local_ip: SocketAddr,
     /// The canonical map of block height to block hash.
     /// This map is a linearly-increasing map of block heights to block hashes,
-    /// updated solely from candidate blocks (not from block locators, to ensure there are no forks).
+    /// updated solely from the ledger and candidate blocks (not from peers' block locators, to ensure there are no forks).
     canon: Arc<RwLock<BTreeMap<u32, N::BlockHash>>>,
     /// The map of peer IP to their block locators.
     /// The block locators are consistent with the canonical map and every other peer's block locators.
@@ -267,7 +267,7 @@ impl<N: Network> Sync<N> {
 
         while current_height <= end_height {
             // Ensure the current height does not contain block requests.
-            if self.contains_request(current_height) {
+            if self.contains_request(current_height) || self.canon.read().contains_key(&current_height) {
                 // Increment the current height by 1.
                 current_height += 1;
                 continue;
@@ -754,4 +754,7 @@ mod tests {
         sync.remove_peer(&peer_ip);
         assert_eq!(sync.get_peer_height(&peer_ip), None);
     }
+
+    // TODO: insert_block_req => insert_block_res => insert_block_req (same), ensure fails.
+    // TODO: duplicate responses, ensure fails.
 }

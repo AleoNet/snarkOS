@@ -27,8 +27,13 @@ pub struct BlockResponse<N: Network> {
 impl<N: Network> MessageTrait for BlockResponse<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> &str {
-        "BlockResponse"
+    fn name(&self) -> String {
+        let start = self.request.start_height;
+        let end = self.request.end_height;
+        match start + 1 == end {
+            true => format!("BlockResponse {start}"),
+            false => format!("BlockResponse {start}..{end}"),
+        }
     }
 
     /// Serializes the message into the buffer.
@@ -57,7 +62,7 @@ pub struct DataBlocks<N: Network>(pub Vec<Block<N>>);
 
 impl<N: Network> DataBlocks<N> {
     /// The maximum number of blocks that can be sent in a single message.
-    pub const MAXIMUM_NUMBER_OF_BLOCKS: u8 = 10;
+    pub const MAXIMUM_NUMBER_OF_BLOCKS: u8 = 50;
 }
 
 impl<N: Network> Deref for DataBlocks<N> {
