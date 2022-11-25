@@ -14,21 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_messages::{BlockLocators, BlockRequest, DataBlocks};
+use snarkos_node_messages::{BlockLocators, DataBlocks};
 use snarkvm::prelude::{Block, Network};
 
 use anyhow::{bail, Result};
 use colored::Colorize;
 use core::hash::Hash;
-use futures::TryStreamExt;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use parking_lot::RwLock;
-use rand::{
-    prelude::{IteratorRandom, SliceRandom},
-    CryptoRng,
-    Rng,
-};
+use rand::{prelude::IteratorRandom, CryptoRng, Rng};
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc};
 
 pub const REDUNDANCY_FACTOR: usize = 3;
@@ -140,6 +135,11 @@ impl<N: Network> Sync<N> {
             .collect()
     }
 
+    /// Returns the common ancestor for the given peer pair, if it exists.
+    pub fn get_common_ancestor(&self, peer_a: SocketAddr, peer_b: SocketAddr) -> Option<u32> {
+        self.common_ancestors.read().get(&PeerPair(peer_a, peer_b)).copied()
+    }
+
     /// Returns a list of block requests, if the node needs to sync.
     pub fn prepare_block_requests(
         &self,
@@ -160,12 +160,11 @@ impl<N: Network> Sync<N> {
 
         // Case 0a: If there are no candidate peers, return `None`.
         if candidate_peers.is_empty() {
-            trace!("No sync peers (this node is ahead)");
             return vec![];
         }
 
         // Retrieve the common ancestors of the peers above the latest canon height.
-        let mut common_ancestors: IndexSet<_> = self
+        let common_ancestors: IndexSet<_> = self
             .common_ancestors
             .read()
             .iter()
@@ -176,9 +175,7 @@ impl<N: Network> Sync<N> {
             .collect();
 
         // Case 0b: If there are no common ancestors between the candidate peers, return `None`.
-        // (We likely just started the node, and are waiting for the first block locators.)
         if common_ancestors.is_empty() {
-            trace!("No sync peers (waiting for block locators)");
             return vec![];
         }
 
@@ -186,6 +183,7 @@ impl<N: Network> Sync<N> {
         let locators = self.locators.read().clone();
 
         let min_common_ancestor = common_ancestors.iter().min().copied().unwrap_or_default();
+        println!("min_common_ancestor: {min_common_ancestor}, latest_canon_height: {latest_canon_height}");
 
         let (end_peer_height, sync_peers) =
             // Case 1: If all of the candidate peers share a common ancestor at or above the latest canon height,
@@ -201,7 +199,7 @@ impl<N: Network> Sync<N> {
             // then pick the peer with the highest height, and find peers (up to extra redundancy) with
             // a common ancestor above the block request range. Set the end height to their common ancestor.
             else {
-                println!("Case 2");
+                println!("Case 2 - candidate_peers: {candidate_peers:?}");
                 let mut end_peer_height = 0;
                 let mut sync_peers = IndexMap::new();
 
@@ -246,6 +244,7 @@ impl<N: Network> Sync<N> {
                     }
                 }
 
+                println!("Case 2 - end_peer_height: {end_peer_height}, latest_canon_height: {latest_canon_height}, sync_peers: {sync_peers:?}");
                 // If there is no cohort of peers with a common ancestor above the latest canon height,
                 // then return early.
                 if end_peer_height < latest_canon_height || sync_peers.is_empty() {
@@ -387,18 +386,20 @@ impl<N: Network> Sync<N> {
         // Ensure the given block locators are well-formed.
         locators.ensure_is_valid()?;
         // Update the locators entry for the given peer IP.
-        self.locators.write().entry(peer_ip).or_insert(locators.clone());
+        self.locators.write().insert(peer_ip, locators.clone());
 
         // Compute the common ancestor with this node.
         let mut ancestor = 0;
         for (height, hash) in locators.clone().into_iter() {
-            match self.get_canon_hash(height) == Some(hash) {
-                true => ancestor = height,
-                false => break,
+            if let Some(canon_hash) = self.get_canon_hash(height) {
+                match canon_hash == hash {
+                    true => ancestor = height,
+                    false => break, // fork
+                }
             }
         }
         // Update the common ancestor entry for this node.
-        self.common_ancestors.write().entry(PeerPair(self.local_ip, peer_ip)).or_insert(ancestor);
+        self.common_ancestors.write().insert(PeerPair(self.local_ip, peer_ip), ancestor);
 
         // Compute the common ancestor with every other peer.
         let mut common_ancestors = self.common_ancestors.write();
@@ -410,9 +411,11 @@ impl<N: Network> Sync<N> {
             // Compute the common ancestor with the other peer.
             let mut ancestor = 0;
             for (height, hash) in other_locators.clone().into_iter() {
-                match locators.get_hash(height) == Some(hash) {
-                    true => ancestor = height,
-                    false => break,
+                if let Some(expected_hash) = locators.get_hash(height) {
+                    match expected_hash == hash {
+                        true => ancestor = height,
+                        false => break, // fork
+                    }
                 }
             }
             common_ancestors.insert(PeerPair(peer_ip, *other_ip), ancestor);
@@ -422,9 +425,11 @@ impl<N: Network> Sync<N> {
     }
 
     /// Removes the block locators for the peer, if they exist.
-    pub fn remove_peer_locators(&self, peer_ip: &SocketAddr) {
+    pub fn remove_peer(&self, peer_ip: &SocketAddr) {
         // Remove the locators entry for the given peer IP.
         self.locators.write().remove(peer_ip);
+        // Remove all block requests to the peer.
+        self.remove_block_requests(peer_ip);
     }
 
     /// Removes the block request for the given peer IP, if it exists.
@@ -574,7 +579,6 @@ fn construct_request<N: Network, R: Rng + CryptoRng>(
     let mut hash = None;
     let mut hash_redundancy: usize = 0;
     let mut previous_hash = None;
-    let mut previous_hash_redundancy: usize = 0;
     let mut is_honest = true;
 
     for peer_ip in peer_ips {
@@ -588,7 +592,6 @@ fn construct_request<N: Network, R: Rng + CryptoRng>(
                         hash = None;
                         hash_redundancy = 0;
                         previous_hash = None;
-                        previous_hash_redundancy = 0;
                         is_honest = false;
                         break;
                     }
@@ -602,21 +605,17 @@ fn construct_request<N: Network, R: Rng + CryptoRng>(
             if let Some(candidate_previous_hash) = locators.get_hash(height.saturating_sub(1)) {
                 match previous_hash {
                     // Increment the redundancy count if the previous hash matches.
-                    Some(previous_hash) if previous_hash == candidate_previous_hash => previous_hash_redundancy += 1,
+                    Some(previous_hash) if previous_hash == candidate_previous_hash => (),
                     // Some peer is dishonest.
                     Some(_) => {
                         hash = None;
                         hash_redundancy = 0;
                         previous_hash = None;
-                        previous_hash_redundancy = 0;
                         is_honest = false;
                         break;
                     }
                     // Set the previous hash if it is not set.
-                    None => {
-                        previous_hash = Some(candidate_previous_hash);
-                        previous_hash_redundancy = 1;
-                    }
+                    None => previous_hash = Some(candidate_previous_hash),
                 }
             }
         }
@@ -644,4 +643,115 @@ fn construct_request<N: Network, R: Rng + CryptoRng>(
 
     // Return the request.
     (hash, previous_hash, sync_ips.into_iter().collect())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snarkos_node_messages::helpers::block_locators::test_helpers::sample_block_locators;
+    use snarkvm::prelude::Field;
+
+    use snarkos_node_messages::{CHECKPOINT_INTERVAL, NUM_RECENTS};
+    use std::net::{IpAddr, Ipv4Addr};
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    /// Returns the local IP for the sync pool.
+    fn sample_local_ip() -> SocketAddr {
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0)
+    }
+
+    /// Returns the peer IP for the sync pool.
+    fn sample_peer_ip(id: u16) -> SocketAddr {
+        assert_ne!(id, 0, "The peer ID must not be 0 (reserved for local IP in testing)");
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), id)
+    }
+
+    /// Returns the sync pool, with the canonical map initialized to the given height.
+    fn sample_sync_at_height(height: u32) -> Sync<CurrentNetwork> {
+        let sync = Sync::<CurrentNetwork>::new(sample_local_ip());
+        sync.insert_canon_locators(sample_block_locators(height)).unwrap();
+        sync
+    }
+
+    #[test]
+    fn test_latest_canon_height() {
+        for height in 0..100_002u32 {
+            let sync = sample_sync_at_height(height);
+            assert_eq!(sync.latest_canon_height(), height);
+        }
+    }
+
+    #[test]
+    fn test_get_canon_height() {
+        for height in 0..100_002u32 {
+            let sync = sample_sync_at_height(height);
+            assert_eq!(sync.get_canon_height(&(Field::<CurrentNetwork>::from_u32(0)).into()), Some(0));
+            assert_eq!(sync.get_canon_height(&(Field::<CurrentNetwork>::from_u32(height)).into()), Some(height));
+        }
+    }
+
+    #[test]
+    fn test_get_canon_hash() {
+        for height in 0..100_002u32 {
+            let sync = sample_sync_at_height(height);
+            assert_eq!(sync.get_canon_hash(0), Some((Field::<CurrentNetwork>::from_u32(0)).into()));
+            assert_eq!(sync.get_canon_hash(height), Some((Field::<CurrentNetwork>::from_u32(height)).into()));
+        }
+    }
+
+    #[test]
+    fn test_update_peer_locators() {
+        let sync = sample_sync_at_height(0);
+
+        // Test 2 peers.
+        let peer1_ip = sample_peer_ip(1);
+        for peer1_height in 0..500u32 {
+            sync.update_peer_locators(peer1_ip, sample_block_locators(peer1_height)).unwrap();
+            assert_eq!(sync.get_peer_height(&peer1_ip), Some(peer1_height));
+
+            let peer2_ip = sample_peer_ip(2);
+            for peer2_height in 0..500u32 {
+                println!("Testing peer 1 height at {peer1_height} and peer 2 height at {peer2_height}");
+
+                sync.update_peer_locators(peer2_ip, sample_block_locators(peer2_height)).unwrap();
+                assert_eq!(sync.get_peer_height(&peer2_ip), Some(peer2_height));
+
+                // Compute the distance between the peers.
+                let distance =
+                    if peer1_height > peer2_height { peer1_height - peer2_height } else { peer2_height - peer1_height };
+
+                // Check the common ancestor.
+                if distance < NUM_RECENTS as u32 {
+                    let expected_ancestor = core::cmp::min(peer1_height, peer2_height);
+                    assert_eq!(sync.get_common_ancestor(peer1_ip, peer2_ip), Some(expected_ancestor));
+                    assert_eq!(sync.get_common_ancestor(peer2_ip, peer1_ip), Some(expected_ancestor));
+                } else {
+                    let min_checkpoints =
+                        core::cmp::min(peer1_height / CHECKPOINT_INTERVAL, peer2_height / CHECKPOINT_INTERVAL);
+                    let expected_ancestor = min_checkpoints * CHECKPOINT_INTERVAL;
+                    assert_eq!(sync.get_common_ancestor(peer1_ip, peer2_ip), Some(expected_ancestor));
+                    assert_eq!(sync.get_common_ancestor(peer2_ip, peer1_ip), Some(expected_ancestor));
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_remove_peer() {
+        let sync = sample_sync_at_height(0);
+
+        let peer_ip = sample_peer_ip(1);
+        sync.update_peer_locators(peer_ip, sample_block_locators(100)).unwrap();
+        assert_eq!(sync.get_peer_height(&peer_ip), Some(100));
+
+        sync.remove_peer(&peer_ip);
+        assert_eq!(sync.get_peer_height(&peer_ip), None);
+
+        sync.update_peer_locators(peer_ip, sample_block_locators(200)).unwrap();
+        assert_eq!(sync.get_peer_height(&peer_ip), Some(200));
+
+        sync.remove_peer(&peer_ip);
+        assert_eq!(sync.get_peer_height(&peer_ip), None);
+    }
 }

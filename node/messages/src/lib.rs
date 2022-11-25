@@ -19,7 +19,7 @@
 #[macro_use]
 extern crate tracing;
 
-mod helpers;
+pub mod helpers;
 pub use helpers::*;
 
 mod block_request;

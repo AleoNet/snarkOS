@@ -17,7 +17,7 @@
 use snarkvm::prelude::{has_duplicates, Network};
 
 use anyhow::{bail, ensure, Result};
-use indexmap::IndexMap;
+use indexmap::{indexmap, IndexMap};
 use serde::{Deserialize, Serialize};
 use std::collections::{btree_map::IntoIter, BTreeMap};
 
@@ -52,6 +52,11 @@ impl<N: Network> BlockLocators<N> {
     /// Initializes a new instance of the block locators.
     pub fn new(recents: IndexMap<u32, N::BlockHash>, checkpoints: IndexMap<u32, N::BlockHash>) -> Self {
         Self { recents, checkpoints }
+    }
+
+    /// Initializes a new genesis instance of the block locators.
+    pub fn new_genesis(genesis_hash: N::BlockHash) -> Self {
+        Self { recents: indexmap![0 => genesis_hash], checkpoints: indexmap![0 => genesis_hash] }
     }
 
     /// Returns the latest locator height.
@@ -244,6 +249,56 @@ impl<N: Network> BlockLocators<N> {
     }
 }
 
+#[cfg(any(test, feature = "test"))]
+pub mod test_helpers {
+    use super::*;
+    use snarkvm::prelude::Field;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    /// Simulates a block locator at the given height.
+    pub fn sample_block_locators(height: u32) -> BlockLocators<CurrentNetwork> {
+        // Create the recent locators.
+        let mut recents = IndexMap::new();
+        let recents_range = match height < NUM_RECENTS as u32 {
+            true => 0..=height,
+            false => (height - NUM_RECENTS as u32 + 1)..=height,
+        };
+        for i in recents_range {
+            recents.insert(i, (Field::<CurrentNetwork>::from_u32(i)).into());
+        }
+
+        // Create the checkpoint locators.
+        let mut checkpoints = IndexMap::new();
+        for i in (0..=height).step_by(CHECKPOINT_INTERVAL as usize) {
+            checkpoints.insert(i, (Field::<CurrentNetwork>::from_u32(i)).into());
+        }
+
+        // Construct the block locators.
+        BlockLocators::new(recents, checkpoints)
+    }
+
+    /// A test to ensure that the sample block locators are valid.
+    #[test]
+    fn test_sample_block_locators() {
+        for expected_height in 0..=100_001u32 {
+            println!("Testing height - {expected_height}");
+
+            let expected_num_checkpoints = (expected_height / CHECKPOINT_INTERVAL) + 1;
+            let expected_num_recents = match expected_height < NUM_RECENTS as u32 {
+                true => expected_height + 1,
+                false => NUM_RECENTS as u32,
+            };
+
+            let block_locators = sample_block_locators(expected_height);
+            assert_eq!(block_locators.checkpoints.len(), expected_num_checkpoints as usize);
+            assert_eq!(block_locators.recents.len(), expected_num_recents as usize);
+            assert_eq!(block_locators.latest_locator_height(), expected_height);
+            assert!(block_locators.is_valid());
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -316,19 +371,14 @@ mod tests {
     #[test]
     fn test_ensure_is_valid() {
         let zero: <CurrentNetwork as Network>::BlockHash = (Field::<CurrentNetwork>::from_u32(0)).into();
-        let one: <CurrentNetwork as Network>::BlockHash = (Field::<CurrentNetwork>::from_u32(1)).into();
         let checkpoint_1: <CurrentNetwork as Network>::BlockHash =
             (Field::<CurrentNetwork>::from_u32(CHECKPOINT_INTERVAL)).into();
 
-        // Ensure genesis block locators is valid.
-        let block_locators =
-            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero)]), IndexMap::from([(0, zero)]));
-        block_locators.ensure_is_valid().unwrap();
-
-        // Ensure block locators with two recent blocks is valid.
-        let block_locators =
-            BlockLocators::<CurrentNetwork>::new(IndexMap::from([(0, zero), (1, one)]), IndexMap::from([(0, zero)]));
-        block_locators.ensure_is_valid().unwrap();
+        // Ensure the block locators are valid.
+        for height in 0..10 {
+            let block_locators = test_helpers::sample_block_locators(height);
+            block_locators.ensure_is_valid().unwrap();
+        }
 
         // Ensure the first NUM_RECENT blocks are valid.
         let checkpoints = IndexMap::from([(0, zero)]);
