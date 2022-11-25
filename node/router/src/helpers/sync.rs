@@ -88,11 +88,6 @@ impl<N: Network> Sync<N> {
         }
     }
 
-    /// Returns `true` if a request for the given block height exists.
-    pub fn contains_request(&self, height: u32) -> bool {
-        self.requests.read().contains_key(&height)
-    }
-
     /// Returns the latest block height in the sync pool.
     pub fn latest_canon_height(&self) -> u32 {
         self.canon.read().keys().last().copied().unwrap_or(0)
@@ -138,110 +133,6 @@ impl<N: Network> Sync<N> {
     /// Returns the common ancestor for the given peer pair, if it exists.
     pub fn get_common_ancestor(&self, peer_a: SocketAddr, peer_b: SocketAddr) -> Option<u32> {
         self.common_ancestors.read().get(&PeerPair(peer_a, peer_b)).copied()
-    }
-
-    /// Returns a list of block requests, if the node needs to sync.
-    pub fn prepare_block_requests(
-        &self,
-    ) -> Vec<(u32, Option<N::BlockHash>, Option<N::BlockHash>, IndexSet<SocketAddr>)> {
-        // Retrieve the latest canon height.
-        let latest_canon_height = self.latest_canon_height();
-
-        // Pick a set of peers above the latest canon height, and include their locators.
-        let candidate_locators: IndexMap<_, _> = self
-            .locators
-            .read()
-            .iter()
-            .filter(|(_, locators)| locators.latest_locator_height() > latest_canon_height)
-            .sorted_by(|(_, a), (_, b)| b.latest_locator_height().cmp(&a.latest_locator_height()))
-            .take(NUM_SYNC_CANDIDATE_PEERS)
-            .map(|(peer_ip, locators)| (*peer_ip, locators.clone()))
-            .collect();
-
-        // Case 0a: If there are no candidate peers, return `None`.
-        if candidate_locators.is_empty() {
-            return vec![];
-        }
-
-        // TODO (howardwu): Change this to the highest cumulative weight for Phase 3.
-        // Case 1: If all of the candidate peers share a common ancestor below the latest canon height,
-        // then pick the peer with the highest height, and find peers (up to extra redundancy) with
-        // a common ancestor above the block request range. Set the end height to their common ancestor.
-
-        // Determine the threshold number of peers to sync from.
-        let threshold_to_request = core::cmp::min(candidate_locators.len(), REDUNDANCY_FACTOR);
-        println!("Case 1 - candidates: {:?}, threshold_to_request: {threshold_to_request}", candidate_locators.keys());
-
-        let mut min_common_ancestor = 0;
-        let mut sync_peers = IndexMap::new();
-
-        // Breaks the loop when the first threshold number of peers are found, biasing for the peer with the highest height
-        // and a cohort of peers who share a common ancestor above this node's latest canon height.
-        for (i, (peer_ip, peer_locators)) in candidate_locators.iter().enumerate() {
-            // As the previous iteration did not `break`, reset the minimum common ancestor and clear the sync peers.
-            min_common_ancestor = 0;
-            sync_peers.clear();
-
-            // Set the minimum common ancestor.
-            min_common_ancestor = peer_locators.latest_locator_height();
-            // Add the peer to the sync peers.
-            sync_peers.insert(*peer_ip, peer_locators.latest_locator_height());
-
-            for (other_ip, other_locators) in candidate_locators.iter().skip(i + 1) {
-                // Check if these two peers have a common ancestor above the latest canon height.
-                if let Some(common_ancestor) = self.common_ancestors.read().get(&PeerPair(*peer_ip, *other_ip)) {
-                    if *common_ancestor > latest_canon_height {
-                        // If so, then check that their block locators are consistent.
-                        if peer_locators.is_consistent_with(other_locators) {
-                            // If their common ancestor is less than the minimum common ancestor, then update it.
-                            if *common_ancestor < min_common_ancestor {
-                                min_common_ancestor = *common_ancestor;
-                            }
-                            // Add the other peer to the list of sync peers.
-                            sync_peers.insert(*other_ip, other_locators.latest_locator_height());
-                        }
-                    }
-                }
-            }
-
-            // If we have enough sync peers above the latest canon height, then break the loop.
-            if min_common_ancestor > latest_canon_height && sync_peers.len() >= threshold_to_request {
-                break;
-            }
-        }
-
-        println!(
-            "Case 1 - min_common_ancestor: {min_common_ancestor}, latest_canon_height: {latest_canon_height}, sync_peers: {sync_peers:?}"
-        );
-        // If there is not enough peers with a minimum common ancestor above the latest canon height, then return early.
-        if min_common_ancestor <= latest_canon_height || sync_peers.len() < threshold_to_request {
-            return vec![];
-        }
-
-        // Initialize an RNG.
-        let rng = &mut rand::thread_rng();
-
-        // Compute the start height for the block request.
-        let start_height = latest_canon_height + 1;
-        // Compute the end height for the block request.
-        let end_height = (min_common_ancestor + 1).min(start_height + DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as u32);
-
-        self.construct_requests(start_height..end_height, sync_peers, candidate_locators, rng)
-
-        // // Determine the number of block requests to make.
-        // let num_block_requests = 1 + (min_common_ancestor - latest_canon_height) / DataBlocks::MAXIMUM_NUMBER_OF_BLOCKS as u32;
-        //
-        // // Determine the list of block requests.
-        // let block_requests = (0..num_block_requests)
-        //     .map(|i| {
-        //         let start_height = 1 + latest_canon_height + i * DataBlocks::MAXIMUM_NUMBER_OF_BLOCKS as u32;
-        //         let end_height = 1 + min_common_ancestor.min(start_height + DataBlocks::MAXIMUM_NUMBER_OF_BLOCKS as u32);
-        //         BlockRequest {
-        //             start_height,
-        //             end_height,
-        //         }
-        //     })
-        //     .collect();
     }
 
     /// Inserts a canonical block hash for the given block height, overriding an existing entry if it exists.
@@ -508,6 +399,109 @@ impl<N: Network> Sync<N> {
     //     Ok(())
     // }
 
+    /// Returns a list of block requests, if the node needs to sync.
+    pub fn prepare_block_requests(
+        &self,
+    ) -> Vec<(u32, Option<N::BlockHash>, Option<N::BlockHash>, IndexSet<SocketAddr>)> {
+        // Retrieve the latest canon height.
+        let latest_canon_height = self.latest_canon_height();
+
+        // Pick a set of peers above the latest canon height, and include their locators.
+        let candidate_locators: IndexMap<_, _> = self
+            .locators
+            .read()
+            .iter()
+            .filter(|(_, locators)| locators.latest_locator_height() > latest_canon_height)
+            .sorted_by(|(_, a), (_, b)| b.latest_locator_height().cmp(&a.latest_locator_height()))
+            .take(NUM_SYNC_CANDIDATE_PEERS)
+            .map(|(peer_ip, locators)| (*peer_ip, locators.clone()))
+            .collect();
+
+        // Case 0a: If there are no candidate peers, return `None`.
+        if candidate_locators.is_empty() {
+            return vec![];
+        }
+
+        // TODO (howardwu): Change this to the highest cumulative weight for Phase 3.
+        // Case 1: If all of the candidate peers share a common ancestor below the latest canon height,
+        // then pick the peer with the highest height, and find peers (up to extra redundancy) with
+        // a common ancestor above the block request range. Set the end height to their common ancestor.
+
+        // Determine the threshold number of peers to sync from.
+        let threshold_to_request = core::cmp::min(candidate_locators.len(), REDUNDANCY_FACTOR);
+        println!("Case 1 - candidates: {:?}, threshold_to_request: {threshold_to_request}", candidate_locators.keys());
+
+        let mut min_common_ancestor = 0;
+        let mut sync_peers = IndexMap::new();
+
+        // Breaks the loop when the first threshold number of peers are found, biasing for the peer with the highest height
+        // and a cohort of peers who share a common ancestor above this node's latest canon height.
+        for (i, (peer_ip, peer_locators)) in candidate_locators.iter().enumerate() {
+            // As the previous iteration did not `break`, reset the sync peers.
+            sync_peers.clear();
+
+            // Set the minimum common ancestor.
+            min_common_ancestor = peer_locators.latest_locator_height();
+            // Add the peer to the sync peers.
+            sync_peers.insert(*peer_ip, peer_locators.latest_locator_height());
+
+            for (other_ip, other_locators) in candidate_locators.iter().skip(i + 1) {
+                // Check if these two peers have a common ancestor above the latest canon height.
+                if let Some(common_ancestor) = self.common_ancestors.read().get(&PeerPair(*peer_ip, *other_ip)) {
+                    if *common_ancestor > latest_canon_height {
+                        // If so, then check that their block locators are consistent.
+                        if peer_locators.is_consistent_with(other_locators) {
+                            // If their common ancestor is less than the minimum common ancestor, then update it.
+                            if *common_ancestor < min_common_ancestor {
+                                min_common_ancestor = *common_ancestor;
+                            }
+                            // Add the other peer to the list of sync peers.
+                            sync_peers.insert(*other_ip, other_locators.latest_locator_height());
+                        }
+                    }
+                }
+            }
+
+            // If we have enough sync peers above the latest canon height, then break the loop.
+            if min_common_ancestor > latest_canon_height && sync_peers.len() >= threshold_to_request {
+                break;
+            }
+        }
+
+        println!(
+            "Case 1 - min_common_ancestor: {min_common_ancestor}, latest_canon_height: {latest_canon_height}, sync_peers: {sync_peers:?}"
+        );
+        // If there is not enough peers with a minimum common ancestor above the latest canon height, then return early.
+        if min_common_ancestor <= latest_canon_height || sync_peers.len() < threshold_to_request {
+            return vec![];
+        }
+
+        // Initialize an RNG.
+        let rng = &mut rand::thread_rng();
+
+        // Compute the start height for the block request.
+        let start_height = latest_canon_height + 1;
+        // Compute the end height for the block request.
+        let end_height = (min_common_ancestor + 1).min(start_height + DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as u32);
+
+        self.construct_requests(start_height..end_height, sync_peers, candidate_locators, rng)
+
+        // // Determine the number of block requests to make.
+        // let num_block_requests = 1 + (min_common_ancestor - latest_canon_height) / DataBlocks::MAXIMUM_NUMBER_OF_BLOCKS as u32;
+        //
+        // // Determine the list of block requests.
+        // let block_requests = (0..num_block_requests)
+        //     .map(|i| {
+        //         let start_height = 1 + latest_canon_height + i * DataBlocks::MAXIMUM_NUMBER_OF_BLOCKS as u32;
+        //         let end_height = 1 + min_common_ancestor.min(start_height + DataBlocks::MAXIMUM_NUMBER_OF_BLOCKS as u32);
+        //         BlockRequest {
+        //             start_height,
+        //             end_height,
+        //         }
+        //     })
+        //     .collect();
+    }
+
     /// Given the start height, end height, sync peers, this function returns a list of block requests.
     fn construct_requests<R: Rng + CryptoRng>(
         &self,
@@ -520,7 +514,7 @@ impl<N: Network> Sync<N> {
 
         for height in heights {
             // Ensure the current height is not canonized or already requested.
-            if self.canon.read().contains_key(&height) || self.contains_request(height) {
+            if self.check_block_request(height).is_err() {
                 continue;
             }
 
