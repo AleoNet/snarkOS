@@ -143,23 +143,23 @@ impl<N: Network> Sync<N> {
     /// Returns a list of block requests, if the node needs to sync.
     pub fn prepare_block_requests(
         &self,
-    ) -> Vec<(u32, (Option<N::BlockHash>, Option<N::BlockHash>, IndexSet<SocketAddr>))> {
+    ) -> Vec<(u32, Option<N::BlockHash>, Option<N::BlockHash>, IndexSet<SocketAddr>)> {
         // Retrieve the latest canon height.
         let latest_canon_height = self.latest_canon_height();
 
-        // Pick a set of peers above the latest canon height, and include their heights.
-        let candidate_peers: IndexMap<_, _> = self
+        // Pick a set of peers above the latest canon height, and include their locators.
+        let candidate_locators: IndexMap<_, _> = self
             .locators
             .read()
             .iter()
-            .map(|(peer_ip, locators)| (*peer_ip, locators.latest_locator_height()))
-            .filter(|(_, height)| *height > latest_canon_height)
-            .sorted_by(|(_, a), (_, b)| b.cmp(a))
+            .filter(|(_, locators)| locators.latest_locator_height() > latest_canon_height)
+            .sorted_by(|(_, a), (_, b)| b.latest_locator_height().cmp(&a.latest_locator_height()))
             .take(NUM_SYNC_CANDIDATE_PEERS)
+            .map(|(peer_ip, locators)| (*peer_ip, locators.clone()))
             .collect();
 
         // Case 0a: If there are no candidate peers, return `None`.
-        if candidate_peers.is_empty() {
+        if candidate_locators.is_empty() {
             return vec![];
         }
 
@@ -169,44 +169,36 @@ impl<N: Network> Sync<N> {
         // a common ancestor above the block request range. Set the end height to their common ancestor.
 
         // Determine the threshold number of peers to sync from.
-        let threshold_to_request = core::cmp::min(candidate_peers.len(), REDUNDANCY_FACTOR);
-        println!("Case 1 - candidate_peers: {candidate_peers:?}, threshold_to_request: {threshold_to_request}");
+        let threshold_to_request = core::cmp::min(candidate_locators.len(), REDUNDANCY_FACTOR);
+        println!("Case 1 - candidates: {:?}, threshold_to_request: {threshold_to_request}", candidate_locators.keys());
 
         let mut min_common_ancestor = 0;
         let mut sync_peers = IndexMap::new();
 
         // Breaks the loop when the first threshold number of peers are found, biasing for the peer with the highest height
         // and a cohort of peers who share a common ancestor above this node's latest canon height.
-        for (i, (peer_ip, peer_height)) in candidate_peers.iter().enumerate() {
+        for (i, (peer_ip, peer_locators)) in candidate_locators.iter().enumerate() {
             // As the previous iteration did not `break`, reset the minimum common ancestor and clear the sync peers.
             min_common_ancestor = 0;
             sync_peers.clear();
 
-            // Retrieve the block locators for this peer.
-            let peer_locators = match self.locators.read().get(peer_ip) {
-                Some(locators) => locators.clone(),
-                None => continue,
-            };
-
             // Set the minimum common ancestor.
-            min_common_ancestor = *peer_height;
+            min_common_ancestor = peer_locators.latest_locator_height();
             // Add the peer to the sync peers.
-            sync_peers.insert(*peer_ip, *peer_height);
+            sync_peers.insert(*peer_ip, peer_locators.latest_locator_height());
 
-            for (other_ip, other_height) in candidate_peers.iter().skip(i + 1) {
+            for (other_ip, other_locators) in candidate_locators.iter().skip(i + 1) {
                 // Check if these two peers have a common ancestor above the latest canon height.
                 if let Some(common_ancestor) = self.common_ancestors.read().get(&PeerPair(*peer_ip, *other_ip)) {
                     if *common_ancestor > latest_canon_height {
                         // If so, then check that their block locators are consistent.
-                        if let Some(other_locators) = self.locators.read().get(other_ip) {
-                            if peer_locators.is_consistent_with(other_locators) {
-                                // If their common ancestor is less than the minimum common ancestor, then update it.
-                                if *common_ancestor < min_common_ancestor {
-                                    min_common_ancestor = *common_ancestor;
-                                }
-                                // Add the other peer to the list of sync peers.
-                                sync_peers.insert(*other_ip, *other_height);
+                        if peer_locators.is_consistent_with(other_locators) {
+                            // If their common ancestor is less than the minimum common ancestor, then update it.
+                            if *common_ancestor < min_common_ancestor {
+                                min_common_ancestor = *common_ancestor;
                             }
+                            // Add the other peer to the list of sync peers.
+                            sync_peers.insert(*other_ip, other_locators.latest_locator_height());
                         }
                     }
                 }
@@ -234,7 +226,7 @@ impl<N: Network> Sync<N> {
         // Compute the end height for the block request.
         let end_height = (min_common_ancestor + 1).min(start_height + DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as u32);
 
-        self.construct_requests(start_height..end_height, sync_peers, rng)
+        self.construct_requests(start_height..end_height, sync_peers, candidate_locators, rng)
 
         // // Determine the number of block requests to make.
         // let num_block_requests = 1 + (min_common_ancestor - latest_canon_height) / DataBlocks::MAXIMUM_NUMBER_OF_BLOCKS as u32;
@@ -521,11 +513,9 @@ impl<N: Network> Sync<N> {
         &self,
         heights: Range<u32>,
         sync_peers: IndexMap<SocketAddr, u32>,
+        locators: IndexMap<SocketAddr, BlockLocators<N>>,
         rng: &mut R,
-    ) -> Vec<(u32, (Option<N::BlockHash>, Option<N::BlockHash>, IndexSet<SocketAddr>))> {
-        // Clone the locators.
-        let locators = self.locators.read().clone();
-
+    ) -> Vec<(u32, Option<N::BlockHash>, Option<N::BlockHash>, IndexSet<SocketAddr>)> {
         let mut requests = Vec::with_capacity(heights.len());
 
         for height in heights {
@@ -541,22 +531,26 @@ impl<N: Network> Sync<N> {
                 .map(|(peer_ip, _)| *peer_ip)
                 .collect::<Vec<_>>();
 
+            // Construct the block request.
+            let (hash, previous_hash, num_sync_ips) = construct_request(height, &peer_ips, &locators);
+            // Pick the sync peers.
+            let sync_ips = peer_ips.iter().copied().choose_multiple(rng, num_sync_ips);
+
             // Append the request.
-            requests.push((height, construct_request(height, &peer_ips, &locators, rng)));
+            requests.push((height, hash, previous_hash, sync_ips.into_iter().collect()));
         }
 
-        return requests;
+        requests
     }
 }
 
 /// If any peer is detected to be dishonest in this function, it will not set the hash or previous hash,
 /// in order to allow the caller to determine what to do.
-fn construct_request<N: Network, R: Rng + CryptoRng>(
+fn construct_request<N: Network>(
     height: u32,
     peer_ips: &[SocketAddr],
     locators: &IndexMap<SocketAddr, BlockLocators<N>>,
-    rng: &mut R,
-) -> (Option<N::BlockHash>, Option<N::BlockHash>, IndexSet<SocketAddr>) {
+) -> (Option<N::BlockHash>, Option<N::BlockHash>, usize) {
     let mut hash = None;
     let mut hash_redundancy: usize = 0;
     let mut previous_hash = None;
@@ -602,30 +596,30 @@ fn construct_request<N: Network, R: Rng + CryptoRng>(
         }
     }
 
-    // Pick the sync IPs. Note that we intentionally do not merely pick the peers that have
-    // the hash we have chosen, to give a stronger confidence bound that we are syncing
-    // successfully when the network is consistent/stable.
-    let sync_ips =
+    // Note that we intentionally do not just pick the peers that have the hash we have chosen,
+    // to give stronger confidence that we are syncing during times when the network is consistent/stable.
+    let num_sync_ips = {
         // Extra redundant peers - as the block hash was dishonest.
         if !is_honest {
             // TODO (howardwu): Consider performing an integrity check on peers (to disconnect).
             warn!("Detected dishonest peer(s) when preparing block request");
             // Choose up to the extra redundancy factor in sync peers.
-            peer_ips.iter().copied().choose_multiple(rng, EXTRA_REDUNDANCY_FACTOR)
+            EXTRA_REDUNDANCY_FACTOR
         }
         // No redundant peers - as we have redundancy on the block hash.
         else if hash.is_some() && hash_redundancy >= REDUNDANCY_FACTOR {
-            // Choose a sync peer.
-            peer_ips.iter().copied().choose_multiple(rng, 1)
+            // Choose one sync peer.
+            1
         }
         // Redundant peers - as we do not have redundancy on the block hash.
         else {
             // Choose up to the redundancy factor in sync peers.
-            peer_ips.iter().copied().choose_multiple(rng, REDUNDANCY_FACTOR)
-        };
+            REDUNDANCY_FACTOR
+        }
+    };
 
     // Return the request.
-    (hash, previous_hash, sync_ips.into_iter().collect())
+    (hash, previous_hash, num_sync_ips)
 }
 
 #[cfg(test)]
@@ -691,19 +685,14 @@ mod tests {
         );
         assert_eq!(requests.len(), expected_num_requests);
 
-        for (idx, (height, (hash, previous_hash, sync_ips))) in requests.into_iter().enumerate() {
+        for (idx, (height, hash, previous_hash, sync_ips)) in requests.into_iter().enumerate() {
             assert_eq!(height, 1 + idx as u32);
+            assert_eq!(hash, Some((Field::<CurrentNetwork>::from_u32(height)).into()));
+            assert_eq!(previous_hash, Some((Field::<CurrentNetwork>::from_u32(height - 1)).into()));
 
             if num_peers_within_recent_range_of_canon >= REDUNDANCY_FACTOR {
-                assert_eq!(hash, Some((Field::<CurrentNetwork>::from_u32(height)).into()));
-                assert_eq!(
-                    sync_ips.len(),
-                    1,
-                    "Only 1 IP is needed because this test ensures all peers are within range of the sync pool"
-                );
+                assert_eq!(sync_ips.len(), 1);
             } else {
-                assert_eq!(hash, Some((Field::<CurrentNetwork>::from_u32(height)).into()));
-                assert_eq!(previous_hash, Some((Field::<CurrentNetwork>::from_u32(height - 1)).into()));
                 assert_eq!(sync_ips.len(), num_peers_within_recent_range_of_canon);
                 assert_eq!(sync_ips, peers);
             }

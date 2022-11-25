@@ -234,7 +234,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
                 let block_requests = validator.router.sync().prepare_block_requests();
                 trace!("{:?} block requests", block_requests.len());
-                for (height, (hash, previous_hash, sync_ips)) in block_requests {
+                for (height, hash, previous_hash, sync_ips) in block_requests {
                     validator.router.sync().insert_block_request(height, hash, previous_hash, sync_ips.clone());
 
                     for sync_ip in sync_ips {
