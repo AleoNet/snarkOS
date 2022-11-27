@@ -30,7 +30,7 @@ use snarkos_node_messages::{
     UnconfirmedTransaction,
 };
 use snarkos_node_tcp::protocols::Reading;
-use snarkvm::prelude::{Block, Network, ProverSolution, Transaction};
+use snarkvm::prelude::{Block, Header, Network, ProverSolution, Transaction};
 
 use anyhow::{bail, ensure, Result};
 use std::{net::SocketAddr, time::Instant};
@@ -212,13 +212,13 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
                 // Clone the serialized message.
                 let serialized = message.clone();
-                // Perform the deferred non-blocking deserialization of the block.
-                let block = match message.block.deserialize().await {
-                    Ok(block) => block,
+                // Perform the deferred non-blocking deserialization of the block header.
+                let header = match message.block_header.deserialize().await {
+                    Ok(header) => header,
                     Err(error) => bail!("[PuzzleResponse] {error}"),
                 };
                 // Process the puzzle response.
-                match self.puzzle_response(peer_ip, serialized, block) {
+                match self.puzzle_response(peer_ip, serialized, header) {
                     true => Ok(()),
                     false => bail!("Peer '{peer_ip}' sent an invalid puzzle response"),
                 }
@@ -372,7 +372,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         false
     }
 
-    fn puzzle_response(&self, peer_ip: SocketAddr, _serialized: PuzzleResponse<N>, _block: Block<N>) -> bool {
+    fn puzzle_response(&self, peer_ip: SocketAddr, _serialized: PuzzleResponse<N>, _header: Header<N>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }

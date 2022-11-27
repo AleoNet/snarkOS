@@ -76,7 +76,6 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
     fn initialize_report(&self) {
         let self_clone = self.clone();
         self.router().spawn(async move {
-            let url = "https://vm.aleo.org/testnet3/report";
             loop {
                 // Prepare the report.
                 let mut report = std::collections::HashMap::new();
@@ -84,9 +83,8 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
                 report.insert("node_type".to_string(), self_clone.router().node_type().to_string());
                 report.insert("is_dev".to_string(), self_clone.router().is_dev().to_string());
                 // Transmit the report.
-                if reqwest::Client::new().post(url).json(&report).send().await.is_err() {
-                    warn!("Failed to send report");
-                }
+                let url = "https://vm.aleo.org/testnet3/report";
+                let _ = reqwest::Client::new().post(url).json(&report).send().await;
                 // Sleep for a fixed duration in seconds.
                 tokio::time::sleep(Duration::from_secs(600)).await;
             }

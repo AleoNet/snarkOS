@@ -202,26 +202,28 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
         true
     }
 
-    /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
+    /// Retrieves the latest epoch challenge and latest block header, and returns the puzzle response to the peer.
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
-        // Retrieve the latest epoch challenge and latest block.
-        let (epoch_challenge, block) = {
+        // Retrieve the latest epoch challenge and latest block header.
+        let (epoch_challenge, header) = {
             // Retrieve the latest epoch challenge.
             let epoch_challenge = match self.ledger.latest_epoch_challenge() {
-                Ok(block) => block,
+                Ok(epoch_challenge) => epoch_challenge,
                 Err(error) => {
                     error!("Failed to retrieve latest epoch challenge for a puzzle request: {error}");
                     return false;
                 }
             };
-            // Retrieve the latest block.
-            let block = self.ledger.latest_block();
-
+            // Retrieve the latest block header.
+            let header = self.ledger.latest_header();
             // Scope drops the read lock on the consensus module.
-            (epoch_challenge, block)
+            (epoch_challenge, header)
         };
         // Send the `PuzzleResponse` message to the peer.
-        self.send(peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block: Data::Object(block) }));
+        self.send(
+            peer_ip,
+            Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block_header: Data::Object(header) }),
+        );
         true
     }
 

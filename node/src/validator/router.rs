@@ -166,7 +166,6 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
 
         // Tries to advance with blocks from the sync pool.
         self.advance_with_sync_blocks();
-
         true
     }
 
@@ -187,7 +186,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         true
     }
 
-    /// Retrieves the latest epoch challenge and latest block, and returns the puzzle response to the peer.
+    /// Retrieves the latest epoch challenge and latest block header, and returns the puzzle response to the peer.
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
         // Send the latest puzzle response, if it exists.
         if let Some(puzzle_response) = self.latest_puzzle_response.read().clone() {
@@ -197,23 +196,23 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         true
     }
 
-    /// Saves the latest epoch challenge and latest block in the node.
-    fn puzzle_response(&self, peer_ip: SocketAddr, serialized: PuzzleResponse<N>, block: Block<N>) -> bool {
+    /// Saves the latest epoch challenge and latest block header in the node.
+    fn puzzle_response(&self, peer_ip: SocketAddr, serialized: PuzzleResponse<N>, header: Header<N>) -> bool {
         // Retrieve the epoch number.
         let epoch_number = serialized.epoch_challenge.epoch_number();
         // Retrieve the block height.
-        let block_height = block.height();
+        let block_height = header.height();
 
         info!(
             "Coinbase Puzzle (Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
-            block.coinbase_target(),
-            block.proof_target()
+            header.coinbase_target(),
+            header.proof_target()
         );
 
         // Save the latest epoch challenge in the node.
         self.latest_epoch_challenge.write().replace(serialized.epoch_challenge.clone());
-        // Save the latest block in the node.
-        self.latest_block.write().replace(block);
+        // Save the latest block header in the node.
+        self.latest_block_header.write().replace(header);
         // Save the latest puzzle response in the node.
         self.latest_puzzle_response.write().replace(serialized);
 
@@ -231,7 +230,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         // Retrieve the latest epoch challenge.
         let epoch_challenge = self.latest_epoch_challenge.read().clone();
         // Retrieve the latest proof target.
-        let proof_target = self.latest_block.read().as_ref().map(|block| block.proof_target());
+        let proof_target = self.latest_block_header.read().as_ref().map(|header| header.proof_target());
 
         if let (Some(epoch_challenge), Some(proof_target)) = (epoch_challenge, proof_target) {
             // Ensure that the prover solution is valid for the given epoch.

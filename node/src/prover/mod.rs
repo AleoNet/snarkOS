@@ -30,6 +30,7 @@ use snarkvm::prelude::{
     CoinbasePuzzle,
     ConsensusStorage,
     EpochChallenge,
+    Header,
     Network,
     PrivateKey,
     ProverSolution,
@@ -64,8 +65,8 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The latest epoch challenge.
     latest_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
-    /// The latest block.
-    latest_block: Arc<RwLock<Option<Block<N>>>>,
+    /// The latest block header.
+    latest_block_header: Arc<RwLock<Option<Header<N>>>>,
     /// The number of puzzle instances.
     puzzle_instances: Arc<AtomicU8>,
     /// The maximum number of puzzle instances.
@@ -108,7 +109,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             genesis,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
-            latest_block: Default::default(),
+            latest_block_header: Default::default(),
             puzzle_instances: Default::default(),
             max_puzzle_instances: u8::try_from(max_puzzle_instances)?,
             handles: Default::default(),
@@ -209,10 +210,10 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             let latest_epoch_challenge = self.latest_epoch_challenge.read().clone();
             // Read the latest state.
             let latest_state = self
-                .latest_block
+                .latest_block_header
                 .read()
                 .as_ref()
-                .map(|block| (block.timestamp(), block.coinbase_target(), block.proof_target()));
+                .map(|header| (header.timestamp(), header.coinbase_target(), header.proof_target()));
 
             // If the latest block timestamp exceeds a multiple of the anchor time, then skip this iteration.
             if let Some((latest_timestamp, _, _)) = latest_state {

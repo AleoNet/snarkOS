@@ -33,6 +33,7 @@ use snarkvm::prelude::{
     CoinbasePuzzle,
     ConsensusStorage,
     EpochChallenge,
+    Header,
     Network,
     PrivateKey,
     ProverSolution,
@@ -68,8 +69,8 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The latest epoch challenge.
     latest_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
-    /// The latest block.
-    latest_block: Arc<RwLock<Option<Block<N>>>>,
+    /// The latest block header.
+    latest_block_header: Arc<RwLock<Option<Header<N>>>>,
     /// The latest puzzle response.
     latest_puzzle_response: Arc<RwLock<Option<PuzzleResponse<N>>>>,
     /// The spawned handles.
@@ -124,7 +125,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             rest: None,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
-            latest_block: Default::default(),
+            latest_block_header: Default::default(),
             latest_puzzle_response: Default::default(),
             handles: Default::default(),
             shutdown: Default::default(),

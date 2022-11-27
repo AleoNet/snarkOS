@@ -178,6 +178,16 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         self.current_block.read().clone()
     }
 
+    /// Returns the latest round number.
+    pub fn latest_round(&self) -> u64 {
+        self.current_block.read().round()
+    }
+
+    /// Returns the latest block height.
+    pub fn latest_height(&self) -> u32 {
+        self.current_block.read().height()
+    }
+
     /// Returns the latest block hash.
     pub fn latest_hash(&self) -> N::BlockHash {
         self.current_block.read().hash()
@@ -186,16 +196,6 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     /// Returns the latest block header.
     pub fn latest_header(&self) -> Header<N> {
         *self.current_block.read().header()
-    }
-
-    /// Returns the latest block height.
-    pub fn latest_height(&self) -> u32 {
-        self.current_block.read().height()
-    }
-
-    /// Returns the latest round number.
-    pub fn latest_round(&self) -> u64 {
-        self.current_block.read().round()
     }
 
     /// Returns the latest block coinbase accumulator point.
