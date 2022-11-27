@@ -216,10 +216,10 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
                 // Initialize an RNG.
                 let rng = &mut OsRng::default();
                 // Pick a sync peer at random.
-                sync_peers.into_iter().choose(rng).map(|(peer_ip, _)| {
+                if let Some(peer_ip) = sync_peers.into_keys().choose(rng) {
                     // Send a "PuzzleRequest" to the peer.
                     self.send(peer_ip, Message::PuzzleRequest(PuzzleRequest));
-                });
+                }
             }
         }
     }
