@@ -182,12 +182,12 @@ impl<N: Network> Sync<N> {
         // Ensure the block (response) from the peer is well-formed. On failure, remove all block requests to the peer.
         if let Err(error) = self.check_block_response(&peer_ip, &block) {
             // Remove all block requests to the peer.
-            self.remove_block_requests(&peer_ip);
+            self.remove_block_requests_to_peer(&peer_ip);
             return Err(error);
         }
 
         // Remove the peer IP from the request entry.
-        self.remove_block_request(&peer_ip, height);
+        self.remove_block_request_to_peer(&peer_ip, height);
 
         // Acquire the write lock on the responses map.
         let mut responses = self.responses.write();
@@ -198,7 +198,7 @@ impl<N: Network> Sync<N> {
                 // Remove the candidate block.
                 responses.remove(&height);
                 // Remove all block requests to the peer.
-                self.remove_block_requests(&peer_ip);
+                self.remove_block_requests_to_peer(&peer_ip);
                 bail!("Candidate block {height} from '{peer_ip}' is malformed");
             }
         }
@@ -261,11 +261,11 @@ impl<N: Network> Sync<N> {
         // Remove the locators entry for the given peer IP.
         self.locators.write().remove(peer_ip);
         // Remove all block requests to the peer.
-        self.remove_block_requests(peer_ip);
+        self.remove_block_requests_to_peer(peer_ip);
     }
 
     /// Removes the block request for the given peer IP, if it exists.
-    pub fn remove_block_request(&self, peer_ip: &SocketAddr, height: u32) {
+    pub fn remove_block_request_to_peer(&self, peer_ip: &SocketAddr, height: u32) {
         // Remove the peer IP from the request entry.
         if let Some((_, _, peer_ips)) = self.requests.write().get_mut(&height) {
             peer_ips.remove(peer_ip);
@@ -273,7 +273,7 @@ impl<N: Network> Sync<N> {
     }
 
     /// Removes all block requests for the given peer IP.
-    pub fn remove_block_requests(&self, peer_ip: &SocketAddr) {
+    pub fn remove_block_requests_to_peer(&self, peer_ip: &SocketAddr) {
         // Remove the peer IP from the requests map.
         self.requests.write().values_mut().for_each(|(_, _, peer_ips)| {
             peer_ips.remove(peer_ip);
