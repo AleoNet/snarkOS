@@ -16,6 +16,7 @@
 
 use pea2pea::{protocols::Handshake, Config, Connection, Node, Pea2Pea};
 use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, NodeType, Status};
+use snarkos_node_router::ALEO_MAXIMUM_FORK_DEPTH;
 use snarkvm::prelude::{Address, Block, FromBytes, Network, Testnet3 as CurrentNetwork};
 
 use futures_util::{sink::SinkExt, TryStreamExt};
@@ -26,8 +27,6 @@ use std::{
     str::FromStr,
 };
 use tokio_util::codec::Framed;
-
-const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 /// Returns a fixed account address.
 pub fn sample_address() -> Address<CurrentNetwork> {
