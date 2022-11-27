@@ -61,8 +61,9 @@ impl<N: Network> MessageTrait for BlockResponse<N> {
 pub struct DataBlocks<N: Network>(pub Vec<Block<N>>);
 
 impl<N: Network> DataBlocks<N> {
+    /// TODO (howardwu): Evaluate the merits of multi-block requests in the new sync model.
     /// The maximum number of blocks that can be sent in a single message.
-    pub const MAXIMUM_NUMBER_OF_BLOCKS: u8 = 50;
+    pub const MAXIMUM_NUMBER_OF_BLOCKS: u8 = 1;
 }
 
 impl<N: Network> Deref for DataBlocks<N> {

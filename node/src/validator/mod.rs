@@ -135,7 +135,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?));
         }
         // Initialize the sync pool.
-        node.initialize_sync().await;
+        node.initialize_sync()?;
         // Initialize the routing.
         node.initialize_routing().await;
         // Initialize the signal handler.
@@ -211,19 +211,16 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
-    /// TODO: THIS IS A DUMMY IMPLEMENTATION. DO NOT USE.
-    async fn initialize_sync(&self) {
+    /// Initializes the sync pool.
+    fn initialize_sync(&self) -> Result<()> {
+        // Retrieve the canon locators.
+        let canon_locators = crate::helpers::get_block_locators(&self.ledger)?;
+        // Insert the canon locators into the sync pool.
+        self.router.sync().insert_canon_locators(canon_locators).unwrap();
+
+        // Start the sync loop.
         let validator = self.clone();
         self.handles.write().push(tokio::spawn(async move {
-            // Expected time per block.
-            const ROUND_TIME: u64 = 15; // 15 seconds per block
-
-            validator
-                .router
-                .sync()
-                .insert_canon_locators(crate::helpers::get_block_locators(&validator.ledger).unwrap())
-                .unwrap();
-
             loop {
                 // If the Ctrl-C handler registered the signal, stop the node.
                 if validator.shutdown.load(Ordering::Relaxed) {
@@ -231,74 +228,68 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                     break;
                 }
 
-                // Sleep for a brief period of time.
+                // Sleep briefly to avoid triggering spam detection.
                 tokio::time::sleep(Duration::from_secs(1)).await;
 
                 // Prepare the block requests, if any.
                 let block_requests = validator.router.sync().prepare_block_requests();
-                trace!("{:?} block requests", block_requests.len());
+                trace!("Prepared {} block requests", block_requests.len());
 
-                for (height, (hash, previous_hash, sync_ips)) in block_requests {
-                    if validator
-                        .router
-                        .sync()
-                        .insert_block_request(height, (hash, previous_hash, sync_ips.clone()))
-                        .is_ok()
-                    {
+                // Process the block requests.
+                'outer: for (height, (hash, previous_hash, sync_ips)) in block_requests {
+                    // Insert the block request into the sync pool.
+                    let result =
+                        validator.router.sync().insert_block_request(height, (hash, previous_hash, sync_ips.clone()));
+
+                    // If the block request was inserted, send it to the peers.
+                    if result.is_ok() {
+                        // Construct the message.
+                        let message =
+                            Message::BlockRequest(BlockRequest { start_height: height, end_height: height + 1 });
+                        // Send the message to the peers.
                         for sync_ip in sync_ips {
-                            validator.send(
-                                sync_ip,
-                                Message::BlockRequest(BlockRequest { start_height: height, end_height: height + 1 }),
-                            );
+                            // If the send fails for any peer, remove the block request from the sync pool.
+                            if validator.send(sync_ip, message.clone()).is_none() {
+                                // Remove the entire block request.
+                                validator.router.sync().remove_block_request(height);
+                                // Break out of the loop.
+                                break 'outer;
+                            }
                         }
                         // Sleep for 10 milliseconds to avoid triggering spam detection.
                         tokio::time::sleep(Duration::from_millis(10)).await;
                     }
                 }
-
-                // // Retrieve the latest block height.
-                // let latest_height = validator.ledger.latest_height();
-                // // Retrieve the peers with their heights.
-                // let peers_by_height = validator.router.sync().get_sync_peers_by_height();
-                //
-                // if peers_by_height.is_empty() {
-                //     // Wait for a bit.
-                //     tokio::time::sleep(Duration::from_secs(ROUND_TIME)).await;
-                //     continue;
-                // }
-                //
-                // // Retrieve the first peer (the one with the highest height).
-                // let (peer_ip, peer_height) = peers_by_height.first().unwrap();
-                //
-                // // Check if the peer is ahead of us.
-                // if peer_height > &latest_height {
-                //     if validator.router.sync().contains_request(latest_height + 1) {
-                //         tokio::time::sleep(Duration::from_secs(1)).await;
-                //         continue;
-                //     }
-                //     let hash = validator.router.sync().get_canon_hash(latest_height + 1);
-                //     let previous_hash = validator.router.sync().get_canon_hash(latest_height);
-                //     if let Err(error) =
-                //         validator
-                //             .router
-                //             .sync()
-                //             .insert_block_request(latest_height + 1, hash, previous_hash, indexset![*peer_ip])
-                //     {
-                //         error!("Failed to insert sync request: {}", error);
-                //         // Wait for a bit.
-                //         tokio::time::sleep(Duration::from_secs(ROUND_TIME)).await;
-                //     } else {
-                //         info!("Syncing with peer {}...", peer_ip);
-                //         validator.send(
-                //             *peer_ip,
-                //             Message::BlockRequest(BlockRequest {
-                //                 start_height: latest_height + 1,
-                //                 end_height: latest_height + 2,
-                //             }),
-                //         );
-                //     }
-                // }
             }
         }));
+        Ok(())
+    }
+
+    /// Attempts to advance with blocks from the sync pool.
+    fn advance_with_sync_blocks(&self) {
+        // Retrieve the latest block height.
+        let mut current_height = self.ledger.latest_height();
+        // Try to advance the ledger with the sync pool.
+        while let Some(block) = self.router.sync().remove_block_response(current_height + 1) {
+            // Ensure the block height matches.
+            if block.height() != current_height + 1 {
+                warn!("Block height mismatch: expected {}, found {}", current_height + 1, block.height());
+                break;
+            }
+            // Check the next block.
+            if let Err(error) = self.consensus.check_next_block(&block) {
+                warn!("The next block ({}) is invalid - {error}", block.height());
+                break;
+            }
+            // Attempt to advance to the next block.
+            if let Err(error) = self.consensus.advance_to_next_block(&block) {
+                warn!("{error}");
+                break;
+            }
+            // Insert the height and hash as canon in the sync pool.
+            self.router.sync().insert_canon_locator(block.height(), block.hash());
+            // Increment the latest height.
+            current_height += 1;
+        }
     }
 }

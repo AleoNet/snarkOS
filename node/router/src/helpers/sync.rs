@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_messages::{BlockLocators, DataBlocks};
+use snarkos_node_messages::BlockLocators;
 use snarkvm::prelude::{Block, Network};
 
 use anyhow::{bail, ensure, Result};
@@ -31,6 +31,7 @@ pub const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
 pub const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 
 pub const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 15; // 15 seconds
+pub const MAXIMUM_BLOCK_REQUESTS: usize = 50; // 50 requests
 
 /// A tuple of the block hash (optional), previous block hash (optional), and sync IPs.
 pub type SyncRequest<N> = (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);
@@ -181,6 +182,14 @@ impl<N: Network> Sync<N> {
         Ok(())
     }
 
+    /// Returns a list of block requests, if the node needs to sync.
+    pub fn prepare_block_requests(&self) -> Vec<(u32, SyncRequest<N>)> {
+        // Remove timed out block requests.
+        self.remove_timed_out_block_requests();
+        // Prepare the block requests.
+        self.prepare_block_requests_inner()
+    }
+
     /// Inserts a block request for the given height.
     pub fn insert_block_request(&self, height: u32, (hash, previous_hash, sync_ips): SyncRequest<N>) -> Result<()> {
         // Ensure the block request does not already exist.
@@ -325,6 +334,16 @@ impl<N: Network> Sync<N> {
         });
     }
 
+    /// Removes the entire block request for the given height, if it exists.
+    pub fn remove_block_request(&self, height: u32) {
+        // Remove the request entry for the given height.
+        self.requests.write().remove(&height);
+        // Remove the request timestamp entry for the given height.
+        self.request_timestamps.write().remove(&height);
+        // Remove the response entry for the given height.
+        self.responses.write().remove(&height);
+    }
+
     /// Removes and returns the block response for the given height, if the request is complete.
     pub fn remove_block_response(&self, height: u32) -> Option<Block<N>> {
         // Determine if the request is complete.
@@ -424,10 +443,7 @@ impl<N: Network> Sync<N> {
     }
 
     /// Returns a list of block requests, if the node needs to sync.
-    pub fn prepare_block_requests(&self) -> Vec<(u32, SyncRequest<N>)> {
-        // Remove timed out block requests.
-        self.remove_timed_out_block_requests();
-
+    fn prepare_block_requests_inner(&self) -> Vec<(u32, SyncRequest<N>)> {
         // Retrieve the latest canon height.
         let latest_canon_height = self.latest_canon_height();
 
@@ -503,7 +519,7 @@ impl<N: Network> Sync<N> {
         // Compute the start height for the block request.
         let start_height = latest_canon_height + 1;
         // Compute the end height for the block request.
-        let end_height = (min_common_ancestor + 1).min(start_height + DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as u32);
+        let end_height = (min_common_ancestor + 1).min(start_height + MAXIMUM_BLOCK_REQUESTS as u32);
 
         self.construct_requests(start_height..end_height, sync_peers, candidate_locators, rng)
     }
@@ -682,10 +698,7 @@ mod tests {
         }
 
         // Otherwise, there should be requests.
-        let expected_num_requests = core::cmp::min(
-            min_common_ancestor as usize,
-            DataBlocks::<CurrentNetwork>::MAXIMUM_NUMBER_OF_BLOCKS as usize,
-        );
+        let expected_num_requests = core::cmp::min(min_common_ancestor as usize, MAXIMUM_BLOCK_REQUESTS);
         assert_eq!(requests.len(), expected_num_requests);
 
         for (idx, (height, (hash, previous_hash, sync_ips))) in requests.into_iter().enumerate() {
