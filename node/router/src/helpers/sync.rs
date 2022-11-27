@@ -209,7 +209,9 @@ impl<N: Network> Sync<N> {
         }
 
         // Remove the peer IP from the request entry.
-        self.remove_block_request_to_peer(&peer_ip, height);
+        if let Some((_, _, sync_ips)) = self.requests.write().get_mut(&height) {
+            sync_ips.remove(&peer_ip);
+        }
 
         // Acquire the write lock on the responses map.
         let mut responses = self.responses.write();
@@ -288,14 +290,18 @@ impl<N: Network> Sync<N> {
 
     /// Removes the block request for the given peer IP, if it exists.
     pub fn remove_block_request_to_peer(&self, peer_ip: &SocketAddr, height: u32) {
+        let mut can_revoke = self.responses.read().get(&height).is_none();
+
         // Remove the peer IP from the request entry. If the request entry is now empty,
         // and the response entry for this height is also empty, then remove the request entry altogether.
         if let Some((_, _, sync_ips)) = self.requests.write().get_mut(&height) {
             sync_ips.remove(peer_ip);
-            if sync_ips.is_empty() && self.responses.read().get(&height).is_none() {
-                self.requests.write().remove(&height);
-                self.request_timestamps.write().remove(&height);
-            }
+            can_revoke &= sync_ips.is_empty();
+        }
+
+        if can_revoke {
+            self.requests.write().remove(&height);
+            self.request_timestamps.write().remove(&height);
         }
     }
 
@@ -310,6 +316,7 @@ impl<N: Network> Sync<N> {
         // and its corresponding response entry is also empty, then remove that request entry altogether.
         requests.retain(|height, (_, _, peer_ips)| {
             peer_ips.remove(peer_ip);
+
             let retain = !peer_ips.is_empty() || responses.get(height).is_some();
             if !retain {
                 self.request_timestamps.write().remove(height);
@@ -359,7 +366,7 @@ impl<N: Network> Sync<N> {
         let height = block.height();
 
         // Retrieve the request entry for the candidate block.
-        if let Some((expected_hash, expected_previous_hash, peer_ips)) = self.requests.read().get(&height) {
+        if let Some((expected_hash, expected_previous_hash, sync_ips)) = self.requests.read().get(&height) {
             // Ensure the candidate block hash matches the expected hash.
             if let Some(expected_hash) = expected_hash {
                 if block.hash() != *expected_hash {
@@ -373,7 +380,7 @@ impl<N: Network> Sync<N> {
                 }
             }
             // Ensure the sync pool requested this block from the given peer.
-            if !peer_ips.contains(peer_ip) {
+            if !sync_ips.contains(peer_ip) {
                 bail!("The sync pool did not request block {height} from '{peer_ip}'")
             }
             Ok(())
@@ -385,7 +392,7 @@ impl<N: Network> Sync<N> {
     /// Returns a list of block requests, if the node needs to sync.
     pub fn prepare_block_requests(&self) -> Vec<(u32, SyncRequest<N>)> {
         // Remove timed out block requests.
-        self.remove_timed_out_block_requests();
+        // self.remove_timed_out_block_requests();
 
         // Retrieve the latest canon height.
         let latest_canon_height = self.latest_canon_height();
@@ -738,6 +745,36 @@ mod tests {
             check_prepare_block_requests(sync, 10, peers);
         }
     }
+
+    // #[test]
+    // fn test_prepare_block_requests_with_fork() {
+    //     let sync = sample_sync_at_height(0);
+    //
+    //     // Add a peer (fork).
+    //     let peer_1 = sample_peer_ip(1);
+    //     sync.update_peer_locators(peer_1, sample_block_locators_with_fork(20)).unwrap();
+    //
+    //     // Add a peer.
+    //     let peer_2 = sample_peer_ip(2);
+    //     sync.update_peer_locators(peer_2, sample_block_locators(10)).unwrap();
+    //
+    //     // Add a peer.
+    //     let peer_3 = sample_peer_ip(3);
+    //     sync.update_peer_locators(peer_3, sample_block_locators(10)).unwrap();
+    //
+    //     // Prepare the block requests.
+    //     let requests = sync.prepare_block_requests();
+    //     assert_eq!(requests.len(), 10);
+    //
+    //     // Check the requests.
+    //     for (idx, (height, (hash, previous_hash, sync_ips))) in requests.into_iter().enumerate() {
+    //         assert_eq!(height, 1 + idx as u32);
+    //         assert_eq!(hash, Some((Field::<CurrentNetwork>::from_u32(height)).into()));
+    //         assert_eq!(previous_hash, Some((Field::<CurrentNetwork>::from_u32(height - 1)).into()));
+    //         assert_eq!(sync_ips.len(), 3);
+    //         assert_eq!(sync_ips, indexset![peer_2, peer_3]);
+    //     }
+    // }
 
     #[test]
     fn test_insert_block_requests() {

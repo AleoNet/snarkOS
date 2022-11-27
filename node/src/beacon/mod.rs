@@ -476,8 +476,8 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
             serialized_block,
         ));
 
-        // Propagate the block to all peers.
-        self.propagate(message, vec![]);
+        // Propagate the block to all beacons.
+        self.propagate_to_beacons(message, vec![]);
 
         Ok(())
     }
