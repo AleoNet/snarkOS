@@ -644,40 +644,8 @@ mod tests {
     }
 
     #[test]
-    fn test_prepare_block_requests_with_no_peers() {
-        let sync = sample_sync_at_height(0);
-
-        // If there are no peers, then no requests should be prepared.
-        check_prepare_block_requests(sync, 0, indexset![]);
-    }
-
-    #[test]
-    fn test_prepare_block_requests_with_one_peer() {
-        let sync = sample_sync_at_height(0);
-
-        // Add a peer.
-        sync.update_peer_locators(sample_peer_ip(1), sample_block_locators(10)).unwrap();
-
-        // If a peer is ahead, then requests should be prepared (regardless of redundancy factor).
-        check_prepare_block_requests(sync, 10, indexset![sample_peer_ip(1)]);
-    }
-
-    #[test]
-    fn test_prepare_block_requests_with_two_peers() {
-        let sync = sample_sync_at_height(0);
-
-        // Add peer 1.
-        sync.update_peer_locators(sample_peer_ip(1), sample_block_locators(10)).unwrap();
-        // Add peer 2.
-        sync.update_peer_locators(sample_peer_ip(2), sample_block_locators(10)).unwrap();
-
-        // If both peers are ahead, then requests should be prepared (regardless of redundancy factor).
-        check_prepare_block_requests(sync, 10, indexset![sample_peer_ip(1), sample_peer_ip(2)]);
-    }
-
-    #[test]
-    fn test_prepare_block_requests_with_multiple_peers() {
-        for num_peers in 2..100 {
+    fn test_prepare_block_requests() {
+        for num_peers in 0..111 {
             println!("Testing with {num_peers} peers");
 
             let sync = sample_sync_at_height(0);
