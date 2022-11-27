@@ -47,7 +47,7 @@ Please note to run an Aleo Prover that is **competitive**, the machine will requ
 
 ### 2.2 Installation
 
-Before beginning, please ensure your machine has `Rust v1.64+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
+Before beginning, please ensure your machine has `Rust v1.65+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 
 Start by cloning this Github repository:
 ```
@@ -113,7 +113,7 @@ APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ### 1. My node is unable to compile.
 
-- Ensure your machine has `Rust v1.64+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
+- Ensure your machine has `Rust v1.65+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 - If large errors appear during compilation, try running `cargo clean`.
 - Ensure `snarkOS` is started using `./run-client.sh` or `./run-prover.sh`.
 
