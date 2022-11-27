@@ -151,6 +151,10 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
 
     /// This function keeps the number of bootstrap peers within the allowed range.
     async fn handle_bootstrap_peers(&self) {
+        // TODO (howardwu): Remove this for Phase 3.
+        if self.router().node_type().is_beacon() {
+            return;
+        }
         // Find the connected bootstrap peers.
         let connected_bootstrap = self.router().connected_bootstrap_peers();
         // If there are not enough connected bootstrap peers, connect to more.
