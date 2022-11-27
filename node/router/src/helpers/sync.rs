@@ -17,7 +17,7 @@
 use snarkos_node_messages::{BlockLocators, DataBlocks};
 use snarkvm::prelude::{Block, Network};
 
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use colored::Colorize;
 use core::hash::Hash;
 use indexmap::{IndexMap, IndexSet};
@@ -30,9 +30,8 @@ pub const REDUNDANCY_FACTOR: usize = 3;
 pub const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
 pub const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 
-/// A tuple of the block hash (optional), previous block hash (optional), and peer IPs.
-pub type RequestHashFromPeers<N> =
-    (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);
+/// A tuple of the block hash (optional), previous block hash (optional), and sync IPs.
+pub type SyncRequest<N> = (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);
 
 #[derive(Copy, Clone, Debug)]
 pub struct PeerPair(SocketAddr, SocketAddr);
@@ -69,7 +68,7 @@ pub struct Sync<N: Network> {
     common_ancestors: Arc<RwLock<IndexMap<PeerPair, u32>>>,
     /// The map of block height to the expected block hash and peer IPs.
     /// Each entry is removed when its corresponding entry in the responses map is removed.
-    requests: Arc<RwLock<BTreeMap<u32, RequestHashFromPeers<N>>>>,
+    requests: Arc<RwLock<BTreeMap<u32, SyncRequest<N>>>>,
     /// The map of block height to the received blocks.
     /// Removing an entry from this map must remove the corresponding entry from the requests map.
     responses: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
@@ -158,17 +157,13 @@ impl<N: Network> Sync<N> {
     }
 
     /// Inserts a block request for the given height.
-    pub fn insert_block_request(
-        &self,
-        height: u32,
-        hash: Option<N::BlockHash>,
-        previous_hash: Option<N::BlockHash>,
-        peer_ips: IndexSet<SocketAddr>,
-    ) -> Result<()> {
+    pub fn insert_block_request(&self, height: u32, (hash, previous_hash, sync_ips): SyncRequest<N>) -> Result<()> {
         // Ensure the block request does not already exist.
         self.check_block_request(height)?;
+        // Ensure the sync IPs are not empty.
+        ensure!(!sync_ips.is_empty(), "Cannot insert a block request with no sync IPs");
         // Insert the block request.
-        self.requests.write().insert(height, (hash, previous_hash, peer_ips));
+        self.requests.write().insert(height, (hash, previous_hash, sync_ips));
         Ok(())
     }
 
@@ -400,9 +395,7 @@ impl<N: Network> Sync<N> {
     // }
 
     /// Returns a list of block requests, if the node needs to sync.
-    pub fn prepare_block_requests(
-        &self,
-    ) -> Vec<(u32, Option<N::BlockHash>, Option<N::BlockHash>, IndexSet<SocketAddr>)> {
+    pub fn prepare_block_requests(&self) -> Vec<(u32, SyncRequest<N>)> {
         // Retrieve the latest canon height.
         let latest_canon_height = self.latest_canon_height();
 
@@ -509,7 +502,7 @@ impl<N: Network> Sync<N> {
         sync_peers: IndexMap<SocketAddr, u32>,
         locators: IndexMap<SocketAddr, BlockLocators<N>>,
         rng: &mut R,
-    ) -> Vec<(u32, Option<N::BlockHash>, Option<N::BlockHash>, IndexSet<SocketAddr>)> {
+    ) -> Vec<(u32, SyncRequest<N>)> {
         let mut requests = Vec::with_capacity(heights.len());
 
         for height in heights {
@@ -531,7 +524,7 @@ impl<N: Network> Sync<N> {
             let sync_ips = peer_ips.iter().copied().choose_multiple(rng, num_sync_ips);
 
             // Append the request.
-            requests.push((height, hash, previous_hash, sync_ips.into_iter().collect()));
+            requests.push((height, (hash, previous_hash, sync_ips.into_iter().collect())));
         }
 
         requests
@@ -679,7 +672,7 @@ mod tests {
         );
         assert_eq!(requests.len(), expected_num_requests);
 
-        for (idx, (height, hash, previous_hash, sync_ips)) in requests.into_iter().enumerate() {
+        for (idx, (height, (hash, previous_hash, sync_ips))) in requests.into_iter().enumerate() {
             assert_eq!(height, 1 + idx as u32);
             assert_eq!(hash, Some((Field::<CurrentNetwork>::from_u32(height)).into()));
             assert_eq!(previous_hash, Some((Field::<CurrentNetwork>::from_u32(height - 1)).into()));

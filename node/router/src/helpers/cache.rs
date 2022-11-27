@@ -32,7 +32,7 @@ use std::{
 use time::{Duration, OffsetDateTime};
 
 /// The maximum number of items to store in the cache.
-const MAX_CACHE_SIZE: usize = 256;
+const MAX_CACHE_SIZE: usize = 4096;
 
 #[derive(Clone, Debug)]
 pub struct Cache<N: Network> {
