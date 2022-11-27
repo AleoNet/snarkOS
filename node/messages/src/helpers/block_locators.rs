@@ -278,6 +278,35 @@ pub mod test_helpers {
         BlockLocators::new(recents, checkpoints)
     }
 
+    /// Simulates a block locator at the given height, with a fork within NUM_RECENTS of the given height.
+    pub fn sample_block_locators_with_fork(height: u32, fork_height: u32) -> BlockLocators<CurrentNetwork> {
+        assert!(fork_height <= height, "Fork height must be less than or equal to the given height");
+        assert!(height - fork_height < NUM_RECENTS as u32, "Fork must be within NUM_RECENTS of the given height");
+
+        // Create the recent locators.
+        let mut recents = IndexMap::new();
+        let recents_range = match height < NUM_RECENTS as u32 {
+            true => 0..=height,
+            false => (height - NUM_RECENTS as u32 + 1)..=height,
+        };
+        for i in recents_range {
+            if i >= fork_height {
+                recents.insert(i, (-Field::<CurrentNetwork>::from_u32(i)).into());
+            } else {
+                recents.insert(i, (Field::<CurrentNetwork>::from_u32(i)).into());
+            }
+        }
+
+        // Create the checkpoint locators.
+        let mut checkpoints = IndexMap::new();
+        for i in (0..=height).step_by(CHECKPOINT_INTERVAL as usize) {
+            checkpoints.insert(i, (Field::<CurrentNetwork>::from_u32(i)).into());
+        }
+
+        // Construct the block locators.
+        BlockLocators::new(recents, checkpoints)
+    }
+
     /// A test to ensure that the sample block locators are valid.
     #[test]
     fn test_sample_block_locators() {

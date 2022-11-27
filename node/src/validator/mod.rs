@@ -231,6 +231,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                     break;
                 }
 
+                // Sleep for a brief period of time.
+                tokio::time::sleep(Duration::from_secs(1)).await;
+
+                // Prepare the block requests, if any.
                 let block_requests = validator.router.sync().prepare_block_requests();
                 trace!("{:?} block requests", block_requests.len());
 
@@ -247,10 +251,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                                 Message::BlockRequest(BlockRequest { start_height: height, end_height: height + 1 }),
                             );
                         }
+                        // Sleep for 10 milliseconds to avoid triggering spam detection.
+                        tokio::time::sleep(Duration::from_millis(10)).await;
                     }
                 }
-
-                tokio::time::sleep(Duration::from_secs(1)).await;
 
                 // // Retrieve the latest block height.
                 // let latest_height = validator.ledger.latest_height();

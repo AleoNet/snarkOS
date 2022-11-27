@@ -625,7 +625,10 @@ fn construct_request<N: Network>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkos_node_messages::helpers::block_locators::test_helpers::sample_block_locators;
+    use snarkos_node_messages::helpers::block_locators::test_helpers::{
+        sample_block_locators,
+        sample_block_locators_with_fork,
+    };
     use snarkvm::prelude::Field;
 
     use indexmap::indexset;
@@ -746,35 +749,140 @@ mod tests {
         }
     }
 
-    // #[test]
-    // fn test_prepare_block_requests_with_fork() {
-    //     let sync = sample_sync_at_height(0);
-    //
-    //     // Add a peer (fork).
-    //     let peer_1 = sample_peer_ip(1);
-    //     sync.update_peer_locators(peer_1, sample_block_locators_with_fork(20)).unwrap();
-    //
-    //     // Add a peer.
-    //     let peer_2 = sample_peer_ip(2);
-    //     sync.update_peer_locators(peer_2, sample_block_locators(10)).unwrap();
-    //
-    //     // Add a peer.
-    //     let peer_3 = sample_peer_ip(3);
-    //     sync.update_peer_locators(peer_3, sample_block_locators(10)).unwrap();
-    //
-    //     // Prepare the block requests.
-    //     let requests = sync.prepare_block_requests();
-    //     assert_eq!(requests.len(), 10);
-    //
-    //     // Check the requests.
-    //     for (idx, (height, (hash, previous_hash, sync_ips))) in requests.into_iter().enumerate() {
-    //         assert_eq!(height, 1 + idx as u32);
-    //         assert_eq!(hash, Some((Field::<CurrentNetwork>::from_u32(height)).into()));
-    //         assert_eq!(previous_hash, Some((Field::<CurrentNetwork>::from_u32(height - 1)).into()));
-    //         assert_eq!(sync_ips.len(), 3);
-    //         assert_eq!(sync_ips, indexset![peer_2, peer_3]);
-    //     }
-    // }
+    #[test]
+    fn test_prepare_block_requests_with_leading_fork_at_11() {
+        let sync = sample_sync_at_height(0);
+
+        // Intuitively, peer 1's fork is above peer 2 and peer 3's height.
+        // So from peer 2 and peer 3's perspective, they don't even realize that peer 1 is on a fork.
+        // Thus, you can sync up to block 10 from any of the 3 peers.
+
+        // When there are NUM_REDUNDANCY peers ahead, and 1 peer is on a leading fork at 11,
+        // then the sync pool should request blocks 1..=10 from the NUM_REDUNDANCY peers.
+        // This is safe because the leading fork is at 11, and the sync pool is at 0,
+        // so all candidate peers are at least 10 blocks ahead of the sync pool.
+
+        // Add a peer (fork).
+        let peer_1 = sample_peer_ip(1);
+        sync.update_peer_locators(peer_1, sample_block_locators_with_fork(20, 11)).unwrap();
+
+        // Add a peer.
+        let peer_2 = sample_peer_ip(2);
+        sync.update_peer_locators(peer_2, sample_block_locators(10)).unwrap();
+
+        // Add a peer.
+        let peer_3 = sample_peer_ip(3);
+        sync.update_peer_locators(peer_3, sample_block_locators(10)).unwrap();
+
+        // Prepare the block requests.
+        let requests = sync.prepare_block_requests();
+        assert_eq!(requests.len(), 10);
+
+        // Check the requests.
+        for (idx, (height, (hash, previous_hash, sync_ips))) in requests.into_iter().enumerate() {
+            assert_eq!(height, 1 + idx as u32);
+            assert_eq!(hash, Some((Field::<CurrentNetwork>::from_u32(height)).into()));
+            assert_eq!(previous_hash, Some((Field::<CurrentNetwork>::from_u32(height - 1)).into()));
+            assert_eq!(sync_ips.len(), 1); // Only 1 needed since we have redundancy factor on this (recent locator) hash.
+        }
+    }
+
+    #[test]
+    fn test_prepare_block_requests_with_leading_fork_at_10() {
+        let sync = sample_sync_at_height(0);
+
+        // Intuitively, peer 1's fork is at peer 2 and peer 3's height.
+        // So from peer 2 and peer 3's perspective, they recognize that peer 1 has forked.
+        // Thus, you don't have NUM_REDUNDANCY peers to sync to block 10.
+        //
+        // Now, while you could in theory sync up to block 9 from any of the 3 peers,
+        // we choose not to do this as either side is likely to disconnect from us,
+        // and we would rather wait for enough redundant peers before syncing.
+
+        // When there are NUM_REDUNDANCY peers ahead, and 1 peer is on a leading fork at 10,
+        // then the sync pool should not request blocks as 1 peer conflicts with the other NUM_REDUNDANCY-1 peers.
+        // We choose to sync with a cohort of peers that are *consistent* with each other,
+        // and prioritize from descending heights (so the highest peer gets priority).
+
+        // Add a peer (fork).
+        let peer_1 = sample_peer_ip(1);
+        sync.update_peer_locators(peer_1, sample_block_locators_with_fork(20, 10)).unwrap();
+
+        // Add a peer.
+        let peer_2 = sample_peer_ip(2);
+        sync.update_peer_locators(peer_2, sample_block_locators(10)).unwrap();
+
+        // Add a peer.
+        let peer_3 = sample_peer_ip(3);
+        sync.update_peer_locators(peer_3, sample_block_locators(10)).unwrap();
+
+        // Prepare the block requests.
+        let requests = sync.prepare_block_requests();
+        assert_eq!(requests.len(), 0);
+
+        // When there are NUM_REDUNDANCY+1 peers ahead, and 1 is on a fork, then there should be block requests.
+
+        // Add a peer.
+        let peer_4 = sample_peer_ip(4);
+        sync.update_peer_locators(peer_4, sample_block_locators(10)).unwrap();
+
+        // Prepare the block requests.
+        let requests = sync.prepare_block_requests();
+        assert_eq!(requests.len(), 10);
+
+        // Check the requests.
+        for (idx, (height, (hash, previous_hash, sync_ips))) in requests.into_iter().enumerate() {
+            assert_eq!(height, 1 + idx as u32);
+            assert_eq!(hash, Some((Field::<CurrentNetwork>::from_u32(height)).into()));
+            assert_eq!(previous_hash, Some((Field::<CurrentNetwork>::from_u32(height - 1)).into()));
+            assert_eq!(sync_ips.len(), 1); // Only 1 needed since we have redundancy factor on this (recent locator) hash.
+            assert_ne!(sync_ips[0], peer_1); // It should never be the forked peer.
+        }
+    }
+
+    #[test]
+    fn test_prepare_block_requests_with_trailing_fork_at_9() {
+        let sync = sample_sync_at_height(0);
+
+        // Peer 1 and 2 diverge from peer 3 at block 10. We only sync when there are NUM_REDUNDANCY peers
+        // who are *consistent* with each other. So if you add a 4th peer that is consistent with peer 1 and 2,
+        // then you should be able to sync up to block 10, thereby biasing away from peer 3.
+
+        // Add a peer (fork).
+        let peer_1 = sample_peer_ip(1);
+        sync.update_peer_locators(peer_1, sample_block_locators(10)).unwrap();
+
+        // Add a peer.
+        let peer_2 = sample_peer_ip(2);
+        sync.update_peer_locators(peer_2, sample_block_locators(10)).unwrap();
+
+        // Add a peer.
+        let peer_3 = sample_peer_ip(3);
+        sync.update_peer_locators(peer_3, sample_block_locators_with_fork(20, 10)).unwrap();
+
+        // Prepare the block requests.
+        let requests = sync.prepare_block_requests();
+        assert_eq!(requests.len(), 0);
+
+        // When there are NUM_REDUNDANCY+1 peers ahead, and peer 3 is on a fork, then there should be block requests.
+
+        // Add a peer.
+        let peer_4 = sample_peer_ip(4);
+        sync.update_peer_locators(peer_4, sample_block_locators(10)).unwrap();
+
+        // Prepare the block requests.
+        let requests = sync.prepare_block_requests();
+        assert_eq!(requests.len(), 10);
+
+        // Check the requests.
+        for (idx, (height, (hash, previous_hash, sync_ips))) in requests.into_iter().enumerate() {
+            assert_eq!(height, 1 + idx as u32);
+            assert_eq!(hash, Some((Field::<CurrentNetwork>::from_u32(height)).into()));
+            assert_eq!(previous_hash, Some((Field::<CurrentNetwork>::from_u32(height - 1)).into()));
+            assert_eq!(sync_ips.len(), 1); // Only 1 needed since we have redundancy factor on this (recent locator) hash.
+            assert_ne!(sync_ips[0], peer_3); // It should never be the forked peer.
+        }
+    }
 
     #[test]
     fn test_insert_block_requests() {
