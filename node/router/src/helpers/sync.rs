@@ -389,10 +389,44 @@ impl<N: Network> Sync<N> {
         }
     }
 
+    /// Removes block requests that have timed out. This also removes the corresponding block responses.
+    /// Returns the number of timed out block requests.
+    fn remove_timed_out_block_requests(&self) -> usize {
+        // Acquire the write lock on the request timestamps map.
+        let mut request_timestamps = self.request_timestamps.write();
+        // Acquire the write lock on the requests map.
+        let mut requests = self.requests.write();
+        // Acquire the write lock on the responses map.
+        let mut responses = self.responses.write();
+
+        // Retrieve the current time.
+        let now = Instant::now();
+
+        // Track the number of timed out block requests.
+        let mut num_timed_out_block_requests = 0;
+
+        // Remove timed out block requests.
+        request_timestamps.retain(|height, timestamp| {
+            // If the request is not complete, and has timed out, then remove it.
+            if !requests.get(height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(false)
+                && now.duration_since(*timestamp).as_secs() > BLOCK_REQUEST_TIMEOUT_IN_SECS
+            {
+                num_timed_out_block_requests += 1;
+                requests.remove(height);
+                responses.remove(height);
+                false
+            } else {
+                true
+            }
+        });
+
+        num_timed_out_block_requests
+    }
+
     /// Returns a list of block requests, if the node needs to sync.
     pub fn prepare_block_requests(&self) -> Vec<(u32, SyncRequest<N>)> {
         // Remove timed out block requests.
-        // self.remove_timed_out_block_requests();
+        self.remove_timed_out_block_requests();
 
         // Retrieve the latest canon height.
         let latest_canon_height = self.latest_canon_height();
@@ -472,40 +506,6 @@ impl<N: Network> Sync<N> {
         let end_height = (min_common_ancestor + 1).min(start_height + DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as u32);
 
         self.construct_requests(start_height..end_height, sync_peers, candidate_locators, rng)
-    }
-
-    /// Removes block requests that have timed out. This also removes the corresponding block responses.
-    /// Returns the number of timed out block requests.
-    fn remove_timed_out_block_requests(&self) -> usize {
-        // Acquire the write lock on the request timestamps map.
-        let mut request_timestamps = self.request_timestamps.write();
-        // Acquire the write lock on the requests map.
-        let mut requests = self.requests.write();
-        // Acquire the write lock on the responses map.
-        let mut responses = self.responses.write();
-
-        // Retrieve the current time.
-        let now = Instant::now();
-
-        // Track the number of timed out block requests.
-        let mut num_timed_out_block_requests = 0;
-
-        // Remove timed out block requests.
-        request_timestamps.retain(|height, timestamp| {
-            // If the request is not complete, and has timed out, then remove it.
-            if !requests.get(height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(false)
-                && now.duration_since(*timestamp).as_secs() > BLOCK_REQUEST_TIMEOUT_IN_SECS
-            {
-                num_timed_out_block_requests += 1;
-                requests.remove(height);
-                responses.remove(height);
-                false
-            } else {
-                true
-            }
-        });
-
-        num_timed_out_block_requests
     }
 
     /// Given the start height, end height, sync peers, this function returns a list of block requests.
