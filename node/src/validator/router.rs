@@ -188,36 +188,25 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
 
     /// Retrieves the latest epoch challenge and latest block header, and returns the puzzle response to the peer.
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
-        // Send the latest puzzle response, if it exists.
-        if let Some(puzzle_response) = self.latest_puzzle_response.read().clone() {
-            // Send the `PuzzleResponse` message to the peer.
-            self.send(peer_ip, Message::PuzzleResponse(puzzle_response));
-        }
+        // Retrieve the latest epoch challenge.
+        let epoch_challenge = match self.ledger.latest_epoch_challenge() {
+            Ok(epoch_challenge) => epoch_challenge,
+            Err(error) => {
+                error!("Failed to prepare a puzzle request for '{peer_ip}': {error}");
+                return false;
+            }
+        };
+        // Retrieve the latest block header.
+        let block_header = Data::Object(self.ledger.latest_header());
+        // Send the `PuzzleResponse` message to the peer.
+        self.send(peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block_header }));
         true
     }
 
-    /// Saves the latest epoch challenge and latest block header in the node.
-    fn puzzle_response(&self, peer_ip: SocketAddr, serialized: PuzzleResponse<N>, header: Header<N>) -> bool {
-        // Retrieve the epoch number.
-        let epoch_number = serialized.epoch_challenge.epoch_number();
-        // Retrieve the block height.
-        let block_height = header.height();
-
-        info!(
-            "Coinbase Puzzle (Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
-            header.coinbase_target(),
-            header.proof_target()
-        );
-
-        // Save the latest epoch challenge in the node.
-        self.latest_epoch_challenge.write().replace(serialized.epoch_challenge.clone());
-        // Save the latest block header in the node.
-        self.latest_block_header.write().replace(header);
-        // Save the latest puzzle response in the node.
-        self.latest_puzzle_response.write().replace(serialized);
-
-        trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
-        true
+    /// Disconnects on receipt of a `PuzzleResponse` message.
+    fn puzzle_response(&self, peer_ip: SocketAddr, _serialized: PuzzleResponse<N>, _header: Header<N>) -> bool {
+        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
+        false
     }
 
     /// Propagates the unconfirmed solution to all connected beacons.
@@ -228,26 +217,29 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         solution: ProverSolution<N>,
     ) -> bool {
         // Retrieve the latest epoch challenge.
-        let epoch_challenge = self.latest_epoch_challenge.read().clone();
-        // Retrieve the latest proof target.
-        let proof_target = self.latest_block_header.read().as_ref().map(|header| header.proof_target());
-
-        if let (Some(epoch_challenge), Some(proof_target)) = (epoch_challenge, proof_target) {
-            // Ensure that the prover solution is valid for the given epoch.
-            let coinbase_puzzle = self.coinbase_puzzle.clone();
-            let is_valid = tokio::task::spawn_blocking(move || {
-                solution.verify(coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target)
-            })
-            .await;
-
-            match is_valid {
-                // If the solution is valid, propagate the `UnconfirmedSolution` to connected beacons.
-                Ok(Ok(true)) => self.propagate_to_beacons(Message::UnconfirmedSolution(serialized), vec![peer_ip]),
-                Ok(Ok(false)) | Ok(Err(_)) => {
-                    trace!("Invalid prover solution '{}' for the proof target.", solution.commitment())
-                }
-                Err(error) => warn!("Failed to verify the prover solution: {error}"),
+        let epoch_challenge = match self.ledger.latest_epoch_challenge() {
+            Ok(epoch_challenge) => epoch_challenge,
+            Err(error) => {
+                error!("Failed to get epoch challenge for unconfirmed solution from '{peer_ip}': {error}");
+                return false;
             }
+        };
+
+        // Retrieve the latest proof target.
+        let proof_target = self.ledger.latest_header().proof_target();
+
+        // Ensure that the prover solution is valid for the given epoch.
+        let coinbase_puzzle = self.coinbase_puzzle.clone();
+        let is_valid = tokio::task::spawn_blocking(move || {
+            solution.verify(coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target)
+        })
+        .await;
+
+        match is_valid {
+            // If the solution is valid, propagate the `UnconfirmedSolution` to connected beacons.
+            Ok(Ok(true)) => self.propagate_to_beacons(Message::UnconfirmedSolution(serialized), vec![peer_ip]),
+            Ok(Ok(false)) | Ok(Err(_)) => (),
+            Err(error) => warn!("Failed to verify an unconfirmed solution from '{peer_ip}': {error}"),
         }
         true
     }

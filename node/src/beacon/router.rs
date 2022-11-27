@@ -28,7 +28,7 @@ use snarkos_node_messages::{
 };
 use snarkos_node_router::{Routing, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::error;
+use snarkvm::prelude::{error, Header};
 
 use futures_util::sink::SinkExt;
 use std::{io, net::SocketAddr};
@@ -204,27 +204,25 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
 
     /// Retrieves the latest epoch challenge and latest block header, and returns the puzzle response to the peer.
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
-        // Retrieve the latest epoch challenge and latest block header.
-        let (epoch_challenge, header) = {
-            // Retrieve the latest epoch challenge.
-            let epoch_challenge = match self.ledger.latest_epoch_challenge() {
-                Ok(epoch_challenge) => epoch_challenge,
-                Err(error) => {
-                    error!("Failed to retrieve latest epoch challenge for a puzzle request: {error}");
-                    return false;
-                }
-            };
-            // Retrieve the latest block header.
-            let header = self.ledger.latest_header();
-            // Scope drops the read lock on the consensus module.
-            (epoch_challenge, header)
+        // Retrieve the latest epoch challenge.
+        let epoch_challenge = match self.ledger.latest_epoch_challenge() {
+            Ok(epoch_challenge) => epoch_challenge,
+            Err(error) => {
+                error!("Failed to prepare a puzzle request for '{peer_ip}': {error}");
+                return false;
+            }
         };
+        // Retrieve the latest block header.
+        let block_header = Data::Object(self.ledger.latest_header());
         // Send the `PuzzleResponse` message to the peer.
-        self.send(
-            peer_ip,
-            Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block_header: Data::Object(header) }),
-        );
+        self.send(peer_ip, Message::PuzzleResponse(PuzzleResponse { epoch_challenge, block_header }));
         true
+    }
+
+    /// Disconnects on receipt of a `PuzzleResponse` message.
+    fn puzzle_response(&self, peer_ip: SocketAddr, _serialized: PuzzleResponse<N>, _header: Header<N>) -> bool {
+        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
+        false
     }
 
     /// Adds the unconfirmed solution to the memory pool, and propagates the solution to all peers.

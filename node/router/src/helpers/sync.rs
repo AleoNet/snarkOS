@@ -182,9 +182,17 @@ impl<N: Network> Sync<N> {
         Ok(())
     }
 
-    /// Returns the sync peers and their minimum common ancestor, if the node needs to sync.
-    pub fn find_sync_peers(&self) -> Option<(IndexMap<SocketAddr, BlockLocators<N>>, u32)> {
-        self.find_sync_peers_inner()
+    /// Returns the sync peers with their latest heights, and their minimum common ancestor, if the node can sync.
+    pub fn find_sync_peers(&self) -> Option<(IndexMap<SocketAddr, u32>, u32)> {
+        if let Some((sync_peers, min_common_ancestor)) = self.find_sync_peers_inner() {
+            // Map the locators into the latest height.
+            let sync_peers =
+                sync_peers.into_iter().map(|(ip, locators)| (ip, locators.latest_locator_height())).collect();
+            // Return the sync peers and their minimum common ancestor.
+            Some((sync_peers, min_common_ancestor))
+        } else {
+            None
+        }
     }
 
     /// Returns a list of block requests, if the node needs to sync.
@@ -192,7 +200,7 @@ impl<N: Network> Sync<N> {
         // Remove timed out block requests.
         self.remove_timed_out_block_requests();
         // Prepare the block requests.
-        if let Some((sync_peers, min_common_ancestor)) = self.find_sync_peers() {
+        if let Some((sync_peers, min_common_ancestor)) = self.find_sync_peers_inner() {
             // Return the list of block requests.
             self.construct_requests(sync_peers, min_common_ancestor, &mut rand::thread_rng())
         } else {

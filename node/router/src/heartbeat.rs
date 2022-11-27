@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Outbound, Router, REDUNDANCY_FACTOR};
-use snarkos_node_messages::{DisconnectReason, Message, PeerRequest};
+use snarkos_node_messages::{DisconnectReason, Message, PeerRequest, PuzzleRequest};
 use snarkvm::prelude::Network;
 
 use rand::{prelude::IteratorRandom, rngs::OsRng};
@@ -52,6 +52,8 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         self.handle_bootstrap_peers();
         // Keep the trusted peers connected.
         self.handle_trusted_peers();
+        // Keep the puzzle request up to date.
+        self.handle_puzzle_request();
     }
 
     /// TODO (howardwu): Consider checking minimum number of beacons and validators, to exclude clients and provers.
@@ -199,6 +201,25 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             if !self.router().is_connected(peer_ip) {
                 // Attempt to connect to the trusted peer.
                 self.router().connect(*peer_ip);
+            }
+        }
+    }
+
+    /// This function updates the coinbase puzzle if network has updated.
+    fn handle_puzzle_request(&self) {
+        // Retrieve the node type.
+        let node_type = self.router().node_type();
+        // If the node is a prover or client, request the coinbase puzzle.
+        if node_type.is_prover() || node_type.is_client() {
+            // Find the sync peers.
+            if let Some((sync_peers, _)) = self.router().sync().find_sync_peers() {
+                // Initialize an RNG.
+                let rng = &mut OsRng::default();
+                // Pick a sync peer at random.
+                sync_peers.into_iter().choose(rng).map(|(peer_ip, _)| {
+                    // Send a "PuzzleRequest" to the peer.
+                    self.send(peer_ip, Message::PuzzleRequest(PuzzleRequest));
+                });
             }
         }
     }

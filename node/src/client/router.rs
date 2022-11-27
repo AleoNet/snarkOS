@@ -140,6 +140,12 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         true
     }
 
+    /// Disconnects on receipt of a `PuzzleRequest` message.
+    fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
+        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
+        false
+    }
+
     /// Saves the latest epoch challenge and latest block header in the node.
     fn puzzle_response(&self, peer_ip: SocketAddr, serialized: PuzzleResponse<N>, header: Header<N>) -> bool {
         // Retrieve the epoch number.

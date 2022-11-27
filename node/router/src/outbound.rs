@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Router, ALEO_MAXIMUM_FORK_DEPTH};
-use snarkos_node_messages::{BlockLocators, Message, Ping, PuzzleRequest};
+use snarkos_node_messages::{BlockLocators, Message, Ping};
 use snarkos_node_tcp::protocols::Writing;
 use snarkvm::prelude::Network;
 use std::io;
@@ -39,21 +39,6 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
                 block_locators,
             }),
         );
-    }
-
-    /// Sends a "PuzzleRequest" to a bootstrap peer.
-    fn send_puzzle_request(&self) {
-        // TODO (howardwu): Change this logic for Phase 3.
-        // Retrieve a bootstrap peer.
-        let bootstrap_ip = match self.router().node_type().is_validator() {
-            true => self.router().connected_beacons().first().copied(),
-            false => self.router().connected_bootstrap_peers().first().copied(),
-        };
-        // If a bootstrap peer exists, send a "PuzzleRequest" to it.
-        if let Some(bootstrap_ip) = bootstrap_ip {
-            // Send the "PuzzleRequest" to the bootstrap peer.
-            self.send(bootstrap_ip, Message::PuzzleRequest(PuzzleRequest));
-        }
     }
 
     /// Sends the given message to specified peer.

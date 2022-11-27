@@ -19,7 +19,6 @@ use snarkos_node_messages::{
     BeaconPropose,
     BlockRequest,
     DataBlocks,
-    DisconnectReason,
     Message,
     PeerResponse,
     Ping,
@@ -367,15 +366,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     /// Sleeps for a period and then sends a `Ping` message to the peer.
     fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool;
 
-    fn puzzle_request(&self, peer_ip: SocketAddr) -> bool {
-        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
-        false
-    }
+    /// Handles a `PuzzleRequest` message.
+    fn puzzle_request(&self, peer_ip: SocketAddr) -> bool;
 
-    fn puzzle_response(&self, peer_ip: SocketAddr, _serialized: PuzzleResponse<N>, _header: Header<N>) -> bool {
-        debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
-        false
-    }
+    /// Handles a `PuzzleResponse` message.
+    fn puzzle_response(&self, peer_ip: SocketAddr, _serialized: PuzzleResponse<N>, _header: Header<N>) -> bool;
 
     /// Handles an `UnconfirmedSolution` message.
     async fn unconfirmed_solution(

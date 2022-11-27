@@ -213,26 +213,10 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 .latest_block_header
                 .read()
                 .as_ref()
-                .map(|header| (header.timestamp(), header.coinbase_target(), header.proof_target()));
-
-            // If the latest block timestamp exceeds a multiple of the anchor time, then skip this iteration.
-            if let Some((latest_timestamp, _, _)) = latest_state {
-                // Compute the elapsed time since the latest block.
-                let elapsed = OffsetDateTime::now_utc().unix_timestamp().saturating_sub(latest_timestamp);
-                // If the elapsed time exceeds a multiple of the anchor time, then skip this iteration.
-                if elapsed > N::ANCHOR_TIME as i64 * 6 {
-                    warn!("Skipping an iteration of the coinbase puzzle (latest block is stale)");
-                    // Send a "PuzzleRequest" to a beacon node.
-                    self.send_puzzle_request();
-                    // Sleep for `N::ANCHOR_TIME` seconds.
-                    tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
-                    continue;
-                }
-            }
+                .map(|header| (header.coinbase_target(), header.proof_target()));
 
             // If the latest epoch challenge and latest state exists, then proceed to generate a prover solution.
-            if let (Some(challenge), Some((_, coinbase_target, proof_target))) = (latest_epoch_challenge, latest_state)
-            {
+            if let (Some(challenge), Some((coinbase_target, proof_target))) = (latest_epoch_challenge, latest_state) {
                 // Execute the coinbase puzzle.
                 let prover = self.clone();
                 let result = tokio::task::spawn_blocking(move || {
