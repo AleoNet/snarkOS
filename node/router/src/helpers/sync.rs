@@ -24,11 +24,13 @@ use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use parking_lot::RwLock;
 use rand::{prelude::IteratorRandom, CryptoRng, Rng};
-use std::{collections::BTreeMap, net::SocketAddr, ops::Range, sync::Arc};
+use std::{collections::BTreeMap, net::SocketAddr, ops::Range, sync::Arc, time::Instant};
 
 pub const REDUNDANCY_FACTOR: usize = 3;
 pub const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
 pub const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
+
+pub const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 15; // 15 seconds
 
 /// A tuple of the block hash (optional), previous block hash (optional), and sync IPs.
 pub type SyncRequest<N> = (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);
@@ -52,6 +54,15 @@ impl Hash for PeerPair {
     }
 }
 
+/// A struct that keeps track of the current sync state.
+///
+/// # State
+/// - When a request is inserted, the `requests` map and `request_timestamps` map insert an entry for the request height.
+/// - When a response is inserted, the `requests` map inserts the entry for the request height.
+/// - When a request is completed, the `requests` map still has the entry, but its `sync_ips` is empty;
+/// - the `request_timestamps` map remains unchanged.
+/// - When a response is removed/completed, the `requests` map and `request_timestamps` map also remove the entry for the request height.
+/// - When a request is timed out, the `requests`, `request_timestamps`, and `responses` map remove the entry for the request height;
 #[derive(Clone, Debug)]
 pub struct Sync<N: Network> {
     /// The listener IP of this node.
@@ -72,6 +83,9 @@ pub struct Sync<N: Network> {
     /// The map of block height to the received blocks.
     /// Removing an entry from this map must remove the corresponding entry from the requests map.
     responses: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
+    /// The map of block height to the timestamp of the last time the block was requested.
+    /// This map is used to determine which requests to remove if they have been pending for too long.
+    request_timestamps: Arc<RwLock<BTreeMap<u32, Instant>>>,
 }
 
 impl<N: Network> Sync<N> {
@@ -84,6 +98,7 @@ impl<N: Network> Sync<N> {
             common_ancestors: Default::default(),
             requests: Default::default(),
             responses: Default::default(),
+            request_timestamps: Default::default(),
         }
     }
 
@@ -139,6 +154,11 @@ impl<N: Network> Sync<N> {
         self.requests.read().get(&height).cloned()
     }
 
+    /// Returns the timestamp of the last time the block was requested, if it exists.
+    pub fn get_block_request_timestamp(&self, height: u32) -> Option<Instant> {
+        self.request_timestamps.read().get(&height).copied()
+    }
+
     /// Inserts a canonical block hash for the given block height, overriding an existing entry if it exists.
     pub fn insert_canon_locator(&self, height: u32, hash: N::BlockHash) {
         if let Some(previous_hash) = self.canon.write().insert(height, hash) {
@@ -169,6 +189,8 @@ impl<N: Network> Sync<N> {
         ensure!(!sync_ips.is_empty(), "Cannot insert a block request with no sync IPs");
         // Insert the block request.
         self.requests.write().insert(height, (hash, previous_hash, sync_ips));
+        // Insert the request timestamp.
+        self.request_timestamps.write().insert(height, Instant::now());
         Ok(())
     }
 
@@ -272,6 +294,7 @@ impl<N: Network> Sync<N> {
             sync_ips.remove(peer_ip);
             if sync_ips.is_empty() && self.responses.read().get(&height).is_none() {
                 self.requests.write().remove(&height);
+                self.request_timestamps.write().remove(&height);
             }
         }
     }
@@ -287,7 +310,11 @@ impl<N: Network> Sync<N> {
         // and its corresponding response entry is also empty, then remove that request entry altogether.
         requests.retain(|height, (_, _, peer_ips)| {
             peer_ips.remove(peer_ip);
-            !peer_ips.is_empty() || responses.get(height).is_some()
+            let retain = !peer_ips.is_empty() || responses.get(height).is_some();
+            if !retain {
+                self.request_timestamps.write().remove(height);
+            }
+            retain
         });
     }
 
@@ -357,6 +384,9 @@ impl<N: Network> Sync<N> {
 
     /// Returns a list of block requests, if the node needs to sync.
     pub fn prepare_block_requests(&self) -> Vec<(u32, SyncRequest<N>)> {
+        // Remove timed out block requests.
+        self.remove_timed_out_block_requests();
+
         // Retrieve the latest canon height.
         let latest_canon_height = self.latest_canon_height();
 
@@ -435,6 +465,40 @@ impl<N: Network> Sync<N> {
         let end_height = (min_common_ancestor + 1).min(start_height + DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as u32);
 
         self.construct_requests(start_height..end_height, sync_peers, candidate_locators, rng)
+    }
+
+    /// Removes block requests that have timed out. This also removes the corresponding block responses.
+    /// Returns the number of timed out block requests.
+    fn remove_timed_out_block_requests(&self) -> usize {
+        // Acquire the write lock on the request timestamps map.
+        let mut request_timestamps = self.request_timestamps.write();
+        // Acquire the write lock on the requests map.
+        let mut requests = self.requests.write();
+        // Acquire the write lock on the responses map.
+        let mut responses = self.responses.write();
+
+        // Retrieve the current time.
+        let now = Instant::now();
+
+        // Track the number of timed out block requests.
+        let mut num_timed_out_block_requests = 0;
+
+        // Remove timed out block requests.
+        request_timestamps.retain(|height, timestamp| {
+            // If the request is not complete, and has timed out, then remove it.
+            if !requests.get(height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(false)
+                && now.duration_since(*timestamp).as_secs() > BLOCK_REQUEST_TIMEOUT_IN_SECS
+            {
+                num_timed_out_block_requests += 1;
+                requests.remove(height);
+                responses.remove(height);
+                false
+            } else {
+                true
+            }
+        });
+
+        num_timed_out_block_requests
     }
 
     /// Given the start height, end height, sync peers, this function returns a list of block requests.
@@ -691,11 +755,13 @@ mod tests {
             sync.insert_block_request(height, (hash, previous_hash, sync_ips.clone())).unwrap();
             // Check that the block requests were inserted.
             assert_eq!(sync.get_block_request(height), Some((hash, previous_hash, sync_ips)));
+            assert!(sync.get_block_request_timestamp(height).is_some());
         }
 
         for (height, (hash, previous_hash, sync_ips)) in requests.clone() {
             // Check that the block requests are still inserted.
             assert_eq!(sync.get_block_request(height), Some((hash, previous_hash, sync_ips)));
+            assert!(sync.get_block_request_timestamp(height).is_some());
         }
 
         for (height, (hash, previous_hash, sync_ips)) in requests {
@@ -703,6 +769,7 @@ mod tests {
             sync.insert_block_request(height, (hash, previous_hash, sync_ips.clone())).unwrap_err();
             // Check that the block requests are still inserted.
             assert_eq!(sync.get_block_request(height), Some((hash, previous_hash, sync_ips)));
+            assert!(sync.get_block_request_timestamp(height).is_some());
         }
     }
 
@@ -806,6 +873,7 @@ mod tests {
             sync.insert_block_request(height, (hash, previous_hash, sync_ips.clone())).unwrap();
             // Check that the block requests were inserted.
             assert_eq!(sync.get_block_request(height), Some((hash, previous_hash, sync_ips)));
+            assert!(sync.get_block_request_timestamp(height).is_some());
         }
 
         // Remove the peer.
@@ -814,6 +882,7 @@ mod tests {
         for (height, _) in requests {
             // Check that the block requests were removed.
             assert_eq!(sync.get_block_request(height), None);
+            assert!(sync.get_block_request_timestamp(height).is_none());
         }
 
         // As there is no peer, it should not be possible to prepare block requests.
@@ -832,6 +901,7 @@ mod tests {
             sync.insert_block_request(height, (hash, previous_hash, sync_ips.clone())).unwrap();
             // Check that the block requests were inserted.
             assert_eq!(sync.get_block_request(height), Some((hash, previous_hash, sync_ips)));
+            assert!(sync.get_block_request_timestamp(height).is_some());
         }
     }
 
