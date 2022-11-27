@@ -266,17 +266,28 @@ impl<N: Network> Sync<N> {
 
     /// Removes the block request for the given peer IP, if it exists.
     pub fn remove_block_request_to_peer(&self, peer_ip: &SocketAddr, height: u32) {
-        // Remove the peer IP from the request entry.
-        if let Some((_, _, peer_ips)) = self.requests.write().get_mut(&height) {
-            peer_ips.remove(peer_ip);
+        // Remove the peer IP from the request entry. If the request entry is now empty,
+        // and the response entry for this height is also empty, then remove the request entry altogether.
+        if let Some((_, _, sync_ips)) = self.requests.write().get_mut(&height) {
+            sync_ips.remove(peer_ip);
+            if sync_ips.is_empty() && self.responses.read().get(&height).is_none() {
+                self.requests.write().remove(&height);
+            }
         }
     }
 
     /// Removes all block requests for the given peer IP.
     pub fn remove_block_requests_to_peer(&self, peer_ip: &SocketAddr) {
-        // Remove the peer IP from the requests map.
-        self.requests.write().values_mut().for_each(|(_, _, peer_ips)| {
+        // Acquire the write lock on the requests map.
+        let mut requests = self.requests.write();
+        // Acquire the read lock on the responses map.
+        let responses = self.responses.read();
+
+        // Remove the peer IP from the requests map. If any request entry is now empty,
+        // and its corresponding response entry is also empty, then remove that request entry altogether.
+        requests.retain(|height, (_, _, peer_ips)| {
             peer_ips.remove(peer_ip);
+            !peer_ips.is_empty() || responses.get(height).is_some()
         });
     }
 
@@ -761,6 +772,67 @@ mod tests {
 
         sync.remove_peer(&peer_ip);
         assert_eq!(sync.get_peer_height(&peer_ip), None);
+    }
+
+    #[test]
+    fn test_locators_insert_remove_insert() {
+        let sync = sample_sync_at_height(0);
+
+        let peer_ip = sample_peer_ip(1);
+        sync.update_peer_locators(peer_ip, sample_block_locators(100)).unwrap();
+        assert_eq!(sync.get_peer_height(&peer_ip), Some(100));
+
+        sync.remove_peer(&peer_ip);
+        assert_eq!(sync.get_peer_height(&peer_ip), None);
+
+        sync.update_peer_locators(peer_ip, sample_block_locators(200)).unwrap();
+        assert_eq!(sync.get_peer_height(&peer_ip), Some(200));
+    }
+
+    #[test]
+    fn test_requests_insert_remove_insert() {
+        let sync = sample_sync_at_height(0);
+
+        // Add a peer.
+        let peer_ip = sample_peer_ip(1);
+        sync.update_peer_locators(peer_ip, sample_block_locators(10)).unwrap();
+
+        // Prepare the block requests.
+        let requests = sync.prepare_block_requests();
+        assert_eq!(requests.len(), 10);
+
+        for (height, (hash, previous_hash, sync_ips)) in requests.clone() {
+            // Insert the block request.
+            sync.insert_block_request(height, (hash, previous_hash, sync_ips.clone())).unwrap();
+            // Check that the block requests were inserted.
+            assert_eq!(sync.get_block_request(height), Some((hash, previous_hash, sync_ips)));
+        }
+
+        // Remove the peer.
+        sync.remove_peer(&peer_ip);
+
+        for (height, _) in requests {
+            // Check that the block requests were removed.
+            assert_eq!(sync.get_block_request(height), None);
+        }
+
+        // As there is no peer, it should not be possible to prepare block requests.
+        let requests = sync.prepare_block_requests();
+        assert_eq!(requests.len(), 0);
+
+        // Add the peer again.
+        sync.update_peer_locators(peer_ip, sample_block_locators(10)).unwrap();
+
+        // Prepare the block requests.
+        let requests = sync.prepare_block_requests();
+        assert_eq!(requests.len(), 10);
+
+        for (height, (hash, previous_hash, sync_ips)) in requests {
+            // Insert the block request.
+            sync.insert_block_request(height, (hash, previous_hash, sync_ips.clone())).unwrap();
+            // Check that the block requests were inserted.
+            assert_eq!(sync.get_block_request(height), Some((hash, previous_hash, sync_ips)));
+        }
     }
 
     // TODO: duplicate responses, ensure fails.
