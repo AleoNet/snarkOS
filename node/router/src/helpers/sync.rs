@@ -134,6 +134,11 @@ impl<N: Network> Sync<N> {
         self.common_ancestors.read().get(&PeerPair(peer_a, peer_b)).copied()
     }
 
+    /// Returns the block request for the given height, if it exists.
+    pub fn get_block_request(&self, height: u32) -> Option<SyncRequest<N>> {
+        self.requests.read().get(&height).cloned()
+    }
+
     /// Inserts a canonical block hash for the given block height, overriding an existing entry if it exists.
     pub fn insert_canon_locator(&self, height: u32, hash: N::BlockHash) {
         if let Some(previous_hash) = self.canon.write().insert(height, hash) {
@@ -339,61 +344,6 @@ impl<N: Network> Sync<N> {
         }
     }
 
-    // /// Checks the given block locators against the canonical map and block locators of all peers.
-    // /// This function ensures all peers share a consistent view of the ledger.
-    // /// On failure, this function returns a list of peer IPs to disconnect.
-    // fn check_locators(&self, peer_ip: SocketAddr, locators: BlockLocators<N>) -> Result<(), Vec<SocketAddr>> {
-    //     // // Ensure the given block locators are valid. If not, remove any requests to the peer, and return early.
-    //     // if let Err(disconnect_ips) = self.check_locators(peer_ip, locators.clone()) {
-    //     //     // Remove any requests to the peer.
-    //     //     disconnect_ips.iter().for_each(|disconnect_ip| self.remove_block_requests(disconnect_ip));
-    //     //     // Return the error.
-    //     //     return Err(disconnect_ips);
-    //     // }
-    //
-    //     // If the locators match the existing locators for the peer, return early.
-    //     if self.locators.read().get(&peer_ip) == Some(&locators) {
-    //         return Ok(());
-    //     }
-    //
-    //     // Ensure the given block locators are well-formed, or disconnect the peer.
-    //     if let Err(error) = locators.ensure_is_valid() {
-    //         warn!("Received invalid block locators from '{peer_ip}': {error}");
-    //         return Err(vec![peer_ip]);
-    //     }
-    //
-    //     // Clone the canonical map.
-    //     let canon = self.canon.read().clone();
-    //     if !canon.is_empty() {
-    //         // Iterate through every checkpoint and recent locator.
-    //         locators.clone().into_iter().try_for_each(|(height, hash)| {
-    //             // Ensure the block locators are consistent with the canonical map.
-    //             if let Some(canon_hash) = canon.get(&height) {
-    //                 // If the block locators are inconsistent, disconnect the peer.
-    //                 if canon_hash != &hash {
-    //                     warn!("Received inconsistent block locators from '{peer_ip}'");
-    //                     return Err(vec![peer_ip]);
-    //                 }
-    //             }
-    //             Ok(())
-    //         })?;
-    //     }
-    //
-    //     // Ensure the locators are consistent with the block locators of every peer (including itself).
-    //     for (other_ip, other_locators) in self.locators.read().iter() {
-    //         // If the locators are inconsistent, disconnect the peer.
-    //         if let Err(error) = locators.ensure_is_consistent_with(other_locators) {
-    //             warn!("Inconsistent block locators between '{peer_ip}' and '{other_ip}': {error}");
-    //             match peer_ip == *other_ip {
-    //                 true => return Err(vec![peer_ip]),
-    //                 false => return Err(vec![peer_ip, *other_ip]),
-    //             }
-    //         }
-    //     }
-    //
-    //     Ok(())
-    // }
-
     /// Returns a list of block requests, if the node needs to sync.
     pub fn prepare_block_requests(&self) -> Vec<(u32, SyncRequest<N>)> {
         // Retrieve the latest canon height.
@@ -422,7 +372,6 @@ impl<N: Network> Sync<N> {
 
         // Determine the threshold number of peers to sync from.
         let threshold_to_request = core::cmp::min(candidate_locators.len(), REDUNDANCY_FACTOR);
-        println!("Case 1 - candidates: {:?}, threshold_to_request: {threshold_to_request}", candidate_locators.keys());
 
         let mut min_common_ancestor = 0;
         let mut sync_peers = IndexMap::new();
@@ -461,9 +410,6 @@ impl<N: Network> Sync<N> {
             }
         }
 
-        println!(
-            "Case 1 - min_common_ancestor: {min_common_ancestor}, latest_canon_height: {latest_canon_height}, sync_peers: {sync_peers:?}"
-        );
         // If there is not enough peers with a minimum common ancestor above the latest canon height, then return early.
         if min_common_ancestor <= latest_canon_height || sync_peers.len() < threshold_to_request {
             return vec![];
@@ -478,21 +424,6 @@ impl<N: Network> Sync<N> {
         let end_height = (min_common_ancestor + 1).min(start_height + DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as u32);
 
         self.construct_requests(start_height..end_height, sync_peers, candidate_locators, rng)
-
-        // // Determine the number of block requests to make.
-        // let num_block_requests = 1 + (min_common_ancestor - latest_canon_height) / DataBlocks::MAXIMUM_NUMBER_OF_BLOCKS as u32;
-        //
-        // // Determine the list of block requests.
-        // let block_requests = (0..num_block_requests)
-        //     .map(|i| {
-        //         let start_height = 1 + latest_canon_height + i * DataBlocks::MAXIMUM_NUMBER_OF_BLOCKS as u32;
-        //         let end_height = 1 + min_common_ancestor.min(start_height + DataBlocks::MAXIMUM_NUMBER_OF_BLOCKS as u32);
-        //         BlockRequest {
-        //             start_height,
-        //             end_height,
-        //         }
-        //     })
-        //     .collect();
     }
 
     /// Given the start height, end height, sync peers, this function returns a list of block requests.
@@ -766,6 +697,50 @@ mod tests {
     }
 
     #[test]
+    fn test_insert_block_requests() {
+        let sync = sample_sync_at_height(0);
+
+        // Add a peer.
+        sync.update_peer_locators(sample_peer_ip(1), sample_block_locators(10)).unwrap();
+
+        // Prepare the block requests.
+        let requests = sync.prepare_block_requests();
+        assert_eq!(requests.len(), 10);
+
+        for (height, (hash, previous_hash, sync_ips)) in requests.clone() {
+            // Insert the block request.
+            sync.insert_block_request(height, (hash, previous_hash, sync_ips.clone())).unwrap();
+            // Check that the block requests were inserted.
+            assert_eq!(sync.get_block_request(height), Some((hash, previous_hash, sync_ips)));
+        }
+
+        for (height, (hash, previous_hash, sync_ips)) in requests.clone() {
+            // Check that the block requests are still inserted.
+            assert_eq!(sync.get_block_request(height), Some((hash, previous_hash, sync_ips)));
+        }
+
+        for (height, (hash, previous_hash, sync_ips)) in requests {
+            // Ensure that the block requests cannot be inserted twice.
+            sync.insert_block_request(height, (hash, previous_hash, sync_ips.clone())).unwrap_err();
+            // Check that the block requests are still inserted.
+            assert_eq!(sync.get_block_request(height), Some((hash, previous_hash, sync_ips)));
+        }
+    }
+
+    #[test]
+    fn test_insert_block_requests_fails() {
+        let sync = sample_sync_at_height(9);
+
+        // Add a peer.
+        sync.update_peer_locators(sample_peer_ip(1), sample_block_locators(10)).unwrap();
+
+        // Inserting a block height that is already canonized should fail.
+        sync.insert_block_request(9, (None, None, indexset![sample_peer_ip(1)])).unwrap_err();
+        // Inserting a block height that is not canonized should succeed.
+        sync.insert_block_request(10, (None, None, indexset![sample_peer_ip(1)])).unwrap();
+    }
+
+    #[test]
     fn test_update_peer_locators() {
         let sync = sample_sync_at_height(0);
 
@@ -820,6 +795,5 @@ mod tests {
         assert_eq!(sync.get_peer_height(&peer_ip), None);
     }
 
-    // TODO: insert_block_req => insert_block_res => insert_block_req (same), ensure fails.
     // TODO: duplicate responses, ensure fails.
 }
