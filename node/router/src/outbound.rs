@@ -100,7 +100,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     fn propagate(&self, message: Message<N>, excluded_peers: Vec<SocketAddr>) {
         // TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
-        // if let Message::UnconfirmedBlock(ref mut message) = message {
+        // if let Message::BeaconPropose(ref mut message) = message {
         //     if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
         //         let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
         //     } else {
@@ -139,7 +139,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     fn propagate_to_beacons(&self, message: Message<N>, excluded_beacons: Vec<SocketAddr>) {
         // TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
-        // if let Message::UnconfirmedBlock(ref mut message) = message {
+        // if let Message::BeaconPropose(ref mut message) = message {
         //     if let Ok(serialized_block) = Data::serialize(message.block.clone()).await {
         //         let _ = std::mem::replace(&mut message.block, Data::Buffer(serialized_block));
         //     } else {
@@ -183,12 +183,6 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         }
         // Determine whether to send the message.
         match message {
-            Message::UnconfirmedBlock(message) => {
-                // Update the timestamp for the unconfirmed block.
-                let seen_before = self.router().cache.insert_outbound_block(message.block_hash).is_some();
-                // Determine whether to send the block.
-                !seen_before
-            }
             Message::UnconfirmedSolution(message) => {
                 // Update the timestamp for the unconfirmed solution.
                 let seen_before = self.router().cache.insert_outbound_solution(message.puzzle_commitment).is_some();

@@ -21,12 +21,12 @@ use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_ledger::{Ledger, RecordMap};
 use snarkos_node_messages::{
+    BeaconPropose,
     Data,
     Message,
     NodeType,
     PuzzleResponse,
     Status,
-    UnconfirmedBlock,
     UnconfirmedSolution,
     UnconfirmedTransaction,
 };
@@ -428,8 +428,6 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 bail!("Failed to propose the next block (JoinError): {error}")
             }
         };
-        let next_block_height = next_block.height();
-        let next_block_hash = next_block.hash();
 
         // // Ensure the block is a valid next block.
         // if let Err(error) = self.consensus.check_next_block(&next_block) {
@@ -459,18 +457,24 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         //     }
         // }
 
+        // Prepare the message.
+        let next_block_round = next_block.round();
+        let next_block_height = next_block.height();
+        let next_block_hash = next_block.hash();
+
         // Serialize the block ahead of time to not do it for each peer.
         let serialized_block = match Data::Object(next_block).serialize().await {
-            Ok(serialized_block) => serialized_block,
+            Ok(serialized_block) => Data::Buffer(serialized_block),
             Err(error) => bail!("Failed to serialize the next block for propagation: {error}"),
         };
 
         // Prepare the block to be sent to all peers.
-        let message = Message::<N>::UnconfirmedBlock(UnconfirmedBlock {
-            block_height: next_block_height,
-            block_hash: next_block_hash,
-            block: Data::Buffer(serialized_block),
-        });
+        let message = Message::<N>::BeaconPropose(BeaconPropose::new(
+            next_block_round,
+            next_block_height,
+            next_block_hash,
+            serialized_block,
+        ));
 
         // Propagate the block to all peers.
         self.propagate(message, vec![]);

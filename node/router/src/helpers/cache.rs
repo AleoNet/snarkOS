@@ -42,8 +42,6 @@ pub struct Cache<N: Network> {
     seen_inbound_messages: Arc<RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>>,
     /// The map of peer IPs to their recent timestamps.
     seen_inbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>>,
-    /// The map of block hashes to their last seen timestamp.
-    seen_inbound_blocks: Arc<RwLock<LinkedHashMap<N::BlockHash, OffsetDateTime>>>,
     /// The map of solution commitments to their last seen timestamp.
     seen_inbound_solutions: Arc<RwLock<LinkedHashMap<PuzzleCommitment<N>, OffsetDateTime>>>,
     /// The map of transaction IDs to their last seen timestamp.
@@ -52,8 +50,6 @@ pub struct Cache<N: Network> {
     seen_outbound_block_requests: Arc<RwLock<IndexMap<SocketAddr, IndexSet<BlockRequest>>>>,
     /// The map of peer IPs to the number of puzzle requests.
     seen_outbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, Arc<AtomicU16>>>>,
-    /// The map of block hashes to their last seen timestamp.
-    seen_outbound_blocks: Arc<RwLock<LinkedHashMap<N::BlockHash, OffsetDateTime>>>,
     /// The map of solution commitments to their last seen timestamp.
     seen_outbound_solutions: Arc<RwLock<LinkedHashMap<PuzzleCommitment<N>, OffsetDateTime>>>,
     /// The map of transaction IDs to their last seen timestamp.
@@ -74,12 +70,10 @@ impl<N: Network> Cache<N> {
             seen_inbound_connections: Default::default(),
             seen_inbound_messages: Default::default(),
             seen_inbound_puzzle_requests: Default::default(),
-            seen_inbound_blocks: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_inbound_solutions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_inbound_transactions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_outbound_block_requests: Default::default(),
             seen_outbound_puzzle_requests: Default::default(),
-            seen_outbound_blocks: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_outbound_solutions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_outbound_transactions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
         }
@@ -100,11 +94,6 @@ impl<N: Network> Cache<N> {
     /// Inserts a new timestamp for the given peer IP, returning the number of recent requests.
     pub fn insert_inbound_puzzle_request(&self, peer_ip: SocketAddr) -> usize {
         Self::retain_and_insert(&self.seen_inbound_puzzle_requests, peer_ip, 60)
-    }
-
-    /// Inserts a block hash into the cache, returning the previously seen timestamp if it existed.
-    pub fn insert_inbound_block(&self, hash: N::BlockHash) -> Option<OffsetDateTime> {
-        Self::refresh_and_insert(&self.seen_inbound_blocks, hash)
     }
 
     /// Inserts a solution commitment into the cache, returning the previously seen timestamp if it existed.
@@ -153,11 +142,6 @@ impl<N: Network> Cache<N> {
     /// Decrement the peer IP's number of puzzle requests, returning the updated number of puzzle requests.
     pub fn decrement_outbound_puzzle_requests(&self, peer_ip: SocketAddr) -> u16 {
         Self::decrement_counter(&self.seen_outbound_puzzle_requests, peer_ip)
-    }
-
-    /// Inserts a block hash into the cache, returning the previously seen timestamp if it existed.
-    pub fn insert_outbound_block(&self, hash: N::BlockHash) -> Option<OffsetDateTime> {
-        Self::refresh_and_insert(&self.seen_outbound_blocks, hash)
     }
 
     /// Inserts a solution commitment into the cache, returning the previously seen timestamp if it existed.

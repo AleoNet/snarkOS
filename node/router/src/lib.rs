@@ -204,9 +204,29 @@ impl<N: Network> Router<N> {
         self.resolver.get_ambiguous(peer_ip)
     }
 
-    /// Returns `true` if the node is connected to the given IP.
+    /// Returns `true` if the node is connected to the given peer IP.
     pub fn is_connected(&self, ip: &SocketAddr) -> bool {
         self.connected_peers.read().contains_key(ip)
+    }
+
+    /// Returns `true` if the given peer IP is a connected beacon.
+    pub fn is_connected_beacon(&self, peer_ip: &SocketAddr) -> bool {
+        self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_beacon())
+    }
+
+    /// Returns `true` if the given peer IP is a connected validator.
+    pub fn is_connected_validator(&self, peer_ip: &SocketAddr) -> bool {
+        self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_validator())
+    }
+
+    /// Returns `true` if the given peer IP is a connected prover.
+    pub fn is_connected_prover(&self, peer_ip: &SocketAddr) -> bool {
+        self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_prover())
+    }
+
+    /// Returns `true` if the given peer IP is a connected client.
+    pub fn is_connected_client(&self, peer_ip: &SocketAddr) -> bool {
+        self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_client())
     }
 
     /// Returns `true` if the given IP is restricted.

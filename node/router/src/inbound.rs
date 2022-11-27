@@ -16,6 +16,7 @@
 
 use crate::{Outbound, Peer, ALEO_MAXIMUM_FORK_DEPTH};
 use snarkos_node_messages::{
+    BeaconPropose,
     BlockRequest,
     DataBlocks,
     DisconnectReason,
@@ -25,7 +26,6 @@ use snarkos_node_messages::{
     Pong,
     PuzzleResponse,
     RawStatus,
-    UnconfirmedBlock,
     UnconfirmedSolution,
     UnconfirmedTransaction,
 };
@@ -58,8 +58,56 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
         trace!("Received '{}' from '{peer_ip}'", message.name());
 
-        // Process the message.
+        // This match statement handles the inbound message by deserializing the message,
+        // checking the message is valid, and then calling the appropriate (trait) handler.
         match message {
+            Message::BeaconPropose(message) => {
+                // Ensure this node is a beacon.
+                ensure!(self.router().node_type().is_beacon(), "[BeaconPropose] This node is not a beacon");
+                // Ensure the peer is a beacon.
+                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconPropose] '{peer_ip}' is not a beacon");
+
+                // Clone the serialized message.
+                let serialized = message.clone();
+                // Perform the deferred non-blocking deserialization of the block.
+                let block = match message.block.deserialize().await {
+                    Ok(block) => block,
+                    Err(error) => bail!("[BeaconPropose] {error}"),
+                };
+                // Check that the block parameters match.
+                if message.round != block.round()
+                    || message.block_height != block.height()
+                    || message.block_hash != block.hash()
+                {
+                    bail!("Peer '{peer_ip}' is not following the 'BeaconPropose' protocol")
+                }
+                // TODO (howardwu): Preemptively check the block signature is valid against the peer's account address.
+                //  Only the block proposer should be able to send a valid block signature. This message type should not
+                //  be propagated by any other peers.
+                // Handle the block proposal.
+                match self.beacon_propose(peer_ip, serialized, block) {
+                    true => Ok(()),
+                    false => bail!("Peer '{peer_ip}' sent an invalid block proposal"),
+                }
+            }
+            Message::BeaconTimeout(_message) => {
+                // Ensure this node is a beacon.
+                ensure!(self.router().node_type().is_beacon(), "[BeaconTimeout] This node is not a beacon");
+                // Ensure the peer is a beacon.
+                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconTimeout] '{peer_ip}' is not a beacon");
+                // TODO (howardwu): Add timeout handling.
+                // Disconnect as the peer is not following the protocol.
+                bail!("Peer '{peer_ip}' is not following the protocol")
+            }
+            Message::BeaconVote(_message) => {
+                // Ensure this node is a beacon.
+                ensure!(self.router().node_type().is_beacon(), "[BeaconVote] This node is not a beacon");
+                // Ensure the peer is a beacon.
+                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconVote] '{peer_ip}' is not a beacon");
+                // TODO (howardwu): Add vote handling.
+                // Disconnect as the peer is not following the protocol.
+                bail!("Peer '{peer_ip}' is not following the protocol")
+            }
             Message::BlockRequest(message) => {
                 let BlockRequest { start_height, end_height } = &message;
 
@@ -175,30 +223,6 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     false => bail!("Peer '{peer_ip}' sent an invalid puzzle response"),
                 }
             }
-            Message::UnconfirmedBlock(message) => {
-                // Clone the serialized message.
-                let serialized = message.clone();
-                // Update the timestamp for the unconfirmed block.
-                let seen_before = self.router().cache.insert_inbound_block(message.block_hash).is_some();
-                // Determine whether to propagate the block.
-                if seen_before {
-                    bail!("Skipping 'UnconfirmedBlock' from '{peer_ip}'")
-                }
-                // Perform the deferred non-blocking deserialization of the block.
-                let block = match message.block.deserialize().await {
-                    Ok(block) => block,
-                    Err(error) => bail!("[UnconfirmedBlock] {error}"),
-                };
-                // Check that the block parameters match.
-                if message.block_height != block.height() || message.block_hash != block.hash() {
-                    bail!("Peer '{peer_ip}' is not following the 'UnconfirmedBlock' protocol")
-                }
-                // Handle the unconfirmed block.
-                match self.unconfirmed_block(peer_ip, serialized, block) {
-                    true => Ok(()),
-                    false => bail!("Peer '{peer_ip}' sent an invalid unconfirmed block"),
-                }
-            }
             Message::UnconfirmedSolution(message) => {
                 // Clone the serialized message.
                 let serialized = message.clone();
@@ -248,6 +272,22 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
             }
         }
+    }
+
+    /// Handles a `BeaconPropose` message.
+    fn beacon_propose(&self, _peer_ip: SocketAddr, _serialized: BeaconPropose<N>, _block: Block<N>) -> bool {
+        // // Retrieve the connected peers by height.
+        // let mut peers = self.router().sync().get_sync_peers_by_height();
+        // // Retain the peers that 1) not the sender, and 2) are within the fork depth of the given block.
+        // peers.retain(|(ip, height)| *ip != peer_ip && *height < block.height() + ALEO_MAXIMUM_FORK_DEPTH);
+        //
+        // // Broadcast the `BeaconPropose` to the peers.
+        // if !peers.is_empty() {
+        //     for (peer_ip, _) in peers {
+        //         self.send(peer_ip, Message::BeaconPropose(serialized.clone()));
+        //     }
+        // }
+        false
     }
 
     /// Handles a `BlockRequest` message.
@@ -335,23 +375,6 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     fn puzzle_response(&self, peer_ip: SocketAddr, _serialized: PuzzleResponse<N>, _block: Block<N>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
-    }
-
-    /// TODO (howardwu): Consider deprecating this message type.
-    /// Broadcasts the `UnconfirmedBlock` message to all connected peers within the fork depth of the given block.
-    fn unconfirmed_block(&self, peer_ip: SocketAddr, serialized: UnconfirmedBlock<N>, block: Block<N>) -> bool {
-        // // Retrieve the connected peers by height.
-        // let mut peers = self.router().sync().get_sync_peers_by_height();
-        // // Retain the peers that 1) not the sender, and 2) are within the fork depth of the given unconfirmed block.
-        // peers.retain(|(ip, height)| *ip != peer_ip && *height < block.height() + ALEO_MAXIMUM_FORK_DEPTH);
-        //
-        // // Broadcast the `UnconfirmedBlock` to the peers.
-        // if !peers.is_empty() {
-        //     for (peer_ip, _) in peers {
-        //         self.send(peer_ip, Message::UnconfirmedBlock(serialized.clone()));
-        //     }
-        // }
-        true
     }
 
     /// Handles an `UnconfirmedSolution` message.
