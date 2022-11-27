@@ -14,8 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use pea2pea::{protocols::Handshake, Config, Connection, Node, Pea2Pea};
 use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, NodeType, Status};
-use snarkos_node_tcp::{protocols::Handshake, Config, Connection, Tcp, P2P};
 use snarkvm::prelude::{Block, FromBytes, Network, Testnet3 as CurrentNetwork};
 
 use futures_util::{sink::SinkExt, TryStreamExt};
@@ -29,20 +29,36 @@ const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 #[derive(Clone)]
 pub struct TestPeer {
-    tcp: Tcp,
+    node: Node,
     node_type: NodeType,
 }
 
-impl P2P for TestPeer {
-    fn tcp(&self) -> &Tcp {
-        &self.tcp
+impl Pea2Pea for TestPeer {
+    fn node(&self) -> &Node {
+        &self.node
     }
 }
 
 impl TestPeer {
+    pub async fn beacon() -> Self {
+        Self::new(NodeType::Beacon).await
+    }
+
+    pub async fn client() -> Self {
+        Self::new(NodeType::Client).await
+    }
+
+    pub async fn prover() -> Self {
+        Self::new(NodeType::Prover).await
+    }
+
+    pub async fn validator() -> Self {
+        Self::new(NodeType::Validator).await
+    }
+
     pub async fn new(node_type: NodeType) -> Self {
         let peer = Self {
-            tcp: Tcp::new(Config {
+            node: Node::new(Config {
                 listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
                 max_connections: 200,
                 ..Default::default()
@@ -68,7 +84,7 @@ impl TestPeer {
 #[async_trait::async_trait]
 impl Handshake for TestPeer {
     async fn perform_handshake(&self, mut conn: Connection) -> io::Result<Connection> {
-        let local_ip = self.tcp().listening_addr().expect("listening address should be present");
+        let local_ip = self.node().listening_addr().expect("listening address should be present");
 
         let stream = self.borrow_stream(&mut conn);
         let mut framed = Framed::new(stream, MessageCodec::<CurrentNetwork>::default());
