@@ -18,6 +18,7 @@ use crate::{Outbound, Router, REDUNDANCY_FACTOR};
 use snarkos_node_messages::{DisconnectReason, Message, PeerRequest, PuzzleRequest};
 use snarkvm::prelude::Network;
 
+use colored::Colorize;
 use rand::{prelude::IteratorRandom, rngs::OsRng};
 
 pub trait Heartbeat<N: Network>: Outbound<N> {
@@ -31,14 +32,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     /// Handles the heartbeat request.
     fn heartbeat(&self) {
         self.safety_check_minimum_number_of_peers();
-
-        // Log the connected peers.
-        let connected_peers = self.router().connected_peers();
-        match connected_peers.len() {
-            0 => debug!("No connected peers"),
-            1 => debug!("Connected to 1 peer: {connected_peers:?}"),
-            num_connected => debug!("Connected to {num_connected} peers: {connected_peers:?}"),
-        }
+        self.log_connected_peers();
 
         // Remove any stale connected peers.
         self.remove_stale_connected_peers();
@@ -62,6 +56,18 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         let is_beacon_or_validator = self.router().node_type().is_beacon() || self.router().node_type().is_validator();
         if !self.router().is_dev() && is_beacon_or_validator && Self::MINIMUM_NUMBER_OF_PEERS < 2 * REDUNDANCY_FACTOR {
             warn!("Caution - please raise the minimum number of peers to be above {}", 2 * REDUNDANCY_FACTOR);
+        }
+    }
+
+    /// This function logs the connected peers.
+    fn log_connected_peers(&self) {
+        // Log the connected peers.
+        let connected_peers = self.router().connected_peers();
+        let connected_peers_fmt = format!("{connected_peers:?}").dimmed();
+        match connected_peers.len() {
+            0 => debug!("No connected peers"),
+            1 => debug!("Connected to 1 peer: {connected_peers_fmt}"),
+            num_connected => debug!("Connected to {num_connected} peers {connected_peers_fmt}"),
         }
     }
 
@@ -104,7 +110,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         // Disconnect from the oldest connected peer, if one exists.
         if let Some(oldest) = oldest_peer {
             info!("Disconnecting from '{oldest}' (periodic refresh of peers)");
-            self.send(oldest, Message::Disconnect(DisconnectReason::PeerRefresh.into()));
+            let _ = self.send(oldest, Message::Disconnect(DisconnectReason::PeerRefresh.into()));
             // Disconnect from this peer.
             self.router().disconnect(oldest);
         }
