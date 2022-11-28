@@ -213,11 +213,9 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         if node_type.is_prover() || node_type.is_client() {
             // Find the sync peers.
             if let Some((sync_peers, _)) = self.router().sync().find_sync_peers() {
-                // Initialize an RNG.
-                let rng = &mut OsRng::default();
-                // Pick a sync peer at random.
-                if let Some(peer_ip) = sync_peers.into_keys().choose(rng) {
-                    // Send a "PuzzleRequest" to the peer.
+                // Choose the peer with the highest block height.
+                if let Some((peer_ip, _)) = sync_peers.into_iter().max_by_key(|(_, height)| *height) {
+                    // Request the coinbase puzzle from the peer.
                     self.send(peer_ip, Message::PuzzleRequest(PuzzleRequest));
                 }
             }
