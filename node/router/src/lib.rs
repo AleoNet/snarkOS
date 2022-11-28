@@ -87,7 +87,7 @@ impl<N: Network> Router<N> {
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
-    const MAXIMUM_CONNECTION_FAILURES: usize = 3;
+    const MAXIMUM_CONNECTION_FAILURES: usize = 5;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
