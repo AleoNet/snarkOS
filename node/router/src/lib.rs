@@ -229,9 +229,9 @@ impl<N: Network> Router<N> {
         self.restricted_peers.read().len()
     }
 
-    /// Returns the list of connected peers with their peer objects.
-    pub fn connected_peers_inner(&self) -> IndexMap<SocketAddr, Peer> {
-        self.connected_peers.read().clone()
+    /// Returns the connected peers.
+    pub fn get_connected_peers(&self) -> Vec<Peer> {
+        self.connected_peers.read().values().cloned().collect()
     }
 
     /// Returns the list of connected peers.

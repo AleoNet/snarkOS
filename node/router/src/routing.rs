@@ -49,7 +49,7 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
         self.router().spawn(async move {
             loop {
                 // Process a heartbeat in the router.
-                self_clone.heartbeat().await;
+                self_clone.heartbeat();
                 // Sleep for `HEARTBEAT_IN_SECS` seconds.
                 tokio::time::sleep(Duration::from_secs(Self::HEARTBEAT_IN_SECS)).await;
             }
