@@ -150,6 +150,9 @@ impl<N: Network> Router<N> {
             // Disconnect from this peer.
             let _disconnected = router.tcp.disconnect(peer_ip).await;
             debug_assert!(_disconnected);
+            // TODO (howardwu): Revisit this. It appears `handle_disconnect` does not necessarily trigger.
+            // Remove the peer from the connected peers.
+            router.remove_connected_peer(peer_ip);
         });
     }
 
