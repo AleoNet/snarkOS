@@ -89,10 +89,10 @@ impl<N: Network> Router<N> {
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
-    const MAXIMUM_CONNECTION_FAILURES: usize = 3;
+    const MAXIMUM_CONNECTION_FAILURES: usize = 5;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
-    const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
+    const RADIO_SILENCE_IN_SECS: u64 = 150; // 2.5 minutes
 }
 
 impl<N: Network> Router<N> {
@@ -231,10 +231,11 @@ impl<N: Network> Router<N> {
 
     /// Returns `true` if the given IP is restricted.
     pub fn is_restricted(&self, ip: &SocketAddr) -> bool {
-        match self.restricted_peers.read().get(ip) {
-            Some(timestamp) => timestamp.elapsed().as_secs() < Self::RADIO_SILENCE_IN_SECS,
-            None => false,
-        }
+        self.restricted_peers
+            .read()
+            .get(ip)
+            .map(|time| time.elapsed().as_secs() < Self::RADIO_SILENCE_IN_SECS)
+            .unwrap_or(false)
     }
 
     /// Returns the maximum number of connected peers.
@@ -245,6 +246,26 @@ impl<N: Network> Router<N> {
     /// Returns the number of connected peers.
     pub fn number_of_connected_peers(&self) -> usize {
         self.connected_peers.read().len()
+    }
+
+    /// Returns the number of connected beacons.
+    pub fn number_of_connected_beacons(&self) -> usize {
+        self.connected_peers.read().values().filter(|peer| peer.is_beacon()).count()
+    }
+
+    /// Returns the number of connected validators.
+    pub fn number_of_connected_validators(&self) -> usize {
+        self.connected_peers.read().values().filter(|peer| peer.is_validator()).count()
+    }
+
+    /// Returns the number of connected provers.
+    pub fn number_of_connected_provers(&self) -> usize {
+        self.connected_peers.read().values().filter(|peer| peer.is_prover()).count()
+    }
+
+    /// Returns the number of connected clients.
+    pub fn number_of_connected_clients(&self) -> usize {
+        self.connected_peers.read().values().filter(|peer| peer.is_client()).count()
     }
 
     /// Returns the number of candidate peers.
@@ -270,6 +291,26 @@ impl<N: Network> Router<N> {
     /// Returns the list of connected peers.
     pub fn connected_peers(&self) -> Vec<SocketAddr> {
         self.connected_peers.read().keys().copied().collect()
+    }
+
+    /// Returns the list of connected beacons.
+    pub fn connected_beacons(&self) -> Vec<SocketAddr> {
+        self.connected_peers.read().iter().filter(|(_, peer)| peer.is_beacon()).map(|(ip, _)| *ip).collect()
+    }
+
+    /// Returns the list of connected validators.
+    pub fn connected_validators(&self) -> Vec<SocketAddr> {
+        self.connected_peers.read().iter().filter(|(_, peer)| peer.is_validator()).map(|(ip, _)| *ip).collect()
+    }
+
+    /// Returns the list of connected provers.
+    pub fn connected_provers(&self) -> Vec<SocketAddr> {
+        self.connected_peers.read().iter().filter(|(_, peer)| peer.is_prover()).map(|(ip, _)| *ip).collect()
+    }
+
+    /// Returns the list of connected clients.
+    pub fn connected_clients(&self) -> Vec<SocketAddr> {
+        self.connected_peers.read().iter().filter(|(_, peer)| peer.is_client()).map(|(ip, _)| *ip).collect()
     }
 
     /// Returns the list of candidate peers.
@@ -312,37 +353,9 @@ impl<N: Network> Router<N> {
         }
     }
 
-    /// Returns the list of connected bootstrap peers.
-    pub fn connected_bootstrap_peers(&self) -> Vec<SocketAddr> {
-        let mut connected_bootstrap = Vec::new();
-        for bootstrap_ip in self.bootstrap_peers() {
-            if self.is_connected(&bootstrap_ip) {
-                connected_bootstrap.push(bootstrap_ip);
-            }
-        }
-        connected_bootstrap
-    }
-
     /// Returns the list of metrics for the connected peers.
     pub fn connected_metrics(&self) -> Vec<(SocketAddr, NodeType)> {
         self.connected_peers.read().iter().map(|(ip, peer)| (*ip, peer.node_type())).collect()
-    }
-
-    /// Returns the list of connected peers that are beacons.
-    pub fn connected_beacons(&self) -> Vec<SocketAddr> {
-        self.connected_peers
-            .read()
-            .iter()
-            .filter_map(|(ip, peer)| match peer.is_beacon() {
-                true => Some(*ip),
-                false => None,
-            })
-            .collect()
-    }
-
-    /// Returns the oldest connected peer.
-    pub fn oldest_connected_peer(&self) -> Option<SocketAddr> {
-        self.connected_peers.read().iter().min_by_key(|(_, peer)| peer.last_seen()).map(|(peer_ip, _)| *peer_ip)
     }
 
     /// Inserts the given peer into the connected peers.
