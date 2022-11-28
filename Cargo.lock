@@ -2665,6 +2665,7 @@ dependencies = [
  "async-trait",
  "bincode 1.3.3",
  "bytes",
+ "colored",
  "futures",
  "indexmap",
  "linked-hash-map",

@@ -133,8 +133,8 @@ impl<N: Network> Router<N> {
             debug!("Connecting to {peer_ip}...");
             if let Err(error) = router.tcp.connect(peer_ip).await {
                 warn!("{error}");
-                // Restrict the peer, if the connection was not successful and is not a trusted peer.
-                if !router.trusted_peers.contains(&peer_ip) {
+                // Restrict the peer, if the connection failed, and is neither trusted nor a bootstrap peer.
+                if !router.trusted_peers.contains(&peer_ip) && !router.bootstrap_peers().contains(&peer_ip) {
                     router.insert_restricted_peer(peer_ip);
                 }
             }
@@ -150,8 +150,10 @@ impl<N: Network> Router<N> {
             // Disconnect from this peer.
             let _disconnected = router.tcp.disconnect(peer_ip).await;
             debug_assert!(_disconnected);
-            // Restrict this peer to prevent reconnection.
-            router.insert_restricted_peer(peer_ip);
+            // TODO (howardwu): Revisit this. It appears `handle_disconnect` does not necessarily trigger.
+            //  See https://github.com/AleoHQ/snarkOS/issues/2102.
+            // Remove the peer from the connected peers.
+            router.remove_connected_peer(peer_ip);
         });
     }
 
@@ -229,9 +231,9 @@ impl<N: Network> Router<N> {
         self.restricted_peers.read().len()
     }
 
-    /// Returns the list of connected peers with their peer objects.
-    pub fn connected_peers_inner(&self) -> IndexMap<SocketAddr, Peer> {
-        self.connected_peers.read().clone()
+    /// Returns the connected peers.
+    pub fn get_connected_peers(&self) -> Vec<Peer> {
+        self.connected_peers.read().values().cloned().collect()
     }
 
     /// Returns the list of connected peers.
