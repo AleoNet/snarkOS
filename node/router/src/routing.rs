@@ -59,17 +59,6 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
     /// TODO (howardwu): Change this for Phase 3.
     /// Initialize a new instance of the puzzle request.
     fn initialize_puzzle_request(&self) {
-        if self.router().node_type().is_prover() && Self::PUZZLE_REQUEST_IN_SECS > 0 {
-            let self_clone = self.clone();
-            self.router().spawn(async move {
-                loop {
-                    // Handle the bootstrap peers.
-                    self_clone.handle_bootstrap_peers().await;
-                    // Sleep for brief period.
-                    tokio::time::sleep(Duration::from_millis(2500)).await;
-                }
-            });
-        }
         if !self.router().node_type().is_beacon() && Self::PUZZLE_REQUEST_IN_SECS > 0 {
             let self_clone = self.clone();
             self.router().spawn(async move {
