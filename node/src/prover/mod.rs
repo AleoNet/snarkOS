@@ -194,7 +194,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         loop {
             // If the node is not connected to any peers, then skip this iteration.
             if self.router.number_of_connected_peers() == 0 {
-                warn!("Skipping an iteration of the coinbase puzzle (no connected peers)");
+                trace!("Skipping an iteration of the coinbase puzzle (no connected peers)");
                 tokio::time::sleep(Duration::from_secs(N::ANCHOR_TIME as u64)).await;
                 continue;
             }
