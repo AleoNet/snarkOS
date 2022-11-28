@@ -18,6 +18,7 @@ use crate::{Outbound, Router};
 use snarkos_node_messages::{DisconnectReason, Message, PeerRequest};
 use snarkvm::prelude::Network;
 
+use colored::Colorize;
 use rand::{prelude::IteratorRandom, rngs::OsRng};
 
 pub trait Heartbeat<N: Network>: Outbound<N> {
@@ -31,14 +32,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     /// Handles the heartbeat request.
     fn heartbeat(&self) {
         self.safety_check_minimum_number_of_peers();
-
-        // Log the connected peers.
-        let connected_peers = self.router().connected_peers();
-        match connected_peers.len() {
-            0 => debug!("No connected peers"),
-            1 => debug!("Connected to 1 peer: {connected_peers:?}"),
-            num_connected => debug!("Connected to {num_connected} peers: {connected_peers:?}"),
-        }
+        self.log_connected_peers();
 
         // Remove any stale connected peers.
         self.remove_stale_connected_peers();
@@ -55,6 +49,18 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
     /// This function performs safety checks on the setting for the minimum number of peers.
     fn safety_check_minimum_number_of_peers(&self) {
         assert!(Self::MINIMUM_NUMBER_OF_PEERS <= Self::MAXIMUM_NUMBER_OF_PEERS);
+    }
+
+    /// This function logs the connected peers.
+    fn log_connected_peers(&self) {
+        // Log the connected peers.
+        let connected_peers = self.router().connected_peers();
+        let connected_peers_fmt = format!("{connected_peers:?}").dimmed();
+        match connected_peers.len() {
+            0 => debug!("No connected peers"),
+            1 => debug!("Connected to 1 peer: {connected_peers_fmt}"),
+            num_connected => debug!("Connected to {num_connected} peers {connected_peers_fmt}"),
+        }
     }
 
     /// This function removes any connected peers that have not communicated within the predefined time.
