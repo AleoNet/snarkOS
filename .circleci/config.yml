@@ -19,6 +19,8 @@ commands:
             $ProgressPreference = "SilentlyContinue"
             Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
             & C:\rustup-init.exe -y --default-toolchain "stable-x86_64-pc-windows-msvc" --no-modify-path --profile minimal
+            choco install llvm -y
+            refreshenv
             $env:Path += ";C:\Users\circleci\.cargo\bin"
             rustc -Vv
             cargo --version
@@ -132,10 +134,19 @@ commands:
       - run: rustup toolchain install nightly-x86_64-unknown-linux-gnu
 
 jobs:
+  integration:
+    docker:
+      - image: cimg/rust:1.65
+    resource_class: 2xlarge
+    steps:
+      - run_serial:
+          workspace_member: .integration
+          cache_key: snarkos-integration-cache
+
   snarkos:
     docker:
-      - image: cimg/rust:1.64
-    resource_class: xlarge
+      - image: cimg/rust:1.65
+    resource_class: 2xlarge
     steps:
       - run_serial:
           workspace_member: .
@@ -143,7 +154,7 @@ jobs:
 
   account:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - run_serial:
@@ -152,7 +163,7 @@ jobs:
 
   cli:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - run_serial:
@@ -161,7 +172,7 @@ jobs:
 
   display:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - run_serial:
@@ -170,34 +181,34 @@ jobs:
 
   node:
     docker:
-      - image: cimg/rust:1.64
-    resource_class: xlarge
+      - image: cimg/rust:1.65
+    resource_class: 2xlarge
     steps:
       - run_serial:
           workspace_member: node
           cache_key: snarkos-node-cache
 
+  node-cdn:
+    docker:
+      - image: cimg/rust:1.65
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/cdn
+          cache_key: snarkos-node-cdn-cache
+
   node-consensus:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: 2xlarge
     steps:
       - run_serial:
           workspace_member: node/consensus
           cache_key: snarkos-node-consensus-cache
 
-  node-executor:
-    docker:
-      - image: cimg/rust:1.64
-    resource_class: xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/executor
-          cache_key: snarkos-node-executor-cache
-
   node-ledger:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -206,7 +217,7 @@ jobs:
 
   node-messages:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - run_serial:
@@ -215,7 +226,7 @@ jobs:
 
   node-rest:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - run_serial:
@@ -224,7 +235,7 @@ jobs:
 
   node-router:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - run_serial:
@@ -233,8 +244,8 @@ jobs:
 
   node-store:
     docker:
-      - image: cimg/rust:1.64
-    resource_class: xlarge
+      - image: cimg/rust:1.65
+    resource_class: 2xlarge
     steps:
       - run_serial:
           workspace_member: node/store
@@ -242,7 +253,7 @@ jobs:
 
   check-fmt:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: xlarge
     steps:
       - checkout
@@ -258,7 +269,7 @@ jobs:
 
   check-clippy:
     docker:
-      - image: cimg/rust:1.64
+      - image: cimg/rust:1.65
     resource_class: 2xlarge
     steps:
       - checkout
@@ -276,7 +287,7 @@ jobs:
   verify-windows:
     executor:
       name: windows/default
-      size: 2xlarge
+      size: xlarge
     environment:
       CARGO_NET_GIT_FETCH_WITH_CLI: "true"
     parameters:
@@ -291,13 +302,14 @@ workflows:
 
   main-workflow:
     jobs:
+      - integration
       - snarkos
       - account
       - cli
       - display
       - node
+      - node-cdn
       - node-consensus
-      - node-executor
       - node-ledger
       - node-messages
       - node-rest
@@ -313,7 +325,7 @@ workflows:
             parameters:
               workspace_member: [
                 account,
-#                cli,
-#                display
-#                node
+                cli,
+                display,
+                node
               ]

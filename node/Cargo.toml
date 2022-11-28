@@ -30,6 +30,16 @@ version = "1"
 [dependencies.async-trait]
 version = "0.1"
 
+[dependencies.colored]
+version = "2"
+
+[dependencies.futures-util]
+version = "0.3"
+features = ["sink"]
+
+[dependencies.num_cpus]
+version = "1"
+
 [dependencies.parking_lot]
 version = "0.12"
 
@@ -43,11 +53,11 @@ version = "1"
 [dependencies.snarkos-account]
 path = "../account"
 
+[dependencies.snarkos-node-cdn]
+path = "./cdn"
+
 [dependencies.snarkos-node-consensus]
 path = "./consensus"
-
-[dependencies.snarkos-node-executor]
-path = "./executor"
 
 [dependencies.snarkos-node-ledger]
 path = "./ledger"
@@ -64,6 +74,9 @@ path = "./router"
 [dependencies.snarkos-node-store]
 path = "./store"
 
+[dependencies.snarkos-node-tcp]
+path = "./tcp"
+
 [dependencies.snarkvm]
 workspace = true
 
@@ -71,14 +84,17 @@ workspace = true
 version = "0.3"
 
 [dependencies.tokio]
-version = "1.21"
+version = "1.22"
 features = ["rt", "signal"]
+
+[dependencies.tokio-util]
+version = "0.7"
 
 [dependencies.tracing]
 version = "0.1"
 
-[dev-dependencies.tokio-test]
-version = "0.4"
+[dev-dependencies.pea2pea]
+version = "0.40"
 
 [dev-dependencies.rand_chacha]
 version = "0.3.0"

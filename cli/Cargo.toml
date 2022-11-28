@@ -30,6 +30,12 @@ features = ["derive"]
 [dependencies.colored]
 version = "2"
 
+[dependencies.crossterm]
+version = "0.25"
+
+[target.'cfg(target_family = "unix")'.dependencies.nix]
+version = "0.25"
+
 [dependencies.num_cpus]
 version = "1"
 
@@ -65,6 +71,9 @@ path = "../display"
 [dependencies.snarkos-node]
 path = "../node"
 
+[dependencies.snarkos-node-rest]
+path = "../node/rest"
+
 [dependencies.snarkvm]
 workspace = true
 
@@ -72,6 +81,9 @@ workspace = true
 version = "1.0"
 
 [dependencies.tokio]
-version = "1.21"
+version = "1.22"
 features = ["rt"]
 
+[dependencies.tracing-subscriber]
+version = "0.3"
+features = [ "env-filter" ]

@@ -18,18 +18,32 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_executor::{Executor, NodeType};
-use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
-use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
+use snarkos_node_messages::{Message, NodeType, PuzzleResponse, UnconfirmedSolution};
+use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
+use snarkos_node_tcp::{
+    protocols::{Disconnect, Handshake, Reading, Writing},
+    P2P,
+};
+use snarkvm::prelude::{
+    Address,
+    Block,
+    CoinbasePuzzle,
+    ConsensusStorage,
+    EpochChallenge,
+    Network,
+    PrivateKey,
+    ProverSolution,
+    ViewKey,
+};
 
 use anyhow::Result;
+use core::marker::PhantomData;
+use parking_lot::RwLock;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::sync::RwLock;
 
 /// A client node is a full node, capable of querying with the network.
 #[derive(Clone)]
-pub struct Client<N: Network> {
+pub struct Client<N: Network, C: ConsensusStorage<N>> {
     /// The account of the node.
     account: Account<N>,
     /// The router of the node.
@@ -40,27 +54,41 @@ pub struct Client<N: Network> {
     latest_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
     /// The latest block.
     latest_block: Arc<RwLock<Option<Block<N>>>>,
+    /// PhantomData.
+    _phantom: PhantomData<C>,
 }
 
-impl<N: Network> Client<N> {
+impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
     /// Initializes a new client node.
-    pub async fn new(node_ip: SocketAddr, private_key: PrivateKey<N>, trusted_peers: &[SocketAddr]) -> Result<Self> {
-        // Initialize the node account.
-        let account = Account::from(private_key)?;
+    pub async fn new(
+        node_ip: SocketAddr,
+        account: Account<N>,
+        trusted_peers: &[SocketAddr],
+        dev: Option<u16>,
+    ) -> Result<Self> {
         // Initialize the node router.
-        let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
+        let router = Router::new(
+            node_ip,
+            NodeType::Client,
+            account.address(),
+            trusted_peers,
+            Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            dev.is_some(),
+        )
+        .await?;
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
         let node = Self {
             account,
-            router: router.clone(),
+            router,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
+            _phantom: PhantomData,
         };
-        // Initialize the router handler.
-        router.initialize_handler(node.clone(), router_receiver).await;
+        // Initialize the routing.
+        node.initialize_routing().await;
         // Initialize the signal handler.
         node.handle_signals();
         // Return the node.
@@ -69,20 +97,10 @@ impl<N: Network> Client<N> {
 }
 
 #[async_trait]
-impl<N: Network> Executor for Client<N> {
-    /// The node type.
-    const NODE_TYPE: NodeType = NodeType::Client;
-}
-
-impl<N: Network> NodeInterface<N> for Client<N> {
+impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Client<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
-        Self::NODE_TYPE
-    }
-
-    /// Returns the node router.
-    fn router(&self) -> &Router<N> {
-        &self.router
+        self.router.node_type()
     }
 
     /// Returns the account private key of the node.
@@ -98,5 +116,20 @@ impl<N: Network> NodeInterface<N> for Client<N> {
     /// Returns the account address of the node.
     fn address(&self) -> Address<N> {
         self.account.address()
+    }
+
+    /// Returns `true` if the node is in development mode.
+    fn is_dev(&self) -> bool {
+        self.router.is_dev()
+    }
+
+    /// Shuts down the node.
+    async fn shut_down(&self) {
+        info!("Shutting down...");
+
+        // Shut down the router.
+        self.router.shut_down().await;
+
+        info!("Node has shut down.");
     }
 }

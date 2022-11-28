@@ -19,22 +19,26 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_executor::{spawn_task_loop, Executor, NodeType, Status};
 use snarkos_node_ledger::{Ledger, RecordMap};
 use snarkos_node_messages::{
     Data,
     Message,
+    NodeType,
     PuzzleResponse,
     UnconfirmedBlock,
     UnconfirmedSolution,
     UnconfirmedTransaction,
 };
 use snarkos_node_rest::Rest;
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
-use snarkos_node_store::ConsensusDB;
+use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
+use snarkos_node_tcp::{
+    protocols::{Disconnect, Handshake, Reading, Writing},
+    P2P,
+};
 use snarkvm::prelude::{
     Address,
     Block,
+    ConsensusStorage,
     Identifier,
     Network,
     PrivateKey,
@@ -58,72 +62,73 @@ use std::{
     },
 };
 use time::OffsetDateTime;
-use tokio::time::timeout;
+use tokio::{task::JoinHandle, time::timeout};
 
 /// A beacon is a full node, capable of producing blocks.
 #[derive(Clone)]
-pub struct Beacon<N: Network> {
+pub struct Beacon<N: Network, C: ConsensusStorage<N>> {
     /// The account of the node.
     account: Account<N>,
     /// The consensus module of the node.
-    consensus: Consensus<N, ConsensusDB<N>>,
+    consensus: Consensus<N, C>,
     /// The ledger of the node.
-    ledger: Ledger<N, ConsensusDB<N>>,
+    ledger: Ledger<N, C>,
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
-    rest: Option<Arc<Rest<N, ConsensusDB<N>>>>,
+    rest: Option<Arc<Rest<N, C, Self>>>,
     /// The time it to generate a block.
     block_generation_time: Arc<AtomicU64>,
     /// The unspent records.
     unspent_records: Arc<RwLock<RecordMap<N>>>,
+    /// The spawned handles.
+    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
 }
 
-impl<N: Network> Beacon<N> {
+impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     /// Initializes a new beacon node.
     pub async fn new(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
-        private_key: PrivateKey<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Option<Block<N>>,
+        cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
         let timer = timer!("Beacon::new");
 
-        // Initialize the node account.
-        let account = Account::from(private_key)?;
-        lap!(timer, "Initialize the account");
-
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
         lap!(timer, "Initialize the ledger");
+
+        // Initialize the CDN.
+        if let Some(base_url) = cdn {
+            // Sync the ledger with the CDN.
+            if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
+                crate::helpers::log_clean_error(dev);
+                return Err(error);
+            }
+            lap!(timer, "Initialize the CDN");
+        }
 
         // Initialize the consensus.
         let consensus = Consensus::new(ledger.clone())?;
         lap!(timer, "Initialize consensus");
 
         // Initialize the node router.
-        let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
+        let router = Router::new(
+            node_ip,
+            NodeType::Beacon,
+            account.address(),
+            trusted_peers,
+            Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            dev.is_some(),
+        )
+        .await?;
         lap!(timer, "Initialize the router");
-
-        // Initialize the REST server.
-        let rest = match rest_ip {
-            Some(rest_ip) => {
-                let server = Arc::new(Rest::start(
-                    rest_ip,
-                    account.address(),
-                    Some(consensus.clone()),
-                    ledger.clone(),
-                    router.clone(),
-                )?);
-                lap!(timer, "Initialize REST server");
-                Some(server)
-            }
-            None => None,
-        };
 
         // Initialize the block generation time.
         let block_generation_time = Arc::new(AtomicU64::new(2));
@@ -132,18 +137,25 @@ impl<N: Network> Beacon<N> {
         lap!(timer, "Retrieve the unspent records");
 
         // Initialize the node.
-        let node = Self {
+        let mut node = Self {
             account,
-            consensus,
-            ledger,
-            router: router.clone(),
-            rest,
+            consensus: consensus.clone(),
+            ledger: ledger.clone(),
+            router,
+            rest: None,
             block_generation_time,
             unspent_records: Arc::new(RwLock::new(unspent_records)),
+            handles: Default::default(),
             shutdown: Default::default(),
         };
-        // Initialize the router handler.
-        router.initialize_handler(node.clone(), router_receiver).await;
+
+        // Initialize the REST server.
+        if let Some(rest_ip) = rest_ip {
+            node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?));
+            lap!(timer, "Initialize REST server");
+        }
+        // Initialize the routing.
+        node.initialize_routing().await;
         // Initialize the block production.
         node.initialize_block_production().await;
         // Initialize the signal handler.
@@ -156,46 +168,21 @@ impl<N: Network> Beacon<N> {
     }
 
     /// Returns the ledger.
-    pub fn ledger(&self) -> &Ledger<N, ConsensusDB<N>> {
+    pub fn ledger(&self) -> &Ledger<N, C> {
         &self.ledger
     }
 
     /// Returns the REST server.
-    pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>>>> {
+    pub fn rest(&self) -> &Option<Arc<Rest<N, C, Self>>> {
         &self.rest
     }
 }
 
 #[async_trait]
-impl<N: Network> Executor for Beacon<N> {
-    /// The node type.
-    const NODE_TYPE: NodeType = NodeType::Beacon;
-
-    /// Disconnects from peers and shuts down the node.
-    async fn shut_down(&self) {
-        info!("Shutting down...");
-        // Update the node status.
-        Self::status().update(Status::ShuttingDown);
-
-        // Shut down the ledger.
-        trace!("Proceeding to shut down the ledger...");
-        self.shutdown.store(true, Ordering::SeqCst);
-
-        // Flush the tasks.
-        Self::resources().shut_down();
-        trace!("Node has shut down.");
-    }
-}
-
-impl<N: Network> NodeInterface<N> for Beacon<N> {
+impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Beacon<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
-        Self::NODE_TYPE
-    }
-
-    /// Returns the node router.
-    fn router(&self) -> &Router<N> {
-        &self.router
+        self.router.node_type()
     }
 
     /// Returns the account private key of the node.
@@ -212,10 +199,37 @@ impl<N: Network> NodeInterface<N> for Beacon<N> {
     fn address(&self) -> Address<N> {
         self.account.address()
     }
+
+    /// Returns `true` if the node is in development mode.
+    fn is_dev(&self) -> bool {
+        self.router.is_dev()
+    }
+
+    /// Shuts down the node.
+    async fn shut_down(&self) {
+        info!("Shutting down...");
+
+        // Shut down block production.
+        trace!("Shutting down block production...");
+        self.shutdown.store(true, Ordering::SeqCst);
+
+        // Abort the tasks.
+        trace!("Shutting down the beacon...");
+        self.handles.read().iter().for_each(|handle| handle.abort());
+
+        // Shut down the router.
+        self.router.shut_down().await;
+
+        // Shut down the ledger.
+        trace!("Shutting down the ledger...");
+        // self.ledger.shut_down().await;
+
+        info!("Node has shut down.");
+    }
 }
 
 /// A helper method to check if the coinbase target has been met.
-async fn check_for_coinbase<N: Network>(consensus: Consensus<N, ConsensusDB<N>>) {
+async fn check_for_coinbase<N: Network, C: ConsensusStorage<N>>(consensus: Consensus<N, C>) {
     loop {
         // Check if the coinbase target has been met.
         match consensus.is_coinbase_target_met() {
@@ -228,11 +242,11 @@ async fn check_for_coinbase<N: Network>(consensus: Consensus<N, ConsensusDB<N>>)
     }
 }
 
-impl<N: Network> Beacon<N> {
+impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     /// Initialize a new instance of block production.
     async fn initialize_block_production(&self) {
         let beacon = self.clone();
-        spawn_task_loop!(Self, {
+        self.handles.write().push(tokio::spawn(async move {
             // Expected time per block.
             const ROUND_TIME: u64 = 15; // 15 seconds per block
 
@@ -273,7 +287,7 @@ impl<N: Network> Beacon<N> {
                     break;
                 }
             }
-        });
+        }));
     }
 
     /// Produces the next block and propagates it to all peers.
@@ -453,9 +467,7 @@ impl<N: Network> Beacon<N> {
         });
 
         // Propagate the block to all peers.
-        if let Err(error) = self.router.process(RouterRequest::MessagePropagate(message, vec![])).await {
-            trace!("Failed to broadcast the next block: {error}");
-        }
+        self.propagate(message, vec![]);
 
         Ok(())
     }
@@ -478,22 +490,30 @@ mod tests {
         // Specify the node attributes.
         let node = SocketAddr::from_str("0.0.0.0:4133").unwrap();
         let rest = SocketAddr::from_str("0.0.0.0:3033").unwrap();
-
         let dev = Some(0);
 
         // Initialize an (insecure) fixed RNG.
         let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
-        // Initialize the beacon private key.
-        let beacon_private_key = PrivateKey::<CurrentNetwork>::new(&mut rng)?;
+        // Initialize the beacon account.
+        let beacon_account = Account::<CurrentNetwork>::new(&mut rng).unwrap();
         // Initialize a new VM.
         let vm = VM::from(ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?)?;
         // Initialize the genesis block.
-        let genesis = Block::genesis(&vm, &beacon_private_key, &mut rng)?;
+        let genesis = Block::genesis(&vm, beacon_account.private_key(), &mut rng)?;
 
         println!("Initializing beacon node...");
 
-        let beacon =
-            Beacon::<CurrentNetwork>::new(node, Some(rest), beacon_private_key, &[], Some(genesis), dev).await.unwrap();
+        let beacon = Beacon::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
+            node,
+            Some(rest),
+            beacon_account,
+            &[],
+            Some(genesis),
+            None,
+            dev,
+        )
+        .await
+        .unwrap();
 
         println!(
             "Loaded beacon node with {} blocks and {} records",

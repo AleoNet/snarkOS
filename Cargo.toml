@@ -22,13 +22,15 @@ members = [
     "cli",
     "display",
     "node",
+    "node/cdn",
     "node/consensus",
-    "node/executor",
     "node/ledger",
     "node/messages",
     "node/rest",
     "node/router",
-    "node/store"
+    "node/store",
+    "node/tcp",
+    ".integration",
 ]
 
 [[bin]]
@@ -61,11 +63,11 @@ path = "./display"
 [dependencies.snarkos-node]
 path = "./node"
 
+[dependencies.snarkos-node-cdn]
+path = "./node/cdn"
+
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"
-
-[dependencies.snarkos-node-executor]
-path = "./node/executor"
 
 [dependencies.snarkos-node-ledger]
 path = "./node/ledger"
@@ -81,6 +83,9 @@ path = "./node/router"
 
 [dependencies.snarkos-node-store]
 path = "./node/store"
+
+[dependencies.snarkos-node-tcp]
+path = "./node/tcp"
 
 [dev-dependencies.rusty-hook]
 version = "0.11.2"

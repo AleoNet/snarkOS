@@ -45,9 +45,6 @@ version = "0.8"
 version = "1"
 optional = true
 
-[dependencies.snarkos-node-store]
-path = "../store"
-
 [dependencies.snarkvm]
 workspace = true
 

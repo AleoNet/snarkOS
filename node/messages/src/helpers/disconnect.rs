@@ -21,6 +21,8 @@ use serde::{Deserialize, Serialize};
 pub enum DisconnectReason {
     /// The fork length limit was exceeded.
     ExceededForkRange,
+    /// The peer's challenge response is invalid.
+    InvalidChallengeResponse,
     /// The peer's client uses an invalid fork depth.
     InvalidForkDepth,
     /// The node is a sync node and the peer is ahead.
@@ -33,6 +35,8 @@ pub enum DisconnectReason {
     OutdatedClientVersion,
     /// Dropping a dead connection.
     PeerHasDisconnected,
+    /// Dropping a connection for a periodic refresh.
+    PeerRefresh,
     /// The node is shutting down.
     ShuttingDown,
     /// The sync node has served its purpose.

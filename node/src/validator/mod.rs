@@ -18,29 +18,41 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_executor::{Executor, NodeType, Status};
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::{Message, PuzzleResponse, UnconfirmedSolution};
+use snarkos_node_messages::{NodeType, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
-use snarkos_node_router::{Handshake, Inbound, Outbound, Router, RouterRequest};
-use snarkos_node_store::ConsensusDB;
-use snarkvm::prelude::{Address, Block, CoinbasePuzzle, EpochChallenge, Network, PrivateKey, ProverSolution, ViewKey};
+use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
+use snarkos_node_tcp::{
+    protocols::{Disconnect, Handshake, Reading, Writing},
+    P2P,
+};
+use snarkvm::prelude::{
+    Address,
+    Block,
+    CoinbasePuzzle,
+    ConsensusStorage,
+    EpochChallenge,
+    Network,
+    PrivateKey,
+    ProverSolution,
+    ViewKey,
+};
 
 use anyhow::Result;
+use parking_lot::RwLock;
 use std::{net::SocketAddr, sync::Arc};
-use tokio::sync::RwLock;
 
 /// A validator is a full node, capable of validating blocks.
 #[derive(Clone)]
-pub struct Validator<N: Network> {
+pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     /// The account of the node.
     account: Account<N>,
     /// The ledger of the node.
-    ledger: Ledger<N, ConsensusDB<N>>,
+    ledger: Ledger<N, C>,
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
-    rest: Option<Arc<Rest<N, ConsensusDB<N>>>>,
+    rest: Option<Arc<Rest<N, C, Self>>>,
     /// The coinbase puzzle.
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The latest epoch challenge.
@@ -51,44 +63,59 @@ pub struct Validator<N: Network> {
     latest_puzzle_response: Arc<RwLock<Option<PuzzleResponse<N>>>>,
 }
 
-impl<N: Network> Validator<N> {
+impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Initializes a new validator node.
     pub async fn new(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
-        private_key: PrivateKey<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         genesis: Option<Block<N>>,
+        cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        // Initialize the node account.
-        let account = Account::from(private_key)?;
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
-        // Initialize the node router.
-        let (router, router_receiver) = Router::new::<Self>(node_ip, account.address(), trusted_peers).await?;
-        // Initialize the REST server.
-        let rest = match rest_ip {
-            Some(rest_ip) => {
-                Some(Arc::new(Rest::start(rest_ip, account.address(), None, ledger.clone(), router.clone())?))
+        // Initialize the CDN.
+        if let Some(base_url) = cdn {
+            // Sync the ledger with the CDN.
+            if let Err((_, error)) = snarkos_node_cdn::sync_ledger_with_cdn(&base_url, ledger.clone()).await {
+                crate::helpers::log_clean_error(dev);
+                return Err(error);
             }
-            None => None,
-        };
+        }
+
+        // Initialize the node router.
+        let router = Router::new(
+            node_ip,
+            NodeType::Validator,
+            account.address(),
+            trusted_peers,
+            Self::MAXIMUM_NUMBER_OF_PEERS as u16,
+            dev.is_some(),
+        )
+        .await?;
+
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
-        let node = Self {
+        let mut node = Self {
             account,
-            ledger,
-            router: router.clone(),
-            rest,
+            ledger: ledger.clone(),
+            router,
+            rest: None,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
             latest_block: Default::default(),
             latest_puzzle_response: Default::default(),
         };
-        // Initialize the router handler.
-        router.initialize_handler(node.clone(), router_receiver).await;
+
+        // Initialize the REST server.
+        if let Some(rest_ip) = rest_ip {
+            node.rest = Some(Arc::new(Rest::start(rest_ip, None, ledger, Arc::new(node.clone()))?));
+        }
+        // Initialize the routing.
+        node.initialize_routing().await;
         // Initialize the signal handler.
         node.handle_signals();
         // Return the node.
@@ -96,46 +123,21 @@ impl<N: Network> Validator<N> {
     }
 
     /// Returns the ledger.
-    pub fn ledger(&self) -> &Ledger<N, ConsensusDB<N>> {
+    pub fn ledger(&self) -> &Ledger<N, C> {
         &self.ledger
     }
 
     /// Returns the REST server.
-    pub fn rest(&self) -> &Option<Arc<Rest<N, ConsensusDB<N>>>> {
+    pub fn rest(&self) -> &Option<Arc<Rest<N, C, Self>>> {
         &self.rest
     }
 }
 
 #[async_trait]
-impl<N: Network> Executor for Validator<N> {
-    /// The node type.
-    const NODE_TYPE: NodeType = NodeType::Validator;
-
-    /// Disconnects from peers and shuts down the node.
-    async fn shut_down(&self) {
-        info!("Shutting down...");
-        // Update the node status.
-        Self::status().update(Status::ShuttingDown);
-
-        // Shut down the ledger.
-        trace!("Proceeding to shut down the ledger...");
-        // self.state.ledger().shut_down().await;
-
-        // Flush the tasks.
-        Self::resources().shut_down();
-        trace!("Node has shut down.");
-    }
-}
-
-impl<N: Network> NodeInterface<N> for Validator<N> {
+impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
-        Self::NODE_TYPE
-    }
-
-    /// Returns the node router.
-    fn router(&self) -> &Router<N> {
-        &self.router
+        self.router.node_type()
     }
 
     /// Returns the account private key of the node.
@@ -151,5 +153,24 @@ impl<N: Network> NodeInterface<N> for Validator<N> {
     /// Returns the account address of the node.
     fn address(&self) -> Address<N> {
         self.account.address()
+    }
+
+    /// Returns `true` if the node is in development mode.
+    fn is_dev(&self) -> bool {
+        self.router.is_dev()
+    }
+
+    /// Shuts down the node.
+    async fn shut_down(&self) {
+        info!("Shutting down...");
+
+        // Shut down the router.
+        self.router.shut_down().await;
+
+        // Shut down the ledger.
+        trace!("Shutting down the ledger...");
+        // self.ledger.shut_down().await;
+
+        info!("Node has shut down.");
     }
 }

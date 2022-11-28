@@ -16,16 +16,26 @@
 
 use snarkos_account::Account;
 use snarkos_display::Display;
-use snarkos_node::Node;
+use snarkos_node::{Node, NodeType};
 use snarkvm::prelude::{Block, ConsensusMemory, ConsensusStore, Network, PrivateKey, Testnet3, VM};
 
 use anyhow::{bail, Result};
 use clap::Parser;
+use colored::Colorize;
 use core::str::FromStr;
-use rand::{seq::SliceRandom, SeedableRng};
+use rand::SeedableRng;
 use rand_chacha::ChaChaRng;
 use std::{net::SocketAddr, path::PathBuf};
 use tokio::runtime::{self, Runtime};
+
+/// The recommended minimum number of 'open files' limit for a beacon.
+/// Beacons should be able to handle at least 1000 concurrent connections, each requiring 2 sockets.
+#[cfg(target_family = "unix")]
+const RECOMMENDED_MIN_NOFILES_LIMIT_BEACON: u64 = 2048;
+/// The recommended minimum number of 'open files' limit for a validator.
+/// Validators should be able to handle at least 500 concurrent connections, each requiring 2 sockets.
+#[cfg(target_family = "unix")]
+const RECOMMENDED_MIN_NOFILES_LIMIT_VALIDATOR: u64 = 1024;
 
 /// Starts the snarkOS node.
 #[derive(Clone, Debug, Parser)]
@@ -63,12 +73,15 @@ pub struct Start {
     #[clap(long)]
     pub norest: bool,
 
-    /// Specify the verbosity of the node [options: 0, 1, 2, 3]
+    /// Specify the verbosity of the node [options: 0, 1, 2, 3, 4]
     #[clap(default_value = "2", long = "verbosity")]
     pub verbosity: u8,
     /// If the flag is set, the node will not render the display.
     #[clap(long)]
     pub nodisplay: bool,
+    /// Enables the node to prefetch initial blocks from a CDN.
+    #[clap(default_value = "https://vm.aleo.org/api", long = "cdn")]
+    pub cdn: String,
     /// Specify the path to the file where logs will be stored.
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
     pub logfile: PathBuf,
@@ -77,6 +90,8 @@ pub struct Start {
 impl Start {
     /// Starts the snarkOS node.
     pub fn parse(self) -> Result<String> {
+        // Initialize the logger.
+        let log_receiver = crate::helpers::initialize_logger(self.verbosity, self.nodisplay, self.logfile.clone());
         // Initialize the runtime.
         Self::runtime().block_on(async move {
             // Clone the configurations.
@@ -86,9 +101,11 @@ impl Start {
                 3 => {
                     // Parse the node from the configurations.
                     let node = cli.parse_node::<Testnet3>().await.expect("Failed to parse the node");
-                    // Initialize the display.
-                    Display::start(node, cli.verbosity, cli.nodisplay, cli.logfile)
-                        .expect("Failed to initialize the display");
+                    // If the display is enabled, render the display.
+                    if !cli.nodisplay {
+                        // Initialize the display.
+                        Display::start(node, log_receiver).expect("Failed to initialize the display");
+                    }
                 }
                 _ => panic!("Invalid network ID specified"),
             };
@@ -120,7 +137,28 @@ impl Start {
         }
     }
 
-    /// Updates the configurations if the node is in development mode.
+    /// Returns the CDN to prefetch initial blocks from, from the given configurations.
+    fn parse_cdn(&self) -> Option<String> {
+        // Disable CDN if:
+        //  1. The node is in development mode.
+        //  2. The user has explicitly disabled CDN.
+        //  3. The node is a client (no need to sync).
+        //  4. The node is a prover (no need to sync).
+        if self.dev.is_some() || self.cdn.is_empty() || self.client.is_some() || self.prover.is_some() {
+            None
+        }
+        // Check for an edge case, where the node defaults to a client.
+        else if let (None, None, None, None) = (&self.beacon, &self.validator, &self.prover, &self.client) {
+            None
+        }
+        // Enable the CDN otherwise.
+        else {
+            Some(self.cdn.clone())
+        }
+    }
+
+    /// Updates the configurations if the node is in development mode, and returns the
+    /// alternative genesis block if the node is in development mode.
     fn parse_development<N: Network>(&mut self, trusted_peers: &mut Vec<SocketAddr>) -> Result<Option<Block<N>>> {
         // If `--dev` is set, assume the dev nodes are initialized from 0 to `dev`,
         // and add each of them to the trusted peers. In addition, set the node IP to `4130 + dev`,
@@ -155,8 +193,8 @@ impl Start {
             // A helper method to set the account private key in the node type.
             let sample_account = |node: &mut Option<String>, is_beacon: bool| -> Result<()> {
                 let account = match is_beacon {
-                    true => Account::<N>::from(beacon_private_key)?,
-                    false => Account::<N>::sample()?,
+                    true => Account::<N>::try_from(beacon_private_key)?,
+                    false => Account::<N>::new(&mut rand::thread_rng())?,
                 };
                 *node = Some(account.private_key().to_string());
                 println!(
@@ -180,27 +218,20 @@ impl Start {
 
             Ok(Some(genesis))
         } else {
-            // Prepare the bootstrap.
-            let bootstrap = [
-                "164.92.111.59:4133",
-                "159.223.204.96:4133",
-                "167.71.219.176:4133",
-                "157.245.205.209:4133",
-                "134.122.95.106:4133",
-                "161.35.24.55:4133",
-                "138.68.103.139:4133",
-                "207.154.215.49:4133",
-                "46.101.114.158:4133",
-                "138.197.190.94:4133",
-            ];
-
-            // Include a bootstrap node, as the node is not in development mode.
-            match bootstrap.choose(&mut rand::thread_rng()) {
-                Some(ip) => trusted_peers.push(SocketAddr::from_str(ip)?),
-                None => bail!("Failed to choose a bootstrap node"),
-            }
-
             Ok(None)
+        }
+    }
+
+    /// Returns the node account and node type, from the given configurations.
+    fn parse_account<N: Network>(&self) -> Result<(Account<N>, NodeType)> {
+        // Ensures only one of the four flags is set. If no flags are set, defaults to a client node.
+        match (&self.beacon, &self.validator, &self.prover, &self.client) {
+            (Some(private_key), None, None, None) => Ok((Account::<N>::from_str(private_key)?, NodeType::Beacon)),
+            (None, Some(private_key), None, None) => Ok((Account::<N>::from_str(private_key)?, NodeType::Validator)),
+            (None, None, Some(private_key), None) => Ok((Account::<N>::from_str(private_key)?, NodeType::Prover)),
+            (None, None, None, Some(private_key)) => Ok((Account::<N>::from_str(private_key)?, NodeType::Client)),
+            (None, None, None, None) => Ok((Account::<N>::new(&mut rand::thread_rng())?, NodeType::Client)),
+            _ => bail!("Unsupported node configuration"),
         }
     }
 
@@ -208,10 +239,13 @@ impl Start {
     #[rustfmt::skip]
     async fn parse_node<N: Network>(&mut self) -> Result<Node<N>> {
         // Print the welcome.
-        println!("{}", Display::<N>::welcome_message());
+        println!("{}", crate::helpers::welcome_message());
 
         // Parse the trusted IPs to connect to.
         let mut trusted_peers = self.parse_trusted_peers()?;
+
+        // Parse the CDN.
+        let cdn = self.parse_cdn();
 
         // Parse the development configurations, and determine the genesis block.
         let genesis = self.parse_development::<N>(&mut trusted_peers)?;
@@ -222,14 +256,46 @@ impl Start {
             false => Some(self.rest),
         };
 
-        // Ensures only one of the four flags is set. If no flags are set, defaults to a client node.
-        match (&self.beacon, &self.validator, &self.prover, &self.client) {
-            (Some(private_key), None, None, None) => Node::new_beacon(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, self.dev).await,
-            (None, Some(private_key), None, None) => Node::new_validator(self.node, rest_ip, PrivateKey::<N>::from_str(private_key)?, &trusted_peers, genesis, self.dev).await,
-            (None, None, Some(private_key), None) => Node::new_prover(self.node, PrivateKey::<N>::from_str(private_key)?, &trusted_peers).await,
-            (None, None, None, Some(private_key)) => Node::new_client(self.node, PrivateKey::<N>::from_str(private_key)?, &trusted_peers).await,
-            (None, None, None, None) => Node::new_client(self.node, PrivateKey::<N>::new(&mut rand::thread_rng())?, &trusted_peers).await,
-            _ => bail!("Unsupported node configuration"),
+        // Parse the node account and node type.
+        let (account, node_type) = self.parse_account::<N>()?;
+
+        // If the display is not enabled, render the welcome message.
+        if self.nodisplay {
+            // Print the Aleo address.
+            println!("🪪 Your Aleo address is {}.\n", account.address().to_string().bold());
+            // Print the node type and network.
+            println!(
+                "🧭 Starting {} on {}.\n",
+                node_type.description().bold(),
+                N::NAME.bold()
+            );
+
+            if let Some(rest_ip) = rest_ip {
+                println!("🌐 Starting the REST server at {}.\n", rest_ip.to_string().bold());
+
+                if let Ok(jwt_token) = snarkos_node_rest::Claims::new(account.address()).to_jwt_string() {
+                    println!("🔑 Your one-time JWT token is {}\n", jwt_token.dimmed());
+                }
+            }
+        }
+
+        // If the node is a beacon, check if the open files limit is lower than recommended.
+        if node_type.is_beacon() {
+            #[cfg(target_family = "unix")]
+            crate::helpers::check_open_files_limit(RECOMMENDED_MIN_NOFILES_LIMIT_BEACON);
+        }
+        // If the node is a validator, check if the open files limit is lower than recommended.
+        if node_type.is_validator() {
+            #[cfg(target_family = "unix")]
+            crate::helpers::check_open_files_limit(RECOMMENDED_MIN_NOFILES_LIMIT_VALIDATOR);
+        }
+
+        // Initialize the node.
+        match node_type {
+            NodeType::Beacon => Node::new_beacon(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
+            NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, self.dev).await,
+            NodeType::Client => Node::new_client(self.node, account, &trusted_peers, self.dev).await,
         }
     }
 
@@ -286,6 +352,97 @@ mod tests {
             SocketAddr::from_str("1.2.3.4:5").unwrap(),
             SocketAddr::from_str("6.7.8.9:0").unwrap()
         ]);
+    }
+
+    #[test]
+    fn test_parse_cdn() {
+        // Beacon (Prod)
+        let config = Start::try_parse_from(["snarkos", "--beacon", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_some());
+        let config = Start::try_parse_from(["snarkos", "--beacon", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_some());
+        let config = Start::try_parse_from(["snarkos", "--beacon", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Beacon (Dev)
+        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Validator (Prod)
+        let config = Start::try_parse_from(["snarkos", "--validator", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_some());
+        let config = Start::try_parse_from(["snarkos", "--validator", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_some());
+        let config = Start::try_parse_from(["snarkos", "--validator", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Validator (Dev)
+        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Prover (Prod)
+        let config = Start::try_parse_from(["snarkos", "--prover", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--prover", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--prover", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Prover (Dev)
+        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Client (Prod)
+        let config = Start::try_parse_from(["snarkos", "--client", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--client", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--client", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Client (Dev)
+        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--client", "aleo1xx"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--client", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--client", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Default (Prod)
+        let config = Start::try_parse_from(["snarkos"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+
+        // Default (Dev)
+        let config = Start::try_parse_from(["snarkos", "--dev", "0"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--cdn", "url"].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--cdn", ""].iter()).unwrap();
+        assert!(config.parse_cdn().is_none());
     }
 
     #[test]

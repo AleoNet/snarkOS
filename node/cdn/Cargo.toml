@@ -1,0 +1,61 @@
+[package]
+name = "snarkos-node-cdn"
+version = "2.0.2"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A CDN client for a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "GPL-3.0"
+edition = "2021"
+
+[features]
+default = [ "parallel" ]
+parallel = [ "snarkvm/parallel", "snarkos-node-ledger/parallel" ]
+
+[dependencies.anyhow]
+version = "1"
+
+[dependencies.backoff]
+version = "0.4"
+features = [ "tokio" ]
+
+[dependencies.bincode]
+version = "1.0"
+
+[dependencies.colored]
+version = "2"
+
+[dependencies.futures]
+version = "0.3"
+
+[dependencies.parking_lot]
+version = "0.12"
+
+[dependencies.reqwest]
+version = "0.11"
+
+[dependencies.snarkos-node-ledger]
+path = "../ledger"
+
+[dependencies.snarkvm]
+workspace = true
+default-features = false
+features = ["synthesizer"]
+
+[dependencies.tokio]
+version = "1.21"
+features = ["rt"]
+
+[dependencies.tracing]
+version = "0.1"
+
+[dev-dependencies.tokio-test]
+version = "0.4"
