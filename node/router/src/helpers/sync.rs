@@ -31,7 +31,8 @@ pub const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
 pub const NUM_SYNC_CANDIDATE_PEERS: usize = REDUNDANCY_FACTOR * 5;
 
 pub const BLOCK_REQUEST_TIMEOUT_IN_SECS: u64 = 15; // 15 seconds
-pub const MAXIMUM_BLOCK_REQUESTS: usize = 50; // 50 requests
+pub const MAX_BLOCK_REQUESTS: usize = 50; // 50 requests
+pub const MAX_BLOCK_REQUEST_TIMEOUTS: usize = 5; // 5 timeouts
 
 /// A tuple of the block hash (optional), previous block hash (optional), and sync IPs.
 pub type SyncRequest<N> = (Option<<N as Network>::BlockHash>, Option<<N as Network>::BlockHash>, IndexSet<SocketAddr>);
@@ -499,12 +500,21 @@ impl<N: Network> Sync<N> {
         // Retrieve the latest canon height.
         let latest_canon_height = self.latest_canon_height();
 
+        // Compute the timeout frequency of each peer.
+        let timeouts = self
+            .request_timeouts
+            .read()
+            .iter()
+            .map(|(peer_ip, timestamps)| (*peer_ip, timestamps.len()))
+            .collect::<IndexMap<_, _>>();
+
         // Pick a set of peers above the latest canon height, and include their locators.
         let candidate_locators: IndexMap<_, _> = self
             .locators
             .read()
             .iter()
             .filter(|(_, locators)| locators.latest_locator_height() > latest_canon_height)
+            .filter(|(ip, _)| timeouts.get(*ip).map(|count| *count < MAX_BLOCK_REQUEST_TIMEOUTS).unwrap_or(true))
             .sorted_by(|(_, a), (_, b)| b.latest_locator_height().cmp(&a.latest_locator_height()))
             .take(NUM_SYNC_CANDIDATE_PEERS)
             .map(|(peer_ip, locators)| (*peer_ip, locators.clone()))
@@ -586,7 +596,7 @@ impl<N: Network> Sync<N> {
         // Compute the start height for the block request.
         let start_height = latest_canon_height + 1;
         // Compute the end height for the block request.
-        let end_height = (min_common_ancestor + 1).min(start_height + MAXIMUM_BLOCK_REQUESTS as u32);
+        let end_height = (min_common_ancestor + 1).min(start_height + MAX_BLOCK_REQUESTS as u32);
 
         let mut requests = Vec::with_capacity((start_height..end_height).len());
 
@@ -752,7 +762,7 @@ mod tests {
         }
 
         // Otherwise, there should be requests.
-        let expected_num_requests = core::cmp::min(min_common_ancestor as usize, MAXIMUM_BLOCK_REQUESTS);
+        let expected_num_requests = core::cmp::min(min_common_ancestor as usize, MAX_BLOCK_REQUESTS);
         assert_eq!(requests.len(), expected_num_requests);
 
         for (idx, (height, (hash, previous_hash, sync_ips))) in requests.into_iter().enumerate() {
