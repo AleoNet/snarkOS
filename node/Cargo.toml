@@ -96,8 +96,15 @@ version = "0.7"
 [dependencies.tracing]
 version = "0.1"
 
+[dev-dependencies.deadline]
+version = "0.2"
+
 [dev-dependencies.pea2pea]
 version = "0.40"
+
+[dev-dependencies.tracing-subscriber]
+version = "0.3"
+features = [ "env-filter", "fmt" ]
 
 [dev-dependencies.rand_chacha]
 version = "0.3.0"
