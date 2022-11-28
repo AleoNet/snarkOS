@@ -118,7 +118,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
 
     /// TODO (howardwu): If the node is a beacon, keep the beacons, and keep 0 clients and provers.
     ///  If the node is a validator, keep REDUNDANCY_FACTOR beacons.
-    ///  If the node is a client or prover, keep 0 beacons.
+    ///  If the node is a client or prover, prioritize validators, and keep 0 beacons.
     /// This function keeps the number of connected peers within the allowed range.
     fn handle_connected_peers(&self) {
         // Obtain the number of connected peers.

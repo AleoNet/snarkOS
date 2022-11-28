@@ -537,7 +537,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             }
             // TODO (howardwu): Remove this in Phase 3.
             // Ensure the number of prover solutions is within the allowed range.
-            if block.height() > 111_000 && coinbase.len() > 256 {
+            if block.height() > 128_000 && coinbase.len() > 256 {
                 bail!("Cannot validate a coinbase proof with more than {} prover solutions", 256);
             }
             // Ensure the number of prover solutions is within the allowed range.
