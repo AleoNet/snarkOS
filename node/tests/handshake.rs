@@ -244,7 +244,7 @@ mod prover {
 mod validator {
     // Initiator side (full node connects to synthetic peer).
     test_handshake! {
-        validator -> beacon = should_panic,
+        validator -> beacon,
         validator -> client,
         validator -> validator,
         validator -> prover
@@ -252,7 +252,7 @@ mod validator {
 
     // Responder side (synthetic peer connects to full node).
     test_handshake! {
-        validator <- beacon = should_panic,
+        validator <- beacon,
         validator <- client,
         validator <- validator,
         validator <- prover
