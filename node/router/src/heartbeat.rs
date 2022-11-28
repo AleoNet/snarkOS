@@ -65,7 +65,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
                 info!("Disconnecting from '{oldest}' (periodic refresh of peers)");
                 self.send(oldest, Message::Disconnect(DisconnectReason::PeerRefresh.into()));
                 // Disconnect from this peer.
-                self.router().disconnect(oldest).await;
+                self.router().disconnect(oldest);
             }
         }
     }
@@ -79,7 +79,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             if elapsed > Router::<N>::RADIO_SILENCE_IN_SECS {
                 warn!("Peer {} has not communicated in {elapsed} seconds", peer.ip());
                 // Disconnect from this peer.
-                self.router().disconnect(peer.ip()).await;
+                self.router().disconnect(peer.ip());
             }
         }
     }
@@ -97,7 +97,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
                 info!("Disconnecting from 'beacon' {peer_ip} (exceeded maximum beacons)");
                 self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers.into()));
                 // Disconnect from this peer.
-                self.router().disconnect(peer_ip).await;
+                self.router().disconnect(peer_ip);
             }
         }
     }
@@ -130,7 +130,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
                 info!("Disconnecting from '{peer_ip}' (exceeded maximum connections)");
                 self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers.into()));
                 // Disconnect from this peer.
-                self.router().disconnect(peer_ip).await;
+                self.router().disconnect(peer_ip);
             }
         }
 
@@ -140,7 +140,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
 
             // Attempt to connect to more peers.
             for peer_ip in self.router().candidate_peers().into_iter().choose_multiple(rng, num_deficient) {
-                self.router().connect(peer_ip).await;
+                self.router().connect(peer_ip);
             }
             // Request more peers from the connected peers.
             for peer_ip in self.router().connected_peers().into_iter().choose_multiple(rng, 3) {
@@ -163,7 +163,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             let rng = &mut OsRng::default();
             // Attempt to connect to a bootstrap peer.
             if let Some(peer_ip) = self.router().bootstrap_peers().into_iter().choose(rng) {
-                self.router().connect(peer_ip).await;
+                self.router().connect(peer_ip);
             }
         }
 
@@ -177,7 +177,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
                 info!("Disconnecting from '{peer_ip}' (exceeded maximum bootstrap)");
                 self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers.into()));
                 // Disconnect from this peer.
-                self.router().disconnect(peer_ip).await;
+                self.router().disconnect(peer_ip);
             }
         }
     }
@@ -189,7 +189,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             // If the peer is not connected, attempt to connect to it.
             if !self.router().is_connected(peer_ip) {
                 // Attempt to connect to the trusted peer.
-                self.router().connect(*peer_ip).await;
+                self.router().connect(*peer_ip);
             }
         }
     }

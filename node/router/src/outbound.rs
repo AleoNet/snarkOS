@@ -52,22 +52,26 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         if !self.should_send(peer_ip, &message) {
             return None;
         }
-        // Ensure the peer is connected before sending.
-        if !self.router().is_connected(&peer_ip) {
-            warn!("Attempted to send to a non-connected peer {peer_ip}");
-            return None;
-        }
+        // Resolve the listener IP to the (ambiguous) peer address.
+        let peer_addr = match self.router().resolve_to_ambiguous(&peer_ip) {
+            Some(peer_addr) => peer_addr,
+            None => {
+                warn!("Unable to resolve the listener IP address '{peer_ip}'");
+                return None;
+            }
+        };
         // Retrieve the message name.
         let name = message.name().to_string();
-        // Resolve the listener IP to the (ambiguous) peer address.
-        if let Some(peer_addr) = self.router().resolve_to_ambiguous(&peer_ip) {
-            // Send the message to the peer.
-            trace!("Sending '{name}' to '{peer_ip}'");
-            self.unicast(peer_addr, message).map_err(|e| warn!("Failed to send '{name}' to '{peer_ip}': {e}")).ok()
-        } else {
-            warn!("Unable to resolve the listener IP address '{peer_ip}'");
-            None
+        // Send the message to the peer.
+        trace!("Sending '{name}' to '{peer_ip}'");
+        let result = self.unicast(peer_addr, message);
+        // If the message was unable to be sent, disconnect.
+        if let Err(e) = &result {
+            warn!("Failed to send '{name}' to '{peer_ip}': {e}");
+            debug!("Disconnecting from '{peer_ip}'");
+            self.router().disconnect(peer_ip);
         }
+        result.ok()
     }
 
     /// Sends the given message to every connected peer, excluding the sender and any specified peer IPs.
@@ -150,6 +154,11 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
 
     /// Returns `true` if the message should be sent.
     fn should_send(&self, peer_ip: SocketAddr, message: &Message<N>) -> bool {
+        // Ensure the peer is connected before sending.
+        if !self.router().is_connected(&peer_ip) {
+            warn!("Attempted to send to a non-connected peer {peer_ip}");
+            return false;
+        }
         // Determine whether to send the message.
         let should_send = match message {
             Message::UnconfirmedBlock(message) => {
