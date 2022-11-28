@@ -315,12 +315,14 @@ impl<N: Network> Sync<N> {
         Ok(())
     }
 
-    /// Removes the block locators for the peer, if they exist.
+    /// Removes the peer from the sync pool, if they exist.
     pub fn remove_peer(&self, peer_ip: &SocketAddr) {
         // Remove the locators entry for the given peer IP.
         self.locators.write().remove(peer_ip);
         // Remove all block requests to the peer.
         self.remove_block_requests_to_peer(peer_ip);
+        // Remove the timeouts for the peer.
+        self.request_timeouts.write().remove(peer_ip);
     }
 
     /// Removes the block request for the given peer IP, if it exists.
