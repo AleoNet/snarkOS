@@ -87,7 +87,7 @@ impl<N: Network> Router<N> {
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
-    const MAXIMUM_CONNECTION_FAILURES: usize = 5;
+    const MAXIMUM_CONNECTION_FAILURES: usize = 3;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
     const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
@@ -133,8 +133,8 @@ impl<N: Network> Router<N> {
             debug!("Connecting to {peer_ip}...");
             if let Err(error) = router.tcp.connect(peer_ip).await {
                 warn!("{error}");
-                // Restrict the peer, if the connection was not successful and is not a trusted peer.
-                if !router.trusted_peers.contains(&peer_ip) {
+                // Restrict the peer, if the connection failed, and is neither trusted nor a bootstrap peer.
+                if !router.trusted_peers.contains(&peer_ip) && !router.bootstrap_peers().contains(&peer_ip) {
                     router.insert_restricted_peer(peer_ip);
                 }
             }
@@ -150,8 +150,6 @@ impl<N: Network> Router<N> {
             // Disconnect from this peer.
             let _disconnected = router.tcp.disconnect(peer_ip).await;
             debug_assert!(_disconnected);
-            // Restrict this peer to prevent reconnection.
-            router.insert_restricted_peer(peer_ip);
         });
     }
 
