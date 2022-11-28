@@ -213,16 +213,6 @@ impl<N: Network> Router<N> {
             return Some(DisconnectReason::INeedToSyncFirst);
         }
 
-        // TODO (howardwu): Remove this after Phase 2.
-        if !self.is_dev
-            && self.node_type.is_validator()
-            && node_type.is_beacon()
-            && peer_addr.ip().to_string() != "159.65.195.225"
-        {
-            warn!("Dropping '{peer_addr}' for an invalid node type of {node_type}");
-            return Some(DisconnectReason::ProtocolViolation);
-        }
-
         None
     }
 

@@ -87,6 +87,9 @@ pub struct Sync<N: Network> {
     /// The map of block height to the timestamp of the last time the block was requested.
     /// This map is used to determine which requests to remove if they have been pending for too long.
     request_timestamps: Arc<RwLock<BTreeMap<u32, Instant>>>,
+    /// The map of (timed out) peer IPs to their request timestamps.
+    /// This map is used to determine which peers to remove if they have timed out too many times.
+    request_timeouts: Arc<RwLock<IndexMap<SocketAddr, Vec<Instant>>>>,
 }
 
 impl<N: Network> Sync<N> {
@@ -100,6 +103,7 @@ impl<N: Network> Sync<N> {
             requests: Default::default(),
             responses: Default::default(),
             request_timestamps: Default::default(),
+            request_timeouts: Default::default(),
         }
     }
 
@@ -183,6 +187,8 @@ impl<N: Network> Sync<N> {
     }
 
     /// Returns the sync peers with their latest heights, and their minimum common ancestor, if the node can sync.
+    /// This function returns peers that are consistent with each other, and have a block height
+    /// that is greater than the canon height of this node.
     pub fn find_sync_peers(&self) -> Option<(IndexMap<SocketAddr, u32>, u32)> {
         if let Some((sync_peers, min_common_ancestor)) = self.find_sync_peers_inner() {
             // Map the locators into the latest height.
@@ -357,10 +363,10 @@ impl<N: Network> Sync<N> {
     pub fn remove_block_request(&self, height: u32) {
         // Remove the request entry for the given height.
         self.requests.write().remove(&height);
-        // Remove the request timestamp entry for the given height.
-        self.request_timestamps.write().remove(&height);
         // Remove the response entry for the given height.
         self.responses.write().remove(&height);
+        // Remove the request timestamp entry for the given height.
+        self.request_timestamps.write().remove(&height);
     }
 
     /// Removes and returns the block response for the given height, if the request is complete.
@@ -391,13 +397,13 @@ impl<N: Network> Sync<N> {
         if self.requests.read().contains_key(&height) {
             bail!("Failed to add block request, as block {height} exists in the requests map");
         }
-        // Ensure the block height is not already requested.
-        if self.request_timestamps.read().contains_key(&height) {
-            bail!("Failed to add block request, as block {height} exists in the timestamps map");
-        }
         // Ensure the block height is not already responded.
         if self.responses.read().contains_key(&height) {
             bail!("Failed to add block request, as block {height} exists in the responses map");
+        }
+        // Ensure the block height is not already requested.
+        if self.request_timestamps.read().contains_key(&height) {
+            bail!("Failed to add block request, as block {height} exists in the timestamps map");
         }
         Ok(())
     }
@@ -431,36 +437,59 @@ impl<N: Network> Sync<N> {
         }
     }
 
-    /// Removes block requests that have timed out. This also removes the corresponding block responses.
-    /// Returns the number of timed out block requests.
+    /// Removes block requests that have timed out. This also removes the corresponding block responses,
+    /// and adds the timed out sync IPs to a map for tracking. Returns the number of timed out block requests.
     fn remove_timed_out_block_requests(&self) -> usize {
         // Acquire the write lock on the requests map.
         let mut requests = self.requests.write();
-        // Acquire the write lock on the request timestamps map.
-        let mut request_timestamps = self.request_timestamps.write();
         // Acquire the write lock on the responses map.
         let mut responses = self.responses.write();
+        // Acquire the write lock on the request timestamps map.
+        let mut request_timestamps = self.request_timestamps.write();
 
         // Retrieve the current time.
         let now = Instant::now();
 
+        // Track each unique peer IP that has timed out.
+        let mut timeout_ips = IndexSet::new();
         // Track the number of timed out block requests.
         let mut num_timed_out_block_requests = 0;
 
         // Remove timed out block requests.
         request_timestamps.retain(|height, timestamp| {
-            // If the request is not complete, and has timed out, then remove it.
-            if !requests.get(height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(false)
-                && now.duration_since(*timestamp).as_secs() > BLOCK_REQUEST_TIMEOUT_IN_SECS
-            {
-                num_timed_out_block_requests += 1;
-                requests.remove(height);
+            // Determine if the duration since the request timestamp has exceeded the request timeout.
+            let is_time_passed = now.duration_since(*timestamp).as_secs() > BLOCK_REQUEST_TIMEOUT_IN_SECS;
+            // Determine if the request is incomplete.
+            let is_request_incomplete =
+                !requests.get(height).map(|(_, _, peer_ips)| peer_ips.is_empty()).unwrap_or(false);
+            // Determine if the request has timed out.
+            let is_timeout = is_time_passed && is_request_incomplete;
+
+            // If the request has timed out, then remove it.
+            if is_timeout {
+                // Remove the request entry for the given height.
+                if let Some((_, _, sync_ips)) = requests.remove(height) {
+                    // Add each sync IP to the timeout IPs.
+                    timeout_ips.extend(sync_ips);
+                }
+                // Remove the response entry for the given height.
                 responses.remove(height);
-                false
-            } else {
-                true
+                // Increment the number of timed out block requests.
+                num_timed_out_block_requests += 1;
             }
+            // Retain if this is not a timeout.
+            !is_timeout
         });
+
+        // If there are timeout IPs, then add them to the request timeouts map.
+        if !timeout_ips.is_empty() {
+            // Acquire the write lock on the request timeouts map.
+            let mut request_timeouts = self.request_timeouts.write();
+            // Add each timeout IP to the request timeouts map.
+            for timeout_ip in timeout_ips {
+                request_timeouts.entry(timeout_ip).or_default().push(now);
+            }
+        }
 
         num_timed_out_block_requests
     }
