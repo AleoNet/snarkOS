@@ -24,7 +24,6 @@ use snarkos_node_messages::{
     Ping,
     Pong,
     PuzzleResponse,
-    RawStatus,
     UnconfirmedSolution,
     UnconfirmedTransaction,
 };
@@ -306,21 +305,6 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             warn!("Dropping '{peer_ip}' for an incorrect maximum fork depth of {}", message.fork_depth);
             return false;
         }
-        // Ensure the peer status is known.
-        if message.status.is_unknown() {
-            warn!("Dropping '{peer_ip}' for an unknown status");
-            return false;
-        }
-
-        // // If this node is not a sync node and is syncing, the peer is a sync node, and this node is ahead, proceed to disconnect.
-        // if E::NODE_TYPE != NodeType::Beacon
-        //     && E::status().is_syncing()
-        //     && node_type == NodeType::Beacon
-        //     && state.ledger().reader().latest_cumulative_weight() > block_header.cumulative_weight()
-        // {
-        //     trace!("Disconnecting from {} (ahead of sync node)", peer_ip);
-        //     break;
-        // }
 
         // If the peer is a beacon or validator, ensure there are block locators.
         if (message.node_type.is_beacon() || message.node_type.is_validator()) && message.block_locators.is_none() {
@@ -347,14 +331,34 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             peer.set_version(message.version);
             // Update the node type of the peer.
             peer.set_node_type(message.node_type);
-            // Update the status of the peer.
-            peer.set_status(RawStatus::from_status(message.status));
             // Update the last seen timestamp of the peer.
             peer.set_last_seen(Instant::now());
         }) {
             warn!("[Ping] {error}");
             return false;
         }
+
+        // TODO (howardwu): For this case, if your canon height is not within NUM_RECENTS of the beacon,
+        //  then disconnect.
+
+        // // If this node is not a beacon and is syncing, the peer is a beacon, and this node is ahead, proceed to disconnect.
+        // if E::NODE_TYPE != NodeType::Beacon
+        //     && E::status().is_syncing()
+        //     && node_type == NodeType::Beacon
+        //     && state.ledger().reader().latest_cumulative_weight() > block_header.cumulative_weight()
+        // {
+        //     trace!("Disconnecting from {} (ahead of beacon)", peer_ip);
+        //     break;
+        // }
+
+        // TODO (howardwu): For this case, check that the peer is not within NUM_RECENTS, and disconnect.
+        //  As the beacon, you should disconnect any node type that is not caught up.
+
+        // // If this node is a beacon, the peer is not a beacon and is syncing, proceed to disconnect.
+        // if self.node_type == NodeType::Beacon && node_type != NodeType::Beacon && peer_status == Status::Syncing {
+        //     warn!("Dropping '{peer_addr}' as this node is ahead");
+        //     return Some(DisconnectReason::INeedToSyncFirst);
+        // }
 
         let is_fork = Some(false);
 

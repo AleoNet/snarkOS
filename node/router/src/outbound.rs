@@ -35,7 +35,6 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
                 version: Message::<N>::VERSION,
                 fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
                 node_type: self.router().node_type(),
-                status: self.router().status(),
                 block_locators,
             }),
         );

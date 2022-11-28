@@ -21,7 +21,6 @@ pub struct Ping<N: Network> {
     pub version: u32,
     pub fork_depth: u32,
     pub node_type: NodeType,
-    pub status: Status,
     pub block_locators: Option<BlockLocators<N>>,
 }
 
@@ -37,7 +36,7 @@ impl<N: Network> MessageTrait for Ping<N> {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
         Ok(bincode::serialize_into(
             &mut *writer,
-            &(self.version, self.fork_depth, self.node_type, self.status, &self.block_locators),
+            &(self.version, self.fork_depth, self.node_type, &self.block_locators),
         )?)
     }
 
@@ -45,7 +44,7 @@ impl<N: Network> MessageTrait for Ping<N> {
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
-        let (version, fork_depth, node_type, status, block_locators) = bincode::deserialize_from(&mut reader)?;
-        Ok(Self { version, fork_depth, node_type, status, block_locators })
+        let (version, fork_depth, node_type, block_locators) = bincode::deserialize_from(&mut reader)?;
+        Ok(Self { version, fork_depth, node_type, block_locators })
     }
 }

@@ -39,7 +39,7 @@ pub use outbound::*;
 mod routing;
 pub use routing::*;
 
-use snarkos_node_messages::{NodeType, RawStatus, Status, NUM_RECENTS};
+use snarkos_node_messages::{NodeType, NUM_RECENTS};
 use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network};
 
@@ -63,8 +63,6 @@ pub struct Router<N: Network> {
     node_type: NodeType,
     /// The address of the node.
     address: Address<N>,
-    /// The node's current state.
-    status: RawStatus,
     /// The cache.
     cache: Cache<N>,
     /// The resolver.
@@ -115,7 +113,6 @@ impl<N: Network> Router<N> {
             local_ip,
             node_type,
             address,
-            status: RawStatus::new(),
             cache: Default::default(),
             resolver: Default::default(),
             sync: Sync::new(local_ip),
@@ -179,11 +176,6 @@ impl<N: Network> Router<N> {
     /// Returns the Aleo address of the node.
     pub const fn address(&self) -> Address<N> {
         self.address
-    }
-
-    /// Returns the status.
-    pub fn status(&self) -> Status {
-        self.status.get()
     }
 
     /// Returns the sync pool.
@@ -445,8 +437,6 @@ impl<N: Network> Router<N> {
     /// Shuts down the router.
     pub async fn shut_down(&self) {
         trace!("Shutting down the router...");
-        // Update the node status.
-        self.status.update(Status::ShuttingDown);
         // Abort the tasks.
         self.handles.read().iter().for_each(|handle| handle.abort());
         // Close the listener.

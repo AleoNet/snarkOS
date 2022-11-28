@@ -20,7 +20,7 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_ledger::Ledger;
-use snarkos_node_messages::{BlockRequest, Message, NodeType, PuzzleResponse, Status, UnconfirmedSolution};
+use snarkos_node_messages::{BlockRequest, Message, NodeType, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::{
@@ -151,11 +151,6 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType {
         self.router.node_type()
-    }
-
-    /// Returns the node status.
-    fn status(&self) -> Status {
-        self.router.status()
     }
 
     /// Returns the account private key of the node.

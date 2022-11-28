@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_messages::{NodeType, RawStatus, Status};
+use snarkos_node_messages::NodeType;
 use snarkvm::prelude::{Address, Network};
 
 use parking_lot::RwLock;
@@ -31,29 +31,14 @@ pub struct Peer<N: Network> {
     version: u32,
     /// The node type of the peer.
     node_type: NodeType,
-    /// The status of the peer.
-    status: RawStatus,
     /// The timestamp of the last message received from this peer.
     last_seen: Arc<RwLock<Instant>>,
 }
 
 impl<N: Network> Peer<N> {
     /// Initializes a new instance of `Peer`.
-    pub fn new(
-        listening_ip: SocketAddr,
-        address: Address<N>,
-        version: u32,
-        node_type: NodeType,
-        status: RawStatus,
-    ) -> Self {
-        Self {
-            peer_ip: listening_ip,
-            address,
-            version,
-            node_type,
-            last_seen: Arc::new(RwLock::new(Instant::now())),
-            status,
-        }
+    pub fn new(listening_ip: SocketAddr, address: Address<N>, version: u32, node_type: NodeType) -> Self {
+        Self { peer_ip: listening_ip, address, version, node_type, last_seen: Arc::new(RwLock::new(Instant::now())) }
     }
 
     /// Returns the IP address of the peer, with the port set to the listener port.
@@ -91,11 +76,6 @@ impl<N: Network> Peer<N> {
         self.node_type.is_client()
     }
 
-    /// Returns the status of the peer.
-    pub fn status(&self) -> Status {
-        self.status.get()
-    }
-
     /// Returns the last seen timestamp of the peer.
     pub fn last_seen(&self) -> Instant {
         *self.last_seen.read()
@@ -111,11 +91,6 @@ impl<N: Network> Peer<N> {
     /// Updates the node type.
     pub fn set_node_type(&mut self, node_type: NodeType) {
         self.node_type = node_type;
-    }
-
-    /// Updates the status.
-    pub fn set_status(&mut self, status: RawStatus) {
-        self.status = status;
     }
 
     /// Updates the last seen timestamp of the peer.

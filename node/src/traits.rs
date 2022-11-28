@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_messages::{NodeType, Status};
+use snarkos_node_messages::NodeType;
 use snarkos_node_router::Routing;
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
@@ -22,9 +22,6 @@ use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 pub trait NodeInterface<N: Network>: Routing<N> {
     /// Returns the node type.
     fn node_type(&self) -> NodeType;
-
-    /// Returns the node status.
-    fn status(&self) -> Status;
 
     /// Returns the account private key of the node.
     fn private_key(&self) -> &PrivateKey<N>;

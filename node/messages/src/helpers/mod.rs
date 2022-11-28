@@ -31,6 +31,3 @@ pub use disconnect::DisconnectReason;
 
 mod node_type;
 pub use node_type::*;
-
-mod status;
-pub use status::*;

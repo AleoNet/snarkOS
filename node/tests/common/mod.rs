@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use pea2pea::{protocols::Handshake, Config, Connection, Node, Pea2Pea};
-use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, NodeType, Status};
+use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, NodeType};
 use snarkos_node_router::ALEO_MAXIMUM_FORK_DEPTH;
 use snarkvm::prelude::{Address, Block, FromBytes, Network, Testnet3 as CurrentNetwork};
 
@@ -113,7 +113,6 @@ impl Handshake for TestPeer {
             version: Message::<CurrentNetwork>::VERSION,
             fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
             node_type: self.node_type(),
-            status: Status::Peering,
             address: self.address(),
             listener_port: local_ip.port(),
         });

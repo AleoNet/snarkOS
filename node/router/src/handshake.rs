@@ -24,9 +24,6 @@ use snarkos_node_messages::{
     Message,
     MessageCodec,
     MessageTrait,
-    NodeType,
-    RawStatus,
-    Status,
 };
 use snarkos_node_tcp::{ConnectionSide, Tcp, P2P};
 use snarkvm::prelude::{error, Header, Network};
@@ -70,7 +67,6 @@ impl<N: Network> Router<N> {
             version: Message::<N>::VERSION,
             fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
             node_type: self.node_type,
-            status: self.status.get(),
             address: self.address,
             listener_port: self.local_ip.port(),
         });
@@ -136,10 +132,9 @@ impl<N: Network> Router<N> {
         let peer_address = challenge_request.address;
         let peer_version = challenge_request.version;
         let peer_type = challenge_request.node_type;
-        let peer_status = RawStatus::from_status(challenge_request.status);
 
         // Construct the peer.
-        let peer = Peer::new(peer_ip, peer_address, peer_version, peer_type, peer_status);
+        let peer = Peer::new(peer_ip, peer_address, peer_version, peer_type);
         // Insert the connected peer in the router.
         self.insert_connected_peer(peer, peer_addr);
         info!("Connected to '{peer_ip}'");
@@ -186,8 +181,7 @@ impl<N: Network> Router<N> {
         message: &ChallengeRequest<N>,
     ) -> Option<DisconnectReason> {
         // Retrieve the components of the challenge request.
-        let &ChallengeRequest { version, fork_depth, node_type, status: peer_status, address: _, listener_port: _ } =
-            message;
+        let &ChallengeRequest { version, fork_depth, node_type: _, address: _, listener_port: _ } = message;
 
         // Ensure the message protocol version is not outdated.
         if version < Message::<N>::VERSION {
@@ -199,18 +193,6 @@ impl<N: Network> Router<N> {
         if fork_depth != ALEO_MAXIMUM_FORK_DEPTH {
             warn!("Dropping '{peer_addr}' for an incorrect maximum fork depth of {fork_depth}");
             return Some(DisconnectReason::InvalidForkDepth);
-        }
-
-        // If this node is not a beacon and is syncing, the peer is a beacon, and this node is ahead, proceed to disconnect.
-        if self.node_type != NodeType::Beacon && self.status.is_syncing() && node_type == NodeType::Beacon {
-            warn!("Dropping '{peer_addr}' as this node is ahead");
-            return Some(DisconnectReason::YouNeedToSyncFirst);
-        }
-
-        // If this node is a beacon, the peer is not a beacon and is syncing, proceed to disconnect.
-        if self.node_type == NodeType::Beacon && node_type != NodeType::Beacon && peer_status == Status::Syncing {
-            warn!("Dropping '{peer_addr}' as this node is ahead");
-            return Some(DisconnectReason::INeedToSyncFirst);
         }
 
         None

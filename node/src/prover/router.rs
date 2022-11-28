@@ -47,7 +47,6 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Prover<N, C> {
             version: Message::<N>::VERSION,
             fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
             node_type: self.node_type(),
-            status: self.status(),
             block_locators: None,
         });
         trace!("Sending '{}' to '{peer_ip}'", message.name());

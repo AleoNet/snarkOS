@@ -27,8 +27,7 @@ use crate::{Message, MessageCodec};
 
 type CurrentNetwork = Testnet3;
 
-// The maximum message size for noise messages. If the data to be encrypted exceedes it, it is
-// chunked.
+/// The maximum message size for noise messages. If the data to be encrypted exceeds it, it is chunked.
 const MAX_MESSAGE_LEN: usize = 65535;
 
 #[repr(u8)]
@@ -290,7 +289,6 @@ mod tests {
         Ping,
         Pong,
         PuzzleRequest,
-        Status,
     };
     use snow::{params::NoiseParams, Builder};
 
@@ -358,7 +356,6 @@ mod tests {
             version: 0,
             fork_depth: 0,
             node_type: NodeType::Client,
-            status: Status::Ready,
             address: Address::new(Group::rand(rng)),
             listener_port: 0,
         })));
@@ -393,7 +390,6 @@ mod tests {
             version: 0,
             fork_depth: 0,
             node_type: NodeType::Client,
-            status: Status::Ready,
             block_locators: None,
         })));
 
