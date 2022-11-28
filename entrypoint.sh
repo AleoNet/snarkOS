@@ -1,4 +1,3 @@
-  GNU nano 6.2                             entrypoint.sh                                       
 #!/bin/bash
 # running the Aleo Testnet3 client in a container
 
@@ -21,7 +20,7 @@ fi
 
 # if address is set
 if [ -z ${ALEO_PRIVKEY+a} ]; then 
-        /aleo/bin/snarkos --node ${SNARKOS_PORT} --rpc ${RPC_PORT} --verbosity ${LOGLEVEL} 
+	/aleo/bin/snarkos --node ${SNARKOS_PORT} --rest ${RPC_PORT} --verbosity ${LOGLEVEL} 
 else
-        /aleo/bin/snarkos --node ${SNARKOS_PORT} --rpc ${RPC_PORT} --verbosity ${LOGLEVEL} --p>
+	/aleo/bin/snarkos --node ${SNARKOS_PORT} --rest ${RPC_PORT} --verbosity ${LOGLEVEL} --private_key ${ALEO_PRIVKEY}
 fi
