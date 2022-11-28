@@ -174,9 +174,10 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         }
         // If the node is a beacon, ensure it is connected to all bootstrap peers.
         if self.router().node_type().is_beacon() {
-            for bootstrap_ip in candidate_bootstrap {
-                self.router().connect(bootstrap_ip);
-            }
+            // TODO (howardwu): Enable with tests passing.
+            // for bootstrap_ip in candidate_bootstrap {
+            //     self.router().connect(bootstrap_ip);
+            // }
             return;
         }
         // If there are not enough connected bootstrap peers, connect to more.

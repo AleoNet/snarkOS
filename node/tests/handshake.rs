@@ -136,7 +136,7 @@ where
     T: Connect,
     U: Connect,
 {
-    assert!(initiator.connect(responder.listening_addr()).await.is_ok())
+    initiator.connect(responder.listening_addr()).await.unwrap()
 }
 
 // Macro to simply construct handshake cases.
