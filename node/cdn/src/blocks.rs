@@ -55,18 +55,22 @@ pub async fn sync_ledger_with_cdn<N: Network, C: ConsensusStorage<N>>(
     // If the sync failed, check the integrity of the ledger.
     if let Err((completed_height, error)) = &result {
         warn!("{error}");
-        debug!("Synced the ledger up to block {completed_height}");
 
-        // Retrieve the latest height, according to the ledger.
-        let node_height = cow_to_copied!(ledger.vm().block_store().heights().max().unwrap_or_default());
-        // Check the integrity of the latest height.
-        if &node_height != completed_height {
-            return Err((*completed_height, anyhow!("The ledger height does not match the last sync height")));
-        }
+        // If the sync made any progress, then check the integrity of the ledger.
+        if *completed_height != start_height {
+            debug!("Synced the ledger up to block {completed_height}");
 
-        // Fetch the latest block from the ledger.
-        if let Err(err) = ledger.get_block(node_height) {
-            return Err((*completed_height, err));
+            // Retrieve the latest height, according to the ledger.
+            let node_height = cow_to_copied!(ledger.vm().block_store().heights().max().unwrap_or_default());
+            // Check the integrity of the latest height.
+            if &node_height != completed_height {
+                return Err((*completed_height, anyhow!("The ledger height does not match the last sync height")));
+            }
+
+            // Fetch the latest block from the ledger.
+            if let Err(err) = ledger.get_block(node_height) {
+                return Err((*completed_height, err));
+            }
         }
     }
 
