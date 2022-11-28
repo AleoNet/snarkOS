@@ -96,7 +96,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         // Disconnect from the oldest connected peer, if one exists.
         if let Some(oldest) = oldest_peer {
             info!("Disconnecting from '{oldest}' (periodic refresh of peers)");
-            self.send(oldest, Message::Disconnect(DisconnectReason::PeerRefresh.into()));
+            let _ = self.send(oldest, Message::Disconnect(DisconnectReason::PeerRefresh.into()));
             // Disconnect from this peer.
             self.router().disconnect(oldest);
         }

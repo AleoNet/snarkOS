@@ -68,7 +68,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         // If the message was unable to be sent, disconnect.
         if let Err(e) = &result {
             warn!("Failed to send '{name}' to '{peer_ip}': {e}");
-            debug!("Disconnecting from '{peer_ip}'");
+            debug!("Disconnecting from '{peer_ip}' (unable to send)");
             self.router().disconnect(peer_ip);
         }
         result.ok()
