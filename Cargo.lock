@@ -774,6 +774,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "deadline"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a7db8ae923a3ef13540aebacb892fc62405343ed1971f70e7c0da079eb16d38f"
+dependencies = [
+ "tokio",
+]
+
+[[package]]
 name = "derivative"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2536,6 +2545,7 @@ dependencies = [
  "anyhow",
  "async-trait",
  "colored",
+ "deadline",
  "futures-util",
  "indexmap",
  "num_cpus",
@@ -2558,6 +2568,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing",
+ "tracing-subscriber 0.3.16",
 ]
 
 [[package]]
