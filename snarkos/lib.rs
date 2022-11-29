@@ -14,21 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-mod lib;
+pub use snarkos_account as account;
 
-use snarkos_cli::{commands::CLI, helpers::Updater};
+pub mod node {
+    pub use snarkos_node::*;
 
-use clap::Parser;
-
-fn main() -> anyhow::Result<()> {
-    // Parse the given arguments.
-    let cli = CLI::parse();
-    // Run the updater.
-    println!("{}", Updater::print_cli());
-    // Run the CLI.
-    match cli.command.parse() {
-        Ok(output) => println!("{output}\n"),
-        Err(error) => println!("⚠️  {error}\n"),
-    }
-    Ok(())
+    pub use snarkos_node_consensus as consensus;
+    pub use snarkos_node_ledger as ledger;
+    pub use snarkos_node_messages as messages;
+    pub use snarkos_node_rest as rest;
+    pub use snarkos_node_store as store;
 }
