@@ -30,7 +30,7 @@ use anyhow::Result;
 use clap::Parser;
 
 #[derive(Debug, Parser)]
-#[clap(name = "snarkOS", author = "The Aleo Team <hello@aleo.org>", setting = clap::AppSettings::ColoredHelp)]
+#[clap(name = "snarkOS", author = "The Aleo Team <hello@aleo.org>")]
 pub struct CLI {
     /// Specify the verbosity [options: 0, 1, 2, 3]
     #[clap(default_value = "2", short, long)]
