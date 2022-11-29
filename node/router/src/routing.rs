@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Heartbeat, Inbound, Outbound};
+use snarkos_node_messages::Message;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake},
     P2P,
@@ -58,6 +59,7 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
             loop {
                 // Prepare the report.
                 let mut report = std::collections::HashMap::new();
+                report.insert("message_version".to_string(), Message::<N>::VERSION.to_string());
                 report.insert("node_address".to_string(), self_clone.router().address().to_string());
                 report.insert("node_type".to_string(), self_clone.router().node_type().to_string());
                 report.insert("is_dev".to_string(), self_clone.router().is_dev().to_string());
