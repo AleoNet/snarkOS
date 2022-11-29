@@ -265,9 +265,10 @@ impl Start {
             println!("🪪 Your Aleo address is {}.\n", account.address().to_string().bold());
             // Print the node type and network.
             println!(
-                "🧭 Starting {} on {}.\n",
+                "🧭 Starting {} on {} at {}.\n",
                 node_type.description().bold(),
-                N::NAME.bold()
+                N::NAME.bold(),
+                self.node.to_string().bold()
             );
 
             if let Some(rest_ip) = rest_ip {
