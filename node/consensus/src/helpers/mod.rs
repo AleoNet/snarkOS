@@ -443,4 +443,60 @@ mod tests {
             test_new_targets(&mut rng, minimum_coinbase_target, true);
         }
     }
+
+    #[test]
+    fn test_target_halving() {
+        let mut rng = TestRng::default();
+
+        let minimum_coinbase_target: u64 = 2u64.pow(10) - 1;
+
+        for _ in 0..ITERATIONS {
+            let previous_coinbase_target: u64 = rng.gen_range(minimum_coinbase_target..u64::MAX);
+            let previous_timestamp = rng.gen();
+
+            let half_life = CurrentNetwork::NUM_BLOCKS_PER_EPOCH.saturating_mul(ROUND_TIME) as i64;
+
+            // New coinbase target is greater than half if the elapsed time equals the half life.
+            let new_timestamp = previous_timestamp + half_life;
+            let new_coinbase_target = coinbase_target::<ROUND_TIME>(
+                previous_coinbase_target,
+                previous_timestamp,
+                new_timestamp,
+                CurrentNetwork::ANCHOR_TIME,
+                CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                true,
+            )
+            .unwrap();
+
+            assert!(new_coinbase_target > previous_coinbase_target / 2);
+
+            // New coinbase target is greater than half if the elapsed time is 1 round time past the half life.
+            let new_timestamp = previous_timestamp + half_life + ROUND_TIME as i64;
+            let new_coinbase_target = coinbase_target::<ROUND_TIME>(
+                previous_coinbase_target,
+                previous_timestamp,
+                new_timestamp,
+                CurrentNetwork::ANCHOR_TIME,
+                CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                true,
+            )
+            .unwrap();
+
+            assert!(new_coinbase_target > previous_coinbase_target / 2);
+
+            // New coinbase target is less than half if the elapsed time is more than 1 round time past the half life.
+            let new_timestamp = previous_timestamp + half_life + 2 * ROUND_TIME as i64;
+            let new_coinbase_target = coinbase_target::<ROUND_TIME>(
+                previous_coinbase_target,
+                previous_timestamp,
+                new_timestamp,
+                CurrentNetwork::ANCHOR_TIME,
+                CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                true,
+            )
+            .unwrap();
+
+            assert!(new_coinbase_target < previous_coinbase_target / 2);
+        }
+    }
 }
