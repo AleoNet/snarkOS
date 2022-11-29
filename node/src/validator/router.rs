@@ -27,7 +27,6 @@ use snarkos_node_messages::{
     Ping,
     Pong,
 };
-use snarkos_node_router::ALEO_MAXIMUM_FORK_DEPTH;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{error, Network};
 
@@ -62,12 +61,8 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Validator<N, C> {
         };
 
         // Send the first `Ping` message to the peer.
-        let message = Message::Ping(Ping::<N> {
-            version: Message::<N>::VERSION,
-            fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
-            node_type: self.node_type(),
-            block_locators,
-        });
+        let message =
+            Message::Ping(Ping::<N> { version: Message::<N>::VERSION, node_type: self.node_type(), block_locators });
         trace!("Sending '{}' to '{peer_ip}'", message.name());
         framed.send(message).await?;
 

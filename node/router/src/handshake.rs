@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Peer, Router, ALEO_MAXIMUM_FORK_DEPTH};
+use crate::{Peer, Router};
 use snarkos_node_messages::{
     ChallengeRequest,
     ChallengeResponse,
@@ -65,10 +65,9 @@ impl<N: Network> Router<N> {
         // Send a challenge request to the peer.
         let message = Message::<N>::ChallengeRequest(ChallengeRequest {
             version: Message::<N>::VERSION,
-            fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
+            listener_port: self.local_ip.port(),
             node_type: self.node_type,
             address: self.address,
-            listener_port: self.local_ip.port(),
         });
         trace!("Sending '{}-A' to '{peer_addr}'", message.name());
         framed.send(message).await?;
@@ -181,18 +180,12 @@ impl<N: Network> Router<N> {
         message: &ChallengeRequest<N>,
     ) -> Option<DisconnectReason> {
         // Retrieve the components of the challenge request.
-        let &ChallengeRequest { version, fork_depth, node_type: _, address: _, listener_port: _ } = message;
+        let &ChallengeRequest { version, listener_port: _, node_type: _, address: _ } = message;
 
         // Ensure the message protocol version is not outdated.
         if version < Message::<N>::VERSION {
             warn!("Dropping '{peer_addr}' on version {version} (outdated)");
             return Some(DisconnectReason::OutdatedClientVersion);
-        }
-
-        // Ensure the maximum fork depth is correct.
-        if fork_depth != ALEO_MAXIMUM_FORK_DEPTH {
-            warn!("Dropping '{peer_addr}' for an incorrect maximum fork depth of {fork_depth}");
-            return Some(DisconnectReason::InvalidForkDepth);
         }
 
         None

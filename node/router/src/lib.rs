@@ -39,7 +39,7 @@ pub use outbound::*;
 mod routing;
 pub use routing::*;
 
-use snarkos_node_messages::{NodeType, NUM_RECENTS};
+use snarkos_node_messages::NodeType;
 use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network};
 
@@ -49,9 +49,6 @@ use indexmap::{IndexMap, IndexSet};
 use parking_lot::RwLock;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
-
-// TODO (raychu86): Move this declaration.
-pub const ALEO_MAXIMUM_FORK_DEPTH: u32 = (NUM_RECENTS as u32).saturating_sub(1);
 
 #[derive(Clone)]
 pub struct Router<N: Network> {

@@ -354,10 +354,9 @@ mod tests {
 
         let challenge_request = MessageOrBytes::Message(Box::new(Message::ChallengeRequest(ChallengeRequest {
             version: 0,
-            fork_depth: 0,
+            listener_port: 0,
             node_type: NodeType::Client,
             address: Address::new(Group::rand(rng)),
-            listener_port: 0,
         })));
 
         assert_roundtrip(challenge_request);
@@ -388,7 +387,6 @@ mod tests {
     fn ping_roundtrip() {
         let ping = MessageOrBytes::Message(Box::new(Message::Ping(Ping::<CurrentNetwork> {
             version: 0,
-            fork_depth: 0,
             node_type: NodeType::Client,
             block_locators: None,
         })));

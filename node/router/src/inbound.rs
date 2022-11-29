@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Outbound, Peer, ALEO_MAXIMUM_FORK_DEPTH};
+use crate::{Outbound, Peer};
 use snarkos_node_messages::{
     BeaconPropose,
     BlockRequest,
@@ -274,6 +274,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
     /// Handles a `BeaconPropose` message.
     fn beacon_propose(&self, _peer_ip: SocketAddr, _serialized: BeaconPropose<N>, _block: Block<N>) -> bool {
+        // pub const ALEO_MAXIMUM_FORK_DEPTH: u32 = (NUM_RECENTS as u32).saturating_sub(1);
+        //
         // // Retrieve the connected peers by height.
         // let mut peers = self.router().sync().get_sync_peers_by_height();
         // // Retain the peers that 1) not the sender, and 2) are within the fork depth of the given block.
@@ -298,11 +300,6 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // Ensure the message protocol version is not outdated.
         if message.version < Message::<N>::VERSION {
             warn!("Dropping '{peer_ip}' on version {} (outdated)", message.version);
-            return false;
-        }
-        // Ensure the maximum fork depth is correct.
-        if message.fork_depth != ALEO_MAXIMUM_FORK_DEPTH {
-            warn!("Dropping '{peer_ip}' for an incorrect maximum fork depth of {}", message.fork_depth);
             return false;
         }
 

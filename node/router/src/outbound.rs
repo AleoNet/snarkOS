@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::{Router, ALEO_MAXIMUM_FORK_DEPTH};
+use crate::Router;
 use snarkos_node_messages::{BlockLocators, Message, Ping};
 use snarkos_node_tcp::protocols::Writing;
 use snarkvm::prelude::Network;
@@ -33,7 +33,6 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
             peer_ip,
             Message::Ping(Ping::<N> {
                 version: Message::<N>::VERSION,
-                fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
                 node_type: self.router().node_type(),
                 block_locators,
             }),

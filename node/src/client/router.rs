@@ -17,7 +17,7 @@
 use super::*;
 
 use snarkos_node_messages::{BlockRequest, DisconnectReason, MessageCodec, Ping, Pong};
-use snarkos_node_router::{Routing, ALEO_MAXIMUM_FORK_DEPTH};
+use snarkos_node_router::Routing;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::Network;
 
@@ -45,7 +45,6 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Client<N, C> {
         // Send the first `Ping` message to the peer.
         let message = Message::Ping(Ping::<N> {
             version: Message::<N>::VERSION,
-            fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
             node_type: self.node_type(),
             block_locators: None,
         });

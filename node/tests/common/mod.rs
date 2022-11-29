@@ -16,7 +16,6 @@
 
 use pea2pea::{protocols::Handshake, Config, Connection, Node, Pea2Pea};
 use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, NodeType};
-use snarkos_node_router::ALEO_MAXIMUM_FORK_DEPTH;
 use snarkvm::prelude::{Address, Block, FromBytes, Network, Testnet3 as CurrentNetwork};
 
 use futures_util::{sink::SinkExt, TryStreamExt};
@@ -111,10 +110,9 @@ impl Handshake for TestPeer {
         // Send a challenge request to the peer.
         let message = Message::<CurrentNetwork>::ChallengeRequest(ChallengeRequest {
             version: Message::<CurrentNetwork>::VERSION,
-            fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
+            listener_port: local_ip.port(),
             node_type: self.node_type(),
             address: self.address(),
-            listener_port: local_ip.port(),
         });
         framed.send(message).await?;
 

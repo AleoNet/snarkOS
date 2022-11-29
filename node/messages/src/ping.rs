@@ -19,7 +19,6 @@ use super::*;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ping<N: Network> {
     pub version: u32,
-    pub fork_depth: u32,
     pub node_type: NodeType,
     pub block_locators: Option<BlockLocators<N>>,
 }
@@ -34,17 +33,14 @@ impl<N: Network> MessageTrait for Ping<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(
-            &mut *writer,
-            &(self.version, self.fork_depth, self.node_type, &self.block_locators),
-        )?)
+        Ok(bincode::serialize_into(&mut *writer, &(self.version, self.node_type, &self.block_locators))?)
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
-        let (version, fork_depth, node_type, block_locators) = bincode::deserialize_from(&mut reader)?;
-        Ok(Self { version, fork_depth, node_type, block_locators })
+        let (version, node_type, block_locators) = bincode::deserialize_from(&mut reader)?;
+        Ok(Self { version, node_type, block_locators })
     }
 }
