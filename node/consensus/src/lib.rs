@@ -42,10 +42,8 @@ use time::OffsetDateTime;
 use rayon::prelude::*;
 
 // TODO (raychu86): Remove this after phase 2.
-/// The expected time per round in seconds.
-const ROUND_TIME: u32 = 15;
 /// The timestamp that the new coinbase targeting algorithm starts.
-const NEW_TARGETING_START: i64 = 1669852800; // December 1, 2022
+const V5_START_TIME: i64 = 1669852800; // December 1, 2022
 
 #[derive(Clone)]
 pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
@@ -247,19 +245,23 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             }
         }
 
-        // TODO (raychu86): Remove this after phase 2.
-        // Determine if the new half life algorithm should be used.
-        let new_half_life = next_timestamp >= NEW_TARGETING_START;
-
         // Construct the next coinbase target.
-        let next_coinbase_target = coinbase_target::<ROUND_TIME>(
-            latest_block.last_coinbase_target(),
-            latest_block.last_coinbase_timestamp(),
-            next_timestamp,
-            N::ANCHOR_TIME,
-            N::NUM_BLOCKS_PER_EPOCH,
-            new_half_life,
-        )?;
+        let next_coinbase_target = match next_timestamp >= V5_START_TIME {
+            true => coinbase_target::<true>(
+                latest_block.last_coinbase_target(),
+                latest_block.last_coinbase_timestamp(),
+                next_timestamp,
+                N::ANCHOR_TIME,
+                N::NUM_BLOCKS_PER_EPOCH,
+            ),
+            false => coinbase_target::<false>(
+                latest_block.last_coinbase_target(),
+                latest_block.last_coinbase_timestamp(),
+                next_timestamp,
+                N::ANCHOR_TIME,
+                N::NUM_BLOCKS_PER_EPOCH,
+            ),
+        }?;
 
         // Construct the next proof target.
         let next_proof_target = proof_target(next_coinbase_target);
@@ -446,19 +448,24 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             }
         }
 
-        // TODO (raychu86): Remove this after phase 2.
-        // Determine if the new half life algorithm should be used.
-        let new_half_life = block.timestamp() >= NEW_TARGETING_START;
+        // Construct the next coinbase target.
+        let expected_coinbase_target = match block.timestamp() >= V5_START_TIME {
+            true => coinbase_target::<true>(
+                self.ledger.last_coinbase_target(),
+                self.ledger.last_coinbase_timestamp(),
+                block.timestamp(),
+                N::ANCHOR_TIME,
+                N::NUM_BLOCKS_PER_EPOCH,
+            ),
+            false => coinbase_target::<false>(
+                self.ledger.last_coinbase_target(),
+                self.ledger.last_coinbase_timestamp(),
+                block.timestamp(),
+                N::ANCHOR_TIME,
+                N::NUM_BLOCKS_PER_EPOCH,
+            ),
+        }?;
 
-        // Ensure the coinbase target is correct.
-        let expected_coinbase_target = coinbase_target::<ROUND_TIME>(
-            self.ledger.last_coinbase_target(),
-            self.ledger.last_coinbase_timestamp(),
-            block.timestamp(),
-            N::ANCHOR_TIME,
-            N::NUM_BLOCKS_PER_EPOCH,
-            new_half_life,
-        )?;
         if block.coinbase_target() != expected_coinbase_target {
             bail!("Invalid coinbase target: expected {}, got {}", expected_coinbase_target, block.coinbase_target())
         }

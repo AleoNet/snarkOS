@@ -84,18 +84,17 @@ pub const fn anchor_block_height(anchor_time: u16, num_years: u32) -> u32 {
     anchor_block_height_at_year_1 * num_years
 }
 
-// TODO (raychu86): Remove `new_half_life` after phase 2.
+// TODO (raychu86): Remove `IS_V5` after phase 2.
 /// Calculate the coinbase target for the given block height.
-pub fn coinbase_target<const ROUND_TIME: u32>(
+pub fn coinbase_target<const IS_V5: bool>(
     previous_coinbase_target: u64,
     previous_block_timestamp: i64,
     block_timestamp: i64,
     anchor_time: u16,
     num_blocks_per_epoch: u32,
-    new_half_life: bool,
 ) -> Result<u64> {
     // Compute the half life.
-    let half_life = if new_half_life { num_blocks_per_epoch.saturating_mul(ROUND_TIME) } else { num_blocks_per_epoch };
+    let half_life = if IS_V5 { num_blocks_per_epoch.saturating_mul(anchor_time as u32) } else { num_blocks_per_epoch };
 
     // Compute the new coinbase target.
     let candidate_target =
@@ -114,7 +113,7 @@ pub fn proof_target(coinbase_target: u64) -> u64 {
 ///     T_i = Current target.
 ///     D = Time elapsed since the previous block.
 ///     B = Expected time per block.
-///     TAU = Rate of doubling (or half-life).
+///     TAU = Rate of doubling (or half-life) in seconds.
 ///     INV = {-1, 1} depending on whether the target is increasing or decreasing.
 fn retarget(
     previous_target: u64,
@@ -215,8 +214,6 @@ mod tests {
     const EXPECTED_ANCHOR_REWARD: u64 = 13;
     const EXPECTED_STAKING_REWARD: u64 = 21_800_481;
     const EXPECTED_COINBASE_REWARD_FOR_BLOCK_1: u64 = 163_987_187;
-
-    const ROUND_TIME: u32 = 15;
 
     #[test]
     fn test_anchor_reward() {
@@ -385,7 +382,7 @@ mod tests {
 
         let minimum_coinbase_target: u64 = 2u64.pow(10) - 1;
 
-        fn test_new_targets(rng: &mut TestRng, minimum_coinbase_target: u64, new_half_life: bool) {
+        fn test_new_targets<const IS_V5: bool>(rng: &mut TestRng, minimum_coinbase_target: u64) {
             let previous_coinbase_target: u64 = rng.gen_range(minimum_coinbase_target..u64::MAX);
             let previous_prover_target = proof_target(previous_coinbase_target);
 
@@ -393,13 +390,12 @@ mod tests {
 
             // Targets stay the same when the timestamp is as expected.
             let new_timestamp = previous_timestamp + CurrentNetwork::ANCHOR_TIME as i64;
-            let new_coinbase_target = coinbase_target::<ROUND_TIME>(
+            let new_coinbase_target = coinbase_target::<IS_V5>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
-                new_half_life,
             )
             .unwrap();
             let new_prover_target = proof_target(new_coinbase_target);
@@ -408,13 +404,12 @@ mod tests {
 
             // Targets decrease (easier) when the timestamp is greater than expected.
             let new_timestamp = previous_timestamp + 2 * CurrentNetwork::ANCHOR_TIME as i64;
-            let new_coinbase_target = coinbase_target::<ROUND_TIME>(
+            let new_coinbase_target = coinbase_target::<IS_V5>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
-                new_half_life,
             )
             .unwrap();
             let new_prover_target = proof_target(new_coinbase_target);
@@ -423,13 +418,12 @@ mod tests {
 
             // Targets increase (harder) when the timestamp is less than expected.
             let new_timestamp = previous_timestamp + CurrentNetwork::ANCHOR_TIME as i64 / 2;
-            let new_coinbase_target = coinbase_target::<ROUND_TIME>(
+            let new_coinbase_target = coinbase_target::<IS_V5>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
-                new_half_life,
             )
             .unwrap();
             let new_prover_target = proof_target(new_coinbase_target);
@@ -439,8 +433,8 @@ mod tests {
         }
 
         for _ in 0..ITERATIONS {
-            test_new_targets(&mut rng, minimum_coinbase_target, false);
-            test_new_targets(&mut rng, minimum_coinbase_target, true);
+            test_new_targets::<true>(&mut rng, minimum_coinbase_target);
+            test_new_targets::<false>(&mut rng, minimum_coinbase_target);
         }
     }
 
@@ -454,45 +448,43 @@ mod tests {
             let previous_coinbase_target: u64 = rng.gen_range(minimum_coinbase_target..u64::MAX);
             let previous_timestamp = rng.gen();
 
-            let half_life = CurrentNetwork::NUM_BLOCKS_PER_EPOCH.saturating_mul(ROUND_TIME) as i64;
+            let half_life =
+                CurrentNetwork::NUM_BLOCKS_PER_EPOCH.saturating_mul(CurrentNetwork::ANCHOR_TIME as u32) as i64;
 
             // New coinbase target is greater than half if the elapsed time equals the half life.
             let new_timestamp = previous_timestamp + half_life;
-            let new_coinbase_target = coinbase_target::<ROUND_TIME>(
+            let new_coinbase_target = coinbase_target::<true>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
-                true,
             )
             .unwrap();
 
             assert!(new_coinbase_target > previous_coinbase_target / 2);
 
-            // New coinbase target is greater than half if the elapsed time is 1 round time past the half life.
-            let new_timestamp = previous_timestamp + half_life + ROUND_TIME as i64;
-            let new_coinbase_target = coinbase_target::<ROUND_TIME>(
+            // New coinbase target is halved if the elapsed time is 1 anchor time past the half life.
+            let new_timestamp = previous_timestamp + half_life + CurrentNetwork::ANCHOR_TIME as i64;
+            let new_coinbase_target = coinbase_target::<true>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
-                true,
             )
             .unwrap();
 
-            assert!(new_coinbase_target > previous_coinbase_target / 2);
+            assert_eq!(new_coinbase_target, previous_coinbase_target / 2);
 
-            // New coinbase target is less than half if the elapsed time is more than 1 round time past the half life.
-            let new_timestamp = previous_timestamp + half_life + 2 * ROUND_TIME as i64;
-            let new_coinbase_target = coinbase_target::<ROUND_TIME>(
+            // New coinbase target is less than half if the elapsed time is more than 1 anchor time past the half life.
+            let new_timestamp = previous_timestamp + half_life + 2 * CurrentNetwork::ANCHOR_TIME as i64;
+            let new_coinbase_target = coinbase_target::<true>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
-                true,
             )
             .unwrap();
 
