@@ -95,7 +95,8 @@ macro_rules! test_handshake {
     ($node_type:ident, $peer_type:ident, $is_initiator:expr, $($attr:meta)?) => {
         #[tokio::test]
         $(#[$attr])?
-        async fn $peer_type () {
+        async fn $peer_type() {
+            // $crate::common::initialise_logger(2);
 
             // Spin up a full node.
             let node = $crate::$node_type().await;

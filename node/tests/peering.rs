@@ -20,9 +20,16 @@
 mod common;
 use common::{node::*, test_peer::TestPeer};
 
+// Macro to simply construct disconnect cases.
+// Syntax:
+// - (full_node |> test_peer): full node disconnects from the synthetic test peer.
+// - (full_node <| test_peer): synthetic test peer disconnects from the full node.
+//
+// Test naming: full_node::handshake_<node or peer>_side::test_peer.
 macro_rules! test_disconnect {
-    ($node_type:ident, $peer_type:ident, $node_disconnects:expr) => {
+    ($node_type:ident, $peer_type:ident, $node_disconnects:expr, $($attr:meta)?) => {
         #[tokio::test]
+        $(#[$attr])?
         async fn $peer_type() {
             use deadline::deadline;
             use pea2pea::Pea2Pea;
@@ -66,18 +73,20 @@ macro_rules! test_disconnect {
         }
     };
 
-    ($($node_type:ident |> $peer_type:ident),*) => {
+    // Node side disconnect.
+    ($($node_type:ident |> $peer_type:ident $(= $attr:meta)?),*) => {
         mod disconnect_node_side {
             $(
-                test_disconnect!($node_type, $peer_type, true);
+                test_disconnect!($node_type, $peer_type, true, $($attr)?);
             )*
         }
     };
 
-    ($($node_type:ident <| $peer_type:ident),*) => {
+    // Peer side disconnect.
+    ($($node_type:ident <| $peer_type:ident $(= $attr:meta)?),*) => {
         mod disconnect_peer_side {
             $(
-                test_disconnect!($node_type, $peer_type, false);
+                test_disconnect!($node_type, $peer_type, false, $($attr)?);
             )*
         }
     };
@@ -139,16 +148,16 @@ mod prover {
 
 mod validator {
     // Full node disconnects from synthetic peer.
-    // validator |> beacon,
     test_disconnect! {
+        validator |> beacon = should_panic,
         validator |> client,
         validator |> validator,
         validator |> prover
     }
 
     // Synthetic peer disconnects from the full node.
-    // validator <| beacon,
     test_disconnect! {
+        validator <| beacon = should_panic,
         validator <| client,
         validator <| validator,
         validator <| prover
