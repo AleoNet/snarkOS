@@ -84,23 +84,22 @@ pub const fn anchor_block_height(anchor_time: u16, num_years: u32) -> u32 {
     anchor_block_height_at_year_1 * num_years
 }
 
+// TODO (raychu86): Remove `new_half_life` after phase 2.
 /// Calculate the coinbase target for the given block height.
-pub fn coinbase_target(
+pub fn coinbase_target<const ROUND_TIME: u32>(
     previous_coinbase_target: u64,
     previous_block_timestamp: i64,
     block_timestamp: i64,
     anchor_time: u16,
     num_blocks_per_epoch: u32,
+    new_half_life: bool,
 ) -> Result<u64> {
+    // Compute the half life.
+    let half_life = if new_half_life { num_blocks_per_epoch.saturating_mul(ROUND_TIME) } else { num_blocks_per_epoch };
+
     // Compute the new coinbase target.
-    let candidate_target = retarget(
-        previous_coinbase_target,
-        previous_block_timestamp,
-        block_timestamp,
-        num_blocks_per_epoch,
-        true,
-        anchor_time,
-    )?;
+    let candidate_target =
+        retarget(previous_coinbase_target, previous_block_timestamp, block_timestamp, half_life, true, anchor_time)?;
     // Return the new coinbase target, floored at 2^10 - 1.
     Ok(core::cmp::max((1u64 << 10).saturating_sub(1), candidate_target))
 }
@@ -216,6 +215,8 @@ mod tests {
     const EXPECTED_ANCHOR_REWARD: u64 = 13;
     const EXPECTED_STAKING_REWARD: u64 = 21_800_481;
     const EXPECTED_COINBASE_REWARD_FOR_BLOCK_1: u64 = 163_987_187;
+
+    const ROUND_TIME: u32 = 15;
 
     #[test]
     fn test_anchor_reward() {
@@ -384,7 +385,7 @@ mod tests {
 
         let minimum_coinbase_target: u64 = 2u64.pow(10) - 1;
 
-        for _ in 0..ITERATIONS {
+        fn test_new_targets(rng: &mut TestRng, minimum_coinbase_target: u64, new_half_life: bool) {
             let previous_coinbase_target: u64 = rng.gen_range(minimum_coinbase_target..u64::MAX);
             let previous_prover_target = proof_target(previous_coinbase_target);
 
@@ -392,12 +393,13 @@ mod tests {
 
             // Targets stay the same when the timestamp is as expected.
             let new_timestamp = previous_timestamp + CurrentNetwork::ANCHOR_TIME as i64;
-            let new_coinbase_target = coinbase_target(
+            let new_coinbase_target = coinbase_target::<ROUND_TIME>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                new_half_life,
             )
             .unwrap();
             let new_prover_target = proof_target(new_coinbase_target);
@@ -406,12 +408,13 @@ mod tests {
 
             // Targets decrease (easier) when the timestamp is greater than expected.
             let new_timestamp = previous_timestamp + 2 * CurrentNetwork::ANCHOR_TIME as i64;
-            let new_coinbase_target = coinbase_target(
+            let new_coinbase_target = coinbase_target::<ROUND_TIME>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                new_half_life,
             )
             .unwrap();
             let new_prover_target = proof_target(new_coinbase_target);
@@ -420,18 +423,24 @@ mod tests {
 
             // Targets increase (harder) when the timestamp is less than expected.
             let new_timestamp = previous_timestamp + CurrentNetwork::ANCHOR_TIME as i64 / 2;
-            let new_coinbase_target = coinbase_target(
+            let new_coinbase_target = coinbase_target::<ROUND_TIME>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                new_half_life,
             )
             .unwrap();
             let new_prover_target = proof_target(new_coinbase_target);
 
             assert!(new_coinbase_target > previous_coinbase_target);
             assert!(new_prover_target > previous_prover_target);
+        }
+
+        for _ in 0..ITERATIONS {
+            test_new_targets(&mut rng, minimum_coinbase_target, false);
+            test_new_targets(&mut rng, minimum_coinbase_target, true);
         }
     }
 }
