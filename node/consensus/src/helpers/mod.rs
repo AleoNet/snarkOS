@@ -500,6 +500,11 @@ mod tests {
     fn test_target_doubling() {
         let mut rng = TestRng::default();
 
+        // The custom block time that is faster than the anchor time.
+        const BLOCK_TIME: u32 = 15;
+        // The expected number of blocks before the coinbase target is doubled.
+        const EXPECTED_NUM_BLOCKS_TO_DOUBLE: u32 = 321;
+
         let minimum_coinbase_target: u64 = 2u64.pow(10) - 1;
 
         let initial_coinbase_target: u64 = rng.gen_range(minimum_coinbase_target..u64::MAX / 2);
@@ -508,12 +513,9 @@ mod tests {
         let mut previous_timestamp = initial_timestamp;
         let mut num_blocks = 0;
 
-        // The custom block time that is faster than the anchor time.
-        let fast_block_time = 15;
-
         while previous_coinbase_target < initial_coinbase_target * 2 {
             // Targets increase (harder) when the timestamp is less than expected.
-            let new_timestamp = previous_timestamp + fast_block_time as i64;
+            let new_timestamp = previous_timestamp + BLOCK_TIME as i64;
             let new_coinbase_target = coinbase_target::<true>(
                 previous_coinbase_target,
                 previous_timestamp,
@@ -532,9 +534,11 @@ mod tests {
 
         println!(
             "For block times of {}s and anchor time of {}s, doubling the coinbase target took {num_blocks} blocks. ({} seconds)",
-            fast_block_time,
+            BLOCK_TIME,
             CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
             previous_timestamp - initial_timestamp
         );
+
+        assert_eq!(EXPECTED_NUM_BLOCKS_TO_DOUBLE, num_blocks);
     }
 }
