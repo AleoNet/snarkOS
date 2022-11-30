@@ -56,11 +56,13 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     /// The beacons.
     // TODO (howardwu): Update this to retrieve from a beacons store.
     beacons: Arc<RwLock<IndexMap<Address<N>, ()>>>,
+    /// The boolean flag for the development mode.
+    is_dev: bool,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Initializes a new instance of consensus.
-    pub fn new(ledger: Ledger<N, C>) -> Result<Self> {
+    pub fn new(ledger: Ledger<N, C>, is_dev: bool) -> Result<Self> {
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
 
@@ -71,6 +73,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             memory_pool: Default::default(),
             // TODO (howardwu): Update this to retrieve from a validators store.
             beacons: Default::default(),
+            is_dev,
         };
 
         // Add the genesis beacon.
@@ -246,7 +249,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         // Construct the next coinbase target.
-        let next_coinbase_target = match next_height >= V4_START_HEIGHT {
+        // Use the new targeting algorithm if the node is in development mode or
+        // if the block height is greater than or equal to `V4_START_HEIGHT`.
+        let next_coinbase_target = match self.is_dev || next_height >= V4_START_HEIGHT {
             true => coinbase_target::<true>(
                 latest_block.last_coinbase_target(),
                 latest_block.last_coinbase_timestamp(),
@@ -451,7 +456,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         // Construct the next coinbase target.
-        let expected_coinbase_target = match block.height() >= V4_START_HEIGHT {
+        // Use the new targeting algorithm if the node is in development mode or
+        // if the block height is greater than or equal to `V4_START_HEIGHT`.
+        let expected_coinbase_target = match self.is_dev || block.height() >= V4_START_HEIGHT {
             true => coinbase_target::<true>(
                 self.ledger.last_coinbase_target(),
                 self.ledger.last_coinbase_timestamp(),
