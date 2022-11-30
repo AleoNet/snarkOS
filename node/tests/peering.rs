@@ -95,7 +95,7 @@ macro_rules! test_disconnect {
 mod beacon {
     // Full node disconnects from synthetic peer.
     test_disconnect! {
-        beacon |> beacon,
+        beacon |> beacon = should_panic,
         beacon |> client,
         beacon |> validator,
         beacon |> prover
@@ -103,7 +103,7 @@ mod beacon {
 
     // Synthetic peer disconnects from the full node.
     test_disconnect! {
-        beacon <| beacon,
+        beacon <| beacon = should_panic,
         beacon <| client,
         beacon <| validator,
         beacon <| prover
@@ -113,7 +113,7 @@ mod beacon {
 mod client {
     // Full node disconnects from synthetic peer.
     test_disconnect! {
-        client |> beacon,
+        client |> beacon = should_panic,
         client |> client,
         client |> validator,
         client |> prover
@@ -121,7 +121,7 @@ mod client {
 
     // Synthetic peer disconnects from the full node.
     test_disconnect! {
-        client <| beacon,
+        client <| beacon = should_panic,
         client <| client,
         client <| validator,
         client <| prover
@@ -131,7 +131,7 @@ mod client {
 mod prover {
     // Full node disconnects from synthetic peer.
     test_disconnect! {
-        prover |> beacon,
+        prover |> beacon = should_panic,
         prover |> client,
         prover |> validator,
         prover |> prover
@@ -139,7 +139,7 @@ mod prover {
 
     // Synthetic peer disconnects from the full node.
     test_disconnect! {
-        prover <| beacon,
+        prover <| beacon = should_panic,
         prover <| client,
         prover <| validator,
         prover <| prover

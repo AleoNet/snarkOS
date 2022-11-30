@@ -17,8 +17,22 @@
 pub mod node;
 pub mod test_peer;
 
-use std::env;
+use std::{env, str::FromStr};
 
+use snarkos_account::Account;
+use snarkvm::prelude::{Block, FromBytes, Network, Testnet3 as CurrentNetwork};
+
+/// Returns a fixed account.
+pub fn sample_account() -> Account<CurrentNetwork> {
+    Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap()
+}
+
+/// Loads the current network's genesis block.
+pub fn sample_genesis_block() -> Block<CurrentNetwork> {
+    Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap()
+}
+
+/// Enables logging in tests.
 pub fn initialise_logger(level: u8) {
     match level {
         0 => env::set_var("RUST_LOG", "info"),
