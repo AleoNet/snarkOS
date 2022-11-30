@@ -41,7 +41,7 @@ use time::OffsetDateTime;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-// TODO (raychu86): Remove this after phase 2.
+// TODO (raychu86): Remove this after Phase 2.
 /// The block height that the new coinbase targeting algorithm starts.
 const V4_START_HEIGHT: u32 = 120000;
 

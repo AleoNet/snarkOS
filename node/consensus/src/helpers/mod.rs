@@ -84,7 +84,7 @@ pub const fn anchor_block_height(anchor_time: u16, num_years: u32) -> u32 {
     anchor_block_height_at_year_1 * num_years
 }
 
-// TODO (raychu86): Remove `IS_V4` after phase 2.
+// TODO (raychu86): Remove `IS_V4` after Phase 2.
 /// Calculate the coinbase target for the given block height.
 pub fn coinbase_target<const IS_V4: bool>(
     previous_coinbase_target: u64,
@@ -95,6 +95,12 @@ pub fn coinbase_target<const IS_V4: bool>(
 ) -> Result<u64> {
     // Compute the half life.
     let half_life = if IS_V4 { num_blocks_per_epoch.saturating_mul(anchor_time as u32) } else { num_blocks_per_epoch };
+
+    let half_life = if IS_V4 {
+        num_blocks_per_epoch.saturating_div(2).saturating_mul(anchor_time as u32)
+    } else {
+        num_blocks_per_epoch
+    };
 
     // Compute the new coinbase target.
     let candidate_target =
@@ -515,7 +521,7 @@ mod tests {
                 previous_timestamp,
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
-                CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                128,
             )
             .unwrap();
 
@@ -529,7 +535,7 @@ mod tests {
         println!(
             "For block times of {}s and anchor time of {}s, doubling the coinbase target took {num_blocks} blocks. ({} seconds)",
             fast_block_time,
-            CurrentNetwork::ANCHOR_TIME,
+            128,
             previous_timestamp - initial_timestamp
         );
     }
