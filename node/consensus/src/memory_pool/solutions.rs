@@ -43,7 +43,7 @@ impl<N: Network> MemoryPool<N> {
             .unique_by(|(k, _)| *k)
             .map(|(_, v)| v.1)
             .sorted_by(|a, b| b.cmp(a))
-            .take(N::MAX_PROVER_SOLUTIONS);
+            .take(256);
 
         // Compute the cumulative proof target of the prover solutions as a u128.
         candidate_proof_targets.try_fold(0u128, |cumulative, proof_target| {
@@ -84,7 +84,7 @@ impl<N: Network> MemoryPool<N> {
             .sorted_by(|a, b| b.1.1.cmp(&a.1.1))
             .map(|(_, v)| v.0)
             .unique_by(|s| s.commitment())
-            .take(N::MAX_PROVER_SOLUTIONS)
+            .take(256)
             .collect();
 
         // Compute the cumulative proof target of the prover solutions as a u128.

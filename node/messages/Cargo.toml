@@ -16,6 +16,10 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
+[features]
+default = []
+test = []
+
 [dependencies.anyhow]
 version = "1"
 
@@ -23,6 +27,9 @@ version = "1"
 version = "1.0"
 
 [dependencies.bytes]
+version = "1"
+
+[dependencies.indexmap]
 version = "1"
 
 [dependencies.kadmium]

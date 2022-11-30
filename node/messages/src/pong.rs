@@ -24,8 +24,8 @@ pub struct Pong {
 impl MessageTrait for Pong {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> &str {
-        "Pong"
+    fn name(&self) -> String {
+        "Pong".to_string()
     }
 
     /// Serializes the message into the buffer.
