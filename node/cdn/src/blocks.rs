@@ -72,9 +72,11 @@ pub async fn sync_ledger_with_cdn<N: Network, C: ConsensusStorage<N>>(
                 return Err((*completed_height, err));
             }
         }
-    }
 
-    result
+        Ok(*completed_height)
+    } else {
+        result
+    }
 }
 
 /// Loads blocks from a CDN and process them with the given function.
