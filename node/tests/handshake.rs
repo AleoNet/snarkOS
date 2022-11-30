@@ -190,7 +190,7 @@ macro_rules! test_handshake {
 mod beacon {
     // Initiator side (full node connects to synthetic peer).
     test_handshake! {
-        beacon -> beacon,
+        beacon -> beacon = should_panic,
         beacon -> client,
         beacon -> validator,
         beacon -> prover
@@ -198,7 +198,7 @@ mod beacon {
 
     // Responder side (synthetic peer connects to full node).
     test_handshake! {
-        beacon <- beacon,
+        beacon <- beacon = should_panic,
         beacon <- client,
         beacon <- validator,
         beacon <- prover
@@ -208,7 +208,7 @@ mod beacon {
 mod client {
     // Initiator side (full node connects to synthetic peer).
     test_handshake! {
-        client -> beacon,
+        client -> beacon = should_panic,
         client -> client,
         client -> validator,
         client -> prover
@@ -216,7 +216,7 @@ mod client {
 
     // Responder side (synthetic peer connects to full node).
     test_handshake! {
-        client <- beacon,
+        client <- beacon = should_panic,
         client <- client,
         client <- validator,
         client <- prover
@@ -226,7 +226,7 @@ mod client {
 mod prover {
     // Initiator side (full node connects to synthetic peer).
     test_handshake! {
-        prover -> beacon,
+        prover -> beacon = should_panic,
         prover -> client,
         prover -> validator,
         prover -> prover
@@ -234,7 +234,7 @@ mod prover {
 
     // Responder side (synthetic peer connects to full node).
     test_handshake! {
-        prover <- beacon,
+        prover <- beacon = should_panic,
         prover <- client,
         prover <- validator,
         prover <- prover
@@ -244,7 +244,7 @@ mod prover {
 mod validator {
     // Initiator side (full node connects to synthetic peer).
     test_handshake! {
-        validator -> beacon,
+        validator -> beacon = should_panic,
         validator -> client,
         validator -> validator,
         validator -> prover
@@ -252,7 +252,7 @@ mod validator {
 
     // Responder side (synthetic peer connects to full node).
     test_handshake! {
-        validator <- beacon,
+        validator <- beacon = should_panic,
         validator <- client,
         validator <- validator,
         validator <- prover
