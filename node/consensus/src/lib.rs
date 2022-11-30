@@ -41,6 +41,12 @@ use time::OffsetDateTime;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
+// TODO (raychu86): Remove this after Phase 2.
+/// The block height to start preparing the new coinbase targeting algorithm.
+const PREPARE_V4_START_HEIGHT: u32 = 120000;
+/// The block height to start checking the new coinbase targeting algorithm.
+const CHECK_V4_START_HEIGHT: u32 = 127500;
+
 #[derive(Clone)]
 pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     /// The ledger.
@@ -242,13 +248,22 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         // Construct the next coinbase target.
-        let next_coinbase_target = coinbase_target(
-            latest_block.last_coinbase_target(),
-            latest_block.last_coinbase_timestamp(),
-            next_timestamp,
-            N::ANCHOR_TIME,
-            N::NUM_BLOCKS_PER_EPOCH,
-        )?;
+        let next_coinbase_target = match next_height >= PREPARE_V4_START_HEIGHT {
+            true => coinbase_target::<true>(
+                latest_block.last_coinbase_target(),
+                latest_block.last_coinbase_timestamp(),
+                next_timestamp,
+                N::ANCHOR_TIME,
+                N::NUM_BLOCKS_PER_EPOCH,
+            ),
+            false => coinbase_target::<false>(
+                latest_block.last_coinbase_target(),
+                latest_block.last_coinbase_timestamp(),
+                next_timestamp,
+                N::ANCHOR_TIME,
+                N::NUM_BLOCKS_PER_EPOCH,
+            ),
+        }?;
 
         // Construct the next proof target.
         let next_proof_target = proof_target(next_coinbase_target);
@@ -437,22 +452,36 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             }
         }
 
-        // Ensure the coinbase target is correct.
-        let expected_coinbase_target = coinbase_target(
-            self.ledger.last_coinbase_target(),
-            self.ledger.last_coinbase_timestamp(),
-            block.timestamp(),
-            N::ANCHOR_TIME,
-            N::NUM_BLOCKS_PER_EPOCH,
-        )?;
-        if block.coinbase_target() != expected_coinbase_target {
-            bail!("Invalid coinbase target: expected {}, got {}", expected_coinbase_target, block.coinbase_target())
-        }
+        // Construct the next coinbase target.
+        let expected_coinbase_target = match block.height() >= PREPARE_V4_START_HEIGHT {
+            true => coinbase_target::<true>(
+                self.ledger.last_coinbase_target(),
+                self.ledger.last_coinbase_timestamp(),
+                block.timestamp(),
+                N::ANCHOR_TIME,
+                N::NUM_BLOCKS_PER_EPOCH,
+            ),
+            false => coinbase_target::<false>(
+                self.ledger.last_coinbase_target(),
+                self.ledger.last_coinbase_timestamp(),
+                block.timestamp(),
+                N::ANCHOR_TIME,
+                N::NUM_BLOCKS_PER_EPOCH,
+            ),
+        }?;
 
-        // Ensure the proof target is correct.
-        let expected_proof_target = proof_target(expected_coinbase_target);
-        if block.proof_target() != expected_proof_target {
-            bail!("Invalid proof target: expected {}, got {}", expected_proof_target, block.proof_target())
+        // TODO (raychu86): Remove this if statement after Phase 2.
+        // Do not check the coinbase target between `PREPARE_V4_START_HEIGHT` and `CHECK_V4_START_HEIGHT`
+        if block.height() < PREPARE_V4_START_HEIGHT || block.height() > CHECK_V4_START_HEIGHT {
+            if block.coinbase_target() != expected_coinbase_target {
+                bail!("Invalid coinbase target: expected {}, got {}", expected_coinbase_target, block.coinbase_target())
+            }
+
+            // Ensure the proof target is correct.
+            let expected_proof_target = proof_target(expected_coinbase_target);
+            if block.proof_target() != expected_proof_target {
+                bail!("Invalid proof target: expected {}, got {}", expected_proof_target, block.proof_target())
+            }
         }
 
         /* Block Hash */
