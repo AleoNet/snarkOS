@@ -15,6 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use crate::{Heartbeat, Inbound, Outbound};
+use snarkos_node_messages::Message;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake},
     P2P,
@@ -25,9 +26,6 @@ use core::time::Duration;
 
 #[async_trait]
 pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbound<N> + Heartbeat<N> {
-    /// The frequency at which the node sends a puzzle request.
-    const PUZZLE_REQUEST_IN_SECS: u64 = N::ANCHOR_TIME as u64;
-
     /// Initialize the routing.
     async fn initialize_routing(&self) {
         // Enable the TCP protocols.
@@ -37,8 +35,6 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
         self.enable_disconnect().await;
         // Initialize the heartbeat.
         self.initialize_heartbeat();
-        // Initialize the puzzle request.
-        self.initialize_puzzle_request();
         // Initialize the report.
         self.initialize_report();
     }
@@ -56,37 +52,20 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
         });
     }
 
-    /// TODO (howardwu): Change this for Phase 3.
-    /// Initialize a new instance of the puzzle request.
-    fn initialize_puzzle_request(&self) {
-        if !self.router().node_type().is_beacon() && Self::PUZZLE_REQUEST_IN_SECS > 0 {
-            let self_clone = self.clone();
-            self.router().spawn(async move {
-                loop {
-                    // Send a "PuzzleRequest".
-                    self_clone.send_puzzle_request();
-                    // Sleep for `PUZZLE_REQUEST_IN_SECS` seconds.
-                    tokio::time::sleep(Duration::from_secs(Self::PUZZLE_REQUEST_IN_SECS)).await;
-                }
-            });
-        }
-    }
-
     /// Initialize a new instance of the report.
     fn initialize_report(&self) {
         let self_clone = self.clone();
         self.router().spawn(async move {
-            let url = "https://vm.aleo.org/testnet3/report";
             loop {
                 // Prepare the report.
                 let mut report = std::collections::HashMap::new();
+                report.insert("message_version".to_string(), Message::<N>::VERSION.to_string());
                 report.insert("node_address".to_string(), self_clone.router().address().to_string());
                 report.insert("node_type".to_string(), self_clone.router().node_type().to_string());
                 report.insert("is_dev".to_string(), self_clone.router().is_dev().to_string());
                 // Transmit the report.
-                if reqwest::Client::new().post(url).json(&report).send().await.is_err() {
-                    warn!("Failed to send report");
-                }
+                let url = "https://vm.aleo.org/testnet3/report";
+                let _ = reqwest::Client::new().post(url).json(&report).send().await;
                 // Sleep for a fixed duration in seconds.
                 tokio::time::sleep(Duration::from_secs(600)).await;
             }

@@ -22,8 +22,8 @@ pub struct PuzzleRequest;
 impl MessageTrait for PuzzleRequest {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> &str {
-        "PuzzleRequest"
+    fn name(&self) -> String {
+        "PuzzleRequest".to_string()
     }
 
     /// Serializes the message into the buffer.

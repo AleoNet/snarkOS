@@ -17,7 +17,7 @@
 #![recursion_limit = "256"]
 
 mod common;
-use common::TestPeer;
+use common::{sample_genesis_block, TestPeer};
 
 use snarkos_account::Account;
 use snarkos_node::{Beacon, Client, Prover, Validator};
@@ -36,7 +36,7 @@ async fn beacon() -> Beacon<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
         None,
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
-        None, // Should load the current network's genesis block.
+        sample_genesis_block(),
         None, // No CDN.
         None,
     )
@@ -49,6 +49,7 @@ async fn client() -> Client<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
         "127.0.0.1:0".parse().unwrap(),
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
+        sample_genesis_block(),
         None,
     )
     .await
@@ -60,6 +61,7 @@ async fn prover() -> Prover<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
         "127.0.0.1:0".parse().unwrap(),
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
+        sample_genesis_block(),
         None,
     )
     .await
@@ -72,7 +74,7 @@ async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNetwork
         None,
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
-        None, // Should load the current network's genesis block.
+        sample_genesis_block(),
         None, // No CDN.
         None,
     )
@@ -128,13 +130,13 @@ where
 
 /* Test case */
 
-// Asserts a succesful connection was created from initiator to responder.
+// Asserts a successful connection was created from initiator to responder.
 async fn assert_connect<T, U>(initiator: T, responder: U)
 where
     T: Connect,
     U: Connect,
 {
-    assert!(initiator.connect(responder.listening_addr()).await.is_ok())
+    initiator.connect(responder.listening_addr()).await.unwrap()
 }
 
 // Macro to simply construct handshake cases.
@@ -242,7 +244,7 @@ mod prover {
 mod validator {
     // Initiator side (full node connects to synthetic peer).
     test_handshake! {
-        validator -> beacon = should_panic,
+        validator -> beacon,
         validator -> client,
         validator -> validator,
         validator -> prover
@@ -250,7 +252,7 @@ mod validator {
 
     // Responder side (synthetic peer connects to full node).
     test_handshake! {
-        validator <- beacon = should_panic,
+        validator <- beacon,
         validator <- client,
         validator <- validator,
         validator <- prover

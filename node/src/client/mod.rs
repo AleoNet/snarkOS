@@ -30,6 +30,7 @@ use snarkvm::prelude::{
     CoinbasePuzzle,
     ConsensusStorage,
     EpochChallenge,
+    Header,
     Network,
     PrivateKey,
     ProverSolution,
@@ -48,12 +49,14 @@ pub struct Client<N: Network, C: ConsensusStorage<N>> {
     account: Account<N>,
     /// The router of the node.
     router: Router<N>,
+    /// The genesis block.
+    genesis: Block<N>,
     /// The coinbase puzzle.
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The latest epoch challenge.
     latest_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
-    /// The latest block.
-    latest_block: Arc<RwLock<Option<Block<N>>>>,
+    /// The latest block header.
+    latest_block_header: Arc<RwLock<Option<Header<N>>>>,
     /// PhantomData.
     _phantom: PhantomData<C>,
 }
@@ -64,6 +67,7 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         node_ip: SocketAddr,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
+        genesis: Block<N>,
         dev: Option<u16>,
     ) -> Result<Self> {
         // Initialize the node router.
@@ -82,9 +86,10 @@ impl<N: Network, C: ConsensusStorage<N>> Client<N, C> {
         let node = Self {
             account,
             router,
+            genesis,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
-            latest_block: Default::default(),
+            latest_block_header: Default::default(),
             _phantom: PhantomData,
         };
         // Initialize the routing.

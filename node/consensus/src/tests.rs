@@ -101,7 +101,7 @@ pub(crate) mod test_helpers {
         let genesis = sample_genesis_block_with_private_key(rng, private_key);
 
         // Initialize the ledger with the genesis block and the associated private key.
-        let ledger = CurrentLedger::load(Some(genesis.clone()), None).unwrap();
+        let ledger = CurrentLedger::load(genesis.clone(), None).unwrap();
         assert_eq!(0, ledger.latest_height());
         assert_eq!(genesis.hash(), ledger.latest_hash());
         assert_eq!(genesis.round(), ledger.latest_round());

@@ -15,22 +15,35 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use pea2pea::{protocols::Handshake, Config, Connection, Node, Pea2Pea};
-use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, NodeType, Status};
-use snarkvm::prelude::{Block, FromBytes, Network, Testnet3 as CurrentNetwork};
+use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, NodeType};
+use snarkvm::prelude::{Address, Block, FromBytes, Network, Testnet3 as CurrentNetwork};
 
 use futures_util::{sink::SinkExt, TryStreamExt};
+use snarkos_account::Account;
 use std::{
     io,
     net::{IpAddr, Ipv4Addr},
+    str::FromStr,
 };
 use tokio_util::codec::Framed;
 
-const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
+/// Returns a fixed account address.
+pub fn sample_address() -> Address<CurrentNetwork> {
+    let account =
+        Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap();
+    account.address()
+}
+
+/// Loads the current network's genesis block.
+pub fn sample_genesis_block() -> Block<CurrentNetwork> {
+    Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap()
+}
 
 #[derive(Clone)]
 pub struct TestPeer {
     node: Node,
     node_type: NodeType,
+    address: Address<CurrentNetwork>,
 }
 
 impl Pea2Pea for TestPeer {
@@ -41,22 +54,22 @@ impl Pea2Pea for TestPeer {
 
 impl TestPeer {
     pub async fn beacon() -> Self {
-        Self::new(NodeType::Beacon).await
+        Self::new(NodeType::Beacon, sample_address()).await
     }
 
     pub async fn client() -> Self {
-        Self::new(NodeType::Client).await
+        Self::new(NodeType::Client, sample_address()).await
     }
 
     pub async fn prover() -> Self {
-        Self::new(NodeType::Prover).await
+        Self::new(NodeType::Prover, sample_address()).await
     }
 
     pub async fn validator() -> Self {
-        Self::new(NodeType::Validator).await
+        Self::new(NodeType::Validator, sample_address()).await
     }
 
-    pub async fn new(node_type: NodeType) -> Self {
+    pub async fn new(node_type: NodeType, address: Address<CurrentNetwork>) -> Self {
         let peer = Self {
             node: Node::new(Config {
                 listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
@@ -66,6 +79,7 @@ impl TestPeer {
             .await
             .expect("couldn't create test peer"),
             node_type,
+            address,
         };
 
         peer.enable_handshake().await;
@@ -79,6 +93,10 @@ impl TestPeer {
     pub fn node_type(&self) -> NodeType {
         self.node_type
     }
+
+    pub fn address(&self) -> Address<CurrentNetwork> {
+        self.address
+    }
 }
 
 #[async_trait::async_trait]
@@ -89,19 +107,12 @@ impl Handshake for TestPeer {
         let stream = self.borrow_stream(&mut conn);
         let mut framed = Framed::new(stream, MessageCodec::<CurrentNetwork>::default());
 
-        // TODO (howardwu): Make this step more efficient (by not deserializing every time).
-        // Retrieve the genesis block header.
-        let genesis_header = *Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes())
-            .expect("genesis block bytes should be valid")
-            .header();
-
         // Send a challenge request to the peer.
         let message = Message::<CurrentNetwork>::ChallengeRequest(ChallengeRequest {
             version: Message::<CurrentNetwork>::VERSION,
-            fork_depth: ALEO_MAXIMUM_FORK_DEPTH,
-            node_type: self.node_type(),
-            status: Status::Peering,
             listener_port: local_ip.port(),
+            node_type: self.node_type(),
+            address: self.address(),
         });
         framed.send(message).await?;
 
@@ -110,6 +121,8 @@ impl Handshake for TestPeer {
 
         // TODO(nkls): add assertions on the contents.
 
+        // Retrieve the genesis block header.
+        let genesis_header = *sample_genesis_block().header();
         // Send the challenge response.
         let message = Message::ChallengeResponse(ChallengeResponse { header: Data::Object(genesis_header) });
         framed.send(message).await?;
