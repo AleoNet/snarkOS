@@ -452,8 +452,9 @@ mod tests {
             let previous_coinbase_target: u64 = rng.gen_range(minimum_coinbase_target..u64::MAX);
             let previous_timestamp = rng.gen();
 
-            let half_life =
-                CurrentNetwork::NUM_BLOCKS_PER_EPOCH.saturating_mul(CurrentNetwork::ANCHOR_TIME as u32) as i64;
+            let half_life = CurrentNetwork::NUM_BLOCKS_PER_EPOCH
+                .saturating_div(2)
+                .saturating_mul(CurrentNetwork::ANCHOR_TIME as u32) as i64;
 
             // New coinbase target is greater than half if the elapsed time equals the half life.
             let new_timestamp = previous_timestamp + half_life;
