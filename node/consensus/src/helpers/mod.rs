@@ -84,9 +84,9 @@ pub const fn anchor_block_height(anchor_time: u16, num_years: u32) -> u32 {
     anchor_block_height_at_year_1 * num_years
 }
 
-// TODO (raychu86): Remove `IS_V5` after phase 2.
+// TODO (raychu86): Remove `IS_V4` after phase 2.
 /// Calculate the coinbase target for the given block height.
-pub fn coinbase_target<const IS_V5: bool>(
+pub fn coinbase_target<const IS_V4: bool>(
     previous_coinbase_target: u64,
     previous_block_timestamp: i64,
     block_timestamp: i64,
@@ -94,7 +94,7 @@ pub fn coinbase_target<const IS_V5: bool>(
     num_blocks_per_epoch: u32,
 ) -> Result<u64> {
     // Compute the half life.
-    let half_life = if IS_V5 { num_blocks_per_epoch.saturating_mul(anchor_time as u32) } else { num_blocks_per_epoch };
+    let half_life = if IS_V4 { num_blocks_per_epoch.saturating_mul(anchor_time as u32) } else { num_blocks_per_epoch };
 
     // Compute the new coinbase target.
     let candidate_target =
@@ -382,7 +382,7 @@ mod tests {
 
         let minimum_coinbase_target: u64 = 2u64.pow(10) - 1;
 
-        fn test_new_targets<const IS_V5: bool>(rng: &mut TestRng, minimum_coinbase_target: u64) {
+        fn test_new_targets<const IS_V4: bool>(rng: &mut TestRng, minimum_coinbase_target: u64) {
             let previous_coinbase_target: u64 = rng.gen_range(minimum_coinbase_target..u64::MAX);
             let previous_prover_target = proof_target(previous_coinbase_target);
 
@@ -390,7 +390,7 @@ mod tests {
 
             // Targets stay the same when the timestamp is as expected.
             let new_timestamp = previous_timestamp + CurrentNetwork::ANCHOR_TIME as i64;
-            let new_coinbase_target = coinbase_target::<IS_V5>(
+            let new_coinbase_target = coinbase_target::<IS_V4>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
@@ -404,7 +404,7 @@ mod tests {
 
             // Targets decrease (easier) when the timestamp is greater than expected.
             let new_timestamp = previous_timestamp + 2 * CurrentNetwork::ANCHOR_TIME as i64;
-            let new_coinbase_target = coinbase_target::<IS_V5>(
+            let new_coinbase_target = coinbase_target::<IS_V4>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
@@ -418,7 +418,7 @@ mod tests {
 
             // Targets increase (harder) when the timestamp is less than expected.
             let new_timestamp = previous_timestamp + CurrentNetwork::ANCHOR_TIME as i64 / 2;
-            let new_coinbase_target = coinbase_target::<IS_V5>(
+            let new_coinbase_target = coinbase_target::<IS_V4>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
