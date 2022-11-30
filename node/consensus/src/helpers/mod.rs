@@ -94,7 +94,11 @@ pub fn coinbase_target<const IS_V4: bool>(
     num_blocks_per_epoch: u32,
 ) -> Result<u64> {
     // Compute the half life.
-    let half_life = if IS_V4 { num_blocks_per_epoch.saturating_mul(anchor_time as u32) } else { num_blocks_per_epoch };
+    let half_life = if IS_V4 {
+        num_blocks_per_epoch.saturating_div(2).saturating_mul(anchor_time as u32)
+    } else {
+        num_blocks_per_epoch
+    };
 
     // Compute the new coinbase target.
     let candidate_target =
