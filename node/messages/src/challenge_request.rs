@@ -22,6 +22,7 @@ pub struct ChallengeRequest<N: Network> {
     pub listener_port: u16,
     pub node_type: NodeType,
     pub address: Address<N>,
+    pub nonce: u64,
 }
 
 impl<N: Network> MessageTrait for ChallengeRequest<N> {
@@ -34,13 +35,16 @@ impl<N: Network> MessageTrait for ChallengeRequest<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(writer, &(self.version, self.listener_port, self.node_type, self.address))?)
+        Ok(bincode::serialize_into(
+            writer,
+            &(self.version, self.listener_port, self.node_type, self.address, self.nonce),
+        )?)
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let (version, listener_port, node_type, address) = bincode::deserialize_from(&mut bytes.reader())?;
-        Ok(Self { version, listener_port, node_type, address })
+        let (version, listener_port, node_type, address, nonce) = bincode::deserialize_from(&mut bytes.reader())?;
+        Ok(Self { version, listener_port, node_type, address, nonce })
     }
 }

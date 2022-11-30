@@ -15,11 +15,12 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use pea2pea::{protocols::Handshake, Config, Connection, Node, Pea2Pea};
+use snarkos_account::Account;
 use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, NodeType};
-use snarkvm::prelude::{Address, Block, FromBytes, Network, Testnet3 as CurrentNetwork};
+use snarkvm::prelude::{error, Address, Block, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork};
 
 use futures_util::{sink::SinkExt, TryStreamExt};
-use snarkos_account::Account;
+use rand::Rng;
 use std::{
     io,
     net::{IpAddr, Ipv4Addr},
@@ -27,11 +28,9 @@ use std::{
 };
 use tokio_util::codec::Framed;
 
-/// Returns a fixed account address.
-pub fn sample_address() -> Address<CurrentNetwork> {
-    let account =
-        Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap();
-    account.address()
+/// Returns a fixed account.
+pub fn sample_account() -> Account<CurrentNetwork> {
+    Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap()
 }
 
 /// Loads the current network's genesis block.
@@ -43,7 +42,7 @@ pub fn sample_genesis_block() -> Block<CurrentNetwork> {
 pub struct TestPeer {
     node: Node,
     node_type: NodeType,
-    address: Address<CurrentNetwork>,
+    account: Account<CurrentNetwork>,
 }
 
 impl Pea2Pea for TestPeer {
@@ -54,22 +53,22 @@ impl Pea2Pea for TestPeer {
 
 impl TestPeer {
     pub async fn beacon() -> Self {
-        Self::new(NodeType::Beacon, sample_address()).await
+        Self::new(NodeType::Beacon, sample_account()).await
     }
 
     pub async fn client() -> Self {
-        Self::new(NodeType::Client, sample_address()).await
+        Self::new(NodeType::Client, sample_account()).await
     }
 
     pub async fn prover() -> Self {
-        Self::new(NodeType::Prover, sample_address()).await
+        Self::new(NodeType::Prover, sample_account()).await
     }
 
     pub async fn validator() -> Self {
-        Self::new(NodeType::Validator, sample_address()).await
+        Self::new(NodeType::Validator, sample_account()).await
     }
 
-    pub async fn new(node_type: NodeType, address: Address<CurrentNetwork>) -> Self {
+    pub async fn new(node_type: NodeType, account: Account<CurrentNetwork>) -> Self {
         let peer = Self {
             node: Node::new(Config {
                 listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
@@ -79,7 +78,7 @@ impl TestPeer {
             .await
             .expect("couldn't create test peer"),
             node_type,
-            address,
+            account,
         };
 
         peer.enable_handshake().await;
@@ -94,14 +93,20 @@ impl TestPeer {
         self.node_type
     }
 
+    pub fn account(&self) -> &Account<CurrentNetwork> {
+        &self.account
+    }
+
     pub fn address(&self) -> Address<CurrentNetwork> {
-        self.address
+        self.account.address()
     }
 }
 
 #[async_trait::async_trait]
 impl Handshake for TestPeer {
     async fn perform_handshake(&self, mut conn: Connection) -> io::Result<Connection> {
+        let rng = &mut TestRng::default();
+
         let local_ip = self.node().listening_addr().expect("listening address should be present");
 
         let stream = self.borrow_stream(&mut conn);
@@ -113,18 +118,30 @@ impl Handshake for TestPeer {
             listener_port: local_ip.port(),
             node_type: self.node_type(),
             address: self.address(),
+            nonce: rng.gen(),
         });
         framed.send(message).await?;
 
-        // Receive the challenge request.
-        let _challenge_request = framed.try_next().await?.unwrap();
+        // Listen for the challenge request.
+        let request_b = match framed.try_next().await? {
+            // Received the challenge request message, proceed.
+            Some(Message::ChallengeRequest(data)) => data,
+            // Received a disconnect message, abort.
+            Some(Message::Disconnect(reason)) => return Err(error(format!("disconnected: {reason:?}"))),
+            // Received an unexpected message, abort.
+            _ => return Err(error("didn't send a challenge request")),
+        };
 
         // TODO(nkls): add assertions on the contents.
+
+        // Sign the nonce.
+        let signature = self.account().sign_bytes(&request_b.nonce.to_le_bytes(), rng).unwrap();
 
         // Retrieve the genesis block header.
         let genesis_header = *sample_genesis_block().header();
         // Send the challenge response.
-        let message = Message::ChallengeResponse(ChallengeResponse { header: Data::Object(genesis_header) });
+        let message =
+            Message::ChallengeResponse(ChallengeResponse { genesis_header, signature: Data::Object(signature) });
         framed.send(message).await?;
 
         // Receive the challenge response.
@@ -132,12 +149,7 @@ impl Handshake for TestPeer {
             panic!("didn't get challenge response")
         };
 
-        // Perform the deferred non-blocking deserialization of the block header.
-        let Ok(block_header) = challenge_response.header.deserialize().await else {
-            panic!("block header not present")
-        };
-
-        assert_eq!(block_header, genesis_header);
+        assert_eq!(challenge_response.genesis_header, genesis_header);
 
         Ok(conn)
     }
