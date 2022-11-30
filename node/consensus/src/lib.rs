@@ -42,8 +42,8 @@ use time::OffsetDateTime;
 use rayon::prelude::*;
 
 // TODO (raychu86): Remove this after phase 2.
-/// The timestamp that the new coinbase targeting algorithm starts.
-const V5_START_TIME: i64 = 1669852800; // December 1, 2022
+/// The block height that the new coinbase targeting algorithm starts.
+const V4_START_HEIGHT: u32 = 120000;
 
 #[derive(Clone)]
 pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
@@ -246,7 +246,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         // Construct the next coinbase target.
-        let next_coinbase_target = match next_timestamp >= V5_START_TIME {
+        let next_coinbase_target = match next_height >= V4_START_HEIGHT {
             true => coinbase_target::<true>(
                 latest_block.last_coinbase_target(),
                 latest_block.last_coinbase_timestamp(),
@@ -449,7 +449,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         // Construct the next coinbase target.
-        let expected_coinbase_target = match block.timestamp() >= V5_START_TIME {
+        let expected_coinbase_target = match block.height() >= V4_START_HEIGHT {
             true => coinbase_target::<true>(
                 self.ledger.last_coinbase_target(),
                 self.ledger.last_coinbase_timestamp(),
