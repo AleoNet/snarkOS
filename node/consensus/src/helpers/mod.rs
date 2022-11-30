@@ -96,12 +96,6 @@ pub fn coinbase_target<const IS_V4: bool>(
     // Compute the half life.
     let half_life = if IS_V4 { num_blocks_per_epoch.saturating_mul(anchor_time as u32) } else { num_blocks_per_epoch };
 
-    let half_life = if IS_V4 {
-        num_blocks_per_epoch.saturating_div(2).saturating_mul(anchor_time as u32)
-    } else {
-        num_blocks_per_epoch
-    };
-
     // Compute the new coinbase target.
     let candidate_target =
         retarget(previous_coinbase_target, previous_block_timestamp, block_timestamp, half_life, true, anchor_time)?;
@@ -521,7 +515,7 @@ mod tests {
                 previous_timestamp,
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
-                128,
+                CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
             )
             .unwrap();
 
@@ -535,7 +529,7 @@ mod tests {
         println!(
             "For block times of {}s and anchor time of {}s, doubling the coinbase target took {num_blocks} blocks. ({} seconds)",
             fast_block_time,
-            128,
+            CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
             previous_timestamp - initial_timestamp
         );
     }
