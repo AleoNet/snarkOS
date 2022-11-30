@@ -94,7 +94,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             }
         }
         // Initialize the consensus.
-        let consensus = Consensus::new(ledger.clone())?;
+        let consensus = Consensus::new(ledger.clone(), dev.is_some())?;
 
         // Initialize the node router.
         let router = Router::new(

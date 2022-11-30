@@ -115,7 +115,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         }
 
         // Initialize the consensus.
-        let consensus = Consensus::new(ledger.clone())?;
+        let consensus = Consensus::new(ledger.clone(), dev.is_some())?;
         lap!(timer, "Initialize consensus");
 
         // Initialize the node router.

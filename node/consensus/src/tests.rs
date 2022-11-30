@@ -107,7 +107,7 @@ pub(crate) mod test_helpers {
         assert_eq!(genesis.round(), ledger.latest_round());
         assert_eq!(genesis, ledger.get_block(0).unwrap());
 
-        CurrentConsensus::new(ledger).unwrap()
+        CurrentConsensus::new(ledger, true).unwrap()
     }
 
     pub(crate) fn sample_program() -> Program<CurrentNetwork> {
