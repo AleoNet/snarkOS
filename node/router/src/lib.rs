@@ -39,6 +39,7 @@ pub use outbound::*;
 mod routing;
 pub use routing::*;
 
+use snarkos_account::Account;
 use snarkos_node_messages::NodeType;
 use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network};
@@ -58,8 +59,8 @@ pub struct Router<N: Network> {
     local_ip: SocketAddr,
     /// The node type.
     node_type: NodeType,
-    /// The address of the node.
-    address: Address<N>,
+    /// The account of the node.
+    account: Account<N>,
     /// The cache.
     cache: Cache<N>,
     /// The resolver.
@@ -95,7 +96,7 @@ impl<N: Network> Router<N> {
     pub async fn new(
         node_ip: SocketAddr,
         node_type: NodeType,
-        address: Address<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         max_peers: u16,
         is_dev: bool,
@@ -109,7 +110,7 @@ impl<N: Network> Router<N> {
             tcp,
             local_ip,
             node_type,
-            address,
+            account,
             cache: Default::default(),
             resolver: Default::default(),
             sync: Sync::new(local_ip),
@@ -172,7 +173,7 @@ impl<N: Network> Router<N> {
 
     /// Returns the Aleo address of the node.
     pub const fn address(&self) -> Address<N> {
-        self.address
+        self.account.address()
     }
 
     /// Returns the sync pool.

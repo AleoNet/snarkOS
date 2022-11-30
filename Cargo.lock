@@ -2677,6 +2677,7 @@ dependencies = [
  "rand",
  "reqwest",
  "serde",
+ "snarkos-account",
  "snarkos-node-messages",
  "snarkos-node-tcp",
  "snarkvm",

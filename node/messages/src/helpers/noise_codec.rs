@@ -357,6 +357,7 @@ mod tests {
             listener_port: 0,
             node_type: NodeType::Client,
             address: Address::new(Group::rand(rng)),
+            nonce: 0,
         })));
 
         assert_roundtrip(challenge_request);

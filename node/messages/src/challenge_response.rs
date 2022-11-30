@@ -18,7 +18,8 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChallengeResponse<N: Network> {
-    pub header: Data<Header<N>>,
+    pub genesis_header: Header<N>,
+    pub signature: Data<Signature<N>>,
 }
 
 impl<N: Network> MessageTrait for ChallengeResponse<N> {
@@ -31,12 +32,17 @@ impl<N: Network> MessageTrait for ChallengeResponse<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.header.serialize_blocking_into(writer)
+        writer.write_all(&self.genesis_header.to_bytes_le()?)?;
+        self.signature.serialize_blocking_into(writer)
     }
 
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        Ok(Self { header: Data::Buffer(bytes.freeze()) })
+        let mut reader = bytes.reader();
+        Ok(Self {
+            genesis_header: Header::read_le(&mut reader)?,
+            signature: Data::Buffer(reader.into_inner().freeze()),
+        })
     }
 }

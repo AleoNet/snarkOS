@@ -122,7 +122,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         let router = Router::new(
             node_ip,
             NodeType::Beacon,
-            account.address(),
+            account.clone(),
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
             dev.is_some(),

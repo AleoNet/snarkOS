@@ -92,7 +92,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         let router = Router::new(
             node_ip,
             NodeType::Prover,
-            account.address(),
+            account.clone(),
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
             dev.is_some(),

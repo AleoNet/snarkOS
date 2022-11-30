@@ -60,6 +60,9 @@ version = "0.11"
 [dependencies.serde]
 version = "1"
 
+[dependencies.snarkos-account]
+path = "../../account"
+
 [dependencies.snarkos-node-messages]
 path = "../messages"
 
