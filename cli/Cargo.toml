@@ -34,7 +34,7 @@ version = "2"
 version = "0.25"
 
 [target.'cfg(target_family = "unix")'.dependencies.nix]
-version = "0.25"
+version = "0.26"
 
 [dependencies.num_cpus]
 version = "1"

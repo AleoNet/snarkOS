@@ -14,10 +14,11 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use snarkos_node_messages::BlockRequest;
 use snarkvm::prelude::{Network, PuzzleCommitment};
 
 use core::hash::Hash;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use linked_hash_map::LinkedHashMap;
 use parking_lot::RwLock;
 use std::{
@@ -31,7 +32,7 @@ use std::{
 use time::{Duration, OffsetDateTime};
 
 /// The maximum number of items to store in the cache.
-const MAX_CACHE_SIZE: usize = 256;
+const MAX_CACHE_SIZE: usize = 4096;
 
 #[derive(Clone, Debug)]
 pub struct Cache<N: Network> {
@@ -41,16 +42,14 @@ pub struct Cache<N: Network> {
     seen_inbound_messages: Arc<RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>>,
     /// The map of peer IPs to their recent timestamps.
     seen_inbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>>,
-    /// The map of block hashes to their last seen timestamp.
-    seen_inbound_blocks: Arc<RwLock<LinkedHashMap<N::BlockHash, OffsetDateTime>>>,
     /// The map of solution commitments to their last seen timestamp.
     seen_inbound_solutions: Arc<RwLock<LinkedHashMap<PuzzleCommitment<N>, OffsetDateTime>>>,
     /// The map of transaction IDs to their last seen timestamp.
     seen_inbound_transactions: Arc<RwLock<LinkedHashMap<N::TransactionID, OffsetDateTime>>>,
+    /// The map of peer IPs to their block requests.
+    seen_outbound_block_requests: Arc<RwLock<IndexMap<SocketAddr, IndexSet<BlockRequest>>>>,
     /// The map of peer IPs to the number of puzzle requests.
     seen_outbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, Arc<AtomicU16>>>>,
-    /// The map of block hashes to their last seen timestamp.
-    seen_outbound_blocks: Arc<RwLock<LinkedHashMap<N::BlockHash, OffsetDateTime>>>,
     /// The map of solution commitments to their last seen timestamp.
     seen_outbound_solutions: Arc<RwLock<LinkedHashMap<PuzzleCommitment<N>, OffsetDateTime>>>,
     /// The map of transaction IDs to their last seen timestamp.
@@ -71,16 +70,17 @@ impl<N: Network> Cache<N> {
             seen_inbound_connections: Default::default(),
             seen_inbound_messages: Default::default(),
             seen_inbound_puzzle_requests: Default::default(),
-            seen_inbound_blocks: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_inbound_solutions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_inbound_transactions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
+            seen_outbound_block_requests: Default::default(),
             seen_outbound_puzzle_requests: Default::default(),
-            seen_outbound_blocks: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_outbound_solutions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_outbound_transactions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
         }
     }
+}
 
+impl<N: Network> Cache<N> {
     /// Inserts a new timestamp for the given peer connection, returning the number of recent connection requests.
     pub fn insert_inbound_connection(&self, peer_ip: IpAddr, interval_in_secs: i64) -> usize {
         Self::retain_and_insert(&self.seen_inbound_connections, peer_ip, interval_in_secs)
@@ -96,6 +96,39 @@ impl<N: Network> Cache<N> {
         Self::retain_and_insert(&self.seen_inbound_puzzle_requests, peer_ip, 60)
     }
 
+    /// Inserts a solution commitment into the cache, returning the previously seen timestamp if it existed.
+    pub fn insert_inbound_solution(&self, solution: PuzzleCommitment<N>) -> Option<OffsetDateTime> {
+        Self::refresh_and_insert(&self.seen_inbound_solutions, solution)
+    }
+
+    /// Inserts a transaction ID into the cache, returning the previously seen timestamp if it existed.
+    pub fn insert_inbound_transaction(&self, transaction: N::TransactionID) -> Option<OffsetDateTime> {
+        Self::refresh_and_insert(&self.seen_inbound_transactions, transaction)
+    }
+}
+
+impl<N: Network> Cache<N> {
+    /// Returns `true` if the cache contains the block request for the given peer.
+    pub fn contains_outbound_block_request(&self, peer_ip: &SocketAddr, request: &BlockRequest) -> bool {
+        self.seen_outbound_block_requests.read().get(peer_ip).map(|r| r.contains(request)).unwrap_or(false)
+    }
+
+    /// Inserts the block request for the given peer IP, returning the number of recent requests.
+    pub fn insert_outbound_block_request(&self, peer_ip: SocketAddr, request: BlockRequest) -> usize {
+        let mut map_write = self.seen_outbound_block_requests.write();
+        let requests = map_write.entry(peer_ip).or_default();
+        requests.insert(request);
+        requests.len()
+    }
+
+    /// Removes the block request for the given peer IP, returning the number of remaining requests.
+    pub fn remove_outbound_block_request(&self, peer_ip: SocketAddr, request: &BlockRequest) -> usize {
+        let mut map_write = self.seen_outbound_block_requests.write();
+        let requests = map_write.entry(peer_ip).or_default();
+        requests.remove(request);
+        requests.len()
+    }
+
     /// Returns `true` if the cache contains a puzzle request from the given peer.
     pub fn contains_outbound_puzzle_request(&self, peer_ip: &SocketAddr) -> bool {
         self.seen_outbound_puzzle_requests.read().contains_key(peer_ip)
@@ -109,26 +142,6 @@ impl<N: Network> Cache<N> {
     /// Decrement the peer IP's number of puzzle requests, returning the updated number of puzzle requests.
     pub fn decrement_outbound_puzzle_requests(&self, peer_ip: SocketAddr) -> u16 {
         Self::decrement_counter(&self.seen_outbound_puzzle_requests, peer_ip)
-    }
-
-    /// Inserts a block hash into the cache, returning the previously seen timestamp if it existed.
-    pub fn insert_inbound_block(&self, hash: N::BlockHash) -> Option<OffsetDateTime> {
-        Self::refresh_and_insert(&self.seen_inbound_blocks, hash)
-    }
-
-    /// Inserts a solution commitment into the cache, returning the previously seen timestamp if it existed.
-    pub fn insert_inbound_solution(&self, solution: PuzzleCommitment<N>) -> Option<OffsetDateTime> {
-        Self::refresh_and_insert(&self.seen_inbound_solutions, solution)
-    }
-
-    /// Inserts a transaction ID into the cache, returning the previously seen timestamp if it existed.
-    pub fn insert_inbound_transaction(&self, transaction: N::TransactionID) -> Option<OffsetDateTime> {
-        Self::refresh_and_insert(&self.seen_inbound_transactions, transaction)
-    }
-
-    /// Inserts a block hash into the cache, returning the previously seen timestamp if it existed.
-    pub fn insert_outbound_block(&self, hash: N::BlockHash) -> Option<OffsetDateTime> {
-        Self::refresh_and_insert(&self.seen_outbound_blocks, hash)
     }
 
     /// Inserts a solution commitment into the cache, returning the previously seen timestamp if it existed.

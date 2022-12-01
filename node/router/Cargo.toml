@@ -39,6 +39,9 @@ features = [ "thread-pool" ]
 version = "1.9"
 features = ["rayon"]
 
+[dependencies.itertools]
+version = "0.10"
+
 [dependencies.linked-hash-map]
 version = "0.5"
 
@@ -56,6 +59,9 @@ version = "0.11"
 
 [dependencies.serde]
 version = "1"
+
+[dependencies.snarkos-account]
+path = "../../account"
 
 [dependencies.snarkos-node-messages]
 path = "../messages"
@@ -90,3 +96,7 @@ version = "=0.1"
 
 [dependencies.tracing]
 version = "0.1"
+
+[dev-dependencies.snarkos-node-messages]
+path = "../messages"
+features = [ "test" ]

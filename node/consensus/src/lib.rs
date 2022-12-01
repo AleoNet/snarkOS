@@ -41,6 +41,10 @@ use time::OffsetDateTime;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
+// TODO (raychu86): Remove this after Phase 2.
+/// The block height to start using new coinbase targeting algorithm.
+const V4_START_HEIGHT: u32 = 123478;
+
 #[derive(Clone)]
 pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     /// The ledger.
@@ -52,11 +56,13 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     /// The beacons.
     // TODO (howardwu): Update this to retrieve from a beacons store.
     beacons: Arc<RwLock<IndexMap<Address<N>, ()>>>,
+    /// The boolean flag for the development mode.
+    is_dev: bool,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Initializes a new instance of consensus.
-    pub fn new(ledger: Ledger<N, C>) -> Result<Self> {
+    pub fn new(ledger: Ledger<N, C>, is_dev: bool) -> Result<Self> {
         // Load the coinbase puzzle.
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
 
@@ -67,6 +73,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             memory_pool: Default::default(),
             // TODO (howardwu): Update this to retrieve from a validators store.
             beacons: Default::default(),
+            is_dev,
         };
 
         // Add the genesis beacon.
@@ -242,13 +249,24 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         // Construct the next coinbase target.
-        let next_coinbase_target = coinbase_target(
-            latest_block.last_coinbase_target(),
-            latest_block.last_coinbase_timestamp(),
-            next_timestamp,
-            N::ANCHOR_TIME,
-            N::NUM_BLOCKS_PER_EPOCH,
-        )?;
+        // Use the new targeting algorithm if the node is in development mode or
+        // if the block height is greater than or equal to `V4_START_HEIGHT`.
+        let next_coinbase_target = match self.is_dev || next_height >= V4_START_HEIGHT {
+            true => coinbase_target::<true>(
+                latest_block.last_coinbase_target(),
+                latest_block.last_coinbase_timestamp(),
+                next_timestamp,
+                N::ANCHOR_TIME,
+                N::NUM_BLOCKS_PER_EPOCH,
+            ),
+            false => coinbase_target::<false>(
+                latest_block.last_coinbase_target(),
+                latest_block.last_coinbase_timestamp(),
+                next_timestamp,
+                N::ANCHOR_TIME,
+                N::NUM_BLOCKS_PER_EPOCH,
+            ),
+        }?;
 
         // Construct the next proof target.
         let next_proof_target = proof_target(next_coinbase_target);
@@ -294,6 +312,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         else if block.coinbase().is_some() {
             self.memory_pool.clear_invalid_solutions(self);
         }
+
+        info!("Advanced to block {}", block.height());
 
         Ok(())
     }
@@ -435,14 +455,26 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             }
         }
 
-        // Ensure the coinbase target is correct.
-        let expected_coinbase_target = coinbase_target(
-            self.ledger.last_coinbase_target(),
-            self.ledger.last_coinbase_timestamp(),
-            block.timestamp(),
-            N::ANCHOR_TIME,
-            N::NUM_BLOCKS_PER_EPOCH,
-        )?;
+        // Construct the next coinbase target.
+        // Use the new targeting algorithm if the node is in development mode or
+        // if the block height is greater than or equal to `V4_START_HEIGHT`.
+        let expected_coinbase_target = match self.is_dev || block.height() >= V4_START_HEIGHT {
+            true => coinbase_target::<true>(
+                self.ledger.last_coinbase_target(),
+                self.ledger.last_coinbase_timestamp(),
+                block.timestamp(),
+                N::ANCHOR_TIME,
+                N::NUM_BLOCKS_PER_EPOCH,
+            ),
+            false => coinbase_target::<false>(
+                self.ledger.last_coinbase_target(),
+                self.ledger.last_coinbase_timestamp(),
+                block.timestamp(),
+                N::ANCHOR_TIME,
+                N::NUM_BLOCKS_PER_EPOCH,
+            ),
+        }?;
+
         if block.coinbase_target() != expected_coinbase_target {
             bail!("Invalid coinbase target: expected {}, got {}", expected_coinbase_target, block.coinbase_target())
         }
@@ -532,6 +564,15 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             // Ensure the coinbase accumulator point matches in the block header.
             if block.header().coinbase_accumulator_point() != coinbase.to_accumulator_point()? {
                 bail!("Coinbase accumulator point does not match the coinbase solution.");
+            }
+            // TODO (howardwu): Remove this in Phase 3.
+            // Ensure the number of prover solutions is within the allowed range.
+            if block.height() > 128_000 && coinbase.len() > 256 {
+                bail!("Cannot validate a coinbase proof with more than {} prover solutions", 256);
+            }
+            // Ensure the number of prover solutions is within the allowed range.
+            if coinbase.len() > N::MAX_PROVER_SOLUTIONS {
+                bail!("Cannot validate a coinbase proof with more than {} prover solutions", N::MAX_PROVER_SOLUTIONS);
             }
             // Ensure the puzzle commitments are new.
             for puzzle_commitment in coinbase.puzzle_commitments() {

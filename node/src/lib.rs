@@ -43,7 +43,7 @@ pub use snarkos_node_messages::NodeType;
 
 use snarkos_account::Account;
 use snarkos_node_store::ConsensusDB;
-use snarkvm::prelude::{Address, Block, Network, PrivateKey, ViewKey};
+use snarkvm::prelude::{Address, Block, ConsensusMemory, Network, PrivateKey, ViewKey};
 
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};
@@ -54,9 +54,9 @@ pub enum Node<N: Network> {
     /// A validator is a full node, capable of validating blocks.
     Validator(Arc<Validator<N, ConsensusDB<N>>>),
     /// A prover is a full node, capable of producing proofs for consensus.
-    Prover(Arc<Prover<N, ConsensusDB<N>>>),
+    Prover(Arc<Prover<N, ConsensusMemory<N>>>),
     /// A client node is a full node, capable of querying with the network.
-    Client(Arc<Client<N, ConsensusDB<N>>>),
+    Client(Arc<Client<N, ConsensusMemory<N>>>),
 }
 
 impl<N: Network> Node<N> {
@@ -66,7 +66,7 @@ impl<N: Network> Node<N> {
         rest_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
-        genesis: Option<Block<N>>,
+        genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
@@ -79,7 +79,7 @@ impl<N: Network> Node<N> {
         rest_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
-        genesis: Option<Block<N>>,
+        genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
@@ -93,9 +93,10 @@ impl<N: Network> Node<N> {
         node_ip: SocketAddr,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
+        genesis: Block<N>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Prover(Arc::new(Prover::new(node_ip, account, trusted_peers, dev).await?)))
+        Ok(Self::Prover(Arc::new(Prover::new(node_ip, account, trusted_peers, genesis, dev).await?)))
     }
 
     /// Initializes a new client node.
@@ -103,9 +104,10 @@ impl<N: Network> Node<N> {
         node_ip: SocketAddr,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
+        genesis: Block<N>,
         dev: Option<u16>,
     ) -> Result<Self> {
-        Ok(Self::Client(Arc::new(Client::new(node_ip, account, trusted_peers, dev).await?)))
+        Ok(Self::Client(Arc::new(Client::new(node_ip, account, trusted_peers, genesis, dev).await?)))
     }
 
     /// Returns the node type.

@@ -41,6 +41,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the block for the given block height.
     pub fn get_block(&self, height: u32) -> Result<Block<N>> {
+        // If the height is 0, return the genesis block.
+        if height == 0 {
+            return Ok(self.genesis.clone());
+        }
         // Retrieve the block hash.
         let block_hash = match self.vm.block_store().get_block_hash(height)? {
             Some(block_hash) => block_hash,
@@ -54,6 +58,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     }
 
     /// Returns the blocks in the given block range.
+    /// The range is inclusive of the start and exclusive of the end.
     pub fn get_blocks(&self, heights: Range<u32>) -> Result<Vec<Block<N>>> {
         cfg_into_iter!(heights).map(|height| self.get_block(height)).collect()
     }
@@ -77,6 +82,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the block hash for the given block height.
     pub fn get_hash(&self, height: u32) -> Result<N::BlockHash> {
+        // If the height is 0, return the genesis block hash.
+        if height == 0 {
+            return Ok(self.genesis.hash());
+        }
         match self.vm.block_store().get_block_hash(height)? {
             Some(block_hash) => Ok(block_hash),
             None => bail!("Missing block hash for block {height}"),
@@ -85,6 +94,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the previous block hash for the given block height.
     pub fn get_previous_hash(&self, height: u32) -> Result<N::BlockHash> {
+        // If the height is 0, return the default block hash.
+        if height == 0 {
+            return Ok(N::BlockHash::default());
+        }
         match self.vm.block_store().get_previous_block_hash(height)? {
             Some(previous_hash) => Ok(previous_hash),
             None => bail!("Missing previous block hash for block {height}"),
@@ -93,6 +106,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the block header for the given block height.
     pub fn get_header(&self, height: u32) -> Result<Header<N>> {
+        // If the height is 0, return the genesis block header.
+        if height == 0 {
+            return Ok(*self.genesis.header());
+        }
         // Retrieve the block hash.
         let block_hash = match self.vm.block_store().get_block_hash(height)? {
             Some(block_hash) => block_hash,
@@ -107,6 +124,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the block transactions for the given block height.
     pub fn get_transactions(&self, height: u32) -> Result<Transactions<N>> {
+        // If the height is 0, return the genesis block transactions.
+        if height == 0 {
+            return Ok(self.genesis.transactions().clone());
+        }
         // Retrieve the block hash.
         let block_hash = match self.vm.block_store().get_block_hash(height)? {
             Some(block_hash) => block_hash,
@@ -138,6 +159,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the block coinbase solution for the given block height.
     pub fn get_coinbase(&self, height: u32) -> Result<Option<CoinbaseSolution<N>>> {
+        // If the height is 0, return the genesis block coinbase.
+        if height == 0 {
+            return Ok(self.genesis.coinbase().cloned());
+        }
         // Retrieve the block hash.
         let block_hash = match self.vm.block_store().get_block_hash(height)? {
             Some(block_hash) => block_hash,
@@ -149,6 +174,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the block signature for the given block height.
     pub fn get_signature(&self, height: u32) -> Result<Signature<N>> {
+        // If the height is 0, return the genesis block signature.
+        if height == 0 {
+            return Ok(*self.genesis.signature());
+        }
         // Retrieve the block hash.
         let block_hash = match self.vm.block_store().get_block_hash(height)? {
             Some(block_hash) => block_hash,
@@ -176,7 +205,7 @@ mod tests {
         let genesis = Block::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
 
         // Initialize a new ledger.
-        let ledger = CurrentLedger::load(None, None).unwrap();
+        let ledger = CurrentLedger::load(genesis.clone(), None).unwrap();
         // Retrieve the genesis block.
         let candidate = ledger.get_block(0).unwrap();
         // Ensure the genesis block matches.

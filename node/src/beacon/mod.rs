@@ -21,11 +21,11 @@ use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_ledger::{Ledger, RecordMap};
 use snarkos_node_messages::{
+    BeaconPropose,
     Data,
     Message,
     NodeType,
     PuzzleResponse,
-    UnconfirmedBlock,
     UnconfirmedSolution,
     UnconfirmedTransaction,
 };
@@ -69,10 +69,10 @@ use tokio::{task::JoinHandle, time::timeout};
 pub struct Beacon<N: Network, C: ConsensusStorage<N>> {
     /// The account of the node.
     account: Account<N>,
-    /// The consensus module of the node.
-    consensus: Consensus<N, C>,
     /// The ledger of the node.
     ledger: Ledger<N, C>,
+    /// The consensus module of the node.
+    consensus: Consensus<N, C>,
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
@@ -94,7 +94,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         rest_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
-        genesis: Option<Block<N>>,
+        genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
@@ -115,14 +115,14 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         }
 
         // Initialize the consensus.
-        let consensus = Consensus::new(ledger.clone())?;
+        let consensus = Consensus::new(ledger.clone(), dev.is_some())?;
         lap!(timer, "Initialize consensus");
 
         // Initialize the node router.
         let router = Router::new(
             node_ip,
             NodeType::Beacon,
-            account.address(),
+            account.clone(),
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
             dev.is_some(),
@@ -139,8 +139,8 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         // Initialize the node.
         let mut node = Self {
             account,
-            consensus: consensus.clone(),
             ledger: ledger.clone(),
+            consensus: consensus.clone(),
             router,
             rest: None,
             block_generation_time,
@@ -422,8 +422,6 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 bail!("Failed to propose the next block (JoinError): {error}")
             }
         };
-        let next_block_height = next_block.height();
-        let next_block_hash = next_block.hash();
 
         // // Ensure the block is a valid next block.
         // if let Err(error) = self.consensus.check_next_block(&next_block) {
@@ -453,21 +451,27 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         //     }
         // }
 
+        // Prepare the message.
+        let next_block_round = next_block.round();
+        let next_block_height = next_block.height();
+        let next_block_hash = next_block.hash();
+
         // Serialize the block ahead of time to not do it for each peer.
         let serialized_block = match Data::Object(next_block).serialize().await {
-            Ok(serialized_block) => serialized_block,
+            Ok(serialized_block) => Data::Buffer(serialized_block),
             Err(error) => bail!("Failed to serialize the next block for propagation: {error}"),
         };
 
         // Prepare the block to be sent to all peers.
-        let message = Message::<N>::UnconfirmedBlock(UnconfirmedBlock {
-            block_height: next_block_height,
-            block_hash: next_block_hash,
-            block: Data::Buffer(serialized_block),
-        });
+        let message = Message::<N>::BeaconPropose(BeaconPropose::new(
+            next_block_round,
+            next_block_height,
+            next_block_hash,
+            serialized_block,
+        ));
 
-        // Propagate the block to all peers.
-        self.propagate(message, vec![]);
+        // Propagate the block to all beacons.
+        self.propagate_to_beacons(message, vec![]);
 
         Ok(())
     }
@@ -508,7 +512,7 @@ mod tests {
             Some(rest),
             beacon_account,
             &[],
-            Some(genesis),
+            genesis,
             None,
             dev,
         )

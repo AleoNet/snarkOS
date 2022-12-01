@@ -84,23 +84,25 @@ pub const fn anchor_block_height(anchor_time: u16, num_years: u32) -> u32 {
     anchor_block_height_at_year_1 * num_years
 }
 
+// TODO (raychu86): Remove `IS_V4` after Phase 2.
 /// Calculate the coinbase target for the given block height.
-pub fn coinbase_target(
+pub fn coinbase_target<const IS_V4: bool>(
     previous_coinbase_target: u64,
     previous_block_timestamp: i64,
     block_timestamp: i64,
     anchor_time: u16,
     num_blocks_per_epoch: u32,
 ) -> Result<u64> {
+    // Compute the half life.
+    let half_life = if IS_V4 {
+        num_blocks_per_epoch.saturating_div(2).saturating_mul(anchor_time as u32)
+    } else {
+        num_blocks_per_epoch
+    };
+
     // Compute the new coinbase target.
-    let candidate_target = retarget(
-        previous_coinbase_target,
-        previous_block_timestamp,
-        block_timestamp,
-        num_blocks_per_epoch,
-        true,
-        anchor_time,
-    )?;
+    let candidate_target =
+        retarget(previous_coinbase_target, previous_block_timestamp, block_timestamp, half_life, true, anchor_time)?;
     // Return the new coinbase target, floored at 2^10 - 1.
     Ok(core::cmp::max((1u64 << 10).saturating_sub(1), candidate_target))
 }
@@ -115,7 +117,7 @@ pub fn proof_target(coinbase_target: u64) -> u64 {
 ///     T_i = Current target.
 ///     D = Time elapsed since the previous block.
 ///     B = Expected time per block.
-///     TAU = Rate of doubling (or half-life).
+///     TAU = Rate of doubling (or half-life) in seconds.
 ///     INV = {-1, 1} depending on whether the target is increasing or decreasing.
 fn retarget(
     previous_target: u64,
@@ -384,7 +386,7 @@ mod tests {
 
         let minimum_coinbase_target: u64 = 2u64.pow(10) - 1;
 
-        for _ in 0..ITERATIONS {
+        fn test_new_targets<const IS_V4: bool>(rng: &mut TestRng, minimum_coinbase_target: u64) {
             let previous_coinbase_target: u64 = rng.gen_range(minimum_coinbase_target..u64::MAX);
             let previous_prover_target = proof_target(previous_coinbase_target);
 
@@ -392,7 +394,7 @@ mod tests {
 
             // Targets stay the same when the timestamp is as expected.
             let new_timestamp = previous_timestamp + CurrentNetwork::ANCHOR_TIME as i64;
-            let new_coinbase_target = coinbase_target(
+            let new_coinbase_target = coinbase_target::<IS_V4>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
@@ -406,7 +408,7 @@ mod tests {
 
             // Targets decrease (easier) when the timestamp is greater than expected.
             let new_timestamp = previous_timestamp + 2 * CurrentNetwork::ANCHOR_TIME as i64;
-            let new_coinbase_target = coinbase_target(
+            let new_coinbase_target = coinbase_target::<IS_V4>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
@@ -420,7 +422,7 @@ mod tests {
 
             // Targets increase (harder) when the timestamp is less than expected.
             let new_timestamp = previous_timestamp + CurrentNetwork::ANCHOR_TIME as i64 / 2;
-            let new_coinbase_target = coinbase_target(
+            let new_coinbase_target = coinbase_target::<IS_V4>(
                 previous_coinbase_target,
                 previous_timestamp,
                 new_timestamp,
@@ -433,5 +435,111 @@ mod tests {
             assert!(new_coinbase_target > previous_coinbase_target);
             assert!(new_prover_target > previous_prover_target);
         }
+
+        for _ in 0..ITERATIONS {
+            test_new_targets::<true>(&mut rng, minimum_coinbase_target);
+            test_new_targets::<false>(&mut rng, minimum_coinbase_target);
+        }
+    }
+
+    #[test]
+    fn test_target_halving() {
+        let mut rng = TestRng::default();
+
+        let minimum_coinbase_target: u64 = 2u64.pow(10) - 1;
+
+        for _ in 0..ITERATIONS {
+            let previous_coinbase_target: u64 = rng.gen_range(minimum_coinbase_target..u64::MAX);
+            let previous_timestamp = rng.gen();
+
+            let half_life = CurrentNetwork::NUM_BLOCKS_PER_EPOCH
+                .saturating_div(2)
+                .saturating_mul(CurrentNetwork::ANCHOR_TIME as u32) as i64;
+
+            // New coinbase target is greater than half if the elapsed time equals the half life.
+            let new_timestamp = previous_timestamp + half_life;
+            let new_coinbase_target = coinbase_target::<true>(
+                previous_coinbase_target,
+                previous_timestamp,
+                new_timestamp,
+                CurrentNetwork::ANCHOR_TIME,
+                CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+            )
+            .unwrap();
+
+            assert!(new_coinbase_target > previous_coinbase_target / 2);
+
+            // New coinbase target is halved if the elapsed time is 1 anchor time past the half life.
+            let new_timestamp = previous_timestamp + half_life + CurrentNetwork::ANCHOR_TIME as i64;
+            let new_coinbase_target = coinbase_target::<true>(
+                previous_coinbase_target,
+                previous_timestamp,
+                new_timestamp,
+                CurrentNetwork::ANCHOR_TIME,
+                CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+            )
+            .unwrap();
+
+            assert_eq!(new_coinbase_target, previous_coinbase_target / 2);
+
+            // New coinbase target is less than half if the elapsed time is more than 1 anchor time past the half life.
+            let new_timestamp = previous_timestamp + half_life + 2 * CurrentNetwork::ANCHOR_TIME as i64;
+            let new_coinbase_target = coinbase_target::<true>(
+                previous_coinbase_target,
+                previous_timestamp,
+                new_timestamp,
+                CurrentNetwork::ANCHOR_TIME,
+                CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+            )
+            .unwrap();
+
+            assert!(new_coinbase_target < previous_coinbase_target / 2);
+        }
+    }
+
+    #[test]
+    fn test_target_doubling() {
+        let mut rng = TestRng::default();
+
+        // The custom block time that is faster than the anchor time.
+        const BLOCK_TIME: u32 = 15;
+        // The expected number of blocks before the coinbase target is doubled.
+        const EXPECTED_NUM_BLOCKS_TO_DOUBLE: u32 = 321;
+
+        let minimum_coinbase_target: u64 = 2u64.pow(10) - 1;
+
+        let initial_coinbase_target: u64 = rng.gen_range(minimum_coinbase_target..u64::MAX / 2);
+        let initial_timestamp: i64 = rng.gen();
+        let mut previous_coinbase_target: u64 = initial_coinbase_target;
+        let mut previous_timestamp = initial_timestamp;
+        let mut num_blocks = 0;
+
+        while previous_coinbase_target < initial_coinbase_target * 2 {
+            // Targets increase (harder) when the timestamp is less than expected.
+            let new_timestamp = previous_timestamp + BLOCK_TIME as i64;
+            let new_coinbase_target = coinbase_target::<true>(
+                previous_coinbase_target,
+                previous_timestamp,
+                new_timestamp,
+                CurrentNetwork::ANCHOR_TIME,
+                CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+            )
+            .unwrap();
+
+            assert!(new_coinbase_target > previous_coinbase_target);
+
+            previous_coinbase_target = new_coinbase_target;
+            previous_timestamp = new_timestamp;
+            num_blocks += 1;
+        }
+
+        println!(
+            "For block times of {}s and anchor time of {}s, doubling the coinbase target took {num_blocks} blocks. ({} seconds)",
+            BLOCK_TIME,
+            CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+            previous_timestamp - initial_timestamp
+        );
+
+        assert_eq!(EXPECTED_NUM_BLOCKS_TO_DOUBLE, num_blocks);
     }
 }

@@ -14,111 +14,87 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_messages::{NodeType, RawStatus};
-use snarkos_node_tcp::ConnectionSide;
+use snarkos_node_messages::NodeType;
+use snarkvm::prelude::{Address, Network};
 
 use parking_lot::RwLock;
-use std::{
-    net::SocketAddr,
-    sync::{atomic::AtomicU32, Arc},
-    time::Instant,
-};
+use std::{net::SocketAddr, sync::Arc, time::Instant};
 
 /// The state for each connected peer.
 #[derive(Clone, Debug)]
-pub struct Peer {
-    /// The connection side of the peer.
-    #[allow(dead_code)]
-    side: ConnectionSide,
+pub struct Peer<N: Network> {
     /// The IP address of the peer, with the port set to the listener port.
-    listening_addr: SocketAddr,
-    /// The timestamp of the last message received from this peer.
-    last_seen: Arc<RwLock<Instant>>,
+    peer_ip: SocketAddr,
+    /// The Aleo address of the peer.
+    address: Address<N>,
     /// The message version of the peer.
     version: u32,
     /// The node type of the peer.
     node_type: NodeType,
-    /// The node type of the peer.
-    status: RawStatus,
-    /// The block height of the peer.
-    #[allow(dead_code)]
-    block_height: Arc<AtomicU32>,
+    /// The timestamp of the last message received from this peer.
+    last_seen: Arc<RwLock<Instant>>,
 }
 
-impl Peer {
+impl<N: Network> Peer<N> {
     /// Initializes a new instance of `Peer`.
-    pub fn new(
-        side: ConnectionSide,
-        listening_addr: SocketAddr,
-        version: u32,
-        node_type: NodeType,
-        status: RawStatus,
-    ) -> Self {
-        Self {
-            side,
-            listening_addr,
-            last_seen: Arc::new(RwLock::new(Instant::now())),
-            version,
-            node_type,
-            status,
-            block_height: Default::default(),
-        }
+    pub fn new(listening_ip: SocketAddr, address: Address<N>, version: u32, node_type: NodeType) -> Self {
+        Self { peer_ip: listening_ip, address, version, node_type, last_seen: Arc::new(RwLock::new(Instant::now())) }
     }
 
     /// Returns the IP address of the peer, with the port set to the listener port.
-    pub fn ip(&self) -> SocketAddr {
-        self.listening_addr
+    pub const fn ip(&self) -> SocketAddr {
+        self.peer_ip
+    }
+
+    /// Returns the Aleo address of the peer.
+    pub const fn address(&self) -> Address<N> {
+        self.address
+    }
+
+    /// Returns the node type.
+    pub const fn node_type(&self) -> NodeType {
+        self.node_type
+    }
+
+    /// Returns `true` if the peer is a beacon.
+    pub const fn is_beacon(&self) -> bool {
+        self.node_type.is_beacon()
+    }
+
+    /// Returns `true` if the peer is a validator.
+    pub const fn is_validator(&self) -> bool {
+        self.node_type.is_validator()
+    }
+
+    /// Returns `true` if the peer is a prover.
+    pub const fn is_prover(&self) -> bool {
+        self.node_type.is_prover()
+    }
+
+    /// Returns `true` if the peer is a client.
+    pub const fn is_client(&self) -> bool {
+        self.node_type.is_client()
     }
 
     /// Returns the last seen timestamp of the peer.
     pub fn last_seen(&self) -> Instant {
         *self.last_seen.read()
     }
-
-    /// Returns the node type.
-    pub fn node_type(&self) -> NodeType {
-        self.node_type
-    }
-
-    /// Returns `true` if the peer is a beacon.
-    pub fn is_beacon(&self) -> bool {
-        self.node_type.is_beacon()
-    }
-
-    /// Returns `true` if the peer is a validator.
-    pub fn is_validator(&self) -> bool {
-        self.node_type.is_validator()
-    }
-
-    /// Returns `true` if the peer is a prover.
-    pub fn is_prover(&self) -> bool {
-        self.node_type.is_prover()
-    }
-
-    /// Returns `true` if the peer is a client.
-    pub fn is_client(&self) -> bool {
-        self.node_type.is_client()
-    }
 }
 
-impl Peer {
-    /// Updates the last seen timestamp of the peer.
-    pub fn set_last_seen(&self, last_seen: Instant) {
-        *self.last_seen.write() = last_seen;
-    }
-
+impl<N: Network> Peer<N> {
     /// Updates the version.
     pub fn set_version(&mut self, version: u32) {
-        self.version = version
+        self.version = version;
     }
 
     /// Updates the node type.
     pub fn set_node_type(&mut self, node_type: NodeType) {
-        self.node_type = node_type
+        self.node_type = node_type;
     }
 
-    /// Updates the status.
-    pub fn set_status(&mut self, status: RawStatus) {
-        self.status = status
+    /// Updates the last seen timestamp of the peer.
+    pub fn set_last_seen(&self, last_seen: Instant) {
+        *self.last_seen.write() = last_seen;
     }
 }

@@ -39,19 +39,17 @@ pub use outbound::*;
 mod routing;
 pub use routing::*;
 
-use snarkos_node_messages::{NodeType, RawStatus, Status};
+use snarkos_account::Account;
+use snarkos_node_messages::NodeType;
 use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::RwLock;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
-
-// TODO (raychu86): Move this declaration.
-const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
 #[derive(Clone)]
 pub struct Router<N: Network> {
@@ -61,18 +59,18 @@ pub struct Router<N: Network> {
     local_ip: SocketAddr,
     /// The node type.
     node_type: NodeType,
-    /// The address of the node.
-    address: Address<N>,
-    /// The node's current state.
-    status: RawStatus,
+    /// The account of the node.
+    account: Account<N>,
     /// The cache.
     cache: Cache<N>,
     /// The resolver.
     resolver: Resolver,
+    /// The sync pool.
+    sync: Sync<N>,
     /// The set of trusted peers.
     trusted_peers: Arc<IndexSet<SocketAddr>>,
     /// The map of connected peer IPs to their peer handlers.
-    connected_peers: Arc<RwLock<IndexMap<SocketAddr, Peer>>>,
+    connected_peers: Arc<RwLock<IndexMap<SocketAddr, Peer<N>>>>,
     /// The set of candidate peer IPs.
     candidate_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of restricted peer IPs.
@@ -87,10 +85,10 @@ impl<N: Network> Router<N> {
     /// The maximum number of candidate peers permitted to be stored in the node.
     const MAXIMUM_CANDIDATE_PEERS: usize = 10_000;
     /// The maximum number of connection failures permitted by an inbound connecting peer.
-    const MAXIMUM_CONNECTION_FAILURES: usize = 3;
+    const MAXIMUM_CONNECTION_FAILURES: usize = 5;
     /// The duration in seconds after which a connected peer is considered inactive or
     /// disconnected if no message has been received in the meantime.
-    const RADIO_SILENCE_IN_SECS: u64 = 180; // 3 minutes
+    const RADIO_SILENCE_IN_SECS: u64 = 150; // 2.5 minutes
 }
 
 impl<N: Network> Router<N> {
@@ -98,7 +96,7 @@ impl<N: Network> Router<N> {
     pub async fn new(
         node_ip: SocketAddr,
         node_type: NodeType,
-        address: Address<N>,
+        account: Account<N>,
         trusted_peers: &[SocketAddr],
         max_peers: u16,
         is_dev: bool,
@@ -112,10 +110,10 @@ impl<N: Network> Router<N> {
             tcp,
             local_ip,
             node_type,
-            address,
-            status: RawStatus::new(),
+            account,
             cache: Default::default(),
             resolver: Default::default(),
+            sync: Sync::new(local_ip),
             trusted_peers: Arc::new(trusted_peers.iter().copied().collect()),
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
@@ -157,26 +155,6 @@ impl<N: Network> Router<N> {
         });
     }
 
-    /// Returns the node type.
-    pub const fn node_type(&self) -> NodeType {
-        self.node_type
-    }
-
-    /// Returns the Aleo address of the node.
-    pub const fn address(&self) -> Address<N> {
-        self.address
-    }
-
-    /// Returns the status.
-    pub fn status(&self) -> Status {
-        self.status.get()
-    }
-
-    /// Returns `true` if the node is in development mode.
-    pub const fn is_dev(&self) -> bool {
-        self.is_dev
-    }
-
     /// Returns the IP address of this node.
     pub const fn local_ip(&self) -> SocketAddr {
         self.local_ip
@@ -188,17 +166,24 @@ impl<N: Network> Router<N> {
             || (ip.ip().is_unspecified() || ip.ip().is_loopback()) && ip.port() == self.local_ip().port()
     }
 
-    /// Returns `true` if the node is connected to the given IP.
-    pub fn is_connected(&self, ip: &SocketAddr) -> bool {
-        self.connected_peers.read().contains_key(ip)
+    /// Returns the node type.
+    pub const fn node_type(&self) -> NodeType {
+        self.node_type
     }
 
-    /// Returns `true` if the given IP is restricted.
-    pub fn is_restricted(&self, ip: &SocketAddr) -> bool {
-        match self.restricted_peers.read().get(ip) {
-            Some(timestamp) => timestamp.elapsed().as_secs() < Self::RADIO_SILENCE_IN_SECS,
-            None => false,
-        }
+    /// Returns the Aleo address of the node.
+    pub const fn address(&self) -> Address<N> {
+        self.account.address()
+    }
+
+    /// Returns the sync pool.
+    pub fn sync(&self) -> &Sync<N> {
+        &self.sync
+    }
+
+    /// Returns `true` if the node is in development mode.
+    pub const fn is_dev(&self) -> bool {
+        self.is_dev
     }
 
     /// Returns the listener IP address from the (ambiguous) peer address.
@@ -211,6 +196,40 @@ impl<N: Network> Router<N> {
         self.resolver.get_ambiguous(peer_ip)
     }
 
+    /// Returns `true` if the node is connected to the given peer IP.
+    pub fn is_connected(&self, ip: &SocketAddr) -> bool {
+        self.connected_peers.read().contains_key(ip)
+    }
+
+    /// Returns `true` if the given peer IP is a connected beacon.
+    pub fn is_connected_beacon(&self, peer_ip: &SocketAddr) -> bool {
+        self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_beacon())
+    }
+
+    /// Returns `true` if the given peer IP is a connected validator.
+    pub fn is_connected_validator(&self, peer_ip: &SocketAddr) -> bool {
+        self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_validator())
+    }
+
+    /// Returns `true` if the given peer IP is a connected prover.
+    pub fn is_connected_prover(&self, peer_ip: &SocketAddr) -> bool {
+        self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_prover())
+    }
+
+    /// Returns `true` if the given peer IP is a connected client.
+    pub fn is_connected_client(&self, peer_ip: &SocketAddr) -> bool {
+        self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_client())
+    }
+
+    /// Returns `true` if the given IP is restricted.
+    pub fn is_restricted(&self, ip: &SocketAddr) -> bool {
+        self.restricted_peers
+            .read()
+            .get(ip)
+            .map(|time| time.elapsed().as_secs() < Self::RADIO_SILENCE_IN_SECS)
+            .unwrap_or(false)
+    }
+
     /// Returns the maximum number of connected peers.
     pub fn max_connected_peers(&self) -> usize {
         self.tcp.config().max_connections as usize
@@ -219,6 +238,26 @@ impl<N: Network> Router<N> {
     /// Returns the number of connected peers.
     pub fn number_of_connected_peers(&self) -> usize {
         self.connected_peers.read().len()
+    }
+
+    /// Returns the number of connected beacons.
+    pub fn number_of_connected_beacons(&self) -> usize {
+        self.connected_peers.read().values().filter(|peer| peer.is_beacon()).count()
+    }
+
+    /// Returns the number of connected validators.
+    pub fn number_of_connected_validators(&self) -> usize {
+        self.connected_peers.read().values().filter(|peer| peer.is_validator()).count()
+    }
+
+    /// Returns the number of connected provers.
+    pub fn number_of_connected_provers(&self) -> usize {
+        self.connected_peers.read().values().filter(|peer| peer.is_prover()).count()
+    }
+
+    /// Returns the number of connected clients.
+    pub fn number_of_connected_clients(&self) -> usize {
+        self.connected_peers.read().values().filter(|peer| peer.is_client()).count()
     }
 
     /// Returns the number of candidate peers.
@@ -231,14 +270,39 @@ impl<N: Network> Router<N> {
         self.restricted_peers.read().len()
     }
 
+    /// Returns the connected peer given the peer IP, if it exists.
+    pub fn get_connected_peer(&self, ip: &SocketAddr) -> Option<Peer<N>> {
+        self.connected_peers.read().get(ip).cloned()
+    }
+
     /// Returns the connected peers.
-    pub fn get_connected_peers(&self) -> Vec<Peer> {
+    pub fn get_connected_peers(&self) -> Vec<Peer<N>> {
         self.connected_peers.read().values().cloned().collect()
     }
 
     /// Returns the list of connected peers.
     pub fn connected_peers(&self) -> Vec<SocketAddr> {
         self.connected_peers.read().keys().copied().collect()
+    }
+
+    /// Returns the list of connected beacons.
+    pub fn connected_beacons(&self) -> Vec<SocketAddr> {
+        self.connected_peers.read().iter().filter(|(_, peer)| peer.is_beacon()).map(|(ip, _)| *ip).collect()
+    }
+
+    /// Returns the list of connected validators.
+    pub fn connected_validators(&self) -> Vec<SocketAddr> {
+        self.connected_peers.read().iter().filter(|(_, peer)| peer.is_validator()).map(|(ip, _)| *ip).collect()
+    }
+
+    /// Returns the list of connected provers.
+    pub fn connected_provers(&self) -> Vec<SocketAddr> {
+        self.connected_peers.read().iter().filter(|(_, peer)| peer.is_prover()).map(|(ip, _)| *ip).collect()
+    }
+
+    /// Returns the list of connected clients.
+    pub fn connected_clients(&self) -> Vec<SocketAddr> {
+        self.connected_peers.read().iter().filter(|(_, peer)| peer.is_client()).map(|(ip, _)| *ip).collect()
     }
 
     /// Returns the list of candidate peers.
@@ -281,41 +345,13 @@ impl<N: Network> Router<N> {
         }
     }
 
-    /// Returns the list of connected bootstrap peers.
-    pub fn connected_bootstrap_peers(&self) -> Vec<SocketAddr> {
-        let mut connected_bootstrap = Vec::new();
-        for bootstrap_ip in self.bootstrap_peers() {
-            if self.is_connected(&bootstrap_ip) {
-                connected_bootstrap.push(bootstrap_ip);
-            }
-        }
-        connected_bootstrap
-    }
-
     /// Returns the list of metrics for the connected peers.
     pub fn connected_metrics(&self) -> Vec<(SocketAddr, NodeType)> {
         self.connected_peers.read().iter().map(|(ip, peer)| (*ip, peer.node_type())).collect()
     }
 
-    /// Returns the list of connected peers that are beacons.
-    pub fn connected_beacons(&self) -> Vec<SocketAddr> {
-        self.connected_peers
-            .read()
-            .iter()
-            .filter_map(|(ip, peer)| match peer.is_beacon() {
-                true => Some(*ip),
-                false => None,
-            })
-            .collect()
-    }
-
-    /// Returns the oldest connected peer.
-    pub fn oldest_connected_peer(&self) -> Option<SocketAddr> {
-        self.connected_peers.read().iter().min_by_key(|(_, peer)| peer.last_seen()).map(|(peer_ip, _)| *peer_ip)
-    }
-
     /// Inserts the given peer into the connected peers.
-    pub fn insert_connected_peer(&self, peer: Peer, peer_addr: SocketAddr) {
+    pub fn insert_connected_peer(&self, peer: Peer<N>, peer_addr: SocketAddr) {
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.insert_peer(peer.ip(), peer_addr);
         // Add an entry for this `Peer` in the connected peers.
@@ -354,10 +390,32 @@ impl<N: Network> Router<N> {
         self.restricted_peers.write().insert(peer_ip, Instant::now());
     }
 
+    /// Updates the connected peer with the given function.
+    pub fn update_connected_peer<Fn: FnMut(&mut Peer<N>)>(
+        &self,
+        peer_ip: SocketAddr,
+        node_type: NodeType,
+        mut write_fn: Fn,
+    ) -> Result<()> {
+        // Retrieve the peer.
+        if let Some(peer) = self.connected_peers.write().get_mut(&peer_ip) {
+            // TODO (howardwu): Consider permitting a validator->beacon and beacon->validator change.
+            // Ensure the node type has not changed.
+            if peer.node_type() != node_type {
+                bail!("Peer '{peer_ip}' has changed node types from {} to {node_type}", peer.node_type())
+            }
+            // Lastly, update the peer with the given function.
+            write_fn(peer);
+        }
+        Ok(())
+    }
+
     /// Removes the connected peer and adds them to the candidate peers.
     pub fn remove_connected_peer(&self, peer_ip: SocketAddr) {
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.remove_peer(&peer_ip);
+        // Removes the peer from the sync pool.
+        self.sync.remove_peer(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().remove(&peer_ip);
         // Add the peer to the candidate peers.
@@ -369,13 +427,6 @@ impl<N: Network> Router<N> {
         self.candidate_peers.write().remove(&peer_ip);
     }
 
-    /// Updates the connected peer with the given function.
-    pub fn update_connected_peer<Fn: FnMut(&mut Peer)>(&self, peer_ip: SocketAddr, mut write_fn: Fn) {
-        if let Some(peer) = self.connected_peers.write().get_mut(&peer_ip) {
-            write_fn(peer)
-        }
-    }
-
     /// Spawns a task with the given future.
     pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
         self.handles.write().push(tokio::spawn(future));
@@ -384,8 +435,6 @@ impl<N: Network> Router<N> {
     /// Shuts down the router.
     pub async fn shut_down(&self) {
         trace!("Shutting down the router...");
-        // Update the node status.
-        self.status.update(Status::ShuttingDown);
         // Abort the tasks.
         self.handles.read().iter().for_each(|handle| handle.abort());
         // Close the listener.
