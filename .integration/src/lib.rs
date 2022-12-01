@@ -26,7 +26,7 @@ mod tests {
 
     type CurrentNetwork = Testnet3;
 
-    const TEST_BASE_URL: &str = "https://vm.aleo.org/api";
+    const TEST_BASE_URL: &str = "https://testnet3.blocks.aleo.org/phase2";
 
     #[test]
     #[traced_test]

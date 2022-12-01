@@ -80,7 +80,7 @@ pub struct Start {
     #[clap(long)]
     pub nodisplay: bool,
     /// Enables the node to prefetch initial blocks from a CDN.
-    #[clap(default_value = "https://vm.aleo.org/api", long = "cdn")]
+    #[clap(default_value = "https://testnet3.blocks.aleo.org/phase2", long = "cdn")]
     pub cdn: String,
     /// Specify the path to the file where logs will be stored.
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
