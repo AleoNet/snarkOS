@@ -17,22 +17,46 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ChallengeResponse<N: Network> {
-    pub genesis_header: Header<N>,
+pub struct BeaconVote<N: Network> {
+    pub version: u8,
+    pub round: u64,
+    pub block_height: u32,
+    pub block_hash: N::BlockHash,
+    pub timestamp: u64,
     pub signature: Data<Signature<N>>,
 }
 
-impl<N: Network> MessageTrait for ChallengeResponse<N> {
+impl<N: Network> BeaconVote<N> {
+    /// The current version of this message.
+    pub const INTERNAL_VERSION: u8 = 0;
+
+    /// Initializes a new message.
+    pub const fn new(
+        round: u64,
+        block_height: u32,
+        block_hash: N::BlockHash,
+        timestamp: u64,
+        signature: Data<Signature<N>>,
+    ) -> Self {
+        Self { version: Self::INTERNAL_VERSION, round, block_height, block_hash, timestamp, signature }
+    }
+}
+
+impl<N: Network> MessageTrait for BeaconVote<N> {
     /// Returns the message name.
     #[inline]
     fn name(&self) -> String {
-        "ChallengeResponse".to_string()
+        format!("BeaconVote {}", self.block_height)
     }
 
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.genesis_header.to_bytes_le()?)?;
+        writer.write_all(&self.version.to_le_bytes())?;
+        writer.write_all(&self.round.to_le_bytes())?;
+        writer.write_all(&self.block_height.to_le_bytes())?;
+        writer.write_all(&self.block_hash.to_bytes_le()?)?;
+        writer.write_all(&self.timestamp.to_le_bytes())?;
         self.signature.serialize_blocking_into(writer)
     }
 
@@ -41,7 +65,11 @@ impl<N: Network> MessageTrait for ChallengeResponse<N> {
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
         Ok(Self {
-            genesis_header: Header::read_le(&mut reader)?,
+            version: bincode::deserialize_from(&mut reader)?,
+            round: bincode::deserialize_from(&mut reader)?,
+            block_height: bincode::deserialize_from(&mut reader)?,
+            block_hash: N::BlockHash::read_le(&mut reader)?,
+            timestamp: bincode::deserialize_from(&mut reader)?,
             signature: Data::Buffer(reader.into_inner().freeze()),
         })
     }

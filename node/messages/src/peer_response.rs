@@ -24,8 +24,8 @@ pub struct PeerResponse {
 impl MessageTrait for PeerResponse {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> &str {
-        "PeerResponse"
+    fn name(&self) -> String {
+        "PeerResponse".to_string()
     }
 
     /// Serializes the message into the buffer.

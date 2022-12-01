@@ -27,8 +27,7 @@ use crate::{Message, MessageCodec};
 
 type CurrentNetwork = Testnet3;
 
-// The maximum message size for noise messages. If the data to be encrypted exceedes it, it is
-// chunked.
+/// The maximum message size for noise messages. If the data to be encrypted exceeds it, it is chunked.
 const MAX_MESSAGE_LEN: usize = 65535;
 
 #[repr(u8)]
@@ -277,6 +276,7 @@ impl Decoder for NoiseCodec {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use snarkvm::prelude::{Address, Group, TestRng, Uniform};
 
     use crate::{
         BlockRequest,
@@ -289,7 +289,6 @@ mod tests {
         Ping,
         Pong,
         PuzzleRequest,
-        Status,
     };
     use snow::{params::NoiseParams, Builder};
 
@@ -343,22 +342,22 @@ mod tests {
 
     #[test]
     fn block_request_roundtrip() {
-        let block_request = MessageOrBytes::Message(Box::new(Message::BlockRequest(BlockRequest {
-            start_block_height: 0,
-            end_block_height: 100,
-        })));
+        let block_request =
+            MessageOrBytes::Message(Box::new(Message::BlockRequest(BlockRequest { start_height: 0, end_height: 100 })));
 
         assert_roundtrip(block_request);
     }
 
     #[test]
     fn challenge_request_roundtrip() {
+        let rng = &mut TestRng::default();
+
         let challenge_request = MessageOrBytes::Message(Box::new(Message::ChallengeRequest(ChallengeRequest {
             version: 0,
-            fork_depth: 0,
-            node_type: NodeType::Client,
-            status: Status::Ready,
             listener_port: 0,
+            node_type: NodeType::Client,
+            address: Address::new(Group::rand(rng)),
+            nonce: 0,
         })));
 
         assert_roundtrip(challenge_request);
@@ -387,11 +386,10 @@ mod tests {
 
     #[test]
     fn ping_roundtrip() {
-        let ping = MessageOrBytes::Message(Box::new(Message::Ping(Ping {
+        let ping = MessageOrBytes::Message(Box::new(Message::Ping(Ping::<CurrentNetwork> {
             version: 0,
-            fork_depth: 0,
             node_type: NodeType::Client,
-            status: Status::Ready,
+            block_locators: None,
         })));
 
         assert_roundtrip(ping)

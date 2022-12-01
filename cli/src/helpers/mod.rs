@@ -38,7 +38,6 @@ pub fn check_open_files_limit(minimum: u64) {
             if soft_limit < minimum {
                 // Warn about too low limit.
                 let warning = [
-                    "⚠️  Warning!".to_owned(),
                     format!("⚠️  Current open files limit ({soft_limit}) for this process is lower than recommended."),
                     format!("⚠️  Please raise it to at least {minimum} to ensure correct behavior of the node."),
                     "⚠️  See `ulimit` command and `/etc/security/limits.conf` for more details.".to_owned(),
@@ -52,7 +51,6 @@ pub fn check_open_files_limit(minimum: u64) {
         Err(err) => {
             // Warn about unknown limit.
             let warning = [
-                "⚠️  Warning!".to_owned(),
                 format!("⚠️  Couldn't check process's open files limit due to {err}."),
                 format!("⚠️  Please make sure it's at least {minimum} to ensure correct behavior of the node."),
                 "⚠️  See `ulimit` command and `/etc/security/limits.conf` for more details.".to_owned(),
