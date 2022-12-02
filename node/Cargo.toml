@@ -97,7 +97,7 @@ version = "0.7"
 version = "0.1"
 
 [dev-dependencies.pea2pea]
-version = "0.40"
+version = "0.42"
 
 [dev-dependencies.rand_chacha]
 version = "0.3.0"
