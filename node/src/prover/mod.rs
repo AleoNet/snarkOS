@@ -45,9 +45,9 @@ use rand::{rngs::OsRng, CryptoRng, Rng};
 use std::{
     net::SocketAddr,
     sync::{
-        atomic::{AtomicBool, AtomicU8, Ordering},
+        atomic::{AtomicBool, AtomicU8, Ordering, AtomicU32},
         Arc,
-    },
+    }, time::Instant, thread,
 };
 use time::OffsetDateTime;
 use tokio::task::JoinHandle;
@@ -59,6 +59,10 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     account: Account<N>,
     /// The router of the node.
     router: Router<N>,
+    /// Counter
+    proves_count: Arc<AtomicU32>,
+    /// Counter Start time
+    proves_start: Arc<RwLock<Option<Instant>>>,
     /// The genesis block.
     genesis: Block<N>,
     /// The coinbase puzzle.
@@ -106,6 +110,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         let node = Self {
             account,
             router,
+            proves_count: Default::default(),
+            proves_start: Default::default(),
             genesis,
             coinbase_puzzle,
             latest_epoch_challenge: Default::default(),
@@ -176,6 +182,7 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Initialize a new instance of the coinbase puzzle.
     async fn initialize_coinbase_puzzle(&self) {
+        warn!("Start {} coinbase_puzzle_loops tasks", self.max_puzzle_instances);
         for _ in 0..self.max_puzzle_instances {
             let prover = self.clone();
             self.handles.write().push(tokio::spawn(async move {
@@ -210,6 +217,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 .as_ref()
                 .map(|header| (header.coinbase_target(), header.proof_target()));
 
+            self.hashrate_init();
+
             // If the latest epoch challenge and latest state exists, then proceed to generate a prover solution.
             if let (Some(challenge), Some((coinbase_target, proof_target))) = (latest_epoch_challenge, latest_state) {
                 // Execute the coinbase puzzle.
@@ -229,6 +238,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 // Otherwise, sleep for a brief period of time, to await for puzzle state.
                 tokio::time::sleep(Duration::from_secs(1)).await;
             }
+
+            self.hashrate_flush();
 
             // If the Ctrl-C handler registered the signal, stop the prover.
             if self.shutdown.load(Ordering::Relaxed) {
@@ -258,6 +269,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             .dimmed()
         );
 
+        self.hashrate_increment(epoch_challenge.clone(), coinbase_target, proof_target);
+
         // Compute the prover solution.
         let result = self
             .coinbase_puzzle
@@ -269,6 +282,43 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         self.decrement_puzzle_instances();
         // Return the result.
         result
+    }
+
+    fn hashrate_init(&self) {
+        let mut start = self.proves_start.write();
+        if start.is_none() {
+            start.replace(Instant::now());
+            self.proves_count.store(0, Ordering::SeqCst);
+        }
+    }
+
+    fn hashrate_increment(&self,
+                            epoch_challenge: EpochChallenge<N>,
+                            coinbase_target: u64,
+                            proof_target: u64) {
+        let old_count = self.proves_count.fetch_add(1, Ordering::SeqCst);
+
+        if old_count % 100 == 0 {
+            debug!(
+                "Proving 'CoinbasePuzzle' {}",
+                format!(
+                    "(Epoch {}, Coinbase Target {coinbase_target}, Proof Target {proof_target})",
+                    epoch_challenge.epoch_number(),
+                )
+                .dimmed()
+            );
+        }
+    }
+
+    fn hashrate_flush(&self) {
+        let mut start = self.proves_start.write();
+        let proves_count = self.proves_count.load(Ordering::SeqCst);
+        let elapsed = start.unwrap().elapsed().as_secs_f64();
+        if elapsed > 10.0 {
+            info!("[{:?}] elapsed: {} sec; total proves: {}; hashrate {} p/s)", thread::current().id(), elapsed, proves_count, proves_count as f64 / elapsed);
+            start.replace(Instant::now());
+            self.proves_count.store(0, Ordering::SeqCst);
+        }
     }
 
     /// Broadcasts the prover solution to the network.
