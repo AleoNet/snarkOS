@@ -1758,9 +1758,9 @@ checksum = "b1de2e551fb905ac83f73f7aedf2f0cb4a0da7e35efa24a202a936269f1f18e1"
 
 [[package]]
 name = "pea2pea"
-version = "0.41.0"
+version = "0.42.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "44ef14c399f2afa39d9d61fe49775f038c9994579446a3090a5025e8ce6a1835"
+checksum = "dc3ca8e07642297b567efe1216fe69d77d30bcb6a59cb151b0982b5ad6f0b748"
 dependencies = [
  "async-trait",
  "bytes",
