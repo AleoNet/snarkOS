@@ -42,7 +42,7 @@ pub use routing::*;
 use snarkos_account::Account;
 use snarkos_node_messages::NodeType;
 use snarkos_node_tcp::{Config, Tcp};
-use snarkvm::prelude::{Address, Network};
+use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
 use core::str::FromStr;
@@ -171,7 +171,17 @@ impl<N: Network> Router<N> {
         self.node_type
     }
 
-    /// Returns the Aleo address of the node.
+    /// Returns the account private key of the node.
+    pub const fn private_key(&self) -> &PrivateKey<N> {
+        self.account.private_key()
+    }
+
+    /// Returns the account view key of the node.
+    pub const fn view_key(&self) -> &ViewKey<N> {
+        self.account.view_key()
+    }
+
+    /// Returns the account address of the node.
     pub const fn address(&self) -> Address<N> {
         self.account.address()
     }

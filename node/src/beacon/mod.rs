@@ -36,17 +36,14 @@ use snarkos_node_tcp::{
     P2P,
 };
 use snarkvm::prelude::{
-    Address,
     Block,
     ConsensusStorage,
     Identifier,
     Network,
-    PrivateKey,
     ProgramID,
     ProverSolution,
     Transaction,
     Value,
-    ViewKey,
     Zero,
 };
 
@@ -180,31 +177,6 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Beacon<N, C> {
-    /// Returns the node type.
-    fn node_type(&self) -> NodeType {
-        self.router.node_type()
-    }
-
-    /// Returns the account private key of the node.
-    fn private_key(&self) -> &PrivateKey<N> {
-        self.account.private_key()
-    }
-
-    /// Returns the account view key of the node.
-    fn view_key(&self) -> &ViewKey<N> {
-        self.account.view_key()
-    }
-
-    /// Returns the account address of the node.
-    fn address(&self) -> Address<N> {
-        self.account.address()
-    }
-
-    /// Returns `true` if the node is in development mode.
-    fn is_dev(&self) -> bool {
-        self.router.is_dev()
-    }
-
     /// Shuts down the node.
     async fn shut_down(&self) {
         info!("Shutting down...");

@@ -27,17 +27,7 @@ use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, Reading, Writing},
     P2P,
 };
-use snarkvm::prelude::{
-    Address,
-    Block,
-    CoinbasePuzzle,
-    ConsensusStorage,
-    Header,
-    Network,
-    PrivateKey,
-    ProverSolution,
-    ViewKey,
-};
+use snarkvm::prelude::{Block, CoinbasePuzzle, ConsensusStorage, Header, Network, ProverSolution};
 
 use anyhow::Result;
 use parking_lot::RwLock;
@@ -54,8 +44,6 @@ use tokio::task::JoinHandle;
 /// A validator is a full node, capable of validating blocks.
 #[derive(Clone)]
 pub struct Validator<N: Network, C: ConsensusStorage<N>> {
-    /// The account of the node.
-    account: Account<N>,
     /// The ledger of the node.
     ledger: Ledger<N, C>,
     /// The consensus module of the node.
@@ -100,7 +88,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let router = Router::new(
             node_ip,
             NodeType::Validator,
-            account.clone(),
+            account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
             dev.is_some(),
@@ -111,7 +99,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
         let mut node = Self {
-            account,
             ledger: ledger.clone(),
             consensus: consensus.clone(),
             router,
@@ -148,31 +135,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
-    /// Returns the node type.
-    fn node_type(&self) -> NodeType {
-        self.router.node_type()
-    }
-
-    /// Returns the account private key of the node.
-    fn private_key(&self) -> &PrivateKey<N> {
-        self.account.private_key()
-    }
-
-    /// Returns the account view key of the node.
-    fn view_key(&self) -> &ViewKey<N> {
-        self.account.view_key()
-    }
-
-    /// Returns the account address of the node.
-    fn address(&self) -> Address<N> {
-        self.account.address()
-    }
-
-    /// Returns `true` if the node is in development mode.
-    fn is_dev(&self) -> bool {
-        self.router.is_dev()
-    }
-
     /// Shuts down the node.
     async fn shut_down(&self) {
         info!("Shutting down...");
