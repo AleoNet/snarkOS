@@ -179,7 +179,6 @@ impl<R: Reading> ReadingInternal for R {
                         error!(parent: node.span(), "can't read from {}: {}", addr, e);
                         node.known_peers().register_failure(addr);
                         if node.config().fatal_io_errors.contains(&e.kind()) {
-                            node.disconnect(addr).await;
                             break;
                         }
                     }
