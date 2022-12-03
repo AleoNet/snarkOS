@@ -34,6 +34,11 @@ use time::{Duration, OffsetDateTime};
 /// The maximum number of items to store in the cache.
 const MAX_CACHE_SIZE: usize = 4096;
 
+/// A helper containing the peer IP and solution commitment.
+type SolutionKey<N> = (SocketAddr, PuzzleCommitment<N>);
+/// A helper containing the peer IP and transaction ID.
+type TransactionKey<N> = (SocketAddr, <N as Network>::TransactionID);
+
 #[derive(Clone, Debug)]
 pub struct Cache<N: Network> {
     /// The map of peer connections to their recent timestamps.
@@ -43,17 +48,17 @@ pub struct Cache<N: Network> {
     /// The map of peer IPs to their recent timestamps.
     seen_inbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>>,
     /// The map of solution commitments to their last seen timestamp.
-    seen_inbound_solutions: Arc<RwLock<LinkedHashMap<(SocketAddr, PuzzleCommitment<N>), OffsetDateTime>>>,
+    seen_inbound_solutions: Arc<RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>>,
     /// The map of transaction IDs to their last seen timestamp.
-    seen_inbound_transactions: Arc<RwLock<LinkedHashMap<(SocketAddr, N::TransactionID), OffsetDateTime>>>,
+    seen_inbound_transactions: Arc<RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>>,
     /// The map of peer IPs to their block requests.
     seen_outbound_block_requests: Arc<RwLock<IndexMap<SocketAddr, IndexSet<BlockRequest>>>>,
     /// The map of peer IPs to the number of puzzle requests.
     seen_outbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, Arc<AtomicU16>>>>,
     /// The map of solution commitments to their last seen timestamp.
-    seen_outbound_solutions: Arc<RwLock<LinkedHashMap<(SocketAddr, PuzzleCommitment<N>), OffsetDateTime>>>,
+    seen_outbound_solutions: Arc<RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>>,
     /// The map of transaction IDs to their last seen timestamp.
-    seen_outbound_transactions: Arc<RwLock<LinkedHashMap<(SocketAddr, N::TransactionID), OffsetDateTime>>>,
+    seen_outbound_transactions: Arc<RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>>,
 }
 
 impl<N: Network> Default for Cache<N> {
