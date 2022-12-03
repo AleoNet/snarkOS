@@ -118,6 +118,12 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         let consensus = Consensus::new(ledger.clone(), dev.is_some())?;
         lap!(timer, "Initialize consensus");
 
+        // Initialize the block generation time.
+        let block_generation_time = Arc::new(AtomicU64::new(2));
+        // Retrieve the unspent records.
+        let unspent_records = ledger.find_unspent_records(account.view_key())?;
+        lap!(timer, "Retrieve the unspent records");
+
         // Initialize the node router.
         let router = Router::new(
             node_ip,
@@ -129,12 +135,6 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         )
         .await?;
         lap!(timer, "Initialize the router");
-
-        // Initialize the block generation time.
-        let block_generation_time = Arc::new(AtomicU64::new(2));
-        // Retrieve the unspent records.
-        let unspent_records = ledger.find_unspent_records(account.view_key())?;
-        lap!(timer, "Retrieve the unspent records");
 
         // Initialize the node.
         let mut node = Self {
