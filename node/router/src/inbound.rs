@@ -225,7 +225,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 // Clone the serialized message.
                 let serialized = message.clone();
                 // Update the timestamp for the unconfirmed solution.
-                let seen_before = self.router().cache.insert_inbound_solution(message.puzzle_commitment).is_some();
+                let seen_before =
+                    self.router().cache.insert_inbound_solution(peer_ip, message.puzzle_commitment).is_some();
                 // Determine whether to propagate the solution.
                 if seen_before {
                     bail!("Skipping 'UnconfirmedSolution' from '{peer_ip}'")
@@ -249,7 +250,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 // Clone the serialized message.
                 let serialized = message.clone();
                 // Update the timestamp for the unconfirmed transaction.
-                let seen_before = self.router().cache.insert_inbound_transaction(message.transaction_id).is_some();
+                let seen_before =
+                    self.router().cache.insert_inbound_transaction(peer_ip, message.transaction_id).is_some();
                 // Determine whether to propagate the transaction.
                 if seen_before {
                     bail!("Skipping 'UnconfirmedTransaction' from '{peer_ip}'")

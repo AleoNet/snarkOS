@@ -168,13 +168,15 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         match message {
             Message::UnconfirmedSolution(message) => {
                 // Update the timestamp for the unconfirmed solution.
-                let seen_before = self.router().cache.insert_outbound_solution(message.puzzle_commitment).is_some();
+                let seen_before =
+                    self.router().cache.insert_outbound_solution(peer_ip, message.puzzle_commitment).is_some();
                 // Determine whether to send the solution.
                 !seen_before
             }
             Message::UnconfirmedTransaction(message) => {
                 // Update the timestamp for the unconfirmed transaction.
-                let seen_before = self.router().cache.insert_outbound_transaction(message.transaction_id).is_some();
+                let seen_before =
+                    self.router().cache.insert_outbound_transaction(peer_ip, message.transaction_id).is_some();
                 // Determine whether to send the transaction.
                 !seen_before
             }
