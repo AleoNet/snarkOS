@@ -220,7 +220,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
         false
     }
 
-    /// Adds the unconfirmed solution to the memory pool, and propagates the solution to all peers.
+    /// Adds the unconfirmed solution to the memory pool, and propagates the solution to all connected beacons.
     async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
@@ -238,7 +238,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
         true
     }
 
-    /// Adds the unconfirmed transaction to the memory pool, and propagates the transaction to all peers.
+    /// Adds the unconfirmed transaction to the memory pool, and propagates the transaction to all connected beacons.
     fn unconfirmed_transaction(
         &self,
         peer_ip: SocketAddr,

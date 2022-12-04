@@ -204,7 +204,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         false
     }
 
-    /// Propagates the unconfirmed solution to all connected beacons.
+    /// Propagates the unconfirmed solution to all connected beacons and validators.
     async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
