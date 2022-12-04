@@ -45,12 +45,15 @@ pub fn is_in_bech32m_charset(s: &str) -> bool {
 /// `false` otherwise.
 pub fn has_vanity_string(s: &str, vanity: &str) -> bool {
     // Split the bech32m string into the HRP and data parts.
-    let parts: Vec<&str> = s.split('1').collect();
-    if parts.len() != 2 {
+    let (hrp, data) = match s.split_once('1') {
+        Some((hrp, data)) => (hrp, data),
+        // The bech32m string is invalid.
+        None => return false,
+    };
+    // Ensure neither the HRP nor the data part are empty.
+    if hrp.is_empty() || data.is_empty() {
         return false;
     }
-    let (_hrp, data) = (parts[0], parts[1]);
-
     // Check if the vanity string exists at the start or end of the data part.
     data.starts_with(vanity) || data.ends_with(vanity)
 }
@@ -58,7 +61,7 @@ pub fn has_vanity_string(s: &str, vanity: &str) -> bool {
 #[test]
 fn test_is_in_bech32m_charset() {
     assert!(is_in_bech32m_charset("qpzry9x8gf2tvdw0s3jn54khce6mua7l1qpzry9x8gf2tvdw0s3jn54khce6mua7l1"));
-    assert!(!is_in_bech32m_charset("qpzry9x8gf2tvdw0s3jn54khce6mua7l1qpzry9x8gf2tvdw0s3jn54khce6mua7l2"));
+    assert!(!is_in_bech32m_charset("qpzry9x8gf2tvdw0s3jn54khce6mua7l1qpzry9x8gf2tvdw0s3jn54khce6mua7lo"));
 }
 
 #[test]

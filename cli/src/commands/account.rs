@@ -84,7 +84,7 @@ impl Account {
         // Output a message if the character set is more than 4 characters.
         if vanity.len() > 4 {
             let message =
-                format!(" The vanity string '{vanity}' contains 4+ characters and will take a while to find.\n");
+                format!(" The vanity string '{vanity}' contains 5 or more characters and will take a while to find.\n");
             println!("{}", message.yellow());
         }
 
