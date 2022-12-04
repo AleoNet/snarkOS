@@ -74,13 +74,18 @@ impl Account {
         const ITERATIONS_STR: &str = "65,535";
 
         // Ensure the vanity string is valid.
-        if !crate::helpers::is_valid_bech32m_charset(vanity) {
-            bail!("The vanity string '{vanity}' contains invalid bech32m characters");
+        if !crate::helpers::is_in_bech32m_charset(vanity) {
+            bail!(
+                "The vanity string '{vanity}' contains invalid bech32m characters. Try using characters from the bech32m character set: {}",
+                crate::helpers::BECH32M_CHARSET
+            );
         }
 
         // Output a message if the character set is more than 4 characters.
         if vanity.len() > 4 {
-            println!(" The vanity string '{vanity}' contains more than 4 characters and will take a while to find");
+            let message =
+                format!(" The vanity string '{vanity}' contains 4+ characters and will take a while to find.\n");
+            println!("{}", message.yellow());
         }
 
         loop {

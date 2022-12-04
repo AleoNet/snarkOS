@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-const BECH32M_CHARSET: &[u8] = b"qpzry9x8gf2tvdw0s3jn54khce6mua7l1";
+pub const BECH32M_CHARSET: &str = "qpzry9x8gf2tvdw0s3jn54khce6mua7l1";
 
 /// Check if a string is a valid bech32m character set.
 ///
@@ -23,8 +23,8 @@ const BECH32M_CHARSET: &[u8] = b"qpzry9x8gf2tvdw0s3jn54khce6mua7l1";
 ///     qpzry9x8gf2tvdw0s3jn54khce6mua7l1
 ///
 /// The function returns `true` if the string is a valid bech32m character set, and `false` otherwise.
-pub fn is_valid_bech32m_charset(s: &str) -> bool {
-    s.as_bytes().iter().all(|b| BECH32M_CHARSET.contains(b))
+pub fn is_in_bech32m_charset(s: &str) -> bool {
+    s.as_bytes().iter().all(|b| BECH32M_CHARSET.as_bytes().contains(b))
 }
 
 /// Check if a given vanity string exists at the start or end of the data part of a bech32m string.
@@ -56,9 +56,9 @@ pub fn has_vanity_string(s: &str, vanity: &str) -> bool {
 }
 
 #[test]
-fn test_is_valid_bech32m_charset() {
-    assert!(is_valid_bech32m_charset("qpzry9x8gf2tvdw0s3jn54khce6mua7l1qpzry9x8gf2tvdw0s3jn54khce6mua7l1"));
-    assert!(!is_valid_bech32m_charset("qpzry9x8gf2tvdw0s3jn54khce6mua7l1qpzry9x8gf2tvdw0s3jn54khce6mua7l2"));
+fn test_is_in_bech32m_charset() {
+    assert!(is_in_bech32m_charset("qpzry9x8gf2tvdw0s3jn54khce6mua7l1qpzry9x8gf2tvdw0s3jn54khce6mua7l1"));
+    assert!(!is_in_bech32m_charset("qpzry9x8gf2tvdw0s3jn54khce6mua7l1qpzry9x8gf2tvdw0s3jn54khce6mua7l2"));
 }
 
 #[test]
