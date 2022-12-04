@@ -45,7 +45,7 @@ pub fn is_valid_bech32m_charset(s: &str) -> bool {
 /// `false` otherwise.
 pub fn has_vanity_string(s: &str, vanity: &str) -> bool {
     // Split the bech32m string into the HRP and data parts.
-    let parts: Vec<&str> = s.split("1").collect();
+    let parts: Vec<&str> = s.split('1').collect();
     if parts.len() != 2 {
         return false;
     }

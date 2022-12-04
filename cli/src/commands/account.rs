@@ -78,6 +78,11 @@ impl Account {
             bail!("The vanity string '{vanity}' contains invalid bech32m characters");
         }
 
+        // Output a message if the character set is more than 4 characters.
+        if vanity.len() > 4 {
+            println!(" The vanity string '{vanity}' contains more than 4 characters and will take a while to find");
+        }
+
         loop {
             // Initialize a timer.
             let timer = std::time::Instant::now();
