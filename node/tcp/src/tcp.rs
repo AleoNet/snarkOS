@@ -100,27 +100,29 @@ pub struct InnerTcp {
 impl Tcp {
     /// Creates a new [`Tcp`] using the given [`Config`].
     pub async fn new(mut config: Config) -> io::Result<Self> {
-        // if there is no pre-configured name, assign a sequential numeric identifier
+        // If there is no pre-configured name, assign a sequential numeric identifier.
         if config.name.is_none() {
             config.name = Some(SEQUENTIAL_NODE_ID.fetch_add(1, SeqCst).to_string());
         }
 
-        // create a tracing span containing the node's name
+        // Create a tracing span containing the node's name.
         let span = create_span(config.name.as_deref().unwrap());
 
-        // procure a listening address
+        // Procure a listening IP address, if the configuration is set.
         let listener = if let Some(listener_ip) = config.listener_ip {
             let listener = if let Some(port) = config.desired_listening_port {
+                // Construct the desired listening IP address.
                 let desired_listening_addr = SocketAddr::new(listener_ip, port);
+                // If a desired listening port is set, try to bind to it.
                 match TcpListener::bind(desired_listening_addr).await {
                     Ok(listener) => listener,
                     Err(e) => {
                         if config.allow_random_port {
-                            warn!(parent: &span, "trying any port, the desired one is unavailable: {}", e);
+                            warn!(parent: &span, "Trying any listening port, as the desired port is unavailable: {e}");
                             let random_available_addr = SocketAddr::new(listener_ip, 0);
                             TcpListener::bind(random_available_addr).await?
                         } else {
-                            error!(parent: &span, "the desired port is unavailable: {}", e);
+                            error!(parent: &span, "The desired listening port is unavailable: {e}");
                             return Err(e);
                         }
                     }
@@ -129,7 +131,7 @@ impl Tcp {
                 let random_available_addr = SocketAddr::new(listener_ip, 0);
                 TcpListener::bind(random_available_addr).await?
             } else {
-                panic!("you must either provide a desired port or allow a random one");
+                panic!("As 'listener_ip' is set, either 'desired_listening_port' or 'allow_random_port' must be set")
             };
 
             Some(listener)
@@ -137,6 +139,7 @@ impl Tcp {
             None
         };
 
+        // If a listener is set, get the listening IP address.
         let listening_addr = if let Some(ref listener) = listener {
             let ip = config.listener_ip.unwrap(); // safe; listener.is_some() => config.listener_ip.is_some()
             let port = listener.local_addr()?.port(); // discover the port if it was unspecified
@@ -145,7 +148,8 @@ impl Tcp {
             None
         };
 
-        let node = Tcp(Arc::new(InnerTcp {
+        // Initialize the Tcp stack.
+        let tcp = Tcp(Arc::new(InnerTcp {
             span,
             config,
             listening_addr,
@@ -158,50 +162,48 @@ impl Tcp {
         }));
 
         if let Some(listener) = listener {
-            // use a channel to know when the listening task is ready
+            // Use a channel to know when the listening task is ready.
             let (tx, rx) = oneshot::channel();
 
-            let node_clone = node.clone();
+            let tcp_clone = tcp.clone();
             let listening_task = tokio::spawn(async move {
-                trace!(parent: node_clone.span(), "spawned the listening task");
+                trace!(parent: tcp_clone.span(), "Spawned the listening task");
                 tx.send(()).unwrap(); // safe; the channel was just opened
 
                 loop {
+                    // Await for a new connection.
                     match listener.accept().await {
                         Ok((stream, addr)) => {
-                            debug!(parent: node_clone.span(), "tentatively accepted a connection from {}", addr);
+                            debug!(parent: tcp_clone.span(), "Received a connection from {addr}");
 
-                            if !node_clone.can_add_connection() {
-                                debug!(parent: node_clone.span(), "rejecting the connection from {}", addr);
+                            if !tcp_clone.can_add_connection() {
+                                debug!(parent: tcp_clone.span(), "Rejecting the connection from {addr}");
                                 continue;
                             }
 
-                            node_clone.connecting.lock().insert(addr);
+                            tcp_clone.connecting.lock().insert(addr);
 
-                            let node_clone2 = node_clone.clone();
+                            let tcp_clone2 = tcp_clone.clone();
                             tokio::spawn(async move {
-                                if let Err(e) = node_clone2.adapt_stream(stream, addr, ConnectionSide::Responder).await
-                                {
-                                    node_clone2.connecting.lock().remove(&addr);
-                                    node_clone2.known_peers().register_failure(addr);
-                                    error!(parent: node_clone2.span(), "couldn't accept a connection: {}", e);
+                                if let Err(e) = tcp_clone2.adapt_stream(stream, addr, ConnectionSide::Responder).await {
+                                    tcp_clone2.connecting.lock().remove(&addr);
+                                    tcp_clone2.known_peers().register_failure(addr);
+                                    error!(parent: tcp_clone2.span(), "Failed to connect with {addr}: {e}");
                                 }
                             });
                         }
-                        Err(e) => {
-                            error!(parent: node_clone.span(), "couldn't accept a connection: {}", e);
-                        }
+                        Err(e) => error!(parent: tcp_clone.span(), "Failed to accept a connection: {e}"),
                     }
                 }
             });
-            node.tasks.lock().push(listening_task);
+            tcp.tasks.lock().push(listening_task);
             let _ = rx.await;
-            debug!(parent: node.span(), "listening on {}", node.listening_addr.unwrap());
+            debug!(parent: tcp.span(), "Listening on {}", tcp.listening_addr.unwrap());
         }
 
-        debug!(parent: node.span(), "the node is ready");
+        debug!(parent: tcp.span(), "The node is ready");
 
-        Ok(node)
+        Ok(tcp)
     }
 
     /// Returns the name assigned to Tcp.
@@ -393,12 +395,18 @@ impl Tcp {
         self.connecting.lock().len()
     }
 
-    /// Checks whether the `Tcp` can handle an additional connection.
+    /// Checks whether `Tcp` can handle an additional connection.
     fn can_add_connection(&self) -> bool {
+        // Retrieve the number of connected peers.
         let num_connected = self.num_connected();
+        // Retrieve the maximum number of connected peers.
         let limit = self.config.max_connections as usize;
-        if num_connected >= limit || num_connected + self.num_connecting() >= limit {
-            warn!(parent: self.span(), "maximum number of connections ({}) reached", limit);
+
+        if num_connected >= limit {
+            warn!(parent: self.span(), "Maximum number of active connections ({limit}) reached");
+            false
+        } else if num_connected + self.num_connecting() >= limit {
+            warn!(parent: self.span(), "Maximum number of active & pending connections ({limit}) reached");
             false
         } else {
             true
