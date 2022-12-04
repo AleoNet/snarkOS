@@ -19,9 +19,9 @@ pub const BECH32M_CHARSET: &str = "qpzry9x8gf2tvdw0s3jn54khce6mua7l1";
 /// Check if a string is a valid bech32m character set.
 ///
 /// A bech32m character set is considered valid if it consists of the following characters:
-///
+/// ```ignore
 ///     qpzry9x8gf2tvdw0s3jn54khce6mua7l1
-///
+/// ```
 /// The function returns `true` if the string is a valid bech32m character set, and `false` otherwise.
 pub fn is_in_bech32m_charset(s: &str) -> bool {
     s.as_bytes().iter().all(|b| BECH32M_CHARSET.as_bytes().contains(b))
@@ -30,9 +30,9 @@ pub fn is_in_bech32m_charset(s: &str) -> bool {
 /// Check if a given vanity string exists at the start or end of the data part of a bech32m string.
 ///
 /// The bech32m string must have the following format:
-///
+/// ```ignore
 ///     <HRP>1<data>[<vanity string>]
-///
+/// ```
 /// where:
 ///
 /// - `<HRP>` is the human-readable part of the bech32m string.
