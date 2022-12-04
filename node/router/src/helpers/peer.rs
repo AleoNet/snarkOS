@@ -31,6 +31,8 @@ pub struct Peer<N: Network> {
     node_type: NodeType,
     /// The message version of the peer.
     version: u32,
+    /// The timestamp of the first message received from the peer.
+    first_seen: Instant,
     /// The timestamp of the last message received from this peer.
     last_seen: Arc<RwLock<Instant>>,
 }
@@ -38,7 +40,14 @@ pub struct Peer<N: Network> {
 impl<N: Network> Peer<N> {
     /// Initializes a new instance of `Peer`.
     pub fn new(listening_ip: SocketAddr, address: Address<N>, node_type: NodeType, version: u32) -> Self {
-        Self { peer_ip: listening_ip, address, node_type, version, last_seen: Arc::new(RwLock::new(Instant::now())) }
+        Self {
+            peer_ip: listening_ip,
+            address,
+            node_type,
+            version,
+            first_seen: Instant::now(),
+            last_seen: Arc::new(RwLock::new(Instant::now())),
+        }
     }
 
     /// Returns the IP address of the peer, with the port set to the listener port.
@@ -79,6 +88,11 @@ impl<N: Network> Peer<N> {
     /// Returns the message version of the peer.
     pub const fn version(&self) -> u32 {
         self.version
+    }
+
+    /// Returns the first seen timestamp of the peer.
+    pub fn first_seen(&self) -> Instant {
+        self.first_seen
     }
 
     /// Returns the last seen timestamp of the peer.
