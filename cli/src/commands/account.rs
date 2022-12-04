@@ -74,7 +74,7 @@ impl Account {
         const ITERATIONS_STR: &str = "65,535";
 
         // Ensure the vanity string is valid.
-        if !crate::helpers::is_valid_bech32m_string(vanity) {
+        if !crate::helpers::is_valid_bech32m_charset(vanity) {
             bail!("The vanity string '{vanity}' contains invalid bech32m characters");
         }
 
@@ -93,7 +93,7 @@ impl Account {
                     let address = candidate.address().to_string();
                     // Set the candidate if the address includes the desired vanity string
                     // at the start or end of the address.
-                    if address.starts_with(vanity) || address.ends_with(vanity) {
+                    if crate::helpers::has_vanity_string(&address, vanity) {
                         account = Some(candidate);
                     }
                 }
