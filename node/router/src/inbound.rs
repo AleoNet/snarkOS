@@ -48,9 +48,9 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             None => bail!("Unable to resolve the (ambiguous) peer address '{peer_addr}'"),
         };
 
-        // Drop the peer, if they have sent more than 250 messages in the last 5 seconds.
+        // Drop the peer, if they have sent more than 1000 messages in the last 5 seconds.
         let num_messages = self.router().cache.insert_inbound_message(peer_ip, 5);
-        if num_messages >= 250 {
+        if num_messages >= 1000 {
             bail!("Dropping '{peer_ip}' for spamming messages (num_messages = {num_messages})")
         }
 
