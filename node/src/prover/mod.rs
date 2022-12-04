@@ -38,7 +38,6 @@ use std::{
         Arc,
     },
 };
-use time::OffsetDateTime;
 use tokio::task::JoinHandle;
 
 /// A prover is a full node, capable of producing proofs for consensus.
@@ -239,8 +238,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             puzzle_commitment: prover_solution.commitment(),
             solution: Data::Object(prover_solution),
         });
-        // Propagate the "UnconfirmedSolution" to the network.
-        self.propagate(message, vec![]);
+        // Propagate the "UnconfirmedSolution" to the connected validators.
+        self.propagate_to_validators(message, vec![]);
     }
 
     /// Returns the current number of puzzle instances.
