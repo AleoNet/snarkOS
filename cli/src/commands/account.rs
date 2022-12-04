@@ -113,6 +113,7 @@ impl Account {
 
             // Return the result if a candidate was found.
             if let Some(account) = account {
+                println!(); // Add a newline for formatting.
                 return Ok(account.to_string());
             } else {
                 let rate = ITERATIONS / timer.elapsed().as_millis();
