@@ -73,6 +73,11 @@ impl Account {
         const ITERATIONS: u128 = u16::MAX as u128;
         const ITERATIONS_STR: &str = "65,535";
 
+        // Ensure the vanity string is valid.
+        if !crate::helpers::is_valid_bech32m_string(vanity) {
+            bail!("The vanity string '{vanity}' contains invalid bech32m characters");
+        }
+
         loop {
             // Initialize a timer.
             let timer = std::time::Instant::now();
