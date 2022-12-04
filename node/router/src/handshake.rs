@@ -145,11 +145,11 @@ impl<N: Network> Router<N> {
             ConnectionSide::Responder => peer_addr,
         };
         let peer_address = request_b.address;
-        let peer_version = request_b.version;
         let peer_type = request_b.node_type;
+        let peer_version = request_b.version;
 
         // Construct the peer.
-        let peer = Peer::new(peer_ip, peer_address, peer_version, peer_type);
+        let peer = Peer::new(peer_ip, peer_address, peer_type, peer_version);
         // Insert the connected peer in the router.
         self.insert_connected_peer(peer, peer_addr);
         info!("Connected to '{peer_ip}'");
