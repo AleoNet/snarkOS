@@ -23,9 +23,6 @@ default-features = false
 [dependencies.anyhow]
 version = "1"
 
-[dependencies.bech32]
-version = "0.9"
-
 [dependencies.clap]
 version = "3.2"
 features = ["derive"]

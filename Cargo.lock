@@ -2491,7 +2491,6 @@ version = "2.0.2"
 dependencies = [
  "aleo-std",
  "anyhow",
- "bech32",
  "clap",
  "colored",
  "crossterm",
