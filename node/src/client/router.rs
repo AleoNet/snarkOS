@@ -16,10 +16,10 @@
 
 use super::*;
 
-use snarkos_node_messages::{BlockRequest, DisconnectReason, MessageCodec, Ping, Pong};
+use snarkos_node_messages::{BlockRequest, DisconnectReason, MessageCodec, Ping, Pong, UnconfirmedTransaction};
 use snarkos_node_router::Routing;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::Network;
+use snarkvm::prelude::{Network, Transaction};
 
 use futures_util::sink::SinkExt;
 use std::{io, net::SocketAddr, time::Duration};
@@ -166,7 +166,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         true
     }
 
-    /// Propagates the unconfirmed solution to all connected beacons.
+    /// Propagates the unconfirmed solution to all connected validators.
     async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
@@ -187,14 +187,30 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
             .await;
 
             match is_valid {
-                // If the solution is valid, propagate the `UnconfirmedSolution` to connected beacons.
-                Ok(Ok(true)) => self.propagate_to_beacons(Message::UnconfirmedSolution(serialized), vec![peer_ip]),
+                // If the solution is valid, propagate the `UnconfirmedSolution`.
+                Ok(Ok(true)) => {
+                    let message = Message::UnconfirmedSolution(serialized);
+                    // Propagate the "UnconfirmedSolution" to the connected validators.
+                    self.propagate_to_validators(message, vec![peer_ip]);
+                }
                 Ok(Ok(false)) | Ok(Err(_)) => {
                     trace!("Invalid prover solution '{}' for the proof target.", solution.commitment())
                 }
                 Err(error) => warn!("Failed to verify the prover solution: {error}"),
             }
         }
+        true
+    }
+
+    /// Handles an `UnconfirmedTransaction` message.
+    fn unconfirmed_transaction(
+        &self,
+        peer_ip: SocketAddr,
+        serialized: UnconfirmedTransaction<N>,
+        _transaction: Transaction<N>,
+    ) -> bool {
+        // Propagate the `UnconfirmedTransaction`.
+        self.propagate(Message::UnconfirmedTransaction(serialized), vec![peer_ip]);
         true
     }
 }

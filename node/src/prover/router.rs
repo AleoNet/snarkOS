@@ -16,9 +16,17 @@
 
 use super::*;
 
-use snarkos_node_messages::{BlockRequest, DisconnectReason, Message, MessageCodec, Ping, Pong};
+use snarkos_node_messages::{
+    BlockRequest,
+    DisconnectReason,
+    Message,
+    MessageCodec,
+    Ping,
+    Pong,
+    UnconfirmedTransaction,
+};
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::Network;
+use snarkvm::prelude::{Network, Transaction};
 
 use futures_util::sink::SinkExt;
 use std::{io, net::SocketAddr};
@@ -165,26 +173,49 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
         true
     }
 
-    /// If the last coinbase timestamp exceeds a multiple of the anchor time,
-    /// then the prover will assist by propagating unconfirmed solutions.
-    /// Otherwise, the prover will ignore the message.
+    /// Propagates the unconfirmed solution to all connected validators.
     async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedSolution<N>,
-        _solution: ProverSolution<N>,
+        solution: ProverSolution<N>,
     ) -> bool {
-        let last_coinbase_timestamp =
-            self.latest_block_header.read().as_ref().map(|header| header.last_coinbase_timestamp());
-        if let Some(last_coinbase_timestamp) = last_coinbase_timestamp {
-            // Compute the elapsed time since the last coinbase block.
-            let elapsed = OffsetDateTime::now_utc().unix_timestamp().saturating_sub(last_coinbase_timestamp);
-            // If the elapsed time exceeds a multiple of the anchor time, then assist in propagation.
-            if elapsed > N::ANCHOR_TIME as i64 * 6 {
-                // Propagate the `UnconfirmedSolution`.
-                self.propagate(Message::UnconfirmedSolution(serialized), vec![peer_ip]);
+        // Retrieve the latest epoch challenge.
+        let epoch_challenge = self.latest_epoch_challenge.read().clone();
+        // Retrieve the latest proof target.
+        let proof_target = self.latest_block_header.read().as_ref().map(|header| header.proof_target());
+
+        if let (Some(epoch_challenge), Some(proof_target)) = (epoch_challenge, proof_target) {
+            // Ensure that the prover solution is valid for the given epoch.
+            let coinbase_puzzle = self.coinbase_puzzle.clone();
+            let is_valid = tokio::task::spawn_blocking(move || {
+                solution.verify(coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target)
+            })
+            .await;
+
+            match is_valid {
+                // If the solution is valid, propagate the `UnconfirmedSolution`.
+                Ok(Ok(true)) => {
+                    let message = Message::UnconfirmedSolution(serialized);
+                    // Propagate the "UnconfirmedSolution" to the connected validators.
+                    self.propagate_to_validators(message, vec![peer_ip]);
+                }
+                Ok(Ok(false)) | Ok(Err(_)) => {
+                    trace!("Invalid prover solution '{}' for the proof target.", solution.commitment())
+                }
+                Err(error) => warn!("Failed to verify the prover solution: {error}"),
             }
         }
+        true
+    }
+
+    /// Handles an `UnconfirmedTransaction` message.
+    fn unconfirmed_transaction(
+        &self,
+        _peer_ip: SocketAddr,
+        _serialized: UnconfirmedTransaction<N>,
+        _transaction: Transaction<N>,
+    ) -> bool {
         true
     }
 }

@@ -395,14 +395,11 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         solution: ProverSolution<N>,
     ) -> bool;
 
+    /// Handles an `UnconfirmedTransaction` message.
     fn unconfirmed_transaction(
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedTransaction<N>,
         _transaction: Transaction<N>,
-    ) -> bool {
-        // Propagate the `UnconfirmedTransaction`.
-        self.propagate(Message::UnconfirmedTransaction(serialized), vec![peer_ip]);
-        true
-    }
+    ) -> bool;
 }

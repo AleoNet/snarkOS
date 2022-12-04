@@ -26,9 +26,10 @@ use snarkos_node_messages::{
     MessageCodec,
     Ping,
     Pong,
+    UnconfirmedTransaction,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{error, Network};
+use snarkvm::prelude::{error, Network, Transaction};
 
 use futures_util::sink::SinkExt;
 use std::{io, net::SocketAddr, time::Duration};
@@ -203,7 +204,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         false
     }
 
-    /// Propagates the unconfirmed solution to all connected beacons.
+    /// Propagates the unconfirmed solution to all connected beacons and validators.
     async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
@@ -230,11 +231,32 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         .await;
 
         match is_valid {
-            // If the solution is valid, propagate the `UnconfirmedSolution` to connected beacons.
-            Ok(Ok(true)) => self.propagate_to_beacons(Message::UnconfirmedSolution(serialized), vec![peer_ip]),
+            // If the solution is valid, propagate the `UnconfirmedSolution`.
+            Ok(Ok(true)) => {
+                let message = Message::UnconfirmedSolution(serialized);
+                // Propagate the "UnconfirmedSolution" to the connected beacons.
+                self.propagate_to_beacons(message.clone(), vec![peer_ip]);
+                // Propagate the "UnconfirmedSolution" to the connected validators.
+                self.propagate_to_validators(message, vec![peer_ip]);
+            }
             Ok(Ok(false)) | Ok(Err(_)) => (),
             Err(error) => warn!("Failed to verify an unconfirmed solution from '{peer_ip}': {error}"),
         }
+        true
+    }
+
+    /// Handles an `UnconfirmedTransaction` message.
+    fn unconfirmed_transaction(
+        &self,
+        peer_ip: SocketAddr,
+        serialized: UnconfirmedTransaction<N>,
+        _transaction: Transaction<N>,
+    ) -> bool {
+        let message = Message::UnconfirmedTransaction(serialized);
+        // Propagate the "UnconfirmedTransaction" to the connected beacons.
+        self.propagate_to_beacons(message.clone(), vec![peer_ip]);
+        // Propagate the "UnconfirmedTransaction" to the connected validators.
+        self.propagate_to_validators(message, vec![peer_ip]);
         true
     }
 }
