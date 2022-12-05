@@ -247,7 +247,8 @@ impl Tcp {
     /// Connects to the provided `SocketAddr`.
     pub async fn connect(&self, addr: SocketAddr) -> io::Result<()> {
         if let Ok(listening_addr) = self.listening_addr() {
-            if addr == listening_addr || addr.ip().is_loopback() && addr.port() == listening_addr.port() {
+            // TODO(nkls): maybe this first check can be dropped; though it might be best to keep just in case.
+            if addr == listening_addr || self.is_self_connect(addr) {
                 error!(parent: self.span(), "Attempted to self-connect ({addr})");
                 return Err(io::ErrorKind::AddrInUse.into());
             }
@@ -348,7 +349,7 @@ impl Tcp {
     fn handle_connection(&self, stream: TcpStream, addr: SocketAddr) {
         debug!(parent: self.span(), "Received a connection from {addr}");
 
-        if !self.can_add_connection() {
+        if !self.can_add_connection() || self.is_self_connect(addr) {
             debug!(parent: self.span(), "Rejecting the connection from {addr}");
             return;
         }
@@ -365,7 +366,21 @@ impl Tcp {
         });
     }
 
-    /// Checks whether `Tcp` can handle an additional connection.
+    /// Checks if the given IP address is the same as the listening address of this `Tcp`.
+    fn is_self_connect(&self, addr: SocketAddr) -> bool {
+        // SAFETY: if we're opening connections, this should never fail.
+        let listening_addr = self.listening_addr().unwrap();
+
+        match listening_addr.ip().is_loopback() {
+            // If localhost, check the ports, this only works on outbound connections, since we
+            // don't know the ephemeral port a peer might be using if they initiate the connection.
+            true => listening_addr.port() == addr.port(),
+            // If it's not localhost, matching IPs indicate a self-connect in both directions.
+            false => listening_addr.ip() == addr.ip(),
+        }
+    }
+
+    /// Checks whether the `Tcp` can handle an additional connection.
     fn can_add_connection(&self) -> bool {
         // Retrieve the number of connected peers.
         let num_connected = self.num_connected();
