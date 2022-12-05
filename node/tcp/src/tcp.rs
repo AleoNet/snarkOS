@@ -171,7 +171,7 @@ impl Tcp {
                         Ok((stream, addr)) => {
                             debug!(parent: node_clone.span(), "tentatively accepted a connection from {}", addr);
 
-                            if !node_clone.can_add_connection() {
+                            if !node_clone.can_add_connection() || node_clone.is_self_connect(addr) {
                                 debug!(parent: node_clone.span(), "rejecting the connection from {}", addr);
                                 continue;
                             }
@@ -289,7 +289,9 @@ impl Tcp {
     /// Connects to the provided `SocketAddr`.
     pub async fn connect(&self, addr: SocketAddr) -> io::Result<()> {
         if let Ok(listening_addr) = self.listening_addr() {
-            if addr == listening_addr || addr.ip().is_loopback() && addr.port() == listening_addr.port() {
+            // TODO(nkls): maybe this first check can be dropped here; though it might be best to keep
+            // for now, just in case.
+            if addr == listening_addr || self.is_self_connect(addr) {
                 error!(parent: self.span(), "can't connect to Tcp's own listening address ({})", addr);
                 return Err(io::ErrorKind::AddrInUse.into());
             }
@@ -391,6 +393,19 @@ impl Tcp {
     /// Returns the number of connections that are currently being set up.
     pub fn num_connecting(&self) -> usize {
         self.connecting.lock().len()
+    }
+
+    fn is_self_connect(&self, addr: SocketAddr) -> bool {
+        // SAFETY: if we're opening connections, this should never fail.
+        let listening_addr = self.listening_addr().unwrap();
+
+        match listening_addr.ip().is_loopback() {
+            // If localhost, check the ports, this only works on outbound connections, since we
+            // don't know the ephemeral port a peer might be using if they initiate the connection.
+            true => listening_addr.port() == addr.port(),
+            // If it's not localhost, matching IPs indicate a self-connect in both directions.
+            false => listening_addr.ip() == addr.ip(),
+        }
     }
 
     /// Checks whether the `Tcp` can handle an additional connection.
