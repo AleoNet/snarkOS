@@ -162,7 +162,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Initializes the sync pool.
     fn initialize_sync(&self) -> Result<()> {
         // Retrieve the canon locators.
-        let canon_locators = crate::helpers::get_block_locators(&self.ledger)?;
+        let canon_locators = self.ledger().latest_block_locators();
         // Insert the canon locators into the sync pool.
         self.router.sync().insert_canon_locators(canon_locators).unwrap();
 

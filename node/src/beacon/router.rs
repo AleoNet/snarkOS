@@ -50,19 +50,15 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Beacon<N, C> {
         let stream = self.borrow_stream(&mut connection);
         let genesis_header = self.ledger.get_header(0).map_err(|e| error(format!("{e}")))?;
         let (peer_ip, mut framed) = self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
-
         // Retrieve the block locators.
-        let block_locators = match crate::helpers::get_block_locators(&self.ledger) {
-            Ok(block_locators) => Some(block_locators),
-            Err(e) => {
-                error!("Failed to get block locators: {e}");
-                return Err(error(format!("Failed to get block locators: {e}")));
-            }
-        };
+        let block_locators = self.ledger().latest_block_locators();
 
         // Send the first `Ping` message to the peer.
-        let message =
-            Message::Ping(Ping::<N> { version: Message::<N>::VERSION, node_type: self.node_type(), block_locators });
+        let message = Message::Ping(Ping::<N> {
+            version: Message::<N>::VERSION,
+            node_type: self.node_type(),
+            block_locators: Some(block_locators),
+        });
         trace!("Sending '{}' to '{peer_ip}'", message.name());
         framed.send(message).await?;
 
@@ -188,11 +184,8 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
             // Sleep for the preset time before sending a `Ping` request.
             tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
             // Retrieve the block locators.
-            match crate::helpers::get_block_locators(&self_clone.ledger) {
-                // Send a `Ping` message to the peer.
-                Ok(block_locators) => self_clone.send_ping(peer_ip, Some(block_locators)),
-                Err(e) => error!("Failed to get block locators: {e}"),
-            }
+            let block_locators = self_clone.ledger().latest_block_locators();
+            self_clone.send_ping(peer_ip, Some(block_locators));
         });
         true
     }

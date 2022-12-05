@@ -50,3 +50,7 @@ workspace = true
 
 [dependencies.tracing]
 version = "0.1"
+
+[dependencies.snarkos-node-messages]
+path = "../messages"
+

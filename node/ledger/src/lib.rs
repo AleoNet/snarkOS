@@ -23,9 +23,10 @@ mod contains;
 mod find;
 mod get;
 mod iterators;
-
 #[cfg(test)]
 mod tests;
+
+use snarkos_node_messages::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENTS};
 
 use snarkvm::{
     console::{
@@ -80,6 +81,8 @@ pub struct Ledger<N: Network, C: ConsensusStorage<N>> {
     current_block: Arc<RwLock<Block<N>>>,
     /// The current epoch challenge.
     current_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
+    /// The current block locators.
+    current_block_locators: Arc<RwLock<BlockLocators<N>>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
@@ -136,6 +139,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
             genesis: genesis.clone(),
             current_block: Arc::new(RwLock::new(genesis.clone())),
             current_epoch_challenge: Default::default(),
+            current_block_locators: Arc::new(RwLock::new(BlockLocators::new_genesis(genesis.hash()))),
         };
 
         // If the block store is empty, initialize the genesis block.
@@ -157,6 +161,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         ledger.current_block = Arc::new(RwLock::new(block));
         // Set the current epoch challenge.
         ledger.current_epoch_challenge = Arc::new(RwLock::new(Some(ledger.get_epoch_challenge(latest_height)?)));
+        ledger.current_block_locators = Arc::new(RwLock::new(ledger.get_block_locators()?));
         lap!(timer, "Initialize ledger");
 
         finish!(timer);
@@ -246,6 +251,10 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         }
     }
 
+    pub fn latest_block_locators(&self) -> BlockLocators<N> {
+        self.current_block_locators.read().clone()
+    }
+
     /// Adds the given block as the next block in the chain.
     pub fn add_next_block(&self, block: &Block<N>) -> Result<()> {
         // Acquire the write lock on the current block.
@@ -262,7 +271,8 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
             // Update the current epoch challenge.
             self.current_epoch_challenge.write().clone_from(&self.get_epoch_challenge(block.height()).ok());
         }
-
+        let block_locators = self.get_block_locators()?;
+        self.current_block_locators.write().clone_from(&block_locators);
         Ok(())
     }
 
@@ -301,5 +311,29 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
             None,
             rng,
         )
+    }
+
+    pub fn get_block_locators(&self) -> Result<BlockLocators<N>> {
+        // Retrieve the latest height.
+        let latest_height = self.latest_height();
+
+        // Initialize the recents map.
+        let mut recents = IndexMap::with_capacity(NUM_RECENTS);
+
+        // Retrieve the recent block hashes.
+        for height in latest_height.saturating_sub((NUM_RECENTS - 1) as u32)..=latest_height {
+            recents.insert(height, self.get_hash(height)?);
+        }
+
+        // Initialize the checkpoints map.
+        let mut checkpoints = IndexMap::with_capacity((latest_height % CHECKPOINT_INTERVAL).try_into()?);
+
+        // Retrieve the checkpoint block hashes.
+        for height in (0..=latest_height).step_by(CHECKPOINT_INTERVAL as usize) {
+            checkpoints.insert(height, self.get_hash(height)?);
+        }
+
+        // Construct the block locators.
+        Ok(BlockLocators::new(recents, checkpoints))
     }
 }

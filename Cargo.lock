@@ -2617,6 +2617,7 @@ dependencies = [
  "parking_lot",
  "rand",
  "rayon",
+ "snarkos-node-messages",
  "snarkvm",
  "tracing",
 ]
