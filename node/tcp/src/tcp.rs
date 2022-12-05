@@ -511,6 +511,44 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_disconnect() {
+        let tcp = Tcp::new(Config::default()).await.unwrap();
+        let _node_ip = tcp.listening_addr().unwrap();
+
+        // Initialize the peer.
+        let peer = Tcp::new(Config {
+            listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            desired_listening_port: Some(0),
+            max_connections: 1,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let peer_ip = peer.listening_addr().unwrap();
+
+        // Connect to the peer.
+        tcp.connect(peer_ip).await.unwrap();
+        assert_eq!(tcp.num_connected(), 1);
+        assert_eq!(tcp.num_connecting(), 0);
+        assert!(tcp.is_connected(peer_ip));
+        assert!(!tcp.is_connecting(peer_ip));
+
+        // Disconnect from the peer.
+        tcp.disconnect(peer_ip).await;
+        assert_eq!(tcp.num_connected(), 0);
+        assert_eq!(tcp.num_connecting(), 0);
+        assert!(!tcp.is_connected(peer_ip));
+        assert!(!tcp.is_connecting(peer_ip));
+
+        // Ensure disconnecting from the peer a second time is okay.
+        tcp.disconnect(peer_ip).await;
+        assert_eq!(tcp.num_connected(), 0);
+        assert_eq!(tcp.num_connecting(), 0);
+        assert!(!tcp.is_connected(peer_ip));
+        assert!(!tcp.is_connecting(peer_ip));
+    }
+
+    #[tokio::test]
     async fn test_can_add_connection() {
         let tcp = Tcp::new(Config { max_connections: 1, ..Default::default() }).await.unwrap();
 
