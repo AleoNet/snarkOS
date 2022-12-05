@@ -42,24 +42,6 @@ use crate::{
     Stats,
 };
 
-macro_rules! enable_protocol {
-    ($handler_type: ident, $node:expr, $conn: expr) => {
-        if let Some(handler) = $node.protocols.$handler_type.get() {
-            let (conn_returner, conn_retriever) = oneshot::channel();
-
-            handler.trigger(($conn, conn_returner));
-
-            match conn_retriever.await {
-                Ok(Ok(conn)) => conn,
-                Err(_) => return Err(io::ErrorKind::BrokenPipe.into()),
-                Ok(e) => return e,
-            }
-        } else {
-            $conn
-        }
-    };
-}
-
 // A seuential numeric identifier assigned to `Tcp`s that were not provided with a name.
 static SEQUENTIAL_NODE_ID: AtomicUsize = AtomicUsize::new(0);
 
@@ -106,7 +88,7 @@ impl Tcp {
         }
 
         // Create a tracing span containing the node's name.
-        let span = create_span(config.name.as_deref().unwrap());
+        let span = crate::helpers::create_span(config.name.as_deref().unwrap());
 
         // Procure a listening IP address, if the configuration is set.
         let listener = if let Some(listener_ip) = config.listener_ip {
@@ -161,44 +143,10 @@ impl Tcp {
             tasks: Default::default(),
         }));
 
+        // If a listener is set, start listening for incoming connections.
         if let Some(listener) = listener {
-            // Use a channel to know when the listening task is ready.
-            let (tx, rx) = oneshot::channel();
-
-            let tcp_clone = tcp.clone();
-            let listening_task = tokio::spawn(async move {
-                trace!(parent: tcp_clone.span(), "Spawned the listening task");
-                tx.send(()).unwrap(); // safe; the channel was just opened
-
-                loop {
-                    // Await for a new connection.
-                    match listener.accept().await {
-                        Ok((stream, addr)) => {
-                            debug!(parent: tcp_clone.span(), "Received a connection from {addr}");
-
-                            if !tcp_clone.can_add_connection() {
-                                debug!(parent: tcp_clone.span(), "Rejecting the connection from {addr}");
-                                continue;
-                            }
-
-                            tcp_clone.connecting.lock().insert(addr);
-
-                            let tcp_clone2 = tcp_clone.clone();
-                            tokio::spawn(async move {
-                                if let Err(e) = tcp_clone2.adapt_stream(stream, addr, ConnectionSide::Responder).await {
-                                    tcp_clone2.connecting.lock().remove(&addr);
-                                    tcp_clone2.known_peers().register_failure(addr);
-                                    error!(parent: tcp_clone2.span(), "Failed to connect with {addr}: {e}");
-                                }
-                            });
-                        }
-                        Err(e) => error!(parent: tcp_clone.span(), "Failed to accept a connection: {e}"),
-                    }
-                }
-            });
-            tcp.tasks.lock().push(listening_task);
-            let _ = rx.await;
-            debug!(parent: tcp.span(), "Listening on {}", tcp.listening_addr.unwrap());
+            // Spawn a task that listens for incoming connections.
+            tcp.enable_listener(listener).await;
         }
 
         debug!(parent: tcp.span(), "The node is ready");
@@ -206,20 +154,62 @@ impl Tcp {
         Ok(tcp)
     }
 
-    /// Returns the name assigned to Tcp.
+    /// Returns the name assigned.
     #[inline]
     pub fn name(&self) -> &str {
         // safe; can be set as None in Config, but receives a default value on Tcp creation
         self.config.name.as_deref().unwrap()
     }
 
-    /// Returns a reference to the Tcp's config.
+    /// Returns a reference to the configuration.
     #[inline]
     pub fn config(&self) -> &Config {
         &self.config
     }
 
-    /// Returns a reference to the Tcp's stats.
+    /// Returns the listening address; returns an error if Tcp was not configured
+    /// to listen for inbound connections.
+    pub fn listening_addr(&self) -> io::Result<SocketAddr> {
+        self.listening_addr.ok_or_else(|| io::ErrorKind::AddrNotAvailable.into())
+    }
+
+    /// Checks whether the provided address is connected.
+    pub fn is_connected(&self, addr: SocketAddr) -> bool {
+        self.connections.is_connected(addr)
+    }
+
+    /// Checks if Tcp is currently setting up a connection with the provided address.
+    pub fn is_connecting(&self, addr: SocketAddr) -> bool {
+        self.connecting.lock().contains(&addr)
+    }
+
+    /// Returns the number of active connections.
+    pub fn num_connected(&self) -> usize {
+        self.connections.num_connected()
+    }
+
+    /// Returns the number of connections that are currently being set up.
+    pub fn num_connecting(&self) -> usize {
+        self.connecting.lock().len()
+    }
+
+    /// Returns a list containing addresses of active connections.
+    pub fn connected_addrs(&self) -> Vec<SocketAddr> {
+        self.connections.addrs()
+    }
+
+    /// Returns a list containing addresses of pending connections.
+    pub fn connecting_addrs(&self) -> Vec<SocketAddr> {
+        self.connecting.lock().iter().copied().collect()
+    }
+
+    /// Returns a reference to the collection of statistics of known peers.
+    #[inline]
+    pub fn known_peers(&self) -> &KnownPeers {
+        &self.known_peers
+    }
+
+    /// Returns a reference to the statistics.
     #[inline]
     pub fn stats(&self) -> &Stats {
         &self.stats
@@ -231,63 +221,29 @@ impl Tcp {
         &self.span
     }
 
-    /// Returns the Tcp's listening address; returns an error if Tcp was configured
-    /// to not listen for inbound connections.
-    pub fn listening_addr(&self) -> io::Result<SocketAddr> {
-        self.listening_addr.ok_or_else(|| io::ErrorKind::AddrNotAvailable.into())
-    }
+    /// Gracefully shuts down the stack.
+    pub async fn shut_down(&self) {
+        debug!(parent: self.span(), "Shutting down the TCP stack");
 
-    async fn enable_protocols(&self, conn: Connection) -> io::Result<Connection> {
-        let mut conn = enable_protocol!(handshake, self, conn);
+        // Retrieve all tasks.
+        let mut tasks = std::mem::take(&mut *self.tasks.lock()).into_iter();
 
-        // split the stream after the handshake (if not done before)
-        if let Some(stream) = conn.stream.take() {
-            let (reader, writer) = split(stream);
-            conn.reader = Some(Box::new(reader));
-            conn.writer = Some(Box::new(writer));
+        // Abort the listening task first.
+        if let Some(listening_task) = tasks.next() {
+            listening_task.abort(); // abort the listening task first
         }
-
-        let conn = enable_protocol!(reading, self, conn);
-        let conn = enable_protocol!(writing, self, conn);
-
-        Ok(conn)
-    }
-
-    /// Prepares the freshly acquired connection to handle the protocols the Tcp implements.
-    async fn adapt_stream(&self, stream: TcpStream, peer_addr: SocketAddr, own_side: ConnectionSide) -> io::Result<()> {
-        self.known_peers.add(peer_addr);
-
-        // register the port seen by the peer
-        if own_side == ConnectionSide::Initiator {
-            if let Ok(addr) = stream.local_addr() {
-                debug!(
-                    parent: self.span(), "establishing connection with {}; the peer is connected on port {}",
-                    peer_addr, addr.port()
-                );
-            } else {
-                warn!(parent: self.span(), "couldn't determine the peer's port");
-            }
+        // Disconnect from all connected peers.
+        for addr in self.connected_addrs() {
+            self.disconnect(addr).await;
         }
-
-        let connection = Connection::new(peer_addr, stream, !own_side);
-
-        // enact the enabled protocols
-        let mut connection = self.enable_protocols(connection).await?;
-
-        // if Reading is enabled, we'll notify the related task when the connection is fully ready
-        let conn_ready_tx = connection.readiness_notifier.take();
-
-        self.connections.add(connection);
-        self.connecting.lock().remove(&peer_addr);
-
-        // send the aforementioned notification so that reading from the socket can commence
-        if let Some(tx) = conn_ready_tx {
-            let _ = tx.send(());
+        // Abort all remaining tasks.
+        for handle in tasks {
+            handle.abort();
         }
-
-        Ok(())
     }
+}
 
+impl Tcp {
     /// Connects to the provided `SocketAddr`.
     pub async fn connect(&self, addr: SocketAddr) -> io::Result<()> {
         if let Ok(listening_addr) = self.listening_addr() {
@@ -302,7 +258,7 @@ impl Tcp {
             return Err(io::ErrorKind::PermissionDenied.into());
         }
 
-        if self.connections.is_connected(addr) {
+        if self.is_connected(addr) {
             warn!(parent: self.span(), "already connected to {}", addr);
             return Err(io::ErrorKind::AlreadyExists.into());
         }
@@ -344,7 +300,7 @@ impl Tcp {
         if let Some(ref conn) = conn {
             debug!(parent: self.span(), "disconnecting from {}", conn.addr());
 
-            // shut the associated tasks down
+            // Shut the associated tasks down
             for task in conn.tasks.iter().rev() {
                 task.abort();
             }
@@ -363,36 +319,51 @@ impl Tcp {
 
         conn.is_some()
     }
+}
 
-    /// Returns a list containing addresses of active connections.
-    pub fn connected_addrs(&self) -> Vec<SocketAddr> {
-        self.connections.addrs()
+impl Tcp {
+    /// Spawns a task that listens for incoming connections.
+    async fn enable_listener(&self, listener: TcpListener) {
+        // Use a channel to know when the listening task is ready.
+        let (tx, rx) = oneshot::channel();
+
+        let tcp = self.clone();
+        let listening_task = tokio::spawn(async move {
+            trace!(parent: tcp.span(), "Spawned the listening task");
+            tx.send(()).unwrap(); // safe; the channel was just opened
+
+            loop {
+                // Await for a new connection.
+                match listener.accept().await {
+                    Ok((stream, addr)) => tcp.handle_connection(stream, addr),
+                    Err(e) => error!(parent: tcp.span(), "Failed to accept a connection: {e}"),
+                }
+            }
+        });
+        self.tasks.lock().push(listening_task);
+        let _ = rx.await;
+        debug!(parent: self.span(), "Listening on {}", self.listening_addr.unwrap());
     }
 
-    /// Returns a reference to the collection of statistics of Tcp's known peers.
-    #[inline]
-    pub fn known_peers(&self) -> &KnownPeers {
-        &self.known_peers
-    }
+    /// Handles a new inbound connection.
+    fn handle_connection(&self, stream: TcpStream, addr: SocketAddr) {
+        debug!(parent: self.span(), "Received a connection from {addr}");
 
-    /// Checks whether the provided address is connected.
-    pub fn is_connected(&self, addr: SocketAddr) -> bool {
-        self.connections.is_connected(addr)
-    }
+        if !self.can_add_connection() {
+            debug!(parent: self.span(), "Rejecting the connection from {addr}");
+            return;
+        }
 
-    /// Checks if Tcp is currently setting up a connection with the provided address.
-    pub fn is_connecting(&self, addr: SocketAddr) -> bool {
-        self.connecting.lock().contains(&addr)
-    }
+        self.connecting.lock().insert(addr);
 
-    /// Returns the number of active connections.
-    pub fn num_connected(&self) -> usize {
-        self.connections.num_connected()
-    }
-
-    /// Returns the number of connections that are currently being set up.
-    pub fn num_connecting(&self) -> usize {
-        self.connecting.lock().len()
+        let tcp = self.clone();
+        tokio::spawn(async move {
+            if let Err(e) = tcp.adapt_stream(stream, addr, ConnectionSide::Responder).await {
+                tcp.connecting.lock().remove(&addr);
+                tcp.known_peers().register_failure(addr);
+                error!(parent: tcp.span(), "Failed to connect with {addr}: {e}");
+            }
+        });
     }
 
     /// Checks whether `Tcp` can handle an additional connection.
@@ -413,43 +384,74 @@ impl Tcp {
         }
     }
 
-    /// Gracefully shuts Tcp down.
-    pub async fn shut_down(&self) {
-        debug!(parent: self.span(), "shutting down");
+    /// Prepares the freshly acquired connection to handle the protocols the Tcp implements.
+    async fn adapt_stream(&self, stream: TcpStream, peer_addr: SocketAddr, own_side: ConnectionSide) -> io::Result<()> {
+        self.known_peers.add(peer_addr);
 
-        let mut tasks = std::mem::take(&mut *self.tasks.lock()).into_iter();
-        if let Some(listening_task) = tasks.next() {
-            listening_task.abort(); // abort the listening task first
+        // register the port seen by the peer
+        if own_side == ConnectionSide::Initiator {
+            if let Ok(addr) = stream.local_addr() {
+                debug!(
+                    parent: self.span(), "establishing connection with {}; the peer is connected on port {}",
+                    peer_addr, addr.port()
+                );
+            } else {
+                warn!(parent: self.span(), "couldn't determine the peer's port");
+            }
         }
 
-        for addr in self.connected_addrs() {
-            self.disconnect(addr).await;
+        let connection = Connection::new(peer_addr, stream, !own_side);
+
+        // enact the enabled protocols
+        let mut connection = self.enable_protocols(connection).await?;
+
+        // if Reading is enabled, we'll notify the related task when the connection is fully ready
+        let conn_ready_tx = connection.readiness_notifier.take();
+
+        self.connections.add(connection);
+        self.connecting.lock().remove(&peer_addr);
+
+        // send the aforementioned notification so that reading from the socket can commence
+        if let Some(tx) = conn_ready_tx {
+            let _ = tx.send(());
         }
 
-        for handle in tasks {
-            handle.abort();
-        }
+        Ok(())
     }
-}
 
-// FIXME: this can probably be done more elegantly
-/// Creates the Tcp's tracing span based on its name.
-fn create_span(tcp_name: &str) -> Span {
-    let mut span = trace_span!("tcp", name = tcp_name);
-    if !span.is_disabled() {
-        return span;
-    } else {
-        span = debug_span!("tcp", name = tcp_name);
+    /// Enacts the enabled protocols on the provided connection.
+    async fn enable_protocols(&self, conn: Connection) -> io::Result<Connection> {
+        /// A helper macro to enable a protocol on a connection.
+        macro_rules! enable_protocol {
+            ($handler_type: ident, $node:expr, $conn: expr) => {
+                if let Some(handler) = $node.protocols.$handler_type.get() {
+                    let (conn_returner, conn_retriever) = oneshot::channel();
+
+                    handler.trigger(($conn, conn_returner));
+
+                    match conn_retriever.await {
+                        Ok(Ok(conn)) => conn,
+                        Err(_) => return Err(io::ErrorKind::BrokenPipe.into()),
+                        Ok(e) => return e,
+                    }
+                } else {
+                    $conn
+                }
+            };
+        }
+
+        let mut conn = enable_protocol!(handshake, self, conn);
+
+        // Split the stream after the handshake (if not done before).
+        if let Some(stream) = conn.stream.take() {
+            let (reader, writer) = split(stream);
+            conn.reader = Some(Box::new(reader));
+            conn.writer = Some(Box::new(writer));
+        }
+
+        let conn = enable_protocol!(reading, self, conn);
+        let conn = enable_protocol!(writing, self, conn);
+
+        Ok(conn)
     }
-    if !span.is_disabled() {
-        return span;
-    } else {
-        span = info_span!("tcp", name = tcp_name);
-    }
-    if !span.is_disabled() {
-        return span;
-    } else {
-        span = warn_span!("tcp", name = tcp_name);
-    }
-    if !span.is_disabled() { span } else { error_span!("tcp", name = tcp_name) }
 }
