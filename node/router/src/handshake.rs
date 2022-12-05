@@ -59,7 +59,9 @@ impl<N: Network> Router<N> {
         if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_addr) {
             return Err(error(format!("{forbidden_message}")));
         }
-        debug!("Received a connection request from '{peer_addr}'");
+        if peer_side == ConnectionSide::Initiator {
+            debug!("Received a connection request from '{peer_addr}'");
+        }
 
         /* Step 1: Send the challenge request. */
 
