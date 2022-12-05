@@ -51,14 +51,20 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Validator<N, C> {
         let stream = self.borrow_stream(&mut connection);
         let genesis_header = self.ledger.get_header(0).map_err(|e| error(format!("{e}")))?;
         let (peer_ip, mut framed) = self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
-
-        // Retrieve the block locators.
-        let block_locators = match crate::helpers::get_block_locators(&self.ledger) {
-            Ok(block_locators) => Some(block_locators),
-            Err(e) => {
-                error!("Failed to get block locators: {e}");
-                return Err(error(format!("Failed to get block locators: {e}")));
+        let peer = self.router().get_connected_peer(&peer_ip).ok_or_else(|| error("get connected peer"))?;
+        // Only get block locators when peer is a beacon or validator
+        let block_locators = match peer.is_beacon() || peer.is_validator() {
+            true => {
+                // Retrieve the block locators.
+                match crate::helpers::get_block_locators(&self.ledger) {
+                    Ok(block_locators) => Some(block_locators),
+                    Err(e) => {
+                        error!("Failed to get block locators: {e}");
+                        return Err(error(format!("Failed to get block locators: {e}")));
+                    }
+                }
             }
+            false => None,
         };
 
         // Send the first `Ping` message to the peer.
