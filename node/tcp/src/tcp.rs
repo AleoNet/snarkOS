@@ -42,7 +42,7 @@ use crate::{
     Stats,
 };
 
-// A seuential numeric identifier assigned to `Tcp`s that were not provided with a name.
+// A sequential numeric identifier assigned to `Tcp`s that were not provided with a name.
 static SEQUENTIAL_NODE_ID: AtomicUsize = AtomicUsize::new(0);
 
 /// The central object responsible for handling connections.
@@ -248,23 +248,23 @@ impl Tcp {
     pub async fn connect(&self, addr: SocketAddr) -> io::Result<()> {
         if let Ok(listening_addr) = self.listening_addr() {
             if addr == listening_addr || addr.ip().is_loopback() && addr.port() == listening_addr.port() {
-                error!(parent: self.span(), "can't connect to Tcp's own listening address ({})", addr);
+                error!(parent: self.span(), "Attempted to self-connect ({addr})");
                 return Err(io::ErrorKind::AddrInUse.into());
             }
         }
 
         if !self.can_add_connection() {
-            error!(parent: self.span(), "too many connections; refusing to connect to {}", addr);
+            error!(parent: self.span(), "Too many connections; refusing to connect to {addr}");
             return Err(io::ErrorKind::ConnectionRefused.into());
         }
 
         if self.is_connected(addr) {
-            warn!(parent: self.span(), "already connected to {}", addr);
+            warn!(parent: self.span(), "Already connected to {addr}");
             return Err(io::ErrorKind::AlreadyExists.into());
         }
 
         if !self.connecting.lock().insert(addr) {
-            warn!(parent: self.span(), "already connecting to {}", addr);
+            warn!(parent: self.span(), "Already connecting to {addr}");
             return Err(io::ErrorKind::AlreadyExists.into());
         }
 
@@ -278,7 +278,7 @@ impl Tcp {
         if let Err(ref e) = ret {
             self.connecting.lock().remove(&addr);
             self.known_peers().register_failure(addr);
-            error!(parent: self.span(), "couldn't initiate a connection with {}: {}", addr, e);
+            error!(parent: self.span(), "Unable to initiate a connection with {addr}: {e}");
         }
 
         ret
@@ -289,7 +289,6 @@ impl Tcp {
         if let Some(handler) = self.protocols.disconnect.get() {
             if self.is_connected(addr) {
                 let (sender, receiver) = oneshot::channel();
-
                 handler.trigger((addr, sender));
                 let _ = receiver.await; // can't really fail
             }
@@ -298,23 +297,23 @@ impl Tcp {
         let conn = self.connections.remove(addr);
 
         if let Some(ref conn) = conn {
-            debug!(parent: self.span(), "disconnecting from {}", conn.addr());
+            debug!(parent: self.span(), "Disconnecting from {}", conn.addr());
 
-            // Shut the associated tasks down
+            // Shut down the associated tasks of the peer.
             for task in conn.tasks.iter().rev() {
                 task.abort();
             }
 
-            // if the (owning) Tcp was not the initiator of the connection, it doesn't know the listening address
+            // If the (owning) Tcp was not the initiator of the connection, it doesn't know the listening address
             // of the associated peer, so the related stats are unreliable; the next connection initiated by the
             // peer could be bound to an entirely different port number
             if conn.side() == ConnectionSide::Initiator {
                 self.known_peers().remove(conn.addr());
             }
 
-            debug!(parent: self.span(), "disconnected from {}", addr);
+            debug!(parent: self.span(), "Disconnected from {}", conn.addr());
         } else {
-            warn!(parent: self.span(), "wasn't connected to {}", addr);
+            warn!(parent: self.span(), "Failed to disconnect, was not connected to {addr}");
         }
 
         conn.is_some()
@@ -388,7 +387,7 @@ impl Tcp {
     async fn adapt_stream(&self, stream: TcpStream, peer_addr: SocketAddr, own_side: ConnectionSide) -> io::Result<()> {
         self.known_peers.add(peer_addr);
 
-        // register the port seen by the peer
+        // Register the port seen by the peer.
         if own_side == ConnectionSide::Initiator {
             if let Ok(addr) = stream.local_addr() {
                 debug!(
@@ -402,16 +401,16 @@ impl Tcp {
 
         let connection = Connection::new(peer_addr, stream, !own_side);
 
-        // enact the enabled protocols
+        // Enact the enabled protocols.
         let mut connection = self.enable_protocols(connection).await?;
 
-        // if Reading is enabled, we'll notify the related task when the connection is fully ready
+        // if Reading is enabled, we'll notify the related task when the connection is fully ready.
         let conn_ready_tx = connection.readiness_notifier.take();
 
         self.connections.add(connection);
         self.connecting.lock().remove(&peer_addr);
 
-        // send the aforementioned notification so that reading from the socket can commence
+        // Send the aforementioned notification so that reading from the socket can commence.
         if let Some(tx) = conn_ready_tx {
             let _ = tx.send(());
         }
@@ -453,5 +452,191 @@ impl Tcp {
         let conn = enable_protocol!(writing, self, conn);
 
         Ok(conn)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use std::net::{IpAddr, Ipv4Addr};
+
+    #[tokio::test]
+    async fn test_new() {
+        let tcp = Tcp::new(Config {
+            listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            max_connections: 200,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+        assert_eq!(tcp.config.max_connections, 200);
+        assert_eq!(tcp.config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
+        assert_eq!(tcp.listening_addr().unwrap().ip(), IpAddr::V4(Ipv4Addr::LOCALHOST));
+
+        assert_eq!(tcp.num_connected(), 0);
+        assert_eq!(tcp.num_connecting(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_connect() {
+        let tcp = Tcp::new(Config::default()).await.unwrap();
+        let node_ip = tcp.listening_addr().unwrap();
+
+        // Ensure self-connecting is not possible.
+        tcp.connect(node_ip).await.unwrap_err();
+        assert_eq!(tcp.num_connected(), 0);
+        assert_eq!(tcp.num_connecting(), 0);
+        assert!(!tcp.is_connected(node_ip));
+        assert!(!tcp.is_connecting(node_ip));
+
+        // Initialize the peer.
+        let peer = Tcp::new(Config {
+            listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            desired_listening_port: Some(0),
+            max_connections: 1,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let peer_ip = peer.listening_addr().unwrap();
+
+        // Connect to the peer.
+        tcp.connect(peer_ip).await.unwrap();
+        assert_eq!(tcp.num_connected(), 1);
+        assert_eq!(tcp.num_connecting(), 0);
+        assert!(tcp.is_connected(peer_ip));
+        assert!(!tcp.is_connecting(peer_ip));
+    }
+
+    #[tokio::test]
+    async fn test_can_add_connection() {
+        let tcp = Tcp::new(Config { max_connections: 1, ..Default::default() }).await.unwrap();
+
+        // Initialize the peer.
+        let peer = Tcp::new(Config {
+            listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            desired_listening_port: Some(0),
+            max_connections: 1,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let peer_ip = peer.listening_addr().unwrap();
+
+        assert!(tcp.can_add_connection());
+
+        // Simulate an active connection.
+        let stream = TcpStream::connect(peer_ip).await.unwrap();
+        tcp.connections.add(Connection::new(peer_ip, stream, ConnectionSide::Initiator));
+        assert!(!tcp.can_add_connection());
+
+        // Remove the active connection.
+        tcp.connections.remove(peer_ip);
+        assert!(tcp.can_add_connection());
+
+        // Simulate a pending connection.
+        tcp.connecting.lock().insert(peer_ip);
+        assert!(!tcp.can_add_connection());
+
+        // Remove the pending connection.
+        tcp.connecting.lock().remove(&peer_ip);
+        assert!(tcp.can_add_connection());
+
+        // Simulate an active and a pending connection (this case should never occur).
+        let stream = TcpStream::connect(peer_ip).await.unwrap();
+        tcp.connections.add(Connection::new(peer_ip, stream, ConnectionSide::Responder));
+        tcp.connecting.lock().insert(peer_ip);
+        assert!(!tcp.can_add_connection());
+
+        // Remove the active and pending connection.
+        tcp.connections.remove(peer_ip);
+        tcp.connecting.lock().remove(&peer_ip);
+        assert!(tcp.can_add_connection());
+    }
+
+    #[tokio::test]
+    async fn test_handle_connection() {
+        let tcp = Tcp::new(Config {
+            listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            max_connections: 1,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+
+        // Initialize peer 1.
+        let peer1 = Tcp::new(Config {
+            listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            desired_listening_port: Some(0),
+            max_connections: 1,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let peer1_ip = peer1.listening_addr().unwrap();
+
+        // Simulate an active connection.
+        let stream = TcpStream::connect(peer1_ip).await.unwrap();
+        tcp.connections.add(Connection::new(peer1_ip, stream, ConnectionSide::Responder));
+        assert!(!tcp.can_add_connection());
+        assert_eq!(tcp.num_connected(), 1);
+        assert_eq!(tcp.num_connecting(), 0);
+        assert!(tcp.is_connected(peer1_ip));
+        assert!(!tcp.is_connecting(peer1_ip));
+
+        // Initialize peer 2.
+        let peer2 = Tcp::new(Config {
+            listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            desired_listening_port: Some(0),
+            max_connections: 1,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let peer2_ip = peer2.listening_addr().unwrap();
+
+        // Handle the connection.
+        let stream = TcpStream::connect(peer2_ip).await.unwrap();
+        tcp.handle_connection(stream, peer2_ip);
+        assert!(!tcp.can_add_connection());
+        assert_eq!(tcp.num_connected(), 1);
+        assert_eq!(tcp.num_connecting(), 0);
+        assert!(tcp.is_connected(peer1_ip));
+        assert!(!tcp.is_connected(peer2_ip));
+        assert!(!tcp.is_connecting(peer1_ip));
+        assert!(!tcp.is_connecting(peer2_ip));
+    }
+
+    #[tokio::test]
+    async fn test_adapt_stream() {
+        let tcp = Tcp::new(Config { max_connections: 1, ..Default::default() }).await.unwrap();
+
+        // Initialize the peer.
+        let peer = Tcp::new(Config {
+            listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
+            desired_listening_port: Some(0),
+            max_connections: 1,
+            ..Default::default()
+        })
+        .await
+        .unwrap();
+        let peer_ip = peer.listening_addr().unwrap();
+
+        // Simulate a pending connection.
+        tcp.connecting.lock().insert(peer_ip);
+        assert_eq!(tcp.num_connected(), 0);
+        assert_eq!(tcp.num_connecting(), 1);
+        assert!(!tcp.is_connected(peer_ip));
+        assert!(tcp.is_connecting(peer_ip));
+
+        // Simulate a new connection.
+        let stream = TcpStream::connect(peer_ip).await.unwrap();
+        tcp.adapt_stream(stream, peer_ip, ConnectionSide::Responder).await.unwrap();
+        assert_eq!(tcp.num_connected(), 1);
+        assert_eq!(tcp.num_connecting(), 0);
+        assert!(tcp.is_connected(peer_ip));
+        assert!(!tcp.is_connecting(peer_ip));
     }
 }
