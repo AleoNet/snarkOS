@@ -255,7 +255,7 @@ impl Tcp {
 
         if !self.can_add_connection() {
             error!(parent: self.span(), "too many connections; refusing to connect to {}", addr);
-            return Err(io::ErrorKind::PermissionDenied.into());
+            return Err(io::ErrorKind::ConnectionRefused.into());
         }
 
         if self.is_connected(addr) {
