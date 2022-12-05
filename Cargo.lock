@@ -2671,6 +2671,7 @@ dependencies = [
  "bytes",
  "colored",
  "futures",
+ "futures-util",
  "indexmap",
  "itertools",
  "linked-hash-map",
@@ -2688,6 +2689,7 @@ dependencies = [
  "tokio-stream",
  "tokio-util",
  "tracing",
+ "tracing-subscriber 0.3.16",
 ]
 
 [[package]]
