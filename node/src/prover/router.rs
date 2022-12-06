@@ -139,8 +139,11 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
         tokio::spawn(async move {
             // Sleep for the preset time before sending a `Ping` request.
             tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
-            // Send a `Ping` message to the peer.
-            self_clone.send_ping(peer_ip, None);
+            // Check that the peer is still connected.
+            if self_clone.router().is_connected(&peer_ip) {
+                // Send a `Ping` message to the peer.
+                self_clone.send_ping(peer_ip, None);
+            }
         });
         true
     }
