@@ -154,10 +154,9 @@ impl<N: Network> BlockLocators<N> {
 
         // If the `last_recent_height` overlaps with a checkpoint, ensure the block hashes match.
         if let Some(last_checkpoint_hash) = checkpoints.get(&last_recent_height) {
-            if let Some(last_recent_hash) = recents.get(&last_recent_height) {
-                if last_checkpoint_hash != last_recent_hash {
-                    bail!("Recent block hash and checkpoint hash mismatch at height {last_recent_height}")
-                }
+            let last_recent_hash = recents.get(&last_recent_height).expect("Unreachable");
+            if last_checkpoint_hash != last_recent_hash {
+                bail!("Recent block hash and checkpoint hash mismatch at height {last_recent_height}")
             }
         }
         Ok(())
