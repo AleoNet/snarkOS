@@ -84,9 +84,7 @@ impl TestPeer {
                 listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
                 max_connections: 200,
                 ..Default::default()
-            })
-            .await
-            .expect("couldn't create test peer"),
+            }),
             node_type,
             account,
         };
@@ -95,6 +93,8 @@ impl TestPeer {
         peer.enable_reading().await;
         peer.enable_writing().await;
         peer.enable_disconnect().await;
+
+        peer.node().start_listening().await.unwrap();
 
         peer
     }
