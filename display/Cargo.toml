@@ -29,7 +29,7 @@ path = "../node"
 workspace = true
 
 [dependencies.tokio]
-version = "1.22"
+version = "1.23"
 features = ["rt"]
 
 [dependencies.tui]

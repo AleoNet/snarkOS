@@ -87,7 +87,7 @@ workspace = true
 version = "0.3"
 
 [dependencies.tokio]
-version = "1.22"
+version = "1.23"
 features = ["rt", "signal"]
 
 [dependencies.tokio-util]

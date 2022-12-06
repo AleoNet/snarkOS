@@ -32,7 +32,7 @@ default-features = false
 features = ["synthesizer"]
 
 [dev-dependencies.tokio]
-version = "1.21"
+version = "1.23"
 features = ["rt"]
 
 [dev-dependencies.tracing]
