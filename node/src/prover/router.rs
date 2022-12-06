@@ -157,6 +157,15 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
         let epoch_number = serialized.epoch_challenge.epoch_number();
         // Retrieve the block height.
         let block_height = header.height();
+        if let Some(block_header) = self.latest_block_header.read().as_ref() {
+            let latest_height = block_header.height();
+            if latest_height >= block_height {
+                info!(
+                    "Received stale PuzzleResponse from {peer_ip}, Current Height {block_height}, Received {latest_height}"
+                );
+                return true;
+            }
+        }
 
         info!(
             "Coinbase Puzzle (Epoch {epoch_number}, Block {block_height}, Coinbase Target {}, Proof Target {})",
@@ -168,7 +177,6 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
         self.latest_epoch_challenge.write().replace(serialized.epoch_challenge);
         // Save the latest block header in the node.
         self.latest_block_header.write().replace(header);
-
         trace!("Received 'PuzzleResponse' from '{peer_ip}' (Epoch {epoch_number}, Block {block_height})");
         true
     }
