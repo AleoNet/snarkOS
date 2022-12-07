@@ -14,6 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use crate::Tcp;
 use snarkos_node_messages::BlockLocators;
 use snarkvm::prelude::{Block, Network};
 
@@ -67,8 +68,9 @@ impl Hash for PeerPair {
 /// - When a request is timed out, the `requests`, `request_timestamps`, and `responses` map remove the entry for the request height;
 #[derive(Clone, Debug)]
 pub struct Sync<N: Network> {
-    /// The listener IP of this node.
-    local_ip: SocketAddr,
+    /// The TCP stack of this node.
+    #[cfg_attr(test, allow(dead_code))]
+    tcp: Tcp,
     /// The canonical map of block height to block hash.
     /// This map is a linearly-increasing map of block heights to block hashes,
     /// updated solely from the ledger and candidate blocks (not from peers' block locators, to ensure there are no forks).
@@ -95,9 +97,9 @@ pub struct Sync<N: Network> {
 
 impl<N: Network> Sync<N> {
     /// Initializes a new instance of the sync pool.
-    pub fn new(local_ip: SocketAddr) -> Self {
+    pub fn new(tcp: Tcp) -> Self {
         Self {
-            local_ip,
+            tcp,
             canon: Default::default(),
             locators: Default::default(),
             common_ancestors: Default::default(),
@@ -106,6 +108,18 @@ impl<N: Network> Sync<N> {
             request_timestamps: Default::default(),
             request_timeouts: Default::default(),
         }
+    }
+
+    /// Returns the listening address of the associated node.
+    #[cfg(not(test))]
+    fn local_ip(&self) -> SocketAddr {
+        self.tcp.listening_addr().unwrap()
+    }
+
+    /// Returns a dummy listening address of the associated node.
+    #[cfg(test)]
+    fn local_ip(&self) -> SocketAddr {
+        SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)), 0)
     }
 
     /// Returns the latest block height in the sync pool.
@@ -290,7 +304,7 @@ impl<N: Network> Sync<N> {
             }
         }
         // Update the common ancestor entry for this node.
-        self.common_ancestors.write().insert(PeerPair(self.local_ip, peer_ip), ancestor);
+        self.common_ancestors.write().insert(PeerPair(self.local_ip(), peer_ip), ancestor);
 
         // Compute the common ancestor with every other peer.
         let mut common_ancestors = self.common_ancestors.write();
@@ -715,14 +729,10 @@ mod tests {
 
     use indexmap::indexset;
     use snarkos_node_messages::{CHECKPOINT_INTERVAL, NUM_RECENTS};
+    use snarkos_node_tcp::Config;
     use std::net::{IpAddr, Ipv4Addr};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
-
-    /// Returns the local IP for the sync pool.
-    fn sample_local_ip() -> SocketAddr {
-        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0)
-    }
 
     /// Returns the peer IP for the sync pool.
     fn sample_peer_ip(id: u16) -> SocketAddr {
@@ -732,7 +742,8 @@ mod tests {
 
     /// Returns the sync pool, with the canonical map initialized to the given height.
     fn sample_sync_at_height(height: u32) -> Sync<CurrentNetwork> {
-        let sync = Sync::<CurrentNetwork>::new(sample_local_ip());
+        let dummy_tcp = Tcp::new(Config::default());
+        let sync = Sync::<CurrentNetwork>::new(dummy_tcp);
         sync.insert_canon_locators(sample_block_locators(height)).unwrap();
         sync
     }
