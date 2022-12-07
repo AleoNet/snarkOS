@@ -52,17 +52,34 @@ impl<N: Network> Router<N> {
         peer_side: ConnectionSide,
         genesis_header: Header<N>,
     ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, MessageCodec<N>>)> {
-        if peer_side == ConnectionSide::Initiator {
+        // If this is an inbound connection, we log it, but don't know the listening address yet.
+        // Otherwise, we can immediately register the listening address and check for its uniqueness.
+        let mut peer_ip = if peer_side == ConnectionSide::Initiator {
             debug!("Received a connection request from '{peer_addr}'");
+            None
+        } else if !self.connecting_peers.lock().insert(peer_addr) {
+            warn!("Already accepting a connection from '{peer_addr}', rejecting the duplicate handshake attempt");
+            return Err(io::ErrorKind::ConnectionRefused.into());
+        } else {
+            Some(peer_addr)
+        };
+
+        // Perform the handshake; we pass on a mutable reference to peer_ip in case the process is broken at any point in time.
+        let handshake_result = self.handshake_inner(peer_addr, &mut peer_ip, stream, peer_side, genesis_header).await;
+
+        // Remove the address from the collection of connecting peers (if the handshake got to the point where it's known).
+        if let Some(ip) = peer_ip {
+            self.connecting_peers.lock().remove(&ip);
         }
 
-        self.handshake_inner(peer_addr, stream, peer_side, genesis_header).await
+        handshake_result
     }
 
     /// A helper that facilitates some extra error handling in `Router::handshake`.
     async fn handshake_inner<'a>(
         &'a self,
         peer_addr: SocketAddr,
+        peer_ip: &mut Option<SocketAddr>,
         stream: &'a mut TcpStream,
         peer_side: ConnectionSide,
         genesis_header: Header<N>,
@@ -102,12 +119,12 @@ impl<N: Network> Router<N> {
         trace!("Received '{}-B' from '{peer_addr}'", request_b.name());
 
         // Obtain the peer's listening address if it's an inbound connection.
-        let peer_ip = match peer_side {
-            // The peer initiated the connection.
-            ConnectionSide::Initiator => SocketAddr::new(peer_addr.ip(), request_b.listener_port),
-            // This node initiated the connection.
-            ConnectionSide::Responder => peer_addr,
-        };
+        if peer_ip.is_none() {
+            *peer_ip = Some(SocketAddr::new(peer_addr.ip(), request_b.listener_port));
+        }
+
+        // This value is now guaranteed to be present, so it can be unwrapped.
+        let peer_ip = peer_ip.unwrap();
 
         // Knowing the peer's listening address, ensure it is allowed to connect.
         if peer_side == ConnectionSide::Initiator {
@@ -184,6 +201,10 @@ impl<N: Network> Router<N> {
         // Ensure the node does not surpass the maximum number of peer connections.
         if self.number_of_connected_peers() >= self.max_connected_peers() {
             bail!("Dropping connection request from '{peer_ip}' (maximum peers reached)")
+        }
+        // Ensure the node is not already connecting to this peer.
+        if !self.connecting_peers.lock().insert(peer_ip) {
+            bail!("Dropping connection request from '{peer_ip}' (already shaking hands as the initiator)")
         }
         // Ensure the node is not already connected to this peer.
         if self.is_connected(&peer_ip) {
