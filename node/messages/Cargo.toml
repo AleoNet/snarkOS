@@ -49,7 +49,7 @@ workspace = true
 version = "0.9.0"
 
 [dependencies.tokio]
-version = "1.22"
+version = "1.23"
 features = [
   "io-util",
   "macros",

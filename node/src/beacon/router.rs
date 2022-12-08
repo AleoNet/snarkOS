@@ -74,7 +74,9 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Beacon<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> Disconnect for Beacon<N, C> {
     /// Any extra operations to be performed during a disconnect.
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
-        self.router.remove_connected_peer(peer_addr);
+        if let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) {
+            self.router.remove_connected_peer(peer_ip);
+        }
     }
 }
 
@@ -187,11 +189,14 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
         tokio::spawn(async move {
             // Sleep for the preset time before sending a `Ping` request.
             tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
-            // Retrieve the block locators.
-            match crate::helpers::get_block_locators(&self_clone.ledger) {
-                // Send a `Ping` message to the peer.
-                Ok(block_locators) => self_clone.send_ping(peer_ip, Some(block_locators)),
-                Err(e) => error!("Failed to get block locators: {e}"),
+            // Check that the peer is still connected.
+            if self_clone.router().is_connected(&peer_ip) {
+                // Retrieve the block locators.
+                match crate::helpers::get_block_locators(&self_clone.ledger) {
+                    // Send a `Ping` message to the peer.
+                    Ok(block_locators) => self_clone.send_ping(peer_ip, Some(block_locators)),
+                    Err(e) => error!("Failed to get block locators: {e}"),
+                }
             }
         });
         true

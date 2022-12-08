@@ -27,7 +27,7 @@ use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, Reading, Writing},
     P2P,
 };
-use snarkvm::prelude::{Block, CoinbasePuzzle, ConsensusStorage, Header, Network, ProverSolution};
+use snarkvm::prelude::{Block, ConsensusStorage, Header, Network, ProverSolution};
 
 use anyhow::Result;
 use parking_lot::RwLock;
@@ -52,8 +52,6 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     router: Router<N>,
     /// The REST server of the node.
     rest: Option<Arc<Rest<N, C, Self>>>,
-    /// The coinbase puzzle.
-    coinbase_puzzle: CoinbasePuzzle<N>,
     /// The spawned handles.
     handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
@@ -95,15 +93,12 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         )
         .await?;
 
-        // Load the coinbase puzzle.
-        let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
         let mut node = Self {
             ledger: ledger.clone(),
             consensus: consensus.clone(),
             router,
             rest: None,
-            coinbase_puzzle,
             handles: Default::default(),
             shutdown: Default::default(),
         };

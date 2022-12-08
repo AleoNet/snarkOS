@@ -22,9 +22,9 @@ bytes = "1"
 futures-util = { version = "0.3", features = ["sink"] }
 once_cell = { version = "1", features = ["parking_lot"] }
 parking_lot = "0.12"
-tokio = { version = "1.22", features = ["io-util", "net", "parking_lot", "rt", "sync", "time"] }
+tokio = { version = "1.23", features = ["io-util", "net", "parking_lot", "rt", "sync", "time"] }
 tokio-util = { version = "0.7", features = ["codec"] }
 tracing = { version = "0.1", default-features = false }
 
 [dev-dependencies]
-tokio = { version = "1.22", features = ["macros"] }
+tokio = { version = "1.23", features = ["macros"] }
