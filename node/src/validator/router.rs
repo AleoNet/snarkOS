@@ -75,7 +75,9 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Validator<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> Disconnect for Validator<N, C> {
     /// Any extra operations to be performed during a disconnect.
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
-        self.router.remove_connected_peer(peer_addr);
+        if let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) {
+            self.router.remove_connected_peer(peer_ip);
+        }
     }
 }
 
