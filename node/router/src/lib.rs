@@ -149,7 +149,7 @@ impl<N: Network> Router<N> {
 
     /// Returns the IP address of this node.
     pub fn local_ip(&self) -> SocketAddr {
-        self.tcp.listening_addr().unwrap()
+        self.tcp.listening_addr().expect("The TCP listener is not enabled")
     }
 
     /// Returns `true` if the given IP is this node.
