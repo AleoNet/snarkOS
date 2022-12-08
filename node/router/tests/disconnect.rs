@@ -21,17 +21,6 @@ use snarkos_node_tcp::{protocols::Handshake, P2P};
 
 use core::time::Duration;
 
-macro_rules! print_tcp {
-    ($node:expr) => {
-        println!(
-            "{}: Active - {:?}, Pending - {:?}",
-            $node.local_ip(),
-            $node.tcp().connected_addrs(),
-            $node.tcp().connecting_addrs()
-        );
-    };
-}
-
 #[tokio::test]
 async fn test_disconnect_without_handshake() {
     initialize_logger(3);

@@ -29,6 +29,19 @@ use snarkos_node_messages::NodeType;
 use snarkos_node_router::Router;
 use snarkvm::prelude::{Block, FromBytes, Network, Testnet3 as CurrentNetwork};
 
+/// A helper macro to print the TCP listening address, along with the connected and connecting peers.
+#[macro_export]
+macro_rules! print_tcp {
+    ($node:expr) => {
+        println!(
+            "{}: Active - {:?}, Pending - {:?}",
+            $node.local_ip(),
+            $node.tcp().connected_addrs(),
+            $node.tcp().connecting_addrs()
+        );
+    };
+}
+
 /// Returns a fixed account.
 pub fn sample_account() -> Account<CurrentNetwork> {
     Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap()
