@@ -129,15 +129,12 @@ impl<N: Network> Router<N> {
         tokio::spawn(async move {
             // Attempt to connect to the candidate peer.
             debug!("Connecting to {peer_ip}...");
-            if let Err(error) = router.tcp.connect(peer_ip).await {
-                warn!("{error}");
-                // Restrict the peer, if the connection failed, and is neither trusted nor a bootstrap peer.
-                if !router.trusted_peers.contains(&peer_ip) && !router.bootstrap_peers().contains(&peer_ip) {
-                    router.insert_restricted_peer(peer_ip);
-                }
+            match router.tcp.connect(peer_ip).await {
+                // Remove the peer from the candidate peers.
+                Ok(()) => router.remove_candidate_peer(peer_ip),
+                // If the connection was not allowed, log the error.
+                Err(error) => warn!("Unable to connect to '{peer_ip}' - {error}"),
             }
-            // Remove the peer from the candidate peers.
-            router.remove_candidate_peer(peer_ip);
         });
     }
 
@@ -187,7 +184,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the sync pool.
-    pub fn sync(&self) -> &Sync<N> {
+    pub const fn sync(&self) -> &Sync<N> {
         &self.sync
     }
 
@@ -392,8 +389,6 @@ impl<N: Network> Router<N> {
 
     /// Inserts the given peer into the restricted peers.
     pub fn insert_restricted_peer(&self, peer_ip: SocketAddr) {
-        // Remove this peer from the connected peers, if it exists.
-        self.connected_peers.write().remove(&peer_ip);
         // Remove this peer from the candidate peers, if it exists.
         self.candidate_peers.write().remove(&peer_ip);
         // Add the peer to the restricted peers.
