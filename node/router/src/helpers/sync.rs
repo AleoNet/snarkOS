@@ -14,7 +14,6 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::Tcp;
 use snarkos_node_messages::BlockLocators;
 use snarkvm::prelude::{Block, Network};
 
@@ -23,6 +22,7 @@ use colored::Colorize;
 use core::hash::Hash;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
+use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use rand::{prelude::IteratorRandom, CryptoRng, Rng};
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Instant};
@@ -68,9 +68,7 @@ impl Hash for PeerPair {
 /// - When a request is timed out, the `requests`, `request_timestamps`, and `responses` map remove the entry for the request height;
 #[derive(Clone, Debug)]
 pub struct Sync<N: Network> {
-    /// The TCP stack of this node.
-    #[cfg_attr(test, allow(dead_code))]
-    tcp: Tcp,
+    local_ip: OnceCell<SocketAddr>,
     /// The canonical map of block height to block hash.
     /// This map is a linearly-increasing map of block heights to block hashes,
     /// updated solely from the ledger and candidate blocks (not from peers' block locators, to ensure there are no forks).
@@ -95,11 +93,10 @@ pub struct Sync<N: Network> {
     request_timeouts: Arc<RwLock<IndexMap<SocketAddr, Vec<Instant>>>>,
 }
 
-impl<N: Network> Sync<N> {
-    /// Initializes a new instance of the sync pool.
-    pub fn new(tcp: Tcp) -> Self {
+impl<N: Network> Default for Sync<N> {
+    fn default() -> Self {
         Self {
-            tcp,
+            local_ip: Default::default(),
             canon: Default::default(),
             locators: Default::default(),
             common_ancestors: Default::default(),
@@ -109,17 +106,17 @@ impl<N: Network> Sync<N> {
             request_timeouts: Default::default(),
         }
     }
+}
 
+impl<N: Network> Sync<N> {
     /// Returns the listening address of the associated node.
-    #[cfg(not(test))]
     fn local_ip(&self) -> SocketAddr {
-        self.tcp.listening_addr().unwrap()
+        *self.local_ip.get().expect("The local IP had not been set")
     }
 
     /// Returns a dummy listening address of the associated node.
-    #[cfg(test)]
-    fn local_ip(&self) -> SocketAddr {
-        SocketAddr::new(std::net::IpAddr::V4(std::net::Ipv4Addr::new(127, 0, 0, 1)), 0)
+    pub fn set_local_ip(&self, local_ip: SocketAddr) {
+        self.local_ip.set(local_ip).expect("The local IP was set more than once");
     }
 
     /// Returns the latest block height in the sync pool.
@@ -729,10 +726,14 @@ mod tests {
 
     use indexmap::indexset;
     use snarkos_node_messages::{CHECKPOINT_INTERVAL, NUM_RECENTS};
-    use snarkos_node_tcp::Config;
     use std::net::{IpAddr, Ipv4Addr};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    /// Returns the local IP for the sync pool.
+    fn sample_local_ip() -> SocketAddr {
+        SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0)
+    }
 
     /// Returns the peer IP for the sync pool.
     fn sample_peer_ip(id: u16) -> SocketAddr {
@@ -742,8 +743,8 @@ mod tests {
 
     /// Returns the sync pool, with the canonical map initialized to the given height.
     fn sample_sync_at_height(height: u32) -> Sync<CurrentNetwork> {
-        let dummy_tcp = Tcp::new(Config::default());
-        let sync = Sync::<CurrentNetwork>::new(dummy_tcp);
+        let sync = Sync::<CurrentNetwork>::default();
+        sync.set_local_ip(sample_local_ip());
         sync.insert_canon_locators(sample_block_locators(height)).unwrap();
         sync
     }
