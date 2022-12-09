@@ -60,7 +60,7 @@ pub struct Router<N: Network> {
     /// The account of the node.
     account: Account<N>,
     /// The cache.
-    cache: Cache<N>,
+    cache: Arc<Cache<N>>,
     /// The resolver.
     resolver: Resolver,
     /// The sync pool.
