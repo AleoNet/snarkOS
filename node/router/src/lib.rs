@@ -62,7 +62,7 @@ pub struct Router<N: Network> {
     /// The cache.
     cache: Arc<Cache<N>>,
     /// The resolver.
-    resolver: Resolver,
+    resolver: Arc<Resolver>,
     /// The sync pool.
     sync: Sync<N>,
     /// The set of trusted peers.
