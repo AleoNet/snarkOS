@@ -64,7 +64,7 @@ pub struct Router<N: Network> {
     /// The resolver.
     resolver: Arc<Resolver>,
     /// The sync pool.
-    sync: Sync<N>,
+    sync: Arc<Sync<N>>,
     /// The set of trusted peers.
     trusted_peers: Arc<IndexSet<SocketAddr>>,
     /// The map of connected peer IPs to their peer handlers.
@@ -177,7 +177,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the sync pool.
-    pub const fn sync(&self) -> &Sync<N> {
+    pub fn sync(&self) -> &Sync<N> {
         &self.sync
     }
 
