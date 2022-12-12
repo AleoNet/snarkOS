@@ -27,18 +27,27 @@ pub struct Peer<N: Network> {
     peer_ip: SocketAddr,
     /// The Aleo address of the peer.
     address: Address<N>,
-    /// The message version of the peer.
-    version: u32,
     /// The node type of the peer.
     node_type: NodeType,
+    /// The message version of the peer.
+    version: u32,
+    /// The timestamp of the first message received from the peer.
+    first_seen: Instant,
     /// The timestamp of the last message received from this peer.
     last_seen: Arc<RwLock<Instant>>,
 }
 
 impl<N: Network> Peer<N> {
     /// Initializes a new instance of `Peer`.
-    pub fn new(listening_ip: SocketAddr, address: Address<N>, version: u32, node_type: NodeType) -> Self {
-        Self { peer_ip: listening_ip, address, version, node_type, last_seen: Arc::new(RwLock::new(Instant::now())) }
+    pub fn new(listening_ip: SocketAddr, address: Address<N>, node_type: NodeType, version: u32) -> Self {
+        Self {
+            peer_ip: listening_ip,
+            address,
+            node_type,
+            version,
+            first_seen: Instant::now(),
+            last_seen: Arc::new(RwLock::new(Instant::now())),
+        }
     }
 
     /// Returns the IP address of the peer, with the port set to the listener port.
@@ -76,6 +85,16 @@ impl<N: Network> Peer<N> {
         self.node_type.is_client()
     }
 
+    /// Returns the message version of the peer.
+    pub const fn version(&self) -> u32 {
+        self.version
+    }
+
+    /// Returns the first seen timestamp of the peer.
+    pub fn first_seen(&self) -> Instant {
+        self.first_seen
+    }
+
     /// Returns the last seen timestamp of the peer.
     pub fn last_seen(&self) -> Instant {
         *self.last_seen.read()
@@ -83,14 +102,14 @@ impl<N: Network> Peer<N> {
 }
 
 impl<N: Network> Peer<N> {
-    /// Updates the version.
-    pub fn set_version(&mut self, version: u32) {
-        self.version = version;
-    }
-
     /// Updates the node type.
     pub fn set_node_type(&mut self, node_type: NodeType) {
         self.node_type = node_type;
+    }
+
+    /// Updates the version.
+    pub fn set_version(&mut self, version: u32) {
+        self.version = version;
     }
 
     /// Updates the last seen timestamp of the peer.

@@ -16,71 +16,17 @@
 
 #![recursion_limit = "256"]
 
+#[allow(dead_code)]
 mod common;
-use common::{sample_genesis_block, TestPeer};
+use common::{node::*, test_peer::TestPeer};
 
-use snarkos_account::Account;
 use snarkos_node::{Beacon, Client, Prover, Validator};
 use snarkos_node_tcp::P2P;
 use snarkvm::prelude::{ConsensusMemory, Testnet3 as CurrentNetwork};
 
 use pea2pea::Pea2Pea;
 
-use std::{io, net::SocketAddr, str::FromStr};
-
-/* Node constructors */
-
-async fn beacon() -> Beacon<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
-    Beacon::new(
-        "127.0.0.1:0".parse().unwrap(),
-        None,
-        Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
-        &[],
-        sample_genesis_block(),
-        None, // No CDN.
-        None,
-    )
-    .await
-    .expect("couldn't create beacon instance")
-}
-
-async fn client() -> Client<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
-    Client::new(
-        "127.0.0.1:0".parse().unwrap(),
-        Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
-        &[],
-        sample_genesis_block(),
-        None,
-    )
-    .await
-    .expect("couldn't create client instance")
-}
-
-async fn prover() -> Prover<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
-    Prover::new(
-        "127.0.0.1:0".parse().unwrap(),
-        Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
-        &[],
-        sample_genesis_block(),
-        None,
-    )
-    .await
-    .expect("couldn't create prover instance")
-}
-
-async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
-    Validator::new(
-        "127.0.0.1:0".parse().unwrap(),
-        None,
-        Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
-        &[],
-        sample_genesis_block(),
-        None, // No CDN.
-        None,
-    )
-    .await
-    .expect("couldn't create validator instance")
-}
+use std::{io, net::SocketAddr};
 
 // Trait to unify Pea2Pea and P2P traits.
 #[async_trait::async_trait]
@@ -149,13 +95,14 @@ macro_rules! test_handshake {
     ($node_type:ident, $peer_type:ident, $is_initiator:expr, $($attr:meta)?) => {
         #[tokio::test]
         $(#[$attr])?
-        async fn $peer_type () {
+        async fn $peer_type() {
+            // $crate::common::initialise_logger(2);
 
             // Spin up a full node.
             let node = $crate::$node_type().await;
 
             // Spin up a test peer (synthetic node).
-            let peer = $crate::common::TestPeer::$peer_type().await;
+            let peer = $crate::common::test_peer::TestPeer::$peer_type().await;
 
             // Sets up the connection direction as described above.
             if $is_initiator {

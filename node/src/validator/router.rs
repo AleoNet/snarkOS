@@ -26,9 +26,10 @@ use snarkos_node_messages::{
     MessageCodec,
     Ping,
     Pong,
+    UnconfirmedTransaction,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{error, Network};
+use snarkvm::prelude::{error, Network, Transaction};
 
 use futures_util::sink::SinkExt;
 use std::{io, net::SocketAddr, time::Duration};
@@ -74,7 +75,9 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Validator<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> Disconnect for Validator<N, C> {
     /// Any extra operations to be performed during a disconnect.
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
-        self.router.remove_connected_peer(peer_addr);
+        if let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) {
+            self.router.remove_connected_peer(peer_ip);
+        }
     }
 }
 
@@ -170,11 +173,14 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         tokio::spawn(async move {
             // Sleep for the preset time before sending a `Ping` request.
             tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
-            // Retrieve the block locators.
-            match crate::helpers::get_block_locators(&self_clone.ledger) {
-                // Send a `Ping` message to the peer.
-                Ok(block_locators) => self_clone.send_ping(peer_ip, Some(block_locators)),
-                Err(e) => error!("Failed to get block locators: {e}"),
+            // Check that the peer is still connected.
+            if self_clone.router().is_connected(&peer_ip) {
+                // Retrieve the block locators.
+                match crate::helpers::get_block_locators(&self_clone.ledger) {
+                    // Send a `Ping` message to the peer.
+                    Ok(block_locators) => self_clone.send_ping(peer_ip, Some(block_locators)),
+                    Err(e) => error!("Failed to get block locators: {e}"),
+                }
             }
         });
         true
@@ -203,38 +209,38 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         false
     }
 
-    /// Propagates the unconfirmed solution to all connected beacons.
+    /// Propagates the unconfirmed solution to all connected beacons and validators.
     async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedSolution<N>,
         solution: ProverSolution<N>,
     ) -> bool {
-        // Retrieve the latest epoch challenge.
-        let epoch_challenge = match self.ledger.latest_epoch_challenge() {
-            Ok(epoch_challenge) => epoch_challenge,
-            Err(error) => {
-                error!("Failed to get epoch challenge for unconfirmed solution from '{peer_ip}': {error}");
-                return false;
-            }
-        };
-
-        // Retrieve the latest proof target.
-        let proof_target = self.ledger.latest_header().proof_target();
-
-        // Ensure that the prover solution is valid for the given epoch.
-        let coinbase_puzzle = self.coinbase_puzzle.clone();
-        let is_valid = tokio::task::spawn_blocking(move || {
-            solution.verify(coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target)
-        })
-        .await;
-
-        match is_valid {
-            // If the solution is valid, propagate the `UnconfirmedSolution` to connected beacons.
-            Ok(Ok(true)) => self.propagate_to_beacons(Message::UnconfirmedSolution(serialized), vec![peer_ip]),
-            Ok(Ok(false)) | Ok(Err(_)) => (),
-            Err(error) => warn!("Failed to verify an unconfirmed solution from '{peer_ip}': {error}"),
+        // Add the unconfirmed solution to the memory pool.
+        if let Err(error) = self.consensus.add_unconfirmed_solution(&solution) {
+            trace!("[UnconfirmedSolution] {error}");
+            return true; // Maintain the connection.
         }
+        let message = Message::UnconfirmedSolution(serialized);
+        // Propagate the "UnconfirmedSolution" to the connected beacons.
+        self.propagate_to_beacons(message.clone(), vec![peer_ip]);
+        // Propagate the "UnconfirmedSolution" to the connected validators.
+        self.propagate_to_validators(message, vec![peer_ip]);
+        true
+    }
+
+    /// Handles an `UnconfirmedTransaction` message.
+    fn unconfirmed_transaction(
+        &self,
+        peer_ip: SocketAddr,
+        serialized: UnconfirmedTransaction<N>,
+        _transaction: Transaction<N>,
+    ) -> bool {
+        let message = Message::UnconfirmedTransaction(serialized);
+        // Propagate the "UnconfirmedTransaction" to the connected beacons.
+        self.propagate_to_beacons(message.clone(), vec![peer_ip]);
+        // Propagate the "UnconfirmedTransaction" to the connected validators.
+        self.propagate_to_validators(message, vec![peer_ip]);
         true
     }
 }

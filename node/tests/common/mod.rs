@@ -14,19 +14,13 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use pea2pea::{protocols::Handshake, Config, Connection, Node, Pea2Pea};
-use snarkos_account::Account;
-use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, NodeType};
-use snarkvm::prelude::{error, Address, Block, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork};
+pub mod node;
+pub mod test_peer;
 
-use futures_util::{sink::SinkExt, TryStreamExt};
-use rand::Rng;
-use std::{
-    io,
-    net::{IpAddr, Ipv4Addr},
-    str::FromStr,
-};
-use tokio_util::codec::Framed;
+use std::{env, str::FromStr};
+
+use snarkos_account::Account;
+use snarkvm::prelude::{Block, FromBytes, Network, Testnet3 as CurrentNetwork};
 
 /// Returns a fixed account.
 pub fn sample_account() -> Account<CurrentNetwork> {
@@ -38,119 +32,21 @@ pub fn sample_genesis_block() -> Block<CurrentNetwork> {
     Block::<CurrentNetwork>::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap()
 }
 
-#[derive(Clone)]
-pub struct TestPeer {
-    node: Node,
-    node_type: NodeType,
-    account: Account<CurrentNetwork>,
-}
+/// Enables logging in tests.
+pub fn initialise_logger(level: u8) {
+    match level {
+        0 => env::set_var("RUST_LOG", "info"),
+        1 => env::set_var("RUST_LOG", "debug"),
+        2 | 3 => env::set_var("RUST_LOG", "trace"),
+        _ => env::set_var("RUST_LOG", "info"),
+    };
 
-impl Pea2Pea for TestPeer {
-    fn node(&self) -> &Node {
-        &self.node
-    }
-}
+    // Filter out undesirable logs.
+    let filter = tracing_subscriber::EnvFilter::from_default_env()
+        .add_directive("snarkos=off".parse().unwrap())
+        .add_directive("tokio_util=off".parse().unwrap())
+        .add_directive("mio=off".parse().unwrap());
 
-impl TestPeer {
-    pub async fn beacon() -> Self {
-        Self::new(NodeType::Beacon, sample_account()).await
-    }
-
-    pub async fn client() -> Self {
-        Self::new(NodeType::Client, sample_account()).await
-    }
-
-    pub async fn prover() -> Self {
-        Self::new(NodeType::Prover, sample_account()).await
-    }
-
-    pub async fn validator() -> Self {
-        Self::new(NodeType::Validator, sample_account()).await
-    }
-
-    pub async fn new(node_type: NodeType, account: Account<CurrentNetwork>) -> Self {
-        let peer = Self {
-            node: Node::new(Config {
-                listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
-                max_connections: 200,
-                ..Default::default()
-            })
-            .await
-            .expect("couldn't create test peer"),
-            node_type,
-            account,
-        };
-
-        peer.enable_handshake().await;
-        //  client.enable_reading().await;
-        //  client.enable_writing().await;
-        //  client.enable_disconnect().await;
-
-        peer
-    }
-
-    pub fn node_type(&self) -> NodeType {
-        self.node_type
-    }
-
-    pub fn account(&self) -> &Account<CurrentNetwork> {
-        &self.account
-    }
-
-    pub fn address(&self) -> Address<CurrentNetwork> {
-        self.account.address()
-    }
-}
-
-#[async_trait::async_trait]
-impl Handshake for TestPeer {
-    async fn perform_handshake(&self, mut conn: Connection) -> io::Result<Connection> {
-        let rng = &mut TestRng::default();
-
-        let local_ip = self.node().listening_addr().expect("listening address should be present");
-
-        let stream = self.borrow_stream(&mut conn);
-        let mut framed = Framed::new(stream, MessageCodec::<CurrentNetwork>::default());
-
-        // Send a challenge request to the peer.
-        let message = Message::<CurrentNetwork>::ChallengeRequest(ChallengeRequest {
-            version: Message::<CurrentNetwork>::VERSION,
-            listener_port: local_ip.port(),
-            node_type: self.node_type(),
-            address: self.address(),
-            nonce: rng.gen(),
-        });
-        framed.send(message).await?;
-
-        // Listen for the challenge request.
-        let request_b = match framed.try_next().await? {
-            // Received the challenge request message, proceed.
-            Some(Message::ChallengeRequest(data)) => data,
-            // Received a disconnect message, abort.
-            Some(Message::Disconnect(reason)) => return Err(error(format!("disconnected: {reason:?}"))),
-            // Received an unexpected message, abort.
-            _ => return Err(error("didn't send a challenge request")),
-        };
-
-        // TODO(nkls): add assertions on the contents.
-
-        // Sign the nonce.
-        let signature = self.account().sign_bytes(&request_b.nonce.to_le_bytes(), rng).unwrap();
-
-        // Retrieve the genesis block header.
-        let genesis_header = *sample_genesis_block().header();
-        // Send the challenge response.
-        let message =
-            Message::ChallengeResponse(ChallengeResponse { genesis_header, signature: Data::Object(signature) });
-        framed.send(message).await?;
-
-        // Receive the challenge response.
-        let Message::ChallengeResponse(challenge_response) = framed.try_next().await.unwrap().unwrap() else {
-            panic!("didn't get challenge response")
-        };
-
-        assert_eq!(challenge_response.genesis_header, genesis_header);
-
-        Ok(conn)
-    }
+    // Initialize tracing.
+    let _ = tracing_subscriber::fmt().with_env_filter(filter).with_target(level == 3).try_init();
 }

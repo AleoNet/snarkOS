@@ -76,7 +76,7 @@ workspace = true
 version = "0.3"
 
 [dependencies.tokio]
-version = "1.22"
+version = "1.23"
 features = [
   "io-util",
   "macros",
@@ -97,6 +97,14 @@ version = "=0.1"
 [dependencies.tracing]
 version = "0.1"
 
+[dev-dependencies.futures-util]
+version = "0.3"
+features = ["sink"]
+
 [dev-dependencies.snarkos-node-messages]
 path = "../messages"
 features = [ "test" ]
+
+[dev-dependencies.tracing-subscriber]
+version = "0.3"
+features = [ "env-filter", "fmt" ]

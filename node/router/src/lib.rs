@@ -42,7 +42,7 @@ pub use routing::*;
 use snarkos_account::Account;
 use snarkos_node_messages::NodeType;
 use snarkos_node_tcp::{Config, Tcp};
-use snarkvm::prelude::{Address, Network};
+use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
 use core::str::FromStr;
@@ -129,15 +129,12 @@ impl<N: Network> Router<N> {
         tokio::spawn(async move {
             // Attempt to connect to the candidate peer.
             debug!("Connecting to {peer_ip}...");
-            if let Err(error) = router.tcp.connect(peer_ip).await {
-                warn!("{error}");
-                // Restrict the peer, if the connection failed, and is neither trusted nor a bootstrap peer.
-                if !router.trusted_peers.contains(&peer_ip) && !router.bootstrap_peers().contains(&peer_ip) {
-                    router.insert_restricted_peer(peer_ip);
-                }
+            match router.tcp.connect(peer_ip).await {
+                // Remove the peer from the candidate peers.
+                Ok(()) => router.remove_candidate_peer(peer_ip),
+                // If the connection was not allowed, log the error.
+                Err(error) => warn!("Unable to connect to '{peer_ip}' - {error}"),
             }
-            // Remove the peer from the candidate peers.
-            router.remove_candidate_peer(peer_ip);
         });
     }
 
@@ -171,13 +168,23 @@ impl<N: Network> Router<N> {
         self.node_type
     }
 
-    /// Returns the Aleo address of the node.
+    /// Returns the account private key of the node.
+    pub const fn private_key(&self) -> &PrivateKey<N> {
+        self.account.private_key()
+    }
+
+    /// Returns the account view key of the node.
+    pub const fn view_key(&self) -> &ViewKey<N> {
+        self.account.view_key()
+    }
+
+    /// Returns the account address of the node.
     pub const fn address(&self) -> Address<N> {
         self.account.address()
     }
 
     /// Returns the sync pool.
-    pub fn sync(&self) -> &Sync<N> {
+    pub const fn sync(&self) -> &Sync<N> {
         &self.sync
     }
 
@@ -382,8 +389,6 @@ impl<N: Network> Router<N> {
 
     /// Inserts the given peer into the restricted peers.
     pub fn insert_restricted_peer(&self, peer_ip: SocketAddr) {
-        // Remove this peer from the connected peers, if it exists.
-        self.connected_peers.write().remove(&peer_ip);
         // Remove this peer from the candidate peers, if it exists.
         self.candidate_peers.write().remove(&peer_ip);
         // Add the peer to the restricted peers.

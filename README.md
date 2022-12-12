@@ -30,7 +30,7 @@
 ## 1. Overview
 
 __snarkOS__ is a decentralized operating system for zero-knowledge applications.
-This code forms the backbone the [Aleo](https://aleo.org/) network,
+This code forms the backbone of [Aleo](https://aleo.org/) network,
 which verifies transactions and stores the encrypted state applications in a publicly-verifiable manner.
 
 ## 2. Build Guide
