@@ -49,7 +49,10 @@ async fn test_disconnect_without_handshake() {
     assert_eq!(node1.tcp().num_connecting(), 0);
 
     // Disconnect node0 from node1.
-    node0.disconnect(node1.local_ip());
+    // note: the lower-level disconnect call is used, as the higher-level
+    // collection of connected peers is only altered during the handshake,
+    // as well as the address resolver needed for the higher-level calls
+    node0.tcp().disconnect(node1.local_ip()).await;
     // Sleep briefly.
     tokio::time::sleep(Duration::from_millis(100)).await;
 

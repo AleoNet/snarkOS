@@ -137,13 +137,11 @@ impl<N: Network> Router<N> {
     pub fn disconnect(&self, peer_ip: SocketAddr) {
         let router = self.clone();
         tokio::spawn(async move {
-            // Disconnect from this peer.
-            let _disconnected = router.tcp.disconnect(peer_ip).await;
-            debug_assert!(_disconnected);
-            // TODO (howardwu): Revisit this. It appears `handle_disconnect` does not necessarily trigger.
-            //  See https://github.com/AleoHQ/snarkOS/issues/2102.
-            // Remove the peer from the connected peers.
-            router.remove_connected_peer(peer_ip);
+            if let Some(peer_addr) = router.resolve_to_ambiguous(&peer_ip) {
+                // Disconnect from this peer.
+                let _disconnected = router.tcp.disconnect(peer_addr).await;
+                debug_assert!(_disconnected);
+            }
         });
     }
 
