@@ -474,6 +474,11 @@ impl<N: Network> Router<N> {
         self.candidate_peers.write().insert(peer_ip);
     }
 
+    #[cfg(feature = "test")]
+    pub fn clear_candidate_peers(&self) {
+        self.candidate_peers.write().clear();
+    }
+
     /// Removes the given address from the candidate peers, if it exists.
     pub fn remove_candidate_peer(&self, peer_ip: SocketAddr) {
         self.candidate_peers.write().remove(&peer_ip);
