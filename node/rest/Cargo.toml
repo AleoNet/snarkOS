@@ -29,7 +29,7 @@ version = "1.8"
 version = "8.2"
 
 [dependencies.once_cell]
-version = "1.13"
+version = "1.17"
 
 [dependencies.serde]
 version = "1"
