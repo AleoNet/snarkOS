@@ -143,14 +143,17 @@ impl<N: Network> Router<N> {
         }
 
         let router = self.clone();
-        self.spawn(async move {
+        tokio::spawn(async move {
             // Attempt to connect to the candidate peer.
             debug!("Connecting to {peer_ip}...");
             match router.tcp.connect(peer_ip).await {
                 // Remove the peer from the candidate peers.
                 Ok(()) => router.remove_candidate_peer(peer_ip),
                 // If the connection was not allowed, log the error.
-                Err(error) => warn!("Unable to connect to '{peer_ip}' - {error}"),
+                Err(error) => {
+                    router.connecting_peers.lock().remove(&peer_ip);
+                    warn!("Unable to connect to '{peer_ip}' - {error}")
+                }
             }
         });
     }
@@ -165,10 +168,6 @@ impl<N: Network> Router<N> {
         if self.number_of_connected_peers() >= self.max_connected_peers() {
             bail!("Dropping connection attempt to '{peer_ip}' (maximum peers reached)")
         }
-        // Ensure the node is not already connecting to this peer.
-        if !self.connecting_peers.lock().insert(peer_ip) {
-            bail!("Dropping connection attempt to '{peer_ip}' (already shaking hands as the initiator)")
-        }
         // Ensure the node is not already connected to this peer.
         if self.is_connected(&peer_ip) {
             bail!("Dropping connection attempt to '{peer_ip}' (already connected)")
@@ -177,13 +176,17 @@ impl<N: Network> Router<N> {
         if self.is_restricted(&peer_ip) {
             bail!("Dropping connection attempt to '{peer_ip}' (restricted)")
         }
+        // Ensure the node is not already connecting to this peer.
+        if !self.connecting_peers.lock().insert(peer_ip) {
+            bail!("Dropping connection attempt to '{peer_ip}' (already shaking hands as the initiator)")
+        }
         Ok(())
     }
 
     /// Disconnects from the given peer IP, if the peer is connected.
     pub fn disconnect(&self, peer_ip: SocketAddr) {
         let router = self.clone();
-        self.spawn(async move {
+        tokio::spawn(async move {
             if let Some(peer_addr) = router.resolve_to_ambiguous(&peer_ip) {
                 // Disconnect from this peer.
                 let _disconnected = router.tcp.disconnect(peer_addr).await;
@@ -474,12 +477,17 @@ impl<N: Network> Router<N> {
         self.candidate_peers.write().insert(peer_ip);
     }
 
+    #[cfg(feature = "test")]
+    pub fn clear_candidate_peers(&self) {
+        self.candidate_peers.write().clear();
+    }
+
     /// Removes the given address from the candidate peers, if it exists.
     pub fn remove_candidate_peer(&self, peer_ip: SocketAddr) {
         self.candidate_peers.write().remove(&peer_ip);
     }
 
-    /// Spawns a task with the given future.
+    /// Spawns a task with the given future; it should only be used for long-running tasks.
     pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
         self.handles.write().push(tokio::spawn(future));
     }
