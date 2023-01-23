@@ -62,15 +62,18 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
 
     /// Initialize a new instance of the report.
     fn initialize_report(&self) {
-        let self_clone = self.clone();
+        // Prepare the base report.
+        let base_report = std::collections::HashMap::from([
+            ("message_version".to_string(), Message::<N>::VERSION.to_string()),
+            ("node_address".to_string(), self.router().address().to_string()),
+            ("node_type".to_string(), self.router().node_type().to_string()),
+            ("is_dev".to_string(), self.router().is_dev().to_string()),
+        ]);
+
         self.router().spawn(async move {
             loop {
                 // Prepare the report.
-                let mut report = std::collections::HashMap::new();
-                report.insert("message_version".to_string(), Message::<N>::VERSION.to_string());
-                report.insert("node_address".to_string(), self_clone.router().address().to_string());
-                report.insert("node_type".to_string(), self_clone.router().node_type().to_string());
-                report.insert("is_dev".to_string(), self_clone.router().is_dev().to_string());
+                let report = base_report.clone();
                 // Transmit the report.
                 let url = "https://vm.aleo.org/testnet3/report";
                 let _ = reqwest::Client::new().post(url).json(&report).send().await;

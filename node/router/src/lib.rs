@@ -131,7 +131,7 @@ impl<N: Network> Router<N> {
     /// Attempts to connect to the given peer IP.
     pub fn connect(&self, peer_ip: SocketAddr) {
         let router = self.clone();
-        tokio::spawn(async move {
+        self.spawn(async move {
             // Attempt to connect to the candidate peer.
             debug!("Connecting to {peer_ip}...");
             match router.tcp.connect(peer_ip).await {
@@ -146,7 +146,7 @@ impl<N: Network> Router<N> {
     /// Disconnects from the given peer IP, if the peer is connected.
     pub fn disconnect(&self, peer_ip: SocketAddr) {
         let router = self.clone();
-        tokio::spawn(async move {
+        self.spawn(async move {
             if let Some(peer_addr) = router.resolve_to_ambiguous(&peer_ip) {
                 // Disconnect from this peer.
                 let _disconnected = router.tcp.disconnect(peer_addr).await;
@@ -380,14 +380,16 @@ impl<N: Network> Router<N> {
         // Compute the maximum number of candidate peers.
         let max_candidate_peers = Self::MAXIMUM_CANDIDATE_PEERS.saturating_sub(self.number_of_candidate_peers());
         // Ensure the combined number of peers does not surpass the threshold.
-        for peer_ip in peers.iter().take(max_candidate_peers) {
-            // Ensure the peer is not itself, is not already connected, and is not restricted.
-            if self.is_local_ip(peer_ip) || self.is_connected(peer_ip) || self.is_restricted(peer_ip) {
-                continue;
-            }
-            // Proceed to insert each new candidate peer IP.
-            self.candidate_peers.write().insert(*peer_ip);
-        }
+        let eligible_peers = peers
+            .iter()
+            .filter(|peer_ip| {
+                // Ensure the peer is not itself, is not already connected, and is not restricted.
+                !self.is_local_ip(peer_ip) && !self.is_connected(peer_ip) && !self.is_restricted(peer_ip)
+            })
+            .take(max_candidate_peers);
+
+        // Proceed to insert the eligible candidate peer IPs.
+        self.candidate_peers.write().extend(eligible_peers);
     }
 
     /// Inserts the given peer into the restricted peers.
