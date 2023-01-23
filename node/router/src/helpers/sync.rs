@@ -22,6 +22,7 @@ use colored::Colorize;
 use core::hash::Hash;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
+use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use rand::{prelude::IteratorRandom, CryptoRng, Rng};
 use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Instant};
@@ -67,8 +68,7 @@ impl Hash for PeerPair {
 /// - When a request is timed out, the `requests`, `request_timestamps`, and `responses` map remove the entry for the request height;
 #[derive(Clone, Debug)]
 pub struct Sync<N: Network> {
-    /// The listener IP of this node.
-    local_ip: SocketAddr,
+    local_ip: OnceCell<SocketAddr>,
     /// The canonical map of block height to block hash.
     /// This map is a linearly-increasing map of block heights to block hashes,
     /// updated solely from the ledger and candidate blocks (not from peers' block locators, to ensure there are no forks).
@@ -93,11 +93,10 @@ pub struct Sync<N: Network> {
     request_timeouts: Arc<RwLock<IndexMap<SocketAddr, Vec<Instant>>>>,
 }
 
-impl<N: Network> Sync<N> {
-    /// Initializes a new instance of the sync pool.
-    pub fn new(local_ip: SocketAddr) -> Self {
+impl<N: Network> Default for Sync<N> {
+    fn default() -> Self {
         Self {
-            local_ip,
+            local_ip: Default::default(),
             canon: Default::default(),
             locators: Default::default(),
             common_ancestors: Default::default(),
@@ -106,6 +105,18 @@ impl<N: Network> Sync<N> {
             request_timestamps: Default::default(),
             request_timeouts: Default::default(),
         }
+    }
+}
+
+impl<N: Network> Sync<N> {
+    /// Returns the listening address of the associated node.
+    fn local_ip(&self) -> SocketAddr {
+        *self.local_ip.get().expect("The local IP had not been set")
+    }
+
+    /// Returns a dummy listening address of the associated node.
+    pub fn set_local_ip(&self, local_ip: SocketAddr) {
+        self.local_ip.set(local_ip).expect("The local IP was set more than once");
     }
 
     /// Returns the latest block height in the sync pool.
@@ -290,7 +301,7 @@ impl<N: Network> Sync<N> {
             }
         }
         // Update the common ancestor entry for this node.
-        self.common_ancestors.write().insert(PeerPair(self.local_ip, peer_ip), ancestor);
+        self.common_ancestors.write().insert(PeerPair(self.local_ip(), peer_ip), ancestor);
 
         // Compute the common ancestor with every other peer.
         let mut common_ancestors = self.common_ancestors.write();
@@ -732,7 +743,8 @@ mod tests {
 
     /// Returns the sync pool, with the canonical map initialized to the given height.
     fn sample_sync_at_height(height: u32) -> Sync<CurrentNetwork> {
-        let sync = Sync::<CurrentNetwork>::new(sample_local_ip());
+        let sync = Sync::<CurrentNetwork>::default();
+        sync.set_local_ip(sample_local_ip());
         sync.insert_canon_locators(sample_block_locators(height)).unwrap();
         sync
     }

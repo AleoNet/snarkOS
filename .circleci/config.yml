@@ -251,6 +251,15 @@ jobs:
           workspace_member: node/store
           cache_key: snarkos-node-store-cache
 
+  node-tcp:
+    docker:
+      - image: cimg/rust:1.65
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/tcp
+          cache_key: snarkos-node-tcp-cache
+
   check-fmt:
     docker:
       - image: cimg/rust:1.65
@@ -315,6 +324,7 @@ workflows:
       - node-rest
       - node-router
       - node-store
+      - node-tcp
       - check-fmt
       - check-clippy
 
