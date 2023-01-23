@@ -143,7 +143,7 @@ impl<N: Network> Router<N> {
         }
 
         let router = self.clone();
-        self.spawn(async move {
+        tokio::spawn(async move {
             // Attempt to connect to the candidate peer.
             debug!("Connecting to {peer_ip}...");
             match router.tcp.connect(peer_ip).await {
@@ -186,7 +186,7 @@ impl<N: Network> Router<N> {
     /// Disconnects from the given peer IP, if the peer is connected.
     pub fn disconnect(&self, peer_ip: SocketAddr) {
         let router = self.clone();
-        self.spawn(async move {
+        tokio::spawn(async move {
             if let Some(peer_addr) = router.resolve_to_ambiguous(&peer_ip) {
                 // Disconnect from this peer.
                 let _disconnected = router.tcp.disconnect(peer_addr).await;
