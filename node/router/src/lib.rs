@@ -48,7 +48,7 @@ use anyhow::{bail, Result};
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashSet, future::Future, net::SocketAddr, sync::Arc, time::Instant};
+use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -83,7 +83,7 @@ pub struct InnerRouter<N: Network> {
     /// and prevents duplicate outbound connection attempts to the same IP address, it is unable to
     /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
     /// attempt to connect to each other). This set is used to prevent this from happening.
-    connecting_peers: Arc<Mutex<HashSet<SocketAddr>>>,
+    connecting_peers: Mutex<HashSet<SocketAddr>>,
     /// The set of candidate peer IPs.
     candidate_peers: RwLock<IndexSet<SocketAddr>>,
     /// The set of restricted peer IPs.
@@ -124,7 +124,6 @@ impl<N: Network> Router<N> {
             cache: Default::default(),
             resolver: Default::default(),
             sync: Default::default(),
-            connecting_peers: Default::default(),
             trusted_peers: trusted_peers.iter().copied().collect(),
             connected_peers: Default::default(),
             connecting_peers: Default::default(),
