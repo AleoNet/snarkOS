@@ -186,6 +186,9 @@ impl<N: Network> Router<N> {
         self.insert_connected_peer(peer, peer_addr);
         info!("Connected to '{peer_ip}'");
 
+        // Increase the maximum permitted message size.
+        framed.codec_mut().update_max_message_len();
+
         Ok((peer_ip, framed))
     }
 

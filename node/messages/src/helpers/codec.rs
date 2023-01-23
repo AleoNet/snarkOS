@@ -21,6 +21,9 @@ use ::bytes::{BufMut, BytesMut};
 use core::marker::PhantomData;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
+/// The maximum size of a message that can be transmitted during the handshake.
+const MAXIMUM_HANDSHAKE_MESSAGE_SIZE: usize = 1024 * 1024; // 1 MiB
+
 /// The maximum size of a message that can be transmitted in the network.
 const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
 
@@ -30,10 +33,20 @@ pub struct MessageCodec<N: Network> {
     _phantom: PhantomData<N>,
 }
 
+impl<N: Network> MessageCodec<N> {
+    /// Increases the maximum permitted message size post-handshake.
+    pub fn update_max_message_len(&mut self) {
+        self.codec = LengthDelimitedCodec::builder().max_frame_length(MAXIMUM_MESSAGE_SIZE).little_endian().new_codec();
+    }
+}
+
 impl<N: Network> Default for MessageCodec<N> {
     fn default() -> Self {
         Self {
-            codec: LengthDelimitedCodec::builder().max_frame_length(MAXIMUM_MESSAGE_SIZE).little_endian().new_codec(),
+            codec: LengthDelimitedCodec::builder()
+                .max_frame_length(MAXIMUM_HANDSHAKE_MESSAGE_SIZE)
+                .little_endian()
+                .new_codec(),
             _phantom: Default::default(),
         }
     }
