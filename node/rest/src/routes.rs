@@ -27,7 +27,7 @@ struct BlockRange {
 
 impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     /// Initializes the routes, given the ledger and ledger sender.
-    pub fn routes(&self) -> impl Filter<Extract = impl Reply, Error = Rejection> + Clone {
+    pub fn routes(&self) -> impl Filter<Extract = (impl Reply,), Error = Rejection> + Clone {
         // GET /testnet3/latest/height
         let latest_height = warp::get()
             .and(warp::path!("testnet3" / "latest" / "height"))
