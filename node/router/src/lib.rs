@@ -47,8 +47,8 @@ use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 use anyhow::{bail, Result};
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
-use parking_lot::RwLock;
-use std::{future::Future, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
+use parking_lot::{Mutex, RwLock};
+use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -79,6 +79,11 @@ pub struct InnerRouter<N: Network> {
     trusted_peers: IndexSet<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
     connected_peers: RwLock<IndexMap<SocketAddr, Peer<N>>>,
+    /// The set of handshaking peers. While `Tcp` already recognizes the connecting IP addresses
+    /// and prevents duplicate outbound connection attempts to the same IP address, it is unable to
+    /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
+    /// attempt to connect to each other). This set is used to prevent this from happening.
+    connecting_peers: Mutex<HashSet<SocketAddr>>,
     /// The set of candidate peer IPs.
     candidate_peers: RwLock<IndexSet<SocketAddr>>,
     /// The set of restricted peer IPs.
@@ -121,6 +126,7 @@ impl<N: Network> Router<N> {
             sync: Default::default(),
             trusted_peers: trusted_peers.iter().copied().collect(),
             connected_peers: Default::default(),
+            connecting_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             handles: Default::default(),
@@ -130,6 +136,12 @@ impl<N: Network> Router<N> {
 
     /// Attempts to connect to the given peer IP.
     pub fn connect(&self, peer_ip: SocketAddr) {
+        // Return early if the attempt is against the protocol rules.
+        if let Err(forbidden_message) = self.check_connection_attempt(peer_ip) {
+            warn!("{forbidden_message}");
+            return;
+        }
+
         let router = self.clone();
         self.spawn(async move {
             // Attempt to connect to the candidate peer.
@@ -141,6 +153,31 @@ impl<N: Network> Router<N> {
                 Err(error) => warn!("Unable to connect to '{peer_ip}' - {error}"),
             }
         });
+    }
+
+    /// Ensure we are allowed to connect to the given peer.
+    fn check_connection_attempt(&self, peer_ip: SocketAddr) -> Result<()> {
+        // Ensure the peer IP is not this node.
+        if self.is_local_ip(&peer_ip) {
+            bail!("Dropping connection attempt to '{peer_ip}' (attempted to self-connect)")
+        }
+        // Ensure the node does not surpass the maximum number of peer connections.
+        if self.number_of_connected_peers() >= self.max_connected_peers() {
+            bail!("Dropping connection attempt to '{peer_ip}' (maximum peers reached)")
+        }
+        // Ensure the node is not already connecting to this peer.
+        if !self.connecting_peers.lock().insert(peer_ip) {
+            bail!("Dropping connection attempt to '{peer_ip}' (already shaking hands as the initiator)")
+        }
+        // Ensure the node is not already connected to this peer.
+        if self.is_connected(&peer_ip) {
+            bail!("Dropping connection attempt to '{peer_ip}' (already connected)")
+        }
+        // Ensure the peer is not restricted.
+        if self.is_restricted(&peer_ip) {
+            bail!("Dropping connection attempt to '{peer_ip}' (restricted)")
+        }
+        Ok(())
     }
 
     /// Disconnects from the given peer IP, if the peer is connected.
@@ -229,6 +266,11 @@ impl<N: Network> Router<N> {
     /// Returns `true` if the given peer IP is a connected client.
     pub fn is_connected_client(&self, peer_ip: &SocketAddr) -> bool {
         self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_client())
+    }
+
+    /// Returns `true` if the node is currently connecting to the given peer IP.
+    pub fn is_connecting(&self, ip: &SocketAddr) -> bool {
+        self.connecting_peers.lock().contains(ip)
     }
 
     /// Returns `true` if the given IP is restricted.

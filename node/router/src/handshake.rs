@@ -52,16 +52,37 @@ impl<N: Network> Router<N> {
         peer_side: ConnectionSide,
         genesis_header: Header<N>,
     ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, MessageCodec<N>>)> {
+        // If this is an inbound connection, we log it, but don't know the listening address yet.
+        // Otherwise, we can immediately register the listening address.
+        let mut peer_ip = if peer_side == ConnectionSide::Initiator {
+            debug!("Received a connection request from '{peer_addr}'");
+            None
+        } else {
+            Some(peer_addr)
+        };
+
+        // Perform the handshake; we pass on a mutable reference to peer_ip in case the process is broken at any point in time.
+        let handshake_result = self.handshake_inner(peer_addr, &mut peer_ip, stream, peer_side, genesis_header).await;
+
+        // Remove the address from the collection of connecting peers (if the handshake got to the point where it's known).
+        if let Some(ip) = peer_ip {
+            self.connecting_peers.lock().remove(&ip);
+        }
+
+        handshake_result
+    }
+
+    /// A helper that facilitates some extra error handling in `Router::handshake`.
+    async fn handshake_inner<'a>(
+        &'a self,
+        peer_addr: SocketAddr,
+        peer_ip: &mut Option<SocketAddr>,
+        stream: &'a mut TcpStream,
+        peer_side: ConnectionSide,
+        genesis_header: Header<N>,
+    ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, MessageCodec<N>>)> {
         // Construct the stream.
         let mut framed = Framed::new(stream, MessageCodec::<N>::default());
-
-        // Ensure the peer is allowed to connect.
-        if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_addr) {
-            return Err(error(format!("{forbidden_message}")));
-        }
-        if peer_side == ConnectionSide::Initiator {
-            debug!("Received a connection request from '{peer_addr}'");
-        }
 
         /* Step 1: Send the challenge request. */
 
@@ -93,6 +114,21 @@ impl<N: Network> Router<N> {
             _ => return Err(error(format!("'{peer_addr}' did not send a challenge request"))),
         };
         trace!("Received '{}-B' from '{peer_addr}'", request_b.name());
+
+        // Obtain the peer's listening address if it's an inbound connection.
+        if peer_ip.is_none() {
+            *peer_ip = Some(SocketAddr::new(peer_addr.ip(), request_b.listener_port));
+        }
+
+        // This value is now guaranteed to be present, so it can be unwrapped.
+        let peer_ip = peer_ip.unwrap();
+
+        // Knowing the peer's listening address, ensure it is allowed to connect.
+        if peer_side == ConnectionSide::Initiator {
+            if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_ip) {
+                return Err(error(format!("{forbidden_message}")));
+            }
+        }
 
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
         if let Some(reason) = self.verify_challenge_request(peer_addr, &request_b) {
@@ -140,12 +176,6 @@ impl<N: Network> Router<N> {
         /* Step 5: Add the peer to the router. */
 
         // Prepare the peer.
-        let peer_ip = match peer_side {
-            // The peer initiated the connection.
-            ConnectionSide::Initiator => SocketAddr::new(peer_addr.ip(), request_b.listener_port),
-            // This node initiated the connection.
-            ConnectionSide::Responder => peer_addr,
-        };
         let peer_address = request_b.address;
         let peer_type = request_b.node_type;
         let peer_version = request_b.version;
@@ -165,9 +195,9 @@ impl<N: Network> Router<N> {
         if self.is_local_ip(&peer_ip) {
             bail!("Dropping connection request from '{peer_ip}' (attempted to self-connect)")
         }
-        // Ensure the node does not surpass the maximum number of peer connections.
-        if self.number_of_connected_peers() >= self.max_connected_peers() {
-            bail!("Dropping connection request from '{peer_ip}' (maximum peers reached)")
+        // Ensure the node is not already connecting to this peer.
+        if !self.connecting_peers.lock().insert(peer_ip) {
+            bail!("Dropping connection request from '{peer_ip}' (already shaking hands as the initiator)")
         }
         // Ensure the node is not already connected to this peer.
         if self.is_connected(&peer_ip) {
