@@ -25,7 +25,7 @@ use itertools::Itertools;
 use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use rand::{prelude::IteratorRandom, CryptoRng, Rng};
-use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Instant};
+use std::{collections::BTreeMap, net::SocketAddr, time::Instant};
 
 pub const REDUNDANCY_FACTOR: usize = 3;
 pub const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
@@ -66,31 +66,31 @@ impl Hash for PeerPair {
 /// - the `request_timestamps` map remains unchanged.
 /// - When a response is removed/completed, the `requests` map and `request_timestamps` map also remove the entry for the request height.
 /// - When a request is timed out, the `requests`, `request_timestamps`, and `responses` map remove the entry for the request height;
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Sync<N: Network> {
     local_ip: OnceCell<SocketAddr>,
     /// The canonical map of block height to block hash.
     /// This map is a linearly-increasing map of block heights to block hashes,
     /// updated solely from the ledger and candidate blocks (not from peers' block locators, to ensure there are no forks).
-    canon: Arc<RwLock<BTreeMap<u32, N::BlockHash>>>,
+    canon: RwLock<BTreeMap<u32, N::BlockHash>>,
     /// The map of peer IP to their block locators.
     /// The block locators are consistent with the canonical map and every other peer's block locators.
-    locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
+    locators: RwLock<IndexMap<SocketAddr, BlockLocators<N>>>,
     /// The map of peer-to-peer to their common ancestor.
     /// This map is used to determine which peers to request blocks from.
-    common_ancestors: Arc<RwLock<IndexMap<PeerPair, u32>>>,
+    common_ancestors: RwLock<IndexMap<PeerPair, u32>>,
     /// The map of block height to the expected block hash and peer IPs.
     /// Each entry is removed when its corresponding entry in the responses map is removed.
-    requests: Arc<RwLock<BTreeMap<u32, SyncRequest<N>>>>,
+    requests: RwLock<BTreeMap<u32, SyncRequest<N>>>,
     /// The map of block height to the received blocks.
     /// Removing an entry from this map must remove the corresponding entry from the requests map.
-    responses: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
+    responses: RwLock<BTreeMap<u32, Block<N>>>,
     /// The map of block height to the timestamp of the last time the block was requested.
     /// This map is used to determine which requests to remove if they have been pending for too long.
-    request_timestamps: Arc<RwLock<BTreeMap<u32, Instant>>>,
+    request_timestamps: RwLock<BTreeMap<u32, Instant>>,
     /// The map of (timed out) peer IPs to their request timestamps.
     /// This map is used to determine which peers to remove if they have timed out too many times.
-    request_timeouts: Arc<RwLock<IndexMap<SocketAddr, Vec<Instant>>>>,
+    request_timeouts: RwLock<IndexMap<SocketAddr, Vec<Instant>>>,
 }
 
 impl<N: Network> Default for Sync<N> {
