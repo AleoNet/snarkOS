@@ -34,7 +34,7 @@ use rand::{rngs::OsRng, CryptoRng, Rng};
 use std::{
     net::SocketAddr,
     sync::{
-        atomic::{AtomicBool, AtomicU8, Ordering},
+        atomic::{AtomicBool, AtomicI64, AtomicU64, AtomicU8, Ordering},
         Arc,
     },
 };
@@ -61,6 +61,12 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
+
+    /// Placeholder timing for number of proofs per second.
+    start_time: Arc<AtomicI64>,
+    /// Number of proof attempts completed.
+    num_iterations: Arc<AtomicU64>,
+
     /// PhantomData.
     _phantom: PhantomData<C>,
 }
@@ -99,6 +105,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             max_puzzle_instances: u8::try_from(max_puzzle_instances)?,
             handles: Default::default(),
             shutdown: Default::default(),
+            start_time: Arc::new(AtomicI64::new(time::OffsetDateTime::now_utc().unix_timestamp())),
+            num_iterations: Default::default(),
             _phantom: Default::default(),
         };
         // Initialize the routing.
@@ -225,6 +233,9 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             .ok()
             .and_then(|solution| solution.to_target().ok().map(|solution_target| (solution_target, solution)));
 
+        // Log the prover speed.
+        self.increment_num_iterations();
+
         // Decrement the puzzle instances.
         self.decrement_puzzle_instances();
         // Return the result.
@@ -259,5 +270,25 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         self.puzzle_instances.fetch_sub(1, Ordering::SeqCst);
         #[cfg(debug_assertions)]
         trace!("Number of Instances - {}", self.num_puzzle_instances());
+    }
+
+    /// Increment the number of attempts at generating a proof.
+    fn increment_num_iterations(&self) {
+        let current_time = time::OffsetDateTime::now_utc().unix_timestamp();
+
+        // Find the amount of time that has elapsed since the pegged `start_time`.
+        let elapsed = current_time - self.start_time.load(Ordering::SeqCst);
+
+        let num_instances = self.num_iterations.load(Ordering::SeqCst);
+
+        trace!("Proofs per second - {}", num_instances * 1000 / elapsed as u64);
+
+        // If the amount of time has passed 1 minute, then reset the counter
+        if elapsed > 3600 {
+            self.start_time.store(current_time, Ordering::SeqCst);
+            self.puzzle_instances.store(1, Ordering::SeqCst);
+        } else {
+            self.puzzle_instances.fetch_add(1, Ordering::SeqCst);
+        }
     }
 }
