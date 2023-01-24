@@ -278,13 +278,19 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
 
         // Find the amount of time that has elapsed since the pegged `start_time`.
         let elapsed = current_time - self.start_time.load(Ordering::SeqCst);
+        let elapsed_in_seconds = current_time - self.start_time.load(Ordering::SeqCst);
 
         let num_instances = self.num_iterations.load(Ordering::SeqCst);
 
-        trace!("Proofs per second - {}", num_instances * 1000 / elapsed as u64);
+        trace!(
+            "Num attempts - {}, seconds elapsed - {}, Proofs per second - {}",
+            num_instances,
+            elapsed_in_seconds,
+            num_instances as f64 / elapsed_in_seconds as f64
+        );
 
         // If the amount of time has passed 1 minute, then reset the counter
-        if elapsed > 3600 {
+        if elapsed > 60000 {
             self.start_time.store(current_time, Ordering::SeqCst);
             self.puzzle_instances.store(1, Ordering::SeqCst);
         } else {
