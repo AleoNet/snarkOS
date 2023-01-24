@@ -277,7 +277,6 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         let current_time = time::OffsetDateTime::now_utc().unix_timestamp();
 
         // Find the amount of time that has elapsed since the pegged `start_time`.
-        let elapsed = current_time - self.start_time.load(Ordering::SeqCst);
         let elapsed_in_seconds = current_time - self.start_time.load(Ordering::SeqCst);
 
         let num_iterations = self.num_iterations.load(Ordering::SeqCst);
@@ -290,7 +289,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         );
 
         // If the amount of time has passed 1 minute, then reset the counter
-        if elapsed > 60000 {
+        if elapsed_in_seconds > 60 || num_iterations == 0 {
             self.start_time.store(current_time, Ordering::SeqCst);
             self.num_iterations.store(1, Ordering::SeqCst);
         } else {
