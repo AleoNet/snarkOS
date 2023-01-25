@@ -178,11 +178,12 @@ impl<N: Network> Cache<N> {
         key: K,
         interval_in_secs: i64,
     ) -> usize {
+        // Fetch the current timestamp.
+        let now = OffsetDateTime::now_utc();
+
         let mut map_write = map.write();
         // Load the entry for the key.
         let timestamps = map_write.entry(key).or_default();
-        // Fetch the current timestamp.
-        let now = OffsetDateTime::now_utc();
         // Insert the new timestamp.
         timestamps.push_back(now);
         // Retain only the timestamps that are within the recent interval.
