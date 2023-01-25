@@ -239,7 +239,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             solution: Data::Object(prover_solution),
         });
         // Propagate the "UnconfirmedSolution" to the connected validators.
-        self.propagate_to_validators(message, vec![]);
+        self.propagate_to_validators(message, &[]);
     }
 
     /// Returns the current number of puzzle instances.
