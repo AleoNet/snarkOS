@@ -457,7 +457,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         ));
 
         // Propagate the block to all beacons.
-        self.propagate_to_beacons(message, vec![]);
+        self.propagate_to_beacons(message, &[]);
 
         Ok(())
     }
