@@ -126,12 +126,10 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
             Message::BlockResponse(message) => {
                 let request = message.request;
 
-                // Check that this node previously sent a block request to this peer.
-                if !self.router().cache.contains_outbound_block_request(&peer_ip, &request) {
+                // Remove the block request, checking if this node previously sent a block request to this peer.
+                if !self.router().cache.remove_outbound_block_request(peer_ip, &request) {
                     bail!("Peer '{peer_ip}' is not following the protocol (unexpected block response)")
                 }
-                // Remove the block request.
-                self.router().cache.remove_outbound_block_request(peer_ip, &request);
 
                 // Perform the deferred non-blocking deserialization of the blocks.
                 let blocks = match message.blocks.deserialize().await {
