@@ -29,7 +29,7 @@ use snarkvm::prelude::{Block, CoinbasePuzzle, ConsensusStorage, EpochChallenge, 
 use anyhow::Result;
 use colored::Colorize;
 use core::{marker::PhantomData, time::Duration};
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use rand::{rngs::OsRng, CryptoRng, Rng};
 use std::{
     net::SocketAddr,
@@ -58,7 +58,7 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     /// The maximum number of puzzle instances.
     max_puzzle_instances: u8,
     /// The spawned handles.
-    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
     /// PhantomData.
@@ -124,7 +124,7 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
 
         // Abort the tasks.
         trace!("Shutting down the prover...");
-        self.handles.read().iter().for_each(|handle| handle.abort());
+        self.handles.lock().iter().for_each(|handle| handle.abort());
 
         // Shut down the router.
         self.router.shut_down().await;
@@ -138,7 +138,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     async fn initialize_coinbase_puzzle(&self) {
         for _ in 0..self.max_puzzle_instances {
             let prover = self.clone();
-            self.handles.write().push(tokio::spawn(async move {
+            self.handles.lock().push(tokio::spawn(async move {
                 prover.coinbase_puzzle_loop().await;
             }));
         }

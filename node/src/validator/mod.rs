@@ -30,7 +30,7 @@ use snarkos_node_tcp::{
 use snarkvm::prelude::{Block, ConsensusStorage, Header, Network, ProverSolution};
 
 use anyhow::Result;
-use parking_lot::RwLock;
+use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
     sync::{
@@ -53,7 +53,7 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     /// The REST server of the node.
     rest: Option<Arc<Rest<N, C, Self>>>,
     /// The spawned handles.
-    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
 }
@@ -140,7 +140,7 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
 
         // Abort the tasks.
         trace!("Shutting down the validator...");
-        self.handles.read().iter().for_each(|handle| handle.abort());
+        self.handles.lock().iter().for_each(|handle| handle.abort());
 
         // Shut down the router.
         self.router.shut_down().await;
@@ -163,7 +163,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Start the sync loop.
         let validator = self.clone();
-        self.handles.write().push(tokio::spawn(async move {
+        self.handles.lock().push(tokio::spawn(async move {
             loop {
                 // If the Ctrl-C handler registered the signal, stop the node.
                 if validator.shutdown.load(Ordering::Relaxed) {
