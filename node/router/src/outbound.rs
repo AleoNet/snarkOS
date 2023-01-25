@@ -104,17 +104,12 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         // }
 
         // Prepare the peers to send to.
-        let peers = self
-            .router()
-            .connected_peers()
-            .iter()
-            .filter(|peer_ip| !excluded_peers.contains(peer_ip))
-            .copied()
-            .collect::<Vec<_>>();
+        let connected_peers = self.router().connected_peers();
+        let peers = connected_peers.iter().filter(|peer_ip| !excluded_peers.contains(peer_ip));
 
         // Iterate through all peers that are not the sender and excluded peers.
         for peer_ip in peers {
-            self.send(peer_ip, message.clone());
+            self.send(*peer_ip, message.clone());
         }
     }
 
@@ -143,17 +138,12 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         // }
 
         // Prepare the peers to send to.
-        let peers = self
-            .router()
-            .connected_beacons()
-            .iter()
-            .filter(|peer_ip| !excluded_peers.contains(peer_ip))
-            .copied()
-            .collect::<Vec<_>>();
+        let connected_beacons = self.router().connected_beacons();
+        let peers = connected_beacons.iter().filter(|peer_ip| !excluded_peers.contains(peer_ip));
 
         // Iterate through all beacons that are not the sender and excluded beacons.
         for peer_ip in peers {
-            self.send(peer_ip, message.clone());
+            self.send(*peer_ip, message.clone());
         }
     }
 
@@ -182,17 +172,12 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         // }
 
         // Prepare the peers to send to.
-        let peers = self
-            .router()
-            .connected_validators()
-            .iter()
-            .filter(|peer_ip| !excluded_peers.contains(peer_ip))
-            .copied()
-            .collect::<Vec<_>>();
+        let connected_validators = self.router().connected_validators();
+        let peers = connected_validators.iter().filter(|peer_ip| !excluded_peers.contains(peer_ip));
 
         // Iterate through all beacons that are not the sender and excluded beacons.
         for peer_ip in peers {
-            self.send(peer_ip, message.clone());
+            self.send(*peer_ip, message.clone());
         }
     }
 
