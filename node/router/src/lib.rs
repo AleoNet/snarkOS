@@ -89,7 +89,7 @@ pub struct InnerRouter<N: Network> {
     /// The set of restricted peer IPs.
     restricted_peers: RwLock<IndexMap<SocketAddr, Instant>>,
     /// The spawned handles.
-    handles: RwLock<Vec<JoinHandle<()>>>,
+    handles: Mutex<Vec<JoinHandle<()>>>,
     /// The boolean flag for the development mode.
     is_dev: bool,
 }
@@ -489,14 +489,14 @@ impl<N: Network> Router<N> {
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
     pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
-        self.handles.write().push(tokio::spawn(future));
+        self.handles.lock().push(tokio::spawn(future));
     }
 
     /// Shuts down the router.
     pub async fn shut_down(&self) {
         trace!("Shutting down the router...");
         // Abort the tasks.
-        self.handles.read().iter().for_each(|handle| handle.abort());
+        self.handles.lock().iter().for_each(|handle| handle.abort());
         // Close the listener.
         self.tcp.shut_down().await;
     }
