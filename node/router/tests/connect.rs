@@ -23,8 +23,6 @@ use core::time::Duration;
 
 #[tokio::test]
 async fn test_connect_without_handshake() {
-    initialize_logger(3);
-
     // Create 2 routers.
     let node0 = validator(0, 2).await;
     let node1 = client(0, 2).await;
@@ -81,8 +79,6 @@ async fn test_connect_without_handshake() {
 
 #[tokio::test]
 async fn test_connect_with_handshake() {
-    initialize_logger(3);
-
     // Create 2 routers.
     let node0 = validator(0, 2).await;
     let node1 = client(0, 2).await;
@@ -159,8 +155,6 @@ async fn test_connect_with_handshake() {
 #[ignore]
 #[tokio::test]
 async fn test_connect_simultaneously_with_handshake() {
-    initialize_logger(3);
-
     // Create 2 routers.
     let node0 = validator(0, 2).await;
     let node1 = client(0, 2).await;

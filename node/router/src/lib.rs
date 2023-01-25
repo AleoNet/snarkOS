@@ -145,7 +145,6 @@ impl<N: Network> Router<N> {
         let router = self.clone();
         tokio::spawn(async move {
             // Attempt to connect to the candidate peer.
-            debug!("Connecting to {peer_ip}...");
             match router.tcp.connect(peer_ip).await {
                 // Remove the peer from the candidate peers.
                 Ok(()) => router.remove_candidate_peer(peer_ip),
