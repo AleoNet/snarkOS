@@ -198,7 +198,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
                 Ok(Ok(true)) => {
                     let message = Message::UnconfirmedSolution(serialized);
                     // Propagate the "UnconfirmedSolution" to the connected validators.
-                    self.propagate_to_validators(message, vec![peer_ip]);
+                    self.propagate_to_validators(message, &[peer_ip]);
                 }
                 Ok(Ok(false)) | Ok(Err(_)) => {
                     trace!("Invalid prover solution '{}' for the proof target.", solution.commitment())
@@ -217,7 +217,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         _transaction: Transaction<N>,
     ) -> bool {
         // Propagate the `UnconfirmedTransaction`.
-        self.propagate(Message::UnconfirmedTransaction(serialized), vec![peer_ip]);
+        self.propagate(Message::UnconfirmedTransaction(serialized), &[peer_ip]);
         true
     }
 }

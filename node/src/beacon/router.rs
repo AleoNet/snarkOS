@@ -241,7 +241,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
         }
         let message = Message::UnconfirmedSolution(serialized);
         // Propagate the "UnconfirmedSolution" to the connected beacons.
-        self.propagate_to_beacons(message, vec![peer_ip]);
+        self.propagate_to_beacons(message, &[peer_ip]);
         true
     }
 
@@ -259,7 +259,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
         }
         let message = Message::UnconfirmedTransaction(serialized);
         // Propagate the "UnconfirmedTransaction" to the connected beacons.
-        self.propagate_to_beacons(message, vec![peer_ip]);
+        self.propagate_to_beacons(message, &[peer_ip]);
         true
     }
 }

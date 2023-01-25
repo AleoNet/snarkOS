@@ -225,9 +225,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         }
         let message = Message::UnconfirmedSolution(serialized);
         // Propagate the "UnconfirmedSolution" to the connected beacons.
-        self.propagate_to_beacons(message.clone(), vec![peer_ip]);
+        self.propagate_to_beacons(message.clone(), &[peer_ip]);
         // Propagate the "UnconfirmedSolution" to the connected validators.
-        self.propagate_to_validators(message, vec![peer_ip]);
+        self.propagate_to_validators(message, &[peer_ip]);
         true
     }
 
@@ -240,9 +240,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
     ) -> bool {
         let message = Message::UnconfirmedTransaction(serialized);
         // Propagate the "UnconfirmedTransaction" to the connected beacons.
-        self.propagate_to_beacons(message.clone(), vec![peer_ip]);
+        self.propagate_to_beacons(message.clone(), &[peer_ip]);
         // Propagate the "UnconfirmedTransaction" to the connected validators.
-        self.propagate_to_validators(message, vec![peer_ip]);
+        self.propagate_to_validators(message, &[peer_ip]);
         true
     }
 }

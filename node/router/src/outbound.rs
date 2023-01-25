@@ -80,7 +80,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     }
 
     /// Sends the given message to every connected peer, excluding the sender and any specified peer IPs.
-    fn propagate(&self, message: Message<N>, excluded_peers: Vec<SocketAddr>) {
+    fn propagate(&self, message: Message<N>, excluded_peers: &[SocketAddr]) {
         // TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         // if let Message::BeaconPropose(ref mut message) = message {
@@ -114,7 +114,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     }
 
     /// Sends the given message to every connected beacon, excluding the sender and any specified IPs.
-    fn propagate_to_beacons(&self, message: Message<N>, excluded_peers: Vec<SocketAddr>) {
+    fn propagate_to_beacons(&self, message: Message<N>, excluded_peers: &[SocketAddr]) {
         // TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         // if let Message::BeaconPropose(ref mut message) = message {
@@ -148,7 +148,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     }
 
     /// Sends the given message to every connected validator, excluding the sender and any specified IPs.
-    fn propagate_to_validators(&self, message: Message<N>, excluded_peers: Vec<SocketAddr>) {
+    fn propagate_to_validators(&self, message: Message<N>, excluded_peers: &[SocketAddr]) {
         // TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         // if let Message::BeaconPropose(ref mut message) = message {
