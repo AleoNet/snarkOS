@@ -108,7 +108,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
             .router()
             .connected_peers()
             .iter()
-            .filter(|peer_ip| !self.router().is_local_ip(peer_ip) && !excluded_peers.contains(peer_ip))
+            .filter(|peer_ip| !excluded_peers.contains(peer_ip))
             .copied()
             .collect::<Vec<_>>();
 
@@ -147,7 +147,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
             .router()
             .connected_beacons()
             .iter()
-            .filter(|peer_ip| !self.router().is_local_ip(peer_ip) && !excluded_peers.contains(peer_ip))
+            .filter(|peer_ip| !excluded_peers.contains(peer_ip))
             .copied()
             .collect::<Vec<_>>();
 
@@ -186,7 +186,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
             .router()
             .connected_validators()
             .iter()
-            .filter(|peer_ip| !self.router().is_local_ip(peer_ip) && !excluded_peers.contains(peer_ip))
+            .filter(|peer_ip| !excluded_peers.contains(peer_ip))
             .copied()
             .collect::<Vec<_>>();
 
