@@ -187,7 +187,7 @@ impl<N: Network> Cache<N> {
         // Insert the new timestamp.
         timestamps.push_back(now);
         // Retain only the timestamps that are within the recent interval.
-        while timestamps.iter().next().map_or(false, |t| now - *t > Duration::seconds(interval_in_secs)) {
+        while timestamps.front().map_or(false, |t| now - *t > Duration::seconds(interval_in_secs)) {
             timestamps.pop_front();
         }
         // Return the frequency of recent requests.
