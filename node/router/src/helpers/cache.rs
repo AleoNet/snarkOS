@@ -131,12 +131,10 @@ impl<N: Network> Cache<N> {
         requests.len()
     }
 
-    /// Removes the block request for the given peer IP, returning the number of remaining requests.
-    pub fn remove_outbound_block_request(&self, peer_ip: SocketAddr, request: &BlockRequest) -> usize {
+    /// Removes the block request for the given peer IP, returning `true` if the request was present.
+    pub fn remove_outbound_block_request(&self, peer_ip: SocketAddr, request: &BlockRequest) -> bool {
         let mut map_write = self.seen_outbound_block_requests.write();
-        let requests = map_write.entry(peer_ip).or_default();
-        requests.remove(request);
-        requests.len()
+        if let Some(requests) = map_write.get_mut(&peer_ip) { requests.remove(request) } else { false }
     }
 
     /// Returns `true` if the cache contains a puzzle request from the given peer.
@@ -180,15 +178,16 @@ impl<N: Network> Cache<N> {
         key: K,
         interval_in_secs: i64,
     ) -> usize {
+        // Fetch the current timestamp.
+        let now = OffsetDateTime::now_utc();
+
         let mut map_write = map.write();
         // Load the entry for the key.
         let timestamps = map_write.entry(key).or_default();
-        // Fetch the current timestamp.
-        let now = OffsetDateTime::now_utc();
         // Insert the new timestamp.
         timestamps.push_back(now);
         // Retain only the timestamps that are within the recent interval.
-        while timestamps.iter().next().map_or(false, |t| now - *t > Duration::seconds(interval_in_secs)) {
+        while timestamps.front().map_or(false, |t| now - *t > Duration::seconds(interval_in_secs)) {
             timestamps.pop_front();
         }
         // Return the frequency of recent requests.

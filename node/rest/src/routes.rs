@@ -377,7 +377,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         });
 
         // Broadcast the transaction.
-        routing.propagate(message, vec![]);
+        routing.propagate(message, &[]);
 
         Ok("OK")
     }

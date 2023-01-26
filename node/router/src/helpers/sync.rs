@@ -145,7 +145,7 @@ impl<N: Network> Sync<N> {
         self.locators.read().iter().map(|(peer_ip, locators)| (locators.latest_locator_height(), *peer_ip)).fold(
             Default::default(),
             |mut map, (height, peer_ip)| {
-                map.entry(height).or_insert_with(Vec::new).push(peer_ip);
+                map.entry(height).or_default().push(peer_ip);
                 map
             },
         )
