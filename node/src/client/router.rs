@@ -152,9 +152,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
     }
 
     /// Saves the latest epoch challenge and latest block header in the node.
-    fn puzzle_response(&self, peer_ip: SocketAddr, serialized: PuzzleResponse<N>, header: Header<N>) -> bool {
+    fn puzzle_response(&self, peer_ip: SocketAddr, epoch_challenge: EpochChallenge<N>, header: Header<N>) -> bool {
         // Retrieve the epoch number.
-        let epoch_number = serialized.epoch_challenge.epoch_number();
+        let epoch_number = epoch_challenge.epoch_number();
         // Retrieve the block height.
         let block_height = header.height();
 
@@ -165,7 +165,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
         );
 
         // Save the latest epoch challenge in the node.
-        self.latest_epoch_challenge.write().replace(serialized.epoch_challenge);
+        self.latest_epoch_challenge.write().replace(epoch_challenge);
         // Save the latest block header in the node.
         self.latest_block_header.write().replace(header);
 
