@@ -22,7 +22,6 @@ use snarkos_node_messages::{
     MessageCodec,
     Ping,
     Pong,
-    PuzzleResponse,
     UnconfirmedSolution,
     UnconfirmedTransaction,
 };
@@ -34,7 +33,7 @@ use snarkos_node_tcp::{
     Tcp,
     P2P,
 };
-use snarkvm::prelude::{Block, Header, Network, ProverSolution, Transaction};
+use snarkvm::prelude::{Block, EpochChallenge, Header, Network, ProverSolution, Transaction};
 
 use async_trait::async_trait;
 use futures_util::sink::SinkExt;
@@ -170,7 +169,7 @@ impl<N: Network> Inbound<N> for TestRouter<N> {
     }
 
     /// Handles an `PuzzleResponse` message.
-    fn puzzle_response(&self, _peer_ip: SocketAddr, _serialized: PuzzleResponse<N>, _header: Header<N>) -> bool {
+    fn puzzle_response(&self, _peer_ip: SocketAddr, _epoch_challenge: EpochChallenge<N>, _header: Header<N>) -> bool {
         true
     }
 

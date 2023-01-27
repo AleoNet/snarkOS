@@ -23,12 +23,11 @@ use snarkos_node_messages::{
     PeerResponse,
     Ping,
     Pong,
-    PuzzleResponse,
     UnconfirmedSolution,
     UnconfirmedTransaction,
 };
 use snarkos_node_tcp::protocols::Reading;
-use snarkvm::prelude::{Block, Header, Network, ProverSolution, Transaction};
+use snarkvm::prelude::{Block, EpochChallenge, Header, Network, ProverSolution, Transaction};
 
 use anyhow::{bail, ensure, Result};
 use std::{net::SocketAddr, time::Instant};
@@ -202,15 +201,13 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 // Decrement the number of puzzle requests.
                 self.router().cache.decrement_outbound_puzzle_requests(peer_ip);
 
-                // Clone the serialized message.
-                let serialized = message.clone();
                 // Perform the deferred non-blocking deserialization of the block header.
                 let header = match message.block_header.deserialize().await {
                     Ok(header) => header,
                     Err(error) => bail!("[PuzzleResponse] {error}"),
                 };
                 // Process the puzzle response.
-                match self.puzzle_response(peer_ip, serialized, header) {
+                match self.puzzle_response(peer_ip, message.epoch_challenge, header) {
                     true => Ok(()),
                     false => bail!("Peer '{peer_ip}' sent an invalid puzzle response"),
                 }
@@ -383,7 +380,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     fn puzzle_request(&self, peer_ip: SocketAddr) -> bool;
 
     /// Handles a `PuzzleResponse` message.
-    fn puzzle_response(&self, peer_ip: SocketAddr, _serialized: PuzzleResponse<N>, _header: Header<N>) -> bool;
+    fn puzzle_response(&self, peer_ip: SocketAddr, _challenge: EpochChallenge<N>, _header: Header<N>) -> bool;
 
     /// Handles an `UnconfirmedSolution` message.
     async fn unconfirmed_solution(
