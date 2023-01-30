@@ -31,7 +31,7 @@ features = ["derive"]
 version = "2"
 
 [dependencies.crossterm]
-version = "0.25"
+version = "0.26"
 
 [target.'cfg(target_family = "unix")'.dependencies.nix]
 version = "0.26"
