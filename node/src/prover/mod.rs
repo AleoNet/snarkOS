@@ -50,7 +50,7 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     /// The coinbase puzzle.
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The latest epoch challenge.
-    latest_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
+    latest_epoch_challenge: Arc<RwLock<Option<Arc<EpochChallenge<N>>>>>,
     /// The latest block header.
     latest_block_header: Arc<RwLock<Option<Header<N>>>>,
     /// The number of puzzle instances.
@@ -175,7 +175,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 // Execute the coinbase puzzle.
                 let prover = self.clone();
                 let result = tokio::task::spawn_blocking(move || {
-                    prover.coinbase_puzzle_iteration(challenge, coinbase_target, proof_target, &mut OsRng)
+                    prover.coinbase_puzzle_iteration(&challenge, coinbase_target, proof_target, &mut OsRng)
                 })
                 .await;
 
@@ -201,7 +201,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Performs one iteration of the coinbase puzzle.
     fn coinbase_puzzle_iteration<R: Rng + CryptoRng>(
         &self,
-        epoch_challenge: EpochChallenge<N>,
+        epoch_challenge: &EpochChallenge<N>,
         coinbase_target: u64,
         proof_target: u64,
         rng: &mut R,
@@ -221,7 +221,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         // Compute the prover solution.
         let result = self
             .coinbase_puzzle
-            .prove(&epoch_challenge, self.address(), rng.gen(), Some(proof_target))
+            .prove(epoch_challenge, self.address(), rng.gen(), Some(proof_target))
             .ok()
             .and_then(|solution| solution.to_target().ok().map(|solution_target| (solution_target, solution)));
 
