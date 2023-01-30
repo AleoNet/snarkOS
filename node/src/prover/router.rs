@@ -172,7 +172,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
         );
 
         // Save the latest epoch challenge in the node.
-        self.latest_epoch_challenge.write().replace(epoch_challenge);
+        self.latest_epoch_challenge.write().replace(Arc::new(epoch_challenge));
         // Save the latest block header in the node.
         self.latest_block_header.write().replace(header);
 
