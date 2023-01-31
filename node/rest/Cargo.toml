@@ -31,6 +31,9 @@ version = "8.2"
 [dependencies.once_cell]
 version = "1.13"
 
+[dependencies.parking_lot]
+version = "0.12"
+
 [dependencies.serde]
 version = "1"
 default-features = false
