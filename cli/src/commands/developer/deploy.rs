@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use super::*;
+use super::{Developer, Network};
 
 use snarkvm::prelude::{
     ConsensusMemory,
@@ -56,6 +56,7 @@ pub struct Deploy {
     /// A path to a directory containing a manifest file. Defaults to the current working directory.
     #[clap(long, help = "A path to a directory containing a manifest file")]
     path: Option<String>,
+    /// Display the generated transaction.
     #[clap(
         short,
         long,
@@ -92,7 +93,7 @@ impl Deploy {
         };
 
         // Fetch the program from the directory.
-        let program = Developer::fetch_program(self.program_id, self.path)?;
+        let program = Developer::parse_program(self.program_id, self.path)?;
 
         println!("📦 Creating deployment transaction for '{}'...\n", &self.program_id.to_string().bold());
 
@@ -125,4 +126,15 @@ impl Deploy {
         // Determine if the transaction should be broadcast or displayed to user.
         Developer::handle_transaction(self.broadcast, self.display, deployment, self.program_id.to_string())
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_decrypt() {}
+
+    #[test]
+    fn test_failed_decryption() {}
 }

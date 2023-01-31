@@ -14,6 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use super::Network;
+
 use snarkvm::{
     console::program::Ciphertext,
     prelude::{Record, ViewKey},
@@ -23,9 +25,7 @@ use anyhow::{bail, Result};
 use clap::Parser;
 use std::str::FromStr;
 
-type Network = snarkvm::prelude::Testnet3;
-
-/// Cleans the snarkOS node storage.
+/// Decrypts a record ciphertext.
 #[derive(Debug, Parser)]
 pub struct Decrypt {
     /// The record ciphertext to decrypt.
@@ -55,4 +55,15 @@ impl Decrypt {
             Err(_) => bail!("Invalid view key for the provided record ciphertext"),
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_decrypt() {}
+
+    #[test]
+    fn test_failed_decryption() {}
 }
