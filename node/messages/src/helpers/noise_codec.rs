@@ -386,11 +386,8 @@ mod tests {
 
     #[test]
     fn ping_roundtrip() {
-        let ping = MessageOrBytes::Message(Box::new(Message::Ping(Ping::<CurrentNetwork> {
-            version: 0,
-            node_type: NodeType::Client,
-            block_locators: None,
-        })));
+        let ping =
+            MessageOrBytes::Message(Box::new(Message::Ping(Ping::<CurrentNetwork>::new(NodeType::Client, None))));
 
         assert_roundtrip(ping)
     }
