@@ -23,6 +23,9 @@ pub use deploy::*;
 mod execute;
 pub use execute::*;
 
+mod scan;
+pub use scan::*;
+
 use snarkvm::{
     file::{AleoFile, Manifest},
     package::Package,
@@ -42,22 +45,25 @@ pub enum Developer {
     /// Decrypt a ciphertext
     Decrypt(Decrypt),
     /// Deploy a program.
-    Deploy,
+    Deploy(Deploy),
     /// Execute a program function.
-    Execute,
+    Execute(Execute),
+    /// Scan the node for records.
+    Scan(Scan),
 }
 
 impl Developer {
     pub fn parse(self) -> Result<String> {
         match self {
             Self::Decrypt(decrypt) => decrypt.parse(),
-            Self::Deploy => Ok("".to_string()),
-            Self::Execute => Ok("".to_string()),
+            Self::Deploy(deploy) => deploy.parse(),
+            Self::Execute(execute) => execute.parse(),
+            Self::Scan(scan) => scan.parse(),
         }
     }
 
-    /// Fetch the program from the directory.
-    fn fetch_program(program_id: ProgramID<Network>, path: Option<String>) -> Result<Program<Network>> {
+    /// Parse the program from the directory.
+    fn parse_program(program_id: ProgramID<Network>, path: Option<String>) -> Result<Program<Network>> {
         // Instantiate a path to the directory containing the manifest file.
         let directory = match path {
             Some(path) => PathBuf::from_str(&path)?,
@@ -117,12 +123,9 @@ impl Developer {
             let transaction_id = transaction.id();
 
             // Send the deployment request to the local development node.
-            let response = ureq::post(&endpoint)
-                .send_json(&transaction)?
-                .into_json::<<Network as snarkvm::prelude::Network>::TransactionID>();
-            match response {
+            match ureq::post(&endpoint).send_json(&transaction)?.into_string() {
                 Ok(id) => {
-                    ensure!(id == transaction_id, "The response does not match the transaction id");
+                    ensure!(id == transaction_id.to_string(), "The response does not match the transaction id");
 
                     match transaction {
                         Transaction::Deploy(..) => {
