@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use super::*;
+use super::{Developer, Network, Program};
 
 use snarkvm::prelude::{
     ConsensusMemory,
@@ -61,9 +61,7 @@ pub struct Execute {
     /// The endpoint to query node state from.
     #[clap(short = 'q', long, help = "The endpoint to query node state from")]
     query: String,
-    /// A path to a directory containing a manifest file. Defaults to the current working directory.
-    #[clap(long, help = "A path to a directory containing a manifest file")]
-    path: Option<String>,
+    /// Display the generated transaction.
     #[clap(
         short,
         long,
@@ -83,7 +81,7 @@ impl Execute {
     #[allow(clippy::format_in_format_args)]
     pub fn parse(self) -> Result<String> {
         // Specify the query
-        let query = Query::from(self.query);
+        let query = Query::from(&self.query);
 
         // Retrieve the private key.
         let private_key = PrivateKey::from_str(&self.private_key)?;
@@ -100,9 +98,9 @@ impl Execute {
             None => None,
         };
 
-        // TODO (raychu86): Add support for fetching the program from the network.
-        // Fetch the program from the directory.
-        let program = Developer::fetch_program(self.program_id, self.path)?;
+        // Fetch the program from query node.
+        let program: Program<Network> =
+            ureq::get(&format!("{}/testnet3/program/{}", self.query, self.program_id)).call()?.into_json()?;
 
         println!("📦 Creating execution transaction for '{}'...\n", &self.program_id.to_string().bold());
 
@@ -116,8 +114,10 @@ impl Execute {
             let vm = VM::from(store)?;
 
             // Add the program deployment to the VM.
-            let deployment = vm.deploy(&program, rng)?;
-            vm.process().write().finalize_deployment(vm.program_store(), &deployment)?;
+            if program.id() != &ProgramID::<Network>::try_from("credits.aleo")? {
+                let deployment = vm.deploy(&program, rng)?;
+                vm.process().write().finalize_deployment(vm.program_store(), &deployment)?;
+            }
 
             // Prepare the fees.
             let fee = match self.record {
@@ -154,4 +154,20 @@ impl Execute {
         // Determine if the transaction should be broadcast or displayed to user.
         Developer::handle_transaction(self.broadcast, self.display, execution, locator.to_string())
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_execute() {}
+
+    #[test]
+    fn test_failed_execution() {}
+
+    // TODO (raychu86):
+    // 1. Execution without deployment
+    // 2. Execution with incorrect inputs
+    // 3. Execution with incorrect function
 }
