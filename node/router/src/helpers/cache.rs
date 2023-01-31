@@ -24,7 +24,6 @@ use parking_lot::RwLock;
 use std::{
     collections::VecDeque,
     net::{IpAddr, SocketAddr},
-    sync::atomic::{AtomicU16, Ordering::SeqCst},
 };
 use time::{Duration, OffsetDateTime};
 
@@ -51,7 +50,7 @@ pub struct Cache<N: Network> {
     /// The map of peer IPs to their block requests.
     seen_outbound_block_requests: RwLock<IndexMap<SocketAddr, IndexSet<BlockRequest>>>,
     /// The map of peer IPs to the number of puzzle requests.
-    seen_outbound_puzzle_requests: RwLock<IndexMap<SocketAddr, AtomicU16>>,
+    seen_outbound_puzzle_requests: RwLock<IndexMap<SocketAddr, u16>>,
     /// The map of solution commitments to their last seen timestamp.
     seen_outbound_solutions: RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>,
     /// The map of transaction IDs to their last seen timestamp.
@@ -195,23 +194,23 @@ impl<N: Network> Cache<N> {
     }
 
     /// Increments the key's counter in the map, returning the updated counter.
-    fn increment_counter<K: Hash + Eq>(map: &RwLock<IndexMap<K, AtomicU16>>, key: K) -> u16 {
+    fn increment_counter<K: Hash + Eq>(map: &RwLock<IndexMap<K, u16>>, key: K) -> u16 {
+        let mut map_write = map.write();
         // Load the entry for the key, and increment the counter.
-        let previous_entry = map.write().entry(key).or_default().fetch_add(1, SeqCst);
+        let entry = map_write.entry(key).or_default();
+        *entry = entry.saturating_add(1);
         // Return the updated counter.
-        previous_entry.saturating_add(1)
+        *entry
     }
 
     /// Decrements the key's counter in the map, returning the updated counter.
-    fn decrement_counter<K: Hash + Eq>(map: &RwLock<IndexMap<K, AtomicU16>>, key: K) -> u16 {
+    fn decrement_counter<K: Hash + Eq>(map: &RwLock<IndexMap<K, u16>>, key: K) -> u16 {
         let mut map_write = map.write();
-        // Load the entry for the key.
+        // Load the entry for the key, and decrement the counter.
         let entry = map_write.entry(key).or_default();
-        // Conditionally decrement the counter.
-        match entry.load(SeqCst) > 0 {
-            true => entry.fetch_sub(1, SeqCst).saturating_sub(1),
-            false => 0,
-        }
+        *entry = entry.saturating_sub(1);
+        // Return the updated counter.
+        *entry
     }
 
     /// Updates the map by enforcing the maximum cache size.
