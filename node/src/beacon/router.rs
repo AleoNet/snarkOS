@@ -61,8 +61,7 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Beacon<N, C> {
         };
 
         // Send the first `Ping` message to the peer.
-        let message =
-            Message::Ping(Ping::<N> { version: Message::<N>::VERSION, node_type: self.node_type(), block_locators });
+        let message = Message::Ping(Ping::new(self.node_type(), block_locators));
         trace!("Sending '{}' to '{peer_ip}'", message.name());
         framed.send(message).await?;
 
