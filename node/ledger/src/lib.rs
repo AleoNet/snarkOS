@@ -169,8 +169,8 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     }
 
     /// Returns the latest state root.
-    pub fn latest_state_root(&self) -> Field<N> {
-        *self.vm.block_store().current_state_root()
+    pub fn latest_state_root(&self) -> N::StateRoot {
+        self.vm.block_store().current_state_root()
     }
 
     /// Returns the latest block.

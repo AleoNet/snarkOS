@@ -169,7 +169,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Returns a candidate for the next block in the ledger.
     pub fn propose_next_block<R: Rng + CryptoRng>(&self, private_key: &PrivateKey<N>, rng: &mut R) -> Result<Block<N>> {
         // Retrieve the latest state root.
-        let latest_state_root = self.ledger.latest_state_root();
+        let latest_state_root = *self.ledger.latest_state_root();
         // Retrieve the latest block.
         let latest_block = self.ledger.latest_block();
         // Retrieve the latest height.
