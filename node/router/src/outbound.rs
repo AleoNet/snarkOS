@@ -29,14 +29,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
 
     /// Sends a "Ping" message to the given peer.
     fn send_ping(&self, peer_ip: SocketAddr, block_locators: Option<BlockLocators<N>>) {
-        self.send(
-            peer_ip,
-            Message::Ping(Ping::<N> {
-                version: Message::<N>::VERSION,
-                node_type: self.router().node_type(),
-                block_locators,
-            }),
-        );
+        self.send(peer_ip, Message::Ping(Ping::new(self.router().node_type(), block_locators)));
     }
 
     /// Sends the given message to specified peer.
