@@ -99,7 +99,7 @@ impl Scan {
             let request_end = request_start.saturating_add(num_blocks_to_request);
 
             // Establish the endpoint.
-            let endpoint = format!("{}/testnet3/blocks?start={}&end={}", endpoint, request_start, request_end);
+            let endpoint = format!("{endpoint}/testnet3/blocks?start={request_start}&end={request_end}");
 
             // Fetch blocks
             let blocks: Vec<Block<Network>> = ureq::get(&endpoint).call()?.into_json()?;
@@ -108,9 +108,9 @@ impl Scan {
             for block in &blocks {
                 for (_, record) in block.records() {
                     // Check if the record is owned by the given view key.
-                    if record.is_owner_with_address_x_coordinate(&view_key, &address_x_coordinate) {
+                    if record.is_owner_with_address_x_coordinate(view_key, &address_x_coordinate) {
                         // Decrypt the record.
-                        records.push(record.decrypt(&view_key)?);
+                        records.push(record.decrypt(view_key)?);
                     }
                 }
             }
