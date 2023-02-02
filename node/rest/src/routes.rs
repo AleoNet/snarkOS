@@ -153,21 +153,21 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .and(with(self.ledger.clone()))
             .and_then(Self::find_block_hash);
 
-        // GET /testnet3/find/deploymentID/{programID}
-        let find_deployment_id = warp::get()
-            .and(warp::path!("testnet3" / "find" / "deploymentID" / ..))
+        // GET /testnet3/find/transactionID/deployment/{programID}
+        let find_transaction_id_from_program_id = warp::get()
+            .and(warp::path!("testnet3" / "find" / "transactionID" / "deployment" / ..))
             .and(warp::path::param::<ProgramID<N>>())
             .and(warp::path::end())
             .and(with(self.ledger.clone()))
-            .and_then(Self::find_deployment_id);
+            .and_then(Self::find_transaction_id_from_program_id);
 
         // GET /testnet3/find/transactionID/{transitionID}
-        let find_transaction_id = warp::get()
+        let find_transaction_id_from_transition_id = warp::get()
             .and(warp::path!("testnet3" / "find" / "transactionID" / ..))
             .and(warp::path::param::<N::TransitionID>())
             .and(warp::path::end())
             .and(with(self.ledger.clone()))
-            .and_then(Self::find_transaction_id);
+            .and_then(Self::find_transaction_id_from_transition_id);
 
         // GET /testnet3/find/transitionID/{inputOrOutputID}
         let find_transition_id = warp::get()
@@ -206,8 +206,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .or(get_peers_all_metrics)
             .or(get_node_address)
             .or(find_block_hash)
-            .or(find_deployment_id)
-            .or(find_transaction_id)
+            .or(find_transaction_id_from_program_id)
+            .or(find_transaction_id_from_transition_id)
             .or(find_transition_id)
             .or(transaction_broadcast)
     }
@@ -341,16 +341,19 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     }
 
     /// Returns the transaction ID that contains the given `program ID`.
-    async fn find_deployment_id(program_id: ProgramID<N>, ledger: Ledger<N, C>) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.find_deployment_id(&program_id).or_reject()?))
+    async fn find_transaction_id_from_program_id(
+        program_id: ProgramID<N>,
+        ledger: Ledger<N, C>,
+    ) -> Result<impl Reply, Rejection> {
+        Ok(reply::json(&ledger.find_transaction_id_from_program_id(&program_id).or_reject()?))
     }
 
     /// Returns the transaction ID that contains the given `transition ID`.
-    async fn find_transaction_id(
+    async fn find_transaction_id_from_transition_id(
         transition_id: N::TransitionID,
         ledger: Ledger<N, C>,
     ) -> Result<impl Reply, Rejection> {
-        Ok(reply::json(&ledger.find_transaction_id(&transition_id).or_reject()?))
+        Ok(reply::json(&ledger.find_transaction_id_from_transition_id(&transition_id).or_reject()?))
     }
 
     /// Returns the transition ID that contains the given `input ID` or `output ID`.
