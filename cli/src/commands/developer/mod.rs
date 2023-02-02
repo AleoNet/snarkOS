@@ -37,7 +37,7 @@ use clap::Parser;
 use colored::Colorize;
 use std::{path::PathBuf, str::FromStr};
 
-type Network = snarkvm::prelude::Testnet3;
+type CurrentNetwork = snarkvm::prelude::Testnet3;
 
 /// Commands to manage Aleo accounts.
 #[derive(Debug, Parser)]
@@ -63,7 +63,7 @@ impl Developer {
     }
 
     /// Parse the program from the directory.
-    fn parse_program(program_id: ProgramID<Network>, path: Option<String>) -> Result<Program<Network>> {
+    fn parse_program(program_id: ProgramID<CurrentNetwork>, path: Option<String>) -> Result<Program<CurrentNetwork>> {
         // Instantiate a path to the directory containing the manifest file.
         let directory = match path {
             Some(path) => PathBuf::from_str(&path)?,
@@ -74,14 +74,14 @@ impl Developer {
         ensure!(directory.exists(), "The program directory does not exist: {}", directory.display());
         // Ensure the manifest file exists.
         ensure!(
-            Manifest::<Network>::exists_at(&directory),
+            Manifest::<CurrentNetwork>::exists_at(&directory),
             "Please ensure that the manifest file exists in the Aleo program directory (missing '{}' at '{}')",
-            Manifest::<Network>::file_name(),
+            Manifest::<CurrentNetwork>::file_name(),
             directory.display()
         );
 
         // Open the manifest file.
-        let manifest = Manifest::<Network>::open(&directory)?;
+        let manifest = Manifest::<CurrentNetwork>::open(&directory)?;
         ensure!(
             manifest.program_id() == &program_id,
             "The program name in the manifest file does not match the specified program name"
@@ -114,7 +114,7 @@ impl Developer {
     fn handle_transaction(
         broadcast: Option<String>,
         display: bool,
-        transaction: Transaction<Network>,
+        transaction: Transaction<CurrentNetwork>,
         operation: String,
     ) -> Result<String> {
         // Determine if the transaction should be broadcast or displayed to user.

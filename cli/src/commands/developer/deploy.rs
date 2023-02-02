@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use super::{Developer, Network};
+use super::{CurrentNetwork, Developer};
 
 use snarkvm::prelude::{
     ConsensusMemory,
@@ -39,7 +39,7 @@ use std::{path::PathBuf, str::FromStr};
 pub struct Deploy {
     /// The name of the program to deploy.
     #[clap(parse(try_from_str), help = "The ID of the program to deploy")]
-    program_id: ProgramID<Network>,
+    program_id: ProgramID<CurrentNetwork>,
     /// A path to a directory containing a manifest file. Defaults to the current working directory.
     #[clap(long, help = "A path to a directory containing a manifest file")]
     path: Option<String>,
@@ -103,11 +103,11 @@ impl Deploy {
             let rng = &mut rand::thread_rng();
 
             // Initialize the VM.
-            let store = ConsensusStore::<Network, ConsensusMemory<Network>>::open(None)?;
+            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
 
             // Prepare the fees.
-            let fee_record = Record::<Network, Plaintext<Network>>::from_str(&self.record)?;
+            let fee_record = Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.record)?;
 
             // TODO (raychu86): Handle default fee.
             let fee_amount = self.fee.unwrap_or(0);

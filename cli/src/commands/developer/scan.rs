@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use super::Network;
+use super::CurrentNetwork;
 
 use snarkvm::prelude::{Block, Plaintext, Record, ViewKey};
 
@@ -42,7 +42,7 @@ pub struct Scan {
 impl Scan {
     pub fn parse(self) -> Result<String> {
         // Derive the view key.
-        let view_key = ViewKey::<Network>::from_str(&self.view_key)?;
+        let view_key = ViewKey::<CurrentNetwork>::from_str(&self.view_key)?;
 
         // Find the end height.
         let end = match self.end {
@@ -75,11 +75,11 @@ impl Scan {
     // TODO (raychu86): Make these unspent records.
     /// Fetch owned records from the endpoint.
     pub fn fetch_records(
-        view_key: &ViewKey<Network>,
+        view_key: &ViewKey<CurrentNetwork>,
         endpoint: String,
         start_height: u32,
         end_height: u32,
-    ) -> Result<Vec<Record<Network, Plaintext<Network>>>> {
+    ) -> Result<Vec<Record<CurrentNetwork, Plaintext<CurrentNetwork>>>> {
         // Check the bounds of the request.
         if start_height > end_height {
             bail!("Invalid block range");
@@ -102,7 +102,7 @@ impl Scan {
             let endpoint = format!("{endpoint}/testnet3/blocks?start={request_start}&end={request_end}");
 
             // Fetch blocks
-            let blocks: Vec<Block<Network>> = ureq::get(&endpoint).call()?.into_json()?;
+            let blocks: Vec<Block<CurrentNetwork>> = ureq::get(&endpoint).call()?.into_json()?;
 
             // Scan the blocks for owned records.
             for block in &blocks {

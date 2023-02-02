@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use super::{Developer, Network, Program};
+use super::{CurrentNetwork, Developer, Program};
 
 use snarkvm::prelude::{
     ConsensusMemory,
@@ -42,13 +42,13 @@ use std::{path::PathBuf, str::FromStr};
 pub struct Execute {
     /// The program identifier.
     #[clap(parse(try_from_str), help = "The ID of the program")]
-    program_id: ProgramID<Network>,
+    program_id: ProgramID<CurrentNetwork>,
     /// The function name.
     #[clap(parse(try_from_str), help = "The name of the function")]
-    function: Identifier<Network>,
+    function: Identifier<CurrentNetwork>,
     /// The function inputs.
     #[clap(parse(try_from_str), help = "The function inputs")]
-    inputs: Vec<Value<Network>>,
+    inputs: Vec<Value<CurrentNetwork>>,
     /// The private key used to generate the execution.
     #[clap(short = 'p', long, help = "The private key used to generate the execution")]
     private_key: String,
@@ -99,7 +99,7 @@ impl Execute {
         };
 
         // Fetch the program from query node.
-        let program: Program<Network> =
+        let program: Program<CurrentNetwork> =
             ureq::get(&format!("{}/testnet3/program/{}", self.query, self.program_id)).call()?.into_json()?;
 
         println!("📦 Creating execution transaction for '{}'...\n", &self.program_id.to_string().bold());
@@ -110,11 +110,11 @@ impl Execute {
             let rng = &mut rand::thread_rng();
 
             // Initialize the VM.
-            let store = ConsensusStore::<Network, ConsensusMemory<Network>>::open(None)?;
+            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
 
             // Add the program deployment to the VM.
-            if program.id() != &ProgramID::<Network>::try_from("credits.aleo")? {
+            if program.id() != &ProgramID::<CurrentNetwork>::try_from("credits.aleo")? {
                 let deployment = vm.deploy(&program, rng)?;
                 vm.process().write().finalize_deployment(vm.program_store(), &deployment)?;
             }
@@ -122,7 +122,7 @@ impl Execute {
             // Prepare the fees.
             let fee = match self.record {
                 Some(record) => {
-                    let record = Record::<Network, Plaintext<Network>>::from_str(&record)?;
+                    let record = Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&record)?;
                     let fee_amount = self.fee.unwrap_or(0);
 
                     Some((record, fee_amount))
@@ -142,7 +142,7 @@ impl Execute {
                 rng,
             )?
         };
-        let locator = Locator::<Network>::from_str(&format!("{}/{}", self.program_id, self.function))?;
+        let locator = Locator::<CurrentNetwork>::from_str(&format!("{}/{}", self.program_id, self.function))?;
         format!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 
         // Store the execution transaction to the specified file path.
