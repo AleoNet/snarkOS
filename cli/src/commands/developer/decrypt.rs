@@ -82,15 +82,15 @@ mod tests {
 
     const ITERATIONS: usize = 1000;
 
-    fn construct_ciphertext(
-        view_key: ViewKey<CurrentNetwork>,
-        owner: Owner<CurrentNetwork, Plaintext<CurrentNetwork>>,
-        gates: Balance<CurrentNetwork, Plaintext<CurrentNetwork>>,
+    fn construct_ciphertext<N: Network>(
+        view_key: ViewKey<N>,
+        owner: Owner<N, Plaintext<N>>,
+        gates: Balance<N, Plaintext<N>>,
         rng: &mut TestRng,
-    ) -> Result<Record<CurrentNetwork, Ciphertext<CurrentNetwork>>> {
+    ) -> Result<Record<N, Ciphertext<N>>> {
         // Prepare the record.
         let randomizer = Scalar::rand(rng);
-        let record = Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_plaintext(
+        let record = Record::<N, Plaintext<N>>::from_plaintext(
             owner,
             gates,
             IndexMap::from_iter(
@@ -100,7 +100,7 @@ mod tests {
                 ]
                 .into_iter(),
             ),
-            <CurrentNetwork as Network>::g_scalar_multiply(&randomizer),
+            N::g_scalar_multiply(&randomizer),
         )?;
         // Encrypt the record.
         let ciphertext = record.encrypt(randomizer)?;
@@ -111,7 +111,7 @@ mod tests {
     }
 
     #[test]
-    fn test_decrypt() {
+    fn test_decryption() {
         let mut rng = TestRng::default();
 
         for _ in 0..ITERATIONS {
@@ -120,8 +120,8 @@ mod tests {
             let address = Address::try_from(private_key).unwrap();
 
             // Construct the ciphertext.
-            let owner = Owner::Public(address);
-            let gates = Balance::Public(U64::new(u64::rand(&mut rng) >> 12));
+            let owner = Owner::Private(Plaintext::from(Literal::Address(address)));
+            let gates = Balance::Private(Plaintext::from(Literal::U64(U64::new(u64::rand(&mut rng) >> 12))));
             let ciphertext = construct_ciphertext(view_key, owner, gates, &mut rng).unwrap();
 
             // Decrypt the ciphertext.
@@ -139,21 +139,19 @@ mod tests {
     fn test_failed_decryption() {
         let mut rng = TestRng::default();
 
+        // Generate a view key that is unaffiliated with the ciphertext.
+        let incorrect_private_key = PrivateKey::<CurrentNetwork>::new(&mut rng).unwrap();
+        let incorrect_view_key = ViewKey::try_from(incorrect_private_key).unwrap();
+
         for _ in 0..ITERATIONS {
             let private_key = PrivateKey::<CurrentNetwork>::new(&mut rng).unwrap();
             let view_key = ViewKey::try_from(private_key).unwrap();
             let address = Address::try_from(private_key).unwrap();
 
             // Construct the ciphertext.
-            let owner = Owner::Public(address);
-            let gates = Balance::Public(U64::new(u64::rand(&mut rng) >> 12));
-            let ciphertext = construct_ciphertext(view_key, owner, gates, &mut rng).unwrap();
-
-            // Generate a view key that is unaffiliated with the ciphertext.
-            let incorrect_private_key = PrivateKey::<CurrentNetwork>::new(&mut rng).unwrap();
-            let incorrect_view_key = ViewKey::try_from(incorrect_private_key).unwrap();
-
-            assert!(ciphertext.decrypt(&incorrect_view_key).is_err());
+            let owner = Owner::Private(Plaintext::from(Literal::Address(address)));
+            let gates = Balance::Private(Plaintext::from(Literal::U64(U64::new(u64::rand(&mut rng) >> 12))));
+            let ciphertext = construct_ciphertext::<CurrentNetwork>(view_key, owner, gates, &mut rng).unwrap();
 
             // Enforce that the decryption fails.
             let decrypt = Decrypt { ciphertext: ciphertext.to_string(), view_key: incorrect_view_key.to_string() };
