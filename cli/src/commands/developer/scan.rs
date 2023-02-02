@@ -16,9 +16,9 @@
 
 use super::Network;
 
-use snarkvm::prelude::{Block, ViewKey};
+use snarkvm::prelude::{Block, Plaintext, Record, ViewKey};
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
 use std::str::FromStr;
 
@@ -30,10 +30,10 @@ pub struct Scan {
     #[clap(short = 'v', long, help = "The view key used to scan the snarkOS node")]
     pub view_key: String,
 
-    #[clap(long, help = "The block to start scanning")]
+    #[clap(long, help = "The block to start scanning", default_value = "0")]
     pub start: u32,
     #[clap(long, help = "The block to stop scanning")]
-    pub end: u32,
+    pub end: Option<u32>,
 
     #[clap(long, help = "The URL to scan blocks from")]
     endpoint: String,
@@ -41,30 +41,28 @@ pub struct Scan {
 
 impl Scan {
     pub fn parse(self) -> Result<String> {
-        // Fetch the endpoint.
-        let endpoint = format!("{}/testnet3/blocks?start={}&end={}", self.endpoint, self.start, self.end);
-
         // Derive the view key.
         let view_key = ViewKey::<Network>::from_str(&self.view_key)?;
 
-        // Derive the x-coordinate of the address corresponding to the given view key.
-        let address_x_coordinate = view_key.to_address().to_x_coordinate();
+        // Find the end height.
+        let end = match self.end {
+            Some(height) => height,
+            None => {
+                // Request the latest block height from the endpoint.
+                let endpoint = format!("{}/testnet3/latest/height", self.endpoint);
+                let latest_height = u32::from_str(&ureq::get(&endpoint).call()?.into_string()?)?;
 
-        // Get blocks.
-        let blocks: Vec<Block<Network>> = ureq::get(&endpoint).call()?.into_json()?;
-
-        let mut records = Vec::new();
-
-        // Scan the given blocks for records.
-        for block in &blocks {
-            for (_, record) in block.records() {
-                // Check if the record is owned by the given view key.
-                if record.is_owner_with_address_x_coordinate(&view_key, &address_x_coordinate) {
-                    // Decrypt the record.
-                    records.push(record.decrypt(&view_key)?);
+                // Print warning message if the user is attempting to scan the whole chain.
+                if self.start == 0 {
+                    println!("⚠️  Attention - Scanning the entire chain. This may take a few minutes...\n");
                 }
+
+                latest_height
             }
-        }
+        };
+
+        // Fetch the records from the network.
+        let records = Self::fetch_records(&view_key, self.endpoint, self.start, end)?;
 
         // Output the decrypted records associated with the view key.
         if records.is_empty() {
@@ -72,5 +70,54 @@ impl Scan {
         } else {
             Ok(serde_json::to_string_pretty(&records)?.replace("\\n", ""))
         }
+    }
+
+    // TODO (raychu86): Make these unspent records.
+    /// Fetch owned records from the endpoint.
+    pub fn fetch_records(
+        view_key: &ViewKey<Network>,
+        endpoint: String,
+        start_height: u32,
+        end_height: u32,
+    ) -> Result<Vec<Record<Network, Plaintext<Network>>>> {
+        // Check the bounds of the request.
+        if start_height > end_height {
+            bail!("Invalid block range");
+        }
+
+        // Derive the x-coordinate of the address corresponding to the given view key.
+        let address_x_coordinate = view_key.to_address().to_x_coordinate();
+
+        const MAX_BLOCK_RANGE: u32 = 50;
+
+        let mut records = Vec::new();
+
+        // Scan the endpoint starting from the start height
+        let mut request_start = start_height;
+        while request_start < end_height {
+            let num_blocks_to_request = std::cmp::min(MAX_BLOCK_RANGE, end_height.saturating_sub(request_start));
+            let request_end = request_start.saturating_add(num_blocks_to_request);
+
+            // Establish the endpoint.
+            let endpoint = format!("{}/testnet3/blocks?start={}&end={}", endpoint, request_start, request_end);
+
+            // Fetch blocks
+            let blocks: Vec<Block<Network>> = ureq::get(&endpoint).call()?.into_json()?;
+
+            // Scan the blocks for owned records.
+            for block in &blocks {
+                for (_, record) in block.records() {
+                    // Check if the record is owned by the given view key.
+                    if record.is_owner_with_address_x_coordinate(&view_key, &address_x_coordinate) {
+                        // Decrypt the record.
+                        records.push(record.decrypt(&view_key)?);
+                    }
+                }
+            }
+
+            request_start = request_start.saturating_add(num_blocks_to_request);
+        }
+
+        Ok(records)
     }
 }
