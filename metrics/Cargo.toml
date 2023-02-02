@@ -16,6 +16,15 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
-[dependencies]
+[dependencies.metrics]
+version = "0.20"
+
+[dependencies.metrics-exporter-prometheus]
+version = "0.11"
+
+[dependencies.tokio]
+version = "1.23"
+features = ["rt"]
+
 
 
