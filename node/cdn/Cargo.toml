@@ -47,7 +47,6 @@ path = "../ledger"
 
 [dependencies.snarkvm]
 workspace = true
-default-features = false
 features = ["synthesizer"]
 
 [dependencies.tokio]

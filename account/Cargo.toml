@@ -28,5 +28,4 @@ default-features = false
 
 [dependencies.snarkvm]
 workspace = true
-default-features = false
 features = [ "console" ]
