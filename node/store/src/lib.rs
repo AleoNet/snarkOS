@@ -98,6 +98,10 @@ pub enum DataID {
     KeyValueIDMap,
     KeyMap,
     ValueMap,
+
+    // TODO (raychu86): Move this up to Deployment for phase 3.
+    DeploymentReverseFeeMap,
+
     // Testing
     #[cfg(test)]
     Test,
