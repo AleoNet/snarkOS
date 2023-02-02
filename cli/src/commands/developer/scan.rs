@@ -32,8 +32,15 @@ pub struct Scan {
 
     #[clap(long, help = "The block to start scanning", default_value = "0")]
     pub start: u32,
+
     #[clap(long, help = "The block to stop scanning")]
     pub end: Option<u32>,
+
+    #[clap(short = 'r', long, help = "Scan in reverse order")]
+    pub reverse: bool,
+
+    #[clap(long, help = "Maximum number of gates to search for")]
+    pub max_gates: Option<u64>,
 
     #[clap(long, help = "The URL to scan blocks from")]
     endpoint: String,
@@ -44,25 +51,28 @@ impl Scan {
         // Derive the view key.
         let view_key = ViewKey::<CurrentNetwork>::from_str(&self.view_key)?;
 
+        // Get the latest height
+        let endpoint = format!("{}/testnet3/latest/height", self.endpoint);
+        let latest_height = u32::from_str(&ureq::get(&endpoint).call()?.into_string()?)?;
+
         // Find the end height.
         let end = match self.end {
-            Some(height) => height,
+            Some(height) => {
+                if height > latest_height {
+                    bail!("❌️  The specified end height exceeded the latest block height of {latest_height}");
+                }
+                height
+            }
             None => {
-                // Request the latest block height from the endpoint.
-                let endpoint = format!("{}/testnet3/latest/height", self.endpoint);
-                let latest_height = u32::from_str(&ureq::get(&endpoint).call()?.into_string()?)?;
-
-                // Print warning message if the user is attempting to scan the whole chain.
                 if self.start == 0 {
                     println!("⚠️  Attention - Scanning the entire chain. This may take a few minutes...\n");
                 }
-
                 latest_height
             }
         };
 
         // Fetch the records from the network.
-        let records = Self::fetch_records(&view_key, self.endpoint, self.start, end)?;
+        let records = Self::fetch_records(&view_key, self.endpoint, self.start, end, self.reverse, self.max_gates)?;
 
         // Output the decrypted records associated with the view key.
         if records.is_empty() {
@@ -79,11 +89,16 @@ impl Scan {
         endpoint: String,
         start_height: u32,
         end_height: u32,
+        reverse: bool,
+        max_gates: Option<u64>,
     ) -> Result<Vec<Record<CurrentNetwork, Plaintext<CurrentNetwork>>>> {
         // Check the bounds of the request.
         if start_height > end_height {
             bail!("Invalid block range");
         }
+
+        // Create a predicate for reverse and forward search.
+        let in_range = |cursor, reverse| if reverse { cursor > start_height } else { cursor < end_height };
 
         // Derive the x-coordinate of the address corresponding to the given view key.
         let address_x_coordinate = view_key.to_address().to_x_coordinate();
@@ -92,11 +107,22 @@ impl Scan {
 
         let mut records = Vec::new();
 
-        // Scan the endpoint starting from the start height
-        let mut request_start = start_height;
-        while request_start < end_height {
-            let num_blocks_to_request = std::cmp::min(MAX_BLOCK_RANGE, end_height.saturating_sub(request_start));
-            let request_end = request_start.saturating_add(num_blocks_to_request);
+        let mut gates = 0u64;
+
+        // Scan the endpoint starting from the start height or if reverse mode, the end height.
+        let mut cursor = if reverse { start_height } else { end_height };
+        while in_range(cursor, reverse) {
+            let num_blocks_to_request = if reverse {
+                std::cmp::min(MAX_BLOCK_RANGE, start_height.saturating_add(cursor))
+            } else {
+                std::cmp::min(MAX_BLOCK_RANGE, end_height.saturating_sub(cursor))
+            };
+
+            let (request_start, request_end) = if reverse {
+                (cursor.saturating_sub(num_blocks_to_request), cursor)
+            } else {
+                (cursor, cursor.saturating_add(num_blocks_to_request))
+            };
 
             // Establish the endpoint.
             let endpoint = format!("{endpoint}/testnet3/blocks?start={request_start}&end={request_end}");
@@ -110,12 +136,23 @@ impl Scan {
                     // Check if the record is owned by the given view key.
                     if record.is_owner_with_address_x_coordinate(view_key, &address_x_coordinate) {
                         // Decrypt the record.
-                        records.push(record.decrypt(view_key)?);
+                        let decrypted_record = record.decrypt(view_key)?;
+                        if max_gates.is_some() {
+                            // TODO (iamalwaysuncomfortable): Ensure this is only done for unspent records
+                            // Sum the number of gates if a maximum number of gates is specified.
+                            gates += ***decrypted_record.gates();
+                        }
+                        records.push(decrypted_record);
                     }
                 }
             }
 
-            request_start = request_start.saturating_add(num_blocks_to_request);
+            // Exit the desired number of gates have been found.
+            if max_gates.is_some() && gates >= max_gates.unwrap() {
+                break;
+            }
+
+            cursor = if reverse { request_start } else { request_end };
         }
 
         Ok(records)
