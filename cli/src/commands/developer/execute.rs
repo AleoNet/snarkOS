@@ -160,11 +160,11 @@ impl Execute {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_execute() {}
-
-    #[test]
-    fn test_failed_execution() {}
+    // #[test]
+    // fn test_execute() {}
+    //
+    // #[test]
+    // fn test_failed_execution() {}
 
     // TODO (raychu86):
     // 1. Execution without deployment

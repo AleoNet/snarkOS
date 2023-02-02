@@ -72,7 +72,7 @@ impl Scan {
         }
     }
 
-    // TODO (raychu86): Make these unspent records.
+    // TODO (raychu86):Account for spent records.
     /// Fetch owned records from the endpoint.
     pub fn fetch_records(
         view_key: &ViewKey<CurrentNetwork>,

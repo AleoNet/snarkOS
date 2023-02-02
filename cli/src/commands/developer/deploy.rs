@@ -132,9 +132,9 @@ impl Deploy {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_decrypt() {}
-
-    #[test]
-    fn test_failed_decryption() {}
+    // #[test]
+    // fn test_deploy() {}
+    //
+    // #[test]
+    // fn test_failed_deployment() {}
 }
