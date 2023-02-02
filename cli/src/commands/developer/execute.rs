@@ -52,15 +52,15 @@ pub struct Execute {
     /// The private key used to generate the execution.
     #[clap(short = 'p', long, help = "The private key used to generate the execution")]
     private_key: String,
+    /// The endpoint to query node state from.
+    #[clap(short = 'q', long, help = "The endpoint to query node state from")]
+    query: String,
     /// The deployment fee in gates.
     #[clap(short, long, help = "The deployment fee in gates, defaults to 0.")]
     fee: Option<u64>,
     /// The record to spend the fee from.
     #[clap(short, long, help = "The record to spend the fee from.")]
     record: Option<String>,
-    /// The endpoint to query node state from.
-    #[clap(short = 'q', long, help = "The endpoint to query node state from")]
-    query: String,
     /// Display the generated transaction.
     #[clap(
         short,

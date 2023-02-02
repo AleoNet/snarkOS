@@ -40,22 +40,22 @@ pub struct Deploy {
     /// The name of the program to deploy.
     #[clap(parse(try_from_str), help = "The ID of the program to deploy")]
     program_id: ProgramID<Network>,
+    /// A path to a directory containing a manifest file. Defaults to the current working directory.
+    #[clap(long, help = "A path to a directory containing a manifest file")]
+    path: Option<String>,
+    /// The private key used to generate the deployment.
+    #[clap(short = 'p', long, help = "The private key used to generate the deployment")]
+    private_key: String,
+    /// The endpoint to query node state from.
+    #[clap(short = 'q', long, help = "The endpoint to query node state from")]
+    query: String,
     // TODO (raychu86): Update the default.
     /// The deployment fee in gates.
     #[clap(short, long, help = "The deployment fee in gates, defaults to 0")]
     fee: Option<u64>,
-    /// The private key used to generate the deployment.
-    #[clap(short = 'p', long, help = "The private key used to generate the deployment")]
-    private_key: String,
     /// The record to spend the fee from.
     #[clap(short, long, help = "The record to spend the fee from")]
     record: String,
-    /// The endpoint to query node state from.
-    #[clap(short = 'q', long, help = "The endpoint to query node state from")]
-    query: String,
-    /// A path to a directory containing a manifest file. Defaults to the current working directory.
-    #[clap(long, help = "A path to a directory containing a manifest file")]
-    path: Option<String>,
     /// Display the generated transaction.
     #[clap(
         short,
