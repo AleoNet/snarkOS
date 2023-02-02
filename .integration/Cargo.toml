@@ -28,7 +28,6 @@ path = "../node/ledger"
 
 [dev-dependencies.snarkvm]
 workspace = true
-default-features = false
 features = ["synthesizer"]
 
 [dev-dependencies.tokio]
