@@ -90,3 +90,6 @@ features = [ "env-filter" ]
 
 [dependencies.ureq]
 version = "2.5"
+
+[dev-dependencies.indexmap]
+version = "1"
