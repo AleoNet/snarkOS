@@ -2666,6 +2666,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-metrics"
+version = "2.0.2"
+
+[[package]]
 name = "snarkos-node"
 version = "2.0.2"
 dependencies = [
@@ -2776,6 +2780,7 @@ dependencies = [
  "indexmap",
  "jsonwebtoken",
  "once_cell",
+ "parking_lot",
  "rand",
  "serde",
  "snarkos-node-consensus",
