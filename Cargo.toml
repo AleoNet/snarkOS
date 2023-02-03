@@ -26,11 +26,11 @@ members = [
     "node/consensus",
     "node/ledger",
     "node/messages",
+    "node/metrics",
     "node/rest",
     "node/router",
     "node/store",
     "node/tcp",
-    "metrics",
     ".integration",
 ]
 
