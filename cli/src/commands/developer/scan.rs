@@ -94,8 +94,9 @@ impl Scan {
 
         // Scan the endpoint starting from the start height
         let mut request_start = start_height;
-        while request_start < end_height {
-            let num_blocks_to_request = std::cmp::min(MAX_BLOCK_RANGE, end_height.saturating_sub(request_start));
+        while request_start <= end_height {
+            let num_blocks_to_request =
+                std::cmp::min(MAX_BLOCK_RANGE, end_height.saturating_sub(request_start).saturating_add(1));
             let request_end = request_start.saturating_add(num_blocks_to_request);
 
             // Establish the endpoint.
