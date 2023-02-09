@@ -123,9 +123,12 @@ impl Developer {
             let transaction_id = transaction.id();
 
             // Send the deployment request to the local development node.
-            match ureq::post(&endpoint).send_json(&transaction)?.into_string() {
+            match ureq::post(&endpoint).send_json(&transaction) {
                 Ok(id) => {
-                    ensure!(id == transaction_id.to_string(), "The response does not match the transaction id");
+                    ensure!(
+                        id.into_string()? == transaction_id.to_string(),
+                        "The response does not match the transaction id"
+                    );
 
                     match transaction {
                         Transaction::Deploy(..) => {
@@ -136,14 +139,28 @@ impl Developer {
                         }
                     }
                 }
-                Err(error) => match transaction {
-                    Transaction::Deploy(..) => {
-                        bail!("❌ Failed to deploy '{}' to {} ({})", operation.bold(), &endpoint, error)
+                Err(error) => {
+                    let error_message = match error {
+                        ureq::Error::Status(code, response) => {
+                            format!("(status code {code}: {:?})", response.into_string()?)
+                        }
+                        ureq::Error::Transport(error) => format!("({})", error.to_string()),
+                    };
+
+                    match transaction {
+                        Transaction::Deploy(..) => {
+                            bail!("❌ Failed to deploy '{}' to {} {}", operation.bold(), &endpoint, error_message)
+                        }
+                        Transaction::Execute(..) => {
+                            bail!(
+                                "❌ Failed to broadcast execution '{}' to {} {}",
+                                operation.bold(),
+                                &endpoint,
+                                error_message
+                            )
+                        }
                     }
-                    Transaction::Execute(..) => {
-                        bail!("❌ Failed to broadcast execution '{}' to {} ({})", operation.bold(), &endpoint, error)
-                    }
-                },
+                }
             };
 
             // Output the transaction id.
