@@ -68,6 +68,8 @@ impl Scan {
         if records.is_empty() {
             Ok("No records found".to_string())
         } else {
+            println!("⚠️  This list may contain records that have already been spent.\n");
+
             Ok(serde_json::to_string_pretty(&records)?.replace("\\n", ""))
         }
     }

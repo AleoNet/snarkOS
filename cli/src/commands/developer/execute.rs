@@ -155,19 +155,3 @@ impl Execute {
         Developer::handle_transaction(self.broadcast, self.display, execution, locator.to_string())
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // #[test]
-    // fn test_execute() {}
-    //
-    // #[test]
-    // fn test_failed_execution() {}
-
-    // TODO (raychu86):
-    // 1. Execution without deployment
-    // 2. Execution with incorrect inputs
-    // 3. Execution with incorrect function
-}

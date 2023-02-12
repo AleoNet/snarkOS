@@ -49,7 +49,6 @@ pub struct Deploy {
     /// The endpoint to query node state from.
     #[clap(short = 'q', long, help = "The endpoint to query node state from")]
     query: String,
-    // TODO (raychu86): Update the default.
     /// The deployment fee in gates.
     #[clap(short, long, help = "The deployment fee in gates, defaults to 0")]
     fee: Option<u64>,
@@ -126,15 +125,4 @@ impl Deploy {
         // Determine if the transaction should be broadcast or displayed to user.
         Developer::handle_transaction(self.broadcast, self.display, deployment, self.program_id.to_string())
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // #[test]
-    // fn test_deploy() {}
-    //
-    // #[test]
-    // fn test_failed_deployment() {}
 }
