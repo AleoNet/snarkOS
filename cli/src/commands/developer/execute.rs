@@ -40,38 +40,34 @@ use std::str::FromStr;
 #[derive(Debug, Parser)]
 pub struct Execute {
     /// The program identifier.
-    #[clap(parse(try_from_str), help = "The ID of the program")]
+    #[clap(parse(try_from_str))]
     program_id: ProgramID<CurrentNetwork>,
     /// The function name.
-    #[clap(parse(try_from_str), help = "The name of the function")]
+    #[clap(parse(try_from_str))]
     function: Identifier<CurrentNetwork>,
     /// The function inputs.
-    #[clap(parse(try_from_str), help = "The function inputs")]
+    #[clap(parse(try_from_str))]
     inputs: Vec<Value<CurrentNetwork>>,
     /// The private key used to generate the execution.
-    #[clap(short = 'p', long, help = "The private key used to generate the execution")]
+    #[clap(short, long)]
     private_key: String,
     /// The endpoint to query node state from.
-    #[clap(short = 'q', long, help = "The endpoint to query node state from")]
+    #[clap(short, long)]
     query: String,
-    /// The deployment fee in gates.
-    #[clap(short, long, help = "The deployment fee in gates, defaults to 0.")]
+    /// The deployment fee in gates, defaults to 0.
+    #[clap(short, long)]
     fee: Option<u64>,
     /// The record to spend the fee from.
-    #[clap(short, long, help = "The record to spend the fee from.")]
+    #[clap(short, long)]
     record: Option<String>,
     /// Display the generated transaction.
-    #[clap(
-        short,
-        long,
-        default_value = "true",
-        help = "Display the generated transaction",
-        conflicts_with = "broadcast"
-    )]
+    #[clap(short, long, default_value = "true", conflicts_with = "broadcast")]
     display: bool,
-    #[clap(short, long, help = "The endpoint used to broadcast the generated transaction", conflicts_with = "display")]
+    /// The endpoint used to broadcast the generated transaction.
+    #[clap(short, long, conflicts_with = "display")]
     broadcast: Option<String>,
-    #[clap(long, help = "Store generated deployment transaction to a local file")]
+    /// Store generated deployment transaction to a local file.
+    #[clap(long)]
     store: Option<String>,
 }
 

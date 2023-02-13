@@ -33,7 +33,7 @@ pub struct Scan {
     /// The block height to start scanning at
     #[clap(long, default_value = "0")]
     pub start: u32,
-    
+
     /// The block height to stop scanning
     #[clap(long)]
     pub end: Option<u32>,

@@ -37,34 +37,30 @@ use std::str::FromStr;
 #[derive(Debug, Parser)]
 pub struct Deploy {
     /// The name of the program to deploy.
-    #[clap(parse(try_from_str), help = "The ID of the program to deploy")]
+    #[clap(parse(try_from_str))]
     program_id: ProgramID<CurrentNetwork>,
     /// A path to a directory containing a manifest file. Defaults to the current working directory.
-    #[clap(long, help = "A path to a directory containing a manifest file")]
+    #[clap(long)]
     path: Option<String>,
     /// The private key used to generate the deployment.
-    #[clap(short = 'p', long, help = "The private key used to generate the deployment")]
+    #[clap(short, long)]
     private_key: String,
     /// The endpoint to query node state from.
-    #[clap(short = 'q', long, help = "The endpoint to query node state from")]
+    #[clap(short, long)]
     query: String,
-    /// The deployment fee in gates, defaults to 0
+    /// The deployment fee in gates, defaults to 0.
     #[clap(short, long)]
     fee: Option<u64>,
     /// The record to spend the fee from.
     #[clap(short, long)]
     record: String,
     /// Display the generated transaction.
-    #[clap(
-        short,
-        long,
-        conflicts_with = "broadcast"
-    )]
+    #[clap(short, long, conflicts_with = "broadcast")]
     display: bool,
-    /// The endpoint used to broadcast the generated transaction
+    /// The endpoint used to broadcast the generated transaction.
     #[clap(short, long, conflicts_with = "display")]
     broadcast: Option<String>,
-    /// Store generated deployment transaction to a local file
+    /// Store generated deployment transaction to a local file.
     #[clap(long)]
     store: Option<String>,
 }
