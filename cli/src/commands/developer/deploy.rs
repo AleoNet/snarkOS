@@ -58,8 +58,6 @@ pub struct Deploy {
     #[clap(
         short,
         long,
-        default_value = "false",
-        help = "Display the generated transaction",
         conflicts_with = "broadcast"
     )]
     display: bool,
