@@ -158,7 +158,7 @@ impl Developer {
                         ureq::Error::Status(code, response) => {
                             format!("(status code {code}: {:?})", response.into_string()?)
                         }
-                        ureq::Error::Transport(error) => format!("({})", error.to_string()),
+                        ureq::Error::Transport(error) => format!("({})", error),
                     };
 
                     match transaction {
