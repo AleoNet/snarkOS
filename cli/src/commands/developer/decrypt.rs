@@ -29,10 +29,10 @@ use std::str::FromStr;
 #[derive(Debug, Parser)]
 pub struct Decrypt {
     /// The record ciphertext to decrypt.
-    #[clap(short = 'c', long, help = "The record ciphertext to decrypt.")]
+    #[clap(short, long)]
     pub ciphertext: String,
     /// The view key used to decrypt the record ciphertext.
-    #[clap(short = 'v', long, help = "The view key used to decrypt the ciphertext.")]
+    #[clap(short, long)]
     pub view_key: String,
 }
 
