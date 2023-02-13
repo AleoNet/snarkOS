@@ -167,7 +167,7 @@ impl Developer {
                         }
                         Transaction::Execute(..) => {
                             bail!(
-                                "❌ Failed to broadcast execution '{}' to {} {}",
+                                "❌ Failed to broadcast execution '{}' to {}: {}",
                                 operation.bold(),
                                 &endpoint,
                                 error_message
