@@ -26,16 +26,15 @@ use snarkvm::prelude::{
     ProgramID,
     Query,
     Record,
-    ToBytes,
     Transaction,
     Value,
     VM,
 };
 
-use anyhow::{ensure, Result};
+use anyhow::Result;
 use clap::Parser;
 use colored::Colorize;
-use std::{path::PathBuf, str::FromStr};
+use std::str::FromStr;
 
 /// Executes an Aleo program function.
 #[derive(Debug, Parser)]
@@ -86,18 +85,6 @@ impl Execute {
         // Retrieve the private key.
         let private_key = PrivateKey::from_str(&self.private_key)?;
 
-        // Validate the storage destination for the transaction.
-        let store_transaction = match self.store {
-            Some(path) => {
-                let file_path = PathBuf::from_str(&path)?;
-                // Ensure the file path doesnt already exist.
-                ensure!(!file_path.exists(), "The file path already exists exist: {}", file_path.display());
-
-                Some(file_path)
-            }
-            None => None,
-        };
-
         // Fetch the program from query node.
         let program: Program<CurrentNetwork> =
             ureq::get(&format!("{}/testnet3/program/{}", self.query, self.program_id)).call()?.into_json()?;
@@ -145,13 +132,7 @@ impl Execute {
         let locator = Locator::<CurrentNetwork>::from_str(&format!("{}/{}", self.program_id, self.function))?;
         format!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 
-        // Store the execution transaction to the specified file path.
-        if let Some(file_path) = store_transaction {
-            let execution_bytes = execution.to_bytes_le()?;
-            std::fs::write(file_path, execution_bytes)?;
-        }
-
-        // Determine if the transaction should be broadcast or displayed to user.
-        Developer::handle_transaction(self.broadcast, self.display, execution, locator.to_string())
+        // Determine if the transaction should be broadcast, stored, or displayed to user.
+        Developer::handle_transaction(self.broadcast, self.display, self.store, execution, locator.to_string())
     }
 }

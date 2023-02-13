@@ -29,7 +29,7 @@ pub use scan::*;
 use snarkvm::{
     file::{AleoFile, Manifest},
     package::Package,
-    prelude::{Program, ProgramID, Transaction},
+    prelude::{Program, ProgramID, ToBytes, Transaction},
 };
 
 use anyhow::{bail, ensure, Result};
@@ -114,9 +114,23 @@ impl Developer {
     fn handle_transaction(
         broadcast: Option<String>,
         display: bool,
+        store: Option<String>,
         transaction: Transaction<CurrentNetwork>,
         operation: String,
     ) -> Result<String> {
+        // Determine if the transaction should be stored.
+        if let Some(path) = store {
+            match PathBuf::from_str(&path) {
+                Ok(file_path) => {
+                    let transaction_bytes = transaction.to_bytes_le()?;
+                    std::fs::write(file_path, transaction_bytes)?;
+                }
+                Err(err) => {
+                    println!("The transaction was unable to be stored due to: {}", err);
+                }
+            }
+        };
+
         // Determine if the transaction should be broadcast or displayed to user.
         if let Some(endpoint) = broadcast {
             // Get the transaction id.
