@@ -48,11 +48,11 @@ pub struct Deploy {
     /// The endpoint to query node state from.
     #[clap(short = 'q', long, help = "The endpoint to query node state from")]
     query: String,
-    /// The deployment fee in gates.
-    #[clap(short, long, help = "The deployment fee in gates, defaults to 0")]
+    /// The deployment fee in gates, defaults to 0
+    #[clap(short, long)]
     fee: Option<u64>,
     /// The record to spend the fee from.
-    #[clap(short, long, help = "The record to spend the fee from")]
+    #[clap(short, long)]
     record: String,
     /// Display the generated transaction.
     #[clap(
