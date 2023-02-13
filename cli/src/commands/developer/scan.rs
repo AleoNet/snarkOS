@@ -27,15 +27,19 @@ use std::str::FromStr;
 #[derive(Debug, Parser)]
 pub struct Scan {
     /// The view key used to scan the snarkOS node.
-    #[clap(short = 'v', long, help = "The view key used to scan the snarkOS node")]
+    #[clap(short, long)]
     pub view_key: String,
 
-    #[clap(long, help = "The block to start scanning", default_value = "0")]
+    /// The block height to start scanning at
+    #[clap(long, default_value = "0")]
     pub start: u32,
-    #[clap(long, help = "The block to stop scanning")]
+    
+    /// The block height to stop scanning
+    #[clap(long)]
     pub end: Option<u32>,
 
-    #[clap(long, help = "The URL to scan blocks from")]
+    /// The endpoint to scan blocks from
+    #[clap(long)]
     endpoint: String,
 }
 
