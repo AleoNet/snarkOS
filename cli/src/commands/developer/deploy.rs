@@ -61,9 +61,11 @@ pub struct Deploy {
         conflicts_with = "broadcast"
     )]
     display: bool,
-    #[clap(short, long, help = "The endpoint used to broadcast the generated transaction", conflicts_with = "display")]
+    /// The endpoint used to broadcast the generated transaction
+    #[clap(short, long, conflicts_with = "display")]
     broadcast: Option<String>,
-    #[clap(long, help = "Store generated deployment transaction to a local file")]
+    /// Store generated deployment transaction to a local file
+    #[clap(long)]
     store: Option<String>,
 }
 
