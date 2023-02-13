@@ -163,7 +163,7 @@ impl Developer {
 
                     match transaction {
                         Transaction::Deploy(..) => {
-                            bail!("❌ Failed to deploy '{}' to {} {}", operation.bold(), &endpoint, error_message)
+                            bail!("❌ Failed to deploy '{}' to {}: {}", operation.bold(), &endpoint, error_message)
                         }
                         Transaction::Execute(..) => {
                             bail!(
