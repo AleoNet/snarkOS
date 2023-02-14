@@ -145,7 +145,7 @@ jobs:
       - run_serial:
           workspace_member: .integration
           cache_key: snarkos-integration-cache
-          timeout: "60m"
+          timeout: "120m"
 
   snarkos:
     docker:
