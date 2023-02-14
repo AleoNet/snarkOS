@@ -15,7 +15,21 @@
 mod router;
 
 use crate::traits::NodeInterface;
+use anyhow::Result;
+use narwhal_config::{Committee, Import};
+use narwhal_crypto::{KeyPair as NarwhalKeyPair, PublicKey};
+use narwhal_node::keypair_file::read_authority_keypair_from_file;
+use once_cell::sync::OnceCell;
+use parking_lot::{Mutex, RwLock};
+use rand::thread_rng;
 use snarkos_account::Account;
+use snarkos_node_bft_consensus::{
+    setup::{workspace_dir, CommitteeSetup, PrimarySetup},
+    BftExecutionState,
+    InertConsensusInstance,
+    RunningConsensusInstance,
+    TransactionValidator,
+};
 use snarkos_node_consensus::Consensus;
 use snarkos_node_messages::{BlockRequest, Message, NodeType, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
@@ -25,10 +39,9 @@ use snarkos_node_tcp::{
     P2P,
 };
 use snarkvm::prelude::{Block, ConsensusStorage, Header, Ledger, Network, ProverSolution};
-
-use anyhow::Result;
-use parking_lot::Mutex;
 use std::{
+    collections::HashMap,
+    fs,
     net::SocketAddr,
     sync::{
         atomic::{AtomicBool, Ordering},
@@ -53,6 +66,17 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
+    /// The primary keypair of the node exposed here for handshaking purposes.
+    primary_keypair: Arc<NarwhalKeyPair>,
+    /// Current consensus committee, might need to be mutable for dynamic committees.
+    committee: Committee,
+    /// The set of connected committee members by public key, no mapping is required currently but
+    /// it will likely be necessary when handling dynamic committees).
+    connected_committee_members: Arc<RwLock<HashMap<SocketAddr, PublicKey>>>,
+    /// The running BFT consensus instance.
+    bft: Arc<OnceCell<RunningConsensusInstance<BftExecutionState<N, C>>>>,
+
+    dev: Option<u16>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
@@ -65,6 +89,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
+        enable_metrics: bool,
     ) -> Result<Self> {
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
@@ -90,14 +115,23 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         )
         .await?;
 
+        // Process the committee file.
+        let (primary_keypair, committee) = Self::read_committee(dev);
+
         // Initialize the node.
         let mut node = Self {
             ledger: ledger.clone(),
             consensus: consensus.clone(),
-            router,
+            router: router.clone(),
             rest: None,
             handles: Default::default(),
             shutdown: Default::default(),
+            primary_keypair: primary_keypair.into(),
+            committee,
+            connected_committee_members: Default::default(),
+            // Note: starting the BFT is called from the handshake logic once quorum is reached.
+            bft: Default::default(),
+            dev,
         };
 
         // Initialize the REST server.
@@ -110,8 +144,93 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         node.initialize_routing().await;
         // Initialize the signal handler.
         node.handle_signals();
+
+        // Initialize metrics.
+        if enable_metrics {
+            info!("Running with metrics enabled.");
+            snarkos_node_metrics::initialize();
+        }
+
         // Return the node.
         Ok(node)
+    }
+
+    // Reads the committee configuration and the primary's authority keypair. This is needed to
+    // establish quorum before the BFT process is started.
+    fn read_committee(dev: Option<u16>) -> (NarwhalKeyPair, Committee) {
+        // Prepare the path containing BFT consensus files.
+        let bft_path =
+            format!("{}/node/bft-consensus/committee/{}", workspace_dir(), if dev.is_some() { ".dev" } else { "" });
+
+        // In dev mode, auto-generate a permanent BFT consensus config.
+        if dev.is_some() && fs::metadata(&bft_path).is_err() {
+            // Prepare a source of randomness for key generation.
+            let mut rng = thread_rng();
+
+            // Hardcode the dev number of primaries, at least for now.
+            const NUM_PRIMARIES: usize = 4;
+
+            // Generate the committee setup.
+            let mut primaries = Vec::with_capacity(NUM_PRIMARIES);
+            for _ in 0..NUM_PRIMARIES {
+                // TODO: set up a meaningful stake
+                let primary = PrimarySetup::new(None, 1, vec![], &mut rng);
+                primaries.push(primary);
+            }
+            let committee = CommitteeSetup::new(primaries, 0);
+
+            // Create the dev subpath and write the commitee files.
+            committee.write_files(true);
+
+            // Copy the existing parameters.
+            fs::copy(format!("{bft_path}/../.parameters.json"), format!("{bft_path}/.parameters.json")).unwrap();
+        }
+
+        let base_path = format!("{bft_path}{}", if dev.is_some() { "/" } else { "" });
+        // If we're running dev mode, potentially use a different primary ID than 0.
+        let primary_id = if let Some(dev_id) = dev { dev_id } else { 0 };
+
+        // Load the primary's keys.
+        let primary_key_file = format!("{base_path}.primary-{primary_id}-key.json");
+        let primary_keypair =
+            read_authority_keypair_from_file(primary_key_file).expect("Failed to load the node's primary keypair");
+
+        // Read the shared files describing the committee, workers and parameters.
+        let committee_file = format!("{base_path}.committee.json");
+        let committee = Committee::import(&committee_file).expect("Failed to load the committee information");
+
+        (primary_keypair, committee)
+    }
+
+    /// Starts and sets the `RunningConsensusInstance`.
+    pub async fn start_bft(&self, initial_last_executed_sub_dag_index: u64) -> Result<()> {
+        let dev = self.dev;
+
+        // Prepare the path containing BFT consensus files.
+        let bft_path =
+            format!("{}/node/bft-consensus/committee/{}", workspace_dir(), if dev.is_some() { ".dev" } else { "" });
+
+        // Load the primary's public key.
+        let primary_id = if let Some(id) = dev { id } else { 0 };
+        let primary_key_file = format!("{bft_path}/.primary-{primary_id}-key.json");
+        let primary_pub = read_authority_keypair_from_file(primary_key_file).unwrap().public().clone();
+
+        // Construct the BFT consensus instance, but don't start it yet.
+        let bft_execution_state = BftExecutionState::new(
+            primary_pub,
+            self.router.clone(),
+            self.consensus.clone(),
+            initial_last_executed_sub_dag_index,
+        );
+        let bft_tx_validator = TransactionValidator(self.consensus.clone());
+        let inert_bft = InertConsensusInstance::load::<N, C>(bft_execution_state, bft_tx_validator, dev)?;
+        // SAFETY: must be present as the bft can only be started once quorum has been reached.
+        let running_bft_consensus = inert_bft.start().await?;
+
+        // Can't fail, but RunningConsensusInstance doesn't impl Debug, hence no unwrap.
+        let _ = self.bft.set(running_bft_consensus);
+
+        Ok(())
     }
 
     /// Returns the ledger.
@@ -122,6 +241,22 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     /// Returns the REST server.
     pub fn rest(&self) -> &Option<Rest<N, C, Self>> {
         &self.rest
+    }
+
+    /// Return the BFT consensus handle.
+    pub fn bft(&self) -> &RunningConsensusInstance<BftExecutionState<N, C>> {
+        // Safe: it is used only once it's populated.
+        self.bft.get().expect("Logic bug: Validator::bft didn't find a RunningConsensusInstance!")
+    }
+
+    #[cfg(feature = "test")]
+    pub fn consensus(&self) -> &Consensus<N, C> {
+        &self.consensus
+    }
+
+    #[cfg(feature = "test")]
+    pub fn router(&self) -> &Router<N> {
+        &self.router
     }
 }
 

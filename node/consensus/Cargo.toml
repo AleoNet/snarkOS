@@ -19,6 +19,7 @@ edition = "2021"
 [features]
 default = [ "parallel" ]
 parallel = [ "rayon" ]
+metrics = [ "snarkos-node/metrics" ]
 
 [dependencies.anyhow]
 version = "1.0.70"
@@ -49,8 +50,42 @@ version = "0.3"
 [dependencies.tracing]
 version = "0.1"
 
+[dev-dependencies.bytes]
+version = "1"
+
 [dev-dependencies.itertools]
 version = "0.10"
 
+[dev-dependencies.multiaddr]
+version = "0.17"
+
+[dev-dependencies.narwhal-types]
+workspace = true
+
+[dev-dependencies.snarkos-account]
+path = "../../account"
+
+[dev-dependencies.snarkos-node]
+path = ".."
+features = ["test"]
+
+[dev-dependencies.snarkos-node-messages]
+path = "../messages"
+
+[dev-dependencies.tokio]
+version = "1"
+features = ["macros", "rt-multi-thread"]
+
+[dev-dependencies.tonic]
+version = "0.8"
+
+[dev-dependencies.tracing-subscriber]
+version = "0.3"
+
 [dev-dependencies.tracing-test]
 version = "0.2"
+
+# a workaround to use the `test` feature in tests by default
+[dev-dependencies.snarkos-node-bft-consensus]
+path = "../bft-consensus"
+features = ["test"]

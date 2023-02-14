@@ -14,7 +14,16 @@
 
 use super::*;
 
-use snarkos_node_messages::{BlockRequest, BlockResponse, DataBlocks, DisconnectReason, Message, MessageCodec, Pong};
+use snarkos_node_messages::{
+    BlockRequest,
+    BlockResponse,
+    DataBlocks,
+    DisconnectReason,
+    Message,
+    MessageCodec,
+    NewBlock,
+    Pong,
+};
 use snarkos_node_router::Routing;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{error, EpochChallenge, Header};
@@ -181,6 +190,12 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
             // Increment the latest height.
             latest_height += 1;
         }
+        true
+    }
+
+    /// Handles a `NewBlock` message.
+    fn new_block(&self, _peer_ip: SocketAddr, _block: Block<N>, _serialized: NewBlock<N>) -> bool {
+        // TODO: add more elaborate handling
         true
     }
 

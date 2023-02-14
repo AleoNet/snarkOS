@@ -5,3 +5,4 @@ storage*/
 wasm/Cargo.lock
 **/build
 **.ledger-*
+**/committee/.dev/
