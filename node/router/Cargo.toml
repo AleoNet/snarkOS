@@ -34,6 +34,10 @@ version = "1"
 [dependencies.colored]
 version = "2"
 
+[dependencies.fastcrypto]
+git = "https://github.com/MystenLabs/fastcrypto"
+rev = "235211dc8195590f5353d38135f5ee51a267521e"
+
 [dependencies.futures]
 version = "0.3.27"
 features = [ "thread-pool" ]
@@ -78,6 +82,9 @@ version = "=2.1.3"
 [dependencies.snarkvm]
 workspace = true
 
+[dependencies.narwhal-crypto]
+workspace = true
+
 [dependencies.time]
 version = "0.3"
 
@@ -98,7 +105,7 @@ version = "0.7"
 features = [ "codec" ]
 
 [dependencies.tokio-stream]
-version = "=0.1"
+version = "0.1"
 
 [dependencies.tracing]
 version = "0.1"

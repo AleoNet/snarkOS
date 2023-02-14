@@ -38,8 +38,8 @@ mod routing;
 pub use routing::*;
 
 use snarkos_account::Account;
-use snarkos_node_messages::NodeType;
-use snarkos_node_tcp::{Config, Tcp};
+use snarkos_node_messages::{Message, MessageCodec, NodeType};
+use snarkos_node_tcp::{protocols::Writing, Config, ConnectionSide, Tcp, P2P};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
@@ -82,7 +82,7 @@ pub struct InnerRouter<N: Network> {
     /// and prevents duplicate outbound connection attempts to the same IP address, it is unable to
     /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
     /// attempt to connect to each other). This set is used to prevent this from happening.
-    connecting_peers: Mutex<HashSet<SocketAddr>>,
+    pub connecting_peers: Mutex<HashSet<SocketAddr>>,
     /// The set of candidate peer IPs.
     candidate_peers: RwLock<IndexSet<SocketAddr>>,
     /// The set of restricted peer IPs.
@@ -91,6 +91,28 @@ pub struct InnerRouter<N: Network> {
     handles: Mutex<Vec<JoinHandle<()>>>,
     /// The boolean flag for the development mode.
     is_dev: bool,
+}
+
+// Implement some of the Tcp traits at this level to allow propagating messages through the router
+// in the BFT. Note: these traits are also implemented at the node level.
+impl<N: Network> P2P for Router<N> {
+    /// Returns a reference to the TCP instance.
+    fn tcp(&self) -> &Tcp {
+        &self.tcp
+    }
+}
+
+// Only Writing is included here, since Reading and Handshake depend on node-level objects.
+#[async_trait]
+impl<N: Network> Writing for Router<N> {
+    type Codec = MessageCodec<N>;
+    type Message = Message<N>;
+
+    /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
+    /// The `side` parameter indicates the connection side **from the node's perspective**.
+    fn codec(&self, _addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
+        Default::default()
+    }
 }
 
 impl<N: Network> Router<N> {

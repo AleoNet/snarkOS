@@ -5,3 +5,6 @@ storage*/
 wasm/Cargo.lock
 **/build
 **.ledger-*
+**/committee/.dev/
+.bft-storage-3/
+validator-*.log
