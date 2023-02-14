@@ -17,28 +17,75 @@ license = "Apache-2.0"
 edition = "2021"
 
 [features]
-default = [ ]
+default = [ "parallel" ]
+parallel = [ "rayon" ]
+metrics = [ "snarkos-node/metrics" ]
 
 [dependencies.anyhow]
 version = "1.0.70"
 
+[dependencies.indexmap]
+version = "2.0"
+features = [ "rayon" ]
+
+[dependencies.once_cell]
+version = "1.18"
+
 [dependencies.parking_lot]
 version = "0.12"
+
+[dependencies.rand]
+version = "0.8"
+
+[dependencies.rayon]
+version = "1"
+optional = true
 
 [dependencies.snarkvm]
 workspace = true
 
+[dependencies.time]
+version = "0.3"
+
 [dependencies.tracing]
 version = "0.1"
 
-[dev-dependencies.indexmap]
-version = "1.9"
+[dev-dependencies.bytes]
+version = "1"
 
 [dev-dependencies.itertools]
 version = "0.10"
 
-[dev-dependencies.once_cell]
-version = "1.13"
+[dev-dependencies.multiaddr]
+version = "0.17"
+
+[dev-dependencies.narwhal-types]
+workspace = true
+
+[dev-dependencies.snarkos-account]
+path = "../../account"
+
+[dev-dependencies.snarkos-node]
+path = ".."
+features = ["test"]
+
+[dev-dependencies.snarkos-node-messages]
+path = "../messages"
+
+[dev-dependencies.tokio]
+version = "1"
+features = ["macros", "rt-multi-thread"]
+
+[dev-dependencies.tonic]
+version = "0.8"
+
+[dev-dependencies.tracing-subscriber]
+version = "0.3"
 
 [dev-dependencies.tracing-test]
 version = "0.2"
+
+# a workaround to use the `test` feature in tests by default
+[dev-dependencies.snarkos-node-bft-consensus]
+path = "../bft-consensus"
+features = ["test"]

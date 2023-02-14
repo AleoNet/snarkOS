@@ -29,8 +29,11 @@ version = "1.0"
 [dependencies.bytes]
 version = "1"
 
+[dependencies.narwhal-crypto]
+workspace = true
+
 [dependencies.indexmap]
-version = "1"
+version = "2"
 
 [dependencies.kadmium]
 version = "0.6.0"
@@ -41,6 +44,12 @@ version = "1"
 
 [dependencies.serde]
 version = "1"
+
+[dependencies.serde_json]
+version = "1"
+
+[dependencies.rand]
+version = "0.8.5"
 
 [dependencies.snarkvm]
 workspace = true

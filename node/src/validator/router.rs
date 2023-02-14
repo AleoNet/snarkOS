@@ -14,27 +14,112 @@
 
 use super::*;
 
+use snarkos_node_bft_consensus::{batched_transactions, sort_transactions};
 use snarkos_node_messages::{
     BlockRequest,
     BlockResponse,
+    ConsensusId,
     Data,
     DataBlocks,
     DisconnectReason,
     Message,
     MessageCodec,
+    NewBlock,
     Pong,
     UnconfirmedTransaction,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{error, EpochChallenge, Network, Transaction};
 
-use std::{io, net::SocketAddr, time::Duration};
-use tokio::task::spawn_blocking;
+use bytes::BytesMut;
+use futures_util::sink::SinkExt;
+use narwhal_executor::ExecutionState;
+use std::{collections::HashSet, io, net::SocketAddr, time::Duration};
+use tokio::{net::TcpStream, task::spawn_blocking};
+use tokio_stream::StreamExt;
+use tokio_util::codec::Framed;
+use tracing::log::{log_enabled, Level::Debug};
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Validator<N, C> {
     /// Returns a reference to the TCP instance.
     fn tcp(&self) -> &Tcp {
         self.router.tcp()
+    }
+}
+
+impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
+    /// An extended handshake dedicated to consensus committee members.
+    async fn committee_handshake(
+        &self,
+        peer_ip: SocketAddr,
+        mut framed: Framed<&mut TcpStream, MessageCodec<N>>,
+    ) -> io::Result<()> {
+        // Establish quorum with other validators:
+        //
+        // 1. Sign and send the node's pub key.
+        // 2. Receive and verify peer's signed pub key.
+        // 3. Insert into connected_committee_members.
+        // 4. If quorum threshold is reached, start the bft.
+
+        // 1.
+        // BFT must be set here.
+        // TODO: we should probably use something else than the public key, potentially interactive, since this could
+        // be copied and reused by a malicious validator.
+        let public_key = self.primary_keypair.public();
+        let signature = self
+            .primary_keypair
+            .private()
+            .sign_bytes(public_key.to_bytes().as_slice(), &mut rand::thread_rng())
+            .unwrap();
+
+        let last_executed_sub_dag_index =
+            if let Some(bft) = self.bft.get() { bft.state.last_executed_sub_dag_index().await } else { 0 };
+        let message = Message::ConsensusId(Box::new(ConsensusId {
+            public_key: public_key.clone(),
+            signature,
+            last_executed_sub_dag_index,
+            aleo_address: self.address(),
+        }));
+        framed.send(message).await?;
+
+        // 2.
+        let consensus_id = match framed.try_next().await? {
+            Some(Message::ConsensusId(data)) => data,
+            _ => return Err(error(format!("'{peer_ip}' did not send a 'ConsensusId' message"))),
+        };
+
+        // Check the advertised public key exists in the committee.
+        if !self.committee.keys().contains(&consensus_id.public_key) {
+            return Err(error(format!("'{peer_ip}' is not part of the committee")));
+        }
+
+        // Check the signature.
+        // TODO: again, the signed message should probably be something we send to the peer, not
+        // their public key.
+        if !consensus_id.signature.verify_bytes(&consensus_id.public_key, &consensus_id.public_key.to_bytes()) {
+            return Err(error(format!("'{peer_ip}' couldn't verify their identity")));
+        }
+
+        // 3.
+        // Track the committee member.
+        // TODO: in future we could error here if it already exists in the collection but that
+        // logic is probably best implemented when dynamic committees are being considered.
+        self.connected_committee_members.write().insert(peer_ip, consensus_id.public_key);
+
+        // 3.5
+        // add the peer to the ledger's `current_committee`
+        self.ledger.insert_committee_member(consensus_id.aleo_address);
+
+        // 4.
+        // If quorum is reached, start the consensus but only if it hasn't already been started.
+        let own_stake = self.committee.stake(public_key);
+        let connected_stake =
+            self.connected_committee_members.read().values().map(|pk| self.committee.stake(pk)).sum::<u64>();
+        if own_stake + connected_stake >= self.committee.quorum_threshold() && self.bft.get().is_none() {
+            self.start_bft(consensus_id.last_executed_sub_dag_index).await.unwrap()
+        }
+
+        Ok(())
     }
 }
 
@@ -47,7 +132,19 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Validator<N, C> {
         let conn_side = connection.side();
         let stream = self.borrow_stream(&mut connection);
         let genesis_header = self.ledger.get_header(0).map_err(|e| error(format!("{e}")))?;
-        self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
+        let (peer, framed) = self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
+
+        // If both nodes are validators, perform the extended committee handshake.
+        if peer.node_type() == NodeType::Validator {
+            let handshake_result = self.committee_handshake(peer.ip(), framed).await;
+            // Adjust the list of connecting peers regardless of the result.
+            self.router.connecting_peers.lock().remove(&peer.ip());
+            handshake_result?;
+        }
+
+        // In case of success, announce it and insert the peer.
+        info!("Connected to '{}'", peer.ip());
+        self.router.insert_connected_peer(peer, peer_addr);
 
         Ok(connection)
     }
@@ -85,6 +182,7 @@ impl<N: Network, C: ConsensusStorage<N>> Disconnect for Validator<N, C> {
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
         if let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) {
             self.router.remove_connected_peer(peer_ip);
+            self.connected_committee_members.write().remove(&peer_ip);
         }
     }
 }
@@ -163,6 +261,11 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
 
     /// Handles a `BlockResponse` message.
     fn block_response(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> bool {
+        if log_enabled!(Debug) {
+            let block_debug =
+                blocks.iter().map(|block| format!("({},{})", block.height(), block.hash())).collect::<Vec<String>>();
+            debug!("Block response for {peer_ip}, {}", block_debug.join(","));
+        }
         // Insert the candidate blocks into the sync pool.
         for block in blocks {
             if let Err(error) = self.router().sync().insert_block_response(peer_ip, block) {
@@ -172,7 +275,68 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         }
 
         // Tries to advance with blocks from the sync pool.
-        self.advance_with_sync_blocks();
+        self.advance_with_sync_blocks()
+    }
+
+    /// Handles a `NewBlock` message.
+    fn new_block(&self, peer_ip: SocketAddr, block: Block<N>, serialized: NewBlock<N>) -> bool {
+        // If the BFT isn't ready, we can't process the block yet.
+        if self.bft.get().is_none() {
+            return true;
+        }
+
+        // A failed check doesn't necessarily mean the block is malformed, so return true here.
+        if self.consensus.check_next_block(&block).is_err() {
+            return true;
+        }
+
+        // If the previous consensus output is available, check the order of transactions.
+        if let Some(last_consensus_output) = self.bft().state.last_output.lock().clone() {
+            let mut expected_txs = batched_transactions(&last_consensus_output)
+                .map(|bytes| {
+                    // Safe; it's our own consensus output, so we already processed this tx with the TransactionValidator.
+                    // Also, it's fast to deserialize, because we only process the ID and keep the actual tx as a blob.
+                    // This, of course, assumes that only the ID is used for sorting.
+                    let message = Message::<N>::deserialize(BytesMut::from(&bytes[..])).unwrap();
+
+                    let unconfirmed_tx = if let Message::UnconfirmedTransaction(tx) = message {
+                        tx
+                    } else {
+                        // TransactionValidator ensures that the Message is an UnconfirmedTransaction.
+                        unreachable!();
+                    };
+
+                    unconfirmed_tx.transaction_id
+                })
+                .collect::<HashSet<_>>();
+
+            // Remove the ids that are not present in the block (presumably dropped due to ledger rejection).
+            let block_txs = block.transaction_ids().copied().collect::<HashSet<_>>();
+            for id in &expected_txs.clone() {
+                if !block_txs.contains(id) {
+                    expected_txs.remove(id);
+                }
+            }
+
+            // Sort the txs according to shared logic.
+            let mut expected_txs = expected_txs.into_iter().collect::<Vec<_>>();
+            sort_transactions::<N>(&mut expected_txs);
+
+            if block.transaction_ids().zip(&expected_txs).any(|(id1, id2)| id1 != id2) {
+                error!("[NewBlock] Invalid order of transactions");
+                return false;
+            }
+        }
+
+        // Attempt to add the block to the ledger.
+        if let Err(err) = self.consensus.advance_to_next_block(&block) {
+            error!("[NewBlock] {err}");
+            return false;
+        }
+
+        // TODO: perform more elaborate propagation
+        self.propagate(Message::NewBlock(serialized), &[peer_ip]);
+
         true
     }
 

@@ -35,7 +35,7 @@ features = [ "erased-json" ]
 version = "0.2"
 
 [dependencies.indexmap]
-version = "1.8"
+version = "2.0"
 
 [dependencies.jsonwebtoken]
 version = "8.3"

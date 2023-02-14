@@ -12,10 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::LogWriter;
+use std::{fs::File, io, path::Path};
 
 use crossterm::tty::IsTty;
-use std::{fs::File, io, path::Path};
 use tokio::sync::mpsc;
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
@@ -23,14 +22,21 @@ use tracing_subscriber::{
     EnvFilter,
 };
 
+use crate::helpers::LogWriter;
+
 /// Initializes the logger.
 pub fn initialize_logger<P: AsRef<Path>>(verbosity: u8, nodisplay: bool, logfile: P) -> mpsc::Receiver<Vec<u8>> {
-    match verbosity {
-        0 => std::env::set_var("RUST_LOG", "info"),
-        1 => std::env::set_var("RUST_LOG", "debug"),
-        2 | 3 | 4 => std::env::set_var("RUST_LOG", "trace"),
-        _ => std::env::set_var("RUST_LOG", "info"),
-    };
+    match std::env::var("RUST_LOG") {
+        Ok(_) => {
+            // RUST_LOG set, don't reset it
+        }
+        Err(_) => match verbosity {
+            0 => std::env::set_var("RUST_LOG", "info"),
+            1 => std::env::set_var("RUST_LOG", "debug"),
+            2 | 3 | 4 => std::env::set_var("RUST_LOG", "trace"),
+            _ => std::env::set_var("RUST_LOG", "info"),
+        },
+    }
 
     // Filter out undesirable logs. (unfortunately EnvFilter cannot be cloned)
     let [filter, filter2] = std::array::from_fn(|_| {

@@ -14,7 +14,7 @@
 
 use super::*;
 
-use snarkos_node_messages::{BlockRequest, DisconnectReason, MessageCodec, Pong, UnconfirmedTransaction};
+use snarkos_node_messages::{BlockRequest, DisconnectReason, MessageCodec, NewBlock, Pong, UnconfirmedTransaction};
 use snarkos_node_router::Routing;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{Network, Transaction};
@@ -132,6 +132,12 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
     fn block_response(&self, peer_ip: SocketAddr, _blocks: Vec<Block<N>>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
+    }
+
+    /// Handles a `NewBlock` message.
+    fn new_block(&self, peer_ip: SocketAddr, _block: Block<N>, serialized: NewBlock<N>) -> bool {
+        self.propagate(Message::NewBlock(serialized), &[peer_ip]);
+        true
     }
 
     /// Sleeps for a period and then sends a `Ping` message to the peer.

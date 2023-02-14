@@ -18,6 +18,7 @@ use snarkos_node_messages::{
     BlockRequest,
     DataBlocks,
     Message,
+    NewBlock,
     PeerResponse,
     Ping,
     Pong,
@@ -158,7 +159,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     false => bail!("Peer '{peer_ip}' sent an invalid block response"),
                 }
             }
-            Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => {
+            Message::ChallengeRequest(..) | Message::ChallengeResponse(..) | Message::ConsensusId(..) => {
                 // Disconnect as the peer is not following the protocol.
                 bail!("Peer '{peer_ip}' is not following the protocol")
             }
@@ -263,6 +264,24 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     false => bail!("Peer '{peer_ip}' sent an invalid unconfirmed transaction"),
                 }
             }
+            Message::NewBlock(message) => {
+                // Clone the serialized message.
+                let serialized = message.clone();
+
+                // TODO: check if we want to use the Cache here.
+
+                // Perform the deferred non-blocking deserialization of the transaction.
+                let block = match message.block.deserialize().await {
+                    Ok(block) => block,
+                    Err(error) => bail!("[NewBlock] {error}"),
+                };
+
+                // Handle the new block.
+                match self.new_block(peer_ip, block, serialized) {
+                    true => Ok(()),
+                    false => bail!("Peer '{peer_ip}' sent an invalid new block"),
+                }
+            }
         }
     }
 
@@ -289,6 +308,9 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
     /// Handles a `BlockResponse` message.
     fn block_response(&self, peer_ip: SocketAddr, _blocks: Vec<Block<N>>) -> bool;
+
+    /// Handles a `NewBlock` message.
+    fn new_block(&self, peer_ip: SocketAddr, block: Block<N>, serialized: NewBlock<N>) -> bool;
 
     /// Handles a `PeerRequest` message.
     fn peer_request(&self, peer_ip: SocketAddr) -> bool {
