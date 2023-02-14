@@ -91,12 +91,15 @@ commands:
       flags:
         type: string
         default: ""
+      timeout:
+        type: string
+        default: "30m"
     steps:
       - checkout
       - setup_environment:
           cache_key: << parameters.cache_key >>
       - run:
-          no_output_timeout: 30m
+          no_output_timeout: << parameters.timeout >>
           command: cd << parameters.workspace_member >> && RUST_MIN_STACK=67108864 cargo test << parameters.flags >>
       - clear_environment:
           cache_key: << parameters.cache_key >>
@@ -141,8 +144,8 @@ jobs:
     steps:
       - run_serial:
           workspace_member: .integration
-          no_output_timeout: 60m
           cache_key: snarkos-integration-cache
+          timeout: "60m"
 
   snarkos:
     docker:
