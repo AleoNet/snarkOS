@@ -1,0 +1,45 @@
+[package]
+name = "snarkos-node-bft-consensus"
+version = "0.1.0"
+edition = "2021"
+
+[features]
+metrics = ["narwhal-node/metrics", "narwhal-executor/metrics"]
+test = ["tempfile"]
+
+[dependencies]
+aleo-std = "0.1.15"
+async-trait = "0.1"
+bincode = "1"
+bytes = "1"
+multiaddr = "0.17"
+parking_lot = "0.12"
+serde = { version = "1", features = ["derive"] }
+tempfile = { version = "3", optional = true }
+tokio = { version = "1", features = ["rt"] }
+tonic = "0.8"
+tracing = "0.1.36"
+serde_json = "1"
+snarkos-node-consensus = { path = "../consensus" }
+snarkos-node-messages = { path = "../messages" }
+snarkos-node-router = { path = "../router" }
+snarkos-node-tcp = { path = "../tcp" }
+snarkvm = { workspace = true }
+
+# below are the dependencies for BFT
+narwhal-config.workspace = true
+narwhal-crypto.workspace = true
+narwhal-executor.workspace = true
+narwhal-node.workspace = true
+narwhal-worker.workspace = true
+narwhal-types.workspace = true
+fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "235211dc8195590f5353d38135f5ee51a267521e" }
+rand = { version = "0.8.5", features = ["small_rng"] }
+arc-swap = "1.5.1"
+anyhow = "1"
+
+[dev-dependencies]
+deadline = "0.2"
+parking_lot = "0.12"
+tracing-subscriber = "0.3"
+snarkos-node-bft-consensus = { path = ".", features = ["test"] } # a workaround to use the `test` feature in tests by default
