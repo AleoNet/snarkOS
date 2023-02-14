@@ -85,6 +85,11 @@ pub struct Start {
     /// Enables the node to prefetch initial blocks from a CDN
     #[clap(default_value = "https://testnet3.blocks.aleo.org/phase3", long = "cdn")]
     pub cdn: String,
+
+    // Enables metrics.
+    #[clap(long = "metrics", action)]
+    pub metrics: bool,
+
     /// Enables development mode, specify a unique ID for this node
     #[clap(long)]
     pub dev: Option<u16>,
@@ -301,7 +306,7 @@ impl Start {
         // Initialize the node.
         match node_type {
             NodeType::Beacon => Node::new_beacon(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
-            NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev, self.metrics).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
             NodeType::Client => Node::new_client(self.node, account, &trusted_peers, genesis, self.dev).await,
         }

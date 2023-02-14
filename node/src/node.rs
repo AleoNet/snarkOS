@@ -49,6 +49,7 @@ impl<N: Network> Node<N> {
     }
 
     /// Initializes a new validator node.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new_validator(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
@@ -57,9 +58,10 @@ impl<N: Network> Node<N> {
         genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
+        enable_metrics: bool,
     ) -> Result<Self> {
         Ok(Self::Validator(Arc::new(
-            Validator::new(node_ip, rest_ip, account, trusted_peers, genesis, cdn, dev).await?,
+            Validator::new(node_ip, rest_ip, account, trusted_peers, genesis, cdn, dev, enable_metrics).await?,
         )))
     }
 

@@ -78,6 +78,9 @@ version = "=2.1.4"
 [dependencies.snarkvm]
 workspace = true
 
+[dependencies.narwhal-crypto]
+workspace = true
+
 [dependencies.time]
 version = "0.3"
 
@@ -98,7 +101,7 @@ version = "0.7"
 features = [ "codec" ]
 
 [dependencies.tokio-stream]
-version = "=0.1"
+version = "0.1"
 
 [dependencies.tracing]
 version = "0.1"

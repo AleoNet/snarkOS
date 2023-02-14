@@ -77,17 +77,6 @@ impl<N: Network> BlockLocators<N> {
         true
     }
 
-    /// Returns `true` if the given block locators are consistent with this one.
-    /// This function assumes the given block locators are well-formed.
-    pub fn is_consistent_with(&self, other: &Self) -> bool {
-        // Ensure the block locators are consistent with the previous ones.
-        if let Err(error) = self.ensure_is_consistent_with(other) {
-            warn!("Inconsistent block locators: {error}");
-            return false;
-        }
-        true
-    }
-
     /// Checks that this block locators are well-formed.
     pub fn ensure_is_valid(&self) -> Result<()> {
         // Ensure the block locators are well-formed.
