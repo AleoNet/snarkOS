@@ -58,7 +58,7 @@ pub struct Transfer {
     #[clap(short, long)]
     fee: Option<u64>,
     /// The record to spend the fee from.
-    #[clap(short, long)]
+    #[clap(long)]
     fee_record: Option<String>,
     /// Display the generated transaction.
     #[clap(short, long, default_value = "true", conflicts_with = "broadcast")]
