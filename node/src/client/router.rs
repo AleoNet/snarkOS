@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -89,13 +89,15 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Client<N, C> {
     }
 
     /// Processes a message received from the network.
-    async fn process_message(&self, peer_ip: SocketAddr, message: Self::Message) -> io::Result<()> {
+    async fn process_message(&self, peer_addr: SocketAddr, message: Self::Message) -> io::Result<()> {
         // Process the message. Disconnect if the peer violated the protocol.
-        if let Err(error) = self.inbound(peer_ip, message).await {
-            warn!("Disconnecting from '{peer_ip}' - {error}");
-            self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
-            // Disconnect from this peer.
-            self.router().disconnect(peer_ip);
+        if let Err(error) = self.inbound(peer_addr, message).await {
+            if let Some(peer_ip) = self.router().resolve_to_listener(&peer_addr) {
+                warn!("Disconnecting from '{peer_ip}' - {error}");
+                self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
+                // Disconnect from this peer.
+                self.router().disconnect(peer_ip);
+            }
         }
         Ok(())
     }

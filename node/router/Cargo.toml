@@ -16,6 +16,9 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
+[features]
+test = []
+
 [dependencies.anyhow]
 version = "1"
 
@@ -97,13 +100,26 @@ version = "=0.1"
 [dependencies.tracing]
 version = "0.1"
 
+[dev-dependencies.deadline]
+version = "0.2"
+
 [dev-dependencies.futures-util]
 version = "0.3"
 features = ["sink"]
 
+[dev-dependencies.peak_alloc]
+version = "0.1"
+
 [dev-dependencies.snarkos-node-messages]
 path = "../messages"
 features = [ "test" ]
+
+[dev-dependencies.snarkos-node-router]
+path = "."
+features = [ "test" ]
+
+[dev-dependencies.snarkvm-utilities]
+version = "0.9"
 
 [dev-dependencies.tracing-subscriber]
 version = "0.3"

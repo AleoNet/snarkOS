@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -16,14 +16,14 @@
 
 use indexmap::IndexMap;
 use parking_lot::RwLock;
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub(crate) struct Resolver {
     /// The map of the listener address to (ambiguous) peer address.
-    from_listener: Arc<RwLock<IndexMap<SocketAddr, SocketAddr>>>,
+    from_listener: RwLock<IndexMap<SocketAddr, SocketAddr>>,
     /// The map of the (ambiguous) peer address to listener address.
-    to_listener: Arc<RwLock<IndexMap<SocketAddr, SocketAddr>>>,
+    to_listener: RwLock<IndexMap<SocketAddr, SocketAddr>>,
 }
 
 impl Default for Resolver {

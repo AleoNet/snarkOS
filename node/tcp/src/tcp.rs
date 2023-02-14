@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -16,8 +16,9 @@
 
 use std::{
     collections::HashSet,
+    fmt,
     io,
-    net::SocketAddr,
+    net::{IpAddr, SocketAddr},
     ops::Deref,
     sync::{
         atomic::{AtomicUsize, Ordering::*},
@@ -25,6 +26,7 @@ use std::{
     },
 };
 
+use once_cell::sync::OnceCell;
 use parking_lot::Mutex;
 use tokio::{
     io::split,
@@ -64,7 +66,7 @@ pub struct InnerTcp {
     /// The node's configuration.
     config: Config,
     /// The node's listening address.
-    listening_addr: Option<SocketAddr>,
+    listening_addr: OnceCell<SocketAddr>,
     /// Contains objects used by the protocols implemented by the node.
     pub(crate) protocols: Protocols,
     /// A list of connections that have not been finalized yet.
@@ -81,7 +83,7 @@ pub struct InnerTcp {
 
 impl Tcp {
     /// Creates a new [`Tcp`] using the given [`Config`].
-    pub async fn new(mut config: Config) -> io::Result<Self> {
+    pub fn new(mut config: Config) -> Self {
         // If there is no pre-configured name, assign a sequential numeric identifier.
         if config.name.is_none() {
             config.name = Some(SEQUENTIAL_NODE_ID.fetch_add(1, SeqCst).to_string());
@@ -90,51 +92,11 @@ impl Tcp {
         // Create a tracing span containing the node's name.
         let span = crate::helpers::create_span(config.name.as_deref().unwrap());
 
-        // Procure a listening IP address, if the configuration is set.
-        let listener = if let Some(listener_ip) = config.listener_ip {
-            let listener = if let Some(port) = config.desired_listening_port {
-                // Construct the desired listening IP address.
-                let desired_listening_addr = SocketAddr::new(listener_ip, port);
-                // If a desired listening port is set, try to bind to it.
-                match TcpListener::bind(desired_listening_addr).await {
-                    Ok(listener) => listener,
-                    Err(e) => {
-                        if config.allow_random_port {
-                            warn!(parent: &span, "Trying any listening port, as the desired port is unavailable: {e}");
-                            let random_available_addr = SocketAddr::new(listener_ip, 0);
-                            TcpListener::bind(random_available_addr).await?
-                        } else {
-                            error!(parent: &span, "The desired listening port is unavailable: {e}");
-                            return Err(e);
-                        }
-                    }
-                }
-            } else if config.allow_random_port {
-                let random_available_addr = SocketAddr::new(listener_ip, 0);
-                TcpListener::bind(random_available_addr).await?
-            } else {
-                panic!("As 'listener_ip' is set, either 'desired_listening_port' or 'allow_random_port' must be set")
-            };
-
-            Some(listener)
-        } else {
-            None
-        };
-
-        // If a listener is set, get the listening IP address.
-        let listening_addr = if let Some(ref listener) = listener {
-            let ip = config.listener_ip.unwrap(); // safe; listener.is_some() => config.listener_ip.is_some()
-            let port = listener.local_addr()?.port(); // discover the port if it was unspecified
-            Some((ip, port).into())
-        } else {
-            None
-        };
-
         // Initialize the Tcp stack.
         let tcp = Tcp(Arc::new(InnerTcp {
             span,
             config,
-            listening_addr,
+            listening_addr: Default::default(),
             protocols: Default::default(),
             connecting: Default::default(),
             connections: Default::default(),
@@ -143,15 +105,9 @@ impl Tcp {
             tasks: Default::default(),
         }));
 
-        // If a listener is set, start listening for incoming connections.
-        if let Some(listener) = listener {
-            // Spawn a task that listens for incoming connections.
-            tcp.enable_listener(listener).await;
-        }
-
         debug!(parent: tcp.span(), "The node is ready");
 
-        Ok(tcp)
+        tcp
     }
 
     /// Returns the name assigned.
@@ -170,7 +126,7 @@ impl Tcp {
     /// Returns the listening address; returns an error if Tcp was not configured
     /// to listen for inbound connections.
     pub fn listening_addr(&self) -> io::Result<SocketAddr> {
-        self.listening_addr.ok_or_else(|| io::ErrorKind::AddrNotAvailable.into())
+        self.listening_addr.get().copied().ok_or_else(|| io::ErrorKind::AddrNotAvailable.into())
     }
 
     /// Checks whether the provided address is connected.
@@ -323,7 +279,21 @@ impl Tcp {
 
 impl Tcp {
     /// Spawns a task that listens for incoming connections.
-    async fn enable_listener(&self, listener: TcpListener) {
+    pub async fn enable_listener(&self) -> io::Result<SocketAddr> {
+        // Retrieve the listening IP address, which must be set.
+        let listener_ip =
+            self.config().listener_ip.expect("Tcp::enable_listener was called, but Config::listener_ip is not set");
+
+        // Initialize the TCP listener.
+        let listener = self.create_listener(listener_ip).await?;
+
+        // Discover the port, if it was unspecified.
+        let port = listener.local_addr()?.port();
+
+        // Set the listening IP address.
+        let listening_addr = (listener_ip, port).into();
+        self.listening_addr.set(listening_addr).expect("The node's listener was started more than once");
+
         // Use a channel to know when the listening task is ready.
         let (tx, rx) = oneshot::channel();
 
@@ -342,7 +312,41 @@ impl Tcp {
         });
         self.tasks.lock().push(listening_task);
         let _ = rx.await;
-        debug!(parent: self.span(), "Listening on {}", self.listening_addr.unwrap());
+        debug!(parent: self.span(), "Listening on {listening_addr}");
+
+        Ok(listening_addr)
+    }
+
+    /// Creates an instance of `TcpListener` based on the node's configuration.
+    async fn create_listener(&self, listener_ip: IpAddr) -> io::Result<TcpListener> {
+        let listener = if let Some(port) = self.config().desired_listening_port {
+            // Construct the desired listening IP address.
+            let desired_listening_addr = SocketAddr::new(listener_ip, port);
+            // If a desired listening port is set, try to bind to it.
+            match TcpListener::bind(desired_listening_addr).await {
+                Ok(listener) => listener,
+                Err(e) => {
+                    if self.config().allow_random_port {
+                        warn!(
+                            parent: self.span(),
+                            "Trying any listening port, as the desired port is unavailable: {e}"
+                        );
+                        let random_available_addr = SocketAddr::new(listener_ip, 0);
+                        TcpListener::bind(random_available_addr).await?
+                    } else {
+                        error!(parent: self.span(), "The desired listening port is unavailable: {e}");
+                        return Err(e);
+                    }
+                }
+            }
+        } else if self.config().allow_random_port {
+            let random_available_addr = SocketAddr::new(listener_ip, 0);
+            TcpListener::bind(random_available_addr).await?
+        } else {
+            panic!("As 'listener_ip' is set, either 'desired_listening_port' or 'allow_random_port' must be set");
+        };
+
+        Ok(listener)
     }
 
     /// Handles a new inbound connection.
@@ -470,6 +474,12 @@ impl Tcp {
     }
 }
 
+impl fmt::Debug for Tcp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "The TCP stack")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -482,13 +492,11 @@ mod tests {
             listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
             max_connections: 200,
             ..Default::default()
-        })
-        .await
-        .unwrap();
+        });
 
         assert_eq!(tcp.config.max_connections, 200);
         assert_eq!(tcp.config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
-        assert_eq!(tcp.listening_addr().unwrap().ip(), IpAddr::V4(Ipv4Addr::LOCALHOST));
+        assert_eq!(tcp.enable_listener().await.unwrap().ip(), IpAddr::V4(Ipv4Addr::LOCALHOST));
 
         assert_eq!(tcp.num_connected(), 0);
         assert_eq!(tcp.num_connecting(), 0);
@@ -496,8 +504,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_connect() {
-        let tcp = Tcp::new(Config::default()).await.unwrap();
-        let node_ip = tcp.listening_addr().unwrap();
+        let tcp = Tcp::new(Config::default());
+        let node_ip = tcp.enable_listener().await.unwrap();
 
         // Ensure self-connecting is not possible.
         tcp.connect(node_ip).await.unwrap_err();
@@ -512,10 +520,8 @@ mod tests {
             desired_listening_port: Some(0),
             max_connections: 1,
             ..Default::default()
-        })
-        .await
-        .unwrap();
-        let peer_ip = peer.listening_addr().unwrap();
+        });
+        let peer_ip = peer.enable_listener().await.unwrap();
 
         // Connect to the peer.
         tcp.connect(peer_ip).await.unwrap();
@@ -527,8 +533,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_disconnect() {
-        let tcp = Tcp::new(Config::default()).await.unwrap();
-        let _node_ip = tcp.listening_addr().unwrap();
+        let tcp = Tcp::new(Config::default());
+        let _node_ip = tcp.enable_listener().await.unwrap();
 
         // Initialize the peer.
         let peer = Tcp::new(Config {
@@ -536,10 +542,8 @@ mod tests {
             desired_listening_port: Some(0),
             max_connections: 1,
             ..Default::default()
-        })
-        .await
-        .unwrap();
-        let peer_ip = peer.listening_addr().unwrap();
+        });
+        let peer_ip = peer.enable_listener().await.unwrap();
 
         // Connect to the peer.
         tcp.connect(peer_ip).await.unwrap();
@@ -565,7 +569,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_can_add_connection() {
-        let tcp = Tcp::new(Config { max_connections: 1, ..Default::default() }).await.unwrap();
+        let tcp = Tcp::new(Config { max_connections: 1, ..Default::default() });
 
         // Initialize the peer.
         let peer = Tcp::new(Config {
@@ -573,10 +577,8 @@ mod tests {
             desired_listening_port: Some(0),
             max_connections: 1,
             ..Default::default()
-        })
-        .await
-        .unwrap();
-        let peer_ip = peer.listening_addr().unwrap();
+        });
+        let peer_ip = peer.enable_listener().await.unwrap();
 
         assert!(tcp.can_add_connection());
 
@@ -615,9 +617,7 @@ mod tests {
             listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
             max_connections: 1,
             ..Default::default()
-        })
-        .await
-        .unwrap();
+        });
 
         // Initialize peer 1.
         let peer1 = Tcp::new(Config {
@@ -625,10 +625,8 @@ mod tests {
             desired_listening_port: Some(0),
             max_connections: 1,
             ..Default::default()
-        })
-        .await
-        .unwrap();
-        let peer1_ip = peer1.listening_addr().unwrap();
+        });
+        let peer1_ip = peer1.enable_listener().await.unwrap();
 
         // Simulate an active connection.
         let stream = TcpStream::connect(peer1_ip).await.unwrap();
@@ -645,10 +643,8 @@ mod tests {
             desired_listening_port: Some(0),
             max_connections: 1,
             ..Default::default()
-        })
-        .await
-        .unwrap();
-        let peer2_ip = peer2.listening_addr().unwrap();
+        });
+        let peer2_ip = peer2.enable_listener().await.unwrap();
 
         // Handle the connection.
         let stream = TcpStream::connect(peer2_ip).await.unwrap();
@@ -664,7 +660,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_adapt_stream() {
-        let tcp = Tcp::new(Config { max_connections: 1, ..Default::default() }).await.unwrap();
+        let tcp = Tcp::new(Config { max_connections: 1, ..Default::default() });
 
         // Initialize the peer.
         let peer = Tcp::new(Config {
@@ -672,10 +668,8 @@ mod tests {
             desired_listening_port: Some(0),
             max_connections: 1,
             ..Default::default()
-        })
-        .await
-        .unwrap();
-        let peer_ip = peer.listening_addr().unwrap();
+        });
+        let peer_ip = peer.enable_listener().await.unwrap();
 
         // Simulate a pending connection.
         tcp.connecting.lock().insert(peer_ip);
