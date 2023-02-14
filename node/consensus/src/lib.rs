@@ -174,11 +174,10 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     }
 
     /// Clears the memory pool of all solutions and transactions.
-    pub fn clear_memory_pool(&self) -> Result<()> {
+    pub fn clear_memory_pool(&self) {
         // Clear the memory pool of unconfirmed solutions that are now invalid.
         self.memory_pool.clear_all_unconfirmed_solutions();
         // Clear the memory pool of unconfirmed transactions that are now invalid.
         self.memory_pool.clear_unconfirmed_transactions();
-        Ok(())
     }
 }

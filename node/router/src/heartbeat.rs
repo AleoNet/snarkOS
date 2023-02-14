@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{Outbound, Router, REDUNDANCY_FACTOR};
-use snarkos_node_messages::{DisconnectReason, Message, PeerRequest, PuzzleRequest};
+use snarkos_node_messages::{DisconnectReason, Message, NodeType, PeerRequest, PuzzleRequest};
 use snarkvm::prelude::Network;
 
 use colored::Colorize;
@@ -45,8 +45,10 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
 
         // Remove any stale connected peers.
         self.remove_stale_connected_peers();
-        // Remove the oldest connected peer.
-        self.remove_oldest_connected_peer();
+        // Remove the oldest connected peer, unless it's a validator.
+        if self.router().node_type() != NodeType::Validator {
+            self.remove_oldest_connected_peer();
+        }
         // Keep the number of connected peers within the allowed range.
         self.handle_connected_peers();
         // Keep the bootstrap peers within the allowed range.

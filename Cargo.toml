@@ -25,6 +25,7 @@ members = [
   "node",
   "node/cdn",
   "node/consensus",
+  "node/bft-consensus",
   "node/env",
   "node/messages",
   "node/metrics",
@@ -43,7 +44,16 @@ name = "snarkos"
 path = "snarkos/main.rs"
 
 [features]
+default = [ "jemalloc" ]
 jemalloc = [ "tikv-jemallocator" ]
+
+[workspace.dependencies]
+narwhal-types       = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-types" }
+narwhal-config      = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-config" }
+narwhal-crypto      = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-crypto" }
+narwhal-executor    = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-executor" }
+narwhal-node        = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-node"}
+narwhal-worker      = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-worker"}
 
 [dependencies.anyhow]
 version = "1.0.70"
