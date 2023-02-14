@@ -31,6 +31,10 @@ async fn test_connect_without_handshake() {
     assert_eq!(node0.number_of_connected_peers(), 0);
     assert_eq!(node1.number_of_connected_peers(), 0);
 
+    // Start listening.
+    node0.tcp().enable_listener().await.unwrap();
+    node1.tcp().enable_listener().await.unwrap();
+
     {
         // Connect node0 to node1.
         node0.connect(node1.local_ip());
@@ -88,6 +92,10 @@ async fn test_connect_with_handshake() {
     // Enable handshake protocol.
     node0.enable_handshake().await;
     node1.enable_handshake().await;
+
+    // Start listening.
+    node0.tcp().enable_listener().await.unwrap();
+    node1.tcp().enable_listener().await.unwrap();
 
     {
         // Connect node0 to node1.
