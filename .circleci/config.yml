@@ -141,6 +141,7 @@ jobs:
     steps:
       - run_serial:
           workspace_member: .integration
+          no_output_timeout: 60m
           cache_key: snarkos-integration-cache
 
   snarkos:
