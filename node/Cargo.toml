@@ -21,6 +21,11 @@ default = [ "parallel" ]
 parallel = [ "rayon" ]
 timer = [ "aleo-std/timer" ]
 
+[dependencies] # added for BFT
+narwhal-types = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-types" }
+bytes = "1.4.0"
+tonic = "0.8.3"
+
 [dependencies.aleo-std]
 version = "0.1.18"
 default-features = false
@@ -34,6 +39,10 @@ version = "0.1"
 [dependencies.colored]
 version = "2"
 
+[dependencies.fastcrypto]
+git = "https://github.com/MystenLabs/fastcrypto"
+rev = "235211dc8195590f5353d38135f5ee51a267521e"
+
 [dependencies.futures-util]
 version = "0.3"
 features = ["sink"]
@@ -42,6 +51,9 @@ features = ["sink"]
 version = "1"
 
 [dependencies.num_cpus]
+version = "1"
+
+[dependencies.once_cell]
 version = "1"
 
 [dependencies.parking_lot]
@@ -66,6 +78,12 @@ path = "./cdn"
 
 [dependencies.snarkos-node-consensus]
 path = "./consensus"
+
+[dependencies.snarkos-node-bft-consensus]
+path = "./bft-consensus"
+
+[dependencies.snarkos-node-ledger]
+path = "./ledger"
 
 [dependencies.snarkos-node-messages]
 path = "./messages"

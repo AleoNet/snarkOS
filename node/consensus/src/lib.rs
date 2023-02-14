@@ -374,12 +374,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     }
 
     /// Clears the memory pool of all solutions and transactions.
-    pub fn clear_memory_pool(&self) -> Result<()> {
+    pub fn clear_memory_pool(&self) {
         // Clear the memory pool of unconfirmed solutions that are now invalid.
         self.memory_pool.clear_all_unconfirmed_solutions();
         // Clear the memory pool of unconfirmed transactions that are now invalid.
         self.memory_pool.clear_unconfirmed_transactions();
-        Ok(())
     }
 
     /// Checks the given block is valid next block.
@@ -598,11 +597,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         /* Signature */
 
-        // Ensure the block is signed by an authorized beacon.
+        // Ensure the block is signed by an authorized entity.
         let signer = block.signature().to_address();
-        if !self.beacons.read().contains_key(&signer) {
-            bail!("Block {} ({}) is signed by an unauthorized beacon ({})", block.height(), block.hash(), signer);
-        }
+        // TODO: check against the committee.
 
         // Check the signature.
         if !block.signature().verify(&signer, &[*block.hash()]) {

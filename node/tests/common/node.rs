@@ -65,7 +65,7 @@ pub async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNet
         &[],
         sample_genesis_block(), // Should load the current network's genesis block.
         None,                   // No CDN.
-        None,
+        Some(0),
     )
     .await
     .expect("couldn't create validator instance")

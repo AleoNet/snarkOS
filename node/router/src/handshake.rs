@@ -23,7 +23,7 @@ use snarkos_node_messages::{
     MessageCodec,
     MessageTrait,
 };
-use snarkos_node_tcp::{ConnectionSide, Tcp, P2P};
+use snarkos_node_tcp::ConnectionSide;
 use snarkvm::prelude::{error, Address, Header, Network};
 
 use anyhow::{bail, Result};

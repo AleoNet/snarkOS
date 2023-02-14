@@ -14,6 +14,7 @@
 
 use super::*;
 
+use snarkos_node_bft_consensus::{batched_transactions, sort_transactions};
 use snarkos_node_messages::{
     BlockRequest,
     BlockResponse,
@@ -22,13 +23,14 @@ use snarkos_node_messages::{
     DisconnectReason,
     Message,
     MessageCodec,
+    NewBlock,
     Pong,
     UnconfirmedTransaction,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{error, EpochChallenge, Network, Transaction};
 
-use std::{io, net::SocketAddr, time::Duration};
+use std::{collections::HashSet, io, net::SocketAddr, time::Duration};
 use tokio::task::spawn_blocking;
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Validator<N, C> {
@@ -173,6 +175,63 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
 
         // Tries to advance with blocks from the sync pool.
         self.advance_with_sync_blocks();
+        true
+    }
+
+    /// Handles a `NewBlock` message.
+    fn new_block(&self, peer_ip: SocketAddr, block: Block<N>, serialized: NewBlock<N>) -> bool {
+        // A failed check doesn't necessarily mean the block is malformed, so return true here.
+        if self.consensus.check_next_block(&block).is_err() {
+            return true;
+        }
+
+        // If the previous consensus output is available, check the order of transactions.
+        if let Some(last_consensus_output) = self.bft().state.last_output.lock().clone() {
+            let mut expected_txs = batched_transactions(&last_consensus_output)
+                .map(|bytes| {
+                    // Safe; it's our own consensus output, so we already processed this tx with the TransactionValidator.
+                    // Also, it's fast to deserialize, because we only process the ID and keep the actual tx as a blob.
+                    // This, of course, assumes that only the ID is used for sorting.
+                    let message = Message::<N>::deserialize(BytesMut::from(&bytes[..])).unwrap();
+
+                    let unconfirmed_tx = if let Message::UnconfirmedTransaction(tx) = message {
+                        tx
+                    } else {
+                        // TransactionValidator ensures that the Message is an UnconfirmedTransaction.
+                        unreachable!();
+                    };
+
+                    unconfirmed_tx.transaction_id
+                })
+                .collect::<HashSet<_>>();
+
+            // Remove the ids that are not present in the block (presumably dropped due to ledger rejection).
+            let block_txs = block.transaction_ids().copied().collect::<HashSet<_>>();
+            for id in &expected_txs.clone() {
+                if !block_txs.contains(id) {
+                    expected_txs.remove(id);
+                }
+            }
+
+            // Sort the txs according to shared logic.
+            let mut expected_txs = expected_txs.into_iter().collect::<Vec<_>>();
+            sort_transactions::<N>(&mut expected_txs);
+
+            if block.transaction_ids().zip(&expected_txs).any(|(id1, id2)| id1 != id2) {
+                error!("[NewBlock] Invalid order of transactions");
+                return false;
+            }
+        }
+
+        // Attempt to add the block to the ledger.
+        if let Err(err) = self.consensus.advance_to_next_block(&block) {
+            error!("[NewBlock] {err}");
+            return false;
+        }
+
+        // TODO: perform more elaborate propagation
+        self.propagate(Message::NewBlock(serialized), vec![peer_ip]);
+
         true
     }
 

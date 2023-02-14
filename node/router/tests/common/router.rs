@@ -152,6 +152,11 @@ impl<N: Network> Inbound<N> for TestRouter<N> {
         true
     }
 
+    /// Handles a `NewBlock` message.
+    fn new_block(&self, _peer_ip: SocketAddr, _block: Block<N>, _serialized: NewBlock<N>) -> bool {
+        true
+    }
+
     /// Handles an `Pong` message.
     fn pong(&self, _peer_ip: SocketAddr, _message: Pong) -> bool {
         true

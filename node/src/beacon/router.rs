@@ -184,6 +184,12 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
         true
     }
 
+    /// Handles a `NewBlock` message.
+    fn new_block(&self, _peer_ip: SocketAddr, _block: Block<N>, _serialized: NewBlock<N>) -> bool {
+        // TODO: add more elaborate handling
+        true
+    }
+
     /// Sleeps for a period and then sends a `Ping` message to the peer.
     fn pong(&self, peer_ip: SocketAddr, _message: Pong) -> bool {
         // Spawn an asynchronous task for the `Ping` request.

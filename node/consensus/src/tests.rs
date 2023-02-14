@@ -12,6 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use std::{net::SocketAddr, time::Duration};
+
+use crate::ConsensusMemory;
+use snarkos_account::Account;
+use snarkos_node::Validator;
+use snarkos_node_ledger::{Ledger, RecordsFilter};
+use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
 use snarkvm::{
     console::{
         account::{Address, PrivateKey, ViewKey},
@@ -22,9 +29,12 @@ use snarkvm::{
     synthesizer::{block::Transaction, program::Program, store::ConsensusStore, vm::VM},
 };
 
-use tracing_test::traced_test;
-
 use indexmap::IndexMap;
+use narwhal_types::TransactionProto;
+use rand::prelude::IteratorRandom;
+use tokio::sync::mpsc;
+use tracing_subscriber::filter::{EnvFilter, LevelFilter};
+use tracing_test::traced_test;
 
 type CurrentNetwork = Testnet3;
 
@@ -233,6 +243,32 @@ function compute:
                 transaction
             })
             .clone()
+    }
+
+    pub(crate) fn start_logger(default_level: LevelFilter) {
+        let filter = match EnvFilter::try_from_default_env() {
+            Ok(filter) => filter
+                .add_directive("anemo=off".parse().unwrap())
+                .add_directive("tokio_util=off".parse().unwrap())
+                .add_directive("narwhal_config=off".parse().unwrap())
+                .add_directive("narwhal_consensus=off".parse().unwrap())
+                .add_directive("narwhal_executor=off".parse().unwrap())
+                .add_directive("narwhal_network=off".parse().unwrap())
+                .add_directive("narwhal_primary=off".parse().unwrap())
+                .add_directive("narwhal_worker=off".parse().unwrap()),
+            _ => EnvFilter::default()
+                .add_directive(default_level.into())
+                .add_directive("anemo=off".parse().unwrap())
+                .add_directive("tokio_util=off".parse().unwrap())
+                .add_directive("narwhal_config=off".parse().unwrap())
+                .add_directive("narwhal_consensus=off".parse().unwrap())
+                .add_directive("narwhal_executor=off".parse().unwrap())
+                .add_directive("narwhal_network=off".parse().unwrap())
+                .add_directive("narwhal_primary=off".parse().unwrap())
+                .add_directive("narwhal_worker=off".parse().unwrap()),
+        };
+
+        tracing_subscriber::fmt().with_env_filter(filter).with_target(false).init();
     }
 }
 
@@ -485,4 +521,212 @@ fn test_coinbase_target() {
     let proposed_block = consensus.propose_next_block(&private_key, rng).unwrap();
     // Ensure the block contains a coinbase solution.
     assert!(proposed_block.coinbase().is_some());
+}
+
+#[tokio::test(flavor = "multi_thread")]
+#[ignore = "This test is intended to be run on-demand and in isolation."]
+async fn test_bullshark_full() {
+    // Start the logger.
+    test_helpers::start_logger(LevelFilter::INFO);
+
+    // TODO: introduce a Ctrl-C signal handler that will delete the temporary databases.
+
+    // The number of validators to run.
+    // TODO: support a different number than 4.
+    const N_VALIDATORS: u16 = 4;
+
+    // The randomly-seeded source of deterministic randomness.
+    let mut rng = TestRng::default();
+
+    // Sample the genesis private key.
+    let genesis_private_key = test_helpers::sample_genesis_private_key(&mut rng);
+    let genesis_view_key = ViewKey::try_from(&genesis_private_key).unwrap();
+
+    // Sample the genesis block.
+    let genesis = test_helpers::sample_genesis_block_with_private_key(&mut rng, genesis_private_key);
+
+    // Collect the validator addresses.
+    let mut validator_addrs = vec![];
+    for i in 0..N_VALIDATORS {
+        let addr: SocketAddr = format!("127.0.0.1:{}", 4130 + i).parse().unwrap();
+        validator_addrs.push(addr);
+    }
+
+    // Start and collect the validator nodes.
+    let mut validators = vec![];
+    for (i, addr) in validator_addrs.iter().copied().enumerate() {
+        info!("Staring validator {i} at {addr}.");
+
+        let account = Account::<CurrentNetwork>::new(&mut rng).unwrap();
+        let other_addrs = validator_addrs.iter().copied().filter(|&a| a != addr).collect::<Vec<_>>();
+        let validator = Validator::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::new(
+            addr,
+            None,
+            account,
+            &other_addrs,    // the other validators are trusted peers
+            genesis.clone(), // use a common genesis block
+            None,
+            Some(i as u16),
+        )
+        .await
+        .unwrap();
+        validators.push(validator);
+
+        info!("Validator {i} is ready.");
+    }
+
+    // Wait until the validators are connected to one another.
+    // TODO: validators should do this automatically until quorum is reached
+    loop {
+        info!("Waiting for the validator mesh...");
+
+        let mut mesh_ready = true;
+
+        for validator in &validators {
+            if validator.router().number_of_connected_peers() != N_VALIDATORS as usize - 1 {
+                mesh_ready = false;
+                break;
+            }
+        }
+
+        if mesh_ready {
+            info!("The validator mesh is ready.");
+            break;
+        } else {
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        }
+    }
+
+    // Prepare the setup related to the BFT workers.
+    let mut tx_clients = validators[0].bft().spawn_tx_clients();
+
+    info!("Preparing a block that will allow the production of transactions.");
+
+    // Initialize the consensus to generate transactions.
+    let ledger = test_helpers::CurrentLedger::load(genesis, None).unwrap();
+    let consensus = test_helpers::CurrentConsensus::new(ledger, true).unwrap();
+
+    // Initialize a new program. This program is a simple program with a function `test` that does not require any
+    // input records. This means you can sample as many execution transactions as you want without needing
+    // to locate any owned records to spend.
+    let program = Program::<CurrentNetwork>::from_str(
+        r"
+program simple.aleo;
+
+function hello:
+    input r0 as u32.private;
+    input r1 as u32.private;
+    add r0 r1 into r2;
+    output r2 as u32.private;
+",
+    )
+    .unwrap();
+
+    // Fetch the unspent records.
+    let records: Vec<_> = consensus
+        .ledger
+        .find_records(&genesis_view_key, RecordsFilter::Unspent)
+        .unwrap()
+        .filter(|(_, record)| !record.gates().is_zero())
+        .collect();
+    assert_eq!(records.len(), 1);
+
+    let fee = 600000;
+    let (_, record) = records.iter().find(|(_, r)| ***r.gates() >= fee).unwrap();
+
+    // Create a deployment transaction for the above program.
+    let deployment_transaction = Transaction::deploy(
+        consensus.ledger.vm(),
+        &genesis_private_key,
+        &program,
+        (record.clone(), fee),
+        None,
+        &mut rng,
+    )
+    .unwrap();
+
+    // Add the transaction to the memory pool.
+    consensus.add_unconfirmed_transaction(deployment_transaction).unwrap();
+    assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), 1);
+
+    // Propose the next block.
+    let next_block = consensus.propose_next_block(&genesis_private_key, &mut rng).unwrap();
+
+    // Ensure the block is a valid next block.
+    consensus.check_next_block(&next_block).unwrap();
+    // Construct a next block.
+    consensus.advance_to_next_block(&next_block).unwrap();
+
+    // Introduce the block to all the validators.
+    for validator in &validators {
+        validator.consensus().check_next_block(&next_block).unwrap();
+        validator.consensus().advance_to_next_block(&next_block).unwrap();
+    }
+
+    info!("Done; the validators are now ready to process transactions.");
+
+    // From this point on, once the deployment transaction has been included in a block,
+    // all executions of the `test` function in `sample.program` will be valid for any subsequent block.
+
+    // Use a channel to be able to process transactions as they are created.
+    let (tx_sender, mut tx_receiver) = mpsc::unbounded_channel();
+
+    // Generate execution transactions in the background.
+    tokio::task::spawn_blocking(move || {
+        let inputs = [Value::from_str("10u32").unwrap(), Value::from_str("100u32").unwrap()];
+
+        for i in 0.. {
+            let transaction = Transaction::execute(
+                consensus.ledger.vm(),
+                &genesis_private_key,
+                ProgramID::from_str("simple.aleo").unwrap(),
+                Identifier::from_str("hello").unwrap(),
+                inputs.iter(),
+                None,
+                None,
+                &mut rng,
+            )
+            .unwrap();
+
+            info!("Created transaction {} ({}/inf).", transaction.id(), i + 1);
+
+            tx_sender.send(transaction).unwrap();
+        }
+    });
+
+    // Note: These transactions do not have conflicting state, so they can be added in any order. However,
+    // this means we can't test for conflicts or double spends using these transactions.
+
+    // Create a new test rng for worker and delay randomization (the other one was moved to the transaction
+    // creation task). This one doesn't need to be deterministic, it's just fast and readily available.
+    let mut rng = TestRng::default();
+
+    // Send the transactions to a random number of BFT workers.
+    while let Some(transaction) = tx_receiver.recv().await {
+        // Randomize the number of worker recipients.
+        let n_recipients: usize = rng.gen_range(1..=4);
+
+        info!("Sending transaction {} to {} workers.", transaction.id(), n_recipients);
+
+        let message = Message::UnconfirmedTransaction(UnconfirmedTransaction {
+            transaction_id: transaction.id(),
+            transaction: Data::Object(transaction),
+        });
+        let mut bytes: Vec<u8> = Vec::new();
+        message.serialize(&mut bytes).unwrap();
+        let payload = bytes::Bytes::from(bytes);
+        let tx = TransactionProto { transaction: payload };
+
+        // Submit the transaction to the chosen workers.
+        for tx_client in tx_clients.iter_mut().choose_multiple(&mut rng, n_recipients) {
+            tx_client.submit_transaction(tx.clone()).await.unwrap();
+        }
+
+        // Wait for a random amount of time before processing further transactions.
+        let delay: u64 = rng.gen_range(0..2_000);
+        tokio::time::sleep(Duration::from_millis(delay)).await;
+    }
+
+    // Wait indefinitely.
+    std::future::pending::<()>().await;
 }
