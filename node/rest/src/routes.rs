@@ -374,14 +374,15 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         }
 
         // Prepare the unconfirmed transaction message.
+        let transaction_id = transaction.id();
         let message = Message::UnconfirmedTransaction(UnconfirmedTransaction {
-            transaction_id: transaction.id(),
+            transaction_id,
             transaction: Data::Object(transaction),
         });
 
         // Broadcast the transaction.
         routing.propagate(message, vec![]);
 
-        Ok("OK")
+        Ok(transaction_id.to_string())
     }
 }
