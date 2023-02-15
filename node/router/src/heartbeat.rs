@@ -85,6 +85,12 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             1 => debug!("Connected to 1 peer: {connected_peers_fmt}"),
             num_connected => debug!("Connected to {num_connected} peers {connected_peers_fmt}"),
         }
+        // TODO (howardwu): TMP - Remove this once the node is stable.
+        trace!(
+            "\nActive - {:?}\nPending - {:?}",
+            self.router().tcp.connected_addrs(),
+            self.router().tcp.connecting_addrs()
+        );
     }
 
     /// This function removes any connected peers that have not communicated within the predefined time.
@@ -143,6 +149,17 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         let num_surplus = num_connected.saturating_sub(Self::MAXIMUM_NUMBER_OF_PEERS);
         // Compute the number of deficit peers.
         let num_deficient = Self::MEDIAN_NUMBER_OF_PEERS.saturating_sub(num_connected);
+
+        if self.router().node_type().is_validator() {
+            for peer in self.router().get_connected_peers() {
+                if peer.node_type().is_prover() && peer.first_seen().elapsed().as_secs() > 120 {
+                    info!("Disconnecting from '{}' (prover)", peer.ip());
+                    let _ = self.send(peer.ip(), Message::Disconnect(DisconnectReason::PeerRefresh.into()));
+                    // Disconnect from this peer.
+                    self.router().disconnect(peer.ip());
+                }
+            }
+        }
 
         if num_surplus > 0 {
             debug!("Exceeded maximum number of connected peers, disconnecting from {num_surplus} peers");
