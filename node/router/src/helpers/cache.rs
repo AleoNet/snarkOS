@@ -29,7 +29,7 @@ use std::{
 use time::{Duration, OffsetDateTime};
 
 /// The maximum number of items to store in a cache map.
-const MAX_CACHE_SIZE: usize = 1 << 17;
+const MAX_CACHE_SIZE: usize = 1 << 20;
 
 /// A helper containing the peer IP and solution commitment.
 type SolutionKey<N> = (SocketAddr, PuzzleCommitment<N>);
