@@ -623,9 +623,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         /* Proof(s) */
 
         // Ensure the transaction is valid.
-        if !self.ledger.vm().verify(transaction) {
-            bail!("Transaction '{transaction_id}' is invalid")
-        }
+        self.ledger.vm().check_transaction(transaction)?;
 
         /* Input */
 

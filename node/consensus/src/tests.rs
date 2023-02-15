@@ -180,7 +180,7 @@ function compute:
                 )
                 .unwrap();
                 // Verify.
-                assert!(consensus.ledger.vm().verify(&transaction));
+                assert!(consensus.ledger.vm().verify_transaction(&transaction));
                 // Return the transaction.
                 transaction
             })
@@ -232,7 +232,7 @@ function compute:
                 // Execute.
                 let transaction = Transaction::execute_authorization(vm, authorization, None, rng).unwrap();
                 // Verify.
-                assert!(vm.verify(&transaction));
+                assert!(vm.verify_transaction(&transaction));
                 // Return the transaction.
                 transaction
             })
