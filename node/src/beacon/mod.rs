@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -280,21 +280,35 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 // Initialize an RNG.
                 let rng = &mut rand::thread_rng();
 
-                // Prepare the inputs.
+                // Prepare the inputs and function name.
                 let to = beacon.account.address();
-                let amount = 1;
-                let inputs = [
-                    Value::Record(record.clone()),
-                    Value::from_str(&format!("{to}"))?,
-                    Value::from_str(&format!("{amount}u64"))?,
-                ];
+                let (inputs, function_name) = match beacon.is_dev() {
+                    true => {
+                        // Prepare the inputs for a split.
+                        let amount = ***record.gates() / 2;
+                        let inputs = vec![Value::Record(record.clone()), Value::from_str(&format!("{amount}u64"))?];
+
+                        (inputs, Identifier::from_str("split")?)
+                    }
+                    false => {
+                        // Prepare the inputs for a transfer.
+                        let amount = 1;
+                        let inputs = vec![
+                            Value::Record(record.clone()),
+                            Value::from_str(&format!("{to}"))?,
+                            Value::from_str(&format!("{amount}u64"))?,
+                        ];
+
+                        (inputs, Identifier::from_str("transfer")?)
+                    }
+                };
 
                 // Create a new transaction.
                 let transaction = Transaction::execute(
                     beacon.ledger.vm(),
                     beacon.account.private_key(),
                     ProgramID::from_str("credits.aleo")?,
-                    Identifier::from_str("transfer")?,
+                    function_name,
                     inputs.iter(),
                     None,
                     None,

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -117,7 +117,7 @@ impl Account {
                 return Ok(account.to_string());
             } else {
                 let rate = ITERATIONS / timer.elapsed().as_millis();
-                let rate = format!("[{} a/ms]", rate);
+                let rate = format!("[{rate} a/ms]");
                 println!(" {} Sampled {ITERATIONS_STR} accounts, searching...", rate.dimmed());
             }
         }

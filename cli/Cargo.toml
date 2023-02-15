@@ -54,7 +54,7 @@ default-features = false
 version = "1"
 
 [dependencies.self_update]
-version = "0.32"
+version = "0.34"
 
 [dependencies.serde]
 version = "1"
@@ -87,3 +87,9 @@ features = ["rt"]
 [dependencies.tracing-subscriber]
 version = "0.3"
 features = [ "env-filter" ]
+
+[dependencies.ureq]
+version = "2.5"
+
+[dev-dependencies.indexmap]
+version = "1"

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -83,6 +83,8 @@ pub struct DeploymentDB<N: Network> {
     certificate_map: DataMap<(ProgramID<N>, Identifier<N>, u16), Certificate<N>>,
     /// The fee map.
     fee_map: DataMap<N::TransactionID, (N::TransitionID, N::StateRoot, Option<Proof<N>>)>,
+    /// The reverse fee map.
+    reverse_fee_map: DataMap<N::TransitionID, N::TransactionID>,
     /// The transition store.
     transition_store: TransitionStore<N, TransitionDB<N>>,
 }
@@ -96,6 +98,7 @@ impl<N: Network> DeploymentStorage<N> for DeploymentDB<N> {
     type VerifyingKeyMap = DataMap<(ProgramID<N>, Identifier<N>, u16), VerifyingKey<N>>;
     type CertificateMap = DataMap<(ProgramID<N>, Identifier<N>, u16), Certificate<N>>;
     type FeeMap = DataMap<N::TransactionID, (N::TransitionID, N::StateRoot, Option<Proof<N>>)>;
+    type ReverseFeeMap = DataMap<N::TransitionID, N::TransactionID>;
     type TransitionStorage = TransitionDB<N>;
 
     /// Initializes the deployment storage.
@@ -110,6 +113,7 @@ impl<N: Network> DeploymentStorage<N> for DeploymentDB<N> {
             verifying_key_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentVerifyingKeyMap)?,
             certificate_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentCertificateMap)?,
             fee_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentFeeMap)?,
+            reverse_fee_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentReverseFeeMap)?,
             transition_store,
         })
     }
@@ -147,6 +151,11 @@ impl<N: Network> DeploymentStorage<N> for DeploymentDB<N> {
     /// Returns the fee map.
     fn fee_map(&self) -> &Self::FeeMap {
         &self.fee_map
+    }
+
+    /// Returns the reverse fee map.
+    fn reverse_fee_map(&self) -> &Self::ReverseFeeMap {
+        &self.reverse_fee_map
     }
 
     /// Returns the transition store.
