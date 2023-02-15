@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -31,6 +31,10 @@ async fn test_disconnect_without_handshake() {
     assert_eq!(node0.number_of_connected_peers(), 0);
     assert_eq!(node1.number_of_connected_peers(), 0);
 
+    // Start listening.
+    node0.tcp().enable_listener().await.unwrap();
+    node1.tcp().enable_listener().await.unwrap();
+
     // Connect node0 to node1.
     node0.connect(node1.local_ip());
     // Sleep briefly.
@@ -45,7 +49,10 @@ async fn test_disconnect_without_handshake() {
     assert_eq!(node1.tcp().num_connecting(), 0);
 
     // Disconnect node0 from node1.
-    node0.disconnect(node1.local_ip());
+    // note: the lower-level disconnect call is used, as the higher-level
+    // collection of connected peers is only altered during the handshake,
+    // as well as the address resolver needed for the higher-level calls
+    node0.tcp().disconnect(node1.local_ip()).await;
     // Sleep briefly.
     tokio::time::sleep(Duration::from_millis(100)).await;
 
@@ -71,6 +78,10 @@ async fn test_disconnect_with_handshake() {
     // Enable handshake protocol.
     node0.enable_handshake().await;
     node1.enable_handshake().await;
+
+    // Start listening.
+    node0.tcp().enable_listener().await.unwrap();
+    node1.tcp().enable_listener().await.unwrap();
 
     // Connect node0 to node1.
     node0.connect(node1.local_ip());

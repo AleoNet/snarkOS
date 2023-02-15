@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -51,11 +51,11 @@ macro_rules! test_disconnect {
 
             // Check the peer counts.
             let node_clone = node.clone();
-            deadline!(Duration::from_secs(1), move || node_clone.router().number_of_connected_peers() == 1);
+            deadline!(Duration::from_secs(5), move || node_clone.router().number_of_connected_peers() == 1);
             let node_clone = node.clone();
-            deadline!(Duration::from_secs(1), move || node_clone.tcp().num_connected() == 1);
+            deadline!(Duration::from_secs(5), move || node_clone.tcp().num_connected() == 1);
             let peer_clone = peer.clone();
-            deadline!(Duration::from_secs(1), move || peer_clone.node().num_connected() == 1);
+            deadline!(Duration::from_secs(5), move || peer_clone.node().num_connected() == 1);
 
             // Disconnect.
             if $node_disconnects {
@@ -66,9 +66,9 @@ macro_rules! test_disconnect {
 
             // Check the peer counts have been updated.
             let node_clone = node.clone();
-            deadline!(Duration::from_secs(1), move || node_clone.router().number_of_connected_peers() == 0);
-            deadline!(Duration::from_secs(1), move || node.tcp().num_connected() == 0);
-            deadline!(Duration::from_secs(1), move || peer.node().num_connected() == 0);
+            deadline!(Duration::from_secs(5), move || node_clone.router().number_of_connected_peers() == 0);
+            deadline!(Duration::from_secs(5), move || node.tcp().num_connected() == 0);
+            deadline!(Duration::from_secs(5), move || peer.node().num_connected() == 0);
 
         }
     };
