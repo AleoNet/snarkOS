@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -19,6 +19,9 @@ pub use account::*;
 
 mod clean;
 pub use clean::*;
+
+mod developer;
+pub use developer::*;
 
 mod start;
 pub use start::*;
@@ -46,6 +49,8 @@ pub enum Command {
     Account(Account),
     #[clap(name = "clean")]
     Clean(Clean),
+    #[clap(subcommand)]
+    Developer(Developer),
     #[clap(name = "start")]
     Start(Box<Start>),
     #[clap(name = "update")]
@@ -58,6 +63,7 @@ impl Command {
         match self {
             Self::Account(command) => command.parse(),
             Self::Clean(command) => command.parse(),
+            Self::Developer(command) => command.parse(),
             Self::Start(command) => command.parse(),
             Self::Update(command) => command.parse(),
         }

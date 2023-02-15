@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -98,6 +98,10 @@ pub enum DataID {
     KeyValueIDMap,
     KeyMap,
     ValueMap,
+
+    // TODO (raychu86): Move this up to Deployment for phase 3.
+    DeploymentReverseFeeMap,
+
     // Testing
     #[cfg(test)]
     Test,

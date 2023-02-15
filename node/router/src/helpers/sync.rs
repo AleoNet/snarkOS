@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -22,9 +22,10 @@ use colored::Colorize;
 use core::hash::Hash;
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
+use once_cell::sync::OnceCell;
 use parking_lot::RwLock;
 use rand::{prelude::IteratorRandom, CryptoRng, Rng};
-use std::{collections::BTreeMap, net::SocketAddr, sync::Arc, time::Instant};
+use std::{collections::BTreeMap, net::SocketAddr, time::Instant};
 
 pub const REDUNDANCY_FACTOR: usize = 3;
 pub const EXTRA_REDUNDANCY_FACTOR: usize = REDUNDANCY_FACTOR * 2;
@@ -65,39 +66,37 @@ impl Hash for PeerPair {
 /// - the `request_timestamps` map remains unchanged.
 /// - When a response is removed/completed, the `requests` map and `request_timestamps` map also remove the entry for the request height.
 /// - When a request is timed out, the `requests`, `request_timestamps`, and `responses` map remove the entry for the request height;
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Sync<N: Network> {
-    /// The listener IP of this node.
-    local_ip: SocketAddr,
+    local_ip: OnceCell<SocketAddr>,
     /// The canonical map of block height to block hash.
     /// This map is a linearly-increasing map of block heights to block hashes,
     /// updated solely from the ledger and candidate blocks (not from peers' block locators, to ensure there are no forks).
-    canon: Arc<RwLock<BTreeMap<u32, N::BlockHash>>>,
+    canon: RwLock<BTreeMap<u32, N::BlockHash>>,
     /// The map of peer IP to their block locators.
     /// The block locators are consistent with the canonical map and every other peer's block locators.
-    locators: Arc<RwLock<IndexMap<SocketAddr, BlockLocators<N>>>>,
+    locators: RwLock<IndexMap<SocketAddr, BlockLocators<N>>>,
     /// The map of peer-to-peer to their common ancestor.
     /// This map is used to determine which peers to request blocks from.
-    common_ancestors: Arc<RwLock<IndexMap<PeerPair, u32>>>,
+    common_ancestors: RwLock<IndexMap<PeerPair, u32>>,
     /// The map of block height to the expected block hash and peer IPs.
     /// Each entry is removed when its corresponding entry in the responses map is removed.
-    requests: Arc<RwLock<BTreeMap<u32, SyncRequest<N>>>>,
+    requests: RwLock<BTreeMap<u32, SyncRequest<N>>>,
     /// The map of block height to the received blocks.
     /// Removing an entry from this map must remove the corresponding entry from the requests map.
-    responses: Arc<RwLock<BTreeMap<u32, Block<N>>>>,
+    responses: RwLock<BTreeMap<u32, Block<N>>>,
     /// The map of block height to the timestamp of the last time the block was requested.
     /// This map is used to determine which requests to remove if they have been pending for too long.
-    request_timestamps: Arc<RwLock<BTreeMap<u32, Instant>>>,
+    request_timestamps: RwLock<BTreeMap<u32, Instant>>,
     /// The map of (timed out) peer IPs to their request timestamps.
     /// This map is used to determine which peers to remove if they have timed out too many times.
-    request_timeouts: Arc<RwLock<IndexMap<SocketAddr, Vec<Instant>>>>,
+    request_timeouts: RwLock<IndexMap<SocketAddr, Vec<Instant>>>,
 }
 
-impl<N: Network> Sync<N> {
-    /// Initializes a new instance of the sync pool.
-    pub fn new(local_ip: SocketAddr) -> Self {
+impl<N: Network> Default for Sync<N> {
+    fn default() -> Self {
         Self {
-            local_ip,
+            local_ip: Default::default(),
             canon: Default::default(),
             locators: Default::default(),
             common_ancestors: Default::default(),
@@ -106,6 +105,18 @@ impl<N: Network> Sync<N> {
             request_timestamps: Default::default(),
             request_timeouts: Default::default(),
         }
+    }
+}
+
+impl<N: Network> Sync<N> {
+    /// Returns the listening address of the associated node.
+    fn local_ip(&self) -> SocketAddr {
+        *self.local_ip.get().expect("The local IP had not been set")
+    }
+
+    /// Returns a dummy listening address of the associated node.
+    pub fn set_local_ip(&self, local_ip: SocketAddr) {
+        self.local_ip.set(local_ip).expect("The local IP was set more than once");
     }
 
     /// Returns the latest block height in the sync pool.
@@ -290,7 +301,7 @@ impl<N: Network> Sync<N> {
             }
         }
         // Update the common ancestor entry for this node.
-        self.common_ancestors.write().insert(PeerPair(self.local_ip, peer_ip), ancestor);
+        self.common_ancestors.write().insert(PeerPair(self.local_ip(), peer_ip), ancestor);
 
         // Compute the common ancestor with every other peer.
         let mut common_ancestors = self.common_ancestors.write();
@@ -732,7 +743,8 @@ mod tests {
 
     /// Returns the sync pool, with the canonical map initialized to the given height.
     fn sample_sync_at_height(height: u32) -> Sync<CurrentNetwork> {
-        let sync = Sync::<CurrentNetwork>::new(sample_local_ip());
+        let sync = Sync::<CurrentNetwork>::default();
+        sync.set_local_ip(sample_local_ip());
         sync.insert_canon_locators(sample_block_locators(height)).unwrap();
         sync
     }

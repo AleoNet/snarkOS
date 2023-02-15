@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -169,7 +169,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Returns a candidate for the next block in the ledger.
     pub fn propose_next_block<R: Rng + CryptoRng>(&self, private_key: &PrivateKey<N>, rng: &mut R) -> Result<Block<N>> {
         // Retrieve the latest state root.
-        let latest_state_root = self.ledger.latest_state_root();
+        let latest_state_root = *self.ledger.latest_state_root();
         // Retrieve the latest block.
         let latest_block = self.ledger.latest_block();
         // Retrieve the latest height.
@@ -610,18 +610,20 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         /* Fee */
 
+        // TODO (raychu86): Currently ignoring this rule for executions. Revisit this in phase 3.
         // Ensure transactions with a positive balance must pay for its storage in bytes.
         let fee = transaction.fee()?;
-        if fee >= 0 && transaction.to_bytes_le()?.len() < usize::try_from(fee)? {
+        if matches!(transaction, Transaction::Deploy(..))
+            && fee >= 0
+            && transaction.to_bytes_le()?.len() > usize::try_from(fee)?
+        {
             bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
         }
 
         /* Proof(s) */
 
         // Ensure the transaction is valid.
-        if !self.ledger.vm().verify(transaction) {
-            bail!("Transaction '{transaction_id}' is invalid")
-        }
+        self.ledger.vm().check_transaction(transaction)?;
 
         /* Input */
 

@@ -1,4 +1,4 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
 // The snarkOS library is free software: you can redistribute it and/or modify
@@ -39,13 +39,16 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     }
 
     /// Returns the transaction ID that contains the given `program ID`.
-    pub fn find_deployment_id(&self, program_id: &ProgramID<N>) -> Result<Option<N::TransactionID>> {
-        self.vm.transaction_store().find_deployment_id(program_id)
+    pub fn find_transaction_id_from_program_id(&self, program_id: &ProgramID<N>) -> Result<Option<N::TransactionID>> {
+        self.vm.transaction_store().find_transaction_id_from_program_id(program_id)
     }
 
     /// Returns the transaction ID that contains the given `transition ID`.
-    pub fn find_transaction_id(&self, transition_id: &N::TransitionID) -> Result<Option<N::TransactionID>> {
-        self.vm.transaction_store().find_transaction_id(transition_id)
+    pub fn find_transaction_id_from_transition_id(
+        &self,
+        transition_id: &N::TransitionID,
+    ) -> Result<Option<N::TransactionID>> {
+        self.vm.transaction_store().find_transaction_id_from_transition_id(transition_id)
     }
 
     /// Returns the transition ID that contains the given `input ID` or `output ID`.
