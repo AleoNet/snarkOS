@@ -20,7 +20,7 @@ edition = "2021"
 version = "1"
 
 [dependencies.crossterm]
-version = "0.25"
+version = "0.26"
 
 [dependencies.snarkos-node]
 path = "../node"
