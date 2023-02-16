@@ -19,6 +19,7 @@ edition = "2021"
 [features]
 default = [ "parallel" ]
 parallel = [ "rayon" ]
+cuda = ["snarkvm/cuda"]
 
 [dependencies.anyhow]
 version = "1"

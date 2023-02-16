@@ -19,6 +19,7 @@ edition = "2021"
 [features]
 default = [ ]
 timer = [ "aleo-std/timer", "snarkos-node-ledger/timer" ]
+cuda = ["snarkvm/cuda"]
 
 [dependencies.aleo-std]
 version = "0.1.15"
