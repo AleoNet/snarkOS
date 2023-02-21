@@ -569,27 +569,58 @@ mod tests {
     #[test]
     fn test_conflicting_flags() {
         // Test starting the SnarkOS node with the sigma algebra of conflicting flags, ensure they conflict
-        let err = Start::try_parse_from(["snarkos", "--beacon", "--validator", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        let err = Start::try_parse_from(["snarkos", "--beacon", "--validator", "--private_key", "aleo1xx"].iter())
+            .unwrap_err()
+            .kind();
         assert_eq!(err, ArgumentConflict);
-        let err = Start::try_parse_from(["snarkos", "--beacon", "--prover", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        let err = Start::try_parse_from(["snarkos", "--beacon", "--prover", "--private_key", "aleo1xx"].iter())
+            .unwrap_err()
+            .kind();
         assert_eq!(err, ArgumentConflict);
-        let err = Start::try_parse_from(["snarkos","--beacon", "--client", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        let err = Start::try_parse_from(["snarkos", "--beacon", "--client", "--private_key", "aleo1xx"].iter())
+            .unwrap_err()
+            .kind();
         assert_eq!(err, ArgumentConflict);
-        let err = Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "--prover", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        let err = Start::try_parse_from(["snarkos", "--validator", "--prover", "--private_key", "aleo1xx"].iter())
+            .unwrap_err()
+            .kind();
         assert_eq!(err, ArgumentConflict);
-        let err = Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "--client", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        let err = Start::try_parse_from(["snarkos", "--validator", "--client", "--private_key", "aleo1xx"].iter())
+            .unwrap_err()
+            .kind();
         assert_eq!(err, ArgumentConflict);
-        let err = Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "--client", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        let err = Start::try_parse_from(["snarkos", "--prover", "--client", "--private_key", "aleo1xx"].iter())
+            .unwrap_err()
+            .kind();
         assert_eq!(err, ArgumentConflict);
-        let err = Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "--client", "--beacon", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        let err =
+            Start::try_parse_from(["snarkos", "--prover", "--client", "--beacon", "--private_key", "aleo1xx"].iter())
+                .unwrap_err()
+                .kind();
         assert_eq!(err, ArgumentConflict);
-        let err = Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "--client", "--validator", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        let err = Start::try_parse_from(
+            ["snarkos", "--prover", "--client", "--validator", "--private_key", "aleo1xx"].iter(),
+        )
+        .unwrap_err()
+        .kind();
         assert_eq!(err, ArgumentConflict);
-        let err = Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "--client", "--validator", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        let err = Start::try_parse_from(
+            ["snarkos", "--beacon", "--client", "--validator", "--private_key", "aleo1xx"].iter(),
+        )
+        .unwrap_err()
+        .kind();
         assert_eq!(err, ArgumentConflict);
-        let err = Start::try_parse_from(["snarkos", "--dev", "0",  "--beacon", "--prover", "--validator", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        let err = Start::try_parse_from(
+            ["snarkos", "--beacon", "--prover", "--validator", "--private_key", "aleo1xx"].iter(),
+        )
+        .unwrap_err()
+        .kind();
         assert_eq!(err, ArgumentConflict);
-        let err = Start::try_parse_from(["snarkos", "--dev", "0",  "--client", "--beacon", "--prover", "--validator", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        let err = Start::try_parse_from(
+            ["snarkos", "--client", "--beacon", "--prover", "--validator", "--private_key", "aleo1xx"].iter(),
+        )
+        .unwrap_err()
+        .kind();
         assert_eq!(err, ArgumentConflict);
     }
 }
