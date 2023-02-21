@@ -40,23 +40,24 @@ const RECOMMENDED_MIN_NOFILES_LIMIT_VALIDATOR: u64 = 1024;
 /// Starts the snarkOS node.
 #[derive(Clone, Debug, Parser)]
 pub struct Start {
-    /// Specify the network of this node.
+    /// Specify the network of this node [default: 3].
     #[clap(default_value = "3", long = "network")]
     pub network: u16,
     /// Enables development mode, specify a unique ID for this node.
     #[clap(long)]
     pub dev: Option<u16>,
 
-    /// Specify this as a beacon, with the given account private key for this node.
+    /// Specify this as a beacon, with the given account private key for this node as an argument
     #[clap(long = "beacon")]
     pub beacon: Option<String>,
-    /// Specify this as a validator, with the given account private key for this node.
+    /// Specify this as a validator, with the given account private key for this node as an
+    /// argument
     #[clap(long = "validator")]
     pub validator: Option<String>,
-    /// Specify this as a prover, with the given account private key for this node.
+    /// Specify this as a prover, with the given account private key for this node as an argument
     #[clap(long = "prover")]
     pub prover: Option<String>,
-    /// Specify this as a client, with an optional account private key for this node.
+    /// Specify this as a client, with an optional account private key for this node as an argument
     #[clap(long = "client")]
     pub client: Option<String>,
 
