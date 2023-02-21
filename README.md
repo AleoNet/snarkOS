@@ -160,20 +160,22 @@ USAGE:
     snarkos start [OPTIONS]
 
 OPTIONS:
-        --beacon <BEACON>          Specify this as a beacon, with the given account private key for this node
-        --client <CLIENT>          Specify this as a client, with an optional account private key for this node
-        --connect <CONNECT>        Specify the IP address and port of a peer to connect to [default: ]
-        --dev <DEV>                Enables development mode, specify a unique ID for this node
-    -h, --help                     Print help information
-        --logfile <LOGFILE>        Specify the path to the file where logs will be stored [default: /tmp/snarkos.log]
-        --network <NETWORK>        Specify the network of this node [default: 3]
-        --node <NODE>              Specify the IP address and port for the node server [default: 0.0.0.0:4133]
-        --nodisplay                If the flag is set, the node will not render the display
-        --norest                   If the flag is set, the node will not initialize the REST server
-        --prover <PROVER>          Specify this as a prover, with the given account private key for this node
-        --rest <REST>              Specify the IP address and port for the REST server [default: 0.0.0.0:3033]
-        --validator <VALIDATOR>    Specify this as a validator, with the given account private key for this node
-        --verbosity <VERBOSITY>    Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
+        --beacon Specify this node to run as a beacon
+        --cdn <URL> Enables the node to prefetch initial blocks from a CDN [default: https://testnet3.blocks.aleo.org/phase2]
+        --client Specify this node to run as a client
+        --dev <NODE_ID> Enables development mode, specify a unique ID for this node
+    -h, --help Print help information
+        --logfile <PATH> Path to file where logs will be stored [default: /path/to/snarkos.log]
+        --network <NETWORK_ID> The network this node should operate on [default: 3] [default: 3]
+        --node <IP:PORT> IP address and port for the node server [default: 0.0.0.0:4133]
+        --nodisplay If this flag is set, the node will not render the display
+        --norest If this flag is set, the node will not initialize the REST server
+        --connect <IP:PORT> IP address and port of a peer to connect to [default: ]
+        --private_key <PRIVATE_KEY> The private key to be used for this node. If left blank in development mode, a new key will be generated
+        --prover Specify this node to run as a prover
+        --rest <IP:PORT> IP address and port for the REST server [default: 0.0.0.0:3033]
+        --validator Specify this node to run as a validator
+        --verbosity <VERBOSITY_LEVEL> The verbosity of the node [options: 0, 1, 2, 3, 4] [default: 2]
 ```
 
 ## 6. Development
@@ -198,11 +200,11 @@ It is important to initialize the nodes starting from `0` and incrementing by `1
 
 The following is a list of options to initialize a node (replace `XX` with a number starting from `0`):
 ```
-cargo run --release -- start --nodisplay --dev XX --beacon ""
-cargo run --release -- start --nodisplay --dev XX --validator ""
-cargo run --release -- start --nodisplay --dev XX --prover ""
-cargo run --release -- start --nodisplay --dev XX --client ""
-cargo run --release -- start --nodisplay --dev XX
+cargo run --release -- start --nodisplay --dev <NODE_ID> --beacon ""
+cargo run --release -- start --nodisplay --dev <NODE_ID> --validator ""
+cargo run --release -- start --nodisplay --dev <NODE_ID> --prover ""
+cargo run --release -- start --nodisplay --dev <NODE_ID> --client ""
+cargo run --release -- start --nodisplay --dev <NODE_ID>
 ```
 
 When no node type is specified, the node will default to `--client`.
