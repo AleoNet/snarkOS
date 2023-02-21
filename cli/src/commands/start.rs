@@ -147,7 +147,7 @@ impl Start {
         //  2. The user has explicitly disabled CDN.
         //  3. The node is a client (no need to sync).
         //  4. The node is a prover (no need to sync).
-        //  5. Check for the edge case where no nodes are specified, in which case the node defaults to a client.
+        //  5. No node type is specified, in which case the node defaults to a client.
         if self.dev.is_some() || self.cdn.is_empty() || self.client || self.prover || (!self.beacon && !self.validator)
         {
             None
@@ -208,7 +208,7 @@ impl Start {
             if self.beacon {
                 sample_account(&mut self.private_key, true)?;
             }
-            // If the node type flag is set, but no private key is provided, then sample one.
+            // If the private key option is set but not provided, sample one.
             else if let Some("") = self.private_key.as_deref() {
                 sample_account(&mut self.private_key, false)?;
             }
@@ -341,6 +341,7 @@ impl Start {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::ErrorKind::ArgumentConflict;
     use snarkvm::prelude::Testnet3;
 
     type CurrentNetwork = Testnet3;
@@ -563,5 +564,32 @@ mod tests {
         assert!(!config.prover);
         assert!(config.client);
         assert_eq!(genesis, expected_genesis);
+    }
+
+    #[test]
+    fn test_conflicting_flags() {
+        // Test starting the SnarkOS node with the sigma algebra of conflicting flags, ensure they conflict
+        let err = Start::try_parse_from(["snarkos", "--beacon", "--validator", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        assert_eq!(err, ArgumentConflict);
+        let err = Start::try_parse_from(["snarkos", "--beacon", "--prover", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        assert_eq!(err, ArgumentConflict);
+        let err = Start::try_parse_from(["snarkos","--beacon", "--client", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        assert_eq!(err, ArgumentConflict);
+        let err = Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "--prover", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        assert_eq!(err, ArgumentConflict);
+        let err = Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "--client", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        assert_eq!(err, ArgumentConflict);
+        let err = Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "--client", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        assert_eq!(err, ArgumentConflict);
+        let err = Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "--client", "--beacon", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        assert_eq!(err, ArgumentConflict);
+        let err = Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "--client", "--validator", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        assert_eq!(err, ArgumentConflict);
+        let err = Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "--client", "--validator", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        assert_eq!(err, ArgumentConflict);
+        let err = Start::try_parse_from(["snarkos", "--dev", "0",  "--beacon", "--prover", "--validator", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        assert_eq!(err, ArgumentConflict);
+        let err = Start::try_parse_from(["snarkos", "--dev", "0",  "--client", "--beacon", "--prover", "--validator", "--private_key", "aleo1xx"].iter()).unwrap_err().kind();
+        assert_eq!(err, ArgumentConflict);
     }
 }
