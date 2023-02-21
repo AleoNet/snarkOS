@@ -30,15 +30,15 @@ pub struct Scan {
     #[clap(short, long)]
     pub view_key: String,
 
-    /// The block height to start scanning at
+    /// The block height to start scanning from.
     #[clap(long, default_value = "0")]
     pub start: u32,
 
-    /// The block height to stop scanning
+    /// The block height to stop scanning.
     #[clap(long)]
     pub end: Option<u32>,
 
-    /// The endpoint to scan blocks from
+    /// The endpoint to scan blocks from.
     #[clap(long)]
     endpoint: String,
 }
