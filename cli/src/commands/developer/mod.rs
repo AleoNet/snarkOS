@@ -124,12 +124,16 @@ impl Developer {
         transaction: Transaction<CurrentNetwork>,
         operation: String,
     ) -> Result<String> {
+        // Get the transaction id.
+        let transaction_id = transaction.id();
+
         // Determine if the transaction should be stored.
         if let Some(path) = store {
             match PathBuf::from_str(&path) {
                 Ok(file_path) => {
                     let transaction_bytes = transaction.to_bytes_le()?;
-                    std::fs::write(file_path, transaction_bytes)?;
+                    std::fs::write(&file_path, transaction_bytes)?;
+                    println!("Transaction {transaction_id} was stored to {}", file_path.display());
                 }
                 Err(err) => {
                     println!("The transaction was unable to be stored due to: {err}");
@@ -139,9 +143,6 @@ impl Developer {
 
         // Determine if the transaction should be broadcast or displayed to user.
         if let Some(endpoint) = broadcast {
-            // Get the transaction id.
-            let transaction_id = transaction.id();
-
             // Send the deployment request to the local development node.
             match ureq::post(&endpoint).send_json(&transaction) {
                 Ok(id) => {
