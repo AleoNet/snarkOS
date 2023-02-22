@@ -20,7 +20,10 @@ use snarkvm::prelude::{Block, Ciphertext, Field, Network, Plaintext, PrivateKey,
 
 use anyhow::{bail, ensure, Result};
 use clap::Parser;
-use std::str::FromStr;
+use std::{
+    io::{stdout, Write},
+    str::FromStr,
+};
 
 // TODO (raychu86): Figure out what to do with this naive scan. This scan currently does not check if records are already spent.
 /// Scan the snarkOS node for records.
@@ -45,6 +48,7 @@ pub struct Scan {
     /// The endpoint to scan blocks from.
     #[clap(long)]
     endpoint: String,
+    // TODO (raychu86): Add `--last` command.
 }
 
 impl Scan {
@@ -145,10 +149,16 @@ impl Scan {
 
         let mut records = Vec::new();
 
+        // Calculate the number of blocks to scan.
+        let total_blocks = end_height.saturating_sub(start_height);
+
         // Scan the endpoint starting from the start height
         let mut request_start = start_height;
         while request_start <= end_height {
-            // TODO (raychu86): Add progress bar.
+            // Log the progress.
+            let percentage_complete = request_start.saturating_sub(start_height) as f64 * 100.0 / total_blocks as f64;
+            print!("\rScanning {total_blocks} blocks for records ({percentage_complete:.2}% complete)...");
+            stdout().flush()?;
 
             let num_blocks_to_request =
                 std::cmp::min(MAX_BLOCK_RANGE, end_height.saturating_sub(request_start).saturating_add(1));
@@ -177,6 +187,10 @@ impl Scan {
 
             request_start = request_start.saturating_add(num_blocks_to_request);
         }
+
+        // Print final complete message.
+        println!("\rScanning {total_blocks} blocks for records (100% complete)...  \n");
+        stdout().flush()?;
 
         Ok(records)
     }
