@@ -139,6 +139,7 @@ jobs:
       - image: cimg/rust:1.65
     resource_class: 2xlarge
     steps:
+      - no_output_timeout: 300m
       - run_serial:
           workspace_member: .integration
           cache_key: snarkos-integration-cache
@@ -311,7 +312,6 @@ workflows:
 
   main-workflow:
     jobs:
-      - integration
       - snarkos
       - account
       - cli
@@ -339,3 +339,14 @@ workflows:
                 display,
                 node
               ]
+
+  nightly-workflow:
+    triggers:
+      - schedule:
+          cron: "0 0,12 * * *"
+          filters:
+            branches:
+              only:
+                - testnet3
+    jobs:
+      - integration
