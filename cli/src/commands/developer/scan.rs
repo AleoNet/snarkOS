@@ -75,11 +75,11 @@ impl Scan {
         match (&self.private_key, &self.view_key) {
             (Some(private_key), Some(view_key)) => {
                 // Derive the private key.
-                let private_key = PrivateKey::<N>::from_str(&private_key)?;
+                let private_key = PrivateKey::<N>::from_str(private_key)?;
                 // Derive the expected view key.
-                let expected_view_key = ViewKey::<N>::try_from(&private_key)?;
+                let expected_view_key = ViewKey::<N>::try_from(private_key)?;
                 // Derive the view key.
-                let view_key = ViewKey::<N>::from_str(&view_key)?;
+                let view_key = ViewKey::<N>::from_str(view_key)?;
 
                 ensure!(
                     expected_view_key == view_key,
@@ -90,13 +90,13 @@ impl Scan {
             }
             (Some(private_key), _) => {
                 // Derive the private key.
-                let private_key = PrivateKey::<N>::from_str(&private_key)?;
+                let private_key = PrivateKey::<N>::from_str(private_key)?;
                 // Derive the view key.
-                let view_key = ViewKey::<N>::try_from(&private_key)?;
+                let view_key = ViewKey::<N>::try_from(private_key)?;
 
                 Ok((Some(private_key), view_key))
             }
-            (None, Some(view_key)) => Ok((None, ViewKey::<N>::from_str(&view_key)?)),
+            (None, Some(view_key)) => Ok((None, ViewKey::<N>::from_str(view_key)?)),
             (None, None) => bail!("Missing private key or view key."),
         }
     }
