@@ -25,7 +25,6 @@ use std::{
     str::FromStr,
 };
 
-// TODO (raychu86): Figure out what to do with this naive scan. This scan currently does not check if records are already spent.
 /// Scan the snarkOS node for records.
 #[derive(Debug, Parser)]
 pub struct Scan {
@@ -38,17 +37,20 @@ pub struct Scan {
     view_key: Option<String>,
 
     /// The block height to start scanning from.
-    #[clap(long, default_value = "0")]
-    start: u32,
+    #[clap(long, conflicts_with = "last")]
+    start: Option<u32>,
 
     /// The block height to stop scanning.
-    #[clap(long)]
+    #[clap(long, conflicts_with = "last")]
     end: Option<u32>,
+
+    /// Scan the latest `n` blocks.
+    #[clap(long)]
+    last: Option<u32>,
 
     /// The endpoint to scan blocks from.
     #[clap(long)]
     endpoint: String,
-    // TODO (raychu86): Add `--last` command.
 }
 
 impl Scan {
@@ -56,11 +58,11 @@ impl Scan {
         // Derive the view key and optional private key.
         let (private_key, view_key) = self.parse_account()?;
 
-        // Find the end height.
-        let end = self.parse_end_height()?;
+        // Find the start and end height to scan.
+        let (start_height, end_height) = self.parse_block_range()?;
 
         // Fetch the records from the network.
-        let records = Self::fetch_records(private_key, &view_key, &self.endpoint, self.start, end)?;
+        let records = Self::fetch_records(private_key, &view_key, &self.endpoint, start_height, end_height)?;
 
         // Output the decrypted records associated with the view key.
         if records.is_empty() {
@@ -105,32 +107,41 @@ impl Scan {
         }
     }
 
-    /// Returns latest block hash to request.
-    fn parse_end_height(&self) -> Result<u32> {
-        // Find the end height.
-        let end = match self.end {
-            Some(height) => height,
-            None => {
+    /// Returns the `start` and `end` blocks to scan.
+    fn parse_block_range(&self) -> Result<(u32, u32)> {
+        match (self.start, self.end, self.last) {
+            (Some(start), Some(end), None) => {
+                ensure!(end > start, "The given scan range is invalid (start = {start}, end = {end})");
+
+                Ok((start, end))
+            }
+            (Some(start), None, None) => {
                 // Request the latest block height from the endpoint.
                 let endpoint = format!("{}/testnet3/latest/height", self.endpoint);
                 let latest_height = u32::from_str(&ureq::get(&endpoint).call()?.into_string()?)?;
 
                 // Print warning message if the user is attempting to scan the whole chain.
-                if self.start == 0 {
-                    println!("⚠️  Attention - Scanning the entire chain. This may take a few minutes...\n");
+                if start == 0 {
+                    println!("⚠️  Attention - Scanning the entire chain. This may take a while...\n");
                 }
 
-                latest_height
+                Ok((start, latest_height))
             }
-        };
+            (None, Some(end), None) => Ok((0, end)),
+            (None, None, Some(last)) => {
+                // Request the latest block height from the endpoint.
+                let endpoint = format!("{}/testnet3/latest/height", self.endpoint);
+                let latest_height = u32::from_str(&ureq::get(&endpoint).call()?.into_string()?)?;
 
-        ensure!(end > self.start, "The given scan range is invalid (start = {}, end = {end})", self.start);
-
-        Ok(end)
+                Ok((latest_height.saturating_sub(last), latest_height))
+            }
+            (None, None, None) => bail!("Missing data about block range."),
+            _ => bail!("`last` flags can't be used with `start` or `end`"),
+        }
     }
 
     /// Fetch owned ciphertext records from the endpoint.
-    pub fn fetch_records(
+    fn fetch_records(
         private_key: Option<PrivateKey<CurrentNetwork>>,
         view_key: &ViewKey<CurrentNetwork>,
         endpoint: &str,
@@ -189,7 +200,7 @@ impl Scan {
         }
 
         // Print final complete message.
-        println!("\rScanning {total_blocks} blocks for records (100% complete)...  \n");
+        println!("\rScanning {total_blocks} blocks for records (100% complete)...   \n");
         stdout().flush()?;
 
         Ok(records)
@@ -258,9 +269,7 @@ mod tests {
                 &format!("{private_key}"),
                 "--view-key",
                 &format!("{view_key}"),
-                "--start",
-                "0",
-                "--end",
+                "--last",
                 "10",
                 "--endpoint",
                 "",
@@ -277,9 +286,7 @@ mod tests {
                 &format!("{private_key}"),
                 "--view-key",
                 &format!("{unassociated_view_key}"),
-                "--start",
-                "0",
-                "--end",
+                "--last",
                 "10",
                 "--endpoint",
                 "",
@@ -291,15 +298,38 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_end_height() {
+    fn test_parse_block_range() {
         let config =
             Scan::try_parse_from(["snarkos", "--view-key", "", "--start", "0", "--end", "10", "--endpoint", ""].iter())
                 .unwrap();
-        assert!(config.parse_end_height().is_ok());
+        assert!(config.parse_block_range().is_ok());
 
+        // `start` height can't be greater than `end` height.
         let config =
             Scan::try_parse_from(["snarkos", "--view-key", "", "--start", "10", "--end", "5", "--endpoint", ""].iter())
                 .unwrap();
-        assert!(config.parse_end_height().is_err());
+        assert!(config.parse_block_range().is_err());
+
+        // `last` conflicts with `start`
+        assert!(
+            Scan::try_parse_from(
+                ["snarkos", "--view-key", "", "--start", "0", "--last", "10", "--endpoint", ""].iter(),
+            )
+            .is_err()
+        );
+
+        // `last` conflicts with `end`
+        assert!(
+            Scan::try_parse_from(["snarkos", "--view-key", "", "--end", "10", "--last", "10", "--endpoint", ""].iter())
+                .is_err()
+        );
+
+        // `last` conflicts with `start` and `end`
+        assert!(
+            Scan::try_parse_from(
+                ["snarkos", "--view-key", "", "--start", "0", "--end", "01", "--last", "10", "--endpoint", ""].iter(),
+            )
+            .is_err()
+        );
     }
 }
