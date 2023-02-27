@@ -44,10 +44,10 @@ pub fn populate_program_memory(
     // For each program and mapping pair, add the desired number of random key-value pairs.
     for (program_name, mapping_name, num_entries) in parameters.iter() {
         // Construct the program ID.
-        let program_id = ProgramID::<Testnet3>::from_str(*program_name).unwrap();
+        let program_id = ProgramID::<Testnet3>::from_str(program_name).unwrap();
 
         // Construct the mapping name.
-        let mapping_name = Identifier::from_str(*mapping_name)?;
+        let mapping_name = Identifier::from_str(mapping_name)?;
 
         // Initialize the mapping if it does not exist.
         if !program_store.contains_mapping(&program_id, &mapping_name).unwrap() {
