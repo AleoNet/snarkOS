@@ -52,7 +52,7 @@ version = "0.1"
 version = "1"
 
 [dev-dependencies.tempfile]
-version = "3.2"
+version = "3.4"
 
 [dev-dependencies.tracing-test]
 version = "0.2"
