@@ -190,7 +190,6 @@ impl<N: Network> Router<N> {
             if let Some(peer_addr) = router.resolve_to_ambiguous(&peer_ip) {
                 // Disconnect from this peer.
                 let _disconnected = router.tcp.disconnect(peer_addr).await;
-                debug_assert!(_disconnected);
             }
         });
     }
