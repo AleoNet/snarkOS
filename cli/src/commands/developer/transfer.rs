@@ -46,7 +46,7 @@ pub struct Transfer {
     #[clap(parse(try_from_str), long)]
     recipient: Address<CurrentNetwork>,
     /// The number of gates to transfer.
-    #[clap(parse(try_from_str))]
+    #[clap(parse(try_from_str), long)]
     amount: u64,
     /// The private key used to generate the execution.
     #[clap(short, long)]
@@ -61,7 +61,7 @@ pub struct Transfer {
     #[clap(long)]
     fee_record: Option<String>,
     /// Display the generated transaction.
-    #[clap(short, long, default_value = "true", conflicts_with = "broadcast")]
+    #[clap(short, long, conflicts_with = "broadcast")]
     display: bool,
     /// The endpoint used to broadcast the generated transaction.
     #[clap(short, long, conflicts_with = "display")]
