@@ -51,7 +51,7 @@ default-features = false
 features = ["synthesizer"]
 
 [dependencies.tokio]
-version = "1.23"
+version = "1.26"
 features = ["rt"]
 
 [dependencies.tracing]
