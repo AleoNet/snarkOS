@@ -155,7 +155,9 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
 
                 // Process the block response.
-                match self.block_response(peer_ip, blocks.0) {
+                let node = self.clone();
+                // TODO: this might be an overkill and only be needed for the validator.
+                match tokio::task::spawn_blocking(move || node.block_response(peer_ip, blocks.0)).await? {
                     true => Ok(()),
                     false => bail!("Peer '{peer_ip}' sent an invalid block response"),
                 }
