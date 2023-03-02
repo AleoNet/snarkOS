@@ -103,20 +103,18 @@ impl<N: Network> MemoryPool<N> {
 
     /// Adds the given unconfirmed solution to the memory pool.
     pub fn add_unconfirmed_solution(&self, solution: &ProverSolution<N>) -> Result<bool> {
-        // Acquire the write lock on the unconfirmed solutions.
-        let mut unconfirmed_solutions = self.unconfirmed_solutions.write();
+        // We eagerly compute the proof target, as we have already checked
+        // if the commitment is known in Consensus::add_unconfirmed_solution.
+        let proof_target = solution.to_target()?;
 
-        // Ensure the solution does not already exist in the memory pool.
-        match !unconfirmed_solutions.contains_key(&solution.commitment()) {
-            true => {
-                // Compute the proof target.
-                let proof_target = solution.to_target()?;
+        match self.unconfirmed_solutions.write().insert(solution.commitment(), (*solution, proof_target)) {
+            None => {
                 // Add the solution to the memory pool.
-                unconfirmed_solutions.insert(solution.commitment(), (*solution, proof_target));
                 debug!("✉️  Added a prover solution with target '{proof_target}' to the memory pool");
                 Ok(true)
             }
-            false => {
+            Some(_) => {
+                // It's unlikely to be the case, but if in the end it was a duplicate, reject it.
                 trace!("Prover solution '{}' already exists in memory pool", solution.commitment());
                 Ok(false)
             }

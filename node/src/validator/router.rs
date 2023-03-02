@@ -219,7 +219,10 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         solution: ProverSolution<N>,
     ) -> bool {
         // Add the unconfirmed solution to the memory pool.
-        if let Err(error) = self.consensus.add_unconfirmed_solution(&solution) {
+        let validator = self.clone();
+        if let Err(error) =
+            tokio::task::spawn_blocking(move || validator.consensus.add_unconfirmed_solution(&solution)).await
+        {
             trace!("[UnconfirmedSolution] {error}");
             return true; // Maintain the connection.
         }
