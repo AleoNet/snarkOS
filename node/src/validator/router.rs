@@ -53,9 +53,13 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Validator<N, C> {
         let (peer_ip, mut framed) = self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
 
         // Retrieve the block locators.
-        let block_locators = match crate::helpers::get_block_locators(&self.ledger) {
-            Ok(block_locators) => Some(block_locators),
-            Err(e) => {
+        let ledger = self.ledger.clone();
+        let block_locators = match tokio::task::spawn_blocking(move || crate::helpers::get_block_locators(&ledger))
+            .await
+            .map_err(|e| e.into())
+        {
+            Ok(Ok(block_locators)) => Some(block_locators),
+            Ok(Err(e)) | Err(e) => {
                 error!("Failed to get block locators: {e}");
                 return Err(error(format!("Failed to get block locators: {e}")));
             }
