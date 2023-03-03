@@ -61,7 +61,7 @@ pub struct Execute {
     #[clap(short, long)]
     record: Option<String>,
     /// Display the generated transaction.
-    #[clap(short, long, default_value = "true", conflicts_with = "broadcast")]
+    #[clap(short, long, conflicts_with = "broadcast")]
     display: bool,
     /// The endpoint used to broadcast the generated transaction.
     #[clap(short, long, conflicts_with = "display")]
