@@ -180,7 +180,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         // POST /testnet3/transaction/broadcast
         let transaction_broadcast = warp::post()
             .and(warp::path!("testnet3" / "transaction" / "broadcast"))
-            .and(warp::body::content_length_limit(10 * 1024 * 1024))
+            .and(warp::body::content_length_limit(16 * 1024 * 1024))
             .and(warp::body::json())
             .and(with(self.consensus.clone()))
             .and(with(self.routing.clone()))
