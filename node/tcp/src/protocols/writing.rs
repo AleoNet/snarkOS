@@ -48,8 +48,8 @@ where
     /// messages the node can enqueue. Setting it to a large value is not recommended, as doing it might
     /// obscure potential issues with your implementation (like slow serialization) or network.
     ///
-    /// The default value is 64.
-    const MESSAGE_QUEUE_DEPTH: usize = 64;
+    /// The default value is 1024.
+    const MESSAGE_QUEUE_DEPTH: usize = 1024;
 
     /// The type of the outbound messages; unless their serialization is expensive and the message
     /// is broadcasted (in which case it would get serialized multiple times), serialization should
