@@ -19,6 +19,7 @@ edition = "2021"
 [features]
 default = [ "parallel" ]
 parallel = [ "rayon" ]
+metrics = [ "snarkos-node/metrics" ]
 
 [dependencies.anyhow]
 version = "1.0.70"
@@ -59,8 +60,7 @@ version = "0.10"
 version = "0.17"
 
 [dev-dependencies.narwhal-types]
-git = "https://github.com/eqlabs/bullshark-bft/"
-package = "narwhal-types"
+workspace = true
 
 [dev-dependencies.snarkos-account]
 path = "../../account"

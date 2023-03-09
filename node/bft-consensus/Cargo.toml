@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [features]
+metrics = ["narwhal-node/metrics", "narwhal-executor/metrics"]
 test = ["tempfile"]
 
 [dependencies]

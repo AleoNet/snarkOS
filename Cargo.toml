@@ -44,12 +44,12 @@ default = [ "jemalloc" ]
 jemalloc = [ "tikv-jemallocator" ]
 
 [workspace.dependencies]
-narwhal-types       = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-types" }
-narwhal-config      = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-config" }
-narwhal-crypto      = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-crypto" }
-narwhal-executor    = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-executor" }
-narwhal-node        = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-node"}
-narwhal-worker      = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-worker"}
+narwhal-types       = { git = "https://github.com/eqlabs/bullshark-bft/", branch = "feat/metrics", package = "narwhal-types" }
+narwhal-config      = { git = "https://github.com/eqlabs/bullshark-bft/", branch = "feat/metrics", package = "narwhal-config" }
+narwhal-crypto      = { git = "https://github.com/eqlabs/bullshark-bft/", branch = "feat/metrics", package = "narwhal-crypto" }
+narwhal-executor    = { git = "https://github.com/eqlabs/bullshark-bft/", branch = "feat/metrics", package = "narwhal-executor" }
+narwhal-node        = { git = "https://github.com/eqlabs/bullshark-bft/", branch = "feat/metrics", package = "narwhal-node"}
+narwhal-worker      = { git = "https://github.com/eqlabs/bullshark-bft/", branch = "feat/metrics", package = "narwhal-worker"}
 
 [workspace.dependencies.snarkvm]
 #path = "../snarkVM"

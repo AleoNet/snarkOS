@@ -18,11 +18,12 @@ edition = "2021"
 
 [features]
 default = [ "parallel" ]
+metrics = ["snarkos-node-bft-consensus/metrics"]
 parallel = [ "rayon" ]
 timer = [ "aleo-std/timer" ]
 
 [dependencies] # added for BFT
-narwhal-types = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-types" }
+narwhal-types.workspace = true
 bytes = "1.4.0"
 tonic = "0.8.3"
 
@@ -87,6 +88,9 @@ path = "./ledger"
 
 [dependencies.snarkos-node-messages]
 path = "./messages"
+
+[dependencies.snarkos-node-metrics]
+path = "./metrics"
 
 [dependencies.snarkos-node-rest]
 path = "./rest"

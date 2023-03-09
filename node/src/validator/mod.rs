@@ -75,6 +75,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
+        enable_metrics: bool,
     ) -> Result<Self> {
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
@@ -121,6 +122,11 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         node.initialize_routing().await;
         // Initialize the signal handler.
         node.handle_signals();
+        // Initialize metrics.
+        if enable_metrics {
+            info!("Running with metrics enabled.");
+            snarkos_node_metrics::initialize();
+        }
 
         // TODO: isolate the BFT logic below to a new method that is started only once the validator mesh is ready.
 

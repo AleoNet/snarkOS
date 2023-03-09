@@ -567,6 +567,7 @@ async fn test_bullshark_full() {
             genesis.clone(), // use a common genesis block
             None,
             Some(i as u16),
+            i == 0, // enable metrics only for the first validator
         )
         .await
         .unwrap();
