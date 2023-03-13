@@ -51,14 +51,14 @@ where
     /// messages the node can enqueue, but setting it to a large value can make the node more susceptible to DoS
     /// attacks.
     ///
-    /// The default value is 64.
-    const MESSAGE_QUEUE_DEPTH: usize = 64;
+    /// The default value is 1024.
+    const MESSAGE_QUEUE_DEPTH: usize = 1024;
 
     /// The initial size of a per-connection buffer for reading inbound messages. Can be set to the maximum expected size
     /// of the inbound message in order to only allocate it once.
     ///
-    /// The default value is 64KiB.
-    const INITIAL_BUFFER_SIZE: usize = 64 * 1024;
+    /// The default value is 1024KiB.
+    const INITIAL_BUFFER_SIZE: usize = 1024 * 1024;
 
     /// The final (deserialized) type of inbound messages.
     type Message: Send;
