@@ -37,6 +37,21 @@ members = [
 name = "snarkos"
 path = "snarkos/main.rs"
 
+[features]
+cuda = [
+    "snarkos-account/cuda",
+    "snarkos-cli/cuda",
+    "snarkos-display/cuda",
+    "snarkos-node/cuda",
+    "snarkos-node-cdn/cuda",
+    "snarkos-node-consensus/cuda",
+    "snarkos-node-ledger/cuda",
+    "snarkos-node-messages/cuda",
+    "snarkos-node-rest/cuda",
+    "snarkos-node-router/cuda",
+    "snarkos-node-store/cuda",
+]
+
 [workspace.dependencies.snarkvm]
 #path = "../snarkVM"
 #git = "https://github.com/AleoHQ/snarkVM.git"

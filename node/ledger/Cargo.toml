@@ -20,6 +20,7 @@ edition = "2021"
 default = [ "parallel" ]
 parallel = [ "rayon" ]
 timer = [ "aleo-std/timer" ]
+cuda = ["snarkvm/cuda"]
 
 [dependencies.aleo-std]
 version = "0.1.15"

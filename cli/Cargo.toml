@@ -16,6 +16,9 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
+[features]
+cuda = ["snarkvm/cuda"]
+
 [dependencies.aleo-std]
 version = "0.1.15"
 default-features = false
