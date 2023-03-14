@@ -101,6 +101,26 @@ commands:
       - clear_environment:
           cache_key: << parameters.cache_key >>
 
+  run_serial_long:
+    description: "Build and run long running tests"
+    parameters:
+      workspace_member:
+        type: string
+      cache_key:
+        type: string
+      flags:
+        type: string
+        default: ""
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: << parameters.cache_key >>
+      - run:
+          no_output_timeout: 300m
+          command: cd << parameters.workspace_member >> && RUST_MIN_STACK=67108864 cargo test << parameters.flags >>
+      - clear_environment:
+          cache_key: << parameters.cache_key >>
+
   run_parallel:
     description: "Build and run tests (in parallel)"
     parameters:
@@ -139,7 +159,7 @@ jobs:
       - image: cimg/rust:1.65
     resource_class: 2xlarge
     steps:
-      - run_serial:
+      - run_serial_long:
           workspace_member: .integration
           cache_key: snarkos-integration-cache
 
@@ -311,7 +331,6 @@ workflows:
 
   main-workflow:
     jobs:
-      - integration
       - snarkos
       - account
       - cli
@@ -339,3 +358,14 @@ workflows:
                 display,
                 node
               ]
+
+  scheduled-workflow:
+    triggers:
+      - schedule:
+          cron: "0 0,12 * * *"
+          filters:
+            branches:
+              only:
+                - testnet3
+    jobs:
+      - integration
