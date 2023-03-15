@@ -278,45 +278,6 @@ impl Tcp {
 }
 
 impl Tcp {
-    /// Spawns a task that listens for incoming connections.
-    pub async fn enable_listener(&self) -> io::Result<SocketAddr> {
-        // Retrieve the listening IP address, which must be set.
-        let listener_ip =
-            self.config().listener_ip.expect("Tcp::enable_listener was called, but Config::listener_ip is not set");
-
-        // Initialize the TCP listener.
-        let listener = self.create_listener(listener_ip).await?;
-
-        // Discover the port, if it was unspecified.
-        let port = listener.local_addr()?.port();
-
-        // Set the listening IP address.
-        let listening_addr = (listener_ip, port).into();
-        self.listening_addr.set(listening_addr).expect("The node's listener was started more than once");
-
-        // Use a channel to know when the listening task is ready.
-        let (tx, rx) = oneshot::channel();
-
-        let tcp = self.clone();
-        let listening_task = tokio::spawn(async move {
-            trace!(parent: tcp.span(), "Spawned the listening task");
-            tx.send(()).unwrap(); // safe; the channel was just opened
-
-            loop {
-                // Await for a new connection.
-                match listener.accept().await {
-                    Ok((stream, addr)) => tcp.handle_connection(stream, addr),
-                    Err(e) => error!(parent: tcp.span(), "Failed to accept a connection: {e}"),
-                }
-            }
-        });
-        self.tasks.lock().push(listening_task);
-        let _ = rx.await;
-        debug!(parent: self.span(), "Listening on {}", listening_addr);
-
-        Ok(listening_addr)
-    }
-
     /// Creates an instance of `TcpListener` based on the node's configuration.
     async fn create_listener(&self, listener_ip: IpAddr) -> io::Result<TcpListener> {
         let listener = if let Some(port) = self.config().desired_listening_port {
@@ -347,6 +308,40 @@ impl Tcp {
         };
 
         Ok(listener)
+    }
+
+    /// Spawns a task that listens for incoming connections.
+    pub async fn enable_listener(&self) -> io::Result<SocketAddr> {
+        let listener_ip =
+            self.config().listener_ip.expect("Tcp::enable_listener was called, but Config::listener_ip is not set");
+        let listener = self.create_listener(listener_ip).await?;
+        // Discover the port if it was unspecified.
+        let port = listener.local_addr()?.port();
+        let listening_addr = (listener_ip, port).into();
+
+        self.listening_addr.set(listening_addr).expect("The node's listener was started more than once");
+
+        // Use a channel to know when the listening task is ready.
+        let (tx, rx) = oneshot::channel();
+
+        let tcp = self.clone();
+        let listening_task = tokio::spawn(async move {
+            trace!(parent: tcp.span(), "Spawned the listening task");
+            tx.send(()).unwrap(); // safe; the channel was just opened
+
+            loop {
+                // Await for a new connection.
+                match listener.accept().await {
+                    Ok((stream, addr)) => tcp.handle_connection(stream, addr),
+                    Err(e) => error!(parent: tcp.span(), "Failed to accept a connection: {e}"),
+                }
+            }
+        });
+        self.tasks.lock().push(listening_task);
+        let _ = rx.await;
+        debug!(parent: self.span(), "Listening on {}", listening_addr);
+
+        Ok(listening_addr)
     }
 
     /// Handles a new inbound connection.
