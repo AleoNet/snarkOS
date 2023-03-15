@@ -47,8 +47,8 @@ use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 use anyhow::{bail, Result};
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
-use parking_lot::{Mutex, RwLock};
-use std::{collections::HashSet, future::Future, net::SocketAddr, sync::Arc, time::Instant};
+use parking_lot::RwLock;
+use std::{future::Future, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -75,13 +75,6 @@ pub struct InnerRouter<N: Network> {
     resolver: Resolver,
     /// The sync pool.
     sync: Sync<N>,
-    /// The set of peers that the node is currently performing a handshake with. While
-    /// Tcp already recognizes the notion of connecting addresses and will deny duplicate
-    /// attempts to connect to outbound ones, that collection has no way of knowing the listening
-    /// addresses of peers connecting to us, which is only known during the handshake. The only
-    /// purpose of this collection is to avoid undesirable, simultaneous "two-way" connections
-    /// with a single peer.
-    connecting_peers: Arc<Mutex<HashSet<SocketAddr>>>,
     /// The set of trusted peers.
     trusted_peers: IndexSet<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
@@ -126,7 +119,6 @@ impl<N: Network> Router<N> {
             cache: Default::default(),
             resolver: Default::default(),
             sync: Default::default(),
-            connecting_peers: Default::default(),
             trusted_peers: trusted_peers.iter().copied().collect(),
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
@@ -212,11 +204,6 @@ impl<N: Network> Router<N> {
     /// Returns the (ambiguous) peer address from the listener IP address.
     pub fn resolve_to_ambiguous(&self, peer_ip: &SocketAddr) -> Option<SocketAddr> {
         self.resolver.get_ambiguous(peer_ip)
-    }
-
-    /// Returns `true` if the node is currently connecting to the given peer IP.
-    pub fn is_connecting(&self, ip: &SocketAddr) -> bool {
-        self.connecting_peers.lock().contains(ip)
     }
 
     /// Returns `true` if the node is connected to the given peer IP.
