@@ -487,7 +487,7 @@ impl<N: Network> Router<N> {
         self.candidate_peers.write().remove(&peer_ip);
     }
 
-    /// Spawns a task with the given future; it should only be used for long-running tasks.
+    /// Spawns a task with the given future.
     pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
         self.handles.write().push(tokio::spawn(future));
     }
