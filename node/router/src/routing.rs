@@ -33,8 +33,8 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
         self.enable_reading().await;
         self.enable_writing().await;
         self.enable_disconnect().await;
-        // Enable the TCP listener. Note: This must be called after the above protocols.
-        self.tcp().enable_listener().await.expect("Failed to enable the TCP listener");
+        // Start the listener.
+        self.tcp().enable_listener().await.unwrap();
         // Initialize the heartbeat.
         self.initialize_heartbeat();
         // Initialize the report.
