@@ -52,23 +52,12 @@ impl<N: Network> Router<N> {
         peer_side: ConnectionSide,
         genesis_header: Header<N>,
     ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, MessageCodec<N>>)> {
+        // Construct the stream.
+        let mut framed = Framed::new(stream, MessageCodec::<N>::default());
+
         if peer_side == ConnectionSide::Initiator {
             debug!("Received a connection request from '{peer_addr}'");
         }
-
-        self.handshake_inner(peer_addr, stream, peer_side, genesis_header).await
-    }
-
-    /// A helper that facilitates some extra error handling in `Router::handshake`.
-    async fn handshake_inner<'a>(
-        &'a self,
-        peer_addr: SocketAddr,
-        stream: &'a mut TcpStream,
-        peer_side: ConnectionSide,
-        genesis_header: Header<N>,
-    ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, MessageCodec<N>>)> {
-        // Construct the stream.
-        let mut framed = Framed::new(stream, MessageCodec::<N>::default());
 
         /* Step 1: Send the challenge request. */
 
