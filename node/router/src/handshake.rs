@@ -55,6 +55,10 @@ impl<N: Network> Router<N> {
         // Construct the stream.
         let mut framed = Framed::new(stream, MessageCodec::<N>::default());
 
+        // Ensure the peer is allowed to connect.
+        if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_addr) {
+            return Err(error(format!("{forbidden_message}")));
+        }
         if peer_side == ConnectionSide::Initiator {
             debug!("Received a connection request from '{peer_addr}'");
         }
@@ -89,21 +93,6 @@ impl<N: Network> Router<N> {
             _ => return Err(error(format!("'{peer_addr}' did not send a challenge request"))),
         };
         trace!("Received '{}-B' from '{peer_addr}'", request_b.name());
-
-        // Obtain the peer's listening address if it's an inbound connection.
-        let peer_ip = match peer_side {
-            // The peer initiated the connection.
-            ConnectionSide::Initiator => SocketAddr::new(peer_addr.ip(), request_b.listener_port),
-            // This node initiated the connection.
-            ConnectionSide::Responder => peer_addr,
-        };
-
-        // Knowing the peer's listening address, ensure it is allowed to connect.
-        if peer_side == ConnectionSide::Initiator {
-            if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_ip) {
-                return Err(error(format!("{forbidden_message}")));
-            }
-        }
 
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
         if let Some(reason) = self.verify_challenge_request(peer_addr, &request_b) {
@@ -151,6 +140,12 @@ impl<N: Network> Router<N> {
         /* Step 5: Add the peer to the router. */
 
         // Prepare the peer.
+        let peer_ip = match peer_side {
+            // The peer initiated the connection.
+            ConnectionSide::Initiator => SocketAddr::new(peer_addr.ip(), request_b.listener_port),
+            // This node initiated the connection.
+            ConnectionSide::Responder => peer_addr,
+        };
         let peer_address = request_b.address;
         let peer_type = request_b.node_type;
         let peer_version = request_b.version;
