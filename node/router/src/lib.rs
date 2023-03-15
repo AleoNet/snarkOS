@@ -103,12 +103,12 @@ impl<N: Network> Router<N> {
         let tcp = Tcp::new(Config::new(node_ip, max_peers));
         // Initialize the router.
         Ok(Self {
-            tcp,
+            tcp: tcp.clone(),
             node_type,
             account,
             cache: Default::default(),
             resolver: Default::default(),
-            sync: Default::default(),
+            sync: Sync::new(tcp),
             trusted_peers: Arc::new(trusted_peers.iter().copied().collect()),
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
