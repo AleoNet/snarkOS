@@ -24,7 +24,10 @@ use parking_lot::RwLock;
 use std::{
     collections::VecDeque,
     net::{IpAddr, SocketAddr},
-    sync::atomic::{AtomicU16, Ordering::SeqCst},
+    sync::{
+        atomic::{AtomicU16, Ordering::SeqCst},
+        Arc,
+    },
 };
 use time::{Duration, OffsetDateTime};
 
@@ -36,26 +39,26 @@ type SolutionKey<N> = (SocketAddr, PuzzleCommitment<N>);
 /// A helper containing the peer IP and transaction ID.
 type TransactionKey<N> = (SocketAddr, <N as Network>::TransactionID);
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Cache<N: Network> {
     /// The map of peer connections to their recent timestamps.
-    seen_inbound_connections: RwLock<IndexMap<IpAddr, VecDeque<OffsetDateTime>>>,
+    seen_inbound_connections: Arc<RwLock<IndexMap<IpAddr, VecDeque<OffsetDateTime>>>>,
     /// The map of peer IPs to their recent timestamps.
-    seen_inbound_messages: RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>,
+    seen_inbound_messages: Arc<RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>>,
     /// The map of peer IPs to their recent timestamps.
-    seen_inbound_puzzle_requests: RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>,
+    seen_inbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>>,
     /// The map of solution commitments to their last seen timestamp.
-    seen_inbound_solutions: RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>,
+    seen_inbound_solutions: Arc<RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>>,
     /// The map of transaction IDs to their last seen timestamp.
-    seen_inbound_transactions: RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>,
+    seen_inbound_transactions: Arc<RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>>,
     /// The map of peer IPs to their block requests.
-    seen_outbound_block_requests: RwLock<IndexMap<SocketAddr, IndexSet<BlockRequest>>>,
+    seen_outbound_block_requests: Arc<RwLock<IndexMap<SocketAddr, IndexSet<BlockRequest>>>>,
     /// The map of peer IPs to the number of puzzle requests.
-    seen_outbound_puzzle_requests: RwLock<IndexMap<SocketAddr, AtomicU16>>,
+    seen_outbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, Arc<AtomicU16>>>>,
     /// The map of solution commitments to their last seen timestamp.
-    seen_outbound_solutions: RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>,
+    seen_outbound_solutions: Arc<RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>>,
     /// The map of transaction IDs to their last seen timestamp.
-    seen_outbound_transactions: RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>,
+    seen_outbound_transactions: Arc<RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>>,
 }
 
 impl<N: Network> Default for Cache<N> {
@@ -72,12 +75,12 @@ impl<N: Network> Cache<N> {
             seen_inbound_connections: Default::default(),
             seen_inbound_messages: Default::default(),
             seen_inbound_puzzle_requests: Default::default(),
-            seen_inbound_solutions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
-            seen_inbound_transactions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
+            seen_inbound_solutions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
+            seen_inbound_transactions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
             seen_outbound_block_requests: Default::default(),
             seen_outbound_puzzle_requests: Default::default(),
-            seen_outbound_solutions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
-            seen_outbound_transactions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
+            seen_outbound_solutions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
+            seen_outbound_transactions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
         }
     }
 }
@@ -176,7 +179,7 @@ impl<N: Network> Cache<N> {
 impl<N: Network> Cache<N> {
     /// Insert a new timestamp for the given key, returning the number of recent entries.
     fn retain_and_insert<K: Eq + Hash + Clone>(
-        map: &RwLock<IndexMap<K, VecDeque<OffsetDateTime>>>,
+        map: &Arc<RwLock<IndexMap<K, VecDeque<OffsetDateTime>>>>,
         key: K,
         interval_in_secs: i64,
     ) -> usize {
@@ -196,7 +199,7 @@ impl<N: Network> Cache<N> {
     }
 
     /// Increments the key's counter in the map, returning the updated counter.
-    fn increment_counter<K: Hash + Eq>(map: &RwLock<IndexMap<K, AtomicU16>>, key: K) -> u16 {
+    fn increment_counter<K: Hash + Eq>(map: &Arc<RwLock<IndexMap<K, Arc<AtomicU16>>>>, key: K) -> u16 {
         // Load the entry for the key, and increment the counter.
         let previous_entry = map.write().entry(key).or_default().fetch_add(1, SeqCst);
         // Return the updated counter.
@@ -204,7 +207,7 @@ impl<N: Network> Cache<N> {
     }
 
     /// Decrements the key's counter in the map, returning the updated counter.
-    fn decrement_counter<K: Hash + Eq>(map: &RwLock<IndexMap<K, AtomicU16>>, key: K) -> u16 {
+    fn decrement_counter<K: Hash + Eq>(map: &Arc<RwLock<IndexMap<K, Arc<AtomicU16>>>>, key: K) -> u16 {
         let mut map_write = map.write();
         // Load the entry for the key.
         let entry = map_write.entry(key).or_default();
