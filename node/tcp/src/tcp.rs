@@ -312,7 +312,7 @@ impl Tcp {
         });
         self.tasks.lock().push(listening_task);
         let _ = rx.await;
-        debug!(parent: self.span(), "Listening on {listening_addr}");
+        debug!(parent: self.span(), "Listening on {}", listening_addr);
 
         Ok(listening_addr)
     }
