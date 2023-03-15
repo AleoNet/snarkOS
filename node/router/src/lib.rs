@@ -55,6 +55,8 @@ use tokio::task::JoinHandle;
 pub struct Router<N: Network> {
     /// The TCP stack.
     tcp: Tcp,
+    /// The local IP address of the node.
+    local_ip: SocketAddr,
     /// The node type.
     node_type: NodeType,
     /// The account of the node.
@@ -100,15 +102,18 @@ impl<N: Network> Router<N> {
         is_dev: bool,
     ) -> Result<Self> {
         // Initialize the TCP stack.
-        let tcp = Tcp::new(Config::new(node_ip, max_peers));
+        let tcp = Tcp::new(Config::new(node_ip, max_peers)).await?;
+        // Fetch the listening IP address.
+        let local_ip = tcp.listening_addr().expect("The listening address for this node must be present");
         // Initialize the router.
         Ok(Self {
-            tcp: tcp.clone(),
+            tcp,
+            local_ip,
             node_type,
             account,
             cache: Default::default(),
             resolver: Default::default(),
-            sync: Sync::new(tcp),
+            sync: Sync::new(local_ip),
             trusted_peers: Arc::new(trusted_peers.iter().copied().collect()),
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
@@ -148,8 +153,8 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the IP address of this node.
-    pub fn local_ip(&self) -> SocketAddr {
-        self.tcp.listening_addr().unwrap()
+    pub const fn local_ip(&self) -> SocketAddr {
+        self.local_ip
     }
 
     /// Returns `true` if the given IP is this node.

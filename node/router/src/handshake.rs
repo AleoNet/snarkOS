@@ -73,7 +73,7 @@ impl<N: Network> Router<N> {
         // Send a challenge request to the peer.
         let message_a = Message::<N>::ChallengeRequest(ChallengeRequest {
             version: Message::<N>::VERSION,
-            listener_port: self.local_ip().port(),
+            listener_port: self.local_ip.port(),
             node_type: self.node_type,
             address: self.address(),
             nonce: nonce_a,
