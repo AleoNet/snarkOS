@@ -75,15 +75,17 @@ pub struct InnerRouter<N: Network> {
     resolver: Resolver,
     /// The sync pool.
     sync: Sync<N>,
+    /// The set of peers that the node is currently performing a handshake with. While
+    /// Tcp already recognizes the notion of connecting addresses and will deny duplicate
+    /// attempts to connect to outbound ones, that collection has no way of knowing the listening
+    /// addresses of peers connecting to us, which is only known during the handshake. The only
+    /// purpose of this collection is to avoid undesirable, simultaneous "two-way" connections
+    /// with a single peer.
+    connecting_peers: Arc<Mutex<HashSet<SocketAddr>>>,
     /// The set of trusted peers.
     trusted_peers: IndexSet<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
     connected_peers: RwLock<IndexMap<SocketAddr, Peer<N>>>,
-    /// The set of handshaking peers. While `Tcp` already recognizes the connecting IP addresses
-    /// and prevents duplicate outbound connection attempts to the same IP address, it is unable to
-    /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
-    /// attempt to connect to each other). This set is used to prevent this from happening.
-    connecting_peers: Arc<Mutex<HashSet<SocketAddr>>>,
     /// The set of candidate peer IPs.
     candidate_peers: RwLock<IndexSet<SocketAddr>>,
     /// The set of restricted peer IPs.
@@ -127,7 +129,6 @@ impl<N: Network> Router<N> {
             connecting_peers: Default::default(),
             trusted_peers: trusted_peers.iter().copied().collect(),
             connected_peers: Default::default(),
-            connecting_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             handles: Default::default(),
@@ -213,6 +214,11 @@ impl<N: Network> Router<N> {
         self.resolver.get_ambiguous(peer_ip)
     }
 
+    /// Returns `true` if the node is currently connecting to the given peer IP.
+    pub fn is_connecting(&self, ip: &SocketAddr) -> bool {
+        self.connecting_peers.lock().contains(ip)
+    }
+
     /// Returns `true` if the node is connected to the given peer IP.
     pub fn is_connected(&self, ip: &SocketAddr) -> bool {
         self.connected_peers.read().contains_key(ip)
@@ -236,11 +242,6 @@ impl<N: Network> Router<N> {
     /// Returns `true` if the given peer IP is a connected client.
     pub fn is_connected_client(&self, peer_ip: &SocketAddr) -> bool {
         self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_client())
-    }
-
-    /// Returns `true` if the node is currently connecting to the given peer IP.
-    pub fn is_connecting(&self, ip: &SocketAddr) -> bool {
-        self.connecting_peers.lock().contains(ip)
     }
 
     /// Returns `true` if the given IP is restricted.
