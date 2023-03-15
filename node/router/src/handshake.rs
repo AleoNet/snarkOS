@@ -53,10 +53,13 @@ impl<N: Network> Router<N> {
         genesis_header: Header<N>,
     ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, MessageCodec<N>>)> {
         // If this is an inbound connection, we log it, but don't know the listening address yet.
-        // Otherwise, we can immediately register the listening address.
+        // Otherwise, we can immediately register the listening address and check for its uniqueness.
         let mut peer_ip = if peer_side == ConnectionSide::Initiator {
             debug!("Received a connection request from '{peer_addr}'");
             None
+        } else if !self.connecting_peers.lock().insert(peer_addr) {
+            warn!("Already accepting a connection from '{peer_addr}', rejecting the duplicate handshake attempt");
+            return Err(io::ErrorKind::ConnectionRefused.into());
         } else {
             Some(peer_addr)
         };
@@ -194,6 +197,10 @@ impl<N: Network> Router<N> {
         // Ensure the peer IP is not this node.
         if self.is_local_ip(&peer_ip) {
             bail!("Dropping connection request from '{peer_ip}' (attempted to self-connect)")
+        }
+        // Ensure the node does not surpass the maximum number of peer connections.
+        if self.number_of_connected_peers() >= self.max_connected_peers() {
+            bail!("Dropping connection request from '{peer_ip}' (maximum peers reached)")
         }
         // Ensure the node is not already connecting to this peer.
         if !self.connecting_peers.lock().insert(peer_ip) {
