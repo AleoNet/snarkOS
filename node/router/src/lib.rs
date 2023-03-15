@@ -150,10 +150,7 @@ impl<N: Network> Router<N> {
                 // Remove the peer from the candidate peers.
                 Ok(()) => router.remove_candidate_peer(peer_ip),
                 // If the connection was not allowed, log the error.
-                Err(error) => {
-                    router.connecting_peers.lock().remove(&peer_ip);
-                    warn!("Unable to connect to '{peer_ip}' - {error}")
-                }
+                Err(error) => warn!("Unable to connect to '{peer_ip}' - {error}"),
             }
         });
     }
@@ -168,6 +165,10 @@ impl<N: Network> Router<N> {
         if self.number_of_connected_peers() >= self.max_connected_peers() {
             bail!("Dropping connection attempt to '{peer_ip}' (maximum peers reached)")
         }
+        // Ensure the node is not already connecting to this peer.
+        if !self.connecting_peers.lock().insert(peer_ip) {
+            bail!("Dropping connection attempt to '{peer_ip}' (already shaking hands as the initiator)")
+        }
         // Ensure the node is not already connected to this peer.
         if self.is_connected(&peer_ip) {
             bail!("Dropping connection attempt to '{peer_ip}' (already connected)")
@@ -175,10 +176,6 @@ impl<N: Network> Router<N> {
         // Ensure the peer is not restricted.
         if self.is_restricted(&peer_ip) {
             bail!("Dropping connection attempt to '{peer_ip}' (restricted)")
-        }
-        // Ensure the node is not already connecting to this peer.
-        if !self.connecting_peers.lock().insert(peer_ip) {
-            bail!("Dropping connection attempt to '{peer_ip}' (already shaking hands as the initiator)")
         }
         Ok(())
     }
