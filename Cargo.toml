@@ -41,7 +41,7 @@ path = "snarkos/main.rs"
 #path = "../snarkVM"
 #git = "https://github.com/AleoHQ/snarkVM.git"
 #rev = "67f8829"
-version = "0.9.13"
+version = "0.9.14"
 features = ["circuit", "console", "parallel"]
 
 [dependencies.anyhow]
