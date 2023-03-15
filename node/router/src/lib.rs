@@ -48,21 +48,11 @@ use anyhow::{bail, Result};
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::RwLock;
-use std::{future::Future, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
+use std::{future::Future, net::SocketAddr, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
-pub struct Router<N: Network>(Arc<InnerRouter<N>>);
-
-impl<N: Network> Deref for Router<N> {
-    type Target = Arc<InnerRouter<N>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-pub struct InnerRouter<N: Network> {
+pub struct Router<N: Network> {
     /// The TCP stack.
     tcp: Tcp,
     /// The node type.
@@ -70,21 +60,21 @@ pub struct InnerRouter<N: Network> {
     /// The account of the node.
     account: Account<N>,
     /// The cache.
-    cache: Cache<N>,
+    cache: Arc<Cache<N>>,
     /// The resolver.
-    resolver: Resolver,
+    resolver: Arc<Resolver>,
     /// The sync pool.
-    sync: Sync<N>,
+    sync: Arc<Sync<N>>,
     /// The set of trusted peers.
-    trusted_peers: IndexSet<SocketAddr>,
+    trusted_peers: Arc<IndexSet<SocketAddr>>,
     /// The map of connected peer IPs to their peer handlers.
-    connected_peers: RwLock<IndexMap<SocketAddr, Peer<N>>>,
+    connected_peers: Arc<RwLock<IndexMap<SocketAddr, Peer<N>>>>,
     /// The set of candidate peer IPs.
-    candidate_peers: RwLock<IndexSet<SocketAddr>>,
+    candidate_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of restricted peer IPs.
-    restricted_peers: RwLock<IndexMap<SocketAddr, Instant>>,
+    restricted_peers: Arc<RwLock<IndexMap<SocketAddr, Instant>>>,
     /// The spawned handles.
-    handles: RwLock<Vec<JoinHandle<()>>>,
+    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
     /// The boolean flag for the development mode.
     is_dev: bool,
 }
@@ -112,20 +102,20 @@ impl<N: Network> Router<N> {
         // Initialize the TCP stack.
         let tcp = Tcp::new(Config::new(node_ip, max_peers));
         // Initialize the router.
-        Ok(Self(Arc::new(InnerRouter {
+        Ok(Self {
             tcp,
             node_type,
             account,
             cache: Default::default(),
             resolver: Default::default(),
             sync: Default::default(),
-            trusted_peers: trusted_peers.iter().copied().collect(),
+            trusted_peers: Arc::new(trusted_peers.iter().copied().collect()),
             connected_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             handles: Default::default(),
             is_dev,
-        })))
+        })
     }
 
     /// Attempts to connect to the given peer IP.
@@ -167,22 +157,22 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the node type.
-    pub fn node_type(&self) -> NodeType {
+    pub const fn node_type(&self) -> NodeType {
         self.node_type
     }
 
     /// Returns the account private key of the node.
-    pub fn private_key(&self) -> &PrivateKey<N> {
+    pub const fn private_key(&self) -> &PrivateKey<N> {
         self.account.private_key()
     }
 
     /// Returns the account view key of the node.
-    pub fn view_key(&self) -> &ViewKey<N> {
+    pub const fn view_key(&self) -> &ViewKey<N> {
         self.account.view_key()
     }
 
     /// Returns the account address of the node.
-    pub fn address(&self) -> Address<N> {
+    pub const fn address(&self) -> Address<N> {
         self.account.address()
     }
 
@@ -192,7 +182,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns `true` if the node is in development mode.
-    pub fn is_dev(&self) -> bool {
+    pub const fn is_dev(&self) -> bool {
         self.is_dev
     }
 
