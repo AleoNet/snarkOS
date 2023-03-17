@@ -14,148 +14,85 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use super::CurrentNetwork;
+use super::{CurrentNetwork, Developer};
 
-use snarkvm::{
-    console::program::Ciphertext,
-    prelude::{Record, ViewKey},
+use snarkvm::prelude::{
+    ConsensusMemory,
+    ConsensusStore,
+    Plaintext,
+    PrivateKey,
+    ProgramID,
+    Query,
+    Record,
+    Transaction,
+    VM,
 };
 
-use anyhow::{bail, Result};
+use anyhow::Result;
 use clap::Parser;
+use colored::Colorize;
 use std::str::FromStr;
 
-/// Decrypts a record ciphertext.
+/// Deploys an Aleo program.
 #[derive(Debug, Parser)]
-pub struct Decrypt {
-    /// The record ciphertext to decrypt.
+pub struct Deploy {
+    /// The name of the program to deploy.
+    #[clap(parse(try_from_str))]
+    program_id: ProgramID<CurrentNetwork>,
+    /// A path to a directory containing a manifest file. Defaults to the current working directory.
+    #[clap(long)]
+    path: Option<String>,
+    /// The private key used to generate the deployment.
     #[clap(short, long)]
-    pub ciphertext: String,
-    /// The view key used to decrypt the record ciphertext.
+    private_key: String,
+    /// The endpoint to query node state from.
     #[clap(short, long)]
-    pub view_key: String,
+    query: String,
+    /// The deployment fee in gates, defaults to 0.
+    #[clap(short, long)]
+    fee: Option<u64>,
+    /// The record to spend the fee from.
+    #[clap(short, long)]
+    record: String,
+    /// Display the generated transaction.
+    #[clap(short, long, conflicts_with = "broadcast")]
+    display: bool,
+    /// The endpoint used to broadcast the generated transaction.
+    #[clap(short, long, conflicts_with = "display")]
+    broadcast: Option<String>,
+    /// Store generated deployment transaction to a local file.
+    #[clap(long)]
+    store: Option<String>,
 }
 
-impl Decrypt {
+impl Deploy {
+    /// Deploys an Aleo program.
     pub fn parse(self) -> Result<String> {
-        // Decrypt the ciphertext.
-        Self::decrypt_ciphertext(&self.ciphertext, &self.view_key)
-    }
+        // Specify the query
+        let query = Query::from(self.query);
 
-    /// Decrypts the ciphertext record with provided the view key.
-    fn decrypt_ciphertext(ciphertext: &str, view_key: &str) -> Result<String> {
-        // Parse the ciphertext record.
-        let ciphertext_record = Record::<CurrentNetwork, Ciphertext<CurrentNetwork>>::from_str(ciphertext)?;
+        // Retrieve the private key.
+        let private_key = PrivateKey::from_str(&self.private_key)?;
 
-        // Parse the account view key.
-        let view_key = ViewKey::<CurrentNetwork>::from_str(view_key)?;
+        // Fetch the program from the directory.
+        let program = Developer::parse_program(self.program_id, self.path)?;
 
-        match ciphertext_record.decrypt(&view_key) {
-            Ok(plaintext_record) => Ok(plaintext_record.to_string()),
-            Err(_) => bail!("Invalid view key for the provided record ciphertext"),
-        }
-    }
-}
+        println!("📦 Creating deployment transaction for '{}'...\n", &self.program_id.to_string().bold());
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+        // Generate the deployment transaction.
+        let deployment = {
+            // Initialize an RNG.
+            let rng = &mut rand::thread_rng();
 
-    use indexmap::IndexMap;
-    use snarkvm::prelude::{
-        Address,
-        Balance,
-        Entry,
-        Field,
-        Identifier,
-        Literal,
-        Network,
-        Owner,
-        Plaintext,
-        PrivateKey,
-        Scalar,
-        TestRng,
-        Uniform,
-        ViewKey,
-        U64,
-    };
+            // Initialize the VM.
+            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
+            let vm = VM::from(store)?;
 
-    const ITERATIONS: usize = 1000;
+            // Prepare the fees.
+            let fee_record = Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.record)?;
 
-    fn construct_ciphertext<N: Network>(
-        view_key: ViewKey<N>,
-        owner: Owner<N, Plaintext<N>>,
-        gates: Balance<N, Plaintext<N>>,
-        rng: &mut TestRng,
-    ) -> Result<Record<N, Ciphertext<N>>> {
-        // Prepare the record.
-        let randomizer = Scalar::rand(rng);
-        let record = Record::<N, Plaintext<N>>::from_plaintext(
-            owner,
-            gates,
-            IndexMap::from_iter(
-                vec![
-                    (Identifier::from_str("a")?, Entry::Private(Plaintext::from(Literal::Field(Field::rand(rng))))),
-                    (Identifier::from_str("b")?, Entry::Private(Plaintext::from(Literal::Scalar(Scalar::rand(rng))))),
-                ]
-                .into_iter(),
-            ),
-            N::g_scalar_multiply(&randomizer),
-        )?;
-        // Encrypt the record.
-        let ciphertext = record.encrypt(randomizer)?;
-        // Decrypt the record.
-        assert_eq!(record, ciphertext.decrypt(&view_key)?);
+            // TODO (raychu86): Handle default fee.
+            let fee_amount = self.fee.unwrap_or(0);
 
-        Ok(ciphertext)
-    }
-
-    #[test]
-    fn test_decryption() {
-        let mut rng = TestRng::default();
-
-        for _ in 0..ITERATIONS {
-            let private_key = PrivateKey::<CurrentNetwork>::new(&mut rng).unwrap();
-            let view_key = ViewKey::try_from(private_key).unwrap();
-            let address = Address::try_from(private_key).unwrap();
-
-            // Construct the ciphertext.
-            let owner = Owner::Private(Plaintext::from(Literal::Address(address)));
-            let gates = Balance::Private(Plaintext::from(Literal::U64(U64::new(u64::rand(&mut rng) >> 12))));
-            let ciphertext = construct_ciphertext(view_key, owner, gates, &mut rng).unwrap();
-
-            // Decrypt the ciphertext.
-            let expected_plaintext = ciphertext.decrypt(&view_key).unwrap();
-
-            let decrypt = Decrypt { ciphertext: ciphertext.to_string(), view_key: view_key.to_string() };
-            let plaintext = decrypt.parse().unwrap();
-
-            // Check that the decryption is correct.
-            assert_eq!(plaintext, expected_plaintext.to_string());
-        }
-    }
-
-    #[test]
-    fn test_failed_decryption() {
-        let mut rng = TestRng::default();
-
-        // Generate a view key that is unaffiliated with the ciphertext.
-        let incorrect_private_key = PrivateKey::<CurrentNetwork>::new(&mut rng).unwrap();
-        let incorrect_view_key = ViewKey::try_from(incorrect_private_key).unwrap();
-
-        for _ in 0..ITERATIONS {
-            let private_key = PrivateKey::<CurrentNetwork>::new(&mut rng).unwrap();
-            let view_key = ViewKey::try_from(private_key).unwrap();
-            let address = Address::try_from(private_key).unwrap();
-
-            // Construct the ciphertext.
-            let owner = Owner::Private(Plaintext::from(Literal::Address(address)));
-            let gates = Balance::Private(Plaintext::from(Literal::U64(U64::new(u64::rand(&mut rng) >> 12))));
-            let ciphertext = construct_ciphertext::<CurrentNetwork>(view_key, owner, gates, &mut rng).unwrap();
-
-            // Enforce that the decryption fails.
-            let decrypt = Decrypt { ciphertext: ciphertext.to_string(), view_key: incorrect_view_key.to_string() };
-            assert!(decrypt.parse().is_err());
-        }
-    }
-}
+            // Create a new transaction.
+            Transaction::<CurrentNetwork>::deploy(&vm, &private_key
