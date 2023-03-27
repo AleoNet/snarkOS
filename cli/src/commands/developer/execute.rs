@@ -95,10 +95,13 @@ impl Execute {
             // Initialize the VM.
             let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
-            vm.process().write().finalize_deployment(vm.program_store(), &vm.deploy(&program_db, rng)?)?;
+            println!("Finalizing deployment for '{}'...", program_db.id());
+            let deployment = vm.deploy(&program_db, rng)?;
+            vm.process().write().finalize_deployment(vm.program_store(), &deployment)?;
             let rng = &mut rand::thread_rng();
             // Add the program deployment to the VM.
             if program.id() != &ProgramID::<CurrentNetwork>::try_from("credits.aleo")? {
+                println!("Finalizing deployment for '{}'...", program.id());
                 let deployment = vm.deploy(&program, rng)?;
                 vm.process().write().finalize_deployment(vm.program_store(), &deployment)?;
             }
@@ -115,6 +118,7 @@ impl Execute {
             };
 
             // Create a new transaction.
+            println!("Creating execution transaction for '{}'...", self.program_id);
             Transaction::execute(
                 &vm,
                 &private_key,
@@ -127,7 +131,7 @@ impl Execute {
             )?
         };
         let locator = Locator::<CurrentNetwork>::from_str(&format!("{}/{}", self.program_id, self.function))?;
-        format!("✅ Created execution transaction for '{}'", locator.to_string().bold());
+        println!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
         Developer::handle_transaction(self.broadcast, self.display, self.store, execution, locator.to_string())
