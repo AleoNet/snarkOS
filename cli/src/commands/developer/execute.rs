@@ -15,7 +15,7 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use super::{CurrentNetwork, Developer, Program};
-
+use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{
     ConsensusMemory,
     ConsensusStore,
@@ -84,9 +84,9 @@ impl Execute {
         // Fetch the program from query node.
         let program: Program<CurrentNetwork> =
             ureq::get(&format!("{}/testnet3/program/{}", self.query, self.program_id)).call()?.into_json()?;
-
         println!("📦 Creating execution transaction for '{}'...\n", &self.program_id.to_string().bold());
-
+        let program_db: Program<CurrentNetwork> =
+        ureq::get(&format!("{}/testnet3/program/{}", self.query, "dicebox.aleo")).call()?.into_json()?;
         // Generate the execution transaction.
         let execution = {
             // Initialize an RNG.
@@ -95,7 +95,8 @@ impl Execute {
             // Initialize the VM.
             let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
-
+            vm.process().write().finalize_deployment(vm.program_store(), &vm.deploy(&program_db, rng)?)?;
+            let rng = &mut rand::thread_rng();
             // Add the program deployment to the VM.
             if program.id() != &ProgramID::<CurrentNetwork>::try_from("credits.aleo")? {
                 let deployment = vm.deploy(&program, rng)?;

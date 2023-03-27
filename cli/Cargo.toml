@@ -74,6 +74,9 @@ path = "../node"
 [dependencies.snarkos-node-rest]
 path = "../node/rest"
 
+[dependencies.snarkos-node-store]
+path = "../node/store"
+
 [dependencies.snarkvm]
 workspace = true
 

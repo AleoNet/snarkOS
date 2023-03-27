@@ -27,6 +27,7 @@ use snarkvm::prelude::{
     Transaction,
     VM,
 };
+use snarkos_node_store::ConsensusDB;
 
 use anyhow::Result;
 use clap::Parser;
@@ -85,7 +86,7 @@ impl Deploy {
             let rng = &mut rand::thread_rng();
 
             // Initialize the VM.
-            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
+            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(Some(1))?;
             let vm = VM::from(store)?;
 
             // Prepare the fees.
