@@ -272,9 +272,18 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
             let beacon = self.clone();
             let transaction = match tokio::task::spawn_blocking(move || {
                 // Fetch an unspent record.
-                let (commitment, record) = match beacon.unspent_records.write().shift_remove_index(0) {
-                    Some(record) => record,
-                    None => bail!("The beacon has no unspent records available"),
+                let (commitment, record) = {
+                    let mut unspent_records = beacon.unspent_records.write();
+                    match unspent_records.shift_remove_index(0) {
+                        Some(record) => record,
+                        None => {
+                            warn!("Unable to find the beacon unspent records, recomputing unspent records.");
+                            // Recompute the unspent records.
+                            *unspent_records = beacon.ledger.find_unspent_records(beacon.account.view_key())?;
+
+                            bail!("The beacon has no unspent records available")
+                        }
+                    }
                 };
 
                 // Initialize an RNG.
