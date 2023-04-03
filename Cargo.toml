@@ -52,6 +52,9 @@ version = "1"
 version = "3.2"
 features = ["derive"]
 
+[dependencies.tikv-jemallocator]
+version = "0.5"
+
 [dependencies.snarkos-account]
 path = "./account"
 
