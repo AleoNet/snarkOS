@@ -16,6 +16,8 @@
 
 use super::*;
 
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
 struct BlockRange {

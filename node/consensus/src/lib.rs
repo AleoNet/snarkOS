@@ -31,12 +31,12 @@ mod tests;
 use snarkos_node_ledger::Ledger;
 use snarkvm::prelude::*;
 
+use ::time::OffsetDateTime;
 use anyhow::{anyhow, ensure, Result};
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
-use time::OffsetDateTime;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;

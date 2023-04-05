@@ -54,6 +54,9 @@ path = "../router"
 [dependencies.rand]
 version = "0.8"
 
+[dependencies.rayon]
+version = "1"
+
 [dependencies.snarkvm]
 workspace = true
 

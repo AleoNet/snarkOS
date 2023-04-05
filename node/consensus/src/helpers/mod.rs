@@ -209,7 +209,7 @@ mod tests {
     use super::*;
     use snarkvm::{console::network::Testnet3, prelude::TestRng};
 
-    use rand::Rng;
+    use ::rand::Rng;
 
     type CurrentNetwork = Testnet3;
 
