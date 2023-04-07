@@ -15,7 +15,6 @@
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
 use super::{CurrentNetwork, Developer, Program};
-use snarkos_node_store::ConsensusDB;
 use snarkvm::prelude::{
     ConsensusMemory,
     ConsensusStore,
@@ -85,8 +84,6 @@ impl Execute {
         let program: Program<CurrentNetwork> =
             ureq::get(&format!("{}/testnet3/program/{}", self.query, self.program_id)).call()?.into_json()?;
         println!("📦 Creating execution transaction for '{}'...\n", &self.program_id.to_string().bold());
-        let program_db: Program<CurrentNetwork> =
-        ureq::get(&format!("{}/testnet3/program/{}", self.query, "dicebox.aleo")).call()?.into_json()?;
         // Generate the execution transaction.
         let execution = {
             // Initialize an RNG.
@@ -95,10 +92,13 @@ impl Execute {
             // Initialize the VM.
             let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
-            println!("Finalizing deployment for '{}'...", program_db.id());
-            let deployment = vm.deploy(&program_db, rng)?;
-            vm.process().write().finalize_deployment(vm.program_store(), &deployment)?;
-            let rng = &mut rand::thread_rng();
+            for (p_id, _) in program.imports() {
+                println!("Adding dependency: {p_id}");
+                let program: Program<CurrentNetwork> = ureq::get(&format!("{}/testnet3/program/{}", self.query, p_id)).call()?.into_json()?;
+                let deployment = vm.deploy(&program, rng)?;
+                vm.process().write().finalize_deployment(vm.program_store(), &deployment)?;
+                println!("Added dependency: {p_id}");
+            }
             // Add the program deployment to the VM.
             if program.id() != &ProgramID::<CurrentNetwork>::try_from("credits.aleo")? {
                 println!("Finalizing deployment for '{}'...", program.id());

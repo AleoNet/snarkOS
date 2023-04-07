@@ -16,7 +16,7 @@
 
 use super::{CurrentNetwork, Developer};
 
-use snarkvm::prelude::{
+use snarkvm::{prelude::{
     ConsensusMemory,
     ConsensusStore,
     Plaintext,
@@ -26,8 +26,7 @@ use snarkvm::prelude::{
     Record,
     Transaction,
     VM,
-};
-use snarkos_node_store::ConsensusDB;
+}, synthesizer::Program};
 
 use anyhow::Result;
 use clap::Parser;
@@ -70,7 +69,7 @@ impl Deploy {
     /// Deploys an Aleo program.
     pub fn parse(self) -> Result<String> {
         // Specify the query
-        let query = Query::from(self.query);
+        let query = Query::from(self.query.clone());
 
         // Retrieve the private key.
         let private_key = PrivateKey::from_str(&self.private_key)?;
@@ -86,9 +85,14 @@ impl Deploy {
             let rng = &mut rand::thread_rng();
 
             // Initialize the VM.
-            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(Some(1))?;
+            let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
-
+            for (p_id, _) in program.imports() {
+                println!("Adding dependency: {p_id}");
+                let program: Program<CurrentNetwork> = ureq::get(&format!("{}/testnet3/program/{}", self.query, p_id)).call()?.into_json()?;
+                let deployment = vm.deploy(&program, rng)?;
+                vm.process().write().finalize_deployment(vm.program_store(), &deployment)?;
+            }
             // Prepare the fees.
             let fee_record = Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.record)?;
 
