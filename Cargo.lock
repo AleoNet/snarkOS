@@ -2861,8 +2861,7 @@ dependencies = [
 [[package]]
 name = "snarkvm"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59bc826fb94e0240a58cc627d1d4795cf02856e87ea47e315c983d1c5e3e0f89"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "anyhow",
  "clap",
@@ -2889,8 +2888,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-algorithms"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8f6bb298e5150e95e85c4658bd0f6d55c733adc5021e2f255fb90c05839cfe0d"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -2916,8 +2914,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7624cbc7e21e73cf83311ad7618bd2fdfe11224ef6c125efb274c9ecfe2e06e0"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-account",
  "snarkvm-circuit-algorithms",
@@ -2931,8 +2928,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-account"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "327bb0b8d52b13619fb3c5e2cec87d12a2891d56d38b5f415cfcde18cea80118"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-algorithms",
  "snarkvm-circuit-network",
@@ -2943,8 +2939,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-algorithms"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "347c010c8128840984c5f5f6a513eaa960258bee87c9ca94d577689e522c8bda"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-types",
  "snarkvm-console-algorithms",
@@ -2954,8 +2949,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-collections"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85f15032bab5ebc07b04685d757d84add90f073b3a7c629f57311f9715ecd2b8"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-algorithms",
  "snarkvm-circuit-types",
@@ -2965,8 +2959,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-environment"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cfdaee135140f27c6321c2ee32b159522331b1f0f57a55c61d85a8eef0261250"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "indexmap",
  "itertools",
@@ -2984,14 +2977,12 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-environment-witness"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b84154491d3f29f739b9254cd23e6ab20868e1ea8a0c50bf70a66215195a49f7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 
 [[package]]
 name = "snarkvm-circuit-network"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eb53bf539d4e7a3d45b84b1a066d69b5fa211145ace42943fc55b33ed04c6886"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-algorithms",
  "snarkvm-circuit-collections",
@@ -3002,8 +2993,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-program"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b491fde294e2df38560c77f47b436eb84cda9179d1384289d48d2f0f381b75f"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-account",
  "snarkvm-circuit-collections",
@@ -3016,8 +3006,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cb99c920473e96d7036761c270077da9600535f632d382a11e99ad4b67c04e0f"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-address",
@@ -3032,8 +3021,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-address"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "35c4c29afe50f82decf8436d9b876b595fff2e3fe69cd8e2ac57091a1936761c"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3046,8 +3034,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-boolean"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "571825663ac3ea5aa057aa2945600a646534ff9e74b4ae4f4d6fa555ac0f5897"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-console-types-boolean",
@@ -3056,8 +3043,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-field"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "79b07ae8fefb380325f3eec538457cfd386a79a9ef998a62c935081b81126b6c"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3067,8 +3053,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-group"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "48b04d694962e0eff5c6f1847202e9a90969c2148a4292c37aaabd68bc5ca85c"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3080,8 +3065,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-integers"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5c06f6ad40106e2310b27ea368993ea29a20e1c21e1eeb6b14103848ce5f67fd"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3092,8 +3076,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-scalar"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dc8d800fdc9deb77e1837aaca4b8295cb48cecbd7a888949c5196f0e828a045d"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3104,8 +3087,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-circuit-types-string"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "77f462665cad0282d51572e9250aa3165214053afbb5a1d36f59c4be46cba3d4"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-circuit-environment",
  "snarkvm-circuit-types-boolean",
@@ -3117,8 +3099,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4873c8da377319091e6aa7f7e3ff85d82be0da1d76f48f9eee4a1c5d2d5f358"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-console-account",
  "snarkvm-console-algorithms",
@@ -3131,8 +3112,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-account"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2f5e3ec09b3153e35e45d126aeb43484a6502ebaee9c1ff70483b77dc7d717b"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "bs58",
  "snarkvm-console-network",
@@ -3142,8 +3122,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-algorithms"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dd4c34eed9d7be1fe81d698cfb1f82807195f91dd0983bbb50e5d0b6861cc783"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "blake2s_simd",
  "smallvec",
@@ -3155,8 +3134,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-collections"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ab9949b61fb8ce05c78885803287c426d5852eefa0012d9c35b62e8e8041a008"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "aleo-std",
  "rayon",
@@ -3167,8 +3145,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-network"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "eac46f0cf67ea542855c7da5684d0c64c29bcf6c13dfd26cd74d170244859e54"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "anyhow",
  "indexmap",
@@ -3191,8 +3168,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-network-environment"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "949790255a3ce43484d2d64e4019e83d377cf6e3378065e3a4dfbe95bada2d2a"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "anyhow",
  "bech32",
@@ -3209,8 +3185,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-program"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ed97fd6b0bc5271e2db014da2f1b6d729941545e2a8579bbc1cfad8929321683"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "enum_index",
  "enum_index_derive",
@@ -3229,8 +3204,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1e6a2eb8fcd2311769e8c4178d33d2d98860afb7bcf57095305d3577fc59536"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-address",
@@ -3245,8 +3219,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-address"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ba29808292f9aa51e64e889729632e0c08f631296812b3af21ccf9dc1eac22d"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3257,8 +3230,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-boolean"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bea412df3e71f3f2ae5df39caff188807ae57769dac9202ed3cb2614952113f7"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-console-network-environment",
 ]
@@ -3266,8 +3238,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-field"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "00306032a99673b0aba8b8913533a4d6846c44020d593b44ffa84088bdd853dd"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3276,8 +3247,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-group"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "416e30243bd359ed354d8594e1f9836a6f0be8bc958778527a04c585cf28f1d5"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3288,8 +3258,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-integers"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1db3e47a68a26d13410306e919efe2442610c1f5fc6ba259c846e39c33da3aea"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3299,8 +3268,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-scalar"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e204373be0ebfa1a17b166851a8f80ba4cb760799f2ad1823daefaea4b739113"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3310,8 +3278,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-console-types-string"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "89189d253ff3d96f646becfc15eec1314224290a1bc7dc215b71f3d38cfca0a1"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "snarkvm-console-network-environment",
  "snarkvm-console-types-boolean",
@@ -3322,8 +3289,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-curves"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "594d431ffc5b5811d3ae126d625f4542c010bc9e3017f882815b8ff639e69d65"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "rand",
  "rustc_version",
@@ -3336,8 +3302,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-fields"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e27cc43b63eec46506b8f49067413f90b6577e7b3811d659884e841898b1c306"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3354,8 +3319,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-parameters"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "27eab7d7b81615de7743ba615e784f851711146923caf137e7963c04da13df7e"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3380,8 +3344,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-r1cs"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20d349dd0c725a8b75189898d40ed67228889b0a418ccc5ea5ec68885d25f87e"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -3397,8 +3360,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-synthesizer"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "013d1cec9d64aa452f05a48ba3af0f1bc9598c2f220a61830c34160e4402920a"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3425,8 +3387,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-utilities"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "34724eac8768fbc1c39b09f925b1fca52c264280c28b40137a91c09a3148b4de"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3445,8 +3406,7 @@ dependencies = [
 [[package]]
 name = "snarkvm-utilities-derives"
 version = "0.9.13"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a06c52a5ceba9b9159f1b8cc3ca29bd5da16f339e4eb077cfc9024c813f2b86"
+source = "git+https://github.com/AleoHQ/snarkVM.git?branch=validator_memory_use_hotfix#8de73e9f95bbc626681fbdb18e4c41e68bb37c00"
 dependencies = [
  "proc-macro2 1.0.51",
  "quote 1.0.23",
