@@ -119,7 +119,9 @@ path = "."
 features = [ "test" ]
 
 [dev-dependencies.snarkvm-utilities]
-version = "0.9"
+#version = "0.9"
+git = "https://github.com/AleoHQ/snarkVM.git"
+branch = "validator_memory_use_hotfix"
 
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
