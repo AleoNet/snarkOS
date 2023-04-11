@@ -136,7 +136,7 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
 
         // Shut down the sync pool.
         trace!("Shutting down the sync pool...");
-        self.shutdown.store(true, Ordering::SeqCst);
+        self.shutdown.store(true, Ordering::Relaxed);
 
         // Abort the tasks.
         trace!("Shutting down the validator...");
