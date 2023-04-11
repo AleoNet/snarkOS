@@ -86,7 +86,7 @@ impl Tcp {
     pub fn new(mut config: Config) -> Self {
         // If there is no pre-configured name, assign a sequential numeric identifier.
         if config.name.is_none() {
-            config.name = Some(SEQUENTIAL_NODE_ID.fetch_add(1, SeqCst).to_string());
+            config.name = Some(SEQUENTIAL_NODE_ID.fetch_add(1, Relaxed).to_string());
         }
 
         // Create a tracing span containing the node's name.
