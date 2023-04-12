@@ -183,7 +183,7 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Beacon<N, C> {
 
         // Shut down block production.
         trace!("Shutting down block production...");
-        self.shutdown.store(true, Ordering::SeqCst);
+        self.shutdown.store(true, Ordering::Relaxed);
 
         // Abort the tasks.
         trace!("Shutting down the beacon...");
@@ -231,7 +231,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
 
                 // Do not produce a block if the elapsed time has not exceeded `ROUND_TIME - block_generation_time`.
                 // This will ensure a block is produced at intervals of approximately `ROUND_TIME`.
-                let time_to_wait = ROUND_TIME.saturating_sub(beacon.block_generation_time.load(Ordering::SeqCst));
+                let time_to_wait = ROUND_TIME.saturating_sub(beacon.block_generation_time.load(Ordering::Acquire));
                 trace!("Waiting for {time_to_wait} seconds before producing a block...");
                 if elapsed_time < time_to_wait {
                     if let Err(error) = timeout(
@@ -249,7 +249,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 // Produce the next block and propagate it to all peers.
                 match beacon.produce_next_block().await {
                     // Update the block generation time.
-                    Ok(()) => beacon.block_generation_time.store(timer.elapsed().as_secs(), Ordering::SeqCst),
+                    Ok(()) => beacon.block_generation_time.store(timer.elapsed().as_secs(), Ordering::Release),
                     Err(error) => error!("{error}"),
                 }
 
