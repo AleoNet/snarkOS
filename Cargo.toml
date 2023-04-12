@@ -52,9 +52,6 @@ version = "1"
 version = "3.2"
 features = ["derive"]
 
-[dependencies.tikv-jemallocator]
-version = "0.5"
-
 [dependencies.snarkos-account]
 path = "./account"
 
@@ -90,6 +87,9 @@ path = "./node/store"
 
 [dependencies.snarkos-node-tcp]
 path = "./node/tcp"
+
+[dependencies.tikv-jemallocator]
+version = "0.5"
 
 [dev-dependencies.rusty-hook]
 version = "0.11.2"
