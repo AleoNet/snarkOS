@@ -391,6 +391,12 @@ impl Tcp {
         // Retrieve the maximum number of connected peers.
         let limit = self.config.max_connections as usize;
 
+        trace!(
+            "TEMPORARY - num_connected: {num_connected}, limit: {limit}\nActive: {:?}\nPending: {:?}",
+            self.connections.addrs(),
+            self.connecting.lock().clone()
+        );
+
         if num_connected >= limit {
             warn!(parent: self.span(), "Maximum number of active connections ({limit}) reached");
             false

@@ -203,6 +203,10 @@ impl<N: Network> Router<N> {
         if self.is_connected(&peer_ip) {
             bail!("Dropping connection request from '{peer_ip}' (already connected)")
         }
+        // TODO (howardwu): TMP - Remove this restriction once the network is more stable.
+        if self.node_type.is_beacon() {
+            return Ok(());
+        }
         // Ensure the peer is not restricted.
         if self.is_restricted(&peer_ip) {
             bail!("Dropping connection request from '{peer_ip}' (restricted)")
