@@ -42,10 +42,10 @@ pub enum MapID {
     Block(BlockMap),
     Deployment(DeploymentMap),
     Execution(ExecutionMap),
-    Input(InputMap),
-    Output(OutputMap),
     Transaction(TransactionMap),
     Transition(TransitionMap),
+    TransitionInput(TransitionInputMap),
+    TransitionOutput(TransitionOutputMap),
     Program(ProgramMap),
     #[cfg(test)]
     Test(TestMap),
@@ -57,10 +57,10 @@ impl From<MapID> for u16 {
             MapID::Block(id) => id as u16,
             MapID::Deployment(id) => id as u16,
             MapID::Execution(id) => id as u16,
-            MapID::Input(id) => id as u16,
-            MapID::Output(id) => id as u16,
             MapID::Transaction(id) => id as u16,
             MapID::Transition(id) => id as u16,
+            MapID::TransitionInput(id) => id as u16,
+            MapID::TransitionOutput(id) => id as u16,
             MapID::Program(id) => id as u16,
             #[cfg(test)]
             MapID::Test(id) => id as u16,
@@ -107,7 +107,7 @@ pub enum ExecutionMap {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
-pub enum InputMap {
+pub enum TransitionInputMap {
     ID = DataID::InputIDMap as u16,
     ReverseID = DataID::InputReverseIDMap as u16,
     Constant = DataID::InputConstantMap as u16,
@@ -120,7 +120,7 @@ pub enum InputMap {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
-pub enum OutputMap {
+pub enum TransitionOutputMap {
     ID = DataID::OutputIDMap as u16,
     ReverseID = DataID::OutputReverseIDMap as u16,
     Constant = DataID::OutputConstantMap as u16,
