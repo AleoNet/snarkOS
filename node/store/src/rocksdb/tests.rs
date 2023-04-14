@@ -188,3 +188,27 @@ fn test_scalar_mul() {
     let elapsed = timer.elapsed().as_secs();
     println!(" {ITERATIONS} Scalar Muls : {elapsed} s");
 }
+
+#[test]
+#[serial]
+fn test_iterator_ordering() {
+    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+
+    map.insert(5, "a".to_string()).expect("Failed to insert");
+    map.insert(6, "c".to_string()).expect("Failed to insert");
+    map.insert(7, "j".to_string()).expect("Failed to insert");
+    map.insert(8, "z".to_string()).expect("Failed to insert");
+
+    map.insert(1, "r".to_string()).expect("Failed to insert");
+    map.insert(2, "k".to_string()).expect("Failed to insert");
+    map.insert(3, "b".to_string()).expect("Failed to insert");
+    map.insert(4, "v".to_string()).expect("Failed to insert");
+
+    let iter_order = map.iter().collect::<Vec<_>>();
+    let keys_order = map.keys().collect::<Vec<_>>();
+    let values_order = map.values().collect::<Vec<_>>();
+
+    println!("{:?}", keys_order);
+    println!("{:?}", values_order);
+    println!("{:?}", iter_order);
+}

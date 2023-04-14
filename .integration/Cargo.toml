@@ -17,8 +17,7 @@ license = "GPL-3.0"
 edition = "2021"
 
 [features]
-default = [ "parallel" ]
-parallel = [ "snarkos-node-cdn/parallel", "snarkos-node-ledger/parallel" ]
+default = [ ]
 
 [dev-dependencies.snarkos-node-cdn]
 path = "../node/cdn"

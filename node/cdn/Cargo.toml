@@ -17,11 +17,10 @@ license = "GPL-3.0"
 edition = "2021"
 
 [features]
-default = [ "parallel" ]
-parallel = [ "snarkvm/parallel", "snarkos-node-ledger/parallel" ]
+default = [ ]
 
 [dependencies.anyhow]
-version = "1"
+version = "1.0.70"
 
 [dependencies.backoff]
 version = "0.4"
