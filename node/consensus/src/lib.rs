@@ -205,7 +205,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         // TODO (raychu86): Pay the provers. Currently we do not pay the provers with the `credits.aleo` program
         //  and instead, will track prover leaderboards via the `coinbase_solution` in each block.
-        if let Some(prover_solutions) = prover_solutions {
+        let cumulative_proof_target = if let Some(prover_solutions) = prover_solutions {
             // Calculate the coinbase reward.
             let coinbase_reward = coinbase_reward(
                 latest_block.last_coinbase_timestamp(),
@@ -246,7 +246,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
                 prover_rewards.push((prover_solution.address(), prover_reward));
             }
-        }
+
+            cumulative_proof_target
+        } else {
+            0u128
+        };
 
         // Construct the next coinbase target.
         // Use the new targeting algorithm if the node is in development mode or
@@ -283,6 +287,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             next_round,
             next_height,
             next_coinbase_target,
+            cumulative_proof_target,
             next_proof_target,
             next_last_coinbase_target,
             next_last_coinbase_timestamp,
@@ -432,7 +437,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Check the last coinbase members in the block.
         if block.height() > 0 {
             match block.coinbase() {
-                Some(_) => {
+                Some(coinbase) => {
                     // Ensure the last coinbase target matches the coinbase target.
                     if block.last_coinbase_target() != block.coinbase_target() {
                         bail!("The last coinbase target does not match the coinbase target")
@@ -440,6 +445,10 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     // Ensure the last coinbase timestamp matches the block timestamp.
                     if block.last_coinbase_timestamp() != block.timestamp() {
                         bail!("The last coinbase timestamp does not match the block timestamp")
+                    }
+                    // Ensure that the cumulative proof target matches the block cumulative proof target.
+                    if block.cumulative_proof_target() != coinbase.to_cumulative_proof_target()? {
+                        bail!("The cumulative proof target does not match the block cumulative proof target")
                     }
                 }
                 None => {
@@ -450,6 +459,10 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     // Ensure the last coinbase timestamp matches the previous block's last coinbase timestamp.
                     if block.last_coinbase_timestamp() != self.ledger.last_coinbase_timestamp() {
                         bail!("The last coinbase timestamp does not match the previous block's last coinbase timestamp")
+                    }
+                    // Ensure that the cumulative proof target is 0.
+                    if block.cumulative_proof_target() != 0 {
+                        bail!("The cumulative proof target is not 0")
                     }
                 }
             }
@@ -614,7 +627,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Ensure transactions with a positive balance must pay for its storage in bytes.
         let fee = transaction.fee()?;
         if matches!(transaction, Transaction::Deploy(..))
-            && fee >= 0
+            && *fee >= 0
             && transaction.to_bytes_le()?.len() > usize::try_from(fee)?
         {
             bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
