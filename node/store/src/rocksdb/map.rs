@@ -260,7 +260,7 @@ impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> fmt::Debu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::rocksdb::tests::temp_dir;
+    use crate::{rocksdb::tests::temp_dir, TestMap};
     use snarkvm::prelude::{Address, FromStr, Testnet3};
 
     use serial_test::serial;
@@ -278,7 +278,7 @@ mod tests {
 
         // Initialize a map.
         let map: DataMap<Address<CurrentNetwork>, ()> =
-            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+            RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMap::Test)).expect("Failed to open data map");
         map.insert(address, ()).expect("Failed to insert into data map");
         assert!(map.contains_key(&address).unwrap());
     }
@@ -289,7 +289,7 @@ mod tests {
     fn test_insert_and_get_speculative() {
         // Initialize a map.
         let map: DataMap<usize, String> =
-            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+            RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMap::Test)).expect("Failed to open data map");
 
         // Sanity check.
         assert!(map.iter().next().is_none());
@@ -342,7 +342,7 @@ mod tests {
     fn test_remove_and_get_speculative() {
         // Initialize a map.
         let map: DataMap<usize, String> =
-            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+            RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMap::Test)).expect("Failed to open data map");
 
         // Sanity check.
         assert!(map.iter().next().is_none());
@@ -405,7 +405,7 @@ mod tests {
 
         // Initialize a map.
         let map: DataMap<usize, String> =
-            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+            RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMap::Test)).expect("Failed to open data map");
 
         // Sanity check.
         assert!(map.iter().next().is_none());
@@ -466,7 +466,7 @@ mod tests {
 
         // Initialize a map.
         let map: DataMap<usize, String> =
-            RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+            RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMap::Test)).expect("Failed to open data map");
 
         // Sanity check.
         assert!(map.iter().next().is_none());

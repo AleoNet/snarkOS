@@ -16,7 +16,8 @@
 
 use crate::{
     rocksdb::{self, DataMap, Database},
-    DataID,
+    BlockMap,
+    MapID,
     TransactionDB,
     TransitionDB,
 };
@@ -72,17 +73,17 @@ impl<N: Network> BlockStorage<N> for BlockDB<N> {
         let transaction_store = TransactionStore::<N, TransactionDB<N>>::open(transition_store)?;
         // Return the block storage.
         Ok(Self {
-            state_root_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockStateRootMap)?,
-            reverse_state_root_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockReverseStateRootMap)?,
-            id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockIDMap)?,
-            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockReverseIDMap)?,
-            header_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockHeaderMap)?,
-            transactions_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockTransactionsMap)?,
-            reverse_transactions_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockReverseTransactionsMap)?,
+            state_root_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Block(BlockMap::StateRoot))?,
+            reverse_state_root_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Block(BlockMap::ReverseStateRoot))?,
+            id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Block(BlockMap::ID))?,
+            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Block(BlockMap::ReverseID))?,
+            header_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Block(BlockMap::Header))?,
+            transactions_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Block(BlockMap::Transactions))?,
+            reverse_transactions_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Block(BlockMap::ReverseTransactions))?,
             transaction_store,
-            coinbase_solution_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockCoinbaseSolutionMap)?,
-            coinbase_puzzle_commitment_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockCoinbasePuzzleCommitmentMap)?,
-            signature_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::BlockSignatureMap)?,
+            coinbase_solution_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Block(BlockMap::CoinbaseSolution))?,
+            coinbase_puzzle_commitment_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Block(BlockMap::CoinbasePuzzleCommitment))?,
+            signature_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Block(BlockMap::Signature))?,
         })
     }
 
