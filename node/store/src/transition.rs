@@ -16,10 +16,10 @@
 
 use crate::{
     rocksdb::{self, DataMap, Database},
-    InputMap,
     MapID,
-    OutputMap,
+    TransitionInputMap,
     TransitionMap,
+    TransitionOutputMap,
 };
 use snarkvm::prelude::*;
 
@@ -165,14 +165,14 @@ impl<N: Network> InputStorage<N> for InputDB<N> {
     /// Initializes the transition input storage.
     fn open(dev: Option<u16>) -> Result<Self> {
         Ok(Self {
-            id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::ID))?,
-            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::ReverseID))?,
-            constant: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::Constant))?,
-            public: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::Public))?,
-            private: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::Private))?,
-            record: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::Record))?,
-            record_tag: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::RecordTag))?,
-            external_record: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::ExternalRecord))?,
+            id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionInput(TransitionInputMap::ID))?,
+            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionInput(TransitionInputMap::ReverseID))?,
+            constant: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionInput(TransitionInputMap::Constant))?,
+            public: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionInput(TransitionInputMap::Public))?,
+            private: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionInput(TransitionInputMap::Private))?,
+            record: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionInput(TransitionInputMap::Record))?,
+            record_tag: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionInput(TransitionInputMap::RecordTag))?,
+            external_record: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionInput(TransitionInputMap::ExternalRecord))?,
             dev,
         })
     }
@@ -261,14 +261,14 @@ impl<N: Network> OutputStorage<N> for OutputDB<N> {
     /// Initializes the transition output storage.
     fn open(dev: Option<u16>) -> Result<Self> {
         Ok(Self {
-            id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::ID))?,
-            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::ReverseID))?,
-            constant: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::Constant))?,
-            public: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::Public))?,
-            private: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::Private))?,
-            record: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::Record))?,
-            record_nonce: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::RecordNonce))?,
-            external_record: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::ExternalRecord))?,
+            id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionOutput(TransitionOutputMap::ID))?,
+            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionOutput(TransitionOutputMap::ReverseID))?,
+            constant: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionOutput(TransitionOutputMap::Constant))?,
+            public: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionOutput(TransitionOutputMap::Public))?,
+            private: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionOutput(TransitionOutputMap::Private))?,
+            record: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionOutput(TransitionOutputMap::Record))?,
+            record_nonce: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionOutput(TransitionOutputMap::RecordNonce))?,
+            external_record: rocksdb::RocksDB::open_map(N::ID, dev, MapID::TransitionOutput(TransitionOutputMap::ExternalRecord))?,
             dev,
         })
     }
