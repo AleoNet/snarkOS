@@ -47,6 +47,25 @@ pub enum MapID {
     Transaction(TransactionMap),
     Transition(TransitionMap),
     Program(ProgramMap),
+    #[cfg(test)]
+    Test(TestMap),
+}
+
+impl From<MapID> for u16 {
+    fn from(id: MapID) -> u16 {
+        match id {
+            MapID::Block(id) => id as u16,
+            MapID::Deployment(id) => id as u16,
+            MapID::Execution(id) => id as u16,
+            MapID::Input(id) => id as u16,
+            MapID::Output(id) => id as u16,
+            MapID::Transaction(id) => id as u16,
+            MapID::Transition(id) => id as u16,
+            MapID::Program(id) => id as u16,
+            #[cfg(test)]
+            MapID::Test(id) => id as u16,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -139,6 +158,13 @@ pub enum ProgramMap {
     KeyValueID = DataID::KeyValueIDMap as u16,
     Key = DataID::KeyMap as u16,
     Value = DataID::ValueMap as u16,
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u16)]
+pub enum TestMap {
+    Test = DataID::Test as u16,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

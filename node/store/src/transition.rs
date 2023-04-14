@@ -16,7 +16,10 @@
 
 use crate::{
     rocksdb::{self, DataMap, Database},
-    DataID,
+    InputMap,
+    MapID,
+    OutputMap,
+    TransitionMap,
 };
 use snarkvm::prelude::*;
 
@@ -61,16 +64,16 @@ impl<N: Network> TransitionStorage<N> for TransitionDB<N> {
     /// Initializes the transition storage.
     fn open(dev: Option<u16>) -> Result<Self> {
         Ok(Self {
-            locator_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionLocatorMap)?,
+            locator_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Transition(TransitionMap::Locator))?,
             input_store: InputStore::open(dev)?,
             output_store: OutputStore::open(dev)?,
-            finalize_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionFinalizeMap)?,
-            proof_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionProofMap)?,
-            tpk_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionTPKMap)?,
-            reverse_tpk_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionReverseTPKMap)?,
-            tcm_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionTCMMap)?,
-            reverse_tcm_map: rocksdb::RocksDB::open_map(N::ID, dev,  DataID::TransitionReverseTCMMap)?,
-            fee_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionFeeMap)?,
+            finalize_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Transition(TransitionMap::Finalize))?,
+            proof_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Transition(TransitionMap::Proof))?,
+            tpk_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Transition(TransitionMap::TPK))?,
+            reverse_tpk_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Transition(TransitionMap::ReverseTPK))?,
+            tcm_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Transition(TransitionMap::TCM))?,
+            reverse_tcm_map: rocksdb::RocksDB::open_map(N::ID, dev,  MapID::Transition(TransitionMap::ReverseTCM))?,
+            fee_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Transition(TransitionMap::Fee))?,
         })
     }
 
@@ -162,14 +165,14 @@ impl<N: Network> InputStorage<N> for InputDB<N> {
     /// Initializes the transition input storage.
     fn open(dev: Option<u16>) -> Result<Self> {
         Ok(Self {
-            id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputIDMap)?,
-            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputReverseIDMap)?,
-            constant: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputConstantMap)?,
-            public: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputPublicMap)?,
-            private: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputPrivateMap)?,
-            record: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputRecordMap)?,
-            record_tag: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputRecordTagMap)?,
-            external_record: rocksdb::RocksDB::open_map(N::ID, dev, DataID::InputExternalRecordMap)?,
+            id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::ID))?,
+            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::ReverseID))?,
+            constant: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::Constant))?,
+            public: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::Public))?,
+            private: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::Private))?,
+            record: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::Record))?,
+            record_tag: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::RecordTag))?,
+            external_record: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Input(InputMap::ExternalRecord))?,
             dev,
         })
     }
@@ -258,14 +261,14 @@ impl<N: Network> OutputStorage<N> for OutputDB<N> {
     /// Initializes the transition output storage.
     fn open(dev: Option<u16>) -> Result<Self> {
         Ok(Self {
-            id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputIDMap)?,
-            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputReverseIDMap)?,
-            constant: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputConstantMap)?,
-            public: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputPublicMap)?,
-            private: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputPrivateMap)?,
-            record: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputRecordMap)?,
-            record_nonce: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputRecordNonceMap)?,
-            external_record: rocksdb::RocksDB::open_map(N::ID, dev, DataID::OutputExternalRecordMap)?,
+            id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::ID))?,
+            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::ReverseID))?,
+            constant: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::Constant))?,
+            public: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::Public))?,
+            private: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::Private))?,
+            record: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::Record))?,
+            record_nonce: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::RecordNonce))?,
+            external_record: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Output(OutputMap::ExternalRecord))?,
             dev,
         })
     }

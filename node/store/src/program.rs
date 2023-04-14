@@ -16,7 +16,8 @@
 
 use crate::{
     rocksdb::{self, DataMap, Database},
-    DataID,
+    MapID,
+    ProgramMap,
 };
 use snarkvm::prelude::*;
 
@@ -50,11 +51,11 @@ impl<N: Network> ProgramStorage<N> for ProgramDB<N> {
     /// Initializes the program state storage.
     fn open(dev: Option<u16>) -> Result<Self> {
         Ok(Self {
-            program_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ProgramIDMap)?,
-            mapping_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::MappingIDMap)?,
-            key_value_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::KeyValueIDMap)?,
-            key_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::KeyMap)?,
-            value_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ValueMap)?,
+            program_id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Program(ProgramMap::ID))?,
+            mapping_id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Program(ProgramMap::MappingID))?,
+            key_value_id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Program(ProgramMap::KeyValueID))?,
+            key_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Program(ProgramMap::Key))?,
+            value_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Program(ProgramMap::Value))?,
             dev,
         })
     }
