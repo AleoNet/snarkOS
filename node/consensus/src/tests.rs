@@ -165,7 +165,7 @@ function compute:
                     .filter(|(_, record)| {
                         // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
                         match record.data().get(&microcredits) {
-                            Some(Entry::Public(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
+                            Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
                             _ => false,
                         }
                     })
@@ -174,7 +174,7 @@ function compute:
 
                 // Prepare the additional fee.
                 let credits = records.values().next().unwrap().clone();
-                let additional_fee = (credits, 1000000);
+                let additional_fee = (credits, 6312000);
 
                 // Deploy.
                 let transaction = Transaction::deploy(
@@ -215,7 +215,7 @@ function compute:
                     .filter(|(_, record)| {
                         // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
                         match record.data().get(&microcredits) {
-                            Some(Entry::Public(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
+                            Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
                             _ => false,
                         }
                     })
@@ -375,7 +375,7 @@ fn test_ledger_execute_many() {
             .filter(|(_, record)| {
                 // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
                 match record.data().get(&microcredits) {
-                    Some(Entry::Public(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
+                    Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
                     _ => false,
                 }
             })

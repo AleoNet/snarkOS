@@ -371,7 +371,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                             for (commitment, record) in transition.into_records() {
                                 let record = record.decrypt(beacon.account.view_key())?;
 
-                                if let Some(Entry::Public(Plaintext::Literal(Literal::U64(amount), _))) =
+                                if let Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) =
                                     record.data().get(&Identifier::from_str("microcredits")?)
                                 {
                                     if !amount.is_zero() {

@@ -284,7 +284,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
             .filter(|(_, record)| {
                 // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
                 match record.data().get(&microcredits) {
-                    Some(Entry::Public(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
+                    Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
                     _ => false,
                 }
             })
