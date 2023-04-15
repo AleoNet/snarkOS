@@ -201,8 +201,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             if transaction.is_coinbase() {
                 match transaction {
                     Transaction::Execute(_, execution, _) => {
-                        // Get the input of the coinbase transaction.
-                        match execution.get(0)?.inputs().get(0) {
+                        // Get the input amount of the coinbase transaction.
+                        match execution.get(0)?.inputs().get(1) {
                             Some(Input::Public(_, Some(Plaintext::Literal(Literal::U64(amount), _)))) => {
                                 // Add the public amount minted to the total supply.
                                 new_total_supply_in_microcredits = new_total_supply_in_microcredits
@@ -471,8 +471,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             if transaction.is_coinbase() {
                 match transaction {
                     Transaction::Execute(_, execution, _) => {
-                        // Get the input of the coinbase transaction.
-                        match execution.get(0)?.inputs().get(0) {
+                        // Get the input amount of the coinbase transaction.
+                        match execution.get(0)?.inputs().get(1) {
                             Some(Input::Public(_, Some(Plaintext::Literal(Literal::U64(amount), _)))) => {
                                 // Add the public amount minted to the total supply.
                                 new_total_supply_in_microcredits = new_total_supply_in_microcredits

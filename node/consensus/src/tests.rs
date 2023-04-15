@@ -385,7 +385,7 @@ fn test_ledger_execute_many() {
         for (_, record) in records {
             // Prepare the inputs.
             let amount = match record.data().get(&Identifier::from_str("microcredits").unwrap()).unwrap() {
-                Entry::Public(Plaintext::Literal(Literal::<CurrentNetwork>::U64(amount), _)) => amount,
+                Entry::Private(Plaintext::Literal(Literal::<CurrentNetwork>::U64(amount), _)) => amount,
                 _ => unreachable!(),
             };
             let inputs = [Value::Record(record.clone()), Value::from_str(&format!("{}u64", **amount / 2)).unwrap()];
