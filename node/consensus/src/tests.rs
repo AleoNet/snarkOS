@@ -365,7 +365,10 @@ fn test_ledger_execute_many() {
     // Sample the genesis consensus.
     let consensus = crate::tests::test_helpers::sample_genesis_consensus(rng);
 
-    for height in 1..6 {
+    // Track the number of starting records.
+    let mut num_starting_records = 4;
+
+    for height in 1..5 {
         // Fetch the unspent records.
         let microcredits = Identifier::from_str("microcredits").unwrap();
         let records: Vec<_> = consensus
@@ -380,9 +383,9 @@ fn test_ledger_execute_many() {
                 }
             })
             .collect();
-        assert_eq!(records.len(), 1 << (height - 1));
+        assert_eq!(records.len(), num_starting_records);
 
-        for (_, record) in records {
+        for ((_, record), (_, fee_record)) in records.iter().tuples() {
             // Prepare the inputs.
             let amount = match record.data().get(&Identifier::from_str("microcredits").unwrap()).unwrap() {
                 Entry::Private(Plaintext::Literal(Literal::<CurrentNetwork>::U64(amount), _)) => amount,
@@ -395,7 +398,7 @@ fn test_ledger_execute_many() {
                 &private_key,
                 (ProgramID::from_str("credits.aleo").unwrap(), Identifier::from_str("split").unwrap()),
                 inputs.iter(),
-                None,
+                Some((fee_record.clone(), 100u64)),
                 None,
                 rng,
             )
@@ -403,7 +406,10 @@ fn test_ledger_execute_many() {
             // Add the transaction to the memory pool.
             consensus.add_unconfirmed_transaction(transaction).unwrap();
         }
-        assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), 1 << (height - 1));
+        assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), num_starting_records / 2);
+
+        // Update the number of starting records
+        num_starting_records = num_starting_records * 3 / 2;
 
         // Propose the next block.
         let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
