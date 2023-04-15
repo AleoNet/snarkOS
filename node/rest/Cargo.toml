@@ -30,7 +30,7 @@ version = "0.2"
 version = "1.8"
 
 [dependencies.jsonwebtoken]
-version = "8.2"
+version = "8.3"
 
 [dependencies.once_cell]
 version = "1.13"
