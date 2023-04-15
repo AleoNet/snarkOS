@@ -27,6 +27,8 @@ use indexmap::{IndexMap, IndexSet};
 pub struct ProgramDB<N: Network> {
     /// The program ID map.
     program_id_map: DataMap<ProgramID<N>, IndexSet<Identifier<N>>>,
+    /// The program index map.
+    program_index_map: DataMap<ProgramID<N>, u32>,
     /// The mapping ID map.
     mapping_id_map: DataMap<(ProgramID<N>, Identifier<N>), Field<N>>,
     /// The key-value ID map.
@@ -42,6 +44,7 @@ pub struct ProgramDB<N: Network> {
 #[rustfmt::skip]
 impl<N: Network> ProgramStorage<N> for ProgramDB<N> {
     type ProgramIDMap = DataMap<ProgramID<N>, IndexSet<Identifier<N>>>;
+    type ProgramIndexMap = DataMap<ProgramID<N>, u32>;
     type MappingIDMap = DataMap<(ProgramID<N>, Identifier<N>), Field<N>>;
     type KeyValueIDMap = DataMap<Field<N>, IndexMap<Field<N>, Field<N>>>;
     type KeyMap = DataMap<Field<N>, Plaintext<N>>;
@@ -51,6 +54,7 @@ impl<N: Network> ProgramStorage<N> for ProgramDB<N> {
     fn open(dev: Option<u16>) -> Result<Self> {
         Ok(Self {
             program_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ProgramIDMap)?,
+            program_index_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ProgramIndexMap)?,
             mapping_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::MappingIDMap)?,
             key_value_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::KeyValueIDMap)?,
             key_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::KeyMap)?,
@@ -62,6 +66,11 @@ impl<N: Network> ProgramStorage<N> for ProgramDB<N> {
     /// Returns the program ID map.
     fn program_id_map(&self) -> &Self::ProgramIDMap {
         &self.program_id_map
+    }
+    
+    /// Returns the program index map.
+    fn program_index_map(&self) -> &Self::ProgramIndexMap {
+        &self.program_index_map
     }
 
     /// Returns the mapping ID map.

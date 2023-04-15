@@ -52,5 +52,8 @@ version = "0.3"
 [dependencies.tracing]
 version = "0.1"
 
+[dev-dependencies.itertools]
+version = "0.10"
+
 [dev-dependencies.tracing-test]
 version = "0.2"
