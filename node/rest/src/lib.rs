@@ -42,6 +42,9 @@ use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::task::JoinHandle;
 use warp::{reject, reply, Filter, Rejection, Reply};
 
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
+
 /// A REST API server for the ledger.
 #[derive(Clone)]
 pub struct Rest<N: Network, C: ConsensusStorage<N>, R: Routing<N>> {
