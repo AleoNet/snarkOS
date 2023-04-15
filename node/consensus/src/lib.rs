@@ -31,12 +31,12 @@ mod tests;
 use snarkos_node_ledger::Ledger;
 use snarkvm::prelude::*;
 
+use ::time::OffsetDateTime;
 use anyhow::{anyhow, ensure, Result};
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
-use time::OffsetDateTime;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
@@ -174,6 +174,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let latest_block = self.ledger.latest_block();
         // Retrieve the latest height.
         let latest_height = latest_block.height();
+        // Retrieve the latest total supply in microcredits.
+        let latest_total_supply_in_microcredits = latest_block.total_supply_in_microcredits();
         // Retrieve the latest proof target.
         let latest_proof_target = latest_block.proof_target();
         // Retrieve the latest coinbase target.
@@ -184,6 +186,36 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Select the prover solutions from the memory pool.
         let prover_solutions =
             self.memory_pool.candidate_solutions(self, latest_height, latest_proof_target, latest_coinbase_target)?;
+
+        // TODO (raychu86): Clean this up or create a `total_supply_delta` in `Transactions`.
+        // Calculate the new total supply of microcredits after the block.
+        let mut new_total_supply_in_microcredits = latest_total_supply_in_microcredits;
+        for transaction in transactions.iter() {
+            // Subtract the fee from the total supply.
+            let fee = transaction.fee()?;
+            new_total_supply_in_microcredits = new_total_supply_in_microcredits
+                .checked_sub(*fee)
+                .ok_or_else(|| anyhow!("Fee exceeded total supply of credits"))?;
+
+            // If the transaction is a coinbase, add the amount to the total supply.
+            if transaction.is_coinbase() {
+                match transaction {
+                    Transaction::Execute(_, execution, _) => {
+                        // Get the input of the coinbase transaction.
+                        match execution.get(0)?.inputs().get(0) {
+                            Some(Input::Public(_, Some(Plaintext::Literal(Literal::U64(amount), _)))) => {
+                                // Add the public amount minted to the total supply.
+                                new_total_supply_in_microcredits = new_total_supply_in_microcredits
+                                    .checked_add(**amount)
+                                    .ok_or_else(|| anyhow!("Total supply of microcredits overflowed"))?;
+                            }
+                            _ => bail!("Invalid coinbase transaction: Missing public input in 'credits.aleo/mint'"),
+                        }
+                    }
+                    _ => bail!("Invalid coinbase transaction"),
+                }
+            }
+        }
 
         // Construct the coinbase solution.
         let (coinbase, coinbase_accumulator_point) = match &prover_solutions {
@@ -286,8 +318,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             N::ID,
             next_round,
             next_height,
-            next_coinbase_target,
+            new_total_supply_in_microcredits,
             cumulative_proof_target,
+            next_coinbase_target,
             next_proof_target,
             next_last_coinbase_target,
             next_last_coinbase_timestamp,
@@ -432,6 +465,41 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Ensure the block header is valid.
         if !block.header().is_valid() {
             bail!("Invalid block header: {:?}", block.header());
+        }
+
+        // TODO (raychu86): Clean this up or create a `total_supply_delta` in `Transactions`.
+        // Calculate the new total supply of microcredits after the block.
+        let mut new_total_supply_in_microcredits = self.ledger.latest_total_supply_in_microcredits();
+        for transaction in block.transactions().iter() {
+            // Subtract the fee from the total supply.
+            let fee = transaction.fee()?;
+            new_total_supply_in_microcredits = new_total_supply_in_microcredits
+                .checked_sub(*fee)
+                .ok_or_else(|| anyhow!("Fee exceeded total supply of credits"))?;
+
+            // If the transaction is a coinbase, add the amount to the total supply.
+            if transaction.is_coinbase() {
+                match transaction {
+                    Transaction::Execute(_, execution, _) => {
+                        // Get the input of the coinbase transaction.
+                        match execution.get(0)?.inputs().get(0) {
+                            Some(Input::Public(_, Some(Plaintext::Literal(Literal::U64(amount), _)))) => {
+                                // Add the public amount minted to the total supply.
+                                new_total_supply_in_microcredits = new_total_supply_in_microcredits
+                                    .checked_add(**amount)
+                                    .ok_or_else(|| anyhow!("Total supply of microcredits overflowed"))?;
+                            }
+                            _ => bail!("Invalid coinbase transaction: Missing public input in 'credits.aleo/mint'"),
+                        }
+                    }
+                    _ => bail!("Invalid coinbase transaction"),
+                }
+            }
+        }
+
+        // Ensure the total supply in microcredits is correct.
+        if new_total_supply_in_microcredits != block.total_supply_in_microcredits() {
+            bail!("Invalid total supply in microcredits")
         }
 
         // Check the last coinbase members in the block.
@@ -626,10 +694,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // TODO (raychu86): Currently ignoring this rule for executions. Revisit this in phase 3.
         // Ensure transactions with a positive balance must pay for its storage in bytes.
         let fee = transaction.fee()?;
-        if matches!(transaction, Transaction::Deploy(..))
-            && *fee >= 0
-            && transaction.to_bytes_le()?.len() > usize::try_from(fee)?
-        {
+        if matches!(transaction, Transaction::Deploy(..)) && transaction.to_bytes_le()?.len() > usize::try_from(*fee)? {
             bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
         }
 
