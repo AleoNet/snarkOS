@@ -120,7 +120,7 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
 
         // Shut down the coinbase puzzle.
         trace!("Shutting down the coinbase puzzle...");
-        self.shutdown.store(true, Ordering::SeqCst);
+        self.shutdown.store(true, Ordering::Relaxed);
 
         // Abort the tasks.
         trace!("Shutting down the prover...");
@@ -244,19 +244,19 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
 
     /// Returns the current number of puzzle instances.
     fn num_puzzle_instances(&self) -> u8 {
-        self.puzzle_instances.load(Ordering::SeqCst)
+        self.puzzle_instances.load(Ordering::Relaxed)
     }
 
     /// Increments the number of puzzle instances.
     fn increment_puzzle_instances(&self) {
-        self.puzzle_instances.fetch_add(1, Ordering::SeqCst);
+        self.puzzle_instances.fetch_add(1, Ordering::Relaxed);
         #[cfg(debug_assertions)]
         trace!("Number of Instances - {}", self.num_puzzle_instances());
     }
 
     /// Decrements the number of puzzle instances.
     fn decrement_puzzle_instances(&self) {
-        self.puzzle_instances.fetch_sub(1, Ordering::SeqCst);
+        self.puzzle_instances.fetch_sub(1, Ordering::Relaxed);
         #[cfg(debug_assertions)]
         trace!("Number of Instances - {}", self.num_puzzle_instances());
     }
