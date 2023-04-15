@@ -41,10 +41,6 @@ use std::sync::Arc;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-// TODO (raychu86): Remove this after Phase 2.
-/// The block height to start using new coinbase targeting algorithm.
-const V4_START_HEIGHT: u32 = 123478;
-
 /// The cost in microcredits per byte for the deployment transaction.
 const DEPLOYMENT_FEE_FACTOR: u64 = 1000;
 
@@ -288,24 +284,13 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         };
 
         // Construct the next coinbase target.
-        // Use the new targeting algorithm if the node is in development mode or
-        // if the block height is greater than or equal to `V4_START_HEIGHT`.
-        let next_coinbase_target = match self.is_dev || next_height >= V4_START_HEIGHT {
-            true => coinbase_target::<true>(
-                latest_block.last_coinbase_target(),
-                latest_block.last_coinbase_timestamp(),
-                next_timestamp,
-                N::ANCHOR_TIME,
-                N::NUM_BLOCKS_PER_EPOCH,
-            ),
-            false => coinbase_target::<false>(
-                latest_block.last_coinbase_target(),
-                latest_block.last_coinbase_timestamp(),
-                next_timestamp,
-                N::ANCHOR_TIME,
-                N::NUM_BLOCKS_PER_EPOCH,
-            ),
-        }?;
+        let next_coinbase_target = coinbase_target(
+            latest_block.last_coinbase_target(),
+            latest_block.last_coinbase_timestamp(),
+            next_timestamp,
+            N::ANCHOR_TIME,
+            N::NUM_BLOCKS_PER_EPOCH,
+        )?;
 
         // Construct the next proof target.
         let next_proof_target = proof_target(next_coinbase_target);
@@ -540,24 +525,13 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         // Construct the next coinbase target.
-        // Use the new targeting algorithm if the node is in development mode or
-        // if the block height is greater than or equal to `V4_START_HEIGHT`.
-        let expected_coinbase_target = match self.is_dev || block.height() >= V4_START_HEIGHT {
-            true => coinbase_target::<true>(
-                self.ledger.last_coinbase_target(),
-                self.ledger.last_coinbase_timestamp(),
-                block.timestamp(),
-                N::ANCHOR_TIME,
-                N::NUM_BLOCKS_PER_EPOCH,
-            ),
-            false => coinbase_target::<false>(
-                self.ledger.last_coinbase_target(),
-                self.ledger.last_coinbase_timestamp(),
-                block.timestamp(),
-                N::ANCHOR_TIME,
-                N::NUM_BLOCKS_PER_EPOCH,
-            ),
-        }?;
+        let expected_coinbase_target = coinbase_target(
+            self.ledger.last_coinbase_target(),
+            self.ledger.last_coinbase_timestamp(),
+            block.timestamp(),
+            N::ANCHOR_TIME,
+            N::NUM_BLOCKS_PER_EPOCH,
+        )?;
 
         if block.coinbase_target() != expected_coinbase_target {
             bail!("Invalid coinbase target: expected {}, got {}", expected_coinbase_target, block.coinbase_target())
