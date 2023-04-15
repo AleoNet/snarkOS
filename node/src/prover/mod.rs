@@ -18,7 +18,7 @@ mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_messages::{Data, Message, NodeType, PuzzleResponse, UnconfirmedSolution};
+use snarkos_node_messages::{Data, Message, NodeType, UnconfirmedSolution};
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, Reading, Writing},
@@ -29,7 +29,7 @@ use snarkvm::prelude::{Block, CoinbasePuzzle, ConsensusStorage, EpochChallenge, 
 use anyhow::Result;
 use colored::Colorize;
 use core::{marker::PhantomData, time::Duration};
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use rand::{rngs::OsRng, CryptoRng, Rng};
 use std::{
     net::SocketAddr,
@@ -50,7 +50,7 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     /// The coinbase puzzle.
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The latest epoch challenge.
-    latest_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
+    latest_epoch_challenge: Arc<RwLock<Option<Arc<EpochChallenge<N>>>>>,
     /// The latest block header.
     latest_block_header: Arc<RwLock<Option<Header<N>>>>,
     /// The number of puzzle instances.
@@ -58,7 +58,7 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     /// The maximum number of puzzle instances.
     max_puzzle_instances: u8,
     /// The spawned handles.
-    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
     /// PhantomData.
@@ -124,7 +124,7 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
 
         // Abort the tasks.
         trace!("Shutting down the prover...");
-        self.handles.read().iter().for_each(|handle| handle.abort());
+        self.handles.lock().iter().for_each(|handle| handle.abort());
 
         // Shut down the router.
         self.router.shut_down().await;
@@ -138,7 +138,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     async fn initialize_coinbase_puzzle(&self) {
         for _ in 0..self.max_puzzle_instances {
             let prover = self.clone();
-            self.handles.write().push(tokio::spawn(async move {
+            self.handles.lock().push(tokio::spawn(async move {
                 prover.coinbase_puzzle_loop().await;
             }));
         }
@@ -175,7 +175,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 // Execute the coinbase puzzle.
                 let prover = self.clone();
                 let result = tokio::task::spawn_blocking(move || {
-                    prover.coinbase_puzzle_iteration(challenge, coinbase_target, proof_target, &mut OsRng)
+                    prover.coinbase_puzzle_iteration(&challenge, coinbase_target, proof_target, &mut OsRng)
                 })
                 .await;
 
@@ -201,7 +201,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Performs one iteration of the coinbase puzzle.
     fn coinbase_puzzle_iteration<R: Rng + CryptoRng>(
         &self,
-        epoch_challenge: EpochChallenge<N>,
+        epoch_challenge: &EpochChallenge<N>,
         coinbase_target: u64,
         proof_target: u64,
         rng: &mut R,
@@ -221,7 +221,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         // Compute the prover solution.
         let result = self
             .coinbase_puzzle
-            .prove(&epoch_challenge, self.address(), rng.gen(), Some(proof_target))
+            .prove(epoch_challenge, self.address(), rng.gen(), Some(proof_target))
             .ok()
             .and_then(|solution| solution.to_target().ok().map(|solution_target| (solution_target, solution)));
 
@@ -239,7 +239,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             solution: Data::Object(prover_solution),
         });
         // Propagate the "UnconfirmedSolution" to the connected validators.
-        self.propagate_to_validators(message, vec![]);
+        self.propagate_to_validators(message, &[]);
     }
 
     /// Returns the current number of puzzle instances.

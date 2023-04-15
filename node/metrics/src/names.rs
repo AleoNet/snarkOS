@@ -14,23 +14,14 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_cli::{commands::CLI, helpers::Updater};
+pub const GAUGE_NAMES: [&str; 4] = [blocks::HEIGHT, peers::CONNECTED, peers::CANDIDATE, peers::RESTRICTED];
 
-use clap::Parser;
-use tikv_jemallocator::Jemalloc;
+pub mod blocks {
+    pub const HEIGHT: &str = "snarkos_blocks_height_total";
+}
 
-#[global_allocator]
-static GLOBAL: Jemalloc = Jemalloc;
-
-fn main() -> anyhow::Result<()> {
-    // Parse the given arguments.
-    let cli = CLI::parse();
-    // Run the updater.
-    println!("{}", Updater::print_cli());
-    // Run the CLI.
-    match cli.command.parse() {
-        Ok(output) => println!("{output}\n"),
-        Err(error) => println!("⚠️  {error}\n"),
-    }
-    Ok(())
+pub mod peers {
+    pub const CONNECTED: &str = "snarkos_peers_connected_total";
+    pub const CANDIDATE: &str = "snarkos_peers_candidate_total";
+    pub const RESTRICTED: &str = "snarkos_peers_restricted_total";
 }

@@ -37,6 +37,7 @@ use snarkvm::{
 
 use anyhow::Result;
 use http::header::HeaderName;
+use parking_lot::Mutex;
 use serde::{Deserialize, Serialize};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::task::JoinHandle;
@@ -52,7 +53,7 @@ pub struct Rest<N: Network, C: ConsensusStorage<N>, R: Routing<N>> {
     /// The node (routing).
     routing: Arc<R>,
     /// The server handles.
-    handles: Vec<Arc<JoinHandle<()>>>,
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
@@ -64,7 +65,7 @@ impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> 
         routing: Arc<R>,
     ) -> Result<Self> {
         // Initialize the server.
-        let mut server = Self { consensus, ledger, routing, handles: vec![] };
+        let mut server = Self { consensus, ledger, routing, handles: Default::default() };
         // Spawn the server.
         server.spawn_server(rest_ip);
         // Return the server.
@@ -79,7 +80,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     }
 
     /// Returns the handles.
-    pub const fn handles(&self) -> &Vec<Arc<JoinHandle<()>>> {
+    pub const fn handles(&self) -> &Arc<Mutex<Vec<JoinHandle<()>>>> {
         &self.handles
     }
 }
@@ -102,9 +103,9 @@ impl<N: Network, C: 'static + ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> 
         });
 
         // Spawn the server.
-        self.handles.push(Arc::new(tokio::spawn(async move {
+        self.handles.lock().push(tokio::spawn(async move {
             // Start the server.
             warp::serve(routes.with(cors).with(custom_log)).run(rest_ip).await
-        })))
+        }))
     }
 }

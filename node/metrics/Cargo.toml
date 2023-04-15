@@ -1,8 +1,8 @@
 [package]
-name = "snarkos-account"
+name = "snarkos-node-metrics"
 version = "2.0.2"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
-description = "Account for a decentralized operating system"
+description = "A node for a decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
@@ -16,16 +16,12 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
-[dependencies.anyhow]
-version = "1"
+[dependencies.metrics]
+version = "0.20"
 
-[dependencies.colored]
-version = "2"
+[dependencies.metrics-exporter-prometheus]
+version = "0.11"
 
-[dependencies.rand]
-version = "0.8"
-default-features = false
-
-[dependencies.snarkvm]
-workspace = true
-features = [ "console" ]
+[dependencies.tokio]
+version = "1.23"
+features = ["rt"]

@@ -44,3 +44,9 @@ impl<N: Network> MessageTrait for Ping<N> {
         Ok(Self { version, node_type, block_locators })
     }
 }
+
+impl<N: Network> Ping<N> {
+    pub fn new(node_type: NodeType, block_locators: Option<BlockLocators<N>>) -> Self {
+        Self { version: <Message<N>>::VERSION, node_type, block_locators }
+    }
+}

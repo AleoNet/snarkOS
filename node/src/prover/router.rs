@@ -50,11 +50,7 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Prover<N, C> {
         let (peer_ip, mut framed) = self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
 
         // Send the first `Ping` message to the peer.
-        let message = Message::Ping(Ping::<N> {
-            version: Message::<N>::VERSION,
-            node_type: self.node_type(),
-            block_locators: None,
-        });
+        let message = Message::Ping(Ping::new(self.node_type(), None));
         trace!("Sending '{}' to '{peer_ip}'", message.name());
         framed.send(message).await?;
 
@@ -159,9 +155,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
     }
 
     /// Saves the latest epoch challenge and latest block header in the node.
-    fn puzzle_response(&self, peer_ip: SocketAddr, serialized: PuzzleResponse<N>, header: Header<N>) -> bool {
+    fn puzzle_response(&self, peer_ip: SocketAddr, epoch_challenge: EpochChallenge<N>, header: Header<N>) -> bool {
         // Retrieve the epoch number.
-        let epoch_number = serialized.epoch_challenge.epoch_number();
+        let epoch_number = epoch_challenge.epoch_number();
         // Retrieve the block height.
         let block_height = header.height();
 
@@ -172,7 +168,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
         );
 
         // Save the latest epoch challenge in the node.
-        self.latest_epoch_challenge.write().replace(serialized.epoch_challenge);
+        self.latest_epoch_challenge.write().replace(Arc::new(epoch_challenge));
         // Save the latest block header in the node.
         self.latest_block_header.write().replace(header);
 
@@ -205,7 +201,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
                 Ok(Ok(true)) => {
                     let message = Message::UnconfirmedSolution(serialized);
                     // Propagate the "UnconfirmedSolution" to the connected validators.
-                    self.propagate_to_validators(message, vec![peer_ip]);
+                    self.propagate_to_validators(message, &[peer_ip]);
                 }
                 Ok(Ok(false)) | Ok(Err(_)) => {
                     trace!("Invalid prover solution '{}' for the proof target.", solution.commitment())
