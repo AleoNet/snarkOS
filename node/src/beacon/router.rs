@@ -28,7 +28,7 @@ use snarkos_node_messages::{
 };
 use snarkos_node_router::Routing;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{error, Header};
+use snarkvm::prelude::{error, EpochChallenge, Header};
 
 use futures_util::sink::SinkExt;
 use std::{io, net::SocketAddr};
@@ -61,8 +61,7 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Beacon<N, C> {
         };
 
         // Send the first `Ping` message to the peer.
-        let message =
-            Message::Ping(Ping::<N> { version: Message::<N>::VERSION, node_type: self.node_type(), block_locators });
+        let message = Message::Ping(Ping::new(self.node_type(), block_locators));
         trace!("Sending '{}' to '{peer_ip}'", message.name());
         framed.send(message).await?;
 
@@ -222,7 +221,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
     }
 
     /// Disconnects on receipt of a `PuzzleResponse` message.
-    fn puzzle_response(&self, peer_ip: SocketAddr, _serialized: PuzzleResponse<N>, _header: Header<N>) -> bool {
+    fn puzzle_response(&self, peer_ip: SocketAddr, _epoch_challenge: EpochChallenge<N>, _header: Header<N>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }
@@ -241,7 +240,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
         }
         let message = Message::UnconfirmedSolution(serialized);
         // Propagate the "UnconfirmedSolution" to the connected beacons.
-        self.propagate_to_beacons(message, vec![peer_ip]);
+        self.propagate_to_beacons(message, &[peer_ip]);
         true
     }
 
@@ -259,7 +258,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
         }
         let message = Message::UnconfirmedTransaction(serialized);
         // Propagate the "UnconfirmedTransaction" to the connected beacons.
-        self.propagate_to_beacons(message, vec![peer_ip]);
+        self.propagate_to_beacons(message, &[peer_ip]);
         true
     }
 }

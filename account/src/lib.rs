@@ -16,7 +16,10 @@
 
 #![forbid(unsafe_code)]
 
-use snarkvm::{console::types::Field, prelude::*};
+use snarkvm::{
+    console::{network::prelude::*, types::Field},
+    prelude::*,
+};
 
 use anyhow::Error;
 use colored::*;

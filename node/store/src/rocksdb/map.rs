@@ -44,7 +44,7 @@ impl<
     ///
     fn insert(&self, key: K, value: V) -> Result<()> {
         // Determine if an atomic batch is in progress.
-        let is_batch = self.batch_in_progress.load(Ordering::SeqCst);
+        let is_batch = self.batch_in_progress.load(Ordering::Acquire);
 
         match is_batch {
             // If a batch is in progress, add the key-value pair to the batch.
@@ -68,7 +68,7 @@ impl<
     ///
     fn remove(&self, key: &K) -> Result<()> {
         // Determine if an atomic batch is in progress.
-        let is_batch = self.batch_in_progress.load(Ordering::SeqCst);
+        let is_batch = self.batch_in_progress.load(Ordering::Acquire);
 
         match is_batch {
             // If a batch is in progress, add the key to the batch.
@@ -92,7 +92,7 @@ impl<
     ///
     fn start_atomic(&self) {
         // Set the atomic batch flag to `true`.
-        self.batch_in_progress.store(true, Ordering::SeqCst);
+        self.batch_in_progress.store(true, Ordering::Relaxed);
         // Ensure that the atomic batch is empty.
         assert!(self.atomic_batch.lock().is_empty());
     }
@@ -103,7 +103,7 @@ impl<
     /// if they are already part of a larger one.
     ///
     fn is_atomic_in_progress(&self) -> bool {
-        self.batch_in_progress.load(Ordering::SeqCst)
+        self.batch_in_progress.load(Ordering::Acquire)
     }
 
     ///
@@ -113,7 +113,7 @@ impl<
         // Clear the atomic batch.
         *self.atomic_batch.lock() = Default::default();
         // Set the atomic batch flag to `false`.
-        self.batch_in_progress.store(false, Ordering::SeqCst);
+        self.batch_in_progress.store(false, Ordering::Release);
     }
 
     ///
@@ -146,7 +146,7 @@ impl<
         }
 
         // Set the atomic batch flag to `false`.
-        self.batch_in_progress.store(false, Ordering::SeqCst);
+        self.batch_in_progress.store(false, Ordering::Release);
 
         Ok(())
     }
@@ -201,7 +201,7 @@ impl<
         K: Borrow<Q>,
         Q: PartialEq + Eq + Hash + Serialize + ?Sized,
     {
-        if self.batch_in_progress.load(Ordering::SeqCst) { self.atomic_batch.lock().get(key).cloned() } else { None }
+        if self.batch_in_progress.load(Ordering::Acquire) { self.atomic_batch.lock().get(key).cloned() } else { None }
     }
 
     ///

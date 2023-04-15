@@ -54,7 +54,7 @@ use ::time::OffsetDateTime;
 use aleo_std::prelude::{finish, lap, timer};
 use anyhow::{bail, Result};
 use core::{str::FromStr, time::Duration};
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use std::{
     net::SocketAddr,
     sync::{
@@ -76,13 +76,13 @@ pub struct Beacon<N: Network, C: ConsensusStorage<N>> {
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
-    rest: Option<Arc<Rest<N, C, Self>>>,
+    rest: Option<Rest<N, C, Self>>,
     /// The time it to generate a block.
     block_generation_time: Arc<AtomicU64>,
     /// The unspent records.
     unspent_records: Arc<RwLock<RecordMap<N>>>,
     /// The spawned handles.
-    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
 }
@@ -151,7 +151,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?));
+            node.rest = Some(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?);
             lap!(timer, "Initialize REST server");
         }
         // Initialize the routing.
@@ -173,7 +173,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     }
 
     /// Returns the REST server.
-    pub fn rest(&self) -> &Option<Arc<Rest<N, C, Self>>> {
+    pub fn rest(&self) -> &Option<Rest<N, C, Self>> {
         &self.rest
     }
 }
@@ -186,11 +186,11 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Beacon<N, C> {
 
         // Shut down block production.
         trace!("Shutting down block production...");
-        self.shutdown.store(true, Ordering::SeqCst);
+        self.shutdown.store(true, Ordering::Relaxed);
 
         // Abort the tasks.
         trace!("Shutting down the beacon...");
-        self.handles.read().iter().for_each(|handle| handle.abort());
+        self.handles.lock().iter().for_each(|handle| handle.abort());
 
         // Shut down the router.
         self.router.shut_down().await;
@@ -221,7 +221,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     /// Initialize a new instance of block production.
     async fn initialize_block_production(&self) {
         let beacon = self.clone();
-        self.handles.write().push(tokio::spawn(async move {
+        self.handles.lock().push(tokio::spawn(async move {
             // Expected time per block.
             const ROUND_TIME: u64 = 15; // 15 seconds per block
 
@@ -234,7 +234,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
 
                 // Do not produce a block if the elapsed time has not exceeded `ROUND_TIME - block_generation_time`.
                 // This will ensure a block is produced at intervals of approximately `ROUND_TIME`.
-                let time_to_wait = ROUND_TIME.saturating_sub(beacon.block_generation_time.load(Ordering::SeqCst));
+                let time_to_wait = ROUND_TIME.saturating_sub(beacon.block_generation_time.load(Ordering::Acquire));
                 trace!("Waiting for {time_to_wait} seconds before producing a block...");
                 if elapsed_time < time_to_wait {
                     if let Err(error) = timeout(
@@ -252,7 +252,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 // Produce the next block and propagate it to all peers.
                 match beacon.produce_next_block().await {
                     // Update the block generation time.
-                    Ok(()) => beacon.block_generation_time.store(timer.elapsed().as_secs(), Ordering::SeqCst),
+                    Ok(()) => beacon.block_generation_time.store(timer.elapsed().as_secs(), Ordering::Release),
                     Err(error) => error!("{error}"),
                 }
 
@@ -467,7 +467,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         ));
 
         // Propagate the block to all beacons.
-        self.propagate_to_beacons(message, vec![]);
+        self.propagate_to_beacons(message, &[]);
 
         Ok(())
     }
