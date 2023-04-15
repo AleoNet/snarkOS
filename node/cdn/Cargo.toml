@@ -38,6 +38,9 @@ version = "0.3"
 [dependencies.parking_lot]
 version = "0.12"
 
+[dependencies.rayon]
+version = "1"
+
 [dependencies.reqwest]
 version = "0.11"
 
