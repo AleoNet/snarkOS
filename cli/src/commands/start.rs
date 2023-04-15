@@ -40,52 +40,53 @@ const RECOMMENDED_MIN_NOFILES_LIMIT_VALIDATOR: u64 = 1024;
 /// Starts the snarkOS node.
 #[derive(Clone, Debug, Parser)]
 pub struct Start {
-    /// Specify the network of this node [default: 3].
+    /// Specify the network of this node
     #[clap(default_value = "3", long = "network")]
     pub network: u16,
-    /// Enables development mode, specify a unique ID for this node.
-    #[clap(long)]
-    pub dev: Option<u16>,
 
-    /// Specify this as a beacon, with the given account private key for this node as an argument
+    /// Specify this node as a beacon, with the account private key as an argument
     #[clap(long = "beacon")]
     pub beacon: Option<String>,
-    /// Specify this as a validator, with the given account private key for this node as an
-    /// argument
+    /// Specify this node as a validator, with the account private key as an argument
     #[clap(long = "validator")]
     pub validator: Option<String>,
-    /// Specify this as a prover, with the given account private key for this node as an argument
+    /// Specify this node as a prover, with the account private key as an argument
     #[clap(long = "prover")]
     pub prover: Option<String>,
-    /// Specify this as a client, with an optional account private key for this node as an argument
+    /// Specify this node as a client, with an optional account private key as an argument
     #[clap(long = "client")]
     pub client: Option<String>,
 
-    /// Specify the IP address and port of a peer to connect to.
-    #[clap(default_value = "", long = "connect")]
-    pub connect: String,
-    /// Specify the IP address and port for the node server.
+    /// Specify the IP address and port for the node server
     #[clap(default_value = "0.0.0.0:4133", long = "node")]
     pub node: SocketAddr,
-    /// Specify the IP address and port for the REST server.
+    /// Specify the IP address and port of a peer to connect to
+    #[clap(default_value = "", long = "connect")]
+    pub connect: String,
+    
+    /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3033", long = "rest")]
     pub rest: SocketAddr,
-    /// If the flag is set, the node will not initialize the REST server.
+    /// If the flag is set, the node will not initialize the REST server
     #[clap(long)]
     pub norest: bool,
 
+    /// If the flag is set, the node will not render the display
+    #[clap(long)]
+    pub nodisplay: bool,
     /// Specify the verbosity of the node [options: 0, 1, 2, 3, 4]
     #[clap(default_value = "2", long = "verbosity")]
     pub verbosity: u8,
-    /// If the flag is set, the node will not render the display.
-    #[clap(long)]
-    pub nodisplay: bool,
-    /// Enables the node to prefetch initial blocks from a CDN.
-    #[clap(default_value = "https://testnet3.blocks.aleo.org/phase2", long = "cdn")]
-    pub cdn: String,
-    /// Specify the path to the file where logs will be stored.
+    /// Specify the path to the file where logs will be stored
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
     pub logfile: PathBuf,
+    
+    /// Enables the node to prefetch initial blocks from a CDN
+    #[clap(default_value = "https://testnet3.blocks.aleo.org/phase2", long = "cdn")]
+    pub cdn: String,
+    /// Enables development mode, specify a unique ID for this node
+    #[clap(long)]
+    pub dev: Option<u16>,
 }
 
 impl Start {
