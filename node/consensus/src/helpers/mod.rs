@@ -209,8 +209,6 @@ mod tests {
     use super::*;
     use snarkvm::{console::network::Testnet3, prelude::TestRng};
 
-    use rand::Rng;
-
     type CurrentNetwork = Testnet3;
 
     const ITERATIONS: usize = 1000;

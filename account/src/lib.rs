@@ -18,6 +18,7 @@
 
 use snarkvm::{console::types::Field, prelude::*};
 
+use anyhow::Error;
 use colored::*;
 use core::fmt;
 

@@ -114,8 +114,7 @@ impl Transfer {
             Transaction::execute(
                 &vm,
                 &private_key,
-                ProgramID::from_str("credits.aleo")?,
-                Identifier::from_str("transfer")?,
+                (ProgramID::from_str("credits.aleo")?, Identifier::from_str("transfer")?),
                 inputs.iter(),
                 fee,
                 Some(query),

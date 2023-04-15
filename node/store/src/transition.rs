@@ -41,8 +41,6 @@ pub struct TransitionDB<N: Network> {
     tcm_map: DataMap<N::TransitionID, Field<N>>,
     /// The reverse `tcm` map.
     reverse_tcm_map: DataMap<Field<N>, N::TransitionID>,
-    /// The transition fees.
-    fee_map: DataMap<N::TransitionID, i64>,
 }
 
 #[rustfmt::skip]
@@ -56,7 +54,6 @@ impl<N: Network> TransitionStorage<N> for TransitionDB<N> {
     type ReverseTPKMap = DataMap<Group<N>, N::TransitionID>;
     type TCMMap = DataMap<N::TransitionID, Field<N>>;
     type ReverseTCMMap = DataMap<Field<N>, N::TransitionID>;
-    type FeeMap = DataMap<N::TransitionID, i64>;
 
     /// Initializes the transition storage.
     fn open(dev: Option<u16>) -> Result<Self> {
@@ -70,7 +67,6 @@ impl<N: Network> TransitionStorage<N> for TransitionDB<N> {
             reverse_tpk_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionReverseTPKMap)?,
             tcm_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionTCMMap)?,
             reverse_tcm_map: rocksdb::RocksDB::open_map(N::ID, dev,  DataID::TransitionReverseTCMMap)?,
-            fee_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::TransitionFeeMap)?,
         })
     }
 
@@ -117,11 +113,6 @@ impl<N: Network> TransitionStorage<N> for TransitionDB<N> {
     /// Returns the reverse `tcm` map.
     fn reverse_tcm_map(&self) -> &Self::ReverseTCMMap {
         &self.reverse_tcm_map
-    }
-
-    /// Returns the transition fees.
-    fn fee_map(&self) -> &Self::FeeMap {
-        &self.fee_map
     }
 }
 

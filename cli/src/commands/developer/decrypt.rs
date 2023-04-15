@@ -64,7 +64,6 @@ mod tests {
     use indexmap::IndexMap;
     use snarkvm::prelude::{
         Address,
-        Balance,
         Entry,
         Field,
         Identifier,
@@ -77,7 +76,6 @@ mod tests {
         TestRng,
         Uniform,
         ViewKey,
-        U64,
     };
 
     const ITERATIONS: usize = 1000;
@@ -85,14 +83,12 @@ mod tests {
     fn construct_ciphertext<N: Network>(
         view_key: ViewKey<N>,
         owner: Owner<N, Plaintext<N>>,
-        gates: Balance<N, Plaintext<N>>,
         rng: &mut TestRng,
     ) -> Result<Record<N, Ciphertext<N>>> {
         // Prepare the record.
         let randomizer = Scalar::rand(rng);
         let record = Record::<N, Plaintext<N>>::from_plaintext(
             owner,
-            gates,
             IndexMap::from_iter(
                 vec![
                     (Identifier::from_str("a")?, Entry::Private(Plaintext::from(Literal::Field(Field::rand(rng))))),
@@ -121,8 +117,7 @@ mod tests {
 
             // Construct the ciphertext.
             let owner = Owner::Private(Plaintext::from(Literal::Address(address)));
-            let gates = Balance::Private(Plaintext::from(Literal::U64(U64::new(u64::rand(&mut rng) >> 12))));
-            let ciphertext = construct_ciphertext(view_key, owner, gates, &mut rng).unwrap();
+            let ciphertext = construct_ciphertext(view_key, owner, &mut rng).unwrap();
 
             // Decrypt the ciphertext.
             let expected_plaintext = ciphertext.decrypt(&view_key).unwrap();
@@ -150,8 +145,7 @@ mod tests {
 
             // Construct the ciphertext.
             let owner = Owner::Private(Plaintext::from(Literal::Address(address)));
-            let gates = Balance::Private(Plaintext::from(Literal::U64(U64::new(u64::rand(&mut rng) >> 12))));
-            let ciphertext = construct_ciphertext::<CurrentNetwork>(view_key, owner, gates, &mut rng).unwrap();
+            let ciphertext = construct_ciphertext::<CurrentNetwork>(view_key, owner, &mut rng).unwrap();
 
             // Enforce that the decryption fails.
             let decrypt = Decrypt { ciphertext: ciphertext.to_string(), view_key: incorrect_view_key.to_string() };

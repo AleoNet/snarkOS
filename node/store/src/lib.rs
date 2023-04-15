@@ -91,7 +91,6 @@ pub enum DataID {
     TransitionReverseTPKMap,
     TransitionTCMMap,
     TransitionReverseTCMMap,
-    TransitionFeeMap,
     // Program
     ProgramIDMap,
     MappingIDMap,

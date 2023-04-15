@@ -38,8 +38,11 @@ use snarkos_node_tcp::{
 use snarkvm::prelude::{
     Block,
     ConsensusStorage,
+    Entry,
     Identifier,
+    Literal,
     Network,
+    Plaintext,
     ProgramID,
     ProverSolution,
     Transaction,
@@ -47,6 +50,7 @@ use snarkvm::prelude::{
     Zero,
 };
 
+use ::time::OffsetDateTime;
 use aleo_std::prelude::{finish, lap, timer};
 use anyhow::{bail, Result};
 use core::{str::FromStr, time::Duration};
@@ -58,7 +62,6 @@ use std::{
         Arc,
     },
 };
-use time::OffsetDateTime;
 use tokio::{task::JoinHandle, time::timeout};
 
 /// A beacon is a full node, capable of producing blocks.
@@ -285,7 +288,10 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 let (inputs, function_name) = match beacon.is_dev() {
                     true => {
                         // Prepare the inputs for a split.
-                        let amount = ***record.gates() / 2;
+                        let amount = match record.data().get(&Identifier::from_str("microcredits")?) {
+                            Some(Entry::Public(Plaintext::Literal(Literal::<N>::U64(amount), _))) => **amount / 2,
+                            _ => 1u64,
+                        };
                         let inputs = vec![Value::Record(record.clone()), Value::from_str(&format!("{amount}u64"))?];
 
                         (inputs, Identifier::from_str("split")?)
@@ -307,8 +313,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 let transaction = Transaction::execute(
                     beacon.ledger.vm(),
                     beacon.account.private_key(),
-                    ProgramID::from_str("credits.aleo")?,
-                    function_name,
+                    (ProgramID::from_str("credits.aleo")?, function_name),
                     inputs.iter(),
                     None,
                     None,
@@ -365,8 +370,13 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                         if let Err(error) = transaction.into_transitions().try_for_each(|transition| {
                             for (commitment, record) in transition.into_records() {
                                 let record = record.decrypt(beacon.account.view_key())?;
-                                if !record.gates().is_zero() {
-                                    beacon.unspent_records.write().insert(commitment, record);
+
+                                if let Some(Entry::Public(Plaintext::Literal(Literal::U64(amount), _))) =
+                                    record.data().get(&Identifier::from_str("microcredits")?)
+                                {
+                                    if !amount.is_zero() {
+                                        beacon.unspent_records.write().insert(commitment, record);
+                                    }
                                 }
                             }
                             Ok::<_, anyhow::Error>(())
