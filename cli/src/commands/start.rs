@@ -50,7 +50,7 @@ pub struct Start {
     /// Specify this node to run as a beacon.
     #[clap(long = "beacon", conflicts_with_all = &["client", "prover", "validator"])]
     pub beacon: bool,
-    /// Specify this node to run as a validator
+    /// Specify this node to run as a validator.
     #[clap(long = "validator", conflicts_with_all = &["beacon", "client", "prover"])]
     pub validator: bool,
     /// Specify this node to run as a prover
