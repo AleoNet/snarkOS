@@ -40,7 +40,7 @@ const RECOMMENDED_MIN_NOFILES_LIMIT_VALIDATOR: u64 = 1024;
 /// Starts the snarkOS node.
 #[derive(Clone, Debug, Parser)]
 pub struct Start {
-    /// The network this node should operate on [default: 3]
+    /// Specify the network ID of this node.
     #[clap(default_value = "3", long = "network", value_name = "NETWORK_ID")]
     pub network: u16,
     /// Enables development mode, specify a unique ID for this node
