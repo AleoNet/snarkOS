@@ -291,10 +291,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             next_timestamp,
             N::ANCHOR_TIME,
             N::NUM_BLOCKS_PER_EPOCH,
+            N::GENESIS_COINBASE_TARGET,
         )?;
 
         // Construct the next proof target.
-        let next_proof_target = proof_target(next_coinbase_target);
+        let next_proof_target = proof_target(next_coinbase_target, N::GENESIS_PROOF_TARGET);
 
         // Construct the next last coinbase target and next last coinbase timestamp.
         let (next_last_coinbase_target, next_last_coinbase_timestamp) = match coinbase {
@@ -532,6 +533,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             block.timestamp(),
             N::ANCHOR_TIME,
             N::NUM_BLOCKS_PER_EPOCH,
+            N::GENESIS_COINBASE_TARGET,
         )?;
 
         if block.coinbase_target() != expected_coinbase_target {
@@ -539,7 +541,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         // Ensure the proof target is correct.
-        let expected_proof_target = proof_target(expected_coinbase_target);
+        let expected_proof_target = proof_target(expected_coinbase_target, N::GENESIS_PROOF_TARGET);
         if block.proof_target() != expected_proof_target {
             bail!("Invalid proof target: expected {}, got {}", expected_proof_target, block.proof_target())
         }

@@ -91,6 +91,7 @@ pub fn coinbase_target(
     block_timestamp: i64,
     anchor_time: u16,
     num_blocks_per_epoch: u32,
+    genesis_coinbase_target: u64,
 ) -> Result<u64> {
     // Compute the half life.
     let half_life = num_blocks_per_epoch.saturating_div(2).saturating_mul(anchor_time as u32);
@@ -98,13 +99,13 @@ pub fn coinbase_target(
     // Compute the new coinbase target.
     let candidate_target =
         retarget(previous_coinbase_target, previous_block_timestamp, block_timestamp, half_life, true, anchor_time)?;
-    // Return the new coinbase target, floored at 2^10 - 1.
-    Ok(core::cmp::max((1u64 << 10).saturating_sub(1), candidate_target))
+    // Return the new coinbase target, floored at `genesis_coinbase_target`.
+    Ok(core::cmp::max(genesis_coinbase_target, candidate_target))
 }
 
 /// Calculate the minimum proof target for the given coinbase target.
-pub fn proof_target(coinbase_target: u64) -> u64 {
-    coinbase_target.checked_shr(7).unwrap_or(7).saturating_add(1)
+pub fn proof_target(coinbase_target: u64, genesis_proof_target: u64) -> u64 {
+    coinbase_target.checked_shr(7).map(|target| target.saturating_add(1)).unwrap_or(genesis_proof_target)
 }
 
 /// Retarget algorithm using fixed point arithmetic from https://www.reference.cash/protocol/forks/2020-11-15-asert.
@@ -381,7 +382,7 @@ mod tests {
 
         fn test_new_targets(rng: &mut TestRng, minimum_coinbase_target: u64) {
             let previous_coinbase_target: u64 = rng.gen_range(minimum_coinbase_target..u64::MAX);
-            let previous_prover_target = proof_target(previous_coinbase_target);
+            let previous_prover_target = proof_target(previous_coinbase_target, CurrentNetwork::GENESIS_PROOF_TARGET);
 
             let previous_timestamp = rng.gen();
 
@@ -393,9 +394,10 @@ mod tests {
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                CurrentNetwork::GENESIS_COINBASE_TARGET,
             )
             .unwrap();
-            let new_prover_target = proof_target(new_coinbase_target);
+            let new_prover_target = proof_target(new_coinbase_target, CurrentNetwork::GENESIS_PROOF_TARGET);
             assert_eq!(new_coinbase_target, previous_coinbase_target);
             assert_eq!(new_prover_target, previous_prover_target);
 
@@ -407,9 +409,10 @@ mod tests {
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                CurrentNetwork::GENESIS_COINBASE_TARGET,
             )
             .unwrap();
-            let new_prover_target = proof_target(new_coinbase_target);
+            let new_prover_target = proof_target(new_coinbase_target, CurrentNetwork::GENESIS_PROOF_TARGET);
             assert!(new_coinbase_target < previous_coinbase_target);
             assert!(new_prover_target < previous_prover_target);
 
@@ -421,9 +424,10 @@ mod tests {
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                CurrentNetwork::GENESIS_COINBASE_TARGET,
             )
             .unwrap();
-            let new_prover_target = proof_target(new_coinbase_target);
+            let new_prover_target = proof_target(new_coinbase_target, CurrentNetwork::GENESIS_PROOF_TARGET);
 
             assert!(new_coinbase_target > previous_coinbase_target);
             assert!(new_prover_target > previous_prover_target);
@@ -456,6 +460,7 @@ mod tests {
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                CurrentNetwork::GENESIS_COINBASE_TARGET,
             )
             .unwrap();
 
@@ -469,6 +474,7 @@ mod tests {
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                CurrentNetwork::GENESIS_COINBASE_TARGET,
             )
             .unwrap();
 
@@ -482,6 +488,7 @@ mod tests {
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                CurrentNetwork::GENESIS_COINBASE_TARGET,
             )
             .unwrap();
 
@@ -515,6 +522,7 @@ mod tests {
                 new_timestamp,
                 CurrentNetwork::ANCHOR_TIME,
                 CurrentNetwork::NUM_BLOCKS_PER_EPOCH,
+                CurrentNetwork::GENESIS_COINBASE_TARGET,
             )
             .unwrap();
 
