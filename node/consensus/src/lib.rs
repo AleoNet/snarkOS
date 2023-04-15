@@ -734,7 +734,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         /* Program */
 
         // Ensure that the ledger does not already contain the given program ID.
-        if let Transaction::Deploy(_, deployment, _) = &transaction {
+        if let Transaction::Deploy(_, _, deployment, _) = &transaction {
             let program_id = deployment.program_id();
             if self.ledger.contains_program_id(program_id)? {
                 bail!("Program ID '{program_id}' already exists in the ledger")

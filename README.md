@@ -153,27 +153,29 @@ SUBCOMMANDS:
 
 The following are the options for the `snarkos start` command:
 ```
-snarkos-start 
-Starts the snarkOS node
-
 USAGE:
     snarkos start [OPTIONS]
 
 OPTIONS:
-        --beacon <BEACON>          Specify this as a beacon, with the given account private key for this node
-        --client <CLIENT>          Specify this as a client, with an optional account private key for this node
-        --connect <CONNECT>        Specify the IP address and port of a peer to connect to [default: ]
-        --dev <DEV>                Enables development mode, specify a unique ID for this node
-    -h, --help                     Print help information
-        --logfile <LOGFILE>        Specify the path to the file where logs will be stored [default: /tmp/snarkos.log]
-        --network <NETWORK>        Specify the network of this node [default: 3]
-        --node <NODE>              Specify the IP address and port for the node server [default: 0.0.0.0:4133]
-        --nodisplay                If the flag is set, the node will not render the display
-        --norest                   If the flag is set, the node will not initialize the REST server
-        --prover <PROVER>          Specify this as a prover, with the given account private key for this node
-        --rest <REST>              Specify the IP address and port for the REST server [default: 0.0.0.0:3033]
-        --validator <VALIDATOR>    Specify this as a validator, with the given account private key for this node
-        --verbosity <VERBOSITY>    Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
+        --network <NETWORK_ID>           Specify the network ID of this node [default: 3]
+        
+        --beacon <PRIVATE_KEY>           Specify this node as a beacon, with the account private key as an argument
+        --validator <PRIVATE KEY>        Specify this node as a validator, with the account private key as an argument
+        --prover <PRIVATE KEY>           Specify this node as a prover, with the given account private key as an argument
+        --client <PRIVATE_KEY>           Specify this node as a client, with an optional account private key as an argument
+        
+        --node <IP:PORT>                 Specify the IP address and port for the node server [default: 0.0.0.0:4133]
+        --connect <IP:PORT>              Specify the IP address and port of a peer to connect to
+        
+        --rest <REST>                    Specify the IP address and port for the REST server [default: 0.0.0.0:3033]
+        --norest                         If the flag is set, the node will not initialize the REST server
+        
+        --nodisplay                      If the flag is set, the node will not render the display
+        --verbosity <VERBOSITY_LEVEL>    Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
+        --logfile <PATH>                 Specify the path to the file where logs will be stored [default: /tmp/snarkos.log]
+        
+        --dev <NODE_ID>                  Enables development mode, specify a unique ID for this node
+    -h, --help                           Print help information
 ```
 
 ## 6. Development
@@ -196,13 +198,13 @@ This procedure can be repeated to start more nodes.
 
 It is important to initialize the nodes starting from `0` and incrementing by `1` for each new node.
 
-The following is a list of options to initialize a node (replace `XX` with a number starting from `0`):
+The following is a list of options to initialize a node (replace `<NODE_ID>` with a number starting from `0`):
 ```
-cargo run --release -- start --nodisplay --dev XX --beacon ""
-cargo run --release -- start --nodisplay --dev XX --validator ""
-cargo run --release -- start --nodisplay --dev XX --prover ""
-cargo run --release -- start --nodisplay --dev XX --client ""
-cargo run --release -- start --nodisplay --dev XX
+cargo run --release -- start --nodisplay --dev <NODE_ID> --beacon ""
+cargo run --release -- start --nodisplay --dev <NODE_ID> --validator ""
+cargo run --release -- start --nodisplay --dev <NODE_ID> --prover ""
+cargo run --release -- start --nodisplay --dev <NODE_ID> --client ""
+cargo run --release -- start --nodisplay --dev <NODE_ID>
 ```
 
 When no node type is specified, the node will default to `--client`.
@@ -211,7 +213,7 @@ When no node type is specified, the node will default to `--client`.
 
 To clean up the node storage, run:
 ```
-cargo run --release -- clean --dev XX
+cargo run --release -- clean --dev <NODE_ID>
 ```
 
 ## 7. License

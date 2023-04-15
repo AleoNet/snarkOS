@@ -16,7 +16,10 @@
 
 use crate::{
     rocksdb::{self, DataMap, Database},
-    DataID,
+    DeploymentMap,
+    ExecutionMap,
+    MapID,
+    TransactionMap,
     TransitionDB,
 };
 use snarkvm::prelude::*;
@@ -46,7 +49,7 @@ impl<N: Network> TransactionStorage<N> for TransactionDB<N> {
         // Initialize the execution store.
         let execution_store = ExecutionStore::<N, ExecutionDB<N>>::open(transition_store)?;
         // Return the transaction storage.
-        Ok(Self { id_map: rocksdb::RocksDB::open_map(N::ID, execution_store.dev(), DataID::TransactionIDMap)?, deployment_store, execution_store })
+        Ok(Self { id_map: rocksdb::RocksDB::open_map(N::ID, execution_store.dev(), MapID::Transaction(TransactionMap::ID))?, deployment_store, execution_store })
     }
 
     /// Returns the ID map.
@@ -75,6 +78,8 @@ pub struct DeploymentDB<N: Network> {
     edition_map: DataMap<ProgramID<N>, u16>,
     /// The reverse ID map.
     reverse_id_map: DataMap<(ProgramID<N>, u16), N::TransactionID>,
+    /// The program owner map.
+    owner_map: DataMap<(ProgramID<N>, u16), ProgramOwner<N>>,
     /// The program map.
     program_map: DataMap<(ProgramID<N>, u16), Program<N>>,
     /// The verifying key map.
@@ -94,6 +99,7 @@ impl<N: Network> DeploymentStorage<N> for DeploymentDB<N> {
     type IDMap = DataMap<N::TransactionID, ProgramID<N>>;
     type EditionMap = DataMap<ProgramID<N>, u16>;
     type ReverseIDMap = DataMap<(ProgramID<N>, u16), N::TransactionID>;
+    type OwnerMap = DataMap<(ProgramID<N>, u16), ProgramOwner<N>>;
     type ProgramMap = DataMap<(ProgramID<N>, u16), Program<N>>;
     type VerifyingKeyMap = DataMap<(ProgramID<N>, Identifier<N>, u16), VerifyingKey<N>>;
     type CertificateMap = DataMap<(ProgramID<N>, Identifier<N>, u16), Certificate<N>>;
@@ -106,14 +112,15 @@ impl<N: Network> DeploymentStorage<N> for DeploymentDB<N> {
         // Retrieve the optional development ID.
         let dev = transition_store.dev();
         Ok(Self {
-            id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentIDMap)?,
-            edition_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentEditionMap)?,
-            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentReverseIDMap)?,
-            program_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentProgramMap)?,
-            verifying_key_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentVerifyingKeyMap)?,
-            certificate_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentCertificateMap)?,
-            fee_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentFeeMap)?,
-            reverse_fee_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::DeploymentReverseFeeMap)?,
+            id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::ID))?,
+            edition_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::Edition))?,
+            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::ReverseID))?,
+            owner_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::Owner))?,
+            program_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::Program))?,
+            verifying_key_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::VerifyingKey))?,
+            certificate_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::Certificate))?,
+            fee_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::Fee))?,
+            reverse_fee_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::ReverseFee))?,
             transition_store,
         })
     }
@@ -131,6 +138,11 @@ impl<N: Network> DeploymentStorage<N> for DeploymentDB<N> {
     /// Returns the reverse ID map.
     fn reverse_id_map(&self) -> &Self::ReverseIDMap {
         &self.reverse_id_map
+    }
+
+    /// Returns the program owner map.
+    fn owner_map(&self) -> &Self::OwnerMap {
+        &self.owner_map
     }
 
     /// Returns the program map.
@@ -193,11 +205,11 @@ impl<N: Network> ExecutionStorage<N> for ExecutionDB<N> {
         // Retrieve the optional development ID.
         let dev = transition_store.dev();
         Ok(Self {
-            id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ExecutionIDMap)?,
-            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ExecutionReverseIDMap)?,
+            id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Execution(ExecutionMap::ID))?,
+            reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Execution(ExecutionMap::ReverseID))?,
             transition_store,
-            inclusion_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ExecutionInclusionMap)?,
-            fee_map: rocksdb::RocksDB::open_map(N::ID, dev, DataID::ExecutionFeeMap)?,
+            inclusion_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Execution(ExecutionMap::Inclusion))?,
+            fee_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Execution(ExecutionMap::Fee))?,
         })
     }
 

@@ -16,7 +16,8 @@
 
 use crate::{
     rocksdb::{DataMap, RocksDB},
-    DataID,
+    MapID,
+    TestMap as TestMapID,
 };
 use snarkvm::{
     console::{network::Testnet3, types::Scalar},
@@ -46,14 +47,15 @@ fn test_open() {
 #[test]
 #[serial]
 fn test_open_map() {
-    let _map =
-        RocksDB::open_map_testing::<u32, String>(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+    let _map = RocksDB::open_map_testing::<u32, String>(temp_dir(), None, MapID::Test(TestMapID::Test))
+        .expect("Failed to open data map");
 }
 
 #[test]
 #[serial]
 fn test_insert_and_contains_key() {
-    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+    let map =
+        RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMapID::Test)).expect("Failed to open data map");
 
     map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
     assert!(map.contains_key(&123456789).expect("Failed to call contains key"));
@@ -63,7 +65,8 @@ fn test_insert_and_contains_key() {
 #[test]
 #[serial]
 fn test_insert_and_get() {
-    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+    let map =
+        RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMapID::Test)).expect("Failed to open data map");
 
     map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
     assert_eq!(Some("123456789".to_string()), map.get(&123456789).expect("Failed to get").map(|v| v.to_string()));
@@ -74,7 +77,8 @@ fn test_insert_and_get() {
 #[test]
 #[serial]
 fn test_insert_and_remove() {
-    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+    let map =
+        RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMapID::Test)).expect("Failed to open data map");
 
     map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
     assert_eq!(map.get(&123456789).expect("Failed to get").map(|v| v.to_string()), Some("123456789".to_string()));
@@ -86,7 +90,8 @@ fn test_insert_and_remove() {
 #[test]
 #[serial]
 fn test_insert_and_iter() {
-    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+    let map =
+        RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMapID::Test)).expect("Failed to open data map");
 
     map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
 
@@ -98,7 +103,8 @@ fn test_insert_and_iter() {
 #[test]
 #[serial]
 fn test_insert_and_keys() {
-    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+    let map =
+        RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMapID::Test)).expect("Failed to open data map");
 
     map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
 
@@ -110,7 +116,8 @@ fn test_insert_and_keys() {
 #[test]
 #[serial]
 fn test_insert_and_values() {
-    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+    let map =
+        RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMapID::Test)).expect("Failed to open data map");
 
     map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
 
@@ -124,11 +131,13 @@ fn test_insert_and_values() {
 fn test_reopen() {
     let directory = temp_dir();
     {
-        let map = RocksDB::open_map_testing(directory.clone(), None, DataID::Test).expect("Failed to open data map");
+        let map = RocksDB::open_map_testing(directory.clone(), None, MapID::Test(TestMapID::Test))
+            .expect("Failed to open data map");
         map.insert(123456789, "123456789".to_string()).expect("Failed to insert");
     }
     {
-        let map: TestMap = RocksDB::open_map_testing(directory, None, DataID::Test).expect("Failed to open data map");
+        let map: TestMap =
+            RocksDB::open_map_testing(directory, None, MapID::Test(TestMapID::Test)).expect("Failed to open data map");
         match map.get(&123456789).expect("Failed to get") {
             Some(Cow::Borrowed(value)) => assert_eq!(value.to_string(), "123456789".to_string()),
             Some(Cow::Owned(value)) => assert_eq!(value, "123456789".to_string()),
@@ -142,7 +151,7 @@ fn test_reopen() {
 // fn test_export_import() {
 //     let file = temp_file();
 //     {
-//         let mut map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+//         let mut map = RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMapID::Test)).expect("Failed to open data map");
 //
 //         for i in 0..100 {
 //             map.insert(i, i.to_string()).expect("Failed to insert");
@@ -154,7 +163,7 @@ fn test_reopen() {
 //     let storage = RocksDB::open_temporary(temp_dir(), None).expect("Failed to open storage");
 //     storage.import(&file).expect("Failed to import storage");
 //
-//     let map = storage.open_map::<u32, String>(DataID::Test).expect("Failed to open data map");
+//     let map = storage.open_map::<u32, String>(MapID::Test(TestMapID::Test)).expect("Failed to open data map");
 //
 //     for i in 0..100 {
 //         assert_eq!(map.get(&i).expect("Failed to get").map(|v| v.to_string()), Some(i.to_string()));
@@ -170,7 +179,8 @@ fn test_scalar_mul() {
 
     const ITERATIONS: u32 = 1_000_000u32;
 
-    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+    let map =
+        RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMapID::Test)).expect("Failed to open data map");
 
     // Sample `ITERATION` random field elements to store.
     for i in 0..ITERATIONS {
@@ -192,7 +202,8 @@ fn test_scalar_mul() {
 #[test]
 #[serial]
 fn test_iterator_ordering() {
-    let map = RocksDB::open_map_testing(temp_dir(), None, DataID::Test).expect("Failed to open data map");
+    let map =
+        RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMapID::Test)).expect("Failed to open data map");
 
     // Insert values into the map.
     map.insert(5, "d".to_string()).expect("Failed to insert");

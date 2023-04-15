@@ -36,9 +36,141 @@ pub use transaction::*;
 mod transition;
 pub use transition::*;
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u16)]
+pub enum MapID {
+    Block(BlockMap),
+    Deployment(DeploymentMap),
+    Execution(ExecutionMap),
+    Transaction(TransactionMap),
+    Transition(TransitionMap),
+    TransitionInput(TransitionInputMap),
+    TransitionOutput(TransitionOutputMap),
+    Program(ProgramMap),
+    #[cfg(test)]
+    Test(TestMap),
+}
+
+impl From<MapID> for u16 {
+    fn from(id: MapID) -> u16 {
+        match id {
+            MapID::Block(id) => id as u16,
+            MapID::Deployment(id) => id as u16,
+            MapID::Execution(id) => id as u16,
+            MapID::Transaction(id) => id as u16,
+            MapID::Transition(id) => id as u16,
+            MapID::TransitionInput(id) => id as u16,
+            MapID::TransitionOutput(id) => id as u16,
+            MapID::Program(id) => id as u16,
+            #[cfg(test)]
+            MapID::Test(id) => id as u16,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u16)]
+pub enum BlockMap {
+    StateRoot = DataID::BlockStateRootMap as u16,
+    ReverseStateRoot = DataID::BlockReverseStateRootMap as u16,
+    ID = DataID::BlockIDMap as u16,
+    ReverseID = DataID::BlockReverseIDMap as u16,
+    Header = DataID::BlockHeaderMap as u16,
+    Transactions = DataID::BlockTransactionsMap as u16,
+    ReverseTransactions = DataID::BlockReverseTransactionsMap as u16,
+    CoinbaseSolution = DataID::BlockCoinbaseSolutionMap as u16,
+    CoinbasePuzzleCommitment = DataID::BlockCoinbasePuzzleCommitmentMap as u16,
+    Signature = DataID::BlockSignatureMap as u16,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u16)]
+pub enum DeploymentMap {
+    ID = DataID::DeploymentIDMap as u16,
+    Edition = DataID::DeploymentEditionMap as u16,
+    ReverseID = DataID::DeploymentReverseIDMap as u16,
+    Owner = DataID::DeploymentOwnerMap as u16,
+    Program = DataID::DeploymentProgramMap as u16,
+    VerifyingKey = DataID::DeploymentVerifyingKeyMap as u16,
+    Certificate = DataID::DeploymentCertificateMap as u16,
+    Fee = DataID::DeploymentFeeMap as u16,
+    ReverseFee = DataID::DeploymentReverseFeeMap as u16,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u16)]
+pub enum ExecutionMap {
+    ID = DataID::ExecutionIDMap as u16,
+    ReverseID = DataID::ExecutionReverseIDMap as u16,
+    Inclusion = DataID::ExecutionInclusionMap as u16,
+    Fee = DataID::ExecutionFeeMap as u16,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u16)]
+pub enum TransitionInputMap {
+    ID = DataID::InputIDMap as u16,
+    ReverseID = DataID::InputReverseIDMap as u16,
+    Constant = DataID::InputConstantMap as u16,
+    Public = DataID::InputPublicMap as u16,
+    Private = DataID::InputPrivateMap as u16,
+    Record = DataID::InputRecordMap as u16,
+    RecordTag = DataID::InputRecordTagMap as u16,
+    ExternalRecord = DataID::InputExternalRecordMap as u16,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u16)]
+pub enum TransitionOutputMap {
+    ID = DataID::OutputIDMap as u16,
+    ReverseID = DataID::OutputReverseIDMap as u16,
+    Constant = DataID::OutputConstantMap as u16,
+    Public = DataID::OutputPublicMap as u16,
+    Private = DataID::OutputPrivateMap as u16,
+    Record = DataID::OutputRecordMap as u16,
+    RecordNonce = DataID::OutputRecordNonceMap as u16,
+    ExternalRecord = DataID::OutputExternalRecordMap as u16,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u16)]
+pub enum TransactionMap {
+    ID = DataID::TransactionIDMap as u16,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u16)]
+pub enum TransitionMap {
+    Locator = DataID::TransitionLocatorMap as u16,
+    Finalize = DataID::TransitionFinalizeMap as u16,
+    Proof = DataID::TransitionProofMap as u16,
+    TPK = DataID::TransitionTPKMap as u16,
+    ReverseTPK = DataID::TransitionReverseTPKMap as u16,
+    TCM = DataID::TransitionTCMMap as u16,
+    ReverseTCM = DataID::TransitionReverseTCMMap as u16,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u16)]
+pub enum ProgramMap {
+    ProgramID = DataID::ProgramIDMap as u16,
+    ProgramIndex = DataID::ProgramIndexMap as u16,
+    MappingID = DataID::MappingIDMap as u16,
+    KeyValueID = DataID::KeyValueIDMap as u16,
+    Key = DataID::KeyMap as u16,
+    Value = DataID::ValueMap as u16,
+}
+
+#[cfg(test)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[repr(u16)]
+pub enum TestMap {
+    Test = DataID::Test as u16,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u16)]
-pub enum DataID {
+enum DataID {
     // Block
     BlockStateRootMap,
     BlockReverseStateRootMap,
@@ -54,6 +186,7 @@ pub enum DataID {
     DeploymentIDMap,
     DeploymentEditionMap,
     DeploymentReverseIDMap,
+    DeploymentOwnerMap,
     DeploymentProgramMap,
     DeploymentVerifyingKeyMap,
     DeploymentCertificateMap,
