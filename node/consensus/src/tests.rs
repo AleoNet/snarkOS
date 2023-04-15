@@ -163,7 +163,7 @@ function compute:
                     .find_records(&caller_view_key, RecordsFilter::SlowUnspent(caller_private_key))
                     .unwrap()
                     .filter(|(_, record)| {
-                        // TODO (raychu86): Also check that the record is associated with the `credits.aleo` program
+                        // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
                         match record.data().get(&microcredits) {
                             Some(Entry::Public(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
                             _ => false,
@@ -213,7 +213,7 @@ function compute:
                     .find_records(&caller_view_key, RecordsFilter::SlowUnspent(caller_private_key))
                     .unwrap()
                     .filter(|(_, record)| {
-                        // TODO (raychu86): Also check that the record is associated with the `credits.aleo` program
+                        // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
                         match record.data().get(&microcredits) {
                             Some(Entry::Public(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
                             _ => false,
@@ -373,7 +373,7 @@ fn test_ledger_execute_many() {
             .find_records(&view_key, RecordsFilter::Unspent)
             .unwrap()
             .filter(|(_, record)| {
-                // TODO (raychu86): Also check that the record is associated with the `credits.aleo` program
+                // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
                 match record.data().get(&microcredits) {
                     Some(Entry::Public(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
                     _ => false,

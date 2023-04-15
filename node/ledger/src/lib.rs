@@ -282,7 +282,7 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         Ok(self
             .find_records(view_key, RecordsFilter::Unspent)?
             .filter(|(_, record)| {
-                // TODO (raychu86): Also check that the record is associated with the `credits.aleo` program
+                // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
                 match record.data().get(&microcredits) {
                     Some(Entry::Public(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
                     _ => false,
