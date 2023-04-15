@@ -63,7 +63,7 @@ pub struct Start {
     /// Specify the IP address and port of a peer to connect to
     #[clap(default_value = "", long = "connect")]
     pub connect: String,
-    
+
     /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3033", long = "rest")]
     pub rest: SocketAddr,
@@ -80,7 +80,7 @@ pub struct Start {
     /// Specify the path to the file where logs will be stored
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
     pub logfile: PathBuf,
-    
+
     /// Enables the node to prefetch initial blocks from a CDN
     #[clap(default_value = "https://testnet3.blocks.aleo.org/phase2", long = "cdn")]
     pub cdn: String,
