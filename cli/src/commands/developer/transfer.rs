@@ -111,15 +111,7 @@ impl Transfer {
             ];
 
             // Create a new transaction.
-            Transaction::execute(
-                &vm,
-                &private_key,
-                (ProgramID::from_str("credits.aleo")?, Identifier::from_str("transfer")?),
-                inputs.iter(),
-                fee,
-                Some(query),
-                rng,
-            )?
+            Transaction::execute(&vm, &private_key, ("credits.aleo", "transfer"), inputs.iter(), fee, Some(query), rng)?
         };
         let locator = Locator::<CurrentNetwork>::from_str("credits.aleo/transfer")?;
         format!("✅ Created transfer of {} gates to {}...\n", &self.amount, self.recipient);
