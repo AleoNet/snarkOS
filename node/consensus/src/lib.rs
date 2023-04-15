@@ -45,6 +45,9 @@ use rayon::prelude::*;
 /// The block height to start using new coinbase targeting algorithm.
 const V4_START_HEIGHT: u32 = 123478;
 
+/// The cost in microcredits per byte for the deployment transaction.
+const DEPLOYMENT_FEE_FACTOR: u64 = 1000;
+
 #[derive(Clone)]
 pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     /// The ledger.
@@ -694,7 +697,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // TODO (raychu86): Currently ignoring this rule for executions. Revisit this in phase 3.
         // Ensure transactions with a positive balance must pay for its storage in bytes.
         let fee = transaction.fee()?;
-        if matches!(transaction, Transaction::Deploy(..)) && transaction.to_bytes_le()?.len() > usize::try_from(*fee)? {
+        if matches!(transaction, Transaction::Deploy(..))
+            && u64::try_from(transaction.to_bytes_le()?.len())?.saturating_mul(DEPLOYMENT_FEE_FACTOR) > *fee
+        {
             bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
         }
 
