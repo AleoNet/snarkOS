@@ -53,13 +53,13 @@ pub struct Start {
     /// Specify this node to run as a validator.
     #[clap(long = "validator", conflicts_with_all = &["beacon", "client", "prover"])]
     pub validator: bool,
-    /// Specify this node to run as a prover
+    /// Specify this node to run as a prover.
     #[clap(long = "prover", conflicts_with_all = &["beacon", "client", "validator"])]
     pub prover: bool,
-    /// Specify this node to run as a client
+    /// Specify this node to run as a client.
     #[clap(long = "client", conflicts_with_all = &["beacon", "prover", "validator"])]
     pub client: bool,
-    /// The private key to be used for this node. If left blank in development mode, a new key will be generated
+    /// Specify the private key of this node.
     #[clap(long = "private_key")]
     pub private_key: Option<String>,
 
