@@ -47,7 +47,7 @@ pub struct Start {
     #[clap(long, value_name = "NODE_ID")]
     pub dev: Option<u16>,
 
-    /// Specify this node to run as a beacon
+    /// Specify this node to run as a beacon.
     #[clap(long = "beacon", conflicts_with_all = &["client", "prover", "validator"])]
     pub beacon: bool,
     /// Specify this node to run as a validator
