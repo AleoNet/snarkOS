@@ -153,27 +153,29 @@ SUBCOMMANDS:
 
 The following are the options for the `snarkos start` command:
 ```
-snarkos-start 
-Starts the snarkOS node
-
 USAGE:
     snarkos start [OPTIONS]
 
 OPTIONS:
-        --beacon <PRIVATE KEY>           Specify this as a beacon, with the given account private key for this node as an argument
-        --client <PRIVATE KEY>           Specify this as a client, with an optional account private key for this node as an argument
-        --connect <IP ADDRESS>           Specify the IP address and port of a peer to connect to [default: ]
-        --dev <NODE ID>                  Enables development mode, specify a unique ID for this node
-    -h, --help                           Print help information
-        --logfile <PATH>                 Specify the path to the file where logs will be stored [default: /tmp/snarkos.log]
-        --network <NETWORK_ID>           Specify the network of this node [default: 3]
-        --node <IP ADDRESS>              Specify the IP address and port for the node server [default: 0.0.0.0:4133]
-        --nodisplay                      If the flag is set, the node will not render the display
-        --norest                         If the flag is set, the node will not initialize the REST server
-        --prover <PRIVATE KEY>           Specify this as a prover, with the given account private key for this node as an argument
+        --network <NETWORK_ID>           Specify the network ID of this node [default: 3]
+        
+        --beacon <PRIVATE_KEY>           Specify this node as a beacon, with the account private key as an argument
+        --validator <PRIVATE KEY>        Specify this node as a validator, with the account private key as an argument
+        --prover <PRIVATE KEY>           Specify this node as a prover, with the given account private key as an argument
+        --client <PRIVATE_KEY>           Specify this node as a client, with an optional account private key as an argument
+        
+        --node <IP:PORT>                 Specify the IP address and port for the node server [default: 0.0.0.0:4133]
+        --connect <IP:PORT>              Specify the IP address and port of a peer to connect to
+        
         --rest <REST>                    Specify the IP address and port for the REST server [default: 0.0.0.0:3033]
-        --validator <PRIVATE KEY>        Specify this as a validator, with the given account private key for this node as an argument
+        --norest                         If the flag is set, the node will not initialize the REST server
+        
+        --nodisplay                      If the flag is set, the node will not render the display
         --verbosity <VERBOSITY_LEVEL>    Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
+        --logfile <PATH>                 Specify the path to the file where logs will be stored [default: /tmp/snarkos.log]
+        
+        --dev <NODE_ID>                  Enables development mode, specify a unique ID for this node
+    -h, --help                           Print help information
 ```
 
 ## 6. Development
