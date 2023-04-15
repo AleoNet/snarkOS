@@ -43,7 +43,7 @@ pub struct Start {
     /// Specify the network ID of this node.
     #[clap(default_value = "3", long = "network", value_name = "NETWORK_ID")]
     pub network: u16,
-    /// Enables development mode, specify a unique ID for this node
+    /// Enables development mode, specify a unique ID for this node.
     #[clap(long, value_name = "NODE_ID")]
     pub dev: Option<u16>,
 
