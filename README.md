@@ -198,7 +198,7 @@ This procedure can be repeated to start more nodes.
 
 It is important to initialize the nodes starting from `0` and incrementing by `1` for each new node.
 
-The following is a list of options to initialize a node (replace `XX` with a number starting from `0`):
+The following is a list of options to initialize a node (replace `<NODE_ID>` with a number starting from `0`):
 ```
 cargo run --release -- start --nodisplay --dev <NODE_ID> --beacon ""
 cargo run --release -- start --nodisplay --dev <NODE_ID> --validator ""
