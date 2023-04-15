@@ -56,6 +56,7 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     // TODO (howardwu): Update this to retrieve from a beacons store.
     beacons: Arc<RwLock<IndexMap<Address<N>, ()>>>,
     /// The boolean flag for the development mode.
+    #[allow(dead_code)]
     is_dev: bool,
 }
 

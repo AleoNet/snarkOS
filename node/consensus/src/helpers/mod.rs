@@ -208,9 +208,9 @@ mod tests {
 
     const ITERATIONS: usize = 1000;
 
-    const EXPECTED_ANCHOR_REWARD: u64 = 13;
-    const EXPECTED_STAKING_REWARD: u64 = 21_800_481;
-    const EXPECTED_COINBASE_REWARD_FOR_BLOCK_1: u64 = 163_987_187;
+    const EXPECTED_ANCHOR_REWARD: u64 = 18;
+    const EXPECTED_STAKING_REWARD: u64 = 29_727_929;
+    const EXPECTED_COINBASE_REWARD_FOR_BLOCK_1: u64 = 227_059_182;
 
     #[test]
     fn test_anchor_reward() {
