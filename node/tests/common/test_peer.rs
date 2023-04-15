@@ -25,7 +25,6 @@ use std::{
     str::FromStr,
 };
 
-use ::rand::Rng;
 use futures_util::{sink::SinkExt, TryStreamExt};
 use pea2pea::{
     protocols::{Disconnect, Handshake, Reading, Writing},
@@ -35,6 +34,7 @@ use pea2pea::{
     Node,
     Pea2Pea,
 };
+use rand::Rng;
 use tokio_util::codec::Framed;
 use tracing::*;
 

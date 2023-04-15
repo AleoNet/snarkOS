@@ -21,7 +21,6 @@ use snarkvm::{
     prelude::*,
 };
 
-use anyhow::Error;
 use colored::*;
 use core::fmt;
 
