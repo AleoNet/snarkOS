@@ -176,6 +176,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let latest_height = latest_block.height();
         // Retrieve the latest total supply in microcredits.
         let latest_total_supply_in_microcredits = latest_block.total_supply_in_microcredits();
+        // Retrieve the latest cumulative proof target.
+        let latest_cumulative_proof_target = latest_block.cumulative_proof_target();
         // Retrieve the latest proof target.
         let latest_proof_target = latest_block.proof_target();
         // Retrieve the latest coinbase target.
@@ -241,7 +243,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         // TODO (raychu86): Pay the provers. Currently we do not pay the provers with the `credits.aleo` program
         //  and instead, will track prover leaderboards via the `coinbase_solution` in each block.
-        let cumulative_proof_target = if let Some(prover_solutions) = prover_solutions {
+        let block_cumulative_proof_target = if let Some(prover_solutions) = prover_solutions {
             // Calculate the coinbase reward.
             let coinbase_reward = coinbase_reward(
                 latest_block.last_coinbase_timestamp(),
@@ -252,11 +254,12 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             )?;
 
             // Compute the cumulative proof target of the prover solutions as a u128.
-            let cumulative_proof_target: u128 = prover_solutions.iter().try_fold(0u128, |cumulative, solution| {
-                cumulative
-                    .checked_add(solution.to_target()? as u128)
-                    .ok_or_else(|| anyhow!("Cumulative proof target overflowed"))
-            })?;
+            let block_cumulative_proof_target: u128 =
+                prover_solutions.iter().try_fold(0u128, |cumulative, solution| {
+                    cumulative
+                        .checked_add(solution.to_target()? as u128)
+                        .ok_or_else(|| anyhow!("Cumulative proof target overflowed"))
+                })?;
 
             // Calculate the rewards for the individual provers.
             let mut prover_rewards: Vec<(Address<N>, u64)> = Vec::new();
@@ -271,7 +274,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     .ok_or_else(|| anyhow!("Prover reward numerator overflowed"))?;
 
                 // Compute the denominator.
-                let denominator = cumulative_proof_target
+                let denominator = block_cumulative_proof_target
                     .checked_mul(2)
                     .ok_or_else(|| anyhow!("Prover reward denominator overflowed"))?;
 
@@ -283,7 +286,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                 prover_rewards.push((prover_solution.address(), prover_reward));
             }
 
-            cumulative_proof_target
+            block_cumulative_proof_target
         } else {
             0u128
         };
@@ -306,6 +309,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             Some(_) => (next_coinbase_target, next_timestamp),
             None => (latest_block.last_coinbase_target(), latest_block.last_coinbase_timestamp()),
         };
+
+        // Construct the new cumulative proof target.
+        let cumulative_proof_target = latest_cumulative_proof_target.saturating_add(block_cumulative_proof_target);
 
         // Construct the metadata.
         let metadata = Metadata::new(
@@ -467,6 +473,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             bail!("Invalid block header: {:?}", block.header());
         }
 
+        // TODO (raychu86): Include mints from the leader of each round.
         // TODO (raychu86): Clean this up or create a `total_supply_delta` in `Transactions`.
         // Calculate the new total supply of microcredits after the block.
         let mut new_total_supply_in_microcredits = self.ledger.latest_total_supply_in_microcredits();
@@ -515,7 +522,12 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                         bail!("The last coinbase timestamp does not match the block timestamp")
                     }
                     // Ensure that the cumulative proof target matches the block cumulative proof target.
-                    if block.cumulative_proof_target() != coinbase.to_cumulative_proof_target()? {
+                    if block.cumulative_proof_target()
+                        != self
+                            .ledger
+                            .latest_cumulative_proof_target()
+                            .saturating_add(coinbase.to_cumulative_proof_target()?)
+                    {
                         bail!("The cumulative proof target does not match the block cumulative proof target")
                     }
                 }
@@ -528,9 +540,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     if block.last_coinbase_timestamp() != self.ledger.last_coinbase_timestamp() {
                         bail!("The last coinbase timestamp does not match the previous block's last coinbase timestamp")
                     }
-                    // Ensure that the cumulative proof target is not 0.
-                    if block.cumulative_proof_target() != 0 {
-                        bail!("The cumulative proof target is not 0")
+                    // Ensure that the cumulative proof target is the same as the previous block.
+                    if block.cumulative_proof_target() != self.ledger.latest_cumulative_proof_target() {
+                        bail!("The cumulative proof target does not match the previous block's cumulative proof target")
                     }
                 }
             }
