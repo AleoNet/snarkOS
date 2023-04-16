@@ -168,6 +168,7 @@ pub enum TestMap {
     Test = DataID::Test as u16,
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u16)]
 enum DataID {
