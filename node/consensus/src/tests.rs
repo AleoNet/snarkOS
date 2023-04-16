@@ -396,7 +396,7 @@ fn test_ledger_execute_many() {
             let transaction = Transaction::execute(
                 consensus.ledger.vm(),
                 &private_key,
-                (ProgramID::from_str("credits.aleo").unwrap(), Identifier::from_str("split").unwrap()),
+                ("credits.aleo", "split"),
                 inputs.iter(),
                 Some((fee_record.clone(), 100u64)),
                 None,
