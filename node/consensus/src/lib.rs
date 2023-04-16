@@ -669,6 +669,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             bail!("Transaction '{transaction_id}' already exists in the ledger")
         }
 
+        // Ensure the transaction does not contain a coinbase.
+        if self.ledger.latest_height() > 0 && transaction.is_coinbase() {
+            bail!("Transaction '{transaction_id}' contains an illegal function call")
+        }
+
         /* Fee */
 
         // TODO (raychu86): Currently ignoring this rule for executions. Revisit this in phase 3.
