@@ -308,14 +308,6 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         ];
 
         // Create a new transaction.
-        Transaction::execute(
-            &self.vm,
-            private_key,
-            (ProgramID::from_str("credits.aleo")?, Identifier::from_str("transfer")?),
-            inputs.iter(),
-            None,
-            None,
-            rng,
-        )
+        Transaction::execute(&self.vm, private_key, ("credits.aleo", "transfer"), inputs.iter(), None, None, rng)
     }
 }
