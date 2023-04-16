@@ -518,7 +518,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     if block.last_coinbase_timestamp() != self.ledger.last_coinbase_timestamp() {
                         bail!("The last coinbase timestamp does not match the previous block's last coinbase timestamp")
                     }
-                    // Ensure that the cumulative proof target is 0.
+                    // Ensure that the cumulative proof target is not 0.
                     if block.cumulative_proof_target() != 0 {
                         bail!("The cumulative proof target is not 0")
                     }

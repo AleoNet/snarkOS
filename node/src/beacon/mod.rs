@@ -288,8 +288,8 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 let (inputs, function_name) = match beacon.is_dev() {
                     true => {
                         // Prepare the inputs for a split.
-                        let amount = match record.data().get(&Identifier::from_str("microcredits")?) {
-                            Some(Entry::Private(Plaintext::Literal(Literal::<N>::U64(amount), _))) => **amount / 2,
+                        let amount = match record.find(&[Identifier::from_str("microcredits")?]) {
+                            Ok(Entry::Private(Plaintext::Literal(Literal::<N>::U64(amount), _))) => *amount / 2,
                             _ => 1u64,
                         };
                         let inputs = vec![Value::Record(record.clone()), Value::from_str(&format!("{amount}u64"))?];
