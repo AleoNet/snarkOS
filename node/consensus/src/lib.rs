@@ -181,6 +181,10 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Retrieve the latest coinbase target.
         let latest_coinbase_target = latest_block.coinbase_target();
 
+        // TODO (raychu86): Use a proper `finalize_root` instead of `Field::zero()` once `finalize` is integrated.
+        // Initialize the new finalize root.
+        let finalize_root = Field::zero();
+
         // Select the transactions from the memory pool.
         let transactions = self.memory_pool.candidate_transactions(self).into_iter().collect::<Transactions<N>>();
         // Select the prover solutions from the memory pool.
@@ -318,7 +322,13 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         )?;
 
         // Construct the header.
-        let header = Header::from(latest_state_root, transactions.to_root()?, coinbase_accumulator_point, metadata)?;
+        let header = Header::from(
+            latest_state_root,
+            transactions.to_root()?,
+            finalize_root,
+            coinbase_accumulator_point,
+            metadata,
+        )?;
 
         // Construct the new block.
         Block::new(private_key, latest_block.hash(), header, transactions, coinbase, rng)
@@ -613,6 +623,14 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             self.check_transaction_basic(transaction)
                 .map_err(|e| anyhow!("Invalid transaction found in the transactions list: {e}"))
         })?;
+
+        /* Finalize Root */
+
+        // TODO (raychu86): Properly check the finalize root once `finalize` is integrated.
+        // Ensure the finalize root matches the one in the block header.
+        if block.finalize_root() != Field::zero() {
+            bail!("Invalid finalize root: expected {}, got {}", Field::<N>::zero(), block.finalize_root())
+        }
 
         /* Coinbase Proof */
 
