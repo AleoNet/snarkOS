@@ -174,7 +174,7 @@ function compute:
 
                 // Prepare the additional fee.
                 let credits = records.values().next().unwrap().clone();
-                let additional_fee = (credits, 6312000);
+                let additional_fee = (credits, 6466000);
 
                 // Deploy.
                 let transaction = Transaction::deploy(
