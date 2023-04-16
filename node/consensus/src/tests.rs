@@ -19,7 +19,7 @@ use snarkvm::{
     console::{
         account::{Address, PrivateKey, ViewKey},
         network::{prelude::*, Testnet3},
-        program::{Identifier, ProgramID, Value},
+        program::{Entry, Identifier, Literal, Plaintext, ProgramID, Value},
     },
     prelude::TestRng,
     synthesizer::{
@@ -157,17 +157,24 @@ function compute:
                 let consensus = crate::tests::test_helpers::sample_genesis_consensus(rng);
 
                 // Fetch the unspent records.
+                let microcredits = Identifier::from_str("microcredits").unwrap();
                 let records = consensus
                     .ledger
                     .find_records(&caller_view_key, RecordsFilter::SlowUnspent(caller_private_key))
                     .unwrap()
-                    .filter(|(_, record)| !record.gates().is_zero())
+                    .filter(|(_, record)| {
+                        // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
+                        match record.data().get(&microcredits) {
+                            Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
+                            _ => false,
+                        }
+                    })
                     .collect::<indexmap::IndexMap<_, _>>();
                 trace!("Unspent Records:\n{:#?}", records);
 
                 // Prepare the additional fee.
                 let credits = records.values().next().unwrap().clone();
-                let additional_fee = (credits, 1000000);
+                let additional_fee = (credits, 6466000);
 
                 // Deploy.
                 let transaction = Transaction::deploy(
@@ -200,11 +207,18 @@ function compute:
                 let consensus = crate::tests::test_helpers::sample_genesis_consensus(rng);
 
                 // Fetch the unspent records.
+                let microcredits = Identifier::from_str("microcredits").unwrap();
                 let records = consensus
                     .ledger
                     .find_records(&caller_view_key, RecordsFilter::SlowUnspent(caller_private_key))
                     .unwrap()
-                    .filter(|(_, record)| !record.gates().is_zero())
+                    .filter(|(_, record)| {
+                        // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
+                        match record.data().get(&microcredits) {
+                            Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
+                            _ => false,
+                        }
+                    })
                     .collect::<indexmap::IndexMap<_, _>>();
                 trace!("Unspent Records:\n{:#?}", records);
                 // Select a record to spend.
@@ -213,24 +227,22 @@ function compute:
                 // Retrieve the VM.
                 let vm = consensus.ledger.vm();
 
+                // Prepare the inputs.
+                let inputs = [
+                    Value::<CurrentNetwork>::from_str(&address.to_string()).unwrap(),
+                    Value::<CurrentNetwork>::from_str("1u64").unwrap(),
+                ]
+                .into_iter();
+
                 // Authorize.
-                let authorization = vm
-                    .authorize(
-                        &caller_private_key,
-                        ProgramID::from_str("credits.aleo").unwrap(),
-                        Identifier::from_str("transfer").unwrap(),
-                        &[
-                            Value::<CurrentNetwork>::Record(record),
-                            Value::<CurrentNetwork>::from_str(&address.to_string()).unwrap(),
-                            Value::<CurrentNetwork>::from_str("1u64").unwrap(),
-                        ],
-                        rng,
-                    )
-                    .unwrap();
+                let authorization = vm.authorize(&caller_private_key, "credits.aleo", "mint", inputs, rng).unwrap();
                 assert_eq!(authorization.len(), 1);
 
+                // Execute the fee.
+                let fee = Transaction::execute_fee(vm, &caller_private_key, record, 100, None, rng).unwrap();
+
                 // Execute.
-                let transaction = Transaction::execute_authorization(vm, authorization, None, rng).unwrap();
+                let transaction = Transaction::execute_authorization(vm, authorization, Some(fee), None, rng).unwrap();
                 // Verify.
                 assert!(vm.verify_transaction(&transaction));
                 // Return the transaction.
@@ -353,28 +365,40 @@ fn test_ledger_execute_many() {
     // Sample the genesis consensus.
     let consensus = crate::tests::test_helpers::sample_genesis_consensus(rng);
 
-    for height in 1..6 {
+    // Track the number of starting records.
+    let mut num_starting_records = 4;
+
+    for height in 1..5 {
         // Fetch the unspent records.
+        let microcredits = Identifier::from_str("microcredits").unwrap();
         let records: Vec<_> = consensus
             .ledger
             .find_records(&view_key, RecordsFilter::Unspent)
             .unwrap()
-            .filter(|(_, record)| !record.gates().is_zero())
+            .filter(|(_, record)| {
+                // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
+                match record.data().get(&microcredits) {
+                    Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
+                    _ => false,
+                }
+            })
             .collect();
-        assert_eq!(records.len(), 1 << (height - 1));
+        assert_eq!(records.len(), num_starting_records);
 
-        for (_, record) in records {
+        for ((_, record), (_, fee_record)) in records.iter().tuples() {
             // Prepare the inputs.
-            let inputs =
-                [Value::Record(record.clone()), Value::from_str(&format!("{}u64", ***record.gates() / 2)).unwrap()];
+            let amount = match record.data().get(&Identifier::from_str("microcredits").unwrap()).unwrap() {
+                Entry::Private(Plaintext::Literal(Literal::<CurrentNetwork>::U64(amount), _)) => amount,
+                _ => unreachable!(),
+            };
+            let inputs = [Value::Record(record.clone()), Value::from_str(&format!("{}u64", **amount / 2)).unwrap()];
             // Create a new transaction.
             let transaction = Transaction::execute(
                 consensus.ledger.vm(),
                 &private_key,
-                ProgramID::from_str("credits.aleo").unwrap(),
-                Identifier::from_str("split").unwrap(),
+                ("credits.aleo", "split"),
                 inputs.iter(),
-                None,
+                Some((fee_record.clone(), 100u64)),
                 None,
                 rng,
             )
@@ -382,7 +406,10 @@ fn test_ledger_execute_many() {
             // Add the transaction to the memory pool.
             consensus.add_unconfirmed_transaction(transaction).unwrap();
         }
-        assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), 1 << (height - 1));
+        assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), num_starting_records / 2);
+
+        // Update the number of starting records
+        num_starting_records = num_starting_records * 3 / 2;
 
         // Propose the next block.
         let next_block = consensus.propose_next_block(&private_key, rng).unwrap();

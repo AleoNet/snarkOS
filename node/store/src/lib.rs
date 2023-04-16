@@ -89,6 +89,7 @@ pub enum DeploymentMap {
     ID = DataID::DeploymentIDMap as u16,
     Edition = DataID::DeploymentEditionMap as u16,
     ReverseID = DataID::DeploymentReverseIDMap as u16,
+    Owner = DataID::DeploymentOwnerMap as u16,
     Program = DataID::DeploymentProgramMap as u16,
     VerifyingKey = DataID::DeploymentVerifyingKeyMap as u16,
     Certificate = DataID::DeploymentCertificateMap as u16,
@@ -147,13 +148,13 @@ pub enum TransitionMap {
     ReverseTPK = DataID::TransitionReverseTPKMap as u16,
     TCM = DataID::TransitionTCMMap as u16,
     ReverseTCM = DataID::TransitionReverseTCMMap as u16,
-    Fee = DataID::TransitionFeeMap as u16,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
 pub enum ProgramMap {
-    ID = DataID::ProgramIDMap as u16,
+    ProgramID = DataID::ProgramIDMap as u16,
+    ProgramIndex = DataID::ProgramIndexMap as u16,
     MappingID = DataID::MappingIDMap as u16,
     KeyValueID = DataID::KeyValueIDMap as u16,
     Key = DataID::KeyMap as u16,
@@ -167,6 +168,7 @@ pub enum TestMap {
     Test = DataID::Test as u16,
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u16)]
 enum DataID {
@@ -185,6 +187,7 @@ enum DataID {
     DeploymentIDMap,
     DeploymentEditionMap,
     DeploymentReverseIDMap,
+    DeploymentOwnerMap,
     DeploymentProgramMap,
     DeploymentVerifyingKeyMap,
     DeploymentCertificateMap,
@@ -223,9 +226,9 @@ enum DataID {
     TransitionReverseTPKMap,
     TransitionTCMMap,
     TransitionReverseTCMMap,
-    TransitionFeeMap,
     // Program
     ProgramIDMap,
+    ProgramIndexMap,
     MappingIDMap,
     KeyValueIDMap,
     KeyMap,

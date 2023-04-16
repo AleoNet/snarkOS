@@ -21,7 +21,7 @@ version = "0.1.15"
 default-features = false
 
 [dependencies.anyhow]
-version = "1"
+version = "1.0.70"
 
 [dependencies.clap]
 version = "3.2"

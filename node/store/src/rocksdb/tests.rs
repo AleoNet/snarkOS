@@ -198,3 +198,38 @@ fn test_scalar_mul() {
     let elapsed = timer.elapsed().as_secs();
     println!(" {ITERATIONS} Scalar Muls : {elapsed} s");
 }
+
+#[test]
+#[serial]
+fn test_iterator_ordering() {
+    let map =
+        RocksDB::open_map_testing(temp_dir(), None, MapID::Test(TestMapID::Test)).expect("Failed to open data map");
+
+    // Insert values into the map.
+    map.insert(5, "d".to_string()).expect("Failed to insert");
+    map.insert(6, "c".to_string()).expect("Failed to insert");
+    map.insert(7, "b".to_string()).expect("Failed to insert");
+    map.insert(8, "a".to_string()).expect("Failed to insert");
+    map.insert(1, "h".to_string()).expect("Failed to insert");
+    map.insert(2, "g".to_string()).expect("Failed to insert");
+    map.insert(3, "f".to_string()).expect("Failed to insert");
+    map.insert(4, "e".to_string()).expect("Failed to insert");
+
+    // Define the expected order of the iterator.
+    let expected_order = vec![
+        (1, "h".to_string()),
+        (2, "g".to_string()),
+        (3, "f".to_string()),
+        (4, "e".to_string()),
+        (5, "d".to_string()),
+        (6, "c".to_string()),
+        (7, "b".to_string()),
+        (8, "a".to_string()),
+    ];
+
+    // Check that the order of the iterator is lexicographical.
+    for ((k1, v1), (k2, v2)) in map.iter().zip(expected_order.iter()) {
+        assert_eq!(&*k1, k2);
+        assert_eq!(&*v1, v2);
+    }
+}

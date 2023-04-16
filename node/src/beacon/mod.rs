@@ -38,8 +38,11 @@ use snarkos_node_tcp::{
 use snarkvm::prelude::{
     Block,
     ConsensusStorage,
+    Entry,
     Identifier,
+    Literal,
     Network,
+    Plaintext,
     ProgramID,
     ProverSolution,
     Transaction,
@@ -47,6 +50,7 @@ use snarkvm::prelude::{
     Zero,
 };
 
+use ::time::OffsetDateTime;
 use aleo_std::prelude::{finish, lap, timer};
 use anyhow::{bail, Result};
 use core::{str::FromStr, time::Duration};
@@ -58,7 +62,6 @@ use std::{
         Arc,
     },
 };
-use time::OffsetDateTime;
 use tokio::{task::JoinHandle, time::timeout};
 
 /// A beacon is a full node, capable of producing blocks.
@@ -280,35 +283,20 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 // Initialize an RNG.
                 let rng = &mut rand::thread_rng();
 
-                // Prepare the inputs and function name.
+                // Prepare the inputs for a transfer.
                 let to = beacon.account.address();
-                let (inputs, function_name) = match beacon.is_dev() {
-                    true => {
-                        // Prepare the inputs for a split.
-                        let amount = ***record.gates() / 2;
-                        let inputs = vec![Value::Record(record.clone()), Value::from_str(&format!("{amount}u64"))?];
-
-                        (inputs, Identifier::from_str("split")?)
-                    }
-                    false => {
-                        // Prepare the inputs for a transfer.
-                        let amount = 1;
-                        let inputs = vec![
-                            Value::Record(record.clone()),
-                            Value::from_str(&format!("{to}"))?,
-                            Value::from_str(&format!("{amount}u64"))?,
-                        ];
-
-                        (inputs, Identifier::from_str("transfer")?)
-                    }
-                };
+                let amount = 1;
+                let inputs = vec![
+                    Value::Record(record.clone()),
+                    Value::from_str(&format!("{to}"))?,
+                    Value::from_str(&format!("{amount}u64"))?,
+                ];
 
                 // Create a new transaction.
                 let transaction = Transaction::execute(
                     beacon.ledger.vm(),
                     beacon.account.private_key(),
-                    ProgramID::from_str("credits.aleo")?,
-                    function_name,
+                    ("credits.aleo", "transfer"),
                     inputs.iter(),
                     None,
                     None,
@@ -365,8 +353,13 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                         if let Err(error) = transaction.into_transitions().try_for_each(|transition| {
                             for (commitment, record) in transition.into_records() {
                                 let record = record.decrypt(beacon.account.view_key())?;
-                                if !record.gates().is_zero() {
-                                    beacon.unspent_records.write().insert(commitment, record);
+
+                                if let Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) =
+                                    record.data().get(&Identifier::from_str("microcredits")?)
+                                {
+                                    if !amount.is_zero() {
+                                        beacon.unspent_records.write().insert(commitment, record);
+                                    }
                                 }
                             }
                             Ok::<_, anyhow::Error>(())

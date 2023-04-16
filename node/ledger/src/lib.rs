@@ -31,7 +31,7 @@ use snarkvm::{
     console::{
         account::{Address, GraphKey, PrivateKey, Signature, ViewKey},
         network::prelude::*,
-        program::{Ciphertext, Identifier, Plaintext, ProgramID, Record, StatePath, Value},
+        program::{Ciphertext, Entry, Identifier, Literal, Plaintext, ProgramID, Record, StatePath, Value},
         types::{Field, Group},
     },
     synthesizer::{
@@ -198,6 +198,16 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         *self.current_block.read().header()
     }
 
+    /// Returns the latest total supply in microcredits.
+    pub fn latest_total_supply_in_microcredits(&self) -> u64 {
+        self.current_block.read().header().total_supply_in_microcredits()
+    }
+
+    /// Returns the latest latest cumulative proof target.
+    pub fn latest_cumulative_proof_target(&self) -> u128 {
+        self.current_block.read().cumulative_proof_target()
+    }
+
     /// Returns the latest block coinbase accumulator point.
     pub fn latest_coinbase_accumulator_point(&self) -> Field<N> {
         self.current_block.read().header().coinbase_accumulator_point()
@@ -268,9 +278,16 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the unspent records.
     pub fn find_unspent_records(&self, view_key: &ViewKey<N>) -> Result<RecordMap<N>> {
+        let microcredits = Identifier::from_str("microcredits")?;
         Ok(self
             .find_records(view_key, RecordsFilter::Unspent)?
-            .filter(|(_, record)| !record.gates().is_zero())
+            .filter(|(_, record)| {
+                // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
+                match record.data().get(&microcredits) {
+                    Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
+                    _ => false,
+                }
+            })
             .collect::<IndexMap<_, _>>())
     }
 
@@ -291,15 +308,6 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         ];
 
         // Create a new transaction.
-        Transaction::execute(
-            &self.vm,
-            private_key,
-            ProgramID::from_str("credits.aleo")?,
-            Identifier::from_str("transfer")?,
-            inputs.iter(),
-            None,
-            None,
-            rng,
-        )
+        Transaction::execute(&self.vm, private_key, ("credits.aleo", "transfer"), inputs.iter(), None, None, rng)
     }
 }

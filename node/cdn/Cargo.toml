@@ -18,10 +18,10 @@ edition = "2021"
 
 [features]
 default = [ "parallel" ]
-parallel = [ "snarkos-node-ledger/parallel" ]
+parallel = [ "rayon" ]
 
 [dependencies.anyhow]
-version = "1"
+version = "1.0.70"
 
 [dependencies.backoff]
 version = "0.4"
@@ -38,6 +38,10 @@ version = "0.3"
 
 [dependencies.parking_lot]
 version = "0.12"
+
+[dependencies.rayon]
+version = "1"
+optional = true
 
 [dependencies.reqwest]
 version = "0.11"

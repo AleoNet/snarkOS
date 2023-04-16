@@ -78,6 +78,8 @@ pub struct DeploymentDB<N: Network> {
     edition_map: DataMap<ProgramID<N>, u16>,
     /// The reverse ID map.
     reverse_id_map: DataMap<(ProgramID<N>, u16), N::TransactionID>,
+    /// The program owner map.
+    owner_map: DataMap<(ProgramID<N>, u16), ProgramOwner<N>>,
     /// The program map.
     program_map: DataMap<(ProgramID<N>, u16), Program<N>>,
     /// The verifying key map.
@@ -97,6 +99,7 @@ impl<N: Network> DeploymentStorage<N> for DeploymentDB<N> {
     type IDMap = DataMap<N::TransactionID, ProgramID<N>>;
     type EditionMap = DataMap<ProgramID<N>, u16>;
     type ReverseIDMap = DataMap<(ProgramID<N>, u16), N::TransactionID>;
+    type OwnerMap = DataMap<(ProgramID<N>, u16), ProgramOwner<N>>;
     type ProgramMap = DataMap<(ProgramID<N>, u16), Program<N>>;
     type VerifyingKeyMap = DataMap<(ProgramID<N>, Identifier<N>, u16), VerifyingKey<N>>;
     type CertificateMap = DataMap<(ProgramID<N>, Identifier<N>, u16), Certificate<N>>;
@@ -112,6 +115,7 @@ impl<N: Network> DeploymentStorage<N> for DeploymentDB<N> {
             id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::ID))?,
             edition_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::Edition))?,
             reverse_id_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::ReverseID))?,
+            owner_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::Owner))?,
             program_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::Program))?,
             verifying_key_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::VerifyingKey))?,
             certificate_map: rocksdb::RocksDB::open_map(N::ID, dev, MapID::Deployment(DeploymentMap::Certificate))?,
@@ -134,6 +138,11 @@ impl<N: Network> DeploymentStorage<N> for DeploymentDB<N> {
     /// Returns the reverse ID map.
     fn reverse_id_map(&self) -> &Self::ReverseIDMap {
         &self.reverse_id_map
+    }
+
+    /// Returns the program owner map.
+    fn owner_map(&self) -> &Self::OwnerMap {
+        &self.owner_map
     }
 
     /// Returns the program map.
