@@ -17,7 +17,7 @@ license = "GPL-3.0"
 edition = "2021"
 
 [dependencies.metrics]
-version = "0.20"
+version = "0.21"
 
 [dependencies.metrics-exporter-prometheus]
 version = "0.11"
