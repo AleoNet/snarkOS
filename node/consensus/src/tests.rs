@@ -19,7 +19,7 @@ use snarkvm::{
     console::{
         account::{Address, PrivateKey, ViewKey},
         network::{prelude::*, Testnet3},
-        program::{Entry, Identifier, Literal, Plaintext, ProgramID, Value},
+        program::{Entry, Identifier, Literal, Plaintext, Value},
     },
     prelude::TestRng,
     synthesizer::{
