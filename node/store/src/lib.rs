@@ -36,6 +36,8 @@ pub use transaction::*;
 mod transition;
 pub use transition::*;
 
+/// The RocksDB map prefix broken down into the record category and the specific type of the record.
+// Note: the order of these variants can be changed at any point in time.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
 pub enum MapID {
@@ -68,6 +70,9 @@ impl From<MapID> for u16 {
     }
 }
 
+/// The RocksDB map prefix for block-related records.
+// Note: the order of these variants can be changed at any point in time,
+// as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
 pub enum BlockMap {
@@ -83,6 +88,9 @@ pub enum BlockMap {
     Signature = DataID::BlockSignatureMap as u16,
 }
 
+/// The RocksDB map prefix for deployment-related records.
+// Note: the order of these variants can be changed at any point in time,
+// as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
 pub enum DeploymentMap {
@@ -97,6 +105,9 @@ pub enum DeploymentMap {
     ReverseFee = DataID::DeploymentReverseFeeMap as u16,
 }
 
+/// The RocksDB map prefix for execution-related records.
+// Note: the order of these variants can be changed at any point in time,
+// as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
 pub enum ExecutionMap {
@@ -106,6 +117,9 @@ pub enum ExecutionMap {
     Fee = DataID::ExecutionFeeMap as u16,
 }
 
+/// The RocksDB map prefix for transition input records.
+// Note: the order of these variants can be changed at any point in time,
+// as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
 pub enum TransitionInputMap {
@@ -119,6 +133,9 @@ pub enum TransitionInputMap {
     ExternalRecord = DataID::InputExternalRecordMap as u16,
 }
 
+/// The RocksDB map prefix for transition output records.
+// Note: the order of these variants can be changed at any point in time,
+// as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
 pub enum TransitionOutputMap {
@@ -132,12 +149,18 @@ pub enum TransitionOutputMap {
     ExternalRecord = DataID::OutputExternalRecordMap as u16,
 }
 
+/// The RocksDB map prefix for transaction-related records.
+// Note: the order of these variants can be changed at any point in time,
+// as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
 pub enum TransactionMap {
     ID = DataID::TransactionIDMap as u16,
 }
 
+/// The RocksDB map prefix for transition-related records.
+// Note: the order of these variants can be changed at any point in time,
+// as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
 pub enum TransitionMap {
@@ -150,6 +173,9 @@ pub enum TransitionMap {
     ReverseTCM = DataID::TransitionReverseTCMMap as u16,
 }
 
+/// The RocksDB map prefix for program-related records.
+// Note: the order of these variants can be changed at any point in time,
+// as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
 pub enum ProgramMap {
@@ -161,6 +187,8 @@ pub enum ProgramMap {
     Value = DataID::ValueMap as u16,
 }
 
+/// The RocksDB map prefix for test-related records.
+// Note: the order of these variants can be changed at any point in time.
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
@@ -168,6 +196,10 @@ pub enum TestMap {
     Test = DataID::Test as u16,
 }
 
+/// The RocksDB map prefix.
+// Note: the order of these variants can NOT be changed once the database is populated:
+// - any new variant MUST be added as the last one (ignoring the Test one)
+// - any deprecated variant MUST remain in its position (it can't be removed)
 #[allow(clippy::enum_variant_names)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[repr(u16)]
