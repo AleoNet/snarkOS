@@ -382,7 +382,7 @@ mod tests {
 
     type CurrentNetwork = Testnet3;
 
-    const TEST_BASE_URL: &str = "https://testnet3.blocks.aleo.org/phase2";
+    const TEST_BASE_URL: &str = "https://testnet3.blocks.aleo.org/phase3";
 
     fn check_load_blocks(start: u32, end: Option<u32>, expected: usize) {
         let blocks = Arc::new(RwLock::new(Vec::new()));

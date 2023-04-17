@@ -82,7 +82,7 @@ pub struct Start {
     pub logfile: PathBuf,
 
     /// Enables the node to prefetch initial blocks from a CDN
-    #[clap(default_value = "https://testnet3.blocks.aleo.org/phase2", long = "cdn")]
+    #[clap(default_value = "https://testnet3.blocks.aleo.org/phase3", long = "cdn")]
     pub cdn: String,
     /// Enables development mode, specify a unique ID for this node
     #[clap(long)]

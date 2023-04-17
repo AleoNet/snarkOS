@@ -119,7 +119,7 @@ path = "."
 features = [ "test" ]
 
 [dev-dependencies.snarkvm-utilities]
-version = "0.9.16"
+version = "0.10.1"
 
 [dev-dependencies.tracing-subscriber]
 version = "0.3"

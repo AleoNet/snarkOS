@@ -43,7 +43,6 @@ use snarkvm::prelude::{
     Literal,
     Network,
     Plaintext,
-    ProgramID,
     ProverSolution,
     Transaction,
     Value,
