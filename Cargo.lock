@@ -1963,9 +1963,9 @@ dependencies = [
 
 [[package]]
 name = "peak_alloc"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ae5ca2a4f36e9bba393e6711350dde5d11f5aacca3660fcca7877fe6b6e9d98"
+checksum = "84d3978b0aa7d46c34452384c28264ac859c652b67635f6acfd598e1b6608de5"
 
 [[package]]
 name = "peeking_take_while"

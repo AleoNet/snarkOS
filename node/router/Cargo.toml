@@ -108,7 +108,7 @@ version = "0.3"
 features = ["sink"]
 
 [dev-dependencies.peak_alloc]
-version = "0.1"
+version = "0.2"
 
 [dev-dependencies.snarkos-node-messages]
 path = "../messages"
