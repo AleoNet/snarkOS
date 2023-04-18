@@ -313,7 +313,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                     beacon.account.private_key(),
                     ("credits.aleo", "transfer"),
                     inputs.iter(),
-                    Some((fee_record.clone(), 1000)),
+                    Some((fee_record.clone(), 1)),
                     None,
                     rng,
                 );
