@@ -273,29 +273,19 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
             // Create a transfer transaction.
             let beacon = self.clone();
             let transaction = match tokio::task::spawn_blocking(move || {
-                // Fetch an unspent record.
-                let (commitment, record) = match beacon.unspent_records.write().shift_remove_index(0) {
-                    Some(record) => record,
-                    None => bail!("The beacon has no unspent records available"),
-                };
-
                 // Initialize an RNG.
                 let rng = &mut rand::thread_rng();
 
                 // Prepare the inputs for a transfer.
                 let to = beacon.account.address();
                 let amount = 1;
-                let inputs = vec![
-                    Value::Record(record.clone()),
-                    Value::from_str(&format!("{to}"))?,
-                    Value::from_str(&format!("{amount}u64"))?,
-                ];
+                let inputs = vec![Value::from_str(&format!("{to}"))?, Value::from_str(&format!("{amount}u64"))?];
 
                 // Create a new transaction.
                 let transaction = Transaction::execute(
                     beacon.ledger.vm(),
                     beacon.account.private_key(),
-                    ("credits.aleo", "transfer"),
+                    ("credits.aleo", "mint"),
                     inputs.iter(),
                     None,
                     None,
@@ -305,8 +295,6 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 match transaction {
                     Ok(transaction) => Ok(transaction),
                     Err(error) => {
-                        // Push the record back into the unspent records.
-                        beacon.unspent_records.write().insert(commitment, record);
                         bail!("Failed to create a transaction: {error}")
                     }
                 }
