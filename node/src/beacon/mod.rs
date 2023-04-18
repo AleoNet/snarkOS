@@ -276,7 +276,23 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 // Fetch an unspent record.
                 let (commitment, record) = match beacon.unspent_records.write().shift_remove_index(0) {
                     Some(record) => record,
-                    None => bail!("The beacon has no unspent records available"),
+                    None => {
+                        // Scan for unspent records.
+                        *beacon.unspent_records.write() =
+                            beacon.ledger.find_unspent_records(beacon.account.view_key())?;
+
+                        bail!("The beacon has no unspent records available")
+                    }
+                };
+
+                // Fetch an unspent record for the fee.
+                let (fee_commitment, fee_record) = match beacon.unspent_records.write().shift_remove_index(0) {
+                    Some(record) => record,
+                    None => {
+                        // Push the first record back into the unspent records.
+                        beacon.unspent_records.write().insert(commitment, record);
+                        bail!("The beacon has no unspent records available to spend as fee")
+                    }
                 };
 
                 // Initialize an RNG.
@@ -297,7 +313,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                     beacon.account.private_key(),
                     ("credits.aleo", "transfer"),
                     inputs.iter(),
-                    None,
+                    Some((fee_record.clone(), 1000)),
                     None,
                     rng,
                 );
@@ -307,6 +323,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                     Err(error) => {
                         // Push the record back into the unspent records.
                         beacon.unspent_records.write().insert(commitment, record);
+                        beacon.unspent_records.write().insert(fee_commitment, fee_record);
                         bail!("Failed to create a transaction: {error}")
                     }
                 }
