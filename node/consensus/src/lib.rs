@@ -699,9 +699,28 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             bail!("Transaction '{transaction_id}' already exists in the ledger")
         }
 
-        // Ensure the transaction does not contain a coinbase.
-        if self.ledger.latest_height() > 0 && transaction.is_coinbase() {
-            bail!("Transaction '{transaction_id}' contains an illegal function call")
+        // TODO (raychu86): Remove this once proper coinbase transactions are integrated with consensus.
+        // Ensure the coinbase transaction is attributed to an authorized beacon.
+        if transaction.is_coinbase() {
+            match transaction {
+                Transaction::Execute(id, execution, _) => {
+                    // Get the input address of the coinbase transaction.
+                    match execution.get(0)?.inputs().get(0) {
+                        Some(Input::Public(_, Some(Plaintext::Literal(Literal::Address(address), _)))) => {
+                            // Check if the address is a valid beacon address.
+                            if !self.beacons.read().contains_key(address) {
+                                bail!(
+                                    "Coinbase transaction ({}) is attributed to an unauthorized beacon ({})",
+                                    id,
+                                    address
+                                );
+                            }
+                        }
+                        _ => bail!("Invalid coinbase transaction: Missing public input in 'credits.aleo/mint'"),
+                    }
+                }
+                _ => bail!("Invalid coinbase transaction"),
+            }
         }
 
         /* Fee */
