@@ -398,7 +398,7 @@ fn test_ledger_execute_many() {
                 &private_key,
                 ("credits.aleo", "split"),
                 inputs.iter(),
-                Some((fee_record.clone(), 100u64)),
+                Some((fee_record.clone(), 3000u64)),
                 None,
                 rng,
             )
