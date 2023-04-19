@@ -28,13 +28,10 @@ use std::str::FromStr;
 #[derive(Debug, Parser)]
 pub struct Execute {
     /// The program identifier.
-    #[clap(parse(try_from_str))]
     program_id: ProgramID<CurrentNetwork>,
     /// The function name.
-    #[clap(parse(try_from_str))]
     function: Identifier<CurrentNetwork>,
     /// The function inputs.
-    #[clap(parse(try_from_str))]
     inputs: Vec<Value<CurrentNetwork>>,
     /// The private key used to generate the execution.
     #[clap(short, long)]

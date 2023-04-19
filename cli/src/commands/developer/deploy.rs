@@ -28,7 +28,6 @@ use std::str::FromStr;
 #[derive(Debug, Parser)]
 pub struct Deploy {
     /// The name of the program to deploy.
-    #[clap(parse(try_from_str))]
     program_id: ProgramID<CurrentNetwork>,
     /// A path to a directory containing a manifest file. Defaults to the current working directory.
     #[clap(long)]

@@ -27,11 +27,19 @@ pub use start::*;
 mod update;
 pub use update::*;
 
+use anstyle::{AnsiColor, Color, Style};
 use anyhow::Result;
-use clap::Parser;
+use clap::{builder::Styles, Parser};
+
+const HEADER_COLOR: Option<Color> = Some(Color::Ansi(AnsiColor::Yellow));
+const LITERAL_COLOR: Option<Color> = Some(Color::Ansi(AnsiColor::Green));
+const STYLES: Styles = Styles::plain()
+    .header(Style::new().bold().fg_color(HEADER_COLOR))
+    .usage(Style::new().bold().fg_color(HEADER_COLOR))
+    .literal(Style::new().bold().fg_color(LITERAL_COLOR));
 
 #[derive(Debug, Parser)]
-#[clap(name = "snarkOS", author = "The Aleo Team <hello@aleo.org>", setting = clap::AppSettings::ColoredHelp)]
+#[clap(name = "snarkOS", author = "The Aleo Team <hello@aleo.org>", styles = STYLES)]
 pub struct CLI {
     /// Specify the verbosity [options: 0, 1, 2, 3]
     #[clap(default_value = "2", short, long)]

@@ -27,13 +27,13 @@ use std::str::FromStr;
 #[derive(Debug, Parser)]
 pub struct Transfer {
     /// The input record used to craft the transfer.
-    #[clap(parse(try_from_str), long)]
+    #[clap(long)]
     input_record: Record<CurrentNetwork, Plaintext<CurrentNetwork>>,
     /// The recipient address.
-    #[clap(parse(try_from_str), long)]
+    #[clap(long)]
     recipient: Address<CurrentNetwork>,
     /// The number of microcredits to transfer.
-    #[clap(parse(try_from_str), long)]
+    #[clap(long)]
     amount: u64,
     /// The private key used to generate the execution.
     #[clap(short, long)]
