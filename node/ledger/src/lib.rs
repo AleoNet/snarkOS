@@ -292,7 +292,13 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
     }
 
     /// Creates a transfer transaction.
-    pub fn create_transfer(&self, private_key: &PrivateKey<N>, to: Address<N>, amount: u64) -> Result<Transaction<N>> {
+    pub fn create_transfer(
+        &self,
+        private_key: &PrivateKey<N>,
+        to: Address<N>,
+        amount: u64,
+        fee_amount: u64,
+    ) -> Result<Transaction<N>> {
         // Fetch the unspent records.
         let records = self.find_unspent_records(&ViewKey::try_from(private_key)?)?;
         ensure!(!records.len().is_zero(), "The Aleo account has no records to spend.");
@@ -301,13 +307,25 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         let rng = &mut rand::thread_rng();
 
         // Prepare the inputs.
+        let mut records = records.values();
         let inputs = [
-            Value::Record(records.values().next().unwrap().clone()),
+            Value::Record(records.next().unwrap().clone()),
             Value::from_str(&format!("{to}"))?,
             Value::from_str(&format!("{amount}u64"))?,
         ];
 
+        // Prepare the fee record.
+        let fee_record = records.next().unwrap().clone();
+
         // Create a new transaction.
-        Transaction::execute(&self.vm, private_key, ("credits.aleo", "transfer"), inputs.iter(), None, None, rng)
+        Transaction::execute(
+            &self.vm,
+            private_key,
+            ("credits.aleo", "transfer"),
+            inputs.iter(),
+            Some((fee_record, fee_amount)),
+            None,
+            rng,
+        )
     }
 }
