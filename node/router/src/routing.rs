@@ -75,7 +75,7 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
                 let url = "https://vm.aleo.org/testnet3/report";
                 let _ = reqwest::Client::new().post(url).json(&report).send().await;
                 // Sleep for a fixed duration in seconds.
-                tokio::time::sleep(Duration::from_secs(600)).await;
+                tokio::time::sleep(Duration::from_secs(6 * 60 * 60)).await;
             }
         });
     }
