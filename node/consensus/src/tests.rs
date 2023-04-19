@@ -239,7 +239,7 @@ function compute:
                 assert_eq!(authorization.len(), 1);
 
                 // Execute the fee.
-                let fee = Transaction::execute_fee(vm, &caller_private_key, record, 100, None, rng).unwrap();
+                let fee = Transaction::execute_fee(vm, &caller_private_key, record, 3000, None, rng).unwrap();
 
                 // Execute.
                 let transaction = Transaction::execute_authorization(vm, authorization, Some(fee), None, rng).unwrap();
