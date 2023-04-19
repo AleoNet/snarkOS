@@ -725,13 +725,22 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         /* Fee */
 
-        // TODO (raychu86): Currently ignoring this rule for executions. Revisit this in phase 3.
-        // Ensure transactions with a positive balance must pay for its storage in bytes.
+        // TODO (raychu86): TODO (raychu86): Consider fees for `finalize` execution when it is ready.
+        // Ensure the transaction has a sufficient fee.
         let fee = transaction.fee()?;
-        if matches!(transaction, Transaction::Deploy(..))
-            && u64::try_from(transaction.to_bytes_le()?.len())?.saturating_mul(DEPLOYMENT_FEE_FACTOR) > *fee
-        {
-            bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
+        match transaction {
+            Transaction::Deploy(_, _, deployment, _) => {
+                // Check that the fee in microcredits is at least the deployment size in bytes.
+                if u64::try_from(deployment.to_bytes_le()?.len())?.saturating_mul(DEPLOYMENT_FEE_FACTOR) > *fee {
+                    bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
+                }
+            }
+            Transaction::Execute(_, execution, _) => {
+                // If the transaction is not a coinbase transaction, check that the fee in microcredits is at least the execution size in bytes.
+                if !transaction.is_coinbase() && u64::try_from(execution.to_bytes_le()?.len())? > *fee {
+                    bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
+                }
+            }
         }
 
         /* Proof(s) */
