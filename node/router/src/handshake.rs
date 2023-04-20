@@ -106,7 +106,7 @@ impl<N: Network> Router<N> {
         };
 
         // Perform the handshake; we pass on a mutable reference to peer_ip in case the process is broken at any point in time.
-        let mut handshake_result = if peer_side == ConnectionSide::Responder {
+        let handshake_result = if peer_side == ConnectionSide::Responder {
             self.handshake_inner_initiator(peer_addr, &mut peer_ip, stream, genesis_header).await
         } else {
             self.handshake_inner_responder(peer_addr, &mut peer_ip, stream, genesis_header).await
@@ -117,10 +117,9 @@ impl<N: Network> Router<N> {
             self.connecting_peers.lock().remove(&ip);
         }
 
-        // If the handshake succeeded, announce it and increase the message size limit.
-        if let Ok((ref peer_ip, ref mut framed)) = handshake_result {
+        // If the handshake succeeded, announce it.
+        if let Ok((ref peer_ip, _)) = handshake_result {
             info!("Connected to '{peer_ip}'");
-            framed.codec_mut().update_max_message_len();
         }
 
         handshake_result
@@ -135,7 +134,7 @@ impl<N: Network> Router<N> {
         genesis_header: Header<N>,
     ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, MessageCodec<N>>)> {
         // Construct the stream.
-        let mut framed = Framed::new(stream, MessageCodec::<N>::default());
+        let mut framed = Framed::new(stream, MessageCodec::<N>::handshake());
 
         // This value is immediately guaranteed to be present, so it can be unwrapped.
         let peer_ip = peer_ip.unwrap();
@@ -199,7 +198,7 @@ impl<N: Network> Router<N> {
         genesis_header: Header<N>,
     ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, MessageCodec<N>>)> {
         // Construct the stream.
-        let mut framed = Framed::new(stream, MessageCodec::<N>::default());
+        let mut framed = Framed::new(stream, MessageCodec::<N>::handshake());
 
         /* Step 1: Receive the challenge request. */
 
