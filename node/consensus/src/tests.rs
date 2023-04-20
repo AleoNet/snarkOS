@@ -25,8 +25,13 @@ use snarkvm::{
         network::{prelude::*, Testnet3},
         program::{Entry, Identifier, Literal, Plaintext, Value},
     },
-    prelude::{Ledger, RecordsFilter, TestRng},
-    synthesizer::{block::Transaction, program::Program, store::ConsensusStore, vm::VM},
+    prelude::{Ledger, ProgramID, RecordsFilter, TestRng},
+    synthesizer::{
+        block::{Block, Transaction},
+        program::Program,
+        store::ConsensusStore,
+        vm::VM,
+    },
 };
 
 use indexmap::IndexMap;

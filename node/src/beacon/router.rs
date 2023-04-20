@@ -14,7 +14,16 @@
 
 use super::*;
 
-use snarkos_node_messages::{BlockRequest, BlockResponse, DataBlocks, DisconnectReason, Message, MessageCodec, Pong};
+use snarkos_node_messages::{
+    BlockRequest,
+    BlockResponse,
+    DataBlocks,
+    DisconnectReason,
+    Message,
+    MessageCodec,
+    NewBlock,
+    Pong,
+};
 use snarkos_node_router::Routing;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{error, EpochChallenge, Header};

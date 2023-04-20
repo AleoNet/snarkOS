@@ -82,7 +82,7 @@ pub struct InnerRouter<N: Network> {
     /// and prevents duplicate outbound connection attempts to the same IP address, it is unable to
     /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
     /// attempt to connect to each other). This set is used to prevent this from happening.
-    connecting_peers: Mutex<HashSet<SocketAddr>>,
+    pub connecting_peers: Mutex<HashSet<SocketAddr>>,
     /// The set of candidate peer IPs.
     candidate_peers: RwLock<IndexSet<SocketAddr>>,
     /// The set of restricted peer IPs.

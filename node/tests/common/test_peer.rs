@@ -13,7 +13,17 @@
 // limitations under the License.
 
 use snarkos_account::Account;
-use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, MessageTrait, NodeType};
+use snarkos_node_bft_consensus::setup::{read_authority_keypair_from_file, workspace_dir};
+use snarkos_node_messages::{
+    ChallengeRequest,
+    ChallengeResponse,
+    ConsensusId,
+    Data,
+    Message,
+    MessageCodec,
+    MessageTrait,
+    NodeType,
+};
 use snarkos_node_router::expect_message;
 use snarkvm::prelude::{error, Address, Block, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork};
 
@@ -23,6 +33,10 @@ use std::{
     str::FromStr,
 };
 
+use fastcrypto::{
+    traits::{KeyPair, Signer, ToFromBytes},
+    Verifier,
+};
 use futures_util::{sink::SinkExt, TryStreamExt};
 use pea2pea::{
     protocols::{Disconnect, Handshake, Reading, Writing},
@@ -127,8 +141,7 @@ impl Handshake for TestPeer {
         // Retrieve the genesis block header.
         let genesis_header = *sample_genesis_block().header();
 
-        // TODO(nkls): add assertions on the contents of messages.
-        match node_side {
+        let peer_request = match node_side {
             ConnectionSide::Initiator => {
                 // Send a challenge request to the peer.
                 let our_request = ChallengeRequest::new(local_ip.port(), self.node_type(), self.address(), rng.gen());
@@ -144,6 +157,8 @@ impl Handshake for TestPeer {
                 // Send the challenge response.
                 let our_response = ChallengeResponse { genesis_header, signature: Data::Object(signature) };
                 framed.send(Message::ChallengeResponse(our_response)).await?;
+
+                peer_request
             }
             ConnectionSide::Responder => {
                 // Listen for the challenge request.
@@ -160,7 +175,37 @@ impl Handshake for TestPeer {
 
                 // Listen for the challenge response.
                 let _peer_response = expect_message!(Message::ChallengeResponse, framed, peer_addr);
+
+                peer_request
             }
+        };
+
+        // If either of the peers is not a Validator, there's nothing more to do.
+        if peer_request.node_type != NodeType::Validator || self.node_type != NodeType::Validator {
+            return Ok(conn);
+        }
+
+        // Use the second committee member's credentials for testing.
+        // TODO: make committee configuration more ergonomic for testing.
+        let bft_path = format!("{}/node/bft-consensus/committee/.dev", workspace_dir());
+
+        let primary_id = 1;
+        let key_file = format!("{bft_path}/.primary-{primary_id}-key.json");
+        let kp = read_authority_keypair_from_file(key_file).unwrap();
+
+        let public_key = kp.public();
+        let signature = kp.sign(public_key.as_bytes());
+
+        let message = Message::ConsensusId(Box::new(ConsensusId { public_key: public_key.clone(), signature }));
+        framed.send(message).await?;
+
+        let Message::ConsensusId(consensus_id) = framed.try_next().await.unwrap().unwrap() else {
+            panic!("didn't get consensus id")
+        };
+
+        // Check the signature.
+        if consensus_id.public_key.verify(consensus_id.public_key.as_bytes(), &consensus_id.signature).is_err() {
+            panic!("signature doesn't verify")
         }
 
         Ok(conn)

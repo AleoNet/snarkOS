@@ -159,7 +159,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     false => bail!("Peer '{peer_ip}' sent an invalid block response"),
                 }
             }
-            Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => {
+            Message::ChallengeRequest(..) | Message::ChallengeResponse(..) | Message::ConsensusId(..) => {
                 // Disconnect as the peer is not following the protocol.
                 bail!("Peer '{peer_ip}' is not following the protocol")
             }

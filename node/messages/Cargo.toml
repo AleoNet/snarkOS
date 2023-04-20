@@ -29,6 +29,10 @@ version = "1.0"
 [dependencies.bytes]
 version = "1"
 
+[dependencies.fastcrypto]
+git = "https://github.com/MystenLabs/fastcrypto"
+rev = "235211dc8195590f5353d38135f5ee51a267521e"
+
 [dependencies.indexmap]
 version = "1"
 

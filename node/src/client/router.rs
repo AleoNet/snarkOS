@@ -143,7 +143,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Client<N, C> {
 
     /// Handles a `NewBlock` message.
     fn new_block(&self, peer_ip: SocketAddr, _block: Block<N>, serialized: NewBlock<N>) -> bool {
-        self.propagate(Message::NewBlock(serialized), vec![peer_ip]);
+        self.propagate(Message::NewBlock(serialized), &[peer_ip]);
         true
     }
 

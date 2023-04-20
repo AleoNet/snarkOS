@@ -51,15 +51,12 @@ async fn test_connection_cleanups() {
         nodes.push(node);
     }
 
-    // Enable handshake handling.
-    nodes[0].enable_handshake().await;
-    nodes[1].enable_handshake().await;
-
-    nodes[0].enable_disconnect().await;
-    nodes[1].enable_disconnect().await;
-
-    nodes[0].enable_listener().await;
-    nodes[1].enable_listener().await;
+    // Enable protocols.
+    for node in &nodes {
+        node.enable_handshake().await;
+        node.enable_disconnect().await;
+        node.enable_listener().await;
+    }
 
     // We'll want to register heap use after a single connection, after the related collections are initialized.
     let mut heap_after_one_conn = None;

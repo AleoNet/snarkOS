@@ -15,10 +15,6 @@
 mod router;
 
 use crate::traits::NodeInterface;
-use aleo_std::prelude::{finish, lap, timer};
-use anyhow::{bail, Result};
-use core::{str::FromStr, time::Duration};
-use parking_lot::RwLock;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_messages::{

@@ -18,6 +18,7 @@ use snarkos_node_messages::{
     DisconnectReason,
     Message,
     MessageCodec,
+    NewBlock,
     Pong,
     UnconfirmedSolution,
     UnconfirmedTransaction,

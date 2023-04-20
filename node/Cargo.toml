@@ -51,6 +51,10 @@ features = ["sink"]
 [dependencies.indexmap]
 version = "1"
 
+[dependencies.narwhal-config]
+git = "https://github.com/eqlabs/bullshark-bft/"
+package = "narwhal-config"
+
 [dependencies.num_cpus]
 version = "1"
 
@@ -110,6 +114,9 @@ version = "0.3"
 [dependencies.tokio]
 version = "1.28"
 features = ["rt", "signal"]
+
+[dependencies.tokio-stream]
+version = "0.1"
 
 [dependencies.tokio-util]
 version = "0.7"
