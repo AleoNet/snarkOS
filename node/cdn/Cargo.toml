@@ -46,6 +46,9 @@ optional = true
 [dependencies.reqwest]
 version = "0.11"
 
+[dependencies.serde]
+version = "1"
+
 [dependencies.snarkos-node-ledger]
 path = "../ledger"
 
