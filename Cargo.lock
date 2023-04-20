@@ -2797,6 +2797,8 @@ dependencies = [
  "parking_lot",
  "rayon",
  "reqwest",
+ "serde",
+ "serde_json",
  "snarkos-node-ledger",
  "snarkvm",
  "tokio",
