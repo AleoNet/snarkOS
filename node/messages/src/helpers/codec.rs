@@ -36,7 +36,7 @@ pub struct MessageCodec<N: Network> {
 impl<N: Network> MessageCodec<N> {
     /// Increases the maximum permitted message size post-handshake.
     pub fn update_max_message_len(&mut self) {
-        self.codec = LengthDelimitedCodec::builder().max_frame_length(MAXIMUM_MESSAGE_SIZE).little_endian().new_codec();
+        self.codec.set_max_frame_length(MAXIMUM_MESSAGE_SIZE);
     }
 }
 
