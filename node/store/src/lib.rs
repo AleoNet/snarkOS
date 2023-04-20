@@ -36,7 +36,7 @@ pub use transaction::*;
 mod transition;
 pub use transition::*;
 
-/// The RocksDB map prefix broken down into the record category and the specific type of the record.
+/// The RocksDB map prefix broken down into the entry category and the specific type of the entry.
 // Note: the order of these variants can be changed at any point in time.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 #[repr(u16)]
@@ -70,7 +70,7 @@ impl From<MapID> for u16 {
     }
 }
 
-/// The RocksDB map prefix for block-related records.
+/// The RocksDB map prefix for block-related entries.
 // Note: the order of these variants can be changed at any point in time,
 // as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -88,7 +88,7 @@ pub enum BlockMap {
     Signature = DataID::BlockSignatureMap as u16,
 }
 
-/// The RocksDB map prefix for deployment-related records.
+/// The RocksDB map prefix for deployment-related entries.
 // Note: the order of these variants can be changed at any point in time,
 // as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -105,7 +105,7 @@ pub enum DeploymentMap {
     ReverseFee = DataID::DeploymentReverseFeeMap as u16,
 }
 
-/// The RocksDB map prefix for execution-related records.
+/// The RocksDB map prefix for execution-related entries.
 // Note: the order of these variants can be changed at any point in time,
 // as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -117,7 +117,7 @@ pub enum ExecutionMap {
     Fee = DataID::ExecutionFeeMap as u16,
 }
 
-/// The RocksDB map prefix for transition input records.
+/// The RocksDB map prefix for transition input entries.
 // Note: the order of these variants can be changed at any point in time,
 // as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -133,7 +133,7 @@ pub enum TransitionInputMap {
     ExternalRecord = DataID::InputExternalRecordMap as u16,
 }
 
-/// The RocksDB map prefix for transition output records.
+/// The RocksDB map prefix for transition output entries.
 // Note: the order of these variants can be changed at any point in time,
 // as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -149,7 +149,7 @@ pub enum TransitionOutputMap {
     ExternalRecord = DataID::OutputExternalRecordMap as u16,
 }
 
-/// The RocksDB map prefix for transaction-related records.
+/// The RocksDB map prefix for transaction-related entries.
 // Note: the order of these variants can be changed at any point in time,
 // as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -158,7 +158,7 @@ pub enum TransactionMap {
     ID = DataID::TransactionIDMap as u16,
 }
 
-/// The RocksDB map prefix for transition-related records.
+/// The RocksDB map prefix for transition-related entries.
 // Note: the order of these variants can be changed at any point in time,
 // as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -173,7 +173,7 @@ pub enum TransitionMap {
     ReverseTCM = DataID::TransitionReverseTCMMap as u16,
 }
 
-/// The RocksDB map prefix for program-related records.
+/// The RocksDB map prefix for program-related entries.
 // Note: the order of these variants can be changed at any point in time,
 // as long as the corresponding DataID values remain the same.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -187,7 +187,7 @@ pub enum ProgramMap {
     Value = DataID::ValueMap as u16,
 }
 
-/// The RocksDB map prefix for test-related records.
+/// The RocksDB map prefix for test-related entries.
 // Note: the order of these variants can be changed at any point in time.
 #[cfg(test)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
