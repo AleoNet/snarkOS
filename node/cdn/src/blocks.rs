@@ -279,10 +279,15 @@ async fn cdn_height<const BLOCKS_PER_FILE: u32>(base_url: &str) -> Result<u32> {
         Ok(bytes) => bytes,
         Err(error) => bail!("Failed to parse the CDN height response: {error}"),
     };
-    // Parse the bytes for the tip.
-    let tip = match bincode::deserialize::<LatestState>(&bytes) {
+    // Parse the bytes for the string.
+    let latest_state_string = match bincode::deserialize::<String>(&bytes) {
+        Ok(string) => string,
+        Err(error) => bail!("Failed to deserialize the CDN height response: {error}"),
+    };
+    // Parse the string for the tip.
+    let tip = match serde_json::from_str::<LatestState>(&latest_state_string) {
         Ok(latest) => latest.exclusive_height,
-        Err(error) => bail!("Failed to deserialize the CDN height respone: {error}"),
+        Err(error) => bail!("Failed to extract the CDN height response: {error}"),
     };
     // Decrement the tip by a few blocks to ensure the CDN is caught up.
     let tip = tip.saturating_sub(10);
@@ -387,7 +392,7 @@ mod tests {
 
     type CurrentNetwork = Testnet3;
 
-    const TEST_BASE_URL: &str = "https://testnet3.blocks.aleo.org/phase2";
+    const TEST_BASE_URL: &str = "https://testnet3.blocks.aleo.org/phase3";
 
     fn check_load_blocks(start: u32, end: Option<u32>, expected: usize) {
         let blocks = Arc::new(RwLock::new(Vec::new()));
