@@ -20,7 +20,7 @@ use std::{
 use anyhow::bail;
 use async_trait::async_trait;
 use bytes::BytesMut;
-use fastcrypto::bls12381::min_sig::BLS12381PublicKey;
+use narwhal_crypto::PublicKey;
 use narwhal_executor::ExecutionState;
 use narwhal_types::ConsensusOutput;
 use parking_lot::Mutex;
@@ -35,14 +35,14 @@ use snarkvm::prelude::{ConsensusStorage, Network};
 // The state available to the BFT consensus.
 #[derive(Clone)]
 pub struct BftExecutionState<N: Network, C: ConsensusStorage<N>> {
-    primary_pub: BLS12381PublicKey,
+    primary_pub: PublicKey,
     router: Router<N>,
     consensus: AleoConsensus<N, C>,
     pub last_output: Arc<Mutex<Option<ConsensusOutput>>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> BftExecutionState<N, C> {
-    pub fn new(primary_pub: BLS12381PublicKey, router: Router<N>, consensus: AleoConsensus<N, C>) -> Self {
+    pub fn new(primary_pub: PublicKey, router: Router<N>, consensus: AleoConsensus<N, C>) -> Self {
         Self { primary_pub, router, consensus, last_output: Default::default() }
     }
 }

@@ -34,6 +34,7 @@ use std::{io, net::SocketAddr};
 use tokio::net::TcpStream;
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
+use tracing::trace;
 
 /// A macro unwrapping the expected handshake message or returning an error for unexpected messages.
 #[macro_export]

@@ -12,6 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use fastcrypto::traits::{EncodeDecodeBase64 as _, KeyPair as _};
+use narwhal_crypto::EncodeDecodeBase64;
 use std::{
     collections::BTreeMap,
     fs,
@@ -21,16 +23,9 @@ use std::{
 
 #[cfg(not(feature = "test"))]
 use aleo_std::aleo_dir;
-use anyhow::anyhow;
-use fastcrypto::{
-    bls12381::min_sig::BLS12381KeyPair,
-    ed25519::Ed25519KeyPair,
-    encoding::{Base64, Encoding},
-    traits::{EncodeDecodeBase64, KeyPair, ToFromBytes},
-};
 use multiaddr::Multiaddr;
 use narwhal_config::{Authority, Committee, WorkerCache, WorkerIndex, WorkerInfo};
-use narwhal_crypto::NetworkKeyPair;
+use narwhal_crypto::{KeyPair as NarwhalKeyPair, NetworkKeyPair};
 use rand::prelude::ThreadRng;
 use tracing::*;
 
@@ -61,7 +56,7 @@ use test_ports::*;
 pub struct PrimarySetup {
     pub stake: u64,
     pub address: Multiaddr,
-    pub keypair: BLS12381KeyPair,
+    pub keypair: NarwhalKeyPair,
     pub network_keypair: NetworkKeyPair,
     pub workers: Vec<WorkerSetup>,
 }
@@ -103,7 +98,7 @@ impl PrimarySetup {
         Self {
             stake,
             address,
-            keypair: BLS12381KeyPair::generate(rng),
+            keypair: NarwhalKeyPair::new(rng).unwrap(),
             network_keypair: NetworkKeyPair::generate(rng),
             workers,
         }
@@ -310,19 +305,6 @@ pub(crate) fn worker_storage_dir(network: u16, worker_id: u32, dev: Option<u16>)
     }
 
     path
-}
-
-// Reads the primary's network keypair from the given path.
-pub(crate) fn read_network_keypair_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<Ed25519KeyPair> {
-    let contents = fs::read_to_string(path)?;
-    let bytes = Base64::decode(contents.as_str()).map_err(|e| anyhow!(e))?;
-    Ed25519KeyPair::from_bytes(&bytes).map_err(|e| anyhow!(e))
-}
-
-// Reads the primary's authority keypair from the given path.
-pub fn read_authority_keypair_from_file<P: AsRef<Path>>(path: P) -> anyhow::Result<BLS12381KeyPair> {
-    let contents = fs::read_to_string(path)?;
-    BLS12381KeyPair::decode_base64(contents.as_str().trim()).map_err(|e| anyhow!(e))
 }
 
 // Returns the workspace path.

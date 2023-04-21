@@ -29,9 +29,8 @@ version = "1.0"
 [dependencies.bytes]
 version = "1"
 
-[dependencies.fastcrypto]
-git = "https://github.com/MystenLabs/fastcrypto"
-rev = "235211dc8195590f5353d38135f5ee51a267521e"
+[dependencies.narwhal-crypto]
+workspace = true
 
 [dependencies.indexmap]
 version = "1"
@@ -45,6 +44,12 @@ version = "1"
 
 [dependencies.serde]
 version = "1"
+
+[dependencies.serde_json]
+version = "1"
+
+[dependencies.rand]
+version = "0.8.5"
 
 [dependencies.snarkvm]
 workspace = true

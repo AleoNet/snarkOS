@@ -23,12 +23,16 @@ pub use validation::TransactionValidator;
 
 use anyhow::Result;
 use arc_swap::ArcSwap;
-use fastcrypto::{bls12381::min_sig::BLS12381KeyPair, traits::KeyPair};
 use multiaddr::Protocol;
 use narwhal_config::{Committee, Import, Parameters, WorkerCache};
-use narwhal_crypto::NetworkKeyPair;
+use narwhal_crypto::{KeyPair as NarwhalKeyPair, NetworkKeyPair};
 use narwhal_executor::ExecutionState;
-use narwhal_node::{primary_node::PrimaryNode, worker_node::WorkerNode, NodeStorage};
+use narwhal_node::{
+    keypair_file::{read_authority_keypair_from_file, read_network_keypair_from_file},
+    primary_node::PrimaryNode,
+    worker_node::WorkerNode,
+    NodeStorage,
+};
 use narwhal_types::TransactionsClient;
 use std::{net::IpAddr, sync::Arc};
 use tonic::transport::Channel;
@@ -38,7 +42,7 @@ use snarkvm::prelude::{ConsensusStorage, Network};
 
 // An instance of BFT consensus that hasn't been started yet.
 pub struct InertConsensusInstance<S: ExecutionState, V: narwhal_worker::TransactionValidator> {
-    pub primary_keypair: BLS12381KeyPair,
+    pub primary_keypair: NarwhalKeyPair,
     pub network_keypair: NetworkKeyPair,
     pub worker_keypairs: Vec<NetworkKeyPair>,
     pub parameters: Parameters,

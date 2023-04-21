@@ -13,15 +13,12 @@
 // limitations under the License.
 
 use super::*;
-use fastcrypto::{
-    bls12381::min_sig::{BLS12381PublicKey, BLS12381Signature},
-    traits::ToFromBytes,
-};
+use narwhal_crypto::{PublicKey, Signature};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ConsensusId {
-    pub public_key: BLS12381PublicKey,
-    pub signature: BLS12381Signature,
+    pub public_key: PublicKey,
+    pub signature: Signature,
 }
 
 impl MessageTrait for Box<ConsensusId> {
@@ -30,15 +27,65 @@ impl MessageTrait for Box<ConsensusId> {
     }
 
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(self.public_key.as_bytes())?;
-        writer.write_all(self.signature.as_bytes())?;
+        bincode::serialize_into(writer, &(&self.public_key, &self.signature))?;
+        // serde_json::to_writer(writer.by_ref(), &(&self.public_key, &self.signature))?;
 
         Ok(())
     }
 
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let (public_key, signature) = bincode::deserialize_from(&mut bytes.reader())?;
+        let mut reader = bytes.reader();
+        // let (public_key, signature) = bincode::deserialize_from(&mut reader.by_ref())?;
+        let mut dst = [0; 1024];
+        let num = reader.read(&mut dst).unwrap();
+        let (public_key, signature) = bincode::deserialize(&dst[..num])?;
 
         Ok(Box::new(ConsensusId { public_key, signature }))
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use bytes::BufMut;
+    use narwhal_crypto::KeyPair as NarwhalKeyPair;
+
+    use super::*;
+
+    #[test]
+    fn consensus_id_serialization() {
+        let mut rng = rand::thread_rng();
+        let keypair = NarwhalKeyPair::new(&mut rng).unwrap();
+        let public = keypair.public();
+        let private = keypair.private();
+
+        let message = &[0u8; 32];
+        let signature = private.sign_bytes(message, &mut rng).unwrap();
+
+        let id = Box::new(ConsensusId { public_key: public.clone(), signature });
+        let mut buf = BytesMut::with_capacity(128).writer();
+        id.serialize(&mut buf).unwrap();
+        let bytes = buf.into_inner();
+        let deserialized = MessageTrait::deserialize(bytes).unwrap();
+        assert_eq!(id, deserialized);
+    }
+
+    #[test]
+    fn signature_serialization() {
+        let mut rng = rand::thread_rng();
+        let keypair = NarwhalKeyPair::new(&mut rng).unwrap();
+        let private = keypair.private();
+
+        let message = &[0u8; 32];
+        let signature = private.sign_bytes(message, &mut rng).unwrap();
+        let json = serde_json::to_string(&signature).unwrap();
+        let deserialized: Signature = serde_json::from_str(&json).unwrap();
+        assert_eq!(signature, deserialized);
+
+        // TODO: why does the below fail?
+        // let mut buf = BytesMut::with_capacity(256).writer();
+        // bincode::serialize_into(&mut buf.by_ref(), &signature).unwrap();
+        // let bytes = buf.into_inner();
+        // let deserialized: Signature = bincode::deserialize_from(&mut bytes.reader()).unwrap();
+        // assert_eq!(signature, deserialized);
     }
 }

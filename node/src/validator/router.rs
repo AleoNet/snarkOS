@@ -32,10 +32,6 @@ use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{error, EpochChallenge, Network, Transaction};
 
 use bytes::BytesMut;
-use fastcrypto::{
-    traits::{Signer, ToFromBytes},
-    Verifier,
-};
 use futures_util::sink::SinkExt;
 use std::{collections::HashSet, io, net::SocketAddr, time::Duration};
 use tokio::{net::TcpStream, task::spawn_blocking};
@@ -68,7 +64,11 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // TODO: we should probably use something else than the public key, potentially interactive, since this could
         // be copied and reused by a malicious validator.
         let public_key = self.primary_keypair.public();
-        let signature = self.primary_keypair.sign(public_key.as_bytes());
+        let signature = self
+            .primary_keypair
+            .private()
+            .sign_bytes(public_key.to_bytes().as_slice(), &mut rand::thread_rng())
+            .unwrap();
 
         let message = Message::ConsensusId(Box::new(ConsensusId { public_key: public_key.clone(), signature }));
         framed.send(message).await?;
@@ -87,7 +87,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Check the signature.
         // TODO: again, the signed message should probably be something we send to the peer, not
         // their public key.
-        if consensus_id.public_key.verify(consensus_id.public_key.as_bytes(), &consensus_id.signature).is_err() {
+        if !consensus_id.signature.verify_bytes(&consensus_id.public_key, &consensus_id.public_key.to_bytes()) {
             return Err(error(format!("'{peer_ip}' couldn't verify their identity")));
         }
 

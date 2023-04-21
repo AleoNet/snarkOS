@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use narwhal_node::keypair_file::read_authority_keypair_from_file;
 use snarkos_account::Account;
-use snarkos_node_bft_consensus::setup::{read_authority_keypair_from_file, workspace_dir};
+use snarkos_node_bft_consensus::setup::workspace_dir;
 use snarkos_node_messages::{
     ChallengeRequest,
     ChallengeResponse,
@@ -33,10 +34,6 @@ use std::{
     str::FromStr,
 };
 
-use fastcrypto::{
-    traits::{KeyPair, Signer, ToFromBytes},
-    Verifier,
-};
 use futures_util::{sink::SinkExt, TryStreamExt};
 use pea2pea::{
     protocols::{Disconnect, Handshake, Reading, Writing},
@@ -48,7 +45,7 @@ use pea2pea::{
 };
 use rand::Rng;
 use tokio_util::codec::Framed;
-use tracing::*;
+use tracing::trace;
 
 const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
@@ -194,7 +191,7 @@ impl Handshake for TestPeer {
         let kp = read_authority_keypair_from_file(key_file).unwrap();
 
         let public_key = kp.public();
-        let signature = kp.sign(public_key.as_bytes());
+        let signature = kp.private().sign_bytes(public_key.to_bytes().as_slice(), rng).unwrap();
 
         let message = Message::ConsensusId(Box::new(ConsensusId { public_key: public_key.clone(), signature }));
         framed.send(message).await?;
@@ -204,7 +201,7 @@ impl Handshake for TestPeer {
         };
 
         // Check the signature.
-        if consensus_id.public_key.verify(consensus_id.public_key.as_bytes(), &consensus_id.signature).is_err() {
+        if !consensus_id.signature.verify_bytes(&consensus_id.public_key, &consensus_id.public_key.to_bytes()) {
             panic!("signature doesn't verify")
         }
 
