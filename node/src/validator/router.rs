@@ -36,6 +36,7 @@ use fastcrypto::{
     traits::{Signer, ToFromBytes},
     Verifier,
 };
+use futures_util::sink::SinkExt;
 use std::{collections::HashSet, io, net::SocketAddr, time::Duration};
 use tokio::{net::TcpStream, task::spawn_blocking};
 use tokio_stream::StreamExt;

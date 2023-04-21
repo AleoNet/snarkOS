@@ -14,7 +14,7 @@
 
 use super::*;
 
-use std::collections::hash_map::Entry;
+use indexmap::map;
 
 impl<N: Network> MemoryPool<N> {
     /// Returns `true` if the given unconfirmed transaction exists in the memory pool.
@@ -75,13 +75,13 @@ impl<N: Network> MemoryPool<N> {
 
         // Ensure the transaction does not already exist in the memory pool.
         match unconfirmed_transactions.entry(transaction.id()) {
-            Entry::Vacant(entry) => {
+            map::Entry::Vacant(entry) => {
                 // Add the transaction to the memory pool.
                 entry.insert(transaction.clone());
                 debug!("✉️  Added transaction '{}' to the memory pool", transaction.id());
                 true
             }
-            Entry::Occupied(_) => {
+            map::Entry::Occupied(_) => {
                 trace!("Transaction '{}' already exists in memory pool", transaction.id());
                 false
             }

@@ -21,6 +21,7 @@ default = [ "parallel" ]
 metrics = ["snarkos-node-bft-consensus/metrics"]
 parallel = [ "rayon" ]
 timer = [ "aleo-std/timer" ]
+test = []
 
 [dependencies] # added for BFT
 narwhal-types.workspace = true
@@ -86,9 +87,6 @@ path = "./consensus"
 
 [dependencies.snarkos-node-bft-consensus]
 path = "./bft-consensus"
-
-[dependencies.snarkos-node-ledger]
-path = "./ledger"
 
 [dependencies.snarkos-node-messages]
 path = "./messages"

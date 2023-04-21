@@ -14,14 +14,7 @@
 
 use super::*;
 
-use snarkos_node_messages::{
-    BlockRequest,
-    DisconnectReason,
-    MessageCodec,
-    NewBlock,
-    Pong,
-    UnconfirmedTransaction,
-};
+use snarkos_node_messages::{BlockRequest, DisconnectReason, MessageCodec, NewBlock, Pong, UnconfirmedTransaction};
 use snarkos_node_router::Routing;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{Network, Transaction};
