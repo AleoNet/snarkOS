@@ -260,7 +260,7 @@ impl<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned> fmt::Debu
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{rocksdb::tests::temp_dir, TestMap};
+    use crate::{rocksdb::tests::temp_dir, MapID, TestMap};
     use snarkvm::prelude::{Address, FromStr, Testnet3};
 
     use serial_test::serial;
