@@ -22,7 +22,8 @@ use core::marker::PhantomData;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
 /// The maximum size of a message that can be transmitted during the handshake.
-const MAXIMUM_HANDSHAKE_MESSAGE_SIZE: usize = 1024 * 1024; // 1 MiB
+// TODO: this is large due to block locators sent by validators; restrict it.
+const MAXIMUM_HANDSHAKE_MESSAGE_SIZE: usize = 64 * 1024 * 1024; // 64 MiB
 
 /// The maximum size of a message that can be transmitted in the network.
 const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
@@ -34,19 +35,17 @@ pub struct MessageCodec<N: Network> {
 }
 
 impl<N: Network> MessageCodec<N> {
-    /// Increases the maximum permitted message size post-handshake.
-    pub fn update_max_message_len(&mut self) {
-        self.codec.set_max_frame_length(MAXIMUM_MESSAGE_SIZE);
+    pub fn handshake() -> Self {
+        let mut codec = Self::default();
+        codec.codec.set_max_frame_length(MAXIMUM_HANDSHAKE_MESSAGE_SIZE);
+        codec
     }
 }
 
 impl<N: Network> Default for MessageCodec<N> {
     fn default() -> Self {
         Self {
-            codec: LengthDelimitedCodec::builder()
-                .max_frame_length(MAXIMUM_HANDSHAKE_MESSAGE_SIZE)
-                .little_endian()
-                .new_codec(),
+            codec: LengthDelimitedCodec::builder().max_frame_length(MAXIMUM_MESSAGE_SIZE).little_endian().new_codec(),
             _phantom: Default::default(),
         }
     }
