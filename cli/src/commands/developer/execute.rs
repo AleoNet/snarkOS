@@ -31,7 +31,7 @@ use snarkvm::prelude::{
     VM,
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
 use std::str::FromStr;
@@ -56,10 +56,10 @@ pub struct Execute {
     query: String,
     /// The transaction fee in microcredits.
     #[clap(short, long)]
-    fee: u64,
+    fee: Option<u64>,
     /// The record to spend the fee from.
     #[clap(short, long)]
-    record: String,
+    record: Option<String>,
     /// Display the generated transaction.
     #[clap(short, long, conflicts_with = "broadcast")]
     display: bool,
@@ -97,13 +97,26 @@ impl Execute {
             let vm = VM::from(store)?;
 
             // Add the program deployment to the VM.
-            if program.id() != &ProgramID::<CurrentNetwork>::try_from("credits.aleo")? {
+            let credits = ProgramID::<CurrentNetwork>::try_from("credits.aleo")?;
+            if program.id() != &credits {
                 let deployment = vm.deploy(&program, rng)?;
                 vm.process().write().finalize_deployment(vm.program_store(), &deployment)?;
             }
 
             // Prepare the fees.
-            let fee = (Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.record)?, self.fee);
+            let fee = match self.record {
+                Some(record) => Some((
+                    Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&record)?,
+                    self.fee.unwrap_or(0),
+                )),
+                None => {
+                    // Ensure that only the `credits.aleo/split` call can be created without a fee.
+                    if program.id() != &credits && self.function != Identifier::from_str("split")? {
+                        bail!("❌ A record must be provided to pay for the transaction fee.");
+                    }
+                    None
+                }
+            };
 
             // Create a new transaction.
             Transaction::execute(
@@ -111,7 +124,7 @@ impl Execute {
                 &private_key,
                 (self.program_id, self.function),
                 self.inputs.iter(),
-                Some(fee),
+                fee,
                 Some(query),
                 rng,
             )?
