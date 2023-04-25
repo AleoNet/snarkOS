@@ -3526,9 +3526,9 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-utilities"
-version = "0.10.2"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f2d974eb4d9050087496ab5f8f7b7ac264e11a8daae5cd0bb8e08c3331745e3"
+checksum = "650db36f474fd2f7b845f54caa24c27323b84f721c55b05efb88e85520fe14fa"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3546,9 +3546,9 @@ dependencies = [
 
 [[package]]
 name = "snarkvm-utilities-derives"
-version = "0.10.2"
+version = "0.10.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9b59d1e033d836325249e13b9d1fd8e026e0a4b7d0c8197d6a42e622faa15291"
+checksum = "9562030dcbb00da42a6500eca56d8d660d17c2be8aa40a6032697903023ce74e"
 dependencies = [
  "proc-macro2 1.0.56",
  "quote 1.0.26",
