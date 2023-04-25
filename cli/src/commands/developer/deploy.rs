@@ -48,9 +48,9 @@ pub struct Deploy {
     /// The endpoint to query node state from.
     #[clap(short, long)]
     query: String,
-    /// The deployment fee in gates, defaults to 0.
+    /// The deployment fee in microcredits.
     #[clap(short, long)]
-    fee: Option<u64>,
+    fee: u64,
     /// The record to spend the fee from.
     #[clap(short, long)]
     record: String,
@@ -89,13 +89,10 @@ impl Deploy {
             let vm = VM::from(store)?;
 
             // Prepare the fees.
-            let fee_record = Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.record)?;
-
-            // TODO (raychu86): Handle default fee.
-            let fee_amount = self.fee.unwrap_or(0);
+            let fee = (Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.record)?, self.fee);
 
             // Create a new transaction.
-            Transaction::deploy(&vm, &private_key, &program, (fee_record, fee_amount), Some(query), rng)?
+            Transaction::deploy(&vm, &private_key, &program, fee, Some(query), rng)?
         };
         format!("✅ Created deployment transaction for '{}'", self.program_id.to_string().bold());
 

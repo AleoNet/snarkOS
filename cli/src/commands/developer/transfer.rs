@@ -43,7 +43,7 @@ pub struct Transfer {
     /// The recipient address.
     #[clap(parse(try_from_str), long)]
     recipient: Address<CurrentNetwork>,
-    /// The number of gates to transfer.
+    /// The number of microcredits to transfer.
     #[clap(parse(try_from_str), long)]
     amount: u64,
     /// The private key used to generate the execution.
@@ -52,12 +52,12 @@ pub struct Transfer {
     /// The endpoint to query node state from.
     #[clap(short, long)]
     query: String,
-    /// The deployment fee in gates, defaults to 0.
+    /// The transaction fee in microcredits.
     #[clap(short, long)]
-    fee: Option<u64>,
+    fee: u64,
     /// The record to spend the fee from.
     #[clap(long)]
-    fee_record: Option<String>,
+    fee_record: String,
     /// Display the generated transaction.
     #[clap(short, long, conflicts_with = "broadcast")]
     display: bool,
@@ -91,15 +91,7 @@ impl Transfer {
             let vm = VM::from(store)?;
 
             // Prepare the fees.
-            let fee = match self.fee_record {
-                Some(record) => {
-                    let record = Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&record)?;
-                    let fee_amount = self.fee.unwrap_or(0);
-
-                    Some((record, fee_amount))
-                }
-                None => None,
-            };
+            let fee = (Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.fee_record)?, self.fee);
 
             // Prepare the inputs for a transfer.
             let inputs = vec![
@@ -109,10 +101,18 @@ impl Transfer {
             ];
 
             // Create a new transaction.
-            Transaction::execute(&vm, &private_key, ("credits.aleo", "transfer"), inputs.iter(), fee, Some(query), rng)?
+            Transaction::execute(
+                &vm,
+                &private_key,
+                ("credits.aleo", "transfer"),
+                inputs.iter(),
+                Some(fee),
+                Some(query),
+                rng,
+            )?
         };
         let locator = Locator::<CurrentNetwork>::from_str("credits.aleo/transfer")?;
-        format!("✅ Created transfer of {} gates to {}...\n", &self.amount, self.recipient);
+        format!("✅ Created transfer of {} credits to {}...\n", &self.amount, self.recipient);
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
         Developer::handle_transaction(self.broadcast, self.display, self.store, execution, locator.to_string())

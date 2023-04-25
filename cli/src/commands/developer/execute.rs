@@ -54,12 +54,12 @@ pub struct Execute {
     /// The endpoint to query node state from.
     #[clap(short, long)]
     query: String,
-    /// The deployment fee in gates, defaults to 0.
+    /// The transaction fee in microcredits.
     #[clap(short, long)]
-    fee: Option<u64>,
+    fee: u64,
     /// The record to spend the fee from.
     #[clap(short, long)]
-    record: Option<String>,
+    record: String,
     /// Display the generated transaction.
     #[clap(short, long, conflicts_with = "broadcast")]
     display: bool,
@@ -103,15 +103,7 @@ impl Execute {
             }
 
             // Prepare the fees.
-            let fee = match self.record {
-                Some(record) => {
-                    let record = Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&record)?;
-                    let fee_amount = self.fee.unwrap_or(0);
-
-                    Some((record, fee_amount))
-                }
-                None => None,
-            };
+            let fee = (Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.record)?, self.fee);
 
             // Create a new transaction.
             Transaction::execute(
@@ -119,7 +111,7 @@ impl Execute {
                 &private_key,
                 (self.program_id, self.function),
                 self.inputs.iter(),
-                fee,
+                Some(fee),
                 Some(query),
                 rng,
             )?
