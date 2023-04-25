@@ -112,7 +112,7 @@ impl Transfer {
             )?
         };
         let locator = Locator::<CurrentNetwork>::from_str("credits.aleo/transfer")?;
-        format!("✅ Created transfer of {} credits to {}...\n", &self.amount, self.recipient);
+        format!("✅ Created transfer of {} microcredits to {}...\n", &self.amount, self.recipient);
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
         Developer::handle_transaction(self.broadcast, self.display, self.store, execution, locator.to_string())
