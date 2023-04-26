@@ -14,7 +14,6 @@
 
 use std::{net::SocketAddr, time::Duration};
 
-use crate::store::helpers::memory::ConsensusMemory;
 use indexmap::IndexMap;
 use narwhal_types::TransactionProto;
 use rand::seq::IteratorRandom;
@@ -29,9 +28,9 @@ use snarkvm::{
     },
     prelude::{Ledger, RecordsFilter, TestRng},
     synthesizer::{
-        block::{Block, Transaction},
+        block::Transaction,
         program::Program,
-        store::ConsensusStore,
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
         vm::VM,
     },
 };
@@ -543,6 +542,7 @@ async fn test_bullshark_full() {
     // Sample the genesis private key.
     let genesis_private_key = test_helpers::sample_genesis_private_key(&mut rng);
     let genesis_view_key = ViewKey::try_from(&genesis_private_key).unwrap();
+    let genesis_address = Address::try_from(&genesis_private_key).unwrap();
 
     // Sample the genesis block.
     let genesis = test_helpers::sample_genesis_block_with_private_key(&mut rng, genesis_private_key);
@@ -576,28 +576,6 @@ async fn test_bullshark_full() {
         validators.push(validator);
 
         info!("Validator {i} is ready.");
-    }
-
-    // Wait until the validators are connected to one another.
-    // TODO: validators should do this automatically until quorum is reached
-    loop {
-        info!("Waiting for the validator mesh...");
-
-        let mut mesh_ready = true;
-
-        for validator in &validators {
-            if validator.router().number_of_connected_peers() != N_VALIDATORS as usize - 1 {
-                mesh_ready = false;
-                break;
-            }
-        }
-
-        if mesh_ready {
-            info!("The validator mesh is ready.");
-            break;
-        } else {
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        }
     }
 
     // Prepare the setup related to the BFT workers.
@@ -638,7 +616,7 @@ function hello:
         .collect();
     assert_eq!(records.len(), 4);
 
-    let fee = 600000;
+    let fee = 4000000;
     let (_, record) = records
         .iter()
         .find(|(_, r)| match r.data().get(&microcredits) {
@@ -648,15 +626,8 @@ function hello:
         .unwrap();
 
     // Create a deployment transaction for the above program.
-    let deployment_transaction = Transaction::deploy(
-        consensus.ledger.vm(),
-        &genesis_private_key,
-        &program,
-        (record.clone(), fee),
-        None,
-        &mut rng,
-    )
-    .unwrap();
+    let deployment_transaction =
+        consensus.ledger.vm().deploy(&genesis_private_key, &program, (record.clone(), fee), None, &mut rng).unwrap();
 
     // Add the transaction to the memory pool.
     consensus.add_unconfirmed_transaction(deployment_transaction).unwrap();
@@ -686,19 +657,21 @@ function hello:
 
     // Generate execution transactions in the background.
     tokio::task::spawn_blocking(move || {
-        let inputs = [Value::from_str("10u32").unwrap(), Value::from_str("100u32").unwrap()];
+        // TODO (raychu86): Update this bandaid workaround.
+        //  Currently the `mint` function can be called without restriction if the recipient is an authorized `beacon`.
+        //  Consensus rules will change later when staking and proper coinbase rewards are integrated, which will invalidate this approach.
+        //  Note: A more proper way to approach this is to create `split` transactions and then start generating increasingly larger numbers of
+        //  transactions, once more and more records are available to you in subsequent blocks.
+
+        // Create inputs for the `credits.aleo/mint` call.
+        let inputs = [Value::from_str(&genesis_address.to_string()).unwrap(), Value::from_str("1u64").unwrap()];
 
         for i in 0.. {
-            let transaction = Transaction::execute(
-                consensus.ledger.vm(),
-                &genesis_private_key,
-                ("simple.aleo", "hello"),
-                inputs.iter(),
-                None,
-                None,
-                &mut rng,
-            )
-            .unwrap();
+            let transaction = consensus
+                .ledger
+                .vm()
+                .execute(&genesis_private_key, ("credits.aleo", "mint"), inputs.iter(), None, None, &mut rng)
+                .unwrap();
 
             info!("Created transaction {} ({}/inf).", transaction.id(), i + 1);
 
