@@ -16,6 +16,8 @@
 
 use super::*;
 
+use std::collections::hash_map::Entry;
+
 impl<N: Network> MemoryPool<N> {
     /// Returns `true` if the given unconfirmed solution exists in the memory pool.
     pub fn contains_unconfirmed_solution(&self, puzzle_commitment: PuzzleCommitment<N>) -> bool {
@@ -107,16 +109,16 @@ impl<N: Network> MemoryPool<N> {
         let mut unconfirmed_solutions = self.unconfirmed_solutions.write();
 
         // Ensure the solution does not already exist in the memory pool.
-        match !unconfirmed_solutions.contains_key(&solution.commitment()) {
-            true => {
+        match unconfirmed_solutions.entry(solution.commitment()) {
+            Entry::Vacant(entry) => {
                 // Compute the proof target.
                 let proof_target = solution.to_target()?;
                 // Add the solution to the memory pool.
-                unconfirmed_solutions.insert(solution.commitment(), (*solution, proof_target));
+                entry.insert((*solution, proof_target));
                 debug!("✉️  Added a prover solution with target '{proof_target}' to the memory pool");
                 Ok(true)
             }
-            false => {
+            Entry::Occupied(_) => {
                 trace!("Prover solution '{}' already exists in memory pool", solution.commitment());
                 Ok(false)
             }
