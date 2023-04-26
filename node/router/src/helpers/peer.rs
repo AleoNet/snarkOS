@@ -14,11 +14,10 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_messages::NodeType;
+use snarkos_node_messages::{ChallengeRequest, NodeType};
 use snarkvm::prelude::{Address, Network};
 
-use parking_lot::RwLock;
-use std::{net::SocketAddr, sync::Arc, time::Instant};
+use std::{net::SocketAddr, time::Instant};
 
 /// The state for each connected peer.
 #[derive(Clone, Debug)]
@@ -34,19 +33,19 @@ pub struct Peer<N: Network> {
     /// The timestamp of the first message received from the peer.
     first_seen: Instant,
     /// The timestamp of the last message received from this peer.
-    last_seen: Arc<RwLock<Instant>>,
+    last_seen: Instant,
 }
 
 impl<N: Network> Peer<N> {
     /// Initializes a new instance of `Peer`.
-    pub fn new(listening_ip: SocketAddr, address: Address<N>, node_type: NodeType, version: u32) -> Self {
+    pub fn new(listening_ip: SocketAddr, challenge_request: &ChallengeRequest<N>) -> Self {
         Self {
             peer_ip: listening_ip,
-            address,
-            node_type,
-            version,
+            address: challenge_request.address,
+            node_type: challenge_request.node_type,
+            version: challenge_request.version,
             first_seen: Instant::now(),
-            last_seen: Arc::new(RwLock::new(Instant::now())),
+            last_seen: Instant::now(),
         }
     }
 
@@ -97,7 +96,7 @@ impl<N: Network> Peer<N> {
 
     /// Returns the last seen timestamp of the peer.
     pub fn last_seen(&self) -> Instant {
-        *self.last_seen.read()
+        self.last_seen
     }
 }
 
@@ -113,7 +112,7 @@ impl<N: Network> Peer<N> {
     }
 
     /// Updates the last seen timestamp of the peer.
-    pub fn set_last_seen(&self, last_seen: Instant) {
-        *self.last_seen.write() = last_seen;
+    pub fn set_last_seen(&mut self, last_seen: Instant) {
+        self.last_seen = last_seen;
     }
 }

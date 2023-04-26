@@ -16,6 +16,8 @@
 
 use super::*;
 
+use rayon::iter::{IntoParallelIterator, ParallelIterator};
+
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
 struct BlockRange {
@@ -381,7 +383,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         });
 
         // Broadcast the transaction.
-        routing.propagate(message, vec![]);
+        routing.propagate(message, &[]);
 
         Ok(transaction_id.to_string())
     }

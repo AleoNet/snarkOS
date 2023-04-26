@@ -89,7 +89,7 @@ pub struct InnerRouter<N: Network> {
     /// The set of restricted peer IPs.
     restricted_peers: RwLock<IndexMap<SocketAddr, Instant>>,
     /// The spawned handles.
-    handles: RwLock<Vec<JoinHandle<()>>>,
+    handles: Mutex<Vec<JoinHandle<()>>>,
     /// The boolean flag for the development mode.
     is_dev: bool,
 }
@@ -145,7 +145,6 @@ impl<N: Network> Router<N> {
         let router = self.clone();
         tokio::spawn(async move {
             // Attempt to connect to the candidate peer.
-            debug!("Connecting to {peer_ip}...");
             match router.tcp.connect(peer_ip).await {
                 // Remove the peer from the candidate peers.
                 Ok(()) => router.remove_candidate_peer(peer_ip),
@@ -386,16 +385,16 @@ impl<N: Network> Router<N> {
         } else {
             // TODO (howardwu): Change this for Phase 3.
             vec![
-                SocketAddr::from_str("164.92.111.59:4133").unwrap(),
-                SocketAddr::from_str("159.223.204.96:4133").unwrap(),
-                SocketAddr::from_str("167.71.219.176:4133").unwrap(),
-                SocketAddr::from_str("157.245.205.209:4133").unwrap(),
-                SocketAddr::from_str("134.122.95.106:4133").unwrap(),
-                SocketAddr::from_str("161.35.24.55:4133").unwrap(),
-                SocketAddr::from_str("138.68.103.139:4133").unwrap(),
-                SocketAddr::from_str("207.154.215.49:4133").unwrap(),
-                SocketAddr::from_str("46.101.114.158:4133").unwrap(),
-                SocketAddr::from_str("138.197.190.94:4133").unwrap(),
+                SocketAddr::from_str("24.199.74.2:4133").unwrap(),
+                SocketAddr::from_str("167.172.14.86:4133").unwrap(),
+                SocketAddr::from_str("159.203.146.71:4133").unwrap(),
+                SocketAddr::from_str("188.166.201.188:4133").unwrap(),
+                SocketAddr::from_str("161.35.247.23:4133").unwrap(),
+                SocketAddr::from_str("144.126.245.162:4133").unwrap(),
+                SocketAddr::from_str("138.68.126.82:4133").unwrap(),
+                SocketAddr::from_str("170.64.252.58:4133").unwrap(),
+                SocketAddr::from_str("159.89.211.64:4133").unwrap(),
+                SocketAddr::from_str("143.244.211.239:4133").unwrap(),
             ]
         }
     }
@@ -407,14 +406,15 @@ impl<N: Network> Router<N> {
 
     /// Inserts the given peer into the connected peers.
     pub fn insert_connected_peer(&self, peer: Peer<N>, peer_addr: SocketAddr) {
+        let peer_ip = peer.ip();
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
-        self.resolver.insert_peer(peer.ip(), peer_addr);
+        self.resolver.insert_peer(peer_ip, peer_addr);
         // Add an entry for this `Peer` in the connected peers.
-        self.connected_peers.write().insert(peer.ip(), peer.clone());
+        self.connected_peers.write().insert(peer_ip, peer);
         // Remove this peer from the candidate peers, if it exists.
-        self.candidate_peers.write().remove(&peer.ip());
+        self.candidate_peers.write().remove(&peer_ip);
         // Remove this peer from the restricted peers, if it exists.
-        self.restricted_peers.write().remove(&peer.ip());
+        self.restricted_peers.write().remove(&peer_ip);
     }
 
     /// Inserts the given peer IPs to the set of candidate peers.
@@ -489,14 +489,14 @@ impl<N: Network> Router<N> {
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
     pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
-        self.handles.write().push(tokio::spawn(future));
+        self.handles.lock().push(tokio::spawn(future));
     }
 
     /// Shuts down the router.
     pub async fn shut_down(&self) {
         trace!("Shutting down the router...");
         // Abort the tasks.
-        self.handles.read().iter().for_each(|handle| handle.abort());
+        self.handles.lock().iter().for_each(|handle| handle.abort());
         // Close the listener.
         self.tcp.shut_down().await;
     }

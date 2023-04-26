@@ -31,19 +31,18 @@ mod tests;
 use snarkos_node_ledger::Ledger;
 use snarkvm::prelude::*;
 
+use ::time::OffsetDateTime;
 use anyhow::{anyhow, ensure, Result};
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 use rayon::iter::ParallelIterator;
 use std::sync::Arc;
-use time::OffsetDateTime;
 
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-// TODO (raychu86): Remove this after Phase 2.
-/// The block height to start using new coinbase targeting algorithm.
-const V4_START_HEIGHT: u32 = 123478;
+/// The cost in microcredits per byte for the deployment transaction.
+const DEPLOYMENT_FEE_FACTOR: u64 = 1000;
 
 #[derive(Clone)]
 pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
@@ -57,6 +56,7 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     // TODO (howardwu): Update this to retrieve from a beacons store.
     beacons: Arc<RwLock<IndexMap<Address<N>, ()>>>,
     /// The boolean flag for the development mode.
+    #[allow(dead_code)]
     is_dev: bool,
 }
 
@@ -174,16 +174,54 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let latest_block = self.ledger.latest_block();
         // Retrieve the latest height.
         let latest_height = latest_block.height();
+        // Retrieve the latest total supply in microcredits.
+        let latest_total_supply_in_microcredits = latest_block.total_supply_in_microcredits();
+        // Retrieve the latest cumulative proof target.
+        let latest_cumulative_proof_target = latest_block.cumulative_proof_target();
         // Retrieve the latest proof target.
         let latest_proof_target = latest_block.proof_target();
         // Retrieve the latest coinbase target.
         let latest_coinbase_target = latest_block.coinbase_target();
+
+        // TODO (raychu86): Use a proper `finalize_root` instead of `Field::zero()` once `finalize` is integrated.
+        // Initialize the new finalize root.
+        let finalize_root = Field::zero();
 
         // Select the transactions from the memory pool.
         let transactions = self.memory_pool.candidate_transactions(self).into_iter().collect::<Transactions<N>>();
         // Select the prover solutions from the memory pool.
         let prover_solutions =
             self.memory_pool.candidate_solutions(self, latest_height, latest_proof_target, latest_coinbase_target)?;
+
+        // TODO (raychu86): Clean this up or create a `total_supply_delta` in `Transactions`.
+        // Calculate the new total supply of microcredits after the block.
+        let mut new_total_supply_in_microcredits = latest_total_supply_in_microcredits;
+        for transaction in transactions.iter() {
+            // Subtract the fee from the total supply.
+            let fee = transaction.fee()?;
+            new_total_supply_in_microcredits = new_total_supply_in_microcredits
+                .checked_sub(*fee)
+                .ok_or_else(|| anyhow!("Fee exceeded total supply of credits"))?;
+
+            // If the transaction is a coinbase, add the amount to the total supply.
+            if transaction.is_coinbase() {
+                match transaction {
+                    Transaction::Execute(_, execution, _) => {
+                        // Get the input amount of the coinbase transaction.
+                        match execution.get(0)?.inputs().get(1) {
+                            Some(Input::Public(_, Some(Plaintext::Literal(Literal::U64(amount), _)))) => {
+                                // Add the public amount minted to the total supply.
+                                new_total_supply_in_microcredits = new_total_supply_in_microcredits
+                                    .checked_add(**amount)
+                                    .ok_or_else(|| anyhow!("Total supply of microcredits overflowed"))?;
+                            }
+                            _ => bail!("Invalid coinbase transaction: Missing public input in 'credits.aleo/mint'"),
+                        }
+                    }
+                    _ => bail!("Invalid coinbase transaction"),
+                }
+            }
+        }
 
         // Construct the coinbase solution.
         let (coinbase, coinbase_accumulator_point) = match &prover_solutions {
@@ -205,7 +243,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         // TODO (raychu86): Pay the provers. Currently we do not pay the provers with the `credits.aleo` program
         //  and instead, will track prover leaderboards via the `coinbase_solution` in each block.
-        if let Some(prover_solutions) = prover_solutions {
+        let block_cumulative_proof_target = if let Some(prover_solutions) = prover_solutions {
             // Calculate the coinbase reward.
             let coinbase_reward = coinbase_reward(
                 latest_block.last_coinbase_timestamp(),
@@ -216,11 +254,12 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             )?;
 
             // Compute the cumulative proof target of the prover solutions as a u128.
-            let cumulative_proof_target: u128 = prover_solutions.iter().try_fold(0u128, |cumulative, solution| {
-                cumulative
-                    .checked_add(solution.to_target()? as u128)
-                    .ok_or_else(|| anyhow!("Cumulative proof target overflowed"))
-            })?;
+            let block_cumulative_proof_target: u128 =
+                prover_solutions.iter().try_fold(0u128, |cumulative, solution| {
+                    cumulative
+                        .checked_add(solution.to_target()? as u128)
+                        .ok_or_else(|| anyhow!("Cumulative proof target overflowed"))
+                })?;
 
             // Calculate the rewards for the individual provers.
             let mut prover_rewards: Vec<(Address<N>, u64)> = Vec::new();
@@ -235,7 +274,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     .ok_or_else(|| anyhow!("Prover reward numerator overflowed"))?;
 
                 // Compute the denominator.
-                let denominator = cumulative_proof_target
+                let denominator = block_cumulative_proof_target
                     .checked_mul(2)
                     .ok_or_else(|| anyhow!("Prover reward denominator overflowed"))?;
 
@@ -246,30 +285,24 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
                 prover_rewards.push((prover_solution.address(), prover_reward));
             }
-        }
+
+            block_cumulative_proof_target
+        } else {
+            0u128
+        };
 
         // Construct the next coinbase target.
-        // Use the new targeting algorithm if the node is in development mode or
-        // if the block height is greater than or equal to `V4_START_HEIGHT`.
-        let next_coinbase_target = match self.is_dev || next_height >= V4_START_HEIGHT {
-            true => coinbase_target::<true>(
-                latest_block.last_coinbase_target(),
-                latest_block.last_coinbase_timestamp(),
-                next_timestamp,
-                N::ANCHOR_TIME,
-                N::NUM_BLOCKS_PER_EPOCH,
-            ),
-            false => coinbase_target::<false>(
-                latest_block.last_coinbase_target(),
-                latest_block.last_coinbase_timestamp(),
-                next_timestamp,
-                N::ANCHOR_TIME,
-                N::NUM_BLOCKS_PER_EPOCH,
-            ),
-        }?;
+        let next_coinbase_target = coinbase_target(
+            latest_block.last_coinbase_target(),
+            latest_block.last_coinbase_timestamp(),
+            next_timestamp,
+            N::ANCHOR_TIME,
+            N::NUM_BLOCKS_PER_EPOCH,
+            N::GENESIS_COINBASE_TARGET,
+        )?;
 
         // Construct the next proof target.
-        let next_proof_target = proof_target(next_coinbase_target);
+        let next_proof_target = proof_target(next_coinbase_target, N::GENESIS_PROOF_TARGET);
 
         // Construct the next last coinbase target and next last coinbase timestamp.
         let (next_last_coinbase_target, next_last_coinbase_timestamp) = match coinbase {
@@ -277,11 +310,16 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             None => (latest_block.last_coinbase_target(), latest_block.last_coinbase_timestamp()),
         };
 
+        // Construct the new cumulative proof target.
+        let cumulative_proof_target = latest_cumulative_proof_target.saturating_add(block_cumulative_proof_target);
+
         // Construct the metadata.
         let metadata = Metadata::new(
             N::ID,
             next_round,
             next_height,
+            new_total_supply_in_microcredits,
+            cumulative_proof_target,
             next_coinbase_target,
             next_proof_target,
             next_last_coinbase_target,
@@ -290,7 +328,13 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         )?;
 
         // Construct the header.
-        let header = Header::from(latest_state_root, transactions.to_root()?, coinbase_accumulator_point, metadata)?;
+        let header = Header::from(
+            latest_state_root,
+            transactions.to_root()?,
+            finalize_root,
+            coinbase_accumulator_point,
+            metadata,
+        )?;
 
         // Construct the new block.
         Block::new(private_key, latest_block.hash(), header, transactions, coinbase, rng)
@@ -429,10 +473,46 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             bail!("Invalid block header: {:?}", block.header());
         }
 
+        // TODO (raychu86): Include mints from the leader of each round.
+        // TODO (raychu86): Clean this up or create a `total_supply_delta` in `Transactions`.
+        // Calculate the new total supply of microcredits after the block.
+        let mut new_total_supply_in_microcredits = self.ledger.latest_total_supply_in_microcredits();
+        for transaction in block.transactions().iter() {
+            // Subtract the fee from the total supply.
+            let fee = transaction.fee()?;
+            new_total_supply_in_microcredits = new_total_supply_in_microcredits
+                .checked_sub(*fee)
+                .ok_or_else(|| anyhow!("Fee exceeded total supply of credits"))?;
+
+            // If the transaction is a coinbase, add the amount to the total supply.
+            if transaction.is_coinbase() {
+                match transaction {
+                    Transaction::Execute(_, execution, _) => {
+                        // Get the input amount of the coinbase transaction.
+                        match execution.get(0)?.inputs().get(1) {
+                            Some(Input::Public(_, Some(Plaintext::Literal(Literal::U64(amount), _)))) => {
+                                // Add the public amount minted to the total supply.
+                                new_total_supply_in_microcredits = new_total_supply_in_microcredits
+                                    .checked_add(**amount)
+                                    .ok_or_else(|| anyhow!("Total supply of microcredits overflowed"))?;
+                            }
+                            _ => bail!("Invalid coinbase transaction: Missing public input in 'credits.aleo/mint'"),
+                        }
+                    }
+                    _ => bail!("Invalid coinbase transaction"),
+                }
+            }
+        }
+
+        // Ensure the total supply in microcredits is correct.
+        if new_total_supply_in_microcredits != block.total_supply_in_microcredits() {
+            bail!("Invalid total supply in microcredits")
+        }
+
         // Check the last coinbase members in the block.
         if block.height() > 0 {
             match block.coinbase() {
-                Some(_) => {
+                Some(coinbase) => {
                     // Ensure the last coinbase target matches the coinbase target.
                     if block.last_coinbase_target() != block.coinbase_target() {
                         bail!("The last coinbase target does not match the coinbase target")
@@ -440,6 +520,15 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     // Ensure the last coinbase timestamp matches the block timestamp.
                     if block.last_coinbase_timestamp() != block.timestamp() {
                         bail!("The last coinbase timestamp does not match the block timestamp")
+                    }
+                    // Ensure that the cumulative proof target matches the block cumulative proof target.
+                    if block.cumulative_proof_target()
+                        != self
+                            .ledger
+                            .latest_cumulative_proof_target()
+                            .saturating_add(coinbase.to_cumulative_proof_target()?)
+                    {
+                        bail!("The cumulative proof target does not match the block cumulative proof target")
                     }
                 }
                 None => {
@@ -451,36 +540,30 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     if block.last_coinbase_timestamp() != self.ledger.last_coinbase_timestamp() {
                         bail!("The last coinbase timestamp does not match the previous block's last coinbase timestamp")
                     }
+                    // Ensure that the cumulative proof target is the same as the previous block.
+                    if block.cumulative_proof_target() != self.ledger.latest_cumulative_proof_target() {
+                        bail!("The cumulative proof target does not match the previous block's cumulative proof target")
+                    }
                 }
             }
         }
 
         // Construct the next coinbase target.
-        // Use the new targeting algorithm if the node is in development mode or
-        // if the block height is greater than or equal to `V4_START_HEIGHT`.
-        let expected_coinbase_target = match self.is_dev || block.height() >= V4_START_HEIGHT {
-            true => coinbase_target::<true>(
-                self.ledger.last_coinbase_target(),
-                self.ledger.last_coinbase_timestamp(),
-                block.timestamp(),
-                N::ANCHOR_TIME,
-                N::NUM_BLOCKS_PER_EPOCH,
-            ),
-            false => coinbase_target::<false>(
-                self.ledger.last_coinbase_target(),
-                self.ledger.last_coinbase_timestamp(),
-                block.timestamp(),
-                N::ANCHOR_TIME,
-                N::NUM_BLOCKS_PER_EPOCH,
-            ),
-        }?;
+        let expected_coinbase_target = coinbase_target(
+            self.ledger.last_coinbase_target(),
+            self.ledger.last_coinbase_timestamp(),
+            block.timestamp(),
+            N::ANCHOR_TIME,
+            N::NUM_BLOCKS_PER_EPOCH,
+            N::GENESIS_COINBASE_TARGET,
+        )?;
 
         if block.coinbase_target() != expected_coinbase_target {
             bail!("Invalid coinbase target: expected {}, got {}", expected_coinbase_target, block.coinbase_target())
         }
 
         // Ensure the proof target is correct.
-        let expected_proof_target = proof_target(expected_coinbase_target);
+        let expected_proof_target = proof_target(expected_coinbase_target, N::GENESIS_PROOF_TARGET);
         if block.proof_target() != expected_proof_target {
             bail!("Invalid proof target: expected {}, got {}", expected_proof_target, block.proof_target())
         }
@@ -553,6 +636,14 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                 .map_err(|e| anyhow!("Invalid transaction found in the transactions list: {e}"))
         })?;
 
+        /* Finalize Root */
+
+        // TODO (raychu86): Properly check the finalize root once `finalize` is integrated.
+        // Ensure the finalize root matches the one in the block header.
+        if block.finalize_root() != Field::zero() {
+            bail!("Invalid finalize root: expected {}, got {}", Field::<N>::zero(), block.finalize_root())
+        }
+
         /* Coinbase Proof */
 
         // Ensure the coinbase solution is valid, if it exists.
@@ -608,16 +699,48 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             bail!("Transaction '{transaction_id}' already exists in the ledger")
         }
 
+        // TODO (raychu86): Remove this once proper coinbase transactions are integrated with consensus.
+        // Ensure the coinbase transaction is attributed to an authorized beacon.
+        if transaction.is_coinbase() {
+            match transaction {
+                Transaction::Execute(id, execution, _) => {
+                    // Get the input address of the coinbase transaction.
+                    match execution.get(0)?.inputs().get(0) {
+                        Some(Input::Public(_, Some(Plaintext::Literal(Literal::Address(address), _)))) => {
+                            // Check if the address is a valid beacon address.
+                            if !self.beacons.read().contains_key(address) {
+                                bail!(
+                                    "Coinbase transaction ({}) is attributed to an unauthorized beacon ({})",
+                                    id,
+                                    address
+                                );
+                            }
+                        }
+                        _ => bail!("Invalid coinbase transaction: Missing public input in 'credits.aleo/mint'"),
+                    }
+                }
+                _ => bail!("Invalid coinbase transaction"),
+            }
+        }
+
         /* Fee */
 
-        // TODO (raychu86): Currently ignoring this rule for executions. Revisit this in phase 3.
-        // Ensure transactions with a positive balance must pay for its storage in bytes.
+        // TODO (raychu86): TODO (raychu86): Consider fees for `finalize` execution when it is ready.
+        // Ensure the transaction has a sufficient fee.
         let fee = transaction.fee()?;
-        if matches!(transaction, Transaction::Deploy(..))
-            && fee >= 0
-            && transaction.to_bytes_le()?.len() > usize::try_from(fee)?
-        {
-            bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
+        match transaction {
+            Transaction::Deploy(_, _, deployment, _) => {
+                // Check that the fee in microcredits is at least the deployment size in bytes.
+                if u64::try_from(deployment.to_bytes_le()?.len())?.saturating_mul(DEPLOYMENT_FEE_FACTOR) > *fee {
+                    bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
+                }
+            }
+            Transaction::Execute(_, execution, _) => {
+                // If the transaction is not a coinbase transaction, check that the fee in microcredits is at least the execution size in bytes.
+                if !transaction.is_coinbase() && u64::try_from(execution.to_bytes_le()?.len())? > *fee {
+                    bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
+                }
+            }
         }
 
         /* Proof(s) */
@@ -674,7 +797,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         /* Program */
 
         // Ensure that the ledger does not already contain the given program ID.
-        if let Transaction::Deploy(_, deployment, _) = &transaction {
+        if let Transaction::Deploy(_, _, deployment, _) = &transaction {
             let program_id = deployment.program_id();
             if self.ledger.contains_program_id(program_id)? {
                 bail!("Program ID '{program_id}' already exists in the ledger")

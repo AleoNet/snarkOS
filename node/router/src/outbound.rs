@@ -29,14 +29,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
 
     /// Sends a "Ping" message to the given peer.
     fn send_ping(&self, peer_ip: SocketAddr, block_locators: Option<BlockLocators<N>>) {
-        self.send(
-            peer_ip,
-            Message::Ping(Ping::<N> {
-                version: Message::<N>::VERSION,
-                node_type: self.router().node_type(),
-                block_locators,
-            }),
-        );
+        self.send(peer_ip, Message::Ping(Ping::new(self.router().node_type(), block_locators)));
     }
 
     /// Sends the given message to specified peer.
@@ -80,7 +73,7 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
     }
 
     /// Sends the given message to every connected peer, excluding the sender and any specified peer IPs.
-    fn propagate(&self, message: Message<N>, excluded_peers: Vec<SocketAddr>) {
+    fn propagate(&self, message: Message<N>, excluded_peers: &[SocketAddr]) {
         // TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         // if let Message::BeaconPropose(ref mut message) = message {
@@ -104,22 +97,17 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         // }
 
         // Prepare the peers to send to.
-        let peers = self
-            .router()
-            .connected_peers()
-            .iter()
-            .filter(|peer_ip| !self.router().is_local_ip(peer_ip) && !excluded_peers.contains(peer_ip))
-            .copied()
-            .collect::<Vec<_>>();
+        let connected_peers = self.router().connected_peers();
+        let peers = connected_peers.iter().filter(|peer_ip| !excluded_peers.contains(peer_ip));
 
         // Iterate through all peers that are not the sender and excluded peers.
         for peer_ip in peers {
-            self.send(peer_ip, message.clone());
+            self.send(*peer_ip, message.clone());
         }
     }
 
     /// Sends the given message to every connected beacon, excluding the sender and any specified IPs.
-    fn propagate_to_beacons(&self, message: Message<N>, excluded_peers: Vec<SocketAddr>) {
+    fn propagate_to_beacons(&self, message: Message<N>, excluded_peers: &[SocketAddr]) {
         // TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         // if let Message::BeaconPropose(ref mut message) = message {
@@ -143,22 +131,17 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         // }
 
         // Prepare the peers to send to.
-        let peers = self
-            .router()
-            .connected_beacons()
-            .iter()
-            .filter(|peer_ip| !self.router().is_local_ip(peer_ip) && !excluded_peers.contains(peer_ip))
-            .copied()
-            .collect::<Vec<_>>();
+        let connected_beacons = self.router().connected_beacons();
+        let peers = connected_beacons.iter().filter(|peer_ip| !excluded_peers.contains(peer_ip));
 
         // Iterate through all beacons that are not the sender and excluded beacons.
         for peer_ip in peers {
-            self.send(peer_ip, message.clone());
+            self.send(*peer_ip, message.clone());
         }
     }
 
     /// Sends the given message to every connected validator, excluding the sender and any specified IPs.
-    fn propagate_to_validators(&self, message: Message<N>, excluded_peers: Vec<SocketAddr>) {
+    fn propagate_to_validators(&self, message: Message<N>, excluded_peers: &[SocketAddr]) {
         // TODO (howardwu): Serialize large messages once only.
         // // Perform ahead-of-time, non-blocking serialization just once for applicable objects.
         // if let Message::BeaconPropose(ref mut message) = message {
@@ -182,17 +165,12 @@ pub trait Outbound<N: Network>: Writing<Message = Message<N>> {
         // }
 
         // Prepare the peers to send to.
-        let peers = self
-            .router()
-            .connected_validators()
-            .iter()
-            .filter(|peer_ip| !self.router().is_local_ip(peer_ip) && !excluded_peers.contains(peer_ip))
-            .copied()
-            .collect::<Vec<_>>();
+        let connected_validators = self.router().connected_validators();
+        let peers = connected_validators.iter().filter(|peer_ip| !excluded_peers.contains(peer_ip));
 
         // Iterate through all beacons that are not the sender and excluded beacons.
         for peer_ip in peers {
-            self.send(peer_ip, message.clone());
+            self.send(*peer_ip, message.clone());
         }
     }
 

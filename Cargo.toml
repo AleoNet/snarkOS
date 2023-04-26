@@ -26,6 +26,7 @@ members = [
     "node/consensus",
     "node/ledger",
     "node/messages",
+    "node/metrics",
     "node/rest",
     "node/router",
     "node/store",
@@ -40,12 +41,11 @@ path = "snarkos/main.rs"
 [workspace.dependencies.snarkvm]
 #path = "../snarkVM"
 #git = "https://github.com/AleoHQ/snarkVM.git"
-#rev = "67f8829"
-version = "0.9.13"
-features = ["circuit", "console", "parallel"]
+version = "=0.10.2"
+features = ["circuit", "console"]
 
 [dependencies.anyhow]
-version = "1"
+version = "1.0.70"
 
 [dependencies.clap]
 version = "3.2"
@@ -86,6 +86,9 @@ path = "./node/store"
 
 [dependencies.snarkos-node-tcp]
 path = "./node/tcp"
+
+[dependencies.tikv-jemallocator]
+version = "0.5"
 
 [dev-dependencies.rusty-hook]
 version = "0.11.2"

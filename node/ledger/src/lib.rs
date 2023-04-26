@@ -31,7 +31,7 @@ use snarkvm::{
     console::{
         account::{Address, GraphKey, PrivateKey, Signature, ViewKey},
         network::prelude::*,
-        program::{Ciphertext, Identifier, Plaintext, ProgramID, Record, StatePath, Value},
+        program::{Ciphertext, Entry, Identifier, Literal, Plaintext, ProgramID, Record, StatePath, Value},
         types::{Field, Group},
     },
     synthesizer::{
@@ -198,6 +198,16 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         *self.current_block.read().header()
     }
 
+    /// Returns the latest total supply in microcredits.
+    pub fn latest_total_supply_in_microcredits(&self) -> u64 {
+        self.current_block.read().header().total_supply_in_microcredits()
+    }
+
+    /// Returns the latest latest cumulative proof target.
+    pub fn latest_cumulative_proof_target(&self) -> u128 {
+        self.current_block.read().cumulative_proof_target()
+    }
+
     /// Returns the latest block coinbase accumulator point.
     pub fn latest_coinbase_accumulator_point(&self) -> Field<N> {
         self.current_block.read().header().coinbase_accumulator_point()
@@ -268,14 +278,27 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
 
     /// Returns the unspent records.
     pub fn find_unspent_records(&self, view_key: &ViewKey<N>) -> Result<RecordMap<N>> {
+        let microcredits = Identifier::from_str("microcredits")?;
         Ok(self
             .find_records(view_key, RecordsFilter::Unspent)?
-            .filter(|(_, record)| !record.gates().is_zero())
+            .filter(|(_, record)| {
+                // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
+                match record.data().get(&microcredits) {
+                    Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
+                    _ => false,
+                }
+            })
             .collect::<IndexMap<_, _>>())
     }
 
     /// Creates a transfer transaction.
-    pub fn create_transfer(&self, private_key: &PrivateKey<N>, to: Address<N>, amount: u64) -> Result<Transaction<N>> {
+    pub fn create_transfer(
+        &self,
+        private_key: &PrivateKey<N>,
+        to: Address<N>,
+        amount: u64,
+        fee_amount: u64,
+    ) -> Result<Transaction<N>> {
         // Fetch the unspent records.
         let records = self.find_unspent_records(&ViewKey::try_from(private_key)?)?;
         ensure!(!records.len().is_zero(), "The Aleo account has no records to spend.");
@@ -284,20 +307,23 @@ impl<N: Network, C: ConsensusStorage<N>> Ledger<N, C> {
         let rng = &mut rand::thread_rng();
 
         // Prepare the inputs.
+        let mut records = records.values();
         let inputs = [
-            Value::Record(records.values().next().unwrap().clone()),
+            Value::Record(records.next().unwrap().clone()),
             Value::from_str(&format!("{to}"))?,
             Value::from_str(&format!("{amount}u64"))?,
         ];
+
+        // Prepare the fee record.
+        let fee_record = records.next().unwrap().clone();
 
         // Create a new transaction.
         Transaction::execute(
             &self.vm,
             private_key,
-            ProgramID::from_str("credits.aleo")?,
-            Identifier::from_str("transfer")?,
+            ("credits.aleo", "transfer"),
             inputs.iter(),
-            None,
+            Some((fee_record, fee_amount)),
             None,
             rng,
         )

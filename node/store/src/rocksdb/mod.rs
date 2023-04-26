@@ -23,7 +23,7 @@ use iterator::*;
 #[cfg(test)]
 mod tests;
 
-use crate::DataID;
+use crate::MapID;
 
 use anyhow::{bail, Result};
 use core::{fmt::Debug, hash::Hash};
@@ -45,11 +45,11 @@ pub trait Database {
     where
         Self: Sized;
 
-    /// Opens the map with the given `network_id`, `(optional) development ID`, and `data_id` from storage.
+    /// Opens the map with the given `network_id`, `(optional) development ID`, and `map_id` from storage.
     fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(
         network_id: u16,
         dev: Option<u16>,
-        data_id: DataID,
+        map_id: MapID,
     ) -> Result<DataMap<K, V>>;
 }
 
@@ -110,18 +110,18 @@ impl Database for RocksDB {
         }
     }
 
-    /// Opens the map with the given `network_id`, `(optional) development ID`, and `data_id` from storage.
+    /// Opens the map with the given `network_id`, `(optional) development ID`, and `map_id` from storage.
     fn open_map<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(
         network_id: u16,
         dev: Option<u16>,
-        data_id: DataID,
+        map_id: MapID,
     ) -> Result<DataMap<K, V>> {
         // Open the RocksDB database.
         let database = Self::open(network_id, dev)?;
 
         // Combine contexts to create a new scope.
         let mut context = database.network_id.to_le_bytes().to_vec();
-        context.extend_from_slice(&(data_id as u16).to_le_bytes());
+        context.extend_from_slice(&(u16::from(map_id)).to_le_bytes());
 
         // Return the DataMap.
         Ok(DataMap { database, context, batch_in_progress: Default::default(), atomic_batch: Default::default() })
@@ -168,14 +168,14 @@ impl RocksDB {
     fn open_map_testing<K: Serialize + DeserializeOwned, V: Serialize + DeserializeOwned>(
         temp_dir: std::path::PathBuf,
         dev: Option<u16>,
-        data_id: DataID,
+        map_id: MapID,
     ) -> Result<DataMap<K, V>> {
         // Open the RocksDB test database.
         let database = Self::open_testing(temp_dir, dev)?;
 
         // Combine contexts to create a new scope.
         let mut context = database.network_id.to_le_bytes().to_vec();
-        context.extend_from_slice(&(data_id as u16).to_le_bytes());
+        context.extend_from_slice(&(u16::from(map_id)).to_le_bytes());
 
         // Return the DataMap.
         Ok(DataMap { database, context, batch_in_progress: Default::default(), atomic_batch: Default::default() })

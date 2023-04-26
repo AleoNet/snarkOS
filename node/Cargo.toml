@@ -17,7 +17,8 @@ license = "GPL-3.0"
 edition = "2021"
 
 [features]
-default = [ ]
+default = [ "parallel" ]
+parallel = [ "rayon" ]
 timer = [ "aleo-std/timer", "snarkos-node-ledger/timer" ]
 
 [dependencies.aleo-std]
@@ -25,7 +26,7 @@ version = "0.1.15"
 default-features = false
 
 [dependencies.anyhow]
-version = "1"
+version = "1.0.70"
 
 [dependencies.async-trait]
 version = "0.1"
@@ -49,6 +50,10 @@ version = "0.12"
 [dependencies.rand]
 version = "0.8"
 default-features = false
+
+[dependencies.rayon]
+version = "1"
+optional = true
 
 [dependencies.serde_json]
 version = "1"

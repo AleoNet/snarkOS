@@ -30,7 +30,7 @@ use snarkos_node_tcp::{
 use snarkvm::prelude::{Block, ConsensusStorage, Header, Network, ProverSolution};
 
 use anyhow::Result;
-use parking_lot::RwLock;
+use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
     sync::{
@@ -51,9 +51,9 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
-    rest: Option<Arc<Rest<N, C, Self>>>,
+    rest: Option<Rest<N, C, Self>>,
     /// The spawned handles.
-    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
 }
@@ -105,7 +105,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?));
+            node.rest = Some(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?);
         }
         // Initialize the sync pool.
         node.initialize_sync()?;
@@ -123,7 +123,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     }
 
     /// Returns the REST server.
-    pub fn rest(&self) -> &Option<Arc<Rest<N, C, Self>>> {
+    pub fn rest(&self) -> &Option<Rest<N, C, Self>> {
         &self.rest
     }
 }
@@ -136,11 +136,11 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
 
         // Shut down the sync pool.
         trace!("Shutting down the sync pool...");
-        self.shutdown.store(true, Ordering::SeqCst);
+        self.shutdown.store(true, Ordering::Relaxed);
 
         // Abort the tasks.
         trace!("Shutting down the validator...");
-        self.handles.read().iter().for_each(|handle| handle.abort());
+        self.handles.lock().iter().for_each(|handle| handle.abort());
 
         // Shut down the router.
         self.router.shut_down().await;
@@ -163,7 +163,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Start the sync loop.
         let validator = self.clone();
-        self.handles.write().push(tokio::spawn(async move {
+        self.handles.lock().push(tokio::spawn(async move {
             loop {
                 // If the Ctrl-C handler registered the signal, stop the node.
                 if validator.shutdown.load(Ordering::Relaxed) {

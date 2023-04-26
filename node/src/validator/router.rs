@@ -29,7 +29,7 @@ use snarkos_node_messages::{
     UnconfirmedTransaction,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{error, Network, Transaction};
+use snarkvm::prelude::{error, EpochChallenge, Network, Transaction};
 
 use futures_util::sink::SinkExt;
 use std::{io, net::SocketAddr, time::Duration};
@@ -62,8 +62,7 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Validator<N, C> {
         };
 
         // Send the first `Ping` message to the peer.
-        let message =
-            Message::Ping(Ping::<N> { version: Message::<N>::VERSION, node_type: self.node_type(), block_locators });
+        let message = Message::Ping(Ping::new(self.node_type(), block_locators));
         trace!("Sending '{}' to '{peer_ip}'", message.name());
         framed.send(message).await?;
 
@@ -206,7 +205,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
     }
 
     /// Disconnects on receipt of a `PuzzleResponse` message.
-    fn puzzle_response(&self, peer_ip: SocketAddr, _serialized: PuzzleResponse<N>, _header: Header<N>) -> bool {
+    fn puzzle_response(&self, peer_ip: SocketAddr, _epoch_challenge: EpochChallenge<N>, _header: Header<N>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }
@@ -225,9 +224,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         }
         let message = Message::UnconfirmedSolution(serialized);
         // Propagate the "UnconfirmedSolution" to the connected beacons.
-        self.propagate_to_beacons(message.clone(), vec![peer_ip]);
+        self.propagate_to_beacons(message.clone(), &[peer_ip]);
         // Propagate the "UnconfirmedSolution" to the connected validators.
-        self.propagate_to_validators(message, vec![peer_ip]);
+        self.propagate_to_validators(message, &[peer_ip]);
         true
     }
 
@@ -240,9 +239,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
     ) -> bool {
         let message = Message::UnconfirmedTransaction(serialized);
         // Propagate the "UnconfirmedTransaction" to the connected beacons.
-        self.propagate_to_beacons(message.clone(), vec![peer_ip]);
+        self.propagate_to_beacons(message.clone(), &[peer_ip]);
         // Propagate the "UnconfirmedTransaction" to the connected validators.
-        self.propagate_to_validators(message, vec![peer_ip]);
+        self.propagate_to_validators(message, &[peer_ip]);
         true
     }
 }

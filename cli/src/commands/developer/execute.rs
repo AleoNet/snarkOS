@@ -122,8 +122,7 @@ impl Execute {
             Transaction::execute(
                 &vm,
                 &private_key,
-                self.program_id,
-                self.function,
+                (self.program_id, self.function),
                 self.inputs.iter(),
                 fee,
                 Some(query),

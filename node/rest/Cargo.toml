@@ -16,8 +16,12 @@ categories = [ "cryptography", "operating-systems" ]
 license = "GPL-3.0"
 edition = "2021"
 
+[features]
+default = [ "parallel" ]
+parallel = [ "rayon" ]
+
 [dependencies.anyhow]
-version = "1"
+version = "1.0.70"
 
 [dependencies.http]
 version = "0.2"
@@ -26,10 +30,13 @@ version = "0.2"
 version = "1.8"
 
 [dependencies.jsonwebtoken]
-version = "8.2"
+version = "8.3"
 
 [dependencies.once_cell]
 version = "1.13"
+
+[dependencies.parking_lot]
+version = "0.12"
 
 [dependencies.serde]
 version = "1"
@@ -50,6 +57,10 @@ path = "../router"
 
 [dependencies.rand]
 version = "0.8"
+
+[dependencies.rayon]
+version = "1"
+optional = true
 
 [dependencies.snarkvm]
 workspace = true

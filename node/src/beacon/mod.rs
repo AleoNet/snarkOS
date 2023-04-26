@@ -38,19 +38,22 @@ use snarkos_node_tcp::{
 use snarkvm::prelude::{
     Block,
     ConsensusStorage,
+    Entry,
     Identifier,
+    Literal,
     Network,
-    ProgramID,
+    Plaintext,
     ProverSolution,
     Transaction,
     Value,
     Zero,
 };
 
+use ::time::OffsetDateTime;
 use aleo_std::prelude::{finish, lap, timer};
 use anyhow::{bail, Result};
 use core::{str::FromStr, time::Duration};
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use std::{
     net::SocketAddr,
     sync::{
@@ -58,7 +61,6 @@ use std::{
         Arc,
     },
 };
-use time::OffsetDateTime;
 use tokio::{task::JoinHandle, time::timeout};
 
 /// A beacon is a full node, capable of producing blocks.
@@ -73,13 +75,13 @@ pub struct Beacon<N: Network, C: ConsensusStorage<N>> {
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
-    rest: Option<Arc<Rest<N, C, Self>>>,
+    rest: Option<Rest<N, C, Self>>,
     /// The time it to generate a block.
     block_generation_time: Arc<AtomicU64>,
     /// The unspent records.
     unspent_records: Arc<RwLock<RecordMap<N>>>,
     /// The spawned handles.
-    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
 }
@@ -148,7 +150,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?));
+            node.rest = Some(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?);
             lap!(timer, "Initialize REST server");
         }
         // Initialize the routing.
@@ -170,7 +172,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     }
 
     /// Returns the REST server.
-    pub fn rest(&self) -> &Option<Arc<Rest<N, C, Self>>> {
+    pub fn rest(&self) -> &Option<Rest<N, C, Self>> {
         &self.rest
     }
 }
@@ -183,11 +185,11 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Beacon<N, C> {
 
         // Shut down block production.
         trace!("Shutting down block production...");
-        self.shutdown.store(true, Ordering::SeqCst);
+        self.shutdown.store(true, Ordering::Relaxed);
 
         // Abort the tasks.
         trace!("Shutting down the beacon...");
-        self.handles.read().iter().for_each(|handle| handle.abort());
+        self.handles.lock().iter().for_each(|handle| handle.abort());
 
         // Shut down the router.
         self.router.shut_down().await;
@@ -218,7 +220,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     /// Initialize a new instance of block production.
     async fn initialize_block_production(&self) {
         let beacon = self.clone();
-        self.handles.write().push(tokio::spawn(async move {
+        self.handles.lock().push(tokio::spawn(async move {
             // Expected time per block.
             const ROUND_TIME: u64 = 15; // 15 seconds per block
 
@@ -231,7 +233,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
 
                 // Do not produce a block if the elapsed time has not exceeded `ROUND_TIME - block_generation_time`.
                 // This will ensure a block is produced at intervals of approximately `ROUND_TIME`.
-                let time_to_wait = ROUND_TIME.saturating_sub(beacon.block_generation_time.load(Ordering::SeqCst));
+                let time_to_wait = ROUND_TIME.saturating_sub(beacon.block_generation_time.load(Ordering::Acquire));
                 trace!("Waiting for {time_to_wait} seconds before producing a block...");
                 if elapsed_time < time_to_wait {
                     if let Err(error) = timeout(
@@ -249,7 +251,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 // Produce the next block and propagate it to all peers.
                 match beacon.produce_next_block().await {
                     // Update the block generation time.
-                    Ok(()) => beacon.block_generation_time.store(timer.elapsed().as_secs(), Ordering::SeqCst),
+                    Ok(()) => beacon.block_generation_time.store(timer.elapsed().as_secs(), Ordering::Release),
                     Err(error) => error!("{error}"),
                 }
 
@@ -271,44 +273,19 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
             // Create a transfer transaction.
             let beacon = self.clone();
             let transaction = match tokio::task::spawn_blocking(move || {
-                // Fetch an unspent record.
-                let (commitment, record) = match beacon.unspent_records.write().shift_remove_index(0) {
-                    Some(record) => record,
-                    None => bail!("The beacon has no unspent records available"),
-                };
-
                 // Initialize an RNG.
                 let rng = &mut rand::thread_rng();
 
-                // Prepare the inputs and function name.
+                // Prepare the inputs for a transfer.
                 let to = beacon.account.address();
-                let (inputs, function_name) = match beacon.is_dev() {
-                    true => {
-                        // Prepare the inputs for a split.
-                        let amount = ***record.gates() / 2;
-                        let inputs = vec![Value::Record(record.clone()), Value::from_str(&format!("{amount}u64"))?];
-
-                        (inputs, Identifier::from_str("split")?)
-                    }
-                    false => {
-                        // Prepare the inputs for a transfer.
-                        let amount = 1;
-                        let inputs = vec![
-                            Value::Record(record.clone()),
-                            Value::from_str(&format!("{to}"))?,
-                            Value::from_str(&format!("{amount}u64"))?,
-                        ];
-
-                        (inputs, Identifier::from_str("transfer")?)
-                    }
-                };
+                let amount = 1;
+                let inputs = vec![Value::from_str(&format!("{to}"))?, Value::from_str(&format!("{amount}u64"))?];
 
                 // Create a new transaction.
                 let transaction = Transaction::execute(
                     beacon.ledger.vm(),
                     beacon.account.private_key(),
-                    ProgramID::from_str("credits.aleo")?,
-                    function_name,
+                    ("credits.aleo", "mint"),
                     inputs.iter(),
                     None,
                     None,
@@ -318,8 +295,6 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 match transaction {
                     Ok(transaction) => Ok(transaction),
                     Err(error) => {
-                        // Push the record back into the unspent records.
-                        beacon.unspent_records.write().insert(commitment, record);
                         bail!("Failed to create a transaction: {error}")
                     }
                 }
@@ -365,8 +340,13 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                         if let Err(error) = transaction.into_transitions().try_for_each(|transition| {
                             for (commitment, record) in transition.into_records() {
                                 let record = record.decrypt(beacon.account.view_key())?;
-                                if !record.gates().is_zero() {
-                                    beacon.unspent_records.write().insert(commitment, record);
+
+                                if let Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) =
+                                    record.data().get(&Identifier::from_str("microcredits")?)
+                                {
+                                    if !amount.is_zero() {
+                                        beacon.unspent_records.write().insert(commitment, record);
+                                    }
                                 }
                             }
                             Ok::<_, anyhow::Error>(())
@@ -457,7 +437,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         ));
 
         // Propagate the block to all beacons.
-        self.propagate_to_beacons(message, vec![]);
+        self.propagate_to_beacons(message, &[]);
 
         Ok(())
     }

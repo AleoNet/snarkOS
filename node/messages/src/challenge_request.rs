@@ -48,3 +48,9 @@ impl<N: Network> MessageTrait for ChallengeRequest<N> {
         Ok(Self { version, listener_port, node_type, address, nonce })
     }
 }
+
+impl<N: Network> ChallengeRequest<N> {
+    pub fn new(listener_port: u16, node_type: NodeType, address: Address<N>, nonce: u64) -> Self {
+        Self { version: Message::<N>::VERSION, listener_port, node_type, address, nonce }
+    }
+}
