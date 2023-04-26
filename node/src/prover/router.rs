@@ -16,19 +16,10 @@
 
 use super::*;
 
-use snarkos_node_messages::{
-    BlockRequest,
-    DisconnectReason,
-    Message,
-    MessageCodec,
-    Ping,
-    Pong,
-    UnconfirmedTransaction,
-};
+use snarkos_node_messages::{BlockRequest, DisconnectReason, Message, MessageCodec, Pong, UnconfirmedTransaction};
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{Network, Transaction};
 
-use futures_util::sink::SinkExt;
 use std::{io, net::SocketAddr};
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Prover<N, C> {
@@ -47,14 +38,26 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Prover<N, C> {
         let conn_side = connection.side();
         let stream = self.borrow_stream(&mut connection);
         let genesis_header = *self.genesis.header();
-        let (peer_ip, mut framed) = self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
-
-        // Send the first `Ping` message to the peer.
-        let message = Message::Ping(Ping::new(self.node_type(), None));
-        trace!("Sending '{}' to '{peer_ip}'", message.name());
-        framed.send(message).await?;
+        self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
 
         Ok(connection)
+    }
+}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> OnConnect for Prover<N, C>
+where
+    Self: Outbound<N>,
+{
+    async fn on_connect(&self, peer_addr: SocketAddr) {
+        let peer_ip = if let Some(ip) = self.router.resolve_to_listener(&peer_addr) {
+            ip
+        } else {
+            return;
+        };
+
+        // Send the first `Ping` message to the peer.
+        self.send_ping(peer_ip, None);
     }
 }
 
