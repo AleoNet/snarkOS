@@ -16,17 +16,10 @@
 
 use super::{CurrentNetwork, Developer};
 
-use snarkvm::{prelude::{
-    ConsensusMemory,
-    ConsensusStore,
-    Plaintext,
-    PrivateKey,
-    ProgramID,
-    Query,
-    Record,
-    Transaction,
-    VM,
-}, synthesizer::Program};
+use snarkvm::{
+    prelude::{ConsensusMemory, ConsensusStore, Plaintext, PrivateKey, ProgramID, Query, Record, Transaction, VM},
+    synthesizer::Program,
+};
 
 use anyhow::Result;
 use clap::Parser;
@@ -89,7 +82,8 @@ impl Deploy {
             let vm = VM::from(store)?;
             for (p_id, _) in program.imports() {
                 println!("Adding dependency: {p_id}");
-                let program: Program<CurrentNetwork> = ureq::get(&format!("{}/testnet3/program/{}", self.query, p_id)).call()?.into_json()?;
+                let program: Program<CurrentNetwork> =
+                    ureq::get(&format!("{}/testnet3/program/{}", self.query, p_id)).call()?.into_json()?;
                 let deployment = vm.deploy(&program, rng)?;
                 vm.process().write().finalize_deployment(vm.program_store(), &deployment)?;
             }
