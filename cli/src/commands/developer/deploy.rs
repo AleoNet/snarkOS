@@ -94,7 +94,7 @@ impl Deploy {
             // Create a new transaction.
             Transaction::deploy(&vm, &private_key, &program, fee, Some(query), rng)?
         };
-        format!("✅ Created deployment transaction for '{}'", self.program_id.to_string().bold());
+        println!("✅ Created deployment transaction for '{}'", self.program_id.to_string().bold());
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
         Developer::handle_transaction(self.broadcast, self.display, self.store, deployment, self.program_id.to_string())

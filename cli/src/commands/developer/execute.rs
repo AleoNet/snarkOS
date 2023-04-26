@@ -130,7 +130,7 @@ impl Execute {
             )?
         };
         let locator = Locator::<CurrentNetwork>::from_str(&format!("{}/{}", self.program_id, self.function))?;
-        format!("✅ Created execution transaction for '{}'", locator.to_string().bold());
+        println!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
         Developer::handle_transaction(self.broadcast, self.display, self.store, execution, locator.to_string())
