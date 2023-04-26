@@ -17,7 +17,7 @@
 use crate::{Heartbeat, Inbound, Outbound};
 use snarkos_node_messages::Message;
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake},
+    protocols::{Disconnect, Handshake, OnConnect},
     P2P,
 };
 use snarkvm::prelude::Network;
@@ -25,7 +25,9 @@ use snarkvm::prelude::Network;
 use core::time::Duration;
 
 #[async_trait]
-pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbound<N> + Heartbeat<N> {
+pub trait Routing<N: Network>:
+    P2P + Disconnect + OnConnect + Handshake + Inbound<N> + Outbound<N> + Heartbeat<N>
+{
     /// Initialize the routing.
     async fn initialize_routing(&self) {
         // Enable the TCP protocols.
@@ -33,6 +35,7 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
         self.enable_reading().await;
         self.enable_writing().await;
         self.enable_disconnect().await;
+        self.enable_on_connect().await;
         // Enable the TCP listener. Note: This must be called after the above protocols.
         self.enable_listener().await;
         // Initialize the heartbeat.
