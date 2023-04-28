@@ -48,7 +48,7 @@ features = ["circuit", "console"]
 version = "1.0.70"
 
 [dependencies.clap]
-version = "3.2"
+version = "4.2"
 features = ["derive"]
 
 [dependencies.snarkos-account]
