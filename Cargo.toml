@@ -24,6 +24,7 @@ members = [
     "node",
     "node/cdn",
     "node/consensus",
+    "node/env",
     "node/messages",
     "node/metrics",
     "node/rest",
@@ -50,6 +51,9 @@ version = "1.0.70"
 version = "3.2"
 features = ["derive"]
 
+[dependencies.once_cell]
+version = "1"
+
 [dependencies.snarkos-account]
 path = "./account"
 
@@ -67,6 +71,9 @@ path = "./node/cdn"
 
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"
+
+[dependencies.snarkos-node-env]
+path = "./node/env"
 
 [dependencies.snarkos-node-messages]
 path = "./node/messages"
