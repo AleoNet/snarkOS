@@ -20,7 +20,7 @@ edition = "2021"
 version = "0.1.15"
 
 [dependencies.anyhow]
-version = "1.0.70"
+version = "1.0.71"
 
 [dependencies.bincode]
 version = "1.0"

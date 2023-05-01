@@ -45,7 +45,7 @@ version = "=0.10.2"
 features = ["circuit", "console"]
 
 [dependencies.anyhow]
-version = "1.0.70"
+version = "1.0.71"
 
 [dependencies.clap]
 version = "3.2"
