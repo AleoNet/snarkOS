@@ -262,6 +262,11 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
 
     /// Handles a `NewBlock` message.
     fn new_block(&self, peer_ip: SocketAddr, block: Block<N>, serialized: NewBlock<N>) -> bool {
+        // If the BFT isn't ready, we can't process the block yet.
+        if self.bft.get().is_none() {
+            return true;
+        }
+
         // A failed check doesn't necessarily mean the block is malformed, so return true here.
         if self.consensus.check_next_block(&block).is_err() {
             return true;
