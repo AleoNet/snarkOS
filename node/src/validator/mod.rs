@@ -79,6 +79,8 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     bft_started: Arc<AtomicBool>,
 
     dev: Option<u16>,
+
+    processed_block: Arc<RwLock<Option<Block<N>>>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
@@ -138,6 +140,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             bft: Default::default(),
             bft_started: Default::default(),
             dev,
+            processed_block: Default::default(),
         };
 
         // Initialize the REST server.
