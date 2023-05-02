@@ -203,7 +203,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     }
 
     /// Starts and sets the `RunningConsensusInstance`.
-    pub async fn start_bft(&self) -> Result<()> {
+    pub async fn start_bft(&self, initial_last_executed_sub_dag_index: u64) -> Result<()> {
         let dev = self.dev;
 
         // Prepare the path containing BFT consensus files.
@@ -216,7 +216,12 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let primary_pub = read_authority_keypair_from_file(primary_key_file).unwrap().public().clone();
 
         // Construct the BFT consensus instance, but don't start it yet.
-        let bft_execution_state = BftExecutionState::new(primary_pub, self.router.clone(), self.consensus.clone());
+        let bft_execution_state = BftExecutionState::new(
+            primary_pub,
+            self.router.clone(),
+            self.consensus.clone(),
+            initial_last_executed_sub_dag_index,
+        );
         let bft_tx_validator = TransactionValidator(self.consensus.clone());
         let inert_bft = InertConsensusInstance::load::<N, C>(bft_execution_state, bft_tx_validator, dev)?;
         // SAFETY: must be present as the bft can only be started once quorum has been reached.

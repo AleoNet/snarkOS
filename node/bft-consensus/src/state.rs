@@ -39,11 +39,17 @@ pub struct BftExecutionState<N: Network, C: ConsensusStorage<N>> {
     router: Router<N>,
     consensus: AleoConsensus<N, C>,
     pub last_output: Arc<Mutex<Option<ConsensusOutput>>>,
+    initial_last_executed_sub_dag_index: u64,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> BftExecutionState<N, C> {
-    pub fn new(primary_pub: PublicKey, router: Router<N>, consensus: AleoConsensus<N, C>) -> Self {
-        Self { primary_pub, router, consensus, last_output: Default::default() }
+    pub fn new(
+        primary_pub: PublicKey,
+        router: Router<N>,
+        consensus: AleoConsensus<N, C>,
+        initial_last_executed_sub_dag_index: u64,
+    ) -> Self {
+        Self { primary_pub, router, consensus, last_output: Default::default(), initial_last_executed_sub_dag_index }
     }
 }
 
@@ -190,8 +196,11 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
     }
 
     async fn last_executed_sub_dag_index(&self) -> u64 {
-        // TODO: this seems like a potential optimization, but shouldn't be needed
-        0
+        self.last_output
+            .lock()
+            .as_ref()
+            .map(|lco| lco.sub_dag.sub_dag_index)
+            .unwrap_or(self.initial_last_executed_sub_dag_index)
     }
 }
 

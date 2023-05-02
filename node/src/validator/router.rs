@@ -33,6 +33,7 @@ use snarkvm::prelude::{error, EpochChallenge, Network, Transaction};
 
 use bytes::BytesMut;
 use futures_util::sink::SinkExt;
+use narwhal_executor::ExecutionState;
 use std::{collections::HashSet, io, net::SocketAddr, time::Duration};
 use tokio::{net::TcpStream, task::spawn_blocking};
 use tokio_stream::StreamExt;
@@ -70,7 +71,13 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             .sign_bytes(public_key.to_bytes().as_slice(), &mut rand::thread_rng())
             .unwrap();
 
-        let message = Message::ConsensusId(Box::new(ConsensusId { public_key: public_key.clone(), signature }));
+        let last_executed_sub_dag_index =
+            if let Some(bft) = self.bft.get() { bft.state.last_executed_sub_dag_index().await } else { 0 };
+        let message = Message::ConsensusId(Box::new(ConsensusId {
+            public_key: public_key.clone(),
+            signature,
+            last_executed_sub_dag_index,
+        }));
         framed.send(message).await?;
 
         // 2.
@@ -102,7 +109,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let connected_stake =
             self.connected_committee_members.read().values().map(|pk| self.committee.stake(pk)).sum::<u64>();
         if connected_stake >= self.committee.quorum_threshold() && self.bft.get().is_none() {
-            self.start_bft().await.unwrap()
+            self.start_bft(consensus_id.last_executed_sub_dag_index).await.unwrap()
         }
 
         Ok(())

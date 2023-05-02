@@ -61,6 +61,9 @@ workspace = true
 [dependencies.narwhal-config]
 workspace = true
 
+[dependencies.narwhal-executor]
+workspace = true
+
 [dependencies.num_cpus]
 version = "1"
 

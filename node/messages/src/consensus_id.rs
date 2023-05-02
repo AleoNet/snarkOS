@@ -19,6 +19,7 @@ use narwhal_crypto::{PublicKey, Signature};
 pub struct ConsensusId {
     pub public_key: PublicKey,
     pub signature: Signature,
+    pub last_executed_sub_dag_index: u64,
 }
 
 impl MessageTrait for Box<ConsensusId> {
@@ -27,20 +28,18 @@ impl MessageTrait for Box<ConsensusId> {
     }
 
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        bincode::serialize_into(writer, &(&self.public_key, &self.signature))?;
-        // serde_json::to_writer(writer.by_ref(), &(&self.public_key, &self.signature))?;
+        bincode::serialize_into(writer, &(&self.public_key, &self.signature, self.last_executed_sub_dag_index))?;
 
         Ok(())
     }
 
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
-        // let (public_key, signature) = bincode::deserialize_from(&mut reader.by_ref())?;
         let mut dst = [0; 1024];
         let num = reader.read(&mut dst).unwrap();
-        let (public_key, signature) = bincode::deserialize(&dst[..num])?;
+        let (public_key, signature, last_executed_sub_dag_index) = bincode::deserialize(&dst[..num])?;
 
-        Ok(Box::new(ConsensusId { public_key, signature }))
+        Ok(Box::new(ConsensusId { public_key, signature, last_executed_sub_dag_index }))
     }
 }
 
@@ -61,7 +60,7 @@ mod test {
         let message = &[0u8; 32];
         let signature = private.sign_bytes(message, &mut rng).unwrap();
 
-        let id = Box::new(ConsensusId { public_key: public.clone(), signature });
+        let id = Box::new(ConsensusId { public_key: public.clone(), signature, last_executed_sub_dag_index: 0 });
         let mut buf = BytesMut::with_capacity(128).writer();
         id.serialize(&mut buf).unwrap();
         let bytes = buf.into_inner();
