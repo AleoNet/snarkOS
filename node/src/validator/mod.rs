@@ -77,6 +77,8 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     bft: Arc<OnceCell<RunningConsensusInstance<BftExecutionState<N, C>>>>,
 
     dev: Option<u16>,
+
+    processed_block: Arc<RwLock<Option<Block<N>>>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
@@ -135,6 +137,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             // Note: starting the BFT is called from the handshake logic once quorum is reached.
             bft: Default::default(),
             dev,
+            processed_block: Default::default(),
         };
 
         // Initialize the REST server.

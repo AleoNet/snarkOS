@@ -280,8 +280,15 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
             return true;
         }
 
+        if self.processed_block.read().as_ref().map(|b| b.height()) == Some(block.height()) {
+            return true;
+        } else {
+            *self.processed_block.write() = Some(block.clone());
+        }
+
         // A failed check doesn't necessarily mean the block is malformed, so return true here.
         if self.consensus.check_next_block(&block).is_err() {
+            *self.processed_block.write() = None;
             return true;
         }
 
@@ -319,6 +326,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
 
             if block.transaction_ids().zip(&expected_txs).any(|(id1, id2)| id1 != id2) {
                 error!("[NewBlock] Invalid order of transactions");
+                *self.processed_block.write() = None;
                 return false;
             }
         }
@@ -326,8 +334,11 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         // Attempt to add the block to the ledger.
         if let Err(err) = self.consensus.advance_to_next_block(&block) {
             error!("[NewBlock] {err}");
+            *self.processed_block.write() = None;
             return false;
         }
+
+        *self.processed_block.write() = None;
 
         // TODO: perform more elaborate propagation
         self.propagate(Message::NewBlock(serialized), &[peer_ip]);
