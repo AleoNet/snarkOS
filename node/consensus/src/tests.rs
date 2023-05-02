@@ -43,7 +43,7 @@ pub(crate) mod test_helpers {
     use snarkvm::{
         console::{account::PrivateKey, network::Testnet3, program::Value},
         prelude::TestRng,
-        synthesizer::{Block, ConsensusMemory},
+        synthesizer::{store::helpers::memory::ConsensusMemory, Block},
     };
 
     use once_cell::sync::OnceCell;
@@ -314,7 +314,7 @@ fn test_ledger_deploy() {
     assert!(consensus.ledger.contains_input_id(transaction.input_ids().next().unwrap()).unwrap());
 
     // Ensure that the VM can't re-deploy the same program.
-    assert!(consensus.ledger.vm().finalize(&Transactions::from(&[transaction.clone()])).is_err());
+    assert!(consensus.ledger.vm().finalize(&Transactions::from(&[transaction.clone()]), None).is_err());
     // Ensure that the ledger deems the same transaction invalid.
     assert!(consensus.check_transaction_basic(&transaction).is_err());
     // Ensure that the ledger cannot add the same transaction.

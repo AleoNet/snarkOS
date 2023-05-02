@@ -446,7 +446,10 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::{ConsensusMemory, ConsensusStore, Testnet3, VM};
+    use snarkvm::{
+        prelude::{ConsensusStore, Testnet3, VM},
+        synthesizer::store::helpers::memory::ConsensusMemory,
+    };
 
     use rand::SeedableRng;
     use rand_chacha::ChaChaRng;

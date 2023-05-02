@@ -79,9 +79,6 @@ path = "./rest"
 [dependencies.snarkos-node-router]
 path = "./router"
 
-[dependencies.snarkos-node-store]
-path = "./store"
-
 [dependencies.snarkos-node-tcp]
 path = "./tcp"
 

@@ -17,7 +17,7 @@
 use crate::common::test_peer::sample_genesis_block;
 use snarkos_account::Account;
 use snarkos_node::{Beacon, Client, Prover, Validator};
-use snarkvm::prelude::{ConsensusMemory, Testnet3 as CurrentNetwork};
+use snarkvm::{prelude::Testnet3 as CurrentNetwork, synthesizer::store::helpers::memory::ConsensusMemory};
 
 use std::str::FromStr;
 
