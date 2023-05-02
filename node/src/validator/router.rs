@@ -106,9 +106,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // 4.
         // If quorum is reached, start the consensus but only if it hasn't already been started.
+        let own_stake = self.committee.stake(public_key);
         let connected_stake =
             self.connected_committee_members.read().values().map(|pk| self.committee.stake(pk)).sum::<u64>();
-        if connected_stake >= self.committee.quorum_threshold() && self.bft.get().is_none() {
+        if own_stake + connected_stake >= self.committee.quorum_threshold() && self.bft.get().is_none() {
             self.start_bft(consensus_id.last_executed_sub_dag_index).await.unwrap()
         }
 
