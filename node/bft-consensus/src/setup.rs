@@ -25,7 +25,7 @@ use std::{
 use aleo_std::aleo_dir;
 use multiaddr::Multiaddr;
 use narwhal_config::{Authority, Committee, WorkerCache, WorkerIndex, WorkerInfo};
-use narwhal_crypto::{KeyPair as NarwhalKeyPair, NetworkKeyPair};
+use narwhal_crypto::{KeyPair as NarwhalKeyPair, NetworkKeyPair, PublicKey};
 use rand::prelude::ThreadRng;
 use tracing::*;
 
@@ -139,27 +139,27 @@ impl WorkerSetup {
 
 // A collection of values capable of generating the entire BFT committee.
 pub struct CommitteeSetup {
-    pub primaries: Vec<PrimarySetup>,
+    pub primaries: BTreeMap<PublicKey, PrimarySetup>,
     pub epoch: u64,
 }
 
 impl CommitteeSetup {
     pub fn new(primaries: Vec<PrimarySetup>, epoch: u64) -> Self {
-        Self { primaries, epoch }
+        Self { primaries: primaries.into_iter().map(|ps| (ps.keypair.public().clone(), ps)).collect(), epoch }
     }
 
     // Generates a Committee.
     pub fn generate_committee(&self) -> Committee {
         #[allow(clippy::mutable_key_type)]
         let mut authorities = BTreeMap::default();
-        for primary in &self.primaries {
+        for (primary_public, primary) in &self.primaries {
             let authority = Authority {
                 stake: primary.stake,
                 primary_address: primary.address.clone(),
                 network_key: primary.network_keypair.public().clone(),
             };
 
-            authorities.insert(primary.keypair.public().clone(), authority);
+            authorities.insert(primary_public.clone(), authority);
         }
 
         Committee { authorities, epoch: self.epoch }
@@ -169,7 +169,7 @@ impl CommitteeSetup {
     pub fn generate_worker_cache(&self) -> WorkerCache {
         #[allow(clippy::mutable_key_type)]
         let mut workers = BTreeMap::default();
-        for primary in &self.primaries {
+        for (primary_public, primary) in &self.primaries {
             let mut worker_index = BTreeMap::default();
             for (worker_id, worker) in primary.workers.iter().enumerate() {
                 let worker_info = WorkerInfo {
@@ -181,7 +181,7 @@ impl CommitteeSetup {
                 worker_index.insert(worker_id as u32, worker_info);
             }
             let worker_index = WorkerIndex(worker_index);
-            workers.insert(primary.keypair.public().clone(), worker_index);
+            workers.insert(primary_public.clone(), worker_index);
         }
 
         WorkerCache { workers, epoch: self.epoch }
@@ -214,7 +214,7 @@ impl CommitteeSetup {
         fs::write(workers_path, workers_json).unwrap();
 
         // Write the primary and worker files to the filesystem.
-        for (primary_id, primary) in self.primaries.iter().enumerate() {
+        for (primary_id, (_, primary)) in self.primaries.iter().enumerate() {
             // Base64-encode the primary keys.
             let primary_key_encoded = primary.keypair.encode_base64();
             let primary_network_key_encoded = primary.network_keypair.encode_base64();
