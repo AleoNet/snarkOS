@@ -51,6 +51,59 @@ use std::{
 };
 use tokio::task::JoinHandle;
 
+const IPS: [&str; 50] = [
+    "35.194.188.110",
+    "34.96.242.203",
+    "34.85.42.148",
+    "34.97.253.222",
+    "34.64.162.141",
+    "34.100.223.12",
+    "34.131.172.155",
+    "35.186.158.143",
+    "34.87.85.84",
+    "34.101.52.145",
+    "34.101.236.0",
+    "34.151.88.152",
+    "34.126.193.90",
+    "34.116.221.182",
+    "34.118.120.251",
+    "35.228.52.226",
+    "34.88.215.58",
+    "34.175.76.245",
+    "34.175.7.200",
+    "35.233.0.36",
+    "130.211.78.224",
+    "34.17.36.40",
+    "34.17.11.36",
+    "34.142.46.149",
+    "35.198.153.162",
+    "34.32.236.100",
+    "34.65.137.89",
+    "34.65.54.43",
+    "34.65.227.61",
+    "34.154.27.53",
+    "34.154.88.122",
+    "34.154.213.64",
+    "34.155.217.254",
+    "34.163.109.159",
+    "34.163.27.93",
+    "34.18.48.100",
+    "34.165.214.65",
+    "34.152.22.55",
+    "34.130.157.56",
+    "34.95.204.229",
+    "34.176.83.181",
+    "34.68.20.182",
+    "34.74.169.175",
+    "35.199.27.85",
+    "34.162.159.104",
+    "34.174.148.188",
+    "34.168.78.252",
+    "35.236.75.199",
+    "34.106.19.187",
+    "34.125.170.163",
+];
+
 /// A validator is a full node, capable of validating blocks.
 #[derive(Clone)]
 pub struct Validator<N: Network, C: ConsensusStorage<N>> {
@@ -177,22 +230,31 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             let mut rng = thread_rng();
 
             // Hardcode the dev number of primaries, at least for now.
-            const NUM_PRIMARIES: usize = 4;
+            const NUM_PRIMARIES: usize = IPS.len();
+
+            const PRIMARY_PORT: u16 = 1030;
+            const WORKER_PORT_NET: u16 = 1242;
+            const WORKER_PORT_TX: u16 = 1360;
 
             // Generate the committee setup.
             let mut primaries = Vec::with_capacity(NUM_PRIMARIES);
-            for _ in 0..NUM_PRIMARIES {
+            for i in 1..=NUM_PRIMARIES {
                 // TODO: set up a meaningful stake
-                let primary = PrimarySetup::new(None, 1, vec![], &mut rng);
+                let primary = PrimarySetup::new(
+                    Some(format!("/ip4/{}/udp/{}", IPS[i - 1], PRIMARY_PORT).parse().unwrap()),
+                    1,
+                    vec![(
+                        format!("/ip4/{}/udp/{}", IPS[i - 1], WORKER_PORT_NET).parse().unwrap(),
+                        format!("/ip4/{}/tcp/{}/http", IPS[i - 1], WORKER_PORT_TX).parse().unwrap(),
+                    )],
+                    &mut rng,
+                );
                 primaries.push(primary);
             }
             let committee = CommitteeSetup::new(primaries, 0);
 
             // Create the dev subpath and write the commitee files.
             committee.write_files(true);
-
-            // Copy the existing parameters.
-            fs::copy(format!("{bft_path}/../.parameters.json"), format!("{bft_path}/.parameters.json")).unwrap();
         }
 
         let base_path = format!("{bft_path}{}", if dev.is_some() { "/" } else { "" });
