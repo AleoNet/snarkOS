@@ -87,7 +87,7 @@ impl PrimarySetup {
         let address = if let Some(addr) = primary_addr {
             addr
         } else {
-            let primary_port = PRIMARY_FIRST_PORT + PRIMARY_PORT_OFFSET.fetch_add(1, Ordering::SeqCst);
+            let primary_port = PRIMARY_FIRST_PORT;
             if primary_port > PRIMARY_LAST_PORT {
                 warn!("Primary port is running into registered range ({primary_port}).");
             }
@@ -118,13 +118,13 @@ impl WorkerSetup {
         let (address, tx_address) = if let Some(addrs) = addrs {
             addrs
         } else {
-            let worker_port_net = WORKER_FIRST_PORT_NET + WORKER_PORT_OFFSET_NET.fetch_add(1, Ordering::SeqCst);
+            let worker_port_net = WORKER_FIRST_PORT_NET;
             if worker_port_net > WORKER_LAST_PORT_NET {
                 warn!("Worker network port is running into registered range ({worker_port_net}).");
             }
             let address = format!("/ip4/127.0.0.1/udp/{worker_port_net}").parse().unwrap();
 
-            let worker_port_tx = WORKER_FIRST_PORT_TX + WORKER_PORT_OFFSET_TX.fetch_add(1, Ordering::SeqCst);
+            let worker_port_tx = WORKER_FIRST_PORT_TX;
             if worker_port_tx > WORKER_LAST_PORT_TX {
                 warn!("Worker transaction port is running into registered range ({worker_port_tx}).");
             }
@@ -189,40 +189,41 @@ impl CommitteeSetup {
 
     // Persists the committee setup to the filesystem.
     pub fn write_files(&self, dev: bool) {
-        fn dev_subpath(dev: bool) -> &'static str {
-            if dev { ".dev/" } else { "" }
-        }
-
-        // Generate the common config.
-        let committee = self.generate_committee();
-        let worker_cache = self.generate_worker_cache();
-
-        // Check if the base path exists.
-        let base_path = format!("{}/node/bft-consensus/committee/{}", workspace_dir(), dev_subpath(dev));
-        if fs::metadata(&base_path).is_err() {
-            fs::create_dir_all(&base_path).unwrap(); // TODO: improve error handling here and below
-        }
-
-        // Write the committee file to the filesystem.
-        let committee_path = format!("{base_path}.committee.json");
-        let committee_json = serde_json::to_string_pretty(&committee).unwrap();
-        fs::write(committee_path, committee_json).unwrap();
-
-        // Write the worker cache file to the filesystem.
-        let workers_path = format!("{base_path}.workers.json");
-        let workers_json = serde_json::to_string_pretty(&worker_cache).unwrap();
-        fs::write(workers_path, workers_json).unwrap();
-
         // Write the primary and worker files to the filesystem.
         for (primary_id, (_, primary)) in self.primaries.iter().enumerate() {
+            fn dev_subpath(dev: bool, primary_id: usize) -> String {
+                if dev { format!(".dev/{:02}/", primary_id + 1) } else { format!("{:02}/", primary_id + 1) }
+            }
+
+            // Generate the common config.
+            let committee = self.generate_committee();
+            let worker_cache = self.generate_worker_cache();
+
+            // Check if the base path exists.
+            let base_path =
+                format!("{}/node/bft-consensus/committee/{}", workspace_dir(), dev_subpath(dev, primary_id));
+            if fs::metadata(&base_path).is_err() {
+                fs::create_dir_all(&base_path).unwrap(); // TODO: improve error handling here and below
+            }
+
+            // Write the committee file to the filesystem.
+            let committee_path = format!("{base_path}.committee.json");
+            let committee_json = serde_json::to_string_pretty(&committee).unwrap();
+            fs::write(committee_path, committee_json).unwrap();
+
+            // Write the worker cache file to the filesystem.
+            let workers_path = format!("{base_path}.workers.json");
+            let workers_json = serde_json::to_string_pretty(&worker_cache).unwrap();
+            fs::write(workers_path, workers_json).unwrap();
+
             // Base64-encode the primary keys.
             let primary_key_encoded = primary.keypair.encode_base64();
             let primary_network_key_encoded = primary.network_keypair.encode_base64();
 
             // Write the encoded primary keys to the filesystem.
-            let primary_key_path = format!("{base_path}.primary-{primary_id}-key.json");
+            let primary_key_path = format!("{base_path}.primary-0-key.json");
             fs::write(primary_key_path, primary_key_encoded).unwrap();
-            let primary_network_key_path = format!("{base_path}.primary-{primary_id}-network.json");
+            let primary_network_key_path = format!("{base_path}.primary-0-network.json");
             fs::write(primary_network_key_path, primary_network_key_encoded).unwrap();
 
             for (worker_id, worker) in primary.workers.iter().enumerate() {
@@ -230,9 +231,12 @@ impl CommitteeSetup {
                 let worker_network_key_encoded = worker.network_keypair.encode_base64();
 
                 // Write the encoded worker key to the filesystem.
-                let worker_network_key_path = format!("{base_path}.worker-{primary_id}-{worker_id}-network.json");
+                let worker_network_key_path = format!("{base_path}.worker-0-0-network.json");
                 fs::write(worker_network_key_path, worker_network_key_encoded).unwrap();
             }
+
+            // Copy the existing parameters.
+            fs::copy(format!("{base_path}../../.parameters.json"), format!("{base_path}.parameters.json")).unwrap();
         }
     }
 }
