@@ -31,7 +31,7 @@ use snarkvm::prelude::{
     VM,
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
 use std::str::FromStr;
@@ -54,7 +54,7 @@ pub struct Execute {
     /// The endpoint to query node state from.
     #[clap(short, long)]
     query: String,
-    /// The deployment fee in gates, defaults to 0.
+    /// The transaction fee in microcredits.
     #[clap(short, long)]
     fee: Option<u64>,
     /// The record to spend the fee from.
@@ -97,20 +97,25 @@ impl Execute {
             let vm = VM::from(store)?;
 
             // Add the program deployment to the VM.
-            if program.id() != &ProgramID::<CurrentNetwork>::try_from("credits.aleo")? {
+            let credits = ProgramID::<CurrentNetwork>::try_from("credits.aleo")?;
+            if program.id() != &credits {
                 let deployment = vm.deploy(&program, rng)?;
                 vm.process().write().finalize_deployment(vm.program_store(), &deployment)?;
             }
 
             // Prepare the fees.
             let fee = match self.record {
-                Some(record) => {
-                    let record = Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&record)?;
-                    let fee_amount = self.fee.unwrap_or(0);
-
-                    Some((record, fee_amount))
+                Some(record) => Some((
+                    Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&record)?,
+                    self.fee.unwrap_or(0),
+                )),
+                None => {
+                    // Ensure that only the `credits.aleo/split` call can be created without a fee.
+                    if program.id() != &credits && self.function != Identifier::from_str("split")? {
+                        bail!("❌ A record must be provided to pay for the transaction fee.");
+                    }
+                    None
                 }
-                None => None,
             };
 
             // Create a new transaction.
@@ -125,7 +130,7 @@ impl Execute {
             )?
         };
         let locator = Locator::<CurrentNetwork>::from_str(&format!("{}/{}", self.program_id, self.function))?;
-        format!("✅ Created execution transaction for '{}'", locator.to_string().bold());
+        println!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
         Developer::handle_transaction(self.broadcast, self.display, self.store, execution, locator.to_string())
