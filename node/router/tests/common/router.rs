@@ -20,14 +20,13 @@ use snarkos_node_messages::{
     DisconnectReason,
     Message,
     MessageCodec,
-    Ping,
     Pong,
     UnconfirmedSolution,
     UnconfirmedTransaction,
 };
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake, Reading, Writing},
+    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Connection,
     ConnectionSide,
     Tcp,
@@ -36,7 +35,6 @@ use snarkos_node_tcp::{
 use snarkvm::prelude::{Block, EpochChallenge, Header, Network, ProverSolution, Transaction};
 
 use async_trait::async_trait;
-use futures_util::sink::SinkExt;
 use std::{io, net::SocketAddr};
 use tracing::*;
 
@@ -73,14 +71,16 @@ impl<N: Network> Handshake for TestRouter<N> {
         let conn_side = connection.side();
         let stream = self.borrow_stream(&mut connection);
         let genesis_header = *sample_genesis_block().header();
-        let (peer_ip, mut framed) = self.router().handshake(peer_addr, stream, conn_side, genesis_header).await?;
-
-        // Send the first `Ping` message to the peer.
-        let message = Message::Ping(Ping::new(self.node_type(), None));
-        trace!("Sending '{}' to '{peer_ip}'", message.name());
-        framed.send(message).await?;
+        self.router().handshake(peer_addr, stream, conn_side, genesis_header).await?;
 
         Ok(connection)
+    }
+}
+
+#[async_trait]
+impl<N: Network> OnConnect for TestRouter<N> {
+    async fn on_connect(&self, _peer_addr: SocketAddr) {
+        // This behavior is currently not tested.
     }
 }
 

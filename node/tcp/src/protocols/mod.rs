@@ -27,11 +27,13 @@ use crate::connections::Connection;
 
 mod disconnect;
 mod handshake;
+mod on_connect;
 mod reading;
 mod writing;
 
 pub use disconnect::Disconnect;
 pub use handshake::Handshake;
+pub use on_connect::OnConnect;
 pub use reading::Reading;
 pub use writing::Writing;
 
@@ -40,6 +42,7 @@ pub(crate) struct Protocols {
     pub(crate) handshake: OnceBox<ProtocolHandler<Connection, io::Result<Connection>>>,
     pub(crate) reading: OnceBox<ProtocolHandler<Connection, io::Result<Connection>>>,
     pub(crate) writing: OnceBox<writing::WritingHandler>,
+    pub(crate) on_connect: OnceBox<ProtocolHandler<SocketAddr, ()>>,
     pub(crate) disconnect: OnceBox<ProtocolHandler<SocketAddr, ()>>,
 }
 
