@@ -47,7 +47,7 @@ fn test_open() {
 #[test]
 #[serial]
 fn test_open_map() {
-    let _map = RocksDB::open_map_testing::<u32, String>(temp_dir(), None, MapID::Test(TestMapID::Test))
+    let _map = RocksDB::open_map_testing::<u32, String, _>(temp_dir(), None, MapID::Test(TestMapID::Test))
         .expect("Failed to open data map");
 }
 
