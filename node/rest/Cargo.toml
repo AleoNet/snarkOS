@@ -23,6 +23,10 @@ parallel = [ "rayon" ]
 [dependencies.anyhow]
 version = "1.0.70"
 
+[dependencies.axum]
+version = "0.6"
+features = ["headers"]
+
 [dependencies.http]
 version = "0.2"
 
@@ -71,8 +75,9 @@ version = "0.3"
 [dependencies.tokio]
 version = "1"
 
+[dependencies.tower-http]
+version = "0.4"
+features = ["cors", "trace"]
+
 [dependencies.tracing]
 version = "0.1"
-
-[dependencies.warp]
-version = "0.3"

@@ -14,10 +14,22 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
+use axum::{
+    http::StatusCode,
+    response::{IntoResponse, Response},
+};
+
 /// An enum of error handlers for the REST API server.
-#[derive(Debug)]
-pub enum RestError {
-    Request(String),
+pub struct RestError(pub String);
+
+impl IntoResponse for RestError {
+    fn into_response(self) -> Response {
+        (StatusCode::INTERNAL_SERVER_ERROR, format!("Something went wrong: {}", self.0)).into_response()
+    }
 }
 
-impl warp::reject::Reject for RestError {}
+impl From<anyhow::Error> for RestError {
+    fn from(err: anyhow::Error) -> Self {
+        Self(err.to_string())
+    }
+}

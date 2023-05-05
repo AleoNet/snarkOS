@@ -14,16 +14,21 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use crate::RestError;
-
 use snarkvm::prelude::*;
 
 use ::time::OffsetDateTime;
 use anyhow::{anyhow, Result};
+use axum::{
+    headers::authorization::{Authorization, Bearer},
+    http::{Request, StatusCode},
+    middleware::Next,
+    response::{IntoResponse, Response},
+    RequestPartsExt,
+    TypedHeader,
+};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use warp::{reject, Filter, Rejection};
 
 /// The time a jwt token is valid for.
 pub const EXPIRATION: i64 = 10 * 365 * 24 * 60 * 60; // 10 years.
@@ -67,28 +72,30 @@ impl Claims {
     }
 }
 
-/// Checks the authorization header for a valid token.
-pub fn with_auth() -> impl Filter<Extract = ((),), Error = Rejection> + Clone {
-    warp::header::<String>("authorization").and_then(|token: String| async move {
-        if !token.starts_with("Bearer ") {
-            return Err(reject::custom(RestError::Request("Invalid authorization header.".to_string())));
-        }
+pub async fn auth_middleware<B>(request: Request<B>, next: Next<B>) -> Result<Response, Response>
+where
+    B: Send,
+{
+    // Deconstruct the request to extract the auth token.
+    let (mut parts, body) = request.into_parts();
+    let auth: TypedHeader<Authorization<Bearer>> =
+        parts.extract().await.map_err(|_| StatusCode::UNAUTHORIZED.into_response())?;
 
-        // Decode the claims from the token.
-        match decode::<Claims>(
-            token.trim_start_matches("Bearer "),
-            &DecodingKey::from_secret(jwt_secret()),
-            &Validation::new(Algorithm::HS256),
-        ) {
-            Ok(decoded) => {
-                let claims = decoded.claims;
-                if claims.is_expired() {
-                    return Err(reject::custom(RestError::Request("Expired JSON Web Token.".to_string())));
-                }
-
-                Ok(())
+    match decode::<Claims>(auth.token(), &DecodingKey::from_secret(jwt_secret()), &Validation::new(Algorithm::HS256)) {
+        Ok(decoded) => {
+            let claims = decoded.claims;
+            if claims.is_expired() {
+                return Err((StatusCode::UNAUTHORIZED, "Expired JSON Web Token".to_owned()).into_response());
             }
-            Err(_) => Err(reject::custom(RestError::Request("Unauthorized caller.".to_string()))),
         }
-    })
+
+        Err(_) => {
+            return Err(StatusCode::UNAUTHORIZED.into_response());
+        }
+    }
+
+    // Reconstruct the request.
+    let request = Request::from_parts(parts, body);
+
+    Ok(next.run(request).await)
 }

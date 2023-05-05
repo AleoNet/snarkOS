@@ -434,6 +434,13 @@ impl Tcp {
             let _ = tx.send(());
         }
 
+        // If enabled, enact OnConnect.
+        if let Some(handler) = self.protocols.on_connect.get() {
+            let (sender, receiver) = oneshot::channel();
+            handler.trigger((peer_addr, sender));
+            let _ = receiver.await; // can't really fail
+        }
+
         Ok(())
     }
 
