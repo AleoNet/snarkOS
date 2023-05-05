@@ -262,15 +262,6 @@ jobs:
           workspace_member: node/router
           cache_key: snarkos-node-router-cache
 
-  node-store:
-    docker:
-      - image: cimg/rust:1.65
-    resource_class: 2xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/store
-          cache_key: snarkos-node-store-cache
-
   node-tcp:
     docker:
       - image: cimg/rust:1.65
@@ -342,7 +333,6 @@ workflows:
       - node-messages
       - node-rest
       - node-router
-      - node-store
       - node-tcp
       - check-fmt
       - check-clippy

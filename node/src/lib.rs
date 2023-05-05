@@ -42,8 +42,10 @@ pub use traits::*;
 pub use snarkos_node_messages::NodeType;
 
 use snarkos_account::Account;
-use snarkos_node_store::ConsensusDB;
-use snarkvm::prelude::{Address, Block, ConsensusMemory, Network, PrivateKey, ViewKey};
+use snarkvm::{
+    prelude::{Address, Block, Network, PrivateKey, ViewKey},
+    synthesizer::store::helpers::{memory::ConsensusMemory, rocksdb::ConsensusDB},
+};
 
 use anyhow::Result;
 use std::{net::SocketAddr, sync::Arc};

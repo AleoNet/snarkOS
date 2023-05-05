@@ -18,7 +18,11 @@ use crate::{tests::test_helpers::CurrentLedger, Ledger};
 use snarkvm::{
     console::network::{prelude::*, Testnet3},
     prelude::TestRng,
-    synthesizer::{block::Block, store::ConsensusStore, vm::VM, ConsensusMemory},
+    synthesizer::{
+        block::Block,
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        vm::VM,
+    },
 };
 
 type CurrentNetwork = Testnet3;
@@ -29,7 +33,6 @@ pub(crate) mod test_helpers {
     use snarkvm::{
         console::{account::PrivateKey, network::Testnet3},
         prelude::TestRng,
-        synthesizer::ConsensusMemory,
     };
 
     use once_cell::sync::OnceCell;
