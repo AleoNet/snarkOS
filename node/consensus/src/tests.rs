@@ -313,13 +313,14 @@ fn test_ledger_deploy() {
     assert!(consensus.ledger.contains_input_id(transaction.input_ids().next().unwrap()).unwrap());
 
     // Ensure that the VM can't re-deploy the same program.
-    assert!(
-        consensus
-            .ledger
-            .vm()
-            .finalize::<{ FinalizeMode::RealRun.to_u8() }>(&Transactions::from(&[transaction.clone()]))
-            .is_err()
-    );
+    let (accepted_transactions, rejected_transactions, _) = consensus
+        .ledger
+        .vm()
+        .finalize::<{ FinalizeMode::RealRun.to_u8() }>(&Transactions::from(&[transaction.clone()]))
+        .unwrap();
+    assert!(accepted_transactions.is_empty());
+    assert_eq!(rejected_transactions, vec![transaction.id()]);
+
     // Ensure that the ledger deems the same transaction invalid.
     assert!(consensus.check_transaction_basic(&transaction).is_err());
     // Ensure that the ledger cannot add the same transaction.
