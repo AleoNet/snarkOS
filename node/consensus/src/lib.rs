@@ -40,9 +40,6 @@ use std::sync::Arc;
 #[cfg(feature = "parallel")]
 use rayon::prelude::*;
 
-/// The cost in microcredits per byte for the deployment transaction.
-const DEPLOYMENT_FEE_FACTOR: u64 = 1000;
-
 #[derive(Clone)]
 pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     /// The ledger.
@@ -727,17 +724,14 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         match transaction {
             Transaction::Deploy(_, _, deployment, _) => {
                 // Check that the fee in microcredits is at least the deployment size in bytes.
-                if u64::try_from(deployment.to_bytes_le()?.len())?.saturating_mul(DEPLOYMENT_FEE_FACTOR) > *fee {
+                if deployment.size_in_bytes()?.saturating_mul(N::DEPLOYMENT_FEE_MULTIPLIER) > *fee {
                     bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
                 }
             }
             Transaction::Execute(_, execution, _) => {
                 // TODO (raychu86): Remove the split check when batch executions are integrated.
                 // If the transaction is not a coinbase or split transaction, check that the fee in microcredits is at least the execution size in bytes.
-                if !transaction.is_coinbase()
-                    && !transaction.is_split()
-                    && u64::try_from(execution.to_bytes_le()?.len())? > *fee
-                {
+                if !transaction.is_coinbase() && !transaction.is_split() && execution.size_in_bytes()? > *fee {
                     bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
                 }
             }
