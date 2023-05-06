@@ -102,7 +102,7 @@ impl Execute {
             let credits = ProgramID::<CurrentNetwork>::try_from("credits.aleo")?;
             if program.id() != &credits {
                 let deployment = vm.deploy(&program, rng)?;
-                vm.process().write().finalize_deployment(vm.finalize_store(), &deployment)?;
+                vm.process().write().load_deployment(&deployment)?;
             }
 
             // Prepare the fees.

@@ -19,9 +19,6 @@ edition = "2021"
 [dev-dependencies.snarkos-node-cdn]
 path = "../node/cdn"
 
-[dev-dependencies.snarkos-node-ledger]
-path = "../node/ledger"
-
 [dev-dependencies.snarkvm]
 workspace = true
 features = ["synthesizer"]

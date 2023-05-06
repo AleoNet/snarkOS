@@ -28,7 +28,6 @@ pub use memory_pool::*;
 #[cfg(test)]
 mod tests;
 
-use snarkos_node_ledger::Ledger;
 use snarkvm::prelude::*;
 
 use ::time::OffsetDateTime;
@@ -176,8 +175,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let latest_height = latest_block.height();
         // Retrieve the latest total supply in microcredits.
         let latest_total_supply_in_microcredits = latest_block.total_supply_in_microcredits();
-        // Retrieve the latest cumulative proof target.
-        let latest_cumulative_proof_target = latest_block.cumulative_proof_target();
+        // Retrieve the latest cumulative weight.
+        let latest_cumulative_weight = latest_block.cumulative_weight();
         // Retrieve the latest proof target.
         let latest_proof_target = latest_block.proof_target();
         // Retrieve the latest coinbase target.
@@ -310,8 +309,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             None => (latest_block.last_coinbase_target(), latest_block.last_coinbase_timestamp()),
         };
 
-        // Construct the new cumulative proof target.
-        let cumulative_proof_target = latest_cumulative_proof_target.saturating_add(block_cumulative_proof_target);
+        // Construct the new cumulative weight.
+        let cumulative_weight = latest_cumulative_weight.saturating_add(block_cumulative_proof_target);
 
         // Construct the metadata.
         let metadata = Metadata::new(
@@ -319,7 +318,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             next_round,
             next_height,
             new_total_supply_in_microcredits,
-            cumulative_proof_target,
+            cumulative_weight,
             next_coinbase_target,
             next_proof_target,
             next_last_coinbase_target,
@@ -521,14 +520,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     if block.last_coinbase_timestamp() != block.timestamp() {
                         bail!("The last coinbase timestamp does not match the block timestamp")
                     }
-                    // Ensure that the cumulative proof target matches the block cumulative proof target.
-                    if block.cumulative_proof_target()
-                        != self
-                            .ledger
-                            .latest_cumulative_proof_target()
-                            .saturating_add(coinbase.to_cumulative_proof_target()?)
+                    // Ensure that the cumulative weight includes the next block's cumulative proof target.
+                    if block.cumulative_weight()
+                        != self.ledger.latest_cumulative_weight().saturating_add(coinbase.to_cumulative_proof_target()?)
                     {
-                        bail!("The cumulative proof target does not match the block cumulative proof target")
+                        bail!("The cumulative weight does not include the block cumulative proof target")
                     }
                 }
                 None => {
@@ -540,9 +536,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     if block.last_coinbase_timestamp() != self.ledger.last_coinbase_timestamp() {
                         bail!("The last coinbase timestamp does not match the previous block's last coinbase timestamp")
                     }
-                    // Ensure that the cumulative proof target is the same as the previous block.
-                    if block.cumulative_proof_target() != self.ledger.latest_cumulative_proof_target() {
-                        bail!("The cumulative proof target does not match the previous block's cumulative proof target")
+                    // Ensure that the cumulative weight is the same as the previous block.
+                    if block.cumulative_weight() != self.ledger.latest_cumulative_weight() {
+                        bail!("The cumulative weight does not match the previous block's cumulative weight")
                     }
                 }
             }

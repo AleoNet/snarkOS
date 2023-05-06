@@ -25,12 +25,11 @@ pub use helpers::*;
 mod routes;
 
 use snarkos_node_consensus::Consensus;
-use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
 use snarkos_node_router::Routing;
 use snarkvm::{
     console::{account::Address, program::ProgramID, types::Field},
-    prelude::{cfg_into_iter, Network},
+    prelude::{cfg_into_iter, Ledger, Network},
     synthesizer::{ConsensusStorage, Program},
 };
 

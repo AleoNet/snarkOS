@@ -50,9 +50,6 @@ features = [ "derive" ]
 [dependencies.snarkos-node-consensus]
 path = "../consensus"
 
-[dependencies.snarkos-node-ledger]
-path = "../ledger"
-
 [dependencies.snarkos-node-messages]
 path = "../messages"
 

@@ -14,9 +14,8 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENTS};
-use snarkvm::prelude::{ConsensusStorage, Network};
+use snarkvm::prelude::{ConsensusStorage, Ledger, Network};
 
 use anyhow::Result;
 use indexmap::IndexMap;
