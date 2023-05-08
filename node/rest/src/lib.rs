@@ -150,7 +150,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             // Cap body size at 10MB.
             .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
             // JWT auth.
-            .layer(middleware::from_fn(auth_middleware))
+            // .layer(middleware::from_fn(auth_middleware))
         };
 
         self.handles.lock().push(tokio::spawn(async move {
