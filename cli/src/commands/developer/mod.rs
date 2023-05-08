@@ -127,6 +127,9 @@ impl Developer {
         // Get the transaction id.
         let transaction_id = transaction.id();
 
+        // Ensure the transaction is not a fee transaction.
+        ensure!(!transaction.is_fee(), "The transaction is a fee transaction and cannot be broadcast");
+
         // Determine if the transaction should be stored.
         if let Some(path) = store {
             match PathBuf::from_str(&path) {
@@ -158,6 +161,9 @@ impl Developer {
                         Transaction::Execute(..) => {
                             println!("✅ Successfully broadcast execution '{}' to the {}.", operation.bold(), endpoint)
                         }
+                        Transaction::Fee(..) => {
+                            println!("❌ Failed to broadcast fee '{}' to the {}.", operation.bold(), endpoint)
+                        }
                     }
                 }
                 Err(error) => {
@@ -175,6 +181,14 @@ impl Developer {
                         Transaction::Execute(..) => {
                             bail!(
                                 "❌ Failed to broadcast execution '{}' to {}: {}",
+                                operation.bold(),
+                                &endpoint,
+                                error_message
+                            )
+                        }
+                        Transaction::Fee(..) => {
+                            bail!(
+                                "❌ Failed to broadcast fee '{}' to {}: {}",
                                 operation.bold(),
                                 &endpoint,
                                 error_message
