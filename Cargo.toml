@@ -24,7 +24,6 @@ members = [
     "node",
     "node/cdn",
     "node/consensus",
-    "node/ledger",
     "node/messages",
     "node/metrics",
     "node/rest",
@@ -40,7 +39,7 @@ path = "snarkos/main.rs"
 [workspace.dependencies.snarkvm]
 #path = "../snarkVM"
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "1779e8d"
+rev = "23ec664"
 #version = "=0.10.3"
 features = ["circuit", "console", "rocks"]
 
@@ -68,9 +67,6 @@ path = "./node/cdn"
 
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"
-
-[dependencies.snarkos-node-ledger]
-path = "./node/ledger"
 
 [dependencies.snarkos-node-messages]
 path = "./node/messages"

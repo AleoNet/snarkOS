@@ -14,19 +14,18 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_ledger::{Ledger, RecordsFilter};
 use snarkvm::{
     console::{
         account::{Address, PrivateKey, ViewKey},
         network::{prelude::*, Testnet3},
         program::{Entry, Identifier, Literal, Plaintext, Value},
     },
-    prelude::TestRng,
+    prelude::{Ledger, RecordsFilter, TestRng},
     synthesizer::{
         block::{Block, Transaction, Transactions},
         program::Program,
         store::ConsensusStore,
-        vm::VM,
+        vm::{FinalizeMode, VM},
     },
 };
 
@@ -314,7 +313,14 @@ fn test_ledger_deploy() {
     assert!(consensus.ledger.contains_input_id(transaction.input_ids().next().unwrap()).unwrap());
 
     // Ensure that the VM can't re-deploy the same program.
-    assert!(consensus.ledger.vm().finalize(&Transactions::from(&[transaction.clone()]), None).is_err());
+    let (accepted_transactions, rejected_transactions, _) = consensus
+        .ledger
+        .vm()
+        .finalize::<{ FinalizeMode::RealRun.to_u8() }>(&Transactions::from(&[transaction.clone()]))
+        .unwrap();
+    assert!(accepted_transactions.is_empty());
+    assert_eq!(rejected_transactions, vec![transaction.id()]);
+
     // Ensure that the ledger deems the same transaction invalid.
     assert!(consensus.check_transaction_basic(&transaction).is_err());
     // Ensure that the ledger cannot add the same transaction.

@@ -19,7 +19,6 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_ledger::{Ledger, RecordMap};
 use snarkos_node_messages::{
     BeaconPropose,
     Data,
@@ -40,10 +39,12 @@ use snarkvm::prelude::{
     ConsensusStorage,
     Entry,
     Identifier,
+    Ledger,
     Literal,
     Network,
     Plaintext,
     ProverSolution,
+    RecordMap,
     Transaction,
     Value,
     Zero,

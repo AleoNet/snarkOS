@@ -14,8 +14,16 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_ledger::Ledger;
-use snarkvm::prelude::{cow_to_copied, Block, ConsensusStorage, Deserialize, DeserializeOwned, Network, Serialize};
+use snarkvm::prelude::{
+    cow_to_copied,
+    Block,
+    ConsensusStorage,
+    Deserialize,
+    DeserializeOwned,
+    Ledger,
+    Network,
+    Serialize,
+};
 
 use anyhow::{anyhow, bail, Result};
 use colored::Colorize;

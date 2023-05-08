@@ -19,7 +19,6 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{BlockRequest, Message, NodeType, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
@@ -27,7 +26,7 @@ use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
 };
-use snarkvm::prelude::{Block, ConsensusStorage, Header, Network, ProverSolution};
+use snarkvm::prelude::{Block, ConsensusStorage, Header, Ledger, Network, ProverSolution};
 
 use anyhow::Result;
 use parking_lot::Mutex;
