@@ -146,17 +146,27 @@ impl Developer {
             // Send the deployment request to the local development node.
             match ureq::post(&endpoint).send_json(&transaction) {
                 Ok(id) => {
+                    // Remove the quotes from the response.
+                    let response_string = id.into_string()?.trim_matches('\"').to_string();
                     ensure!(
-                        id.into_string()? == transaction_id.to_string(),
-                        "The response does not match the transaction id"
+                        response_string == transaction_id.to_string(),
+                        "The response does not match the transaction id. ({response_string} != {transaction_id})"
                     );
 
                     match transaction {
                         Transaction::Deploy(..) => {
-                            println!("✅ Successfully deployed '{}' to {}.", operation.bold(), endpoint)
+                            println!(
+                                "✅ Successfully broadcast deployment {transaction_id} ('{}') to {}.",
+                                operation.bold(),
+                                endpoint
+                            )
                         }
                         Transaction::Execute(..) => {
-                            println!("✅ Successfully broadcast execution '{}' to the {}.", operation.bold(), endpoint)
+                            println!(
+                                "✅ Successfully broadcast execution {transaction_id} ('{}') to {}.",
+                                operation.bold(),
+                                endpoint
+                            )
                         }
                     }
                 }
