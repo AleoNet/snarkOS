@@ -81,7 +81,7 @@ workspace = true
 version = "1.0"
 
 [dependencies.tokio]
-version = "1.26"
+version = "1.28"
 features = ["rt"]
 
 [dependencies.tracing-subscriber]
