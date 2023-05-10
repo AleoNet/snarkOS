@@ -22,10 +22,10 @@ use snarkvm::{
     },
     prelude::{Ledger, RecordsFilter, TestRng},
     synthesizer::{
-        block::{Block, Transaction, Transactions},
+        block::{Block, Transaction},
         program::Program,
         store::ConsensusStore,
-        vm::{FinalizeMode, VM},
+        vm::VM,
     },
 };
 
@@ -298,6 +298,9 @@ fn test_ledger_deploy() {
     let transaction = crate::tests::test_helpers::sample_deployment_transaction(rng);
     consensus.add_unconfirmed_transaction(transaction.clone()).unwrap();
 
+    // Compute a confirmed transactions to reuse later.
+    let transactions = consensus.ledger.vm().speculate([transaction.clone()].iter()).unwrap();
+
     // Propose the next block.
     let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
 
@@ -313,14 +316,7 @@ fn test_ledger_deploy() {
     assert!(consensus.ledger.contains_input_id(transaction.input_ids().next().unwrap()).unwrap());
 
     // Ensure that the VM can't re-deploy the same program.
-    let (accepted_transactions, rejected_transactions, _) = consensus
-        .ledger
-        .vm()
-        .finalize::<{ FinalizeMode::RealRun.to_u8() }>(&Transactions::from(&[transaction.clone()]))
-        .unwrap();
-    assert!(accepted_transactions.is_empty());
-    assert_eq!(rejected_transactions, vec![transaction.id()]);
-
+    assert!(consensus.ledger.vm().finalize(&transactions).is_err());
     // Ensure that the ledger deems the same transaction invalid.
     assert!(consensus.check_transaction_basic(&transaction).is_err());
     // Ensure that the ledger cannot add the same transaction.
