@@ -34,8 +34,10 @@ use ::time::OffsetDateTime;
 use anyhow::{anyhow, ensure, Result};
 use indexmap::IndexMap;
 use parking_lot::RwLock;
-use rayon::iter::ParallelIterator;
 use std::sync::Arc;
+
+#[cfg(feature = "parallel")]
+use rayon::prelude::*;
 
 #[derive(Clone)]
 pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
