@@ -118,9 +118,6 @@ features = [ "test" ]
 path = "."
 features = [ "test" ]
 
-[dev-dependencies.snarkvm-utilities]
-version = "=0.10.3"
-
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
 features = [ "env-filter", "fmt" ]
