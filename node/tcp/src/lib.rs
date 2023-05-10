@@ -27,8 +27,21 @@ pub mod protocols;
 mod tcp;
 pub use tcp::Tcp;
 
+use std::net::IpAddr;
+
 /// A trait for objects containing a [`Tcp`]; it is required to implement protocols.
 pub trait P2P {
     /// Returns a reference to the TCP instance.
     fn tcp(&self) -> &Tcp;
+}
+
+/// Checks if the given IP address is a bogon address.
+///
+/// A bogon address is an IP address that should not appear on the public Internet.
+/// This includes private addresses, loopback addresses, and link-local addresses.
+pub fn is_bogon_address(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(ipv4) => ipv4.is_loopback() || ipv4.is_private() || ipv4.is_link_local(),
+        IpAddr::V6(ipv6) => ipv6.is_loopback(),
+    }
 }

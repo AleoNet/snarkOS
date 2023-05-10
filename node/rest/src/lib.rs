@@ -25,12 +25,11 @@ pub use helpers::*;
 mod routes;
 
 use snarkos_node_consensus::Consensus;
-use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
 use snarkos_node_router::Routing;
 use snarkvm::{
     console::{account::Address, program::ProgramID, types::Field},
-    prelude::{cfg_into_iter, Network},
+    prelude::{cfg_into_iter, Ledger, Network},
     synthesizer::{ConsensusStorage, Program},
 };
 
@@ -44,6 +43,7 @@ use axum::{
     routing::{get, post},
     Json,
 };
+use axum_extra::response::ErasedJson;
 use parking_lot::Mutex;
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tokio::task::JoinHandle;
@@ -151,7 +151,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             // Cap body size at 10MB.
             .layer(DefaultBodyLimit::max(10 * 1024 * 1024))
             // JWT auth.
-            .layer(middleware::from_fn(auth_middleware))
+            // .layer(middleware::from_fn(auth_middleware))
         };
 
         self.handles.lock().push(tokio::spawn(async move {

@@ -17,7 +17,10 @@
 use snarkos_account::Account;
 use snarkos_display::Display;
 use snarkos_node::{Node, NodeType};
-use snarkvm::prelude::{Block, ConsensusMemory, ConsensusStore, FromBytes, Network, PrivateKey, Testnet3, VM};
+use snarkvm::{
+    prelude::{Block, ConsensusStore, FromBytes, Network, PrivateKey, Testnet3, VM},
+    synthesizer::store::helpers::memory::ConsensusMemory,
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;

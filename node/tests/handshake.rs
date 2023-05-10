@@ -22,7 +22,7 @@ use common::{node::*, test_peer::TestPeer};
 
 use snarkos_node::{Beacon, Client, Prover, Validator};
 use snarkos_node_tcp::P2P;
-use snarkvm::prelude::{ConsensusMemory, Testnet3 as CurrentNetwork};
+use snarkvm::{prelude::Testnet3 as CurrentNetwork, synthesizer::store::helpers::memory::ConsensusMemory};
 
 use pea2pea::Pea2Pea;
 

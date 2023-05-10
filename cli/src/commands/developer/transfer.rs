@@ -16,18 +16,9 @@
 
 use super::{CurrentNetwork, Developer};
 
-use snarkvm::prelude::{
-    Address,
-    ConsensusMemory,
-    ConsensusStore,
-    Locator,
-    Plaintext,
-    PrivateKey,
-    Query,
-    Record,
-    Transaction,
-    Value,
-    VM,
+use snarkvm::{
+    prelude::{Address, ConsensusStore, Locator, Plaintext, PrivateKey, Query, Record, Transaction, Value, VM},
+    synthesizer::store::helpers::memory::ConsensusMemory,
 };
 
 use anyhow::Result;

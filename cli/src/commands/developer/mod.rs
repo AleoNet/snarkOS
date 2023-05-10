@@ -127,6 +127,9 @@ impl Developer {
         // Get the transaction id.
         let transaction_id = transaction.id();
 
+        // Ensure the transaction is not a fee transaction.
+        ensure!(!transaction.is_fee(), "The transaction is a fee transaction and cannot be broadcast");
+
         // Determine if the transaction should be stored.
         if let Some(path) = store {
             match PathBuf::from_str(&path) {
@@ -146,17 +149,30 @@ impl Developer {
             // Send the deployment request to the local development node.
             match ureq::post(&endpoint).send_json(&transaction) {
                 Ok(id) => {
+                    // Remove the quotes from the response.
+                    let response_string = id.into_string()?.trim_matches('\"').to_string();
                     ensure!(
-                        id.into_string()? == transaction_id.to_string(),
-                        "The response does not match the transaction id"
+                        response_string == transaction_id.to_string(),
+                        "The response does not match the transaction id. ({response_string} != {transaction_id})"
                     );
 
                     match transaction {
                         Transaction::Deploy(..) => {
-                            println!("✅ Successfully deployed '{}' to {}.", operation.bold(), endpoint)
+                            println!(
+                                "✅ Successfully broadcast deployment {transaction_id} ('{}') to {}.",
+                                operation.bold(),
+                                endpoint
+                            )
                         }
                         Transaction::Execute(..) => {
-                            println!("✅ Successfully broadcast execution '{}' to the {}.", operation.bold(), endpoint)
+                            println!(
+                                "✅ Successfully broadcast execution {transaction_id} ('{}') to {}.",
+                                operation.bold(),
+                                endpoint
+                            )
+                        }
+                        Transaction::Fee(..) => {
+                            println!("❌ Failed to broadcast fee '{}' to the {}.", operation.bold(), endpoint)
                         }
                     }
                 }
@@ -175,6 +191,14 @@ impl Developer {
                         Transaction::Execute(..) => {
                             bail!(
                                 "❌ Failed to broadcast execution '{}' to {}: {}",
+                                operation.bold(),
+                                &endpoint,
+                                error_message
+                            )
+                        }
+                        Transaction::Fee(..) => {
+                            bail!(
+                                "❌ Failed to broadcast fee '{}' to {}: {}",
                                 operation.bold(),
                                 &endpoint,
                                 error_message

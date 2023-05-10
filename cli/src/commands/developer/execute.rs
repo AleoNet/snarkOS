@@ -16,19 +16,21 @@
 
 use super::{CurrentNetwork, Developer, Program};
 
-use snarkvm::prelude::{
-    ConsensusMemory,
-    ConsensusStore,
-    Identifier,
-    Locator,
-    Plaintext,
-    PrivateKey,
-    ProgramID,
-    Query,
-    Record,
-    Transaction,
-    Value,
-    VM,
+use snarkvm::{
+    prelude::{
+        ConsensusStore,
+        Identifier,
+        Locator,
+        Plaintext,
+        PrivateKey,
+        ProgramID,
+        Query,
+        Record,
+        Transaction,
+        Value,
+        VM,
+    },
+    synthesizer::store::helpers::memory::ConsensusMemory,
 };
 
 use anyhow::{bail, Result};
@@ -100,7 +102,7 @@ impl Execute {
             let credits = ProgramID::<CurrentNetwork>::try_from("credits.aleo")?;
             if program.id() != &credits {
                 let deployment = vm.deploy(&program, rng)?;
-                vm.process().write().finalize_deployment(vm.program_store(), &deployment)?;
+                vm.process().write().load_deployment(&deployment)?;
             }
 
             // Prepare the fees.

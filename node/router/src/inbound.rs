@@ -26,7 +26,7 @@ use snarkos_node_messages::{
     UnconfirmedSolution,
     UnconfirmedTransaction,
 };
-use snarkos_node_tcp::protocols::Reading;
+use snarkos_node_tcp::{is_bogon_address, protocols::Reading};
 use snarkvm::prelude::{Block, EpochChallenge, Header, Network, ProverSolution, Transaction};
 
 use anyhow::{bail, ensure, Result};
@@ -293,6 +293,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     fn peer_request(&self, peer_ip: SocketAddr) -> bool {
         // Retrieve the connected peers.
         let peers = self.router().connected_peers();
+        // Filter out bogon addresses.
+        let peers = peers.into_iter().filter(|addr| !is_bogon_address(addr.ip())).collect();
         // Send a `PeerResponse` message to the peer.
         self.send(peer_ip, Message::PeerResponse(PeerResponse { peers }));
         true
@@ -300,8 +302,10 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
     /// Handles a `PeerResponse` message.
     fn peer_response(&self, _peer_ip: SocketAddr, peers: &[SocketAddr]) -> bool {
+        // Filter out bogon addresses.
+        let peers = peers.iter().copied().filter(|addr| !is_bogon_address(addr.ip())).collect::<Vec<_>>();
         // Adds the given peer IPs to the list of candidate peers.
-        self.router().insert_candidate_peers(peers);
+        self.router().insert_candidate_peers(&peers);
         true
     }
 

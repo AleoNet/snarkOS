@@ -14,16 +14,15 @@
 // You should have received a copy of the GNU General Public License
 // along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
 
-use snarkos_node_ledger::{Ledger, RecordsFilter};
 use snarkvm::{
     console::{
         account::{Address, PrivateKey, ViewKey},
         network::{prelude::*, Testnet3},
         program::{Entry, Identifier, Literal, Plaintext, Value},
     },
-    prelude::TestRng,
+    prelude::{Ledger, RecordsFilter, TestRng},
     synthesizer::{
-        block::{Block, Transaction, Transactions},
+        block::{Block, Transaction},
         program::Program,
         store::ConsensusStore,
         vm::VM,
@@ -43,7 +42,7 @@ pub(crate) mod test_helpers {
     use snarkvm::{
         console::{account::PrivateKey, network::Testnet3, program::Value},
         prelude::TestRng,
-        synthesizer::{Block, ConsensusMemory},
+        synthesizer::{store::helpers::memory::ConsensusMemory, Block},
     };
 
     use once_cell::sync::OnceCell;
@@ -299,6 +298,9 @@ fn test_ledger_deploy() {
     let transaction = crate::tests::test_helpers::sample_deployment_transaction(rng);
     consensus.add_unconfirmed_transaction(transaction.clone()).unwrap();
 
+    // Compute a confirmed transactions to reuse later.
+    let transactions = consensus.ledger.vm().speculate([transaction.clone()].iter()).unwrap();
+
     // Propose the next block.
     let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
 
@@ -314,7 +316,7 @@ fn test_ledger_deploy() {
     assert!(consensus.ledger.contains_input_id(transaction.input_ids().next().unwrap()).unwrap());
 
     // Ensure that the VM can't re-deploy the same program.
-    assert!(consensus.ledger.vm().finalize(&Transactions::from(&[transaction.clone()])).is_err());
+    assert!(consensus.ledger.vm().finalize(&transactions).is_err());
     // Ensure that the ledger deems the same transaction invalid.
     assert!(consensus.check_transaction_basic(&transaction).is_err());
     // Ensure that the ledger cannot add the same transaction.

@@ -19,7 +19,7 @@ edition = "2021"
 [features]
 default = [ "parallel" ]
 parallel = [ "rayon" ]
-timer = [ "aleo-std/timer", "snarkos-node-ledger/timer" ]
+timer = [ "aleo-std/timer" ]
 
 [dependencies.aleo-std]
 version = "0.1.15"
@@ -67,9 +67,6 @@ path = "./cdn"
 [dependencies.snarkos-node-consensus]
 path = "./consensus"
 
-[dependencies.snarkos-node-ledger]
-path = "./ledger"
-
 [dependencies.snarkos-node-messages]
 path = "./messages"
 
@@ -78,9 +75,6 @@ path = "./rest"
 
 [dependencies.snarkos-node-router]
 path = "./router"
-
-[dependencies.snarkos-node-store]
-path = "./store"
 
 [dependencies.snarkos-node-tcp]
 path = "./tcp"
