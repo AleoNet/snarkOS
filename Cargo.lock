@@ -2924,7 +2924,6 @@ dependencies = [
  "snarkos-node-router",
  "snarkos-node-tcp",
  "snarkvm",
- "snarkvm-utilities",
  "time",
  "tokio",
  "tokio-stream",

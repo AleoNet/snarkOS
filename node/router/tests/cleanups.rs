@@ -24,8 +24,7 @@ use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake},
     P2P,
 };
-use snarkvm::prelude::Rng;
-use snarkvm_utilities::TestRng;
+use snarkvm::{prelude::Rng, utilities::TestRng};
 
 use core::time::Duration;
 
