@@ -184,7 +184,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let finalize_root = Field::zero();
 
         // Select the transactions from the memory pool.
-        let transactions = self.memory_pool.candidate_transactions(self).into_iter().collect::<Transactions<N>>();
+        let transactions = self.ledger.vm().speculate(self.memory_pool.candidate_transactions(self).iter())?;
+
         // Select the prover solutions from the memory pool.
         let prover_solutions =
             self.memory_pool.candidate_solutions(self, latest_height, latest_proof_target, latest_coinbase_target)?;
@@ -192,16 +193,16 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // TODO (raychu86): Clean this up or create a `total_supply_delta` in `Transactions`.
         // Calculate the new total supply of microcredits after the block.
         let mut new_total_supply_in_microcredits = latest_total_supply_in_microcredits;
-        for transaction in transactions.iter() {
+        for confirmed_tx in transactions.iter() {
             // Subtract the fee from the total supply.
-            let fee = transaction.fee()?;
+            let fee = confirmed_tx.fee()?;
             new_total_supply_in_microcredits = new_total_supply_in_microcredits
                 .checked_sub(*fee)
                 .ok_or_else(|| anyhow!("Fee exceeded total supply of credits"))?;
 
             // If the transaction is a coinbase, add the amount to the total supply.
-            if transaction.is_coinbase() {
-                match transaction {
+            if confirmed_tx.is_coinbase() {
+                match confirmed_tx.transaction() {
                     Transaction::Execute(_, execution, _) => {
                         // Get the input amount of the coinbase transaction.
                         match execution.get(0)?.inputs().get(1) {
@@ -473,16 +474,16 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // TODO (raychu86): Clean this up or create a `total_supply_delta` in `Transactions`.
         // Calculate the new total supply of microcredits after the block.
         let mut new_total_supply_in_microcredits = self.ledger.latest_total_supply_in_microcredits();
-        for transaction in block.transactions().iter() {
+        for confirmed_tx in block.transactions().iter() {
             // Subtract the fee from the total supply.
-            let fee = transaction.fee()?;
+            let fee = confirmed_tx.fee()?;
             new_total_supply_in_microcredits = new_total_supply_in_microcredits
                 .checked_sub(*fee)
                 .ok_or_else(|| anyhow!("Fee exceeded total supply of credits"))?;
 
             // If the transaction is a coinbase, add the amount to the total supply.
-            if transaction.is_coinbase() {
-                match transaction {
+            if confirmed_tx.is_coinbase() {
+                match confirmed_tx.transaction() {
                     Transaction::Execute(_, execution, _) => {
                         // Get the input amount of the coinbase transaction.
                         match execution.get(0)?.inputs().get(1) {
@@ -624,7 +625,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         // Ensure each transaction is well-formed and unique.
-        cfg_iter!(block.transactions()).try_for_each(|(_, transaction)| {
+        cfg_iter!(block.transactions()).try_for_each(|transaction| {
             self.check_transaction_basic(transaction)
                 .map_err(|e| anyhow!("Invalid transaction found in the transactions list: {e}"))
         })?;
@@ -730,6 +731,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                     bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
                 }
             }
+            // TODO (howardwu): Pass the confirmed transaction in and check its rejected size against the fee.
+            Transaction::Fee(..) => (),
         }
 
         /* Proof(s) */
