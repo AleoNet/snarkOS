@@ -650,11 +650,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             if block.header().coinbase_accumulator_point() != coinbase.to_accumulator_point()? {
                 bail!("Coinbase accumulator point does not match the coinbase solution.");
             }
-            // TODO (howardwu): Remove this in Phase 3.
-            // Ensure the number of prover solutions is within the allowed range.
-            if block.height() > 128_000 && coinbase.len() > 256 {
-                bail!("Cannot validate a coinbase proof with more than {} prover solutions", 256);
-            }
             // Ensure the number of prover solutions is within the allowed range.
             if coinbase.len() > N::MAX_PROVER_SOLUTIONS {
                 bail!("Cannot validate a coinbase proof with more than {} prover solutions", N::MAX_PROVER_SOLUTIONS);
