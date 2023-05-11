@@ -24,7 +24,7 @@ workspace = true
 features = ["synthesizer"]
 
 [dev-dependencies.tokio]
-version = "1.26"
+version = "1.28"
 features = ["rt"]
 
 [dev-dependencies.tracing]
