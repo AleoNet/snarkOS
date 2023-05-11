@@ -2709,6 +2709,7 @@ version = "2.0.2"
 dependencies = [
  "anyhow",
  "clap",
+ "once_cell",
  "rusty-hook",
  "snarkos-account",
  "snarkos-cli",
@@ -2716,6 +2717,7 @@ dependencies = [
  "snarkos-node",
  "snarkos-node-cdn",
  "snarkos-node-consensus",
+ "snarkos-node-env",
  "snarkos-node-messages",
  "snarkos-node-rest",
  "snarkos-node-router",
@@ -2858,6 +2860,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-node-env"
+version = "2.0.2"
+dependencies = [
+ "once_cell",
+ "serde",
+]
+
+[[package]]
 name = "snarkos-node-messages"
 version = "2.0.2"
 dependencies = [
@@ -2900,6 +2910,7 @@ dependencies = [
  "rayon",
  "serde",
  "snarkos-node-consensus",
+ "snarkos-node-env",
  "snarkos-node-messages",
  "snarkos-node-router",
  "snarkvm",
