@@ -138,7 +138,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Path(id): Path<ProgramID<N>>,
     ) -> Result<ErasedJson, RestError> {
-        let program = if id == ProgramID::<N>::from_str("creadits.aleo")? {
+        let program = if id == ProgramID::<N>::from_str("credits.aleo")? {
             Program::<N>::credits()?
         } else {
             rest.ledger.get_program(id)?
