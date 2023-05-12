@@ -45,7 +45,7 @@ macro_rules! test_disconnect {
             let peer_addr = peer.node().listening_addr().unwrap();
 
             // Connect the node to the test peer.
-            node.router().connect(peer_addr);
+            node.router().connect(peer_addr).unwrap().await.unwrap();
 
             // Check the peer counts.
             let node_clone = node.clone();
@@ -57,7 +57,7 @@ macro_rules! test_disconnect {
 
             // Disconnect.
             if $node_disconnects {
-                node.router().disconnect(node.tcp().connected_addrs()[0]);
+                node.router().disconnect(node.tcp().connected_addrs()[0]).await.unwrap();
             } else {
                 peer.node().disconnect(peer.node().connected_addrs()[0]).await;
             }
