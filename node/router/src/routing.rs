@@ -41,6 +41,7 @@ pub trait Routing<N: Network>:
         // Initialize the heartbeat.
         self.initialize_heartbeat();
         // Initialize the report.
+        #[cfg(not(feature = "test"))]
         self.initialize_report();
     }
 
