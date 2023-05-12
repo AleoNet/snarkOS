@@ -101,6 +101,10 @@ version = "0.2"
 [dev-dependencies.pea2pea]
 version = "0.46"
 
+[dev-dependencies.snarkos-node-router]
+path = "./router"
+features = [ "test" ]
+
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
 features = [ "env-filter", "fmt" ]
