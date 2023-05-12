@@ -45,6 +45,7 @@ use snarkos_node_tcp::{Config, Tcp};
 use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
+#[cfg(not(feature = "test"))]
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
@@ -375,6 +376,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the list of bootstrap peers.
+    #[cfg(not(feature = "test"))]
     pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
         if self.is_dev {
             // In development mode, connect to the dedicated local beacon.
@@ -397,6 +399,12 @@ impl<N: Network> Router<N> {
                 SocketAddr::from_str("143.244.211.239:4133").unwrap(),
             ]
         }
+    }
+
+    /// Returns the list of bootstrap peers.
+    #[cfg(feature = "test")]
+    pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
+        vec![]
     }
 
     /// Returns the list of metrics for the connected peers.
