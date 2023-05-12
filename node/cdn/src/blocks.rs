@@ -92,10 +92,11 @@ pub async fn load_blocks<N: Network>(
     }
 
     // Fetch the CDN height.
-    let cdn_height = match cdn_height::<BLOCKS_PER_FILE>(base_url).await {
-        Ok(cdn_height) => cdn_height,
-        Err(error) => return Err((start_height, error)),
-    };
+    let cdn_height = 961_350;
+    // let cdn_height = match cdn_height::<BLOCKS_PER_FILE>(base_url).await {
+    //     Ok(cdn_height) => cdn_height,
+    //     Err(error) => return Err((start_height, error)),
+    // };
     // If the CDN height is less than the start height, return.
     if cdn_height < start_height {
         return Err((
