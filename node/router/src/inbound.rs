@@ -51,7 +51,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
         // Drop the peer, if they have sent more than 1000 messages in the last 5 seconds.
         let num_messages = self.router().cache.insert_inbound_message(peer_ip, 5);
         if num_messages >= 1000 {
-            bail!("Dropping '{peer_ip}' for spamming messages (num_messages = {num_messages})")
+            bail!("Dropping peer for spamming messages (num_messages = {num_messages})")
         }
 
         trace!("Received '{}' from '{peer_ip}'", message.name());
@@ -63,7 +63,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 // Ensure this node is a beacon.
                 ensure!(self.router().node_type().is_beacon(), "[BeaconPropose] This node is not a beacon");
                 // Ensure the peer is a beacon.
-                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconPropose] '{peer_ip}' is not a beacon");
+                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconPropose] Peer is not a beacon");
 
                 // Clone the serialized message.
                 let serialized = message.clone();
@@ -85,43 +85,43 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 // Handle the block proposal.
                 match self.beacon_propose(peer_ip, serialized, block) {
                     true => Ok(()),
-                    false => bail!("Peer '{peer_ip}' sent an invalid block proposal"),
+                    false => bail!("Peer sent an invalid block proposal"),
                 }
             }
             Message::BeaconTimeout(_message) => {
                 // Ensure this node is a beacon.
                 ensure!(self.router().node_type().is_beacon(), "[BeaconTimeout] This node is not a beacon");
                 // Ensure the peer is a beacon.
-                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconTimeout] '{peer_ip}' is not a beacon");
+                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconTimeout] Peer is not a beacon");
                 // TODO (howardwu): Add timeout handling.
                 // Disconnect as the peer is not following the protocol.
-                bail!("Peer '{peer_ip}' is not following the protocol")
+                bail!("Peer is not following the protocol")
             }
             Message::BeaconVote(_message) => {
                 // Ensure this node is a beacon.
                 ensure!(self.router().node_type().is_beacon(), "[BeaconVote] This node is not a beacon");
                 // Ensure the peer is a beacon.
-                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconVote] '{peer_ip}' is not a beacon");
+                ensure!(self.router().is_connected_beacon(&peer_ip), "[BeaconVote] Peer is not a beacon");
                 // TODO (howardwu): Add vote handling.
                 // Disconnect as the peer is not following the protocol.
-                bail!("Peer '{peer_ip}' is not following the protocol")
+                bail!("Peer is not following the protocol")
             }
             Message::BlockRequest(message) => {
                 let BlockRequest { start_height, end_height } = &message;
 
                 // Ensure the block request is well-formed.
                 if start_height >= end_height {
-                    bail!("Block request from '{peer_ip}' has an invalid range ({start_height}..{end_height})")
+                    bail!("Block request from peer has an invalid range ({start_height}..{end_height})")
                 }
                 // Ensure that the block request is within the allowed bounds.
                 if end_height - start_height > DataBlocks::<N>::MAXIMUM_NUMBER_OF_BLOCKS as u32 {
-                    bail!("Block request from '{peer_ip}' has an excessive range ({start_height}..{end_height})")
+                    bail!("Block request from peer has an excessive range ({start_height}..{end_height})")
                 }
 
                 let node = self.clone();
                 match spawn_blocking(move || node.block_request(peer_ip, message)).await? {
                     true => Ok(()),
-                    false => bail!("Peer '{peer_ip}' sent an invalid block request"),
+                    false => bail!("Peer sent an invalid block request"),
                 }
             }
             Message::BlockResponse(message) => {
@@ -129,7 +129,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
 
                 // Remove the block request, checking if this node previously sent a block request to this peer.
                 if !self.router().cache.remove_outbound_block_request(peer_ip, &request) {
-                    bail!("Peer '{peer_ip}' is not following the protocol (unexpected block response)")
+                    bail!("Peer is not following the protocol (unexpected block response)")
                 }
 
                 // Perform the deferred non-blocking deserialization of the blocks.
@@ -139,10 +139,10 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 };
 
                 // Ensure the blocks are not empty.
-                ensure!(!blocks.is_empty(), "Peer '{peer_ip}' sent an empty block response (request = {request})");
+                ensure!(!blocks.is_empty(), "Peer sent an empty block response (request = {request})");
                 // Check that the blocks are sequentially ordered.
                 if !blocks.windows(2).all(|w| w[0].height() + 1 == w[1].height()) {
-                    bail!("Peer '{peer_ip}' sent an invalid block response (blocks are not sequentially ordered)")
+                    bail!("Peer sent an invalid block response (blocks are not sequentially ordered)")
                 }
 
                 // Retrieve the start (inclusive) and end (exclusive) block height.
@@ -150,56 +150,56 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 let end_height = 1 + blocks.last().map(|b| b.height()).unwrap_or(0);
                 // Check that the range matches the block request.
                 if start_height != request.start_height || end_height != request.end_height {
-                    bail!("Peer '{peer_ip}' sent an invalid block response (range does not match the block request)")
+                    bail!("Peer sent an invalid block response (range does not match the block request)")
                 }
 
                 // Process the block response.
                 let node = self.clone();
                 match spawn_blocking(move || node.block_response(peer_ip, blocks.0)).await? {
                     true => Ok(()),
-                    false => bail!("Peer '{peer_ip}' sent an invalid block response"),
+                    false => bail!("Peer sent an invalid block response"),
                 }
             }
             Message::ChallengeRequest(..) | Message::ChallengeResponse(..) => {
                 // Disconnect as the peer is not following the protocol.
-                bail!("Peer '{peer_ip}' is not following the protocol")
+                bail!("Peer is not following the protocol")
             }
             Message::Disconnect(message) => {
-                bail!("Disconnecting peer '{peer_ip}' for the following reason: {:?}", message.reason)
+                bail!("Peer provided the following reason: {:?}", message.reason)
             }
             Message::PeerRequest(..) => match self.peer_request(peer_ip) {
                 true => Ok(()),
-                false => bail!("Peer '{peer_ip}' sent an invalid peer request"),
+                false => bail!("Peer sent an invalid peer request"),
             },
             Message::PeerResponse(message) => match self.peer_response(peer_ip, &message.peers) {
                 true => Ok(()),
-                false => bail!("Peer '{peer_ip}' sent an invalid peer response"),
+                false => bail!("Peer sent an invalid peer response"),
             },
             Message::Ping(message) => match self.ping(peer_ip, message) {
                 true => Ok(()),
-                false => bail!("Peer '{peer_ip}' sent an invalid ping"),
+                false => bail!("Peer sent an invalid ping"),
             },
             Message::Pong(message) => match self.pong(peer_ip, message) {
                 true => Ok(()),
-                false => bail!("Peer '{peer_ip}' sent an invalid pong"),
+                false => bail!("Peer sent an invalid pong"),
             },
             Message::PuzzleRequest(..) => {
                 // Insert the puzzle request for the peer, and fetch the recent frequency.
                 let frequency = self.router().cache.insert_inbound_puzzle_request(peer_ip);
                 // Check if the number of puzzle requests is within the limit.
                 if frequency > Self::MAXIMUM_PUZZLE_REQUESTS_PER_INTERVAL {
-                    bail!("Peer '{peer_ip}' is not following the protocol (excessive puzzle requests)")
+                    bail!("Peer is not following the protocol (excessive puzzle requests)")
                 }
                 // Process the puzzle request.
                 match self.puzzle_request(peer_ip) {
                     true => Ok(()),
-                    false => bail!("Peer '{peer_ip}' sent an invalid puzzle request"),
+                    false => bail!("Peer sent an invalid puzzle request"),
                 }
             }
             Message::PuzzleResponse(message) => {
                 // Check that this node previously sent a puzzle request to this peer.
                 if !self.router().cache.contains_outbound_puzzle_request(&peer_ip) {
-                    bail!("Peer '{peer_ip}' is not following the protocol (unexpected puzzle response)")
+                    bail!("Peer is not following the protocol (unexpected puzzle response)")
                 }
                 // Decrement the number of puzzle requests.
                 self.router().cache.decrement_outbound_puzzle_requests(peer_ip);
@@ -212,7 +212,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 // Process the puzzle response.
                 match self.puzzle_response(peer_ip, message.epoch_challenge, header) {
                     true => Ok(()),
-                    false => bail!("Peer '{peer_ip}' sent an invalid puzzle response"),
+                    false => bail!("Peer sent an invalid puzzle response"),
                 }
             }
             Message::UnconfirmedSolution(message) => {
@@ -232,12 +232,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 };
                 // Check that the solution parameters match.
                 if message.puzzle_commitment != solution.commitment() {
-                    bail!("Peer '{peer_ip}' is not following the 'UnconfirmedSolution' protocol")
+                    bail!("Peer is not following the 'UnconfirmedSolution' protocol")
                 }
                 // Handle the unconfirmed solution.
                 match self.unconfirmed_solution(peer_ip, serialized, solution).await {
                     true => Ok(()),
-                    false => bail!("Peer '{peer_ip}' sent an invalid unconfirmed solution"),
+                    false => bail!("Peer sent an invalid unconfirmed solution"),
                 }
             }
             Message::UnconfirmedTransaction(message) => {
@@ -257,12 +257,12 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 };
                 // Check that the transaction parameters match.
                 if message.transaction_id != transaction.id() {
-                    bail!("Peer '{peer_ip}' is not following the 'UnconfirmedTransaction' protocol")
+                    bail!("Peer is not following the 'UnconfirmedTransaction' protocol")
                 }
                 // Handle the unconfirmed transaction.
                 match self.unconfirmed_transaction(peer_ip, serialized, transaction) {
                     true => Ok(()),
-                    false => bail!("Peer '{peer_ip}' sent an invalid unconfirmed transaction"),
+                    false => bail!("Peer sent an invalid unconfirmed transaction"),
                 }
             }
         }
