@@ -16,8 +16,10 @@ use snarkos_cli::{commands::CLI, helpers::Updater};
 use snarkos_node_env::EnvInfo;
 
 use clap::Parser;
+#[cfg(feature = "jemalloc")]
 use tikv_jemallocator::Jemalloc;
 
+#[cfg(feature = "jemalloc")]
 #[global_allocator]
 static GLOBAL: Jemalloc = Jemalloc;
 
