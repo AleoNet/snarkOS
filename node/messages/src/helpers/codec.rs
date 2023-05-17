@@ -22,8 +22,7 @@ use core::marker::PhantomData;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
 /// The maximum size of a message that can be transmitted during the handshake.
-// TODO: this is large due to block locators sent by validators; restrict it.
-const MAXIMUM_HANDSHAKE_MESSAGE_SIZE: usize = 64 * 1024 * 1024; // 64 MiB
+const MAXIMUM_HANDSHAKE_MESSAGE_SIZE: usize = 1024 * 1024; // 1 MiB
 
 /// The maximum size of a message that can be transmitted in the network.
 const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
