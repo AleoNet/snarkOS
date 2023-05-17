@@ -29,6 +29,7 @@ use snarkvm::prelude::{Block, EpochChallenge, Header, Network, ProverSolution, T
 
 use anyhow::{bail, ensure, Result};
 use std::{net::SocketAddr, time::Instant};
+use tokio::task::spawn_blocking;
 
 #[async_trait]
 pub trait Inbound<N: Network>: Reading + Outbound<N> {
@@ -115,7 +116,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     bail!("Block request from '{peer_ip}' has an excessive range ({start_height}..{end_height})")
                 }
 
-                match self.block_request(peer_ip, message) {
+                let node = self.clone();
+                match spawn_blocking(move || node.block_request(peer_ip, message)).await? {
                     true => Ok(()),
                     false => bail!("Peer '{peer_ip}' sent an invalid block request"),
                 }
@@ -150,7 +152,8 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                 }
 
                 // Process the block response.
-                match self.block_response(peer_ip, blocks.0) {
+                let node = self.clone();
+                match spawn_blocking(move || node.block_response(peer_ip, blocks.0)).await? {
                     true => Ok(()),
                     false => bail!("Peer '{peer_ip}' sent an invalid block response"),
                 }
