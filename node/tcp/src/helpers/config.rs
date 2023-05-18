@@ -50,6 +50,8 @@ pub struct Config {
     /// note: This number can very briefly be breached by 1 in case of inbound connection attempts. It can never be
     /// breached by outbound connection attempts, though.
     pub max_connections: u16,
+    /// The maximum time (in milliseconds) allowed to establish a raw (before the [`Handshake`] protocol) TCP connection.
+    pub connection_timeout_ms: u16,
 }
 
 impl Config {
@@ -85,6 +87,7 @@ impl Default for Config {
             allow_random_port: true,
             fatal_io_errors: vec![ConnectionReset, ConnectionAborted, BrokenPipe, InvalidData, UnexpectedEof],
             max_connections: 100,
+            connection_timeout_ms: 1_000,
         }
     }
 }

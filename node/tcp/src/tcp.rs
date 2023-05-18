@@ -22,6 +22,7 @@ use std::{
         atomic::{AtomicUsize, Ordering::*},
         Arc,
     },
+    time::Duration,
 };
 
 use once_cell::sync::OnceCell;
@@ -31,6 +32,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     sync::oneshot,
     task::JoinHandle,
+    time::timeout,
 };
 use tracing::*;
 
@@ -223,10 +225,21 @@ impl Tcp {
             return Err(io::ErrorKind::AlreadyExists.into());
         }
 
-        let stream = TcpStream::connect(addr).await.map_err(|e| {
-            self.connecting.lock().remove(&addr);
-            e
-        })?;
+        let stream =
+            match timeout(Duration::from_millis(self.config().connection_timeout_ms.into()), TcpStream::connect(addr))
+                .await
+            {
+                Ok(Ok(stream)) => Ok(stream),
+                Ok(err) => {
+                    self.connecting.lock().remove(&addr);
+                    err
+                }
+                Err(err) => {
+                    self.connecting.lock().remove(&addr);
+                    error!("connection timeout error: {}", err);
+                    Err(io::ErrorKind::TimedOut.into())
+                }
+            }?;
 
         let ret = self.adapt_stream(stream, addr, ConnectionSide::Initiator).await;
 
