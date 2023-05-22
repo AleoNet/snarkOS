@@ -220,4 +220,4 @@ cargo run --release -- clean --dev <NODE_ID>
 
 We welcome all contributions to `snarkOS`. Please refer to the [license](#7-license) for the terms of contributions.
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
+[![License: GPL v3](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE.md)
