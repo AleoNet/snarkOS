@@ -54,17 +54,22 @@ macro_rules! expect_message {
                 data
             }
             // Received a disconnect message, abort.
-            Some(Message::Disconnect(reason)) => return Err(error(format!("Peer disconnected: {reason:?}"))),
+            Some(Message::Disconnect(reason)) => {
+                return Err(error(format!("'{}' disconnected: {reason:?}", $peer_addr)))
+            }
             // Received an unexpected message, abort.
             Some(ty) => {
                 return Err(error(format!(
-                    "Handshake protocol violated: received {:?} instead of {}",
+                    "'{}' did not follow the handshake protocol: received {:?} instead of {}",
+                    $peer_addr,
                     ty.name(),
                     stringify!($msg_ty),
                 )))
             }
             // Received nothing.
-            None => return Err(error(format!("Didn't receive {:?}", stringify!($msg_ty),))),
+            None => {
+                return Err(error(format!("'{}' disconnected before sending {:?}", $peer_addr, stringify!($msg_ty),)))
+            }
         }
     };
 }
