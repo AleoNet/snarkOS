@@ -30,7 +30,7 @@ use anyhow::Result;
 #[derive(Clone)]
 pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     /// The ledger.
-    ledger: Ledger<N, C>,
+    pub ledger: Ledger<N, C>,
     /// The memory pool.
     memory_pool: MemoryPool<N>,
     /// The boolean flag for the development mode.
