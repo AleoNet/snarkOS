@@ -15,6 +15,7 @@ keywords = [
 categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
+rust-version = "1.66"
 
 [workspace]
 members = [
