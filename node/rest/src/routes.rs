@@ -16,6 +16,7 @@ use super::*;
 
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
+use snarkos_node_env::ENV_INFO;
 use snarkvm::prelude::Transaction;
 
 /// The `get_blocks` query object.
@@ -211,6 +212,11 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Path(input_or_output_id): Path<Field<N>>,
     ) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.find_transition_id(&input_or_output_id)?))
+    }
+
+    // GET /testnet3/node/env
+    pub(crate) async fn get_env_info() -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(ENV_INFO.get()))
     }
 
     // POST /testnet3/transaction/broadcast

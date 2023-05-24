@@ -20,6 +20,7 @@ use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{error, EpochChallenge, Header};
 
 use std::{io, net::SocketAddr};
+use tokio::task::spawn_blocking;
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Beacon<N, C> {
     /// Returns a reference to the TCP instance.
@@ -234,9 +235,17 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
         solution: ProverSolution<N>,
     ) -> bool {
         // Add the unconfirmed solution to the memory pool.
-        if let Err(error) = self.consensus.add_unconfirmed_solution(&solution) {
-            trace!("[UnconfirmedSolution] {error}");
-            return true; // Maintain the connection.
+        let node = self.clone();
+        match spawn_blocking(move || node.consensus.add_unconfirmed_solution(&solution)).await {
+            Ok(Err(error)) => {
+                trace!("[UnconfirmedSolution] {error}");
+                return true; // Maintain the connection.
+            }
+            Err(error) => {
+                trace!("[UnconfirmedSolution] {error}");
+                return true; // Maintain the connection.
+            }
+            _ => {}
         }
         let message = Message::UnconfirmedSolution(serialized);
         // Propagate the "UnconfirmedSolution" to the connected beacons.
