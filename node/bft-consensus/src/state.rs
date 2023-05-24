@@ -66,7 +66,7 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
         let mut validator_id = self.primary_pub.to_string();
         validator_id.truncate(8);
 
-        info!(
+        debug!(
             "Consensus (id: {}) output for round {}: {} batches, leader: {}",
             validator_id,
             consensus_output.sub_dag.leader.header.round,
@@ -75,16 +75,16 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
         );
 
         if consensus_output.batches.is_empty() {
-            info!("There are no batches to process; not attempting to create a block.");
+            debug!("There are no batches to process; not attempting to create a block.");
             return;
         }
 
         if self.primary_pub != *leader {
-            info!("I'm not the current leader (id: {}), yielding block production.", validator_id);
+            debug!("I'm not the current leader (id: {}), yielding block production.", validator_id);
             return;
         }
 
-        info!("I'm the current leader (id: {}); producing a block.", validator_id);
+        debug!("I'm the current leader (id: {}); producing a block.", validator_id);
 
         let consensus = self.consensus.clone();
         let private_key = *self.router.private_key();
@@ -117,6 +117,7 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
             let mut num_valid_txs = 0;
             for id in &sorted_tx_ids {
                 let transaction = transactions.remove(id).unwrap(); // guaranteed to be there
+
                 // Skip invalid transactions.
                 if consensus.add_unconfirmed_transaction(transaction).is_ok() {
                     num_valid_txs += 1;
@@ -125,7 +126,7 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
 
             // Return early if there are no valid transactions.
             if num_valid_txs == 0 {
-                debug!("No valid transactions in ConsensusOutput; not producing a block.");
+                warn!("No valid transactions in ConsensusOutput; not producing a block.");
                 return Ok(None);
             }
 
@@ -147,8 +148,8 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
                 Ok(()) => {
                     // Log the next block.
                     match serde_json::to_string_pretty(&next_block.header()) {
-                        Ok(header) => info!("Block {}: {header}", next_block.height()),
-                        Err(error) => info!("Block {}: (serde failed: {error})", next_block.height()),
+                        Ok(header) => debug!("Block {}: {header}", next_block.height()),
+                        Err(error) => debug!("Block {}: (serde failed: {error})", next_block.height()),
                     }
                 }
                 Err(error) => {
@@ -158,7 +159,7 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
                 }
             }
 
-            info!("Produced a block with {num_valid_txs} transactions.");
+            debug!("Produced a block with {num_valid_txs} transactions.");
 
             Ok(Some(next_block))
         })

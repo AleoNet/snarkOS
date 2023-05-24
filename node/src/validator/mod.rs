@@ -80,6 +80,7 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
+    #[allow(clippy::too_many_arguments)]
     /// Initializes a new validator node.
     pub async fn new(
         node_ip: SocketAddr,

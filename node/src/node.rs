@@ -49,6 +49,7 @@ impl<N: Network> Node<N> {
     }
 
     /// Initializes a new validator node.
+    #[allow(clippy::too_many_arguments)]
     pub async fn new_validator(
         node_ip: SocketAddr,
         rest_ip: Option<SocketAddr>,
