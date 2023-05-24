@@ -22,7 +22,7 @@ parallel = [ "rayon" ]
 timer = [ "aleo-std/timer" ]
 
 [dependencies.aleo-std]
-version = "0.1.15"
+version = "0.1.18"
 default-features = false
 
 [dependencies.anyhow]
