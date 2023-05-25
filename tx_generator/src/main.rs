@@ -17,8 +17,7 @@ use std::{env, net::IpAddr, time::Duration};
 use multiaddr::Protocol;
 use narwhal_config::{Import, WorkerCache};
 use narwhal_types::{TransactionProto, TransactionsClient};
-use rand::{prelude::IteratorRandom, SeedableRng};
-use rand_chacha::ChaChaRng;
+use rand::prelude::IteratorRandom;
 use snarkos_node_bft_consensus::setup::workspace_dir;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
@@ -32,8 +31,7 @@ use snarkvm::{
     synthesizer::{
         block::{Block, Transaction},
         program::Program,
-        store::{helpers::rocksdb::ConsensusDB, ConsensusStore},
-        vm::VM,
+        store::helpers::rocksdb::ConsensusDB,
     },
 };
 use tikv_jemallocator::Jemalloc;
@@ -45,7 +43,6 @@ use tracing::*;
 static GLOBAL: Jemalloc = Jemalloc;
 
 type CurrentNetwork = Testnet3;
-type CurrentStore = ConsensusStore<CurrentNetwork, ConsensusDB<CurrentNetwork>>;
 type CurrentLedger = Ledger<CurrentNetwork, ConsensusDB<CurrentNetwork>>;
 type CurrentConsensus = Consensus<CurrentNetwork, ConsensusDB<CurrentNetwork>>;
 
@@ -56,31 +53,32 @@ async fn main() {
     // Simple runtime arguments.
     const EXPECTED_ARGS: [&str; 2] = ["create_ledger", "create_txs"];
     let mut args = env::args();
-    if args.len() != 2 {
-        panic!("Invalid runtime arguments! Expected 1, found {}", args.len() - 1);
+    if args.len() != 3 {
+        panic!("Invalid runtime arguments! Expected 2, found {}", args.len() - 1);
     }
     args.next(); // Skip the binary name.
 
-    // Retrieve the argument of interest.
+    // Retrieve the command.
     let arg = args.next().unwrap();
 
-    // Prepare an Rng expected in dev environments.
-    let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
+    // Retrieve the private key.
+    let private_key = args.next().unwrap();
+
+    // Prepare an Rng.
+    let mut rng = TestRng::default();
 
     info!("Preparing an instance of consensus that can generate transactions.");
 
     // Initialize the beacon private key.
-    let genesis_private_key = PrivateKey::<CurrentNetwork>::new(&mut rng).unwrap();
+    let genesis_private_key = PrivateKey::<CurrentNetwork>::from_str(&private_key).unwrap();
     let genesis_view_key = ViewKey::try_from(&genesis_private_key).unwrap();
     let genesis_address = Address::try_from(&genesis_private_key).unwrap();
-    // Initialize a new VM.
-    let vm = VM::from(CurrentStore::open(Some(0)).unwrap()).unwrap();
     // Initialize the genesis block.
-    let genesis = Block::genesis(&vm, &genesis_private_key, &mut rng).unwrap();
+    let genesis = Block::from_bytes_le(Testnet3::genesis_bytes()).unwrap();
 
     // Initialize the consensus to generate transactions.
-    let ledger = CurrentLedger::load(genesis, Some(0)).unwrap();
-    let consensus = CurrentConsensus::new(ledger, true).unwrap();
+    let ledger = CurrentLedger::load(genesis, None).unwrap();
+    let consensus = CurrentConsensus::new(ledger, false).unwrap();
 
     // Create the initial block or start producing transactions.
     if arg == EXPECTED_ARGS[0] {
@@ -150,7 +148,7 @@ function hello:
         info!("The ledger containing a block facilitating test transactions is ready!");
     } else if arg == EXPECTED_ARGS[1] {
         // Read the workers file.
-        let base_path = format!("{}/node/bft-consensus/committee/.dev/", workspace_dir());
+        let base_path = format!("{}/node/bft-consensus/committee/", workspace_dir());
         let workers_file = format!("{base_path}.workers.json");
         let worker_cache = WorkerCache::import(&workers_file).expect("Failed to load the worker information");
 
@@ -167,9 +165,6 @@ function hello:
             //  Consensus rules will change later when staking and proper coinbase rewards are integrated, which will invalidate this approach.
             //  Note: A more proper way to approach this is to create `split` transactions and then start generating increasingly larger numbers of
             //  transactions, once more and more records are available to you in subsequent blocks.
-
-            // Create a new Rng to generate random txs with.
-            let mut rng = TestRng::default();
 
             // Create inputs for the `credits.aleo/mint` call.
             let inputs = [Value::from_str(&genesis_address.to_string()).unwrap(), Value::from_str("1u64").unwrap()];
