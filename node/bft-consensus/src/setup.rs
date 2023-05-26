@@ -327,13 +327,7 @@ pub(crate) fn worker_storage_dir(network: u16, worker_id: u32, dev: Option<u16>)
 // Returns the workspace path.
 // TODO: move to a more appropriate place
 pub fn workspace_dir() -> String {
-    let output = std::process::Command::new(env!("CARGO"))
-        .arg("locate-project")
-        .arg("--workspace")
-        .arg("--message-format=plain")
-        .output()
-        .unwrap()
-        .stdout;
-    let cargo_path = Path::new(std::str::from_utf8(&output).unwrap().trim());
+    let output = env!("SNARKOS");
+    let cargo_path = Path::new(output);
     cargo_path.parent().unwrap().display().to_string()
 }
