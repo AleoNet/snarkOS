@@ -20,7 +20,6 @@ use std::{
     net::Ipv4Addr,
     ops::Deref,
     path::{Path, PathBuf},
-    sync::atomic::Ordering,
 };
 
 #[cfg(not(feature = "test"))]
@@ -33,7 +32,7 @@ use tracing::*;
 
 // These ports are used by tests and in dev mode.
 mod test_ports {
-    use std::sync::atomic::AtomicU16;
+    // use std::sync::atomic::AtomicU16;
 
     // The non-registered port range for primaries (27 slots).
     pub(super) const PRIMARY_FIRST_PORT: u16 = 1030;
@@ -48,9 +47,9 @@ mod test_ports {
     pub(super) const WORKER_LAST_PORT_TX: u16 = 1413;
 
     // Offsets to use when creating multiple primaries and workers.
-    pub(super) static PRIMARY_PORT_OFFSET: AtomicU16 = AtomicU16::new(0);
-    pub(super) static WORKER_PORT_OFFSET_NET: AtomicU16 = AtomicU16::new(0);
-    pub(super) static WORKER_PORT_OFFSET_TX: AtomicU16 = AtomicU16::new(0);
+    // pub(super) static PRIMARY_PORT_OFFSET: AtomicU16 = AtomicU16::new(0);
+    // pub(super) static WORKER_PORT_OFFSET_NET: AtomicU16 = AtomicU16::new(0);
+    // pub(super) static WORKER_PORT_OFFSET_TX: AtomicU16 = AtomicU16::new(0);
 }
 use test_ports::*;
 
