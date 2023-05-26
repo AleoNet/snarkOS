@@ -12,20 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{
-    collections::BTreeMap,
-    fs,
-    net::Ipv4Addr,
-    ops::Deref,
-    path::{Path, PathBuf},
-};
-
 #[cfg(not(feature = "test"))]
 use aleo_std::aleo_dir;
 use mysten_network::multiaddr::Multiaddr;
 use narwhal_config::{Committee, CommitteeBuilder, WorkerCache, WorkerIndex, WorkerInfo};
 use narwhal_crypto::{EncodeDecodeBase64, KeyPair as NarwhalKeyPair, NetworkKeyPair, PublicKey};
 use rand::prelude::ThreadRng;
+use std::{collections::BTreeMap, fs, net::Ipv4Addr, ops::Deref, path::PathBuf};
 use tracing::*;
 
 // These ports are used by tests and in dev mode.
@@ -187,7 +180,7 @@ impl CommitteeSetup {
     pub fn write_files(&self, dev: bool) {
         // Write the primary and worker files to the filesystem.
         for (primary_id, (_, primary)) in self.primaries.iter().enumerate() {
-            let primary_addr: Ipv4Addr = if let multiaddr::Protocol::Ip4(addr) = primary.address.iter().next().unwrap()
+            let primary_addr: Ipv4Addr = if let multiaddr::Protocol::Ip4(addr) = primary.address.clone().pop().unwrap()
             {
                 addr
             } else {

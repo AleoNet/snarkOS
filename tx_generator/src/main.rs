@@ -70,81 +70,19 @@ async fn main() {
     info!("Preparing an instance of consensus that can generate transactions.");
 
     // Initialize the beacon private key.
-    let genesis_private_key = PrivateKey::<CurrentNetwork>::from_str(&private_key).unwrap();
-    let genesis_view_key = ViewKey::try_from(&genesis_private_key).unwrap();
-    let genesis_address = Address::try_from(&genesis_private_key).unwrap();
+    let creator_private_key = PrivateKey::<CurrentNetwork>::from_str(&private_key).unwrap();
+    let creator_view_key = ViewKey::try_from(&creator_private_key).unwrap();
     // Initialize the genesis block.
     let genesis = Block::from_bytes_le(Testnet3::genesis_bytes()).unwrap();
 
     // Initialize the consensus to generate transactions.
     let ledger = CurrentLedger::load(genesis, None).unwrap();
     let consensus = CurrentConsensus::new(ledger, false).unwrap();
+    let genesis_address: Address<Testnet3> = *consensus.beacons().keys().next().unwrap();
 
     // Create the initial block or start producing transactions.
     if arg == EXPECTED_ARGS[0] {
-        info!("Preparing a block that will allow the production of transactions.");
-
-        // Initialize a new program. This program is a simple program with a function `test` that does not require any
-        // input records. This means you can sample as many execution transactions as you want without needing
-        // to locate any owned records to spend.
-        let program = Program::<CurrentNetwork>::from_str(
-            r"
-program simple.aleo;
-
-function hello:
-    input r0 as u32.private;
-    input r1 as u32.private;
-    add r0 r1 into r2;
-    output r2 as u32.private;
-",
-        )
-        .unwrap();
-
-        // Fetch the unspent records.
-        let microcredits = Identifier::from_str("microcredits").unwrap();
-        let records: Vec<_> = consensus
-            .ledger
-            .find_records(&genesis_view_key, RecordsFilter::Unspent)
-            .unwrap()
-            .filter(|(_, record)| match record.data().get(&microcredits) {
-                Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
-                _ => false,
-            })
-            .collect();
-        assert_eq!(records.len(), 4);
-
-        let fee = 4000000;
-        let (_, record) = records
-            .iter()
-            .find(|(_, r)| match r.data().get(&microcredits) {
-                Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) => **amount >= fee,
-                _ => false,
-            })
-            .unwrap();
-
-        // Create a deployment transaction for the above program.
-        let deployment_transaction = Transaction::deploy(
-            consensus.ledger.vm(),
-            &genesis_private_key,
-            &program,
-            (record.clone(), fee),
-            None,
-            &mut rng,
-        )
-        .unwrap();
-
-        // Add the transaction to the memory pool.
-        consensus.add_unconfirmed_transaction(deployment_transaction).unwrap();
-        assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), 1);
-
-        // Propose the next block.
-        let next_block = consensus.propose_next_block(&genesis_private_key, &mut rng).unwrap();
-
-        // Ensure the block is a valid next block.
-        consensus.check_next_block(&next_block).unwrap();
-        // Construct a next block.
-        consensus.advance_to_next_block(&next_block).unwrap();
-
+        // nothing to do here anymore, no deployment transaction is necessary
         info!("The ledger containing a block facilitating test transactions is ready!");
     } else if arg == EXPECTED_ARGS[1] {
         // Read the workers file.
@@ -170,16 +108,11 @@ function hello:
             let inputs = [Value::from_str(&genesis_address.to_string()).unwrap(), Value::from_str("1u64").unwrap()];
 
             for i in 0.. {
-                let transaction = Transaction::execute(
-                    consensus.ledger.vm(),
-                    &genesis_private_key,
-                    ("credits.aleo", "mint"),
-                    inputs.iter(),
-                    None,
-                    None,
-                    &mut rng,
-                )
-                .unwrap();
+                let transaction = consensus
+                    .ledger
+                    .vm()
+                    .execute(&creator_private_key, ("credits.aleo", "mint"), inputs.iter(), None, None, &mut rng)
+                    .unwrap();
 
                 info!("Created transaction {} ({}/inf).", transaction.id(), i + 1);
 
