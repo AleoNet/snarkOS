@@ -15,6 +15,8 @@
 use std::{
     collections::BTreeMap,
     fs,
+    net::Ipv4Addr,
+    ops::Deref,
     path::{Path, PathBuf},
     sync::atomic::Ordering,
 };
@@ -186,9 +188,24 @@ impl CommitteeSetup {
     pub fn write_files(&self, dev: bool) {
         // Write the primary and worker files to the filesystem.
         for (primary_id, (_, primary)) in self.primaries.iter().enumerate() {
-            fn dev_subpath(dev: bool, primary_id: usize) -> String {
-                if dev { format!(".dev/{:02}/", primary_id + 1) } else { format!("{:02}/", primary_id + 1) }
+            let primary_addr: Ipv4Addr = if let multiaddr::Protocol::Ip4(addr) = primary.address.iter().next().unwrap()
+            {
+                addr
+            } else {
+                unreachable!()
+            };
+
+            fn dev_subpath(dev: bool, primary_addr: Ipv4Addr) -> String {
+                if dev { format!(".dev/{}/", primary_addr) } else { format!("{}/", primary_addr) }
             }
+
+            // Print out committee member information.
+            println!("validator {:02}:", primary_id + 1);
+            println!("    primary_address: {}", primary.address);
+            println!("    Aleo private key: {}", primary.keypair.private().deref());
+            println!("    Aleo address: {}", primary.keypair.public().deref());
+            println!("    primary-0-key: {}", primary.keypair.encode_base64());
+            println!("    primary-0-network: {}", primary.network_keypair.encode_base64());
 
             // Generate the common config.
             let committee = self.generate_committee();
@@ -196,7 +213,7 @@ impl CommitteeSetup {
 
             // Check if the base path exists.
             let base_path =
-                format!("{}/node/bft-consensus/committee/{}", workspace_dir(), dev_subpath(dev, primary_id));
+                format!("{}/node/bft-consensus/committee/{}", workspace_dir(), dev_subpath(dev, primary_addr));
             if fs::metadata(&base_path).is_err() {
                 fs::create_dir_all(&base_path).unwrap(); // TODO: improve error handling here and below
             }
@@ -221,9 +238,11 @@ impl CommitteeSetup {
             let primary_network_key_path = format!("{base_path}.primary-0-network.json");
             fs::write(primary_network_key_path, primary_network_key_encoded).unwrap();
 
-            for (worker_id, worker) in primary.workers.iter().enumerate() {
+            for (_worker_id, worker) in primary.workers.iter().enumerate() {
                 // Base64-encode the worker network key.
                 let worker_network_key_encoded = worker.network_keypair.encode_base64();
+
+                println!("    worker-0-0-network: {}", worker_network_key_encoded);
 
                 // Write the encoded worker key to the filesystem.
                 let worker_network_key_path = format!("{base_path}.worker-0-0-network.json");
