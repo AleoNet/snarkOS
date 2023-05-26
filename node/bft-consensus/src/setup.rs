@@ -14,13 +14,7 @@
 
 use fastcrypto::traits::{EncodeDecodeBase64 as _, KeyPair as _};
 use narwhal_crypto::EncodeDecodeBase64;
-use std::{
-    collections::BTreeMap,
-    fs,
-    net::Ipv4Addr,
-    ops::Deref,
-    path::{Path, PathBuf},
-};
+use std::{collections::BTreeMap, fs, net::Ipv4Addr, ops::Deref, path::PathBuf};
 
 #[cfg(not(feature = "test"))]
 use aleo_std::aleo_dir;
