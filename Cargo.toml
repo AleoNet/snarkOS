@@ -40,7 +40,7 @@ path = "snarkos/main.rs"
 
 [features]
 default = [ "jemalloc" ]
-jemalloc = [ "tikv-jemallocator" ]
+jemalloc = [ "tcmalloc" ]
 
 [workspace.dependencies.snarkvm]
 #path = "../snarkVM"
@@ -92,8 +92,8 @@ path = "./node/router"
 [dependencies.snarkos-node-tcp]
 path = "./node/tcp"
 
-[dependencies.tikv-jemallocator]
-version = "0.5"
+[dependencies.tcmalloc]
+version = "0.3"
 optional = true
 
 [dev-dependencies.rusty-hook]

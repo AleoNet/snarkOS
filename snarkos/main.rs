@@ -17,11 +17,11 @@ use snarkos_node_env::EnvInfo;
 
 use clap::Parser;
 #[cfg(feature = "jemalloc")]
-use tikv_jemallocator::Jemalloc;
+use tcmalloc::TCMalloc;
 
 #[cfg(feature = "jemalloc")]
 #[global_allocator]
-static GLOBAL: Jemalloc = Jemalloc;
+static GLOBAL: TCMalloc = TCMalloc;
 
 fn main() -> anyhow::Result<()> {
     // Register the environment information.
