@@ -94,6 +94,7 @@ path = "./node/tcp"
 
 [dependencies.tcmalloc]
 version = "0.3"
+features = ["bundled"]
 optional = true
 
 [dev-dependencies.rusty-hook]
