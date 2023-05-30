@@ -47,6 +47,18 @@ mod test_ports {
 }
 use test_ports::*;
 
+#[derive(serde::Serialize)]
+struct ValidatorInfo {
+    aleo_private_key: String,
+    aleo_address: String,
+    primary_address: String,
+    worker_address: String,
+    worker_tx_address: String,
+    primary_keypair: String,
+    primary_network_keypair: String,
+    worker_network_keypair: String,
+}
+
 // A collection of values required to create a full primary.
 pub struct PrimarySetup {
     pub stake: u64,
@@ -184,8 +196,10 @@ impl CommitteeSetup {
 
     // Persists the committee setup to the filesystem.
     pub fn write_files(&self, dev: bool) {
+        let mut validator_infos: std::collections::HashMap<_, _> = Default::default();
+
         // Write the primary and worker files to the filesystem.
-        for (primary_id, (_, primary)) in self.primaries.iter().enumerate() {
+        for (_, (_, primary)) in self.primaries.iter().enumerate() {
             let primary_addr: Ipv4Addr = if let multiaddr::Protocol::Ip4(addr) = primary.address.iter().next().unwrap()
             {
                 addr
@@ -196,14 +210,6 @@ impl CommitteeSetup {
             fn dev_subpath(dev: bool, primary_addr: Ipv4Addr) -> String {
                 if dev { format!(".dev/{}/", primary_addr) } else { format!("{}/", primary_addr) }
             }
-
-            // Print out committee member information.
-            println!("validator {:02}:", primary_id + 1);
-            println!("    primary_address: {}", primary.address);
-            println!("    Aleo private key: {}", primary.keypair.private().deref());
-            println!("    Aleo address: {}", primary.keypair.public().deref());
-            println!("    primary-0-key: {}", primary.keypair.encode_base64());
-            println!("    primary-0-network: {}", primary.network_keypair.encode_base64());
 
             // Generate the common config.
             let committee = self.generate_committee();
@@ -240,7 +246,17 @@ impl CommitteeSetup {
                 // Base64-encode the worker network key.
                 let worker_network_key_encoded = worker.network_keypair.encode_base64();
 
-                println!("    worker-0-0-network: {}", worker_network_key_encoded);
+                let vi = ValidatorInfo {
+                    aleo_private_key: primary.keypair.private().deref().to_string(),
+                    aleo_address: primary.keypair.public().deref().to_string(),
+                    primary_address: primary.address.to_string(),
+                    worker_address: worker.address.to_string(),
+                    worker_tx_address: worker.tx_address.to_string(),
+                    primary_keypair: primary.keypair.encode_base64(),
+                    primary_network_keypair: primary.network_keypair.encode_base64(),
+                    worker_network_keypair: worker_network_key_encoded.clone(),
+                };
+                validator_infos.insert(primary_addr, vi);
 
                 // Write the encoded worker key to the filesystem.
                 let worker_network_key_path = format!("{base_path}.worker-0-0-network.json");
@@ -250,6 +266,10 @@ impl CommitteeSetup {
             // Copy the existing parameters.
             fs::copy(format!("{base_path}../../.parameters.json"), format!("{base_path}.parameters.json")).unwrap();
         }
+
+        let validators_json = serde_json::to_string_pretty(&validator_infos).unwrap();
+        let path = format!("{}/node/bft-consensus/committee/.dev/validator_infos.json", workspace_dir());
+        fs::write(path, validators_json).unwrap();
     }
 }
 
