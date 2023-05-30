@@ -17,14 +17,13 @@ use std::{sync::atomic::Ordering, time::Duration};
 use bytes::Bytes;
 use deadline::deadline;
 use narwhal_types::TransactionProto;
-use rand::prelude::{thread_rng, IteratorRandom, Rng};
+use rand::prelude::{IteratorRandom, Rng};
 use snarkvm::prelude::TestRng;
 use tokio::time::{sleep, timeout};
 
 mod common;
 
-use common::{generate_consensus_instances, TestBftExecutionState};
-use snarkos_node_bft_consensus::setup::{CommitteeSetup, PrimarySetup};
+use common::generate_running_consensus_instances;
 
 // Makes sure that all the primaries have identical state after
 // having processed a range of transactions using the consensus.
@@ -37,29 +36,8 @@ async fn verify_state_coherence() {
     // Configure the transactions.
     const NUM_TRANSACTIONS: usize = 100;
 
-    // Prepare a source of randomness for key generation.
-    let mut rng = thread_rng();
-
-    // Generate the committee setup.
-    let mut primaries = Vec::with_capacity(NUM_PRIMARIES);
-    for _ in 0..NUM_PRIMARIES {
-        let primary = PrimarySetup::new(None, PRIMARY_STAKE, vec![], &mut rng);
-        primaries.push(primary);
-    }
-    let committee = CommitteeSetup::new(primaries, 0);
-
-    // Prepare the initial state.
-    let state = TestBftExecutionState::default();
-
-    // Create the preconfigured consensus instances.
-    let inert_consensus_instances = generate_consensus_instances(committee, state.clone());
-
-    // Start the consensus instances.
-    let mut running_consensus_instances = Vec::with_capacity(NUM_PRIMARIES);
-    for instance in inert_consensus_instances {
-        let running_instance = instance.start().await.unwrap();
-        running_consensus_instances.push(running_instance);
-    }
+    // Set up the base state.
+    let (state, running_consensus_instances) = generate_running_consensus_instances(NUM_PRIMARIES, PRIMARY_STAKE).await;
 
     // Create transaction clients; any instance can be used to do that.
     let mut tx_clients = running_consensus_instances[0].spawn_tx_clients();
@@ -111,35 +89,15 @@ async fn primary_failures() {
     const NUM_TXS_PER_ITER: usize = 5;
     const NUM_TRANSACTIONS: usize = (MAX_FAILURES + 2) * NUM_TXS_PER_ITER;
 
-    // Prepare a source of randomness for key generation.
-    let mut rng = thread_rng();
-
-    // Generate the committee setup.
-    let mut primaries = Vec::with_capacity(NUM_PRIMARIES);
-    for _ in 0..NUM_PRIMARIES {
-        let primary = PrimarySetup::new(None, PRIMARY_STAKE, vec![], &mut rng);
-        primaries.push(primary);
-    }
-    let committee = CommitteeSetup::new(primaries, 0);
-
-    // Prepare the initial state.
-    let state = TestBftExecutionState::default();
+    // Set up the base state.
+    let (state, mut running_consensus_instances) =
+        generate_running_consensus_instances(NUM_PRIMARIES, PRIMARY_STAKE).await;
 
     // Use a deterministic Rng for transaction generation.
     let mut rng = TestRng::default();
 
     // Generate random transactions.
     let mut transfers = state.generate_random_transfers(NUM_TRANSACTIONS, &mut rng);
-
-    // Create the preconfigured consensus instances.
-    let inert_consensus_instances = generate_consensus_instances(committee, state.clone());
-
-    // Start the consensus instances.
-    let mut running_consensus_instances = Vec::with_capacity(NUM_PRIMARIES);
-    for instance in inert_consensus_instances {
-        let running_instance = instance.start().await.unwrap();
-        running_consensus_instances.push(running_instance);
-    }
 
     // Create transaction clients; any instance can be used to do that.
     let mut tx_clients = running_consensus_instances[0].spawn_tx_clients();

@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use narwhal_crypto::PublicKey;
 use serde::{Deserialize, Serialize};
 
 use super::state::{Address, Amount};
@@ -22,6 +23,7 @@ pub const MAX_TRANSFER_AMOUNT: u64 = 10_000;
 #[derive(Serialize, Deserialize)]
 pub enum Transaction {
     Transfer(Transfer),
+    StakeChange(StakeChange),
 }
 
 // A simple transfer from A to B.
@@ -30,4 +32,10 @@ pub struct Transfer {
     pub from: Address,
     pub to: Address,
     pub amount: Amount,
+}
+
+#[derive(Serialize, Deserialize)]
+pub struct StakeChange {
+    pub pub_key: PublicKey,
+    pub stake: i64,
 }

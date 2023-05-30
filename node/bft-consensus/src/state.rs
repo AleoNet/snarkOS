@@ -173,6 +173,8 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
             }
         };
 
+        // TODO(nkls): update the committee state with the new stake from the transaction.
+
         let next_block_round = next_block.round();
         let next_block_height = next_block.height();
         let next_block_hash = next_block.hash();

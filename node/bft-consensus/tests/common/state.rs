@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use arc_swap::ArcSwap;
 use std::{
     collections::HashMap,
     fmt,
@@ -22,6 +23,7 @@ use std::{
 };
 
 use async_trait::async_trait;
+use narwhal_config::{Committee, SharedCommittee};
 use narwhal_executor::ExecutionState;
 use narwhal_types::ConsensusOutput;
 use parking_lot::Mutex;
@@ -38,6 +40,7 @@ pub type Amount = u64;
 
 // A simple state for BFT consensus tests.
 pub struct TestBftExecutionState {
+    pub committee: SharedCommittee,
     pub balances: Mutex<HashMap<Address, Amount>>,
     pub processed_txs: AtomicUsize,
     pub storage_dir: Arc<TempDir>,
@@ -46,6 +49,7 @@ pub struct TestBftExecutionState {
 impl Clone for TestBftExecutionState {
     fn clone(&self) -> Self {
         Self {
+            committee: self.committee.clone(),
             balances: Mutex::new(self.balances.lock().clone()),
             processed_txs: self.processed_txs.load(Ordering::SeqCst).into(),
             storage_dir: Arc::clone(&self.storage_dir),
@@ -73,21 +77,17 @@ impl fmt::Debug for TestBftExecutionState {
     }
 }
 
-impl Default for TestBftExecutionState {
-    fn default() -> Self {
-        let mut balances = HashMap::new();
-        balances.insert("Alice".into(), 1_000_000);
-        balances.insert("Bob".into(), 2_000_000);
-        balances.insert("Chad".into(), 3_000_000);
-        let balances = Mutex::new(balances);
-
-        let storage_dir = Arc::new(TempDir::new().unwrap());
-
-        Self { balances, processed_txs: Default::default(), storage_dir }
-    }
-}
-
 impl TestBftExecutionState {
+    pub fn new(committee: Committee, balances: HashMap<Address, Amount>) -> Self {
+        Self {
+            committee: Arc::new(ArcSwap::from_pointee(committee)),
+            balances: Mutex::new(balances),
+            processed_txs: Default::default(),
+            storage_dir: Arc::new(TempDir::new().unwrap()),
+        }
+    }
+
+    #[allow(dead_code)]
     pub fn generate_random_transfers<T: Rng>(&self, num_transfers: usize, rng: &mut T) -> Vec<Transaction> {
         let balances = self.balances.lock();
 
@@ -131,6 +131,24 @@ impl TestBftExecutionState {
                     if let Some(to_balance) = balances.get_mut(&to) {
                         *to_balance += amount;
                     }
+                }
+
+                Transaction::StakeChange(StakeChange { pub_key, stake }) => {
+                    // Load the committee so that state is consistent between reads and writes.
+                    self.committee.rcu(|committee| {
+                        let previous_stake = committee.stake(&pub_key);
+                        let new_stake = previous_stake.saturating_add_signed(stake);
+
+                        // Update the committee.
+                        let mut committee = Committee::clone(&committee);
+
+                        // TODO(nkls): check if this is sufficient.
+                        if let Some(authority) = committee.authorities.get_mut(&pub_key) {
+                            authority.stake = new_stake;
+                        }
+
+                        committee
+                    });
                 }
             }
         }
