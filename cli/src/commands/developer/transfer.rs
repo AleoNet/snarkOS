@@ -15,7 +15,7 @@
 use super::{CurrentNetwork, Developer};
 
 use snarkvm::{
-    prelude::{Address, ConsensusStore, Locator, Plaintext, PrivateKey, Query, Record, Transaction, Value, VM},
+    prelude::{Address, ConsensusStore, Locator, Plaintext, PrivateKey, Query, Record, Value, VM},
     synthesizer::store::helpers::memory::ConsensusMemory,
 };
 
@@ -90,15 +90,7 @@ impl Transfer {
             ];
 
             // Create a new transaction.
-            Transaction::execute(
-                &vm,
-                &private_key,
-                ("credits.aleo", "transfer"),
-                inputs.iter(),
-                Some(fee),
-                Some(query),
-                rng,
-            )?
+            vm.execute(&private_key, ("credits.aleo", "transfer"), inputs.iter(), Some(fee), Some(query), rng)?
         };
         let locator = Locator::<CurrentNetwork>::from_str("credits.aleo/transfer")?;
         format!("✅ Created transfer of {} microcredits to {}...\n", &self.amount, self.recipient);

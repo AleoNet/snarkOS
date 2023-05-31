@@ -281,8 +281,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 let inputs = vec![Value::from_str(&format!("{to}"))?, Value::from_str(&format!("{amount}u64"))?];
 
                 // Create a new transaction.
-                let transaction = Transaction::execute(
-                    beacon.ledger.vm(),
+                let transaction = beacon.ledger.vm().execute(
                     beacon.account.private_key(),
                     ("credits.aleo", "mint"),
                     inputs.iter(),
@@ -471,7 +470,7 @@ mod tests {
         // Initialize a new VM.
         let vm = VM::from(ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?)?;
         // Initialize the genesis block.
-        let genesis = Block::genesis(&vm, beacon_account.private_key(), &mut rng)?;
+        let genesis = vm.genesis(beacon_account.private_key(), &mut rng)?;
 
         println!("Initializing beacon node...");
 
