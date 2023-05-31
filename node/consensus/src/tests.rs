@@ -19,12 +19,7 @@ use snarkvm::{
         program::{Entry, Identifier, Literal, Plaintext, Value},
     },
     prelude::{Ledger, RecordsFilter, TestRng},
-    synthesizer::{
-        block::{Block, Transaction},
-        program::Program,
-        store::ConsensusStore,
-        vm::VM,
-    },
+    synthesizer::{block::Transaction, program::Program, store::ConsensusStore, vm::VM},
 };
 
 use tracing_test::traced_test;
@@ -71,7 +66,7 @@ pub(crate) mod test_helpers {
                 // Initialize a new caller.
                 let caller_private_key = PrivateKey::<CurrentNetwork>::new(rng).unwrap();
                 // Return the block.
-                Block::genesis(&vm, &caller_private_key, rng).unwrap()
+                vm.genesis(&caller_private_key, rng).unwrap()
             })
             .clone()
     }
@@ -86,7 +81,7 @@ pub(crate) mod test_helpers {
                 // Initialize the VM.
                 let vm = crate::tests::test_helpers::sample_vm();
                 // Return the block.
-                Block::genesis(&vm, &private_key, rng).unwrap()
+                vm.genesis(&private_key, rng).unwrap()
             })
             .clone()
     }
@@ -173,15 +168,8 @@ function compute:
                 let additional_fee = (credits, 6466000);
 
                 // Deploy.
-                let transaction = Transaction::deploy(
-                    consensus.ledger.vm(),
-                    &caller_private_key,
-                    &program,
-                    additional_fee,
-                    None,
-                    rng,
-                )
-                .unwrap();
+                let transaction =
+                    consensus.ledger.vm().deploy(&caller_private_key, &program, additional_fee, None, rng).unwrap();
                 // Verify.
                 assert!(consensus.ledger.vm().verify_transaction(&transaction));
                 // Return the transaction.
@@ -235,10 +223,10 @@ function compute:
                 assert_eq!(authorization.len(), 1);
 
                 // Execute the fee.
-                let fee = Transaction::execute_fee(vm, &caller_private_key, record, 3000, None, rng).unwrap();
+                let (_, fee, _) = vm.execute_fee_raw(&caller_private_key, record, 3000, None, rng).unwrap();
 
                 // Execute.
-                let transaction = Transaction::execute_authorization(vm, authorization, Some(fee), None, rng).unwrap();
+                let transaction = vm.execute_authorization(authorization, Some(fee), None, rng).unwrap();
                 // Verify.
                 assert!(vm.verify_transaction(&transaction));
                 // Return the transaction.
@@ -262,7 +250,7 @@ fn test_validators() {
     let vm = crate::tests::test_helpers::sample_vm();
 
     // Create a genesis block.
-    let genesis = Block::genesis(&vm, &private_key, rng).unwrap();
+    let genesis = vm.genesis(&private_key, rng).unwrap();
 
     // Initialize the validators.
     let validators: IndexMap<Address<_>, ()> = [(address, ())].into_iter().collect();
@@ -389,16 +377,11 @@ fn test_ledger_execute_many() {
             };
             let inputs = [Value::Record(record.clone()), Value::from_str(&format!("{}u64", **amount / 2)).unwrap()];
             // Create a new transaction.
-            let transaction = Transaction::execute(
-                consensus.ledger.vm(),
-                &private_key,
-                ("credits.aleo", "split"),
-                inputs.iter(),
-                None,
-                None,
-                rng,
-            )
-            .unwrap();
+            let transaction = consensus
+                .ledger
+                .vm()
+                .execute(&private_key, ("credits.aleo", "split"), inputs.iter(), None, None, rng)
+                .unwrap();
             // Add the transaction to the memory pool.
             consensus.add_unconfirmed_transaction(transaction).unwrap();
         }

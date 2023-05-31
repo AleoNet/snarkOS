@@ -15,19 +15,7 @@
 use super::{CurrentNetwork, Developer, Program};
 
 use snarkvm::{
-    prelude::{
-        ConsensusStore,
-        Identifier,
-        Locator,
-        Plaintext,
-        PrivateKey,
-        ProgramID,
-        Query,
-        Record,
-        Transaction,
-        Value,
-        VM,
-    },
+    prelude::{ConsensusStore, Identifier, Locator, Plaintext, PrivateKey, ProgramID, Query, Record, Value, VM},
     synthesizer::store::helpers::memory::ConsensusMemory,
 };
 
@@ -99,7 +87,7 @@ impl Execute {
             // Add the program deployment to the VM.
             let credits = ProgramID::<CurrentNetwork>::try_from("credits.aleo")?;
             if program.id() != &credits {
-                let deployment = vm.deploy(&program, rng)?;
+                let deployment = vm.deploy_raw(&program, rng)?;
                 vm.process().write().load_deployment(&deployment)?;
             }
 
@@ -119,15 +107,7 @@ impl Execute {
             };
 
             // Create a new transaction.
-            Transaction::execute(
-                &vm,
-                &private_key,
-                (self.program_id, self.function),
-                self.inputs.iter(),
-                fee,
-                Some(query),
-                rng,
-            )?
+            vm.execute(&private_key, (self.program_id, self.function), self.inputs.iter(), fee, Some(query), rng)?
         };
         let locator = Locator::<CurrentNetwork>::from_str(&format!("{}/{}", self.program_id, self.function))?;
         println!("✅ Created execution transaction for '{}'", locator.to_string().bold());

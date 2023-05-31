@@ -15,7 +15,7 @@
 use super::{CurrentNetwork, Developer};
 
 use snarkvm::{
-    prelude::{ConsensusStore, Plaintext, PrivateKey, ProgramID, Query, Record, Transaction, VM},
+    prelude::{ConsensusStore, Plaintext, PrivateKey, ProgramID, Query, Record, VM},
     synthesizer::store::helpers::memory::ConsensusMemory,
 };
 
@@ -83,7 +83,7 @@ impl Deploy {
             let fee = (Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.record)?, self.fee);
 
             // Create a new transaction.
-            Transaction::deploy(&vm, &private_key, &program, fee, Some(query), rng)?
+            vm.deploy(&private_key, &program, fee, Some(query), rng)?
         };
         println!("✅ Created deployment transaction for '{}'", self.program_id.to_string().bold());
 
