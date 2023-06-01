@@ -199,20 +199,28 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
             // If the transaction is a coinbase, add the amount to the total supply.
             if confirmed_tx.is_coinbase() {
-                match confirmed_tx.transaction() {
-                    Transaction::Execute(_, execution, _) => {
-                        // Get the input amount of the coinbase transaction.
-                        match execution.get(0)?.inputs().get(1) {
-                            Some(Input::Public(_, Some(Plaintext::Literal(Literal::U64(amount), _)))) => {
-                                // Add the public amount minted to the total supply.
-                                new_total_supply_in_microcredits = new_total_supply_in_microcredits
-                                    .checked_add(**amount)
-                                    .ok_or_else(|| anyhow!("Total supply of microcredits overflowed"))?;
-                            }
-                            _ => bail!("Invalid coinbase transaction: Missing public input in 'credits.aleo/mint'"),
-                        }
+                if let Transaction::Execute(_, execution, _) = confirmed_tx.transaction() {
+                    // Loop over coinbase transitions and accumulate the amounts.
+                    for transition in execution.transitions().filter(|t| t.is_coinbase()) {
+                        // Extract the amount from the second input (amount) if it exists.
+                        let amount = transition
+                            .inputs()
+                            .get(1)
+                            .and_then(|input| match input {
+                                Input::Public(_, Some(Plaintext::Literal(Literal::U64(amount), _))) => Some(amount),
+                                _ => None,
+                            })
+                            .ok_or_else(|| {
+                                anyhow!("Invalid coinbase transaction: Missing public input in 'credits.aleo/mint'")
+                            })?;
+
+                        // Add the public amount minted to the total supply.
+                        new_total_supply_in_microcredits = new_total_supply_in_microcredits
+                            .checked_add(**amount)
+                            .ok_or_else(|| anyhow!("Total supply of microcredits overflowed"))?;
                     }
-                    _ => bail!("Invalid coinbase transaction"),
+                } else {
+                    bail!("Invalid coinbase transaction");
                 }
             }
         }
@@ -480,20 +488,28 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
             // If the transaction is a coinbase, add the amount to the total supply.
             if confirmed_tx.is_coinbase() {
-                match confirmed_tx.transaction() {
-                    Transaction::Execute(_, execution, _) => {
-                        // Get the input amount of the coinbase transaction.
-                        match execution.get(0)?.inputs().get(1) {
-                            Some(Input::Public(_, Some(Plaintext::Literal(Literal::U64(amount), _)))) => {
-                                // Add the public amount minted to the total supply.
-                                new_total_supply_in_microcredits = new_total_supply_in_microcredits
-                                    .checked_add(**amount)
-                                    .ok_or_else(|| anyhow!("Total supply of microcredits overflowed"))?;
-                            }
-                            _ => bail!("Invalid coinbase transaction: Missing public input in 'credits.aleo/mint'"),
-                        }
+                if let Transaction::Execute(_, execution, _) = confirmed_tx.transaction() {
+                    // Loop over coinbase transitions and accumulate the amounts.
+                    for transition in execution.transitions().filter(|t| t.is_coinbase()) {
+                        // Extract the amount from the second input (amount) if it exists.
+                        let amount = transition
+                            .inputs()
+                            .get(1)
+                            .and_then(|input| match input {
+                                Input::Public(_, Some(Plaintext::Literal(Literal::U64(amount), _))) => Some(amount),
+                                _ => None,
+                            })
+                            .ok_or_else(|| {
+                                anyhow!("Invalid coinbase transaction: Missing public input in 'credits.aleo/mint'")
+                            })?;
+
+                        // Add the public amount minted to the total supply.
+                        new_total_supply_in_microcredits = new_total_supply_in_microcredits
+                            .checked_add(**amount)
+                            .ok_or_else(|| anyhow!("Total supply of microcredits overflowed"))?;
                     }
-                    _ => bail!("Invalid coinbase transaction"),
+                } else {
+                    bail!("Invalid coinbase transaction");
                 }
             }
         }
@@ -688,10 +704,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // TODO (raychu86): Remove this once proper coinbase transactions are integrated with consensus.
         // Ensure the coinbase transaction is attributed to an authorized beacon.
         if transaction.is_coinbase() {
-            match transaction {
-                Transaction::Execute(id, execution, _) => {
-                    // Get the input address of the coinbase transaction.
-                    match execution.get(0)?.inputs().get(0) {
+            if let Transaction::Execute(id, execution, _) = transaction {
+                // Loop over coinbase transitions and check the input address.
+                for transition in execution.transitions().filter(|t| t.is_coinbase()) {
+                    // Get the input address of the coinbase transition.
+                    match transition.inputs().get(0) {
                         Some(Input::Public(_, Some(Plaintext::Literal(Literal::Address(address), _)))) => {
                             // Check if the address is a valid beacon address.
                             if !self.beacons.read().contains_key(address) {
@@ -705,7 +722,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                         _ => bail!("Invalid coinbase transaction: Missing public input in 'credits.aleo/mint'"),
                     }
                 }
-                _ => bail!("Invalid coinbase transaction"),
+            } else {
+                bail!("Invalid coinbase transaction");
             }
         }
 
@@ -724,7 +742,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             Transaction::Execute(_, execution, _) => {
                 // TODO (raychu86): Remove the split check when batch executions are integrated.
                 // If the transaction is not a coinbase or split transaction, check that the fee in microcredits is at least the execution size in bytes.
-                if !transaction.is_coinbase() && !transaction.is_split() && execution.size_in_bytes()? > *fee {
+                if !((transaction.is_coinbase() || transaction.is_split()) && execution.len() == 1)
+                    && execution.size_in_bytes()? > *fee
+                {
                     bail!("Transaction '{transaction_id}' has insufficient fee to cover its storage in bytes")
                 }
             }
