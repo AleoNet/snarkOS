@@ -14,7 +14,7 @@
 
 use arc_swap::ArcSwap;
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     fmt,
     sync::{
         atomic::{AtomicUsize, Ordering},
@@ -42,7 +42,8 @@ pub type Amount = u64;
 pub struct TestBftExecutionState {
     pub committee: SharedCommittee,
     pub balances: Mutex<HashMap<Address, Amount>>,
-    pub processed_txs: AtomicUsize,
+    pub processed_tx_count: AtomicUsize,
+    pub processed_txs: Mutex<HashSet<u64>>,
     pub storage_dir: Arc<TempDir>,
 }
 
@@ -51,7 +52,8 @@ impl Clone for TestBftExecutionState {
         Self {
             committee: self.committee.clone(),
             balances: Mutex::new(self.balances.lock().clone()),
-            processed_txs: self.processed_txs.load(Ordering::SeqCst).into(),
+            processed_tx_count: self.processed_tx_count.load(Ordering::SeqCst).into(),
+            processed_txs: Mutex::new(self.processed_txs.lock().clone()),
             storage_dir: Arc::clone(&self.storage_dir),
         }
     }
@@ -59,7 +61,8 @@ impl Clone for TestBftExecutionState {
 
 impl PartialEq for TestBftExecutionState {
     fn eq(&self, other: &Self) -> bool {
-        self.processed_txs.load(Ordering::SeqCst) == other.processed_txs.load(Ordering::SeqCst)
+        self.processed_tx_count.load(Ordering::SeqCst) == other.processed_tx_count.load(Ordering::SeqCst)
+            && *self.processed_txs.lock() == *other.processed_txs.lock()
             && *self.balances.lock() == *other.balances.lock()
     }
 }
@@ -70,8 +73,9 @@ impl fmt::Debug for TestBftExecutionState {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "processed txs: {}, balances: {:?}",
-            self.processed_txs.load(Ordering::SeqCst),
+            "processed tx count: {}, processed txs: {:?}, balances: {:?}",
+            self.processed_tx_count.load(Ordering::SeqCst),
+            &*self.processed_txs.lock(),
             &*self.balances.lock()
         )
     }
@@ -82,6 +86,7 @@ impl TestBftExecutionState {
         Self {
             committee: Arc::new(ArcSwap::from_pointee(committee)),
             balances: Mutex::new(balances),
+            processed_tx_count: Default::default(),
             processed_txs: Default::default(),
             storage_dir: Arc::new(TempDir::new().unwrap()),
         }
@@ -92,12 +97,12 @@ impl TestBftExecutionState {
         let balances = self.balances.lock();
 
         let mut transfers = Vec::with_capacity(num_transfers);
-        for _ in 0..num_transfers {
+        for i in 0..num_transfers {
             let mut sides = balances.keys().cloned().choose_multiple(rng, 2);
             sides.shuffle(rng);
             let amount = rng.gen_range(1..=MAX_TRANSFER_AMOUNT);
 
-            let transfer = Transfer { from: sides.pop().unwrap(), to: sides.pop().unwrap(), amount };
+            let transfer = Transfer { id: i as u64, from: sides.pop().unwrap(), to: sides.pop().unwrap(), amount };
             transfers.push(Transaction::Transfer(transfer));
         }
 
@@ -108,10 +113,15 @@ impl TestBftExecutionState {
         let mut balances = self.balances.lock();
 
         for transaction in transactions {
-            self.processed_txs.fetch_add(1, Ordering::Relaxed);
+            self.processed_tx_count.fetch_add(1, Ordering::Relaxed);
+
+            // Skip transactions that have already been processed to avoid corrupting state.
+            if !self.processed_txs.lock().insert(transaction.id()) {
+                continue;
+            }
 
             match transaction {
-                Transaction::Transfer(Transfer { from, to, amount }) => {
+                Transaction::Transfer(Transfer { from, to, amount, .. }) => {
                     if amount > MAX_TRANSFER_AMOUNT {
                         continue;
                     }
@@ -133,7 +143,7 @@ impl TestBftExecutionState {
                     }
                 }
 
-                Transaction::StakeChange(StakeChange { pub_key, stake }) => {
+                Transaction::StakeChange(StakeChange { pub_key, stake, .. }) => {
                     // Load the committee so that state is consistent between reads and writes.
                     self.committee.rcu(|committee| {
                         let previous_stake = committee.stake(&pub_key);
@@ -142,7 +152,6 @@ impl TestBftExecutionState {
                         // Update the committee.
                         let mut committee = Committee::clone(&committee);
 
-                        // TODO(nkls): check if this is sufficient.
                         if let Some(authority) = committee.authorities.get_mut(&pub_key) {
                             authority.stake = new_stake;
                         }

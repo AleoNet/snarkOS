@@ -16,7 +16,7 @@ use std::time::Duration;
 
 use bytes::Bytes;
 use narwhal_types::TransactionProto;
-use rand::prelude::{thread_rng, IteratorRandom, Rng};
+use rand::prelude::{IteratorRandom, Rng};
 use snarkvm::prelude::TestRng;
 use tokio::time::sleep;
 
@@ -42,22 +42,18 @@ async fn staking() {
     // Use a deterministic Rng.
     let mut rng = TestRng::default();
 
-    for _ in 0..NUM_STAKE_CHANGES {
+    for i in 0..NUM_STAKE_CHANGES {
         // 1. Generate a stake change for a random authority.
-        let (pub_key, _authority) =
-            state.committee.load().authorities.clone().into_iter().choose(&mut thread_rng()).unwrap();
+        let (pub_key, _authority) = state.committee.load().authorities.clone().into_iter().choose(&mut rng).unwrap();
 
         // Generate a random stake change.
         let stake = rng.gen_range(1..=10);
         // Create a stake change transaction.
-        let stake_tx = Transaction::StakeChange(StakeChange { pub_key: pub_key.clone(), stake });
+        let stake_tx = Transaction::StakeChange(StakeChange { id: i as u64, pub_key: pub_key.clone(), stake });
 
         // 2. Send the transactions to a random number of BFT workers at a time.
-        let n_recipients = 1;
-
-        // TODO(nkls): once txs have a nonce, we can send them to a larger set of workers.
         // Randomize the number of worker recipients.
-        // let n_recipients: usize = rng.gen_range(1..=tx_clients.len());
+        let n_recipients: usize = rng.gen_range(1..=tx_clients.len());
 
         let transaction: Bytes = bincode::serialize(&stake_tx).unwrap().into();
         let tx = TransactionProto { transaction };
@@ -69,7 +65,7 @@ async fn staking() {
     }
 
     // Wait for a while to allow the transfers to be processed.
-    sleep(Duration::from_secs(3)).await;
+    sleep(Duration::from_secs(10)).await;
 
     // 3. Check the state matches across the network.
     let first_state = running_consensus_instances[0].state.committee.load_full();

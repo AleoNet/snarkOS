@@ -107,7 +107,7 @@ async fn primary_failures() {
         // Save the number of processed transactions before the next batch is distributed.
         // note: in the first iteration it's zero for everyone, and later on it's guaranteed
         // to be coherent due to us waiting for the numbers to be aligned for everyone.
-        let tx_count_before_batch = running_consensus_instances[0].state.processed_txs.load(Ordering::SeqCst);
+        let tx_count_before_batch = running_consensus_instances[0].state.processed_tx_count.load(Ordering::SeqCst);
 
         // Prepare a batch of transactions to be sent to the workers.
         let tx_batch = transfers
@@ -146,13 +146,15 @@ async fn primary_failures() {
         // Use a generous timeout in case many primaries are tested.
         deadline!(Duration::from_secs(10), move || {
             let mut states = states.iter();
-            let first_tx_count = states.next().unwrap().processed_txs.load(Ordering::SeqCst);
+            let first_tx_count = states.next().unwrap().processed_tx_count.load(Ordering::SeqCst);
 
             if first_tx_count == tx_count_before_batch {
                 return false;
             }
 
-            states.map(|state| state.processed_txs.load(Ordering::SeqCst)).all(|tx_count| tx_count == first_tx_count)
+            states
+                .map(|state| state.processed_tx_count.load(Ordering::SeqCst))
+                .all(|tx_count| tx_count == first_tx_count)
         });
 
         // Kill one of the consensus instances and shut down the corresponding transaction client.

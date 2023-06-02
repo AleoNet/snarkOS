@@ -26,9 +26,19 @@ pub enum Transaction {
     StakeChange(StakeChange),
 }
 
+impl Transaction {
+    pub fn id(&self) -> u64 {
+        match self {
+            Transaction::Transfer(t) => t.id,
+            Transaction::StakeChange(t) => t.id,
+        }
+    }
+}
+
 // A simple transfer from A to B.
 #[derive(Serialize, Deserialize)]
 pub struct Transfer {
+    pub id: u64,
     pub from: Address,
     pub to: Address,
     pub amount: Amount,
@@ -36,6 +46,7 @@ pub struct Transfer {
 
 #[derive(Serialize, Deserialize)]
 pub struct StakeChange {
+    pub id: u64,
     pub pub_key: PublicKey,
     pub stake: i64,
 }
