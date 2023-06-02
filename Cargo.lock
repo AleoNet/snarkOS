@@ -4930,6 +4930,37 @@ dependencies = [
 ]
 
 [[package]]
+name = "snarkos-tx-generator"
+version = "2.0.2"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "indexmap",
+ "itertools",
+ "multiaddr",
+ "narwhal-config",
+ "narwhal-types",
+ "once_cell",
+ "parking_lot",
+ "rand",
+ "rand_chacha",
+ "rayon",
+ "snarkos-account",
+ "snarkos-node",
+ "snarkos-node-bft-consensus",
+ "snarkos-node-consensus",
+ "snarkos-node-messages",
+ "snarkvm",
+ "tikv-jemallocator",
+ "time",
+ "tokio",
+ "tonic",
+ "tracing",
+ "tracing-subscriber 0.3.17",
+ "tracing-test 0.2.4",
+]
+
+[[package]]
 name = "snarkvm"
 version = "0.12.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
