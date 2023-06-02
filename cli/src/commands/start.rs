@@ -130,7 +130,22 @@ impl Start {
     /// Returns the initial node(s) to connect to, from the given configurations.
     fn parse_trusted_peers(&self) -> Result<Vec<SocketAddr>> {
         match self.connect.is_empty() {
-            true => Ok(vec![]),
+            true => {
+                if let Ok(list) = std::env::var("TRUSTED_PEERS") {
+                    Ok(list
+                        .split(',')
+                        .flat_map(|ip| match ip.parse::<SocketAddr>() {
+                            Ok(ip) => Some(ip),
+                            Err(e) => {
+                                eprintln!("The IP supplied to --connect ('{ip}') is malformed: {e}");
+                                None
+                            }
+                        })
+                        .collect())
+                } else {
+                    Ok(vec![])
+                }
+            }
             false => Ok(self
                 .connect
                 .split(',')
