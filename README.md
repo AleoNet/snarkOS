@@ -69,6 +69,14 @@ Lastly, install `snarkOS`:
 cargo install --path .
 ```
 
+**[For Windows users]** While an official Windows build guide doesn't exist yet, you may need to build snarkOS
+without the default features if you're using the `*-windows-msvc` toolchain, as the default global allocator
+(`tikv-jemallocator`) doesn't currently support it:
+```
+cargo build --release --no-default-features
+```
+Depending on your toolchain you may also need to install additional dependencies such as `clang`.
+
 ## 3. Run an Aleo Node
 
 ## 3a. Run an Aleo Client
