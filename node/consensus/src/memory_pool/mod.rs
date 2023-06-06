@@ -15,8 +15,11 @@
 mod solutions;
 mod transactions;
 
-use crate::{anchor_block_height, Consensus};
-use snarkvm::prelude::{ConsensusStorage, Itertools, Network, ProverSolution, PuzzleCommitment, Transaction};
+use crate::Consensus;
+use snarkvm::{
+    ledger::anchor_block_height,
+    prelude::{ConsensusStorage, Itertools, Network, ProverSolution, PuzzleCommitment, Transaction},
+};
 
 use anyhow::{anyhow, Result};
 use parking_lot::RwLock;
@@ -31,15 +34,15 @@ pub struct MemoryPool<N: Network> {
     unconfirmed_solutions: Arc<RwLock<HashMap<PuzzleCommitment<N>, (ProverSolution<N>, u64)>>>,
 }
 
-impl<N: Network> Default for MemoryPool<N> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<N: Network> MemoryPool<N> {
     /// Initializes a new instance of a memory pool.
     pub fn new() -> Self {
         Self { unconfirmed_transactions: Default::default(), unconfirmed_solutions: Default::default() }
+    }
+}
+
+impl<N: Network> Default for MemoryPool<N> {
+    fn default() -> Self {
+        Self::new()
     }
 }

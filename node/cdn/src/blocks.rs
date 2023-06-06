@@ -52,7 +52,8 @@ pub async fn sync_ledger_with_cdn<N: Network, C: ConsensusStorage<N>>(
     // Load the blocks from the CDN into the ledger.
     let ledger_clone = ledger.clone();
     let result =
-        load_blocks(base_url, start_height, None, move |block: Block<N>| ledger_clone.add_next_block(&block)).await;
+        load_blocks(base_url, start_height, None, move |block: Block<N>| ledger_clone.advance_to_next_block(&block))
+            .await;
 
     // TODO (howardwu): Find a way to resolve integrity failures.
     // If the sync failed, check the integrity of the ledger.

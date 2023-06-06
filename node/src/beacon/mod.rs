@@ -119,8 +119,8 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         // Initialize the block generation time.
         let block_generation_time = Arc::new(AtomicU64::new(2));
         // Retrieve the unspent records.
-        let unspent_records = ledger.find_unspent_records(account.view_key())?;
-        lap!(timer, "Retrieve the unspent records");
+        let unspent_records = ledger.find_unspent_credits_records(account.view_key())?;
+        lap!(timer, "Retrieve the unspent credits records");
 
         // Initialize the node router.
         let router = Router::new(
@@ -352,7 +352,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                             warn!("Unable to save the beacon unspent records, recomputing unspent records: {error}");
                             // Recompute the unspent records.
                             *beacon.unspent_records.write() =
-                                beacon.ledger.find_unspent_records(beacon.account.view_key())?;
+                                beacon.ledger.find_unspent_credits_records(beacon.account.view_key())?;
                         };
                     }
                     // Log the next block.
