@@ -171,7 +171,7 @@ function compute:
                 let transaction =
                     consensus.ledger.vm().deploy(&caller_private_key, &program, additional_fee, None, rng).unwrap();
                 // Verify.
-                assert!(consensus.ledger.vm().verify_transaction(&transaction));
+                assert!(consensus.ledger.vm().verify_transaction(&transaction, None));
                 // Return the transaction.
                 transaction
             })
@@ -208,6 +208,9 @@ function compute:
                 // Select a record to spend.
                 let record = records.values().next().unwrap().clone();
 
+                // Prepare the fee.
+                let fee = Some((record, 3000));
+
                 // Retrieve the VM.
                 let vm = consensus.ledger.vm();
 
@@ -218,17 +221,11 @@ function compute:
                 ]
                 .into_iter();
 
-                // Authorize.
-                let authorization = vm.authorize(&caller_private_key, "credits.aleo", "mint", inputs, rng).unwrap();
-                assert_eq!(authorization.len(), 1);
-
-                // Execute the fee.
-                let (_, fee, _) = vm.execute_fee_raw(&caller_private_key, record, 3000, None, rng).unwrap();
-
                 // Execute.
-                let transaction = vm.execute_authorization(authorization, Some(fee), None, rng).unwrap();
+                let transaction =
+                    vm.execute(&caller_private_key, ("credits.aleo", "mint"), inputs, fee, None, rng).unwrap();
                 // Verify.
-                assert!(vm.verify_transaction(&transaction));
+                assert!(vm.verify_transaction(&transaction, None));
                 // Return the transaction.
                 transaction
             })
@@ -304,7 +301,7 @@ fn test_ledger_deploy() {
     // Ensure that the VM can't re-deploy the same program.
     assert!(consensus.ledger.vm().finalize(&transactions).is_err());
     // Ensure that the ledger deems the same transaction invalid.
-    assert!(consensus.check_transaction_basic(&transaction).is_err());
+    assert!(consensus.check_transaction_basic(&transaction, None).is_err());
     // Ensure that the ledger cannot add the same transaction.
     assert!(consensus.add_unconfirmed_transaction(transaction).is_err());
 }
@@ -335,7 +332,7 @@ fn test_ledger_execute() {
     assert_eq!(consensus.ledger.latest_hash(), next_block.hash());
 
     // Ensure that the ledger deems the same transaction invalid.
-    assert!(consensus.check_transaction_basic(&transaction).is_err());
+    assert!(consensus.check_transaction_basic(&transaction, None).is_err());
     // Ensure that the ledger cannot add the same transaction.
     assert!(consensus.add_unconfirmed_transaction(transaction).is_err());
 }

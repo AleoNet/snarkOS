@@ -113,7 +113,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             bail!("Transaction is already in the memory pool.");
         }
         // Check that the transaction is well-formed and unique.
-        self.check_transaction_basic(&transaction)?;
+        self.check_transaction_basic(&transaction, None)?;
         // Insert the transaction to the memory pool.
         self.memory_pool.add_unconfirmed_transaction(&transaction);
 
@@ -639,7 +639,14 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 
         // Ensure each transaction is well-formed and unique.
         cfg_iter!(block.transactions()).try_for_each(|transaction| {
-            self.check_transaction_basic(transaction)
+            // Construct the rejected ID.
+            let rejected_id = match transaction {
+                ConfirmedTransaction::AcceptedDeploy(..) | ConfirmedTransaction::AcceptedExecute(..) => None,
+                ConfirmedTransaction::RejectedDeploy(_, _, deployment) => Some(deployment.to_deployment_id()?),
+                ConfirmedTransaction::RejectedExecute(_, _, execution) => Some(execution.to_execution_id()?),
+            };
+
+            self.check_transaction_basic(transaction, rejected_id)
                 .map_err(|e| anyhow!("Invalid transaction found in the transactions list: {e}"))
         })?;
 
@@ -693,7 +700,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     }
 
     /// Checks the given transaction is well-formed and unique.
-    pub fn check_transaction_basic(&self, transaction: &Transaction<N>) -> Result<()> {
+    pub fn check_transaction_basic(&self, transaction: &Transaction<N>, rejected_id: Option<Field<N>>) -> Result<()> {
         let transaction_id = transaction.id();
 
         // Ensure the ledger does not already contain the given transaction ID.
@@ -713,9 +720,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
                             // Check if the address is a valid beacon address.
                             if !self.beacons.read().contains_key(address) {
                                 bail!(
-                                    "Coinbase transaction ({}) is attributed to an unauthorized beacon ({})",
-                                    id,
-                                    address
+                                    "Coinbase transaction ({id}) is attributed to an unauthorized beacon ({address})",
                                 );
                             }
                         }
@@ -755,7 +760,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         /* Proof(s) */
 
         // Ensure the transaction is valid.
-        self.ledger.vm().check_transaction(transaction)?;
+        self.ledger.vm().check_transaction(transaction, rejected_id)?;
 
         /* Input */
 
