@@ -19,7 +19,12 @@ use snarkvm::{
         program::{Entry, Identifier, Literal, Plaintext, Value},
     },
     prelude::{Ledger, RecordsFilter, TestRng},
-    synthesizer::{block::Transaction, program::Program, store::ConsensusStore, vm::VM},
+    synthesizer::{
+        block::{Block, Transaction},
+        program::Program,
+        store::ConsensusStore,
+        vm::VM,
+    },
 };
 
 use tracing_test::traced_test;
@@ -349,6 +354,8 @@ fn test_ledger_execute_many() {
     // Sample the genesis consensus.
     let consensus = crate::tests::test_helpers::sample_genesis_consensus(rng);
 
+    const NUM_GENESIS: usize = Block::<CurrentNetwork>::NUM_GENESIS_TRANSACTIONS;
+
     for height in 1..4 {
         // Fetch the unspent records.
         let microcredits = Identifier::from_str("microcredits").unwrap();
@@ -364,7 +371,7 @@ fn test_ledger_execute_many() {
                 }
             })
             .collect();
-        assert_eq!(records.len(), 2 << height);
+        assert_eq!(records.len(), NUM_GENESIS * height);
 
         for (_, record) in records.iter() {
             // Prepare the inputs.
@@ -382,7 +389,7 @@ fn test_ledger_execute_many() {
             // Add the transaction to the memory pool.
             consensus.add_unconfirmed_transaction(transaction).unwrap();
         }
-        assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), 2 << height);
+        assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), NUM_GENESIS * height);
 
         // Propose the next block.
         let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
@@ -391,7 +398,7 @@ fn test_ledger_execute_many() {
         consensus.check_next_block(&next_block).unwrap();
         // Construct a next block.
         consensus.advance_to_next_block(&next_block).unwrap();
-        assert_eq!(consensus.ledger.latest_height(), height);
+        assert_eq!(consensus.ledger.latest_height(), height as u32);
         assert_eq!(consensus.ledger.latest_hash(), next_block.hash());
     }
 }
