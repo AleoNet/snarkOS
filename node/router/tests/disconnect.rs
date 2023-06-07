@@ -34,7 +34,7 @@ async fn test_disconnect_without_handshake() {
     // Connect node0 to node1.
     node0.connect(node1.local_ip());
     // Sleep briefly.
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     print_tcp!(node0);
     print_tcp!(node1);
@@ -80,7 +80,7 @@ async fn test_disconnect_with_handshake() {
     // Connect node0 to node1.
     node0.connect(node1.local_ip());
     // Sleep briefly.
-    tokio::time::sleep(Duration::from_millis(100)).await;
+    tokio::time::sleep(Duration::from_millis(200)).await;
 
     print_tcp!(node0);
     print_tcp!(node1);
