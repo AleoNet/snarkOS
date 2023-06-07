@@ -128,8 +128,8 @@ APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - Also double-check the spelling of `snarkos`. Note the directory is `/snarkOS`, the command is `snarkos`
 
 ### 4. Install on Windows FAQ ### 
-<details><summary>`git`: command not found</summary>
-     [install Git for Windows can be found here.](https://git-scm.com/download/win) </details>
+<details><summary>`git` command not found</summary>
+ Instructions to [install Git for Windows can be found here.](https://git-scm.com/download/win) </details>
 - Also double-check the spelling of `snarkos`. Note the directory is `/snarkOS`, the command is `snarkos`
 
 ## 5. Command Line Interface
