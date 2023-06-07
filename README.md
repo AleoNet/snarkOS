@@ -128,9 +128,9 @@ APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - Also double-check the spelling of `snarkos`. Note the directory is `/snarkOS`, the command is `snarkos`
 
 ### 4. Install on Windows FAQ ### 
-<details><summary>`git` command not found</summary>
- Instructions to [install Git for Windows can be found here.](https://git-scm.com/download/win) </details>
-- Also double-check the spelling of `snarkos`. Note the directory is `/snarkOS`, the command is `snarkos`
+- `Git command not found`
+ Instructions to [install Git for Windows can be found here.](https://git-scm.com/download/win)
+- `Unable to find libclang` The latest LLVM `.exe` [can be found here.](https://github.com/llvm/llvm-project/releases)
 
 ## 5. Command Line Interface
 
