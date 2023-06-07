@@ -127,6 +127,11 @@ APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 - Before running the command above (`snarkos account new`) try `source ~/.bashrc`
 - Also double-check the spelling of `snarkos`. Note the directory is `/snarkOS`, the command is `snarkos`
 
+### 4. Install on Windows FAQ ### 
+<details><summary>`git`: command not found</summary>
+     [install Git for Windows can be found here.](https://git-scm.com/download/win) </details>
+- Also double-check the spelling of `snarkos`. Note the directory is `/snarkOS`, the command is `snarkos`
+
 ## 5. Command Line Interface
 
 To run a node with custom settings, refer to the full list of options and flags available in the `snarkOS` CLI.
