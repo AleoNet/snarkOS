@@ -48,5 +48,5 @@ pub struct Transfer {
 pub struct StakeChange {
     pub id: u64,
     pub pub_key: PublicKey,
-    pub stake: i64,
+    pub change: i64,
 }

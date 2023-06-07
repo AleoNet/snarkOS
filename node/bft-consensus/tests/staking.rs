@@ -47,9 +47,9 @@ async fn staking() {
         let (pub_key, _authority) = state.committee.load().authorities.clone().into_iter().choose(&mut rng).unwrap();
 
         // Generate a random stake change.
-        let stake = rng.gen_range(1..=10);
+        let change = rng.gen_range(-10..=10);
         // Create a stake change transaction.
-        let stake_tx = Transaction::StakeChange(StakeChange { id: i as u64, pub_key: pub_key.clone(), stake });
+        let stake_tx = Transaction::StakeChange(StakeChange { id: i as u64, pub_key: pub_key.clone(), change });
 
         // 2. Send the transactions to a random number of BFT workers at a time.
         // Randomize the number of worker recipients.
