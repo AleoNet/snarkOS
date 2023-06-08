@@ -39,9 +39,9 @@ which verifies transactions and stores the encrypted state applications in a pub
 
 The following are **minimum** requirements to run an Aleo node:
  - **CPU**: 16-cores (32-cores preferred)
- - **RAM**: 16GB of memory (32GB preferred)
- - **Storage**: 128GB of disk space
- - **Network**: 10 Mbps of upload **and** download bandwidth
+ - **RAM**: 32GB of memory (64GB preferred)
+ - **Storage**: 256GB of disk space
+ - **Network**: 20 Mbps of upload **and** download bandwidth
 
 Please note to run an Aleo Prover that is **competitive**, the machine will require more than these requirements.
 
