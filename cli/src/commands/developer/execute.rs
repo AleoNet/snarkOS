@@ -28,13 +28,10 @@ use std::str::FromStr;
 #[derive(Debug, Parser)]
 pub struct Execute {
     /// The program identifier.
-    #[clap(parse(try_from_str))]
     program_id: ProgramID<CurrentNetwork>,
     /// The function name.
-    #[clap(parse(try_from_str))]
     function: Identifier<CurrentNetwork>,
     /// The function inputs.
-    #[clap(parse(try_from_str))]
     inputs: Vec<Value<CurrentNetwork>>,
     /// The private key used to generate the execution.
     #[clap(short, long)]
@@ -114,5 +111,45 @@ impl Execute {
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
         Developer::handle_transaction(self.broadcast, self.display, self.store, execution, locator.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::{Command, CLI};
+
+    #[test]
+    fn clap_snarkos_execute() {
+        let arg_vec = vec![
+            "snarkos",
+            "developer",
+            "execute",
+            "--private-key",
+            "PRIVATE_KEY",
+            "--query",
+            "QUERY",
+            "--fee",
+            "77",
+            "--record",
+            "RECORD",
+            "hello.aleo",
+            "hello",
+            "1u32",
+            "2u32",
+        ];
+        let cli = CLI::parse_from(arg_vec);
+
+        if let Command::Developer(Developer::Execute(execute)) = cli.command {
+            assert_eq!(execute.private_key, "PRIVATE_KEY");
+            assert_eq!(execute.query, "QUERY");
+            assert_eq!(execute.fee, Some(77));
+            assert_eq!(execute.record, Some("RECORD".into()));
+            assert_eq!(execute.program_id, "hello.aleo".try_into().unwrap());
+            assert_eq!(execute.function, "hello".try_into().unwrap());
+            assert_eq!(execute.inputs, vec!["1u32".try_into().unwrap(), "2u32".try_into().unwrap()]);
+        } else {
+            panic!("Unexpected result of clap parsing!");
+        }
     }
 }

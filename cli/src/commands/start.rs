@@ -340,6 +340,7 @@ impl Start {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::{Command, CLI};
     use snarkvm::prelude::Testnet3;
 
     type CurrentNetwork = Testnet3;
@@ -528,5 +529,37 @@ mod tests {
         assert!(config.prover.is_none());
         assert!(config.client.is_some());
         assert_eq!(genesis, expected_genesis);
+    }
+
+    #[test]
+    fn clap_snarkos_start() {
+        let arg_vec = vec![
+            "snarkos",
+            "start",
+            "--nodisplay",
+            "--dev",
+            "2",
+            "--validator",
+            "PRIVATE_KEY",
+            "--cdn",
+            "CDN",
+            "--connect",
+            "IP1,IP2,IP3",
+            "--rest",
+            "127.0.0.1:3033",
+        ];
+        let cli = CLI::parse_from(arg_vec);
+
+        if let Command::Start(start) = cli.command {
+            assert!(start.nodisplay);
+            assert_eq!(start.dev, Some(2));
+            assert_eq!(start.validator.as_deref(), Some("PRIVATE_KEY"));
+            assert_eq!(start.cdn, "CDN");
+            assert_eq!(start.rest, "127.0.0.1:3033".parse().unwrap());
+            assert_eq!(start.network, 3);
+            assert_eq!(start.connect, "IP1,IP2,IP3");
+        } else {
+            panic!("Unexpected result of clap parsing!");
+        }
     }
 }

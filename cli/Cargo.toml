@@ -20,12 +20,15 @@ edition = "2021"
 version = "0.1.18"
 default-features = false
 
+[dependencies.anstyle]
+version = "1"
+
 [dependencies.anyhow]
 version = "1.0.70"
 
 [dependencies.clap]
-version = "3.2"
-features = ["derive"]
+version = "4.3"
+features = ["derive", "color", "unstable-styles"]
 
 [dependencies.colored]
 version = "2"
