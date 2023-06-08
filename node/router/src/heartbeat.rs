@@ -151,7 +151,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             let bootstrap = self.router().bootstrap_peers();
 
             // Initialize an RNG.
-            let rng = &mut OsRng::default();
+            let rng = &mut OsRng;
 
             // TODO (howardwu): As a validator, prioritize disconnecting from clients and provers.
             //  Remove RNG, pick the `n` oldest nodes.
@@ -183,7 +183,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
 
         if num_deficient > 0 {
             // Initialize an RNG.
-            let rng = &mut OsRng::default();
+            let rng = &mut OsRng;
 
             // Attempt to connect to more peers.
             for peer_ip in self.router().candidate_peers().into_iter().choose_multiple(rng, num_deficient) {
@@ -219,7 +219,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         // If there are not enough connected bootstrap peers, connect to more.
         if connected_bootstrap.is_empty() {
             // Initialize an RNG.
-            let rng = &mut OsRng::default();
+            let rng = &mut OsRng;
             // Attempt to connect to a bootstrap peer.
             if let Some(peer_ip) = candidate_bootstrap.into_iter().choose(rng) {
                 self.router().connect(peer_ip);
@@ -229,7 +229,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         let num_surplus = connected_bootstrap.len().saturating_sub(1);
         if num_surplus > 0 {
             // Initialize an RNG.
-            let rng = &mut OsRng::default();
+            let rng = &mut OsRng;
             // Proceed to send disconnect requests to these bootstrap peers.
             for peer_ip in connected_bootstrap.into_iter().choose_multiple(rng, num_surplus) {
                 info!("Disconnecting from '{peer_ip}' (exceeded maximum bootstrap)");
