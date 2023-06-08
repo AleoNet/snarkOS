@@ -14,7 +14,7 @@
 
 use snarkos_account::Account;
 use snarkos_display::Display;
-use snarkos_node::{Node, NodeType};
+use snarkos_node::{messages::NodeType, Node};
 use snarkvm::{
     prelude::{Block, ConsensusStore, FromBytes, Network, PrivateKey, Testnet3, VM},
     synthesizer::store::helpers::memory::ConsensusMemory,
