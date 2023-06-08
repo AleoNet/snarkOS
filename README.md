@@ -47,7 +47,7 @@ The following are **minimum** requirements to run an Aleo node:
     - Provers: 32GB of memory (64GB or larger preferred)
     - Validators: 64GB of memory (128GB or larger preferred)
  - **Storage**: PCIe Gen 3 x4, PCIe Gen 4 x2 NVME SSD, or better
-    - Clients: 128GB of disk space
+    - Clients: 64GB of disk space
     - Provers: 128GB of disk space
     - Validators: 2TB of disk space (4TB or larger preferred)
  - **Network**: Symmetric, commercial, always-on
