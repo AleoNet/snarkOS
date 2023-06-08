@@ -357,6 +357,8 @@ fn test_ledger_execute_many() {
     const NUM_GENESIS: usize = Block::<CurrentNetwork>::NUM_GENESIS_TRANSACTIONS;
 
     for height in 1..4 {
+        println!("\nStarting on block {height}\n");
+
         // Fetch the unspent records.
         let microcredits = Identifier::from_str("microcredits").unwrap();
         let records: Vec<_> = consensus
@@ -371,7 +373,7 @@ fn test_ledger_execute_many() {
                 }
             })
             .collect();
-        assert_eq!(records.len(), NUM_GENESIS * height);
+        assert_eq!(records.len(), NUM_GENESIS * (1 << (height - 1)));
 
         for (_, record) in records.iter() {
             // Prepare the inputs.
@@ -389,7 +391,7 @@ fn test_ledger_execute_many() {
             // Add the transaction to the memory pool.
             consensus.add_unconfirmed_transaction(transaction).unwrap();
         }
-        assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), NUM_GENESIS * height);
+        assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), NUM_GENESIS * (1 << (height - 1)));
 
         // Propose the next block.
         let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
