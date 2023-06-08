@@ -45,7 +45,7 @@ jemalloc = [ "tikv-jemallocator" ]
 [workspace.dependencies.snarkvm]
 #path = "../snarkVM"
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "b120e1a"
+rev = "37a40da"
 #version = "=0.11.7"
 features = ["circuit", "console", "rocks"]
 
