@@ -38,6 +38,10 @@ which verifies transactions and stores the encrypted state applications in a pub
 ### 2.1 Requirements
 
 The following are **minimum** requirements to run an Aleo node:
+ - **OS**: 64-bit architectures only, latest up-to-date for security
+    - Clients: Ubuntu 20.04, macOS Ventura or later, Windows 11 or later
+    - Provers: Ubuntu 20.04, macOS Ventura or later
+    - Validators: Ubuntu 20.04, macOS Ventura or later
  - **CPU**: 64-bit architectures only
     - Clients: 16-cores
     - Provers: 32-cores (64-cores preferred)
