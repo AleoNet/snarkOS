@@ -28,7 +28,6 @@ use std::str::FromStr;
 #[derive(Debug, Parser)]
 pub struct Deploy {
     /// The name of the program to deploy.
-    #[clap(parse(try_from_str))]
     program_id: ProgramID<CurrentNetwork>,
     /// A path to a directory containing a manifest file. Defaults to the current working directory.
     #[clap(long)]
@@ -89,5 +88,40 @@ impl Deploy {
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
         Developer::handle_transaction(self.broadcast, self.display, self.store, deployment, self.program_id.to_string())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::commands::{Command, CLI};
+
+    #[test]
+    fn clap_snarkos_deploy() {
+        let arg_vec = vec![
+            "snarkos",
+            "developer",
+            "deploy",
+            "--private-key",
+            "PRIVATE_KEY",
+            "--query",
+            "QUERY",
+            "--fee",
+            "77",
+            "--record",
+            "RECORD",
+            "hello.aleo",
+        ];
+        let cli = CLI::parse_from(arg_vec);
+
+        if let Command::Developer(Developer::Deploy(deploy)) = cli.command {
+            assert_eq!(deploy.program_id, "hello.aleo".try_into().unwrap());
+            assert_eq!(deploy.private_key, "PRIVATE_KEY");
+            assert_eq!(deploy.query, "QUERY");
+            assert_eq!(deploy.fee, 77);
+            assert_eq!(deploy.record, "RECORD");
+        } else {
+            panic!("Unexpected result of clap parsing!");
+        }
     }
 }
