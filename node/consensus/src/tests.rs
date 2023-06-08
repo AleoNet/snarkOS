@@ -486,3 +486,107 @@ fn test_coinbase_target() {
     // Ensure the block contains a coinbase solution.
     assert!(proposed_block.coinbase().is_some());
 }
+
+#[test]
+#[traced_test]
+fn test_insufficient_finalize_fees() {
+    let rng = &mut TestRng::default();
+
+    // Sample the genesis private key.
+    let private_key = test_helpers::sample_genesis_private_key(rng);
+    let view_key = ViewKey::try_from(&private_key).unwrap();
+    // Sample the genesis consensus.
+    let consensus = test_helpers::sample_genesis_consensus(rng);
+
+    // Deploy a test program to the ledger.
+    let program = Program::<CurrentNetwork>::from_str(
+        r"
+program dummy.aleo;
+
+function foo:
+    input r0 as u8.private;
+    finalize r0;
+
+finalize foo:
+    input r0 as u8.public;
+    add r0 r0 into r1;",
+    )
+    .unwrap();
+
+    // A helper function to find records.
+    let find_records = |consensus: &test_helpers::CurrentConsensus| {
+        let microcredits = Identifier::from_str("microcredits").unwrap();
+        consensus
+            .ledger
+            .find_records(&view_key, RecordsFilter::SlowUnspent(private_key))
+            .unwrap()
+            .filter(|(_, record)| {
+                // TODO (raychu86): Find cleaner approach and check that the record is associated with the `credits.aleo` program
+                match record.data().get(&microcredits) {
+                    Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) => !amount.is_zero(),
+                    _ => false,
+                }
+            })
+            .collect::<indexmap::IndexMap<_, _>>()
+    };
+
+    // Fetch the unspent records.
+    let records = find_records(&consensus);
+    trace!("Unspent Records:\n{:#?}", records);
+
+    // Prepare the additional fee.
+    let credits = records.values().next().unwrap().clone();
+    let additional_fee = (credits, 6466000);
+
+    // Deploy.
+    let transaction = consensus.ledger.vm().deploy(&private_key, &program, additional_fee, None, rng).unwrap();
+    // Verify.
+    assert!(consensus.ledger.vm().verify_transaction(&transaction));
+
+    // Add a transaction to the memory pool.
+    consensus.add_unconfirmed_transaction(transaction.clone()).unwrap();
+
+    // Propose the next block.
+    let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
+
+    // Ensure the block is a valid next block.
+    consensus.check_next_block(&next_block).unwrap();
+
+    // Construct a next block.
+    consensus.advance_to_next_block(&next_block).unwrap();
+    assert_eq!(consensus.ledger.latest_height(), 1);
+    assert_eq!(consensus.ledger.latest_hash(), next_block.hash());
+
+    // Ensure that the ledger deems the same transaction invalid.
+    assert!(consensus.check_transaction_basic(&transaction).is_err());
+    // Ensure that the ledger cannot add the same transaction.
+    assert!(consensus.add_unconfirmed_transaction(transaction).is_err());
+
+    // Execute the test program, without providing enough fees for finalize, and ensure that the ledger deems the transaction invalid.
+    // Fetch the unspent records.
+    let records = find_records(&consensus);
+    trace!("Unspent Records:\n{:#?}", records);
+    // Select a record to spend.
+    let record = records.values().next().unwrap().clone();
+
+    // Retrieve the VM.
+    let vm = consensus.ledger.vm();
+
+    // Prepare the inputs.
+    let inputs = [Value::<CurrentNetwork>::from_str("1u8").unwrap()].into_iter();
+
+    // Authorize.
+    let authorization = vm.authorize(&private_key, "dummy.aleo", "foo", inputs, rng).unwrap();
+    assert_eq!(authorization.len(), 1);
+
+    // Execute the fee.
+    let (_, fee, _) = vm.execute_fee_raw(&private_key, record, 1_000, None, rng).unwrap();
+
+    // Execute.
+    let transaction = vm.execute_authorization(authorization, Some(fee), None, rng).unwrap();
+    // Verify.
+    assert!(vm.verify_transaction(&transaction));
+
+    // Ensure that the ledger deems the transaction invalid.
+    assert!(consensus.check_transaction_basic(&transaction).is_err());
+}
