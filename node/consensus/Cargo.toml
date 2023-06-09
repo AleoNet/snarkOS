@@ -28,7 +28,7 @@ version = "1.9"
 features = [ "rayon" ]
 
 [dependencies.once_cell]
-version = "1.13"
+version = "1.18"
 
 [dependencies.parking_lot]
 version = "0.12"
