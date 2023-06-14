@@ -66,9 +66,19 @@ impl Execute {
         // Retrieve the private key.
         let private_key = PrivateKey::from_str(&self.private_key)?;
 
-        // Fetch the program from query node.
-        let program: Program<CurrentNetwork> =
-            ureq::get(&format!("{}/testnet3/program/{}", self.query, self.program_id)).call()?.into_json()?;
+        // Send a request to the query node.
+        let response = ureq::get(&format!("{}/testnet3/program/{}", self.query, self.program_id)).call();
+
+        // Deserialize the program.
+        let program: Program<CurrentNetwork> = match response {
+            Ok(response) => response.into_json()?,
+            Err(err) => match err {
+                ureq::Error::Status(_status, response) => {
+                    bail!(response.into_string().unwrap_or("Response too large!".to_owned()))
+                }
+                err => bail!(err),
+            },
+        };
 
         println!("📦 Creating execution transaction for '{}'...\n", &self.program_id.to_string().bold());
 
