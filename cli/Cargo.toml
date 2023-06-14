@@ -67,15 +67,19 @@ version = "1"
 
 [dependencies.snarkos-account]
 path = "../account"
+version = "2.0.2"
 
 [dependencies.snarkos-display]
 path = "../display"
+version = "2.0.2"
 
 [dependencies.snarkos-node]
 path = "../node"
+version = "2.0.2"
 
 [dependencies.snarkos-node-rest]
 path = "../node/rest"
+version = "2.0.2"
 
 [dependencies.snarkvm]
 workspace = true

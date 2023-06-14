@@ -24,6 +24,7 @@ version = "0.26"
 
 [dependencies.snarkos-node]
 path = "../node"
+version = "2.0.2"
 
 [dependencies.snarkvm]
 workspace = true
