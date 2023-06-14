@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-messages"
-version = "2.0.2"
+version = "2.1.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Node messages for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -17,8 +17,8 @@ license = "Apache-2.0"
 edition = "2021"
 
 [features]
-default = []
-test = []
+default = [ ]
+test = [ ]
 
 [dependencies.anyhow]
 version = "1.0.70"
@@ -34,7 +34,7 @@ version = "1"
 
 [dependencies.kadmium]
 version = "0.6.0"
-features = ["codec", "sync"]
+features = [ "codec", "sync" ]
 
 [dependencies.rayon]
 version = "1"

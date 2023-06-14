@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-cdn"
-version = "2.0.2"
+version = "2.1.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A CDN client for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -54,11 +54,11 @@ version = "1"
 
 [dependencies.snarkvm]
 workspace = true
-features = ["synthesizer"]
+features = [ "synthesizer" ]
 
 [dependencies.tokio]
 version = "1.28"
-features = ["rt"]
+features = [ "rt" ]
 
 [dependencies.tracing]
 version = "0.1"

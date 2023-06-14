@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-rest"
-version = "2.0.2"
+version = "2.1.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A REST API server for a decentralized virtual machine"
 homepage = "https://aleo.org"
@@ -25,11 +25,11 @@ version = "1.0.70"
 
 [dependencies.axum]
 version = "0.6"
-features = ["headers"]
+features = [ "headers" ]
 
 [dependencies.axum-extra]
 version = "0.7.4"
-features = ["erased-json"]
+features = [ "erased-json" ]
 
 [dependencies.http]
 version = "0.2"
@@ -53,19 +53,19 @@ features = [ "derive" ]
 
 [dependencies.snarkos-node-consensus]
 path = "../consensus"
-version = "2.0.2"
+version = "=2.1.0"
 
 [dependencies.snarkos-node-env]
 path = "../env"
-version = "2.0.2"
+version = "=2.1.0"
 
 [dependencies.snarkos-node-messages]
 path = "../messages"
-version = "2.0.2"
+version = "=2.1.0"
 
 [dependencies.snarkos-node-router]
 path = "../router"
-version = "2.0.2"
+version = "=2.1.0"
 
 [dependencies.rand]
 version = "0.8"
@@ -85,7 +85,7 @@ version = "1"
 
 [dependencies.tower-http]
 version = "0.4"
-features = ["cors", "trace"]
+features = [ "cors", "trace" ]
 
 [dependencies.tracing]
 version = "0.1"

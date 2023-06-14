@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-integration"
-version = "2.0.2"
+version = "2.1.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A integration testing suite for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -21,11 +21,11 @@ path = "../node/cdn"
 
 [dev-dependencies.snarkvm]
 workspace = true
-features = ["synthesizer"]
+features = [ "synthesizer" ]
 
 [dev-dependencies.tokio]
 version = "1.28"
-features = ["rt"]
+features = [ "rt" ]
 
 [dev-dependencies.tracing]
 version = "0.1"

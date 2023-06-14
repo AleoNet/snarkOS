@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-metrics"
-version = "2.0.2"
+version = "2.1.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -24,4 +24,4 @@ version = "0.12"
 
 [dependencies.tokio]
 version = "1.28"
-features = ["rt"]
+features = [ "rt" ]

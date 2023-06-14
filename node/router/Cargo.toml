@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-router"
-version = "2.0.2"
+version = "2.1.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node router for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -17,7 +17,7 @@ license = "Apache-2.0"
 edition = "2021"
 
 [features]
-test = []
+test = [ ]
 
 [dependencies.anyhow]
 version = "1.0.70"
@@ -40,7 +40,7 @@ features = [ "thread-pool" ]
 
 [dependencies.indexmap]
 version = "1.9"
-features = ["rayon"]
+features = [ "rayon" ]
 
 [dependencies.itertools]
 version = "0.10"
@@ -65,15 +65,15 @@ version = "1"
 
 [dependencies.snarkos-account]
 path = "../../account"
-version = "2.0.2"
+version = "=2.1.0"
 
 [dependencies.snarkos-node-messages]
 path = "../messages"
-version = "2.0.2"
+version = "=2.1.0"
 
 [dependencies.snarkos-node-tcp]
 path = "../tcp"
-version = "2.0.2"
+version = "=2.1.0"
 
 [dependencies.snarkvm]
 workspace = true
@@ -108,7 +108,7 @@ version = "0.2"
 
 [dev-dependencies.futures-util]
 version = "0.3"
-features = ["sink"]
+features = [ "sink" ]
 
 [dev-dependencies.peak_alloc]
 version = "0.2"

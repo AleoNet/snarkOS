@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-cli"
-version = "2.0.2"
+version = "2.1.0"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A CLI for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -28,15 +28,12 @@ version = "1.0.70"
 
 [dependencies.clap]
 version = "4.3"
-features = ["derive", "color", "unstable-styles"]
+features = [ "derive", "color", "unstable-styles" ]
 
 [dependencies.colored]
 version = "2"
 
 [dependencies.crossterm]
-version = "0.26"
-
-[target.'cfg(target_family = "unix")'.dependencies.nix]
 version = "0.26"
 
 [dependencies.num_cpus]
@@ -67,19 +64,19 @@ version = "1"
 
 [dependencies.snarkos-account]
 path = "../account"
-version = "2.0.2"
+version = "=2.1.0"
 
 [dependencies.snarkos-display]
 path = "../display"
-version = "2.0.2"
+version = "=2.1.0"
 
 [dependencies.snarkos-node]
 path = "../node"
-version = "2.0.2"
+version = "=2.1.0"
 
 [dependencies.snarkos-node-rest]
 path = "../node/rest"
-version = "2.0.2"
+version = "=2.1.0"
 
 [dependencies.snarkvm]
 workspace = true
@@ -89,7 +86,7 @@ version = "1.0"
 
 [dependencies.tokio]
 version = "1.28"
-features = ["rt"]
+features = [ "rt" ]
 
 [dependencies.tracing-subscriber]
 version = "0.3"
@@ -97,6 +94,9 @@ features = [ "env-filter" ]
 
 [dependencies.ureq]
 version = "2.5"
+
+[target."cfg(target_family = \"unix\")".dependencies.nix]
+version = "0.26"
 
 [dev-dependencies.indexmap]
 version = "1"
