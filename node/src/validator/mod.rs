@@ -260,8 +260,9 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Load the primary's keys.
         let primary_key_file = format!("{base_path}.primary-{primary_id}-key.json");
-        let primary_keypair =
-            read_authority_keypair_from_file(primary_key_file).expect("Failed to load the node's primary keypair");
+        let primary_keypair = read_authority_keypair_from_file(primary_key_file).unwrap_or_else(|error| {
+            panic!("Failed to load the node's primary keypair {base_path}.primary-{primary_id}-key.json: {error:?}")
+        });
 
         // Read the shared files describing the committee, workers and parameters.
         let committee_file = format!("{base_path}.committee.json");
@@ -409,7 +410,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     }
 
     /// Attempts to advance with blocks from the sync pool.
-    fn advance_with_sync_blocks(&self) {
+    fn advance_with_sync_blocks(&self) -> bool {
         // Retrieve the latest block height.
         let mut current_height = self.ledger.latest_height();
         // Try to advance the ledger with the sync pool.
@@ -417,22 +418,23 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             // Ensure the block height matches.
             if block.height() != current_height + 1 {
                 warn!("Block height mismatch: expected {}, found {}", current_height + 1, block.height());
-                break;
+                return false;
             }
             // Check the next block.
             if let Err(error) = self.consensus.check_next_block(&block) {
                 warn!("The next block ({}) is invalid - {error}", block.height());
-                break;
+                return false;
             }
             // Attempt to advance to the next block.
             if let Err(error) = self.consensus.advance_to_next_block(&block) {
                 warn!("{error}");
-                break;
+                return false;
             }
             // Insert the height and hash as canon in the sync pool.
             self.router.sync().insert_canon_locator(block.height(), block.hash());
             // Increment the latest height.
             current_height += 1;
         }
+        true
     }
 }

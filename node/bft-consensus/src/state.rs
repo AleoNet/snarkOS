@@ -119,8 +119,13 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
                 let transaction = transactions.remove(id).unwrap(); // guaranteed to be there
 
                 // Skip invalid transactions.
-                if consensus.add_unconfirmed_transaction(transaction).is_ok() {
-                    num_valid_txs += 1;
+                match consensus.add_unconfirmed_transaction(transaction) {
+                    Ok(_) => {
+                        num_valid_txs += 1;
+                    }
+                    Err(error) => {
+                        debug!("Failed to add unconfirmed transaction: {error}");
+                    }
                 }
             }
 

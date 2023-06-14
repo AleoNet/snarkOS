@@ -563,13 +563,19 @@ impl<N: Network> Sync<N> {
                 if let Some(common_ancestor) = self.common_ancestors.read().get(&PeerPair(*peer_ip, *other_ip)) {
                     if *common_ancestor > latest_canon_height {
                         // If so, then check that their block locators are consistent.
-                        if peer_locators.is_consistent_with(other_locators) {
-                            // If their common ancestor is less than the minimum common ancestor, then update it.
-                            if *common_ancestor < min_common_ancestor {
-                                min_common_ancestor = *common_ancestor;
+
+                        match peer_locators.ensure_is_consistent_with(other_locators) {
+                            Ok(_) => {
+                                // If their common ancestor is less than the minimum common ancestor, then update it.
+                                if *common_ancestor < min_common_ancestor {
+                                    min_common_ancestor = *common_ancestor;
+                                }
+                                // Add the other peer to the list of sync peers.
+                                sync_peers.insert(*other_ip, other_locators.clone());
                             }
-                            // Add the other peer to the list of sync peers.
-                            sync_peers.insert(*other_ip, other_locators.clone());
+                            Err(error) => {
+                                warn!("Inconsistent block locators between {} and {}: {}", *peer_ip, *other_ip, error);
+                            }
                         }
                     }
                 }

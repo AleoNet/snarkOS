@@ -38,6 +38,7 @@ use std::{collections::HashSet, io, net::SocketAddr, time::Duration};
 use tokio::{net::TcpStream, task::spawn_blocking};
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
+use tracing::log::{log_enabled, Level::Debug};
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Validator<N, C> {
     /// Returns a reference to the TCP instance.
@@ -260,6 +261,11 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
 
     /// Handles a `BlockResponse` message.
     fn block_response(&self, peer_ip: SocketAddr, blocks: Vec<Block<N>>) -> bool {
+        if log_enabled!(Debug) {
+            let block_debug =
+                blocks.iter().map(|block| format!("({},{})", block.height(), block.hash())).collect::<Vec<String>>();
+            debug!("Block response for {peer_ip}, {}", block_debug.join(","));
+        }
         // Insert the candidate blocks into the sync pool.
         for block in blocks {
             if let Err(error) = self.router().sync().insert_block_response(peer_ip, block) {
@@ -269,8 +275,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         }
 
         // Tries to advance with blocks from the sync pool.
-        self.advance_with_sync_blocks();
-        true
+        self.advance_with_sync_blocks()
     }
 
     /// Handles a `NewBlock` message.
