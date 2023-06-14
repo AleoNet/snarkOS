@@ -120,7 +120,7 @@ pub(crate) mod test_helpers {
                 // Initialize a new program.
                 Program::<CurrentNetwork>::from_str(
                     r"
-program testing.aleo;
+program test_program.aleo;
 
 struct message:
     amount as u128;
