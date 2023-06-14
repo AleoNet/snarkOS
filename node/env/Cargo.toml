@@ -21,3 +21,4 @@ version = "1"
 
 [dependencies.serde]
 version = "1"
+features = ["derive"]
