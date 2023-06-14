@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::tests::test_helpers::sample_finalize_state;
 use snarkvm::{
     console::{
         account::{Address, PrivateKey, ViewKey},
@@ -40,7 +41,7 @@ pub(crate) mod test_helpers {
     use snarkvm::{
         console::{account::PrivateKey, network::Testnet3, program::Value},
         prelude::TestRng,
-        synthesizer::{store::helpers::memory::ConsensusMemory, Block},
+        synthesizer::{process::FinalizeGlobalState, store::helpers::memory::ConsensusMemory, Block},
     };
 
     use once_cell::sync::OnceCell;
@@ -51,6 +52,11 @@ pub(crate) mod test_helpers {
 
     pub(crate) fn sample_vm() -> VM<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
         VM::from(ConsensusStore::open(None).unwrap()).unwrap()
+    }
+
+    /// Samples a new finalize state.
+    pub(crate) fn sample_finalize_state(block_height: u32) -> FinalizeGlobalState {
+        FinalizeGlobalState::from(block_height, [0u8; 32])
     }
 
     pub(crate) fn sample_genesis_private_key(rng: &mut TestRng) -> PrivateKey<CurrentNetwork> {
@@ -287,7 +293,7 @@ fn test_ledger_deploy() {
     consensus.add_unconfirmed_transaction(transaction.clone()).unwrap();
 
     // Compute a confirmed transactions to reuse later.
-    let transactions = consensus.ledger.vm().speculate([transaction.clone()].iter()).unwrap();
+    let transactions = consensus.ledger.vm().speculate(sample_finalize_state(1), [transaction.clone()].iter()).unwrap();
 
     // Propose the next block.
     let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
@@ -304,7 +310,7 @@ fn test_ledger_deploy() {
     assert!(consensus.ledger.contains_input_id(transaction.input_ids().next().unwrap()).unwrap());
 
     // Ensure that the VM can't re-deploy the same program.
-    assert!(consensus.ledger.vm().finalize(&transactions).is_err());
+    assert!(consensus.ledger.vm().finalize(sample_finalize_state(1), &transactions).is_err());
     // Ensure that the ledger deems the same transaction invalid.
     assert!(consensus.check_transaction_basic(&transaction, None).is_err());
     // Ensure that the ledger cannot add the same transaction.
