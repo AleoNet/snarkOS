@@ -28,7 +28,7 @@ use snarkos_node_router::Routing;
 use snarkvm::{
     console::{program::ProgramID, types::Field},
     prelude::{cfg_into_iter, Ledger, Network},
-    synthesizer::{ConsensusStorage, Program},
+    synthesizer::ConsensusStorage,
 };
 
 use anyhow::Result;
@@ -43,7 +43,7 @@ use axum::{
 };
 use axum_extra::response::ErasedJson;
 use parking_lot::Mutex;
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 use tokio::task::JoinHandle;
 use tower_http::{
     cors::{Any, CorsLayer},
