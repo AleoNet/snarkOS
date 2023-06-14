@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::tests::test_helpers::sample_finalize_state;
 use snarkvm::{
     console::{
         account::{Address, PrivateKey, ViewKey},
@@ -19,7 +20,12 @@ use snarkvm::{
         program::{Entry, Identifier, Literal, Plaintext, Value},
     },
     prelude::{Ledger, RecordsFilter, TestRng},
-    synthesizer::{block::Transaction, program::Program, store::ConsensusStore, vm::VM},
+    synthesizer::{
+        block::{Block, Transaction},
+        program::Program,
+        store::ConsensusStore,
+        vm::VM,
+    },
 };
 
 use tracing_test::traced_test;
@@ -35,7 +41,7 @@ pub(crate) mod test_helpers {
     use snarkvm::{
         console::{account::PrivateKey, network::Testnet3, program::Value},
         prelude::TestRng,
-        synthesizer::{store::helpers::memory::ConsensusMemory, Block},
+        synthesizer::{process::FinalizeGlobalState, store::helpers::memory::ConsensusMemory, Block},
     };
 
     use once_cell::sync::OnceCell;
@@ -46,6 +52,11 @@ pub(crate) mod test_helpers {
 
     pub(crate) fn sample_vm() -> VM<CurrentNetwork, ConsensusMemory<CurrentNetwork>> {
         VM::from(ConsensusStore::open(None).unwrap()).unwrap()
+    }
+
+    /// Samples a new finalize state.
+    pub(crate) fn sample_finalize_state(block_height: u32) -> FinalizeGlobalState {
+        FinalizeGlobalState::from(block_height, [0u8; 32])
     }
 
     pub(crate) fn sample_genesis_private_key(rng: &mut TestRng) -> PrivateKey<CurrentNetwork> {
@@ -171,7 +182,7 @@ function compute:
                 let transaction =
                     consensus.ledger.vm().deploy(&caller_private_key, &program, additional_fee, None, rng).unwrap();
                 // Verify.
-                assert!(consensus.ledger.vm().verify_transaction(&transaction));
+                assert!(consensus.ledger.vm().verify_transaction(&transaction, None));
                 // Return the transaction.
                 transaction
             })
@@ -208,6 +219,9 @@ function compute:
                 // Select a record to spend.
                 let record = records.values().next().unwrap().clone();
 
+                // Prepare the fee.
+                let fee = Some((record, 3000));
+
                 // Retrieve the VM.
                 let vm = consensus.ledger.vm();
 
@@ -218,17 +232,11 @@ function compute:
                 ]
                 .into_iter();
 
-                // Authorize.
-                let authorization = vm.authorize(&caller_private_key, "credits.aleo", "mint", inputs, rng).unwrap();
-                assert_eq!(authorization.len(), 1);
-
-                // Execute the fee.
-                let (_, fee, _) = vm.execute_fee_raw(&caller_private_key, record, 3000, None, rng).unwrap();
-
                 // Execute.
-                let transaction = vm.execute_authorization(authorization, Some(fee), None, rng).unwrap();
+                let transaction =
+                    vm.execute(&caller_private_key, ("credits.aleo", "mint"), inputs, fee, None, rng).unwrap();
                 // Verify.
-                assert!(vm.verify_transaction(&transaction));
+                assert!(vm.verify_transaction(&transaction, None));
                 // Return the transaction.
                 transaction
             })
@@ -285,7 +293,7 @@ fn test_ledger_deploy() {
     consensus.add_unconfirmed_transaction(transaction.clone()).unwrap();
 
     // Compute a confirmed transactions to reuse later.
-    let transactions = consensus.ledger.vm().speculate([transaction.clone()].iter()).unwrap();
+    let transactions = consensus.ledger.vm().speculate(sample_finalize_state(1), [transaction.clone()].iter()).unwrap();
 
     // Propose the next block.
     let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
@@ -302,9 +310,9 @@ fn test_ledger_deploy() {
     assert!(consensus.ledger.contains_input_id(transaction.input_ids().next().unwrap()).unwrap());
 
     // Ensure that the VM can't re-deploy the same program.
-    assert!(consensus.ledger.vm().finalize(&transactions).is_err());
+    assert!(consensus.ledger.vm().finalize(sample_finalize_state(1), &transactions).is_err());
     // Ensure that the ledger deems the same transaction invalid.
-    assert!(consensus.check_transaction_basic(&transaction).is_err());
+    assert!(consensus.check_transaction_basic(&transaction, None).is_err());
     // Ensure that the ledger cannot add the same transaction.
     assert!(consensus.add_unconfirmed_transaction(transaction).is_err());
 }
@@ -335,7 +343,7 @@ fn test_ledger_execute() {
     assert_eq!(consensus.ledger.latest_hash(), next_block.hash());
 
     // Ensure that the ledger deems the same transaction invalid.
-    assert!(consensus.check_transaction_basic(&transaction).is_err());
+    assert!(consensus.check_transaction_basic(&transaction, None).is_err());
     // Ensure that the ledger cannot add the same transaction.
     assert!(consensus.add_unconfirmed_transaction(transaction).is_err());
 }
@@ -352,7 +360,11 @@ fn test_ledger_execute_many() {
     // Sample the genesis consensus.
     let consensus = crate::tests::test_helpers::sample_genesis_consensus(rng);
 
+    const NUM_GENESIS: usize = Block::<CurrentNetwork>::NUM_GENESIS_TRANSACTIONS;
+
     for height in 1..4 {
+        println!("\nStarting on block {height}\n");
+
         // Fetch the unspent records.
         let microcredits = Identifier::from_str("microcredits").unwrap();
         let records: Vec<_> = consensus
@@ -367,7 +379,7 @@ fn test_ledger_execute_many() {
                 }
             })
             .collect();
-        assert_eq!(records.len(), 2 << height);
+        assert_eq!(records.len(), NUM_GENESIS * (1 << (height - 1)));
 
         for (_, record) in records.iter() {
             // Prepare the inputs.
@@ -385,7 +397,7 @@ fn test_ledger_execute_many() {
             // Add the transaction to the memory pool.
             consensus.add_unconfirmed_transaction(transaction).unwrap();
         }
-        assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), 2 << height);
+        assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), NUM_GENESIS * (1 << (height - 1)));
 
         // Propose the next block.
         let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
@@ -394,7 +406,7 @@ fn test_ledger_execute_many() {
         consensus.check_next_block(&next_block).unwrap();
         // Construct a next block.
         consensus.advance_to_next_block(&next_block).unwrap();
-        assert_eq!(consensus.ledger.latest_height(), height);
+        assert_eq!(consensus.ledger.latest_height(), height as u32);
         assert_eq!(consensus.ledger.latest_hash(), next_block.hash());
     }
 }
@@ -417,7 +429,7 @@ fn test_proof_target() {
 
     for _ in 0..100 {
         // Generate a prover solution.
-        let prover_solution = consensus.coinbase_puzzle.prove(&epoch_challenge, address, rng.gen(), None).unwrap();
+        let prover_solution = consensus.coinbase_puzzle().prove(&epoch_challenge, address, rng.gen(), None).unwrap();
 
         // Check that the prover solution meets the proof target requirement.
         if prover_solution.to_target().unwrap() >= proof_target {
@@ -427,7 +439,8 @@ fn test_proof_target() {
         }
 
         // Generate a prover solution with a minimum proof target.
-        let prover_solution = consensus.coinbase_puzzle.prove(&epoch_challenge, address, rng.gen(), Some(proof_target));
+        let prover_solution =
+            consensus.coinbase_puzzle().prove(&epoch_challenge, address, rng.gen(), Some(proof_target));
 
         // Check that the prover solution meets the proof target requirement.
         if let Ok(prover_solution) = prover_solution {
@@ -464,7 +477,7 @@ fn test_coinbase_target() {
 
     while cumulative_target < consensus.ledger.latest_coinbase_target() as u128 {
         // Generate a prover solution.
-        let prover_solution = match consensus.coinbase_puzzle.prove(
+        let prover_solution = match consensus.coinbase_puzzle().prove(
             &epoch_challenge,
             address,
             rng.gen(),

@@ -43,7 +43,7 @@ impl<N: Network> MemoryPool<N> {
 
         'outer: for transaction in self.unconfirmed_transactions.read().values() {
             // Ensure the transaction is well-formed.
-            if consensus.check_transaction_basic(transaction).is_err() {
+            if consensus.check_transaction_basic(transaction, None).is_err() {
                 continue;
             }
 
@@ -92,7 +92,7 @@ impl<N: Network> MemoryPool<N> {
     pub fn clear_invalid_transactions<C: ConsensusStorage<N>>(&self, consensus: &Consensus<N, C>) {
         self.unconfirmed_transactions.write().retain(|transaction_id, transaction| {
             // Ensure the transaction is valid.
-            match consensus.check_transaction_basic(transaction) {
+            match consensus.check_transaction_basic(transaction, None) {
                 Ok(_) => true,
                 Err(_) => {
                     trace!("Removed transaction '{transaction_id}' from the memory pool");

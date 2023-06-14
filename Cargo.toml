@@ -39,14 +39,13 @@ name = "snarkos"
 path = "snarkos/main.rs"
 
 [features]
-default = [ "jemalloc" ]
 jemalloc = [ "tikv-jemallocator" ]
 
 [workspace.dependencies.snarkvm]
 #path = "../snarkVM"
 #git = "https://github.com/AleoHQ/snarkVM.git"
-#rev = "d916cef"
-version = "=0.11.7"
+#rev = "37a40da"
+version = "=0.12.0"
 features = ["circuit", "console", "rocks"]
 
 [dependencies.anyhow]

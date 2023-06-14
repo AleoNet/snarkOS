@@ -167,10 +167,10 @@ impl Start {
         // and add each of them to the trusted peers. In addition, set the node IP to `4130 + dev`,
         // and the REST IP to `3030 + dev`.
         if let Some(dev) = self.dev {
-            // Until Phase 3, we only support a single beacon node. To avoid ambiguity, we require
+            // Only one beacon node is allowed in testing. To avoid ambiguity, we require
             // the beacon to be the first node in the dev network.
             if dev > 0 && self.beacon.is_some() {
-                bail!("Until Phase 3, at most one beacon at '--dev 0' is supported in development mode");
+                bail!("At most one beacon at '--dev 0' is supported in development mode");
             }
 
             // Add the dev nodes to the trusted peers.
