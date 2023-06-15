@@ -153,6 +153,7 @@ impl Start {
     }
 
     /// Returns the CDN to prefetch initial blocks from, from the given configurations.
+    #[allow(clippy::if_same_then_else)]
     fn parse_cdn(&self) -> Option<String> {
         // Disable CDN if:
         //  1. The node is in development mode.
