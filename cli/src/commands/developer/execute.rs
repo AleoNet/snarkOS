@@ -80,7 +80,8 @@ impl Execute {
             },
         };
 
-        println!("📦 Creating execution transaction for '{}'...\n", &self.program_id.to_string().bold());
+        let locator = Locator::<CurrentNetwork>::from_str(&format!("{}/{}", self.program_id, self.function))?;
+        println!("📦 Creating execution transaction for '{}'...\n", &locator.to_string().bold());
 
         // Generate the execution transaction.
         let execution = {
@@ -116,7 +117,6 @@ impl Execute {
             // Create a new transaction.
             vm.execute(&private_key, (self.program_id, self.function), self.inputs.iter(), fee, Some(query), rng)?
         };
-        let locator = Locator::<CurrentNetwork>::from_str(&format!("{}/{}", self.program_id, self.function))?;
         println!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
