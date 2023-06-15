@@ -24,8 +24,8 @@ pub use execute::*;
 mod scan;
 pub use scan::*;
 
-mod transfer;
-pub use transfer::*;
+mod transfer_private;
+pub use transfer_private::*;
 
 use snarkvm::{
     file::{AleoFile, Manifest},
@@ -51,8 +51,8 @@ pub enum Developer {
     Execute(Execute),
     /// Scan the node for records.
     Scan(Scan),
-    /// Transfer credits.
-    Transfer(Transfer),
+    /// Execute the `credits.aleo/transfer_private` function.
+    TransferPrivate(TransferPrivate),
 }
 
 impl Developer {
@@ -62,7 +62,7 @@ impl Developer {
             Self::Deploy(deploy) => deploy.parse(),
             Self::Execute(execute) => execute.parse(),
             Self::Scan(scan) => scan.parse(),
-            Self::Transfer(transfer) => transfer.parse(),
+            Self::TransferPrivate(transfer_private) => transfer_private.parse(),
         }
     }
 
@@ -117,7 +117,7 @@ impl Developer {
     /// Determine if the transaction should be broadcast or displayed to user.
     fn handle_transaction(
         broadcast: Option<String>,
-        display: bool,
+        dry_run: bool,
         store: Option<String>,
         transaction: Transaction<CurrentNetwork>,
         operation: String,
@@ -142,7 +142,7 @@ impl Developer {
             }
         };
 
-        // Determine if the transaction should be broadcast or displayed to user.
+        // Determine if the transaction should be broadcast to the network.
         if let Some(endpoint) = broadcast {
             // Send the deployment request to the local development node.
             match ureq::post(&endpoint).send_json(&transaction) {
@@ -208,11 +208,10 @@ impl Developer {
 
             // Output the transaction id.
             Ok(transaction_id.to_string())
-        } else if display {
+        } else if dry_run {
             // Output the transaction string.
             Ok(transaction.to_string())
         } else {
-            // TODO (raychu86): Handle the case where the user does not specify a broadcast or display flag.
             Ok("".to_string())
         }
     }

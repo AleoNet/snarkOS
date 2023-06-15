@@ -19,7 +19,7 @@ use snarkvm::{
     synthesizer::store::helpers::memory::ConsensusMemory,
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
 use std::str::FromStr;
@@ -44,12 +44,12 @@ pub struct Deploy {
     /// The record to spend the fee from.
     #[clap(short, long)]
     record: String,
-    /// Display the generated transaction.
-    #[clap(short, long, conflicts_with = "broadcast")]
-    display: bool,
     /// The endpoint used to broadcast the generated transaction.
-    #[clap(short, long, conflicts_with = "display")]
+    #[clap(short, long, conflicts_with = "dry_run")]
     broadcast: Option<String>,
+    /// Performs a dry-run of transaction generation.
+    #[clap(short, long, conflicts_with = "broadcast")]
+    dry_run: bool,
     /// Store generated deployment transaction to a local file.
     #[clap(long)]
     store: Option<String>,
@@ -58,6 +58,11 @@ pub struct Deploy {
 impl Deploy {
     /// Deploys an Aleo program.
     pub fn parse(self) -> Result<String> {
+        // Ensure that the user has specified an action.
+        if !self.dry_run && self.broadcast.is_none() && self.store.is_none() {
+            bail!("❌ Please specify one of the following actions: --broadcast, --dry-run, --store");
+        }
+
         // Specify the query
         let query = Query::from(self.query);
 
@@ -87,7 +92,7 @@ impl Deploy {
         println!("✅ Created deployment transaction for '{}'", self.program_id.to_string().bold());
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
-        Developer::handle_transaction(self.broadcast, self.display, self.store, deployment, self.program_id.to_string())
+        Developer::handle_transaction(self.broadcast, self.dry_run, self.store, deployment, self.program_id.to_string())
     }
 }
 
