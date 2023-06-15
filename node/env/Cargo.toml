@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-env"
-version = "2.1.0"
+version = "2.1.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Execution environment information for snarkOS"
 homepage = "https://aleo.org"
@@ -21,4 +21,4 @@ version = "1"
 
 [dependencies.serde]
 version = "1"
-features = ["derive"]
+features = [ "derive" ]
