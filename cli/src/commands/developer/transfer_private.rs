@@ -48,7 +48,7 @@ pub struct TransferPrivate {
     #[clap(long)]
     fee_record: String,
     /// The endpoint used to broadcast the generated transaction.
-    #[clap(short, long, conflicts_with = "display")]
+    #[clap(short, long, conflicts_with = "dry_run")]
     broadcast: Option<String>,
     /// Performs a dry-run of transaction generation.
     #[clap(short, long, conflicts_with = "broadcast")]

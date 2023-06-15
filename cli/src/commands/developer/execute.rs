@@ -46,7 +46,7 @@ pub struct Execute {
     #[clap(short, long)]
     record: Option<String>,
     /// The endpoint used to broadcast the generated transaction.
-    #[clap(short, long, conflicts_with = "display")]
+    #[clap(short, long, conflicts_with = "dry_run")]
     broadcast: Option<String>,
     /// Performs a dry-run of transaction generation.
     #[clap(short, long, conflicts_with = "broadcast")]
