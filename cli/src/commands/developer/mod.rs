@@ -24,8 +24,8 @@ pub use execute::*;
 mod scan;
 pub use scan::*;
 
-mod transfer;
-pub use transfer::*;
+mod transfer_private;
+pub use transfer_private::*;
 
 use snarkvm::{
     file::{AleoFile, Manifest},
@@ -51,8 +51,8 @@ pub enum Developer {
     Execute(Execute),
     /// Scan the node for records.
     Scan(Scan),
-    /// Transfer credits.
-    Transfer(Transfer),
+    /// Execute the `credits.aleo/transfer_private` function.
+    TransferPrivate(TransferPrivate),
 }
 
 impl Developer {
@@ -62,7 +62,7 @@ impl Developer {
             Self::Deploy(deploy) => deploy.parse(),
             Self::Execute(execute) => execute.parse(),
             Self::Scan(scan) => scan.parse(),
-            Self::Transfer(transfer) => transfer.parse(),
+            Self::TransferPrivate(transfer_private) => transfer_private.parse(),
         }
     }
 

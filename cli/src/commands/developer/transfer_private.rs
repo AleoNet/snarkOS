@@ -23,9 +23,9 @@ use anyhow::Result;
 use clap::Parser;
 use std::str::FromStr;
 
-/// Executes an Aleo program function.
+/// Executes the `transfer_public` function in the `credits.aleo` program.
 #[derive(Debug, Parser)]
-pub struct Transfer {
+pub struct TransferPrivate {
     /// The input record used to craft the transfer.
     #[clap(long)]
     input_record: Record<CurrentNetwork, Plaintext<CurrentNetwork>>,
@@ -58,7 +58,7 @@ pub struct Transfer {
     store: Option<String>,
 }
 
-impl Transfer {
+impl TransferPrivate {
     /// Creates an Aleo transfer with the provided inputs.
     #[allow(clippy::format_in_format_args)]
     pub fn parse(self) -> Result<String> {
@@ -68,7 +68,7 @@ impl Transfer {
         // Retrieve the private key.
         let private_key = PrivateKey::from_str(&self.private_key)?;
 
-        println!("📦 Creating transfer...\n");
+        println!("📦 Creating private transfer...\n");
 
         // Generate the transfer transaction.
         let execution = {
@@ -90,10 +90,10 @@ impl Transfer {
             ];
 
             // Create a new transaction.
-            vm.execute(&private_key, ("credits.aleo", "transfer"), inputs.iter(), Some(fee), Some(query), rng)?
+            vm.execute(&private_key, ("credits.aleo", "transfer_private"), inputs.iter(), Some(fee), Some(query), rng)?
         };
-        let locator = Locator::<CurrentNetwork>::from_str("credits.aleo/transfer")?;
-        format!("✅ Created transfer of {} microcredits to {}...\n", &self.amount, self.recipient);
+        let locator = Locator::<CurrentNetwork>::from_str("credits.aleo/transfer_private")?;
+        println!("✅ Created transfer of {} microcredits to {}...\n", &self.amount, self.recipient);
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
         Developer::handle_transaction(self.broadcast, self.display, self.store, execution, locator.to_string())
