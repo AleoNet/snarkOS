@@ -117,7 +117,7 @@ impl Developer {
     /// Determine if the transaction should be broadcast or displayed to user.
     fn handle_transaction(
         broadcast: Option<String>,
-        display: bool,
+        dry_run: bool,
         store: Option<String>,
         transaction: Transaction<CurrentNetwork>,
         operation: String,
@@ -208,7 +208,7 @@ impl Developer {
 
             // Output the transaction id.
             Ok(transaction_id.to_string())
-        } else if display {
+        } else if dry_run {
             // Output the transaction string.
             Ok(transaction.to_string())
         } else {

@@ -48,9 +48,9 @@ pub struct Execute {
     /// The endpoint used to broadcast the generated transaction.
     #[clap(short, long, conflicts_with = "display")]
     broadcast: Option<String>,
-    /// Display the generated transaction.
+    /// Performs a dry-run of transaction generation.
     #[clap(short, long, conflicts_with = "broadcast")]
-    display: bool,
+    dry_run: bool,
     /// Store generated deployment transaction to a local file.
     #[clap(long)]
     store: Option<String>,
@@ -61,8 +61,8 @@ impl Execute {
     #[allow(clippy::format_in_format_args)]
     pub fn parse(self) -> Result<String> {
         // Ensure that the user has specified an action.
-        if !self.display && self.broadcast.is_none() && self.store.is_none() {
-            bail!("❌ Please specify one of the following actions: --broadcast, --display, --store");
+        if !self.dry_run && self.broadcast.is_none() && self.store.is_none() {
+            bail!("❌ Please specify one of the following actions: --broadcast, --dry-run, --store");
         }
 
         // Specify the query
@@ -125,7 +125,7 @@ impl Execute {
         println!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
-        Developer::handle_transaction(self.broadcast, self.display, self.store, execution, locator.to_string())
+        Developer::handle_transaction(self.broadcast, self.dry_run, self.store, execution, locator.to_string())
     }
 }
 
