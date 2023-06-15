@@ -45,18 +45,25 @@ pub struct Start {
     #[clap(default_value = "3", long = "network")]
     pub network: u16,
 
-    /// Specify this node as a beacon, with the account private key as an argument
+    /// Specify this node as a beacon
     #[clap(long = "beacon")]
-    pub beacon: Option<String>,
-    /// Specify this node as a validator, with the account private key as an argument
+    pub beacon: bool,
+    /// Specify this node as a validator
     #[clap(long = "validator")]
-    pub validator: Option<String>,
-    /// Specify this node as a prover, with the account private key as an argument
+    pub validator: bool,
+    /// Specify this node as a prover
     #[clap(long = "prover")]
-    pub prover: Option<String>,
-    /// Specify this node as a client, with an optional account private key as an argument
+    pub prover: bool,
+    /// Specify this node as a client
     #[clap(long = "client")]
-    pub client: Option<String>,
+    pub client: bool,
+
+    /// Specify the node's account private key.
+    #[clap(long = "private-key")]
+    pub private_key: Option<String>,
+    /// Specify the path to the node's account private key.
+    #[clap(long = "private-key-path")]
+    pub private_key_path: Option<PathBuf>,
 
     /// Specify the IP address and port for the node server
     #[clap(default_value = "0.0.0.0:4133", long = "node")]
@@ -147,16 +154,39 @@ impl Start {
         //  2. The user has explicitly disabled CDN.
         //  3. The node is a client (no need to sync).
         //  4. The node is a prover (no need to sync).
-        if self.dev.is_some() || self.cdn.is_empty() || self.client.is_some() || self.prover.is_some() {
+        if self.dev.is_some() || self.cdn.is_empty() || self.client || self.prover {
             None
         }
         // Check for an edge case, where the node defaults to a client.
-        else if let (None, None, None, None) = (&self.beacon, &self.validator, &self.prover, &self.client) {
+        else if !(self.beacon || self.validator || self.prover || self.client) {
             None
         }
         // Enable the CDN otherwise.
         else {
             Some(self.cdn.clone())
+        }
+    }
+
+    /// Read the private key directly from an argument or from a filesystem location.
+    fn parse_private_key(&mut self) -> Result<()> {
+        // If the private key is provided directly, don't do anything else.
+        if self.private_key.is_some() {
+            return Ok(());
+        }
+
+        // If a filesystem path to the private key is provided, attempt to
+        // read it and overwrite `self.private_key` in case of success.
+        if let Some(path) = &self.private_key_path {
+            let private_key = std::fs::read_to_string(path)?;
+            self.private_key = Some(private_key);
+            return Ok(());
+        }
+
+        // Only allow the private key to be missing if the node type is unspecified, in line with `parse_account`.
+        if self.beacon || self.validator || self.prover || self.client {
+            bail!("Misconfiguration; if the node type is provided, the private key must also be present.");
+        } else {
+            Ok(())
         }
     }
 
@@ -169,7 +199,7 @@ impl Start {
         if let Some(dev) = self.dev {
             // Only one beacon node is allowed in testing. To avoid ambiguity, we require
             // the beacon to be the first node in the dev network.
-            if dev > 0 && self.beacon.is_some() {
+            if dev > 0 && self.beacon {
                 bail!("At most one beacon at '--dev 0' is supported in development mode");
             }
 
@@ -207,16 +237,12 @@ impl Start {
             };
 
             // If the beacon type flag is set, override the private key.
-            if self.beacon.is_some() {
-                sample_account(&mut self.beacon, true)?;
+            if self.beacon {
+                sample_account(&mut self.private_key, true)?;
             }
             // If the node type flag is set, but no private key is provided, then sample one.
-            else if let Some("") = self.validator.as_deref() {
-                sample_account(&mut self.validator, false)?;
-            } else if let Some("") = self.prover.as_deref() {
-                sample_account(&mut self.prover, false)?;
-            } else if let Some("") = self.client.as_deref() {
-                sample_account(&mut self.client, false)?;
+            else if self.private_key.is_none() && (self.validator || self.prover || self.client) {
+                sample_account(&mut self.private_key, false)?;
             }
 
             Ok(genesis)
@@ -227,13 +253,15 @@ impl Start {
 
     /// Returns the node account and node type, from the given configurations.
     fn parse_account<N: Network>(&self) -> Result<(Account<N>, NodeType)> {
+        // `parse_private_key` ensured that the private key, if provided, is stored in `self.private_key`.
+        let private_key = self.private_key.as_deref().unwrap_or_default();
         // Ensures only one of the four flags is set. If no flags are set, defaults to a client node.
         match (&self.beacon, &self.validator, &self.prover, &self.client) {
-            (Some(private_key), None, None, None) => Ok((Account::<N>::from_str(private_key)?, NodeType::Beacon)),
-            (None, Some(private_key), None, None) => Ok((Account::<N>::from_str(private_key)?, NodeType::Validator)),
-            (None, None, Some(private_key), None) => Ok((Account::<N>::from_str(private_key)?, NodeType::Prover)),
-            (None, None, None, Some(private_key)) => Ok((Account::<N>::from_str(private_key)?, NodeType::Client)),
-            (None, None, None, None) => Ok((Account::<N>::new(&mut rand::thread_rng())?, NodeType::Client)),
+            (true, false, false, false) => Ok((Account::<N>::from_str(private_key)?, NodeType::Beacon)),
+            (false, true, false, false) => Ok((Account::<N>::from_str(private_key)?, NodeType::Validator)),
+            (false, false, true, false) => Ok((Account::<N>::from_str(private_key)?, NodeType::Prover)),
+            (false, false, false, true) => Ok((Account::<N>::from_str(private_key)?, NodeType::Client)),
+            (false, false, false, false) => Ok((Account::<N>::new(&mut rand::thread_rng())?, NodeType::Client)),
             _ => bail!("Unsupported node configuration"),
         }
     }
@@ -258,6 +286,9 @@ impl Start {
             true => None,
             false => Some(self.rest),
         };
+
+        // Parse the node's private key.
+        self.parse_private_key()?;
 
         // Parse the node account and node type.
         let (account, node_type) = self.parse_account::<N>()?;
@@ -366,75 +397,104 @@ mod tests {
     #[test]
     fn test_parse_cdn() {
         // Beacon (Prod)
-        let config = Start::try_parse_from(["snarkos", "--beacon", "aleo1xx"].iter()).unwrap();
+        let config = Start::try_parse_from(["snarkos", "--beacon", "--private-key", "aleo1xx"].iter()).unwrap();
         assert!(config.parse_cdn().is_some());
-        let config = Start::try_parse_from(["snarkos", "--beacon", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        let config =
+            Start::try_parse_from(["snarkos", "--beacon", "--private-key", "aleo1xx", "--cdn", "url"].iter()).unwrap();
         assert!(config.parse_cdn().is_some());
-        let config = Start::try_parse_from(["snarkos", "--beacon", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        let config =
+            Start::try_parse_from(["snarkos", "--beacon", "--private-key", "aleo1xx", "--cdn", ""].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
 
         // Beacon (Dev)
-        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "aleo1xx"].iter()).unwrap();
-        assert!(config.parse_cdn().is_none());
         let config =
-            Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+            Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "--private-key", "aleo1xx"].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
-        let config =
-            Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        let config = Start::try_parse_from(
+            ["snarkos", "--dev", "0", "--beacon", "--private-key", "aleo1xx", "--cdn", "url"].iter(),
+        )
+        .unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(
+            ["snarkos", "--dev", "0", "--beacon", "--private-key", "aleo1xx", "--cdn", ""].iter(),
+        )
+        .unwrap();
         assert!(config.parse_cdn().is_none());
 
         // Validator (Prod)
-        let config = Start::try_parse_from(["snarkos", "--validator", "aleo1xx"].iter()).unwrap();
+        let config = Start::try_parse_from(["snarkos", "--validator", "--private-key", "aleo1xx"].iter()).unwrap();
         assert!(config.parse_cdn().is_some());
-        let config = Start::try_parse_from(["snarkos", "--validator", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        let config =
+            Start::try_parse_from(["snarkos", "--validator", "--private-key", "aleo1xx", "--cdn", "url"].iter())
+                .unwrap();
         assert!(config.parse_cdn().is_some());
-        let config = Start::try_parse_from(["snarkos", "--validator", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        let config =
+            Start::try_parse_from(["snarkos", "--validator", "--private-key", "aleo1xx", "--cdn", ""].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
 
         // Validator (Dev)
-        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "aleo1xx"].iter()).unwrap();
-        assert!(config.parse_cdn().is_none());
         let config =
-            Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+            Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "--private-key", "aleo1xx"].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
-        let config =
-            Start::try_parse_from(["snarkos", "--dev", "0", "--validator", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        let config = Start::try_parse_from(
+            ["snarkos", "--dev", "0", "--validator", "--private-key", "aleo1xx", "--cdn", "url"].iter(),
+        )
+        .unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(
+            ["snarkos", "--dev", "0", "--validator", "--private-key", "aleo1xx", "--cdn", ""].iter(),
+        )
+        .unwrap();
         assert!(config.parse_cdn().is_none());
 
         // Prover (Prod)
-        let config = Start::try_parse_from(["snarkos", "--prover", "aleo1xx"].iter()).unwrap();
+        let config = Start::try_parse_from(["snarkos", "--prover", "--private-key", "aleo1xx"].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
-        let config = Start::try_parse_from(["snarkos", "--prover", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        let config =
+            Start::try_parse_from(["snarkos", "--prover", "--private-key", "aleo1xx", "--cdn", "url"].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
-        let config = Start::try_parse_from(["snarkos", "--prover", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        let config =
+            Start::try_parse_from(["snarkos", "--prover", "--private-key", "aleo1xx", "--cdn", ""].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
 
         // Prover (Dev)
-        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "aleo1xx"].iter()).unwrap();
-        assert!(config.parse_cdn().is_none());
         let config =
-            Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+            Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "--private-key", "aleo1xx"].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
-        let config =
-            Start::try_parse_from(["snarkos", "--dev", "0", "--prover", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        let config = Start::try_parse_from(
+            ["snarkos", "--dev", "0", "--prover", "--private-key", "aleo1xx", "--cdn", "url"].iter(),
+        )
+        .unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(
+            ["snarkos", "--dev", "0", "--prover", "--private-key", "aleo1xx", "--cdn", ""].iter(),
+        )
+        .unwrap();
         assert!(config.parse_cdn().is_none());
 
         // Client (Prod)
-        let config = Start::try_parse_from(["snarkos", "--client", "aleo1xx"].iter()).unwrap();
+        let config = Start::try_parse_from(["snarkos", "--client", "--private-key", "aleo1xx"].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
-        let config = Start::try_parse_from(["snarkos", "--client", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+        let config =
+            Start::try_parse_from(["snarkos", "--client", "--private-key", "aleo1xx", "--cdn", "url"].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
-        let config = Start::try_parse_from(["snarkos", "--client", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        let config =
+            Start::try_parse_from(["snarkos", "--client", "--private-key", "aleo1xx", "--cdn", ""].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
 
         // Client (Dev)
-        let config = Start::try_parse_from(["snarkos", "--dev", "0", "--client", "aleo1xx"].iter()).unwrap();
-        assert!(config.parse_cdn().is_none());
         let config =
-            Start::try_parse_from(["snarkos", "--dev", "0", "--client", "aleo1xx", "--cdn", "url"].iter()).unwrap();
+            Start::try_parse_from(["snarkos", "--dev", "0", "--client", "--private-key", "aleo1xx"].iter()).unwrap();
         assert!(config.parse_cdn().is_none());
-        let config =
-            Start::try_parse_from(["snarkos", "--dev", "0", "--client", "aleo1xx", "--cdn", ""].iter()).unwrap();
+        let config = Start::try_parse_from(
+            ["snarkos", "--dev", "0", "--client", "--private-key", "aleo1xx", "--cdn", "url"].iter(),
+        )
+        .unwrap();
+        assert!(config.parse_cdn().is_none());
+        let config = Start::try_parse_from(
+            ["snarkos", "--dev", "0", "--client", "--private-key", "aleo1xx", "--cdn", ""].iter(),
+        )
+        .unwrap();
         assert!(config.parse_cdn().is_none());
 
         // Default (Prod)
@@ -467,7 +527,8 @@ mod tests {
         let _config = Start::try_parse_from(["snarkos", "--dev", ""].iter()).unwrap_err();
 
         // Remove this for Phase 3.
-        let mut config = Start::try_parse_from(["snarkos", "--dev", "1", "--beacon", ""].iter()).unwrap();
+        let mut config =
+            Start::try_parse_from(["snarkos", "--dev", "1", "--beacon", "--private-key", ""].iter()).unwrap();
         config.parse_development::<CurrentNetwork>(&mut vec![]).unwrap_err();
 
         let mut trusted_peers = vec![];
@@ -476,58 +537,62 @@ mod tests {
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4130").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
         assert_eq!(trusted_peers.len(), 0);
-        assert!(config.beacon.is_none());
-        assert!(config.validator.is_none());
-        assert!(config.prover.is_none());
-        assert!(config.client.is_none());
+        assert!(!config.beacon);
+        assert!(!config.validator);
+        assert!(!config.prover);
+        assert!(!config.client);
         assert_ne!(expected_genesis, prod_genesis);
 
         let mut trusted_peers = vec![];
-        let mut config = Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", ""].iter()).unwrap();
+        let mut config =
+            Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "--private-key", ""].iter()).unwrap();
         let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4130").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
         assert_eq!(trusted_peers.len(), 0);
-        assert!(config.beacon.is_some());
-        assert!(config.validator.is_none());
-        assert!(config.prover.is_none());
-        assert!(config.client.is_none());
+        assert!(config.beacon);
+        assert!(!config.validator);
+        assert!(!config.prover);
+        assert!(!config.client);
         assert_eq!(genesis, expected_genesis);
 
         let mut trusted_peers = vec![];
-        let mut config = Start::try_parse_from(["snarkos", "--dev", "1", "--validator", ""].iter()).unwrap();
+        let mut config =
+            Start::try_parse_from(["snarkos", "--dev", "1", "--validator", "--private-key", ""].iter()).unwrap();
         let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4131").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3031").unwrap());
         assert_eq!(trusted_peers.len(), 1);
-        assert!(config.beacon.is_none());
-        assert!(config.validator.is_some());
-        assert!(config.prover.is_none());
-        assert!(config.client.is_none());
+        assert!(!config.beacon);
+        assert!(config.validator);
+        assert!(!config.prover);
+        assert!(!config.client);
         assert_eq!(genesis, expected_genesis);
 
         let mut trusted_peers = vec![];
-        let mut config = Start::try_parse_from(["snarkos", "--dev", "2", "--prover", ""].iter()).unwrap();
+        let mut config =
+            Start::try_parse_from(["snarkos", "--dev", "2", "--prover", "--private-key", ""].iter()).unwrap();
         let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4132").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3032").unwrap());
         assert_eq!(trusted_peers.len(), 2);
-        assert!(config.beacon.is_none());
-        assert!(config.validator.is_none());
-        assert!(config.prover.is_some());
-        assert!(config.client.is_none());
+        assert!(!config.beacon);
+        assert!(!config.validator);
+        assert!(config.prover);
+        assert!(!config.client);
         assert_eq!(genesis, expected_genesis);
 
         let mut trusted_peers = vec![];
-        let mut config = Start::try_parse_from(["snarkos", "--dev", "3", "--client", ""].iter()).unwrap();
+        let mut config =
+            Start::try_parse_from(["snarkos", "--dev", "3", "--client", "--private-key", ""].iter()).unwrap();
         let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4133").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3033").unwrap());
         assert_eq!(trusted_peers.len(), 3);
-        assert!(config.beacon.is_none());
-        assert!(config.validator.is_none());
-        assert!(config.prover.is_none());
-        assert!(config.client.is_some());
+        assert!(!config.beacon);
+        assert!(!config.validator);
+        assert!(!config.prover);
+        assert!(config.client);
         assert_eq!(genesis, expected_genesis);
     }
 
@@ -540,6 +605,7 @@ mod tests {
             "--dev",
             "2",
             "--validator",
+            "--private-key",
             "PRIVATE_KEY",
             "--cdn",
             "CDN",
@@ -553,7 +619,8 @@ mod tests {
         if let Command::Start(start) = cli.command {
             assert!(start.nodisplay);
             assert_eq!(start.dev, Some(2));
-            assert_eq!(start.validator.as_deref(), Some("PRIVATE_KEY"));
+            assert!(start.validator);
+            assert_eq!(start.private_key.as_deref(), Some("PRIVATE_KEY"));
             assert_eq!(start.cdn, "CDN");
             assert_eq!(start.rest, "127.0.0.1:3033".parse().unwrap());
             assert_eq!(start.network, 3);
