@@ -55,9 +55,9 @@ The following are **minimum** requirements to run an Aleo node:
     - Provers: 128GB of disk space
     - Validators: 2TB of disk space (4TB or larger preferred)
  - **Network**: Symmetric, commercial, always-on
-    - Clients: 10Mbps of upload **and** download bandwidth
-    - Provers: 25Mbps of upload **and** download bandwidth
-    - Validators: 50Mbps of upload **and** download bandwidth
+    - Clients: 100Mbps of upload **and** download bandwidth
+    - Provers: 250Mbps of upload **and** download bandwidth
+    - Validators: 500Mbps of upload **and** download bandwidth
 - **GPU**:
     - Clients: Not required at this time
     - Provers: CUDA-enabled GPU (optional)
