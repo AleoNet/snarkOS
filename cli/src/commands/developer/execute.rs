@@ -45,12 +45,12 @@ pub struct Execute {
     /// The record to spend the fee from.
     #[clap(short, long)]
     record: Option<String>,
-    /// Display the generated transaction.
-    #[clap(short, long, conflicts_with = "broadcast")]
-    display: bool,
     /// The endpoint used to broadcast the generated transaction.
     #[clap(short, long, conflicts_with = "display")]
     broadcast: Option<String>,
+    /// Display the generated transaction.
+    #[clap(short, long, conflicts_with = "broadcast")]
+    display: bool,
     /// Store generated deployment transaction to a local file.
     #[clap(long)]
     store: Option<String>,
@@ -60,6 +60,11 @@ impl Execute {
     /// Executes an Aleo program function with the provided inputs.
     #[allow(clippy::format_in_format_args)]
     pub fn parse(self) -> Result<String> {
+        // Ensure that the user has specified an action.
+        if !self.display && self.broadcast.is_none() && self.store.is_none() {
+            bail!("❌ Please specify one of the following actions: --broadcast, --display, --store");
+        }
+
         // Specify the query
         let query = Query::from(&self.query);
 

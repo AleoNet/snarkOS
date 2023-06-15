@@ -142,7 +142,7 @@ impl Developer {
             }
         };
 
-        // Determine if the transaction should be broadcast or displayed to user.
+        // Determine if the transaction should be broadcast to the network.
         if let Some(endpoint) = broadcast {
             // Send the deployment request to the local development node.
             match ureq::post(&endpoint).send_json(&transaction) {
@@ -212,7 +212,6 @@ impl Developer {
             // Output the transaction string.
             Ok(transaction.to_string())
         } else {
-            // TODO (raychu86): Handle the case where the user does not specify a broadcast or display flag.
             Ok("".to_string())
         }
     }

@@ -19,7 +19,7 @@ use snarkvm::{
     synthesizer::store::helpers::memory::ConsensusMemory,
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use clap::Parser;
 use colored::Colorize;
 use std::str::FromStr;
@@ -44,12 +44,12 @@ pub struct Deploy {
     /// The record to spend the fee from.
     #[clap(short, long)]
     record: String,
-    /// Display the generated transaction.
-    #[clap(short, long, conflicts_with = "broadcast")]
-    display: bool,
     /// The endpoint used to broadcast the generated transaction.
     #[clap(short, long, conflicts_with = "display")]
     broadcast: Option<String>,
+    /// Display the generated transaction.
+    #[clap(short, long, conflicts_with = "broadcast")]
+    display: bool,
     /// Store generated deployment transaction to a local file.
     #[clap(long)]
     store: Option<String>,
@@ -58,6 +58,11 @@ pub struct Deploy {
 impl Deploy {
     /// Deploys an Aleo program.
     pub fn parse(self) -> Result<String> {
+        // Ensure that the user has specified an action.
+        if !self.display && self.broadcast.is_none() && self.store.is_none() {
+            bail!("❌ Please specify one of the following actions: --broadcast, --display, --store");
+        }
+
         // Specify the query
         let query = Query::from(self.query);
 
