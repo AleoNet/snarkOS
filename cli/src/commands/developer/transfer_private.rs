@@ -23,7 +23,7 @@ use anyhow::Result;
 use clap::Parser;
 use std::str::FromStr;
 
-/// Executes the `transfer_public` function in the `credits.aleo` program.
+/// Executes the `transfer_private` function in the `credits.aleo` program.
 #[derive(Debug, Parser)]
 pub struct TransferPrivate {
     /// The input record used to craft the transfer.
@@ -68,7 +68,7 @@ impl TransferPrivate {
         // Retrieve the private key.
         let private_key = PrivateKey::from_str(&self.private_key)?;
 
-        println!("📦 Creating private transfer...\n");
+        println!("📦 Creating private transfer of {} microcredits to {}...\n", self.amount, self.recipient);
 
         // Generate the transfer transaction.
         let execution = {
@@ -93,7 +93,7 @@ impl TransferPrivate {
             vm.execute(&private_key, ("credits.aleo", "transfer_private"), inputs.iter(), Some(fee), Some(query), rng)?
         };
         let locator = Locator::<CurrentNetwork>::from_str("credits.aleo/transfer_private")?;
-        println!("✅ Created transfer of {} microcredits to {}...\n", &self.amount, self.recipient);
+        println!("✅ Created private transfer of {} microcredits to {}...\n", &self.amount, self.recipient);
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
         Developer::handle_transaction(self.broadcast, self.display, self.store, execution, locator.to_string())
