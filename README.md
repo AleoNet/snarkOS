@@ -133,7 +133,7 @@ APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ### 1. My node is unable to compile.
 
-- Ensure your machine has `Rust v1.65+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
+- Ensure your machine has `Rust v1.66+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 - If large errors appear during compilation, try running `cargo clean`.
 - Ensure `snarkOS` is started using `./run-client.sh` or `./run-prover.sh`.
 
