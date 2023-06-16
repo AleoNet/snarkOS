@@ -1,18 +1,16 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use snarkos_node_messages::BlockRequest;
 use snarkvm::prelude::{Network, PuzzleCommitment};
@@ -24,41 +22,37 @@ use parking_lot::RwLock;
 use std::{
     collections::VecDeque,
     net::{IpAddr, SocketAddr},
-    sync::{
-        atomic::{AtomicU16, Ordering::SeqCst},
-        Arc,
-    },
 };
 use time::{Duration, OffsetDateTime};
 
-/// The maximum number of items to store in the cache.
-const MAX_CACHE_SIZE: usize = 4096;
+/// The maximum number of items to store in a cache map.
+const MAX_CACHE_SIZE: usize = 1 << 17;
 
 /// A helper containing the peer IP and solution commitment.
 type SolutionKey<N> = (SocketAddr, PuzzleCommitment<N>);
 /// A helper containing the peer IP and transaction ID.
 type TransactionKey<N> = (SocketAddr, <N as Network>::TransactionID);
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Cache<N: Network> {
     /// The map of peer connections to their recent timestamps.
-    seen_inbound_connections: Arc<RwLock<IndexMap<IpAddr, VecDeque<OffsetDateTime>>>>,
+    seen_inbound_connections: RwLock<IndexMap<IpAddr, VecDeque<OffsetDateTime>>>,
     /// The map of peer IPs to their recent timestamps.
-    seen_inbound_messages: Arc<RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>>,
+    seen_inbound_messages: RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>,
     /// The map of peer IPs to their recent timestamps.
-    seen_inbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>>,
+    seen_inbound_puzzle_requests: RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>,
     /// The map of solution commitments to their last seen timestamp.
-    seen_inbound_solutions: Arc<RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>>,
+    seen_inbound_solutions: RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>,
     /// The map of transaction IDs to their last seen timestamp.
-    seen_inbound_transactions: Arc<RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>>,
+    seen_inbound_transactions: RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>,
     /// The map of peer IPs to their block requests.
-    seen_outbound_block_requests: Arc<RwLock<IndexMap<SocketAddr, IndexSet<BlockRequest>>>>,
+    seen_outbound_block_requests: RwLock<IndexMap<SocketAddr, IndexSet<BlockRequest>>>,
     /// The map of peer IPs to the number of puzzle requests.
-    seen_outbound_puzzle_requests: Arc<RwLock<IndexMap<SocketAddr, Arc<AtomicU16>>>>,
+    seen_outbound_puzzle_requests: RwLock<IndexMap<SocketAddr, u16>>,
     /// The map of solution commitments to their last seen timestamp.
-    seen_outbound_solutions: Arc<RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>>,
+    seen_outbound_solutions: RwLock<LinkedHashMap<SolutionKey<N>, OffsetDateTime>>,
     /// The map of transaction IDs to their last seen timestamp.
-    seen_outbound_transactions: Arc<RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>>,
+    seen_outbound_transactions: RwLock<LinkedHashMap<TransactionKey<N>, OffsetDateTime>>,
 }
 
 impl<N: Network> Default for Cache<N> {
@@ -75,12 +69,12 @@ impl<N: Network> Cache<N> {
             seen_inbound_connections: Default::default(),
             seen_inbound_messages: Default::default(),
             seen_inbound_puzzle_requests: Default::default(),
-            seen_inbound_solutions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
-            seen_inbound_transactions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
+            seen_inbound_solutions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
+            seen_inbound_transactions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
             seen_outbound_block_requests: Default::default(),
             seen_outbound_puzzle_requests: Default::default(),
-            seen_outbound_solutions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
-            seen_outbound_transactions: Arc::new(RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE))),
+            seen_outbound_solutions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
+            seen_outbound_transactions: RwLock::new(LinkedHashMap::with_capacity(MAX_CACHE_SIZE)),
         }
     }
 }
@@ -134,12 +128,10 @@ impl<N: Network> Cache<N> {
         requests.len()
     }
 
-    /// Removes the block request for the given peer IP, returning the number of remaining requests.
-    pub fn remove_outbound_block_request(&self, peer_ip: SocketAddr, request: &BlockRequest) -> usize {
+    /// Removes the block request for the given peer IP, returning `true` if the request was present.
+    pub fn remove_outbound_block_request(&self, peer_ip: SocketAddr, request: &BlockRequest) -> bool {
         let mut map_write = self.seen_outbound_block_requests.write();
-        let requests = map_write.entry(peer_ip).or_default();
-        requests.remove(request);
-        requests.len()
+        if let Some(requests) = map_write.get_mut(&peer_ip) { requests.remove(request) } else { false }
     }
 
     /// Returns `true` if the cache contains a puzzle request from the given peer.
@@ -179,19 +171,20 @@ impl<N: Network> Cache<N> {
 impl<N: Network> Cache<N> {
     /// Insert a new timestamp for the given key, returning the number of recent entries.
     fn retain_and_insert<K: Eq + Hash + Clone>(
-        map: &Arc<RwLock<IndexMap<K, VecDeque<OffsetDateTime>>>>,
+        map: &RwLock<IndexMap<K, VecDeque<OffsetDateTime>>>,
         key: K,
         interval_in_secs: i64,
     ) -> usize {
+        // Fetch the current timestamp.
+        let now = OffsetDateTime::now_utc();
+
         let mut map_write = map.write();
         // Load the entry for the key.
         let timestamps = map_write.entry(key).or_default();
-        // Fetch the current timestamp.
-        let now = OffsetDateTime::now_utc();
         // Insert the new timestamp.
         timestamps.push_back(now);
         // Retain only the timestamps that are within the recent interval.
-        while timestamps.iter().next().map_or(false, |t| now - *t > Duration::seconds(interval_in_secs)) {
+        while timestamps.front().map_or(false, |t| now - *t > Duration::seconds(interval_in_secs)) {
             timestamps.pop_front();
         }
         // Return the frequency of recent requests.
@@ -199,23 +192,23 @@ impl<N: Network> Cache<N> {
     }
 
     /// Increments the key's counter in the map, returning the updated counter.
-    fn increment_counter<K: Hash + Eq>(map: &Arc<RwLock<IndexMap<K, Arc<AtomicU16>>>>, key: K) -> u16 {
+    fn increment_counter<K: Hash + Eq>(map: &RwLock<IndexMap<K, u16>>, key: K) -> u16 {
+        let mut map_write = map.write();
         // Load the entry for the key, and increment the counter.
-        let previous_entry = map.write().entry(key).or_default().fetch_add(1, SeqCst);
+        let entry = map_write.entry(key).or_default();
+        *entry = entry.saturating_add(1);
         // Return the updated counter.
-        previous_entry.saturating_add(1)
+        *entry
     }
 
     /// Decrements the key's counter in the map, returning the updated counter.
-    fn decrement_counter<K: Hash + Eq>(map: &Arc<RwLock<IndexMap<K, Arc<AtomicU16>>>>, key: K) -> u16 {
+    fn decrement_counter<K: Hash + Eq>(map: &RwLock<IndexMap<K, u16>>, key: K) -> u16 {
         let mut map_write = map.write();
-        // Load the entry for the key.
+        // Load the entry for the key, and decrement the counter.
         let entry = map_write.entry(key).or_default();
-        // Conditionally decrement the counter.
-        match entry.load(SeqCst) > 0 {
-            true => entry.fetch_sub(1, SeqCst).saturating_sub(1),
-            false => 0,
-        }
+        *entry = entry.saturating_sub(1);
+        // Return the updated counter.
+        *entry
     }
 
     /// Updates the map by enforcing the maximum cache size.

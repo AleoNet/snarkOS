@@ -1,21 +1,20 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use snarkos_account::Account;
-use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, NodeType};
+use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, MessageTrait, NodeType};
+use snarkos_node_router::expect_message;
 use snarkvm::prelude::{error, Address, Block, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork};
 
 use std::{
@@ -35,6 +34,7 @@ use pea2pea::{
 };
 use rand::Rng;
 use tokio_util::codec::Framed;
+use tracing::*;
 
 const ALEO_MAXIMUM_FORK_DEPTH: u32 = 4096;
 
@@ -84,9 +84,7 @@ impl TestPeer {
                 listener_ip: Some(IpAddr::V4(Ipv4Addr::LOCALHOST)),
                 max_connections: 200,
                 ..Default::default()
-            })
-            .await
-            .expect("couldn't create test peer"),
+            }),
             node_type,
             account,
         };
@@ -95,6 +93,8 @@ impl TestPeer {
         peer.enable_reading().await;
         peer.enable_writing().await;
         peer.enable_disconnect().await;
+
+        peer.node().start_listening().await.unwrap();
 
         peer
     }
@@ -119,47 +119,49 @@ impl Handshake for TestPeer {
 
         let local_ip = self.node().listening_addr().expect("listening address should be present");
 
+        let peer_addr = conn.addr();
+        let node_side = !conn.side();
         let stream = self.borrow_stream(&mut conn);
         let mut framed = Framed::new(stream, MessageCodec::<CurrentNetwork>::default());
 
-        // Send a challenge request to the peer.
-        let message = Message::<CurrentNetwork>::ChallengeRequest(ChallengeRequest {
-            version: Message::<CurrentNetwork>::VERSION,
-            listener_port: local_ip.port(),
-            node_type: self.node_type(),
-            address: self.address(),
-            nonce: rng.gen(),
-        });
-        framed.send(message).await?;
-
-        // Listen for the challenge request.
-        let request_b = match framed.try_next().await? {
-            // Received the challenge request message, proceed.
-            Some(Message::ChallengeRequest(data)) => data,
-            // Received a disconnect message, abort.
-            Some(Message::Disconnect(reason)) => return Err(error(format!("disconnected: {reason:?}"))),
-            // Received an unexpected message, abort.
-            _ => return Err(error("didn't send a challenge request")),
-        };
-
-        // TODO(nkls): add assertions on the contents.
-
-        // Sign the nonce.
-        let signature = self.account().sign_bytes(&request_b.nonce.to_le_bytes(), rng).unwrap();
-
         // Retrieve the genesis block header.
         let genesis_header = *sample_genesis_block().header();
-        // Send the challenge response.
-        let message =
-            Message::ChallengeResponse(ChallengeResponse { genesis_header, signature: Data::Object(signature) });
-        framed.send(message).await?;
 
-        // Receive the challenge response.
-        let Message::ChallengeResponse(challenge_response) = framed.try_next().await.unwrap().unwrap() else {
-            panic!("didn't get challenge response")
-        };
+        // TODO(nkls): add assertions on the contents of messages.
+        match node_side {
+            ConnectionSide::Initiator => {
+                // Send a challenge request to the peer.
+                let our_request = ChallengeRequest::new(local_ip.port(), self.node_type(), self.address(), rng.gen());
+                framed.send(Message::ChallengeRequest(our_request)).await?;
 
-        assert_eq!(challenge_response.genesis_header, genesis_header);
+                // Receive the peer's challenge bundle.
+                let _peer_response = expect_message!(Message::ChallengeResponse, framed, peer_addr);
+                let peer_request = expect_message!(Message::ChallengeRequest, framed, peer_addr);
+
+                // Sign the nonce.
+                let signature = self.account().sign_bytes(&peer_request.nonce.to_le_bytes(), rng).unwrap();
+
+                // Send the challenge response.
+                let our_response = ChallengeResponse { genesis_header, signature: Data::Object(signature) };
+                framed.send(Message::ChallengeResponse(our_response)).await?;
+            }
+            ConnectionSide::Responder => {
+                // Listen for the challenge request.
+                let peer_request = expect_message!(Message::ChallengeRequest, framed, peer_addr);
+
+                // Sign the nonce.
+                let signature = self.account().sign_bytes(&peer_request.nonce.to_le_bytes(), rng).unwrap();
+
+                // Send our challenge bundle.
+                let our_response = ChallengeResponse { genesis_header, signature: Data::Object(signature) };
+                framed.send(Message::ChallengeResponse(our_response)).await?;
+                let our_request = ChallengeRequest::new(local_ip.port(), self.node_type(), self.address(), rng.gen());
+                framed.send(Message::ChallengeRequest(our_request)).await?;
+
+                // Listen for the challenge response.
+                let _peer_response = expect_message!(Message::ChallengeResponse, framed, peer_addr);
+            }
+        }
 
         Ok(conn)
     }

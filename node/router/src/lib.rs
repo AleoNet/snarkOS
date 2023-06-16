@@ -1,18 +1,16 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #![forbid(unsafe_code)]
 
@@ -42,21 +40,30 @@ pub use routing::*;
 use snarkos_account::Account;
 use snarkos_node_messages::NodeType;
 use snarkos_node_tcp::{Config, Tcp};
-use snarkvm::prelude::{Address, Network};
+use snarkvm::prelude::{Address, Network, PrivateKey, ViewKey};
 
 use anyhow::{bail, Result};
+#[cfg(not(feature = "test"))]
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
-use parking_lot::RwLock;
-use std::{future::Future, net::SocketAddr, sync::Arc, time::Instant};
+use parking_lot::{Mutex, RwLock};
+use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
-pub struct Router<N: Network> {
+pub struct Router<N: Network>(Arc<InnerRouter<N>>);
+
+impl<N: Network> Deref for Router<N> {
+    type Target = Arc<InnerRouter<N>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+pub struct InnerRouter<N: Network> {
     /// The TCP stack.
     tcp: Tcp,
-    /// The local IP address of the node.
-    local_ip: SocketAddr,
     /// The node type.
     node_type: NodeType,
     /// The account of the node.
@@ -68,15 +75,20 @@ pub struct Router<N: Network> {
     /// The sync pool.
     sync: Sync<N>,
     /// The set of trusted peers.
-    trusted_peers: Arc<IndexSet<SocketAddr>>,
+    trusted_peers: IndexSet<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
-    connected_peers: Arc<RwLock<IndexMap<SocketAddr, Peer<N>>>>,
+    connected_peers: RwLock<IndexMap<SocketAddr, Peer<N>>>,
+    /// The set of handshaking peers. While `Tcp` already recognizes the connecting IP addresses
+    /// and prevents duplicate outbound connection attempts to the same IP address, it is unable to
+    /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
+    /// attempt to connect to each other). This set is used to prevent this from happening.
+    connecting_peers: Mutex<HashSet<SocketAddr>>,
     /// The set of candidate peer IPs.
-    candidate_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
+    candidate_peers: RwLock<IndexSet<SocketAddr>>,
     /// The set of restricted peer IPs.
-    restricted_peers: Arc<RwLock<IndexMap<SocketAddr, Instant>>>,
+    restricted_peers: RwLock<IndexMap<SocketAddr, Instant>>,
     /// The spawned handles.
-    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
+    handles: Mutex<Vec<JoinHandle<()>>>,
     /// The boolean flag for the development mode.
     is_dev: bool,
 }
@@ -102,62 +114,88 @@ impl<N: Network> Router<N> {
         is_dev: bool,
     ) -> Result<Self> {
         // Initialize the TCP stack.
-        let tcp = Tcp::new(Config::new(node_ip, max_peers)).await?;
-        // Fetch the listening IP address.
-        let local_ip = tcp.listening_addr().expect("The listening address for this node must be present");
+        let tcp = Tcp::new(Config::new(node_ip, max_peers));
         // Initialize the router.
-        Ok(Self {
+        Ok(Self(Arc::new(InnerRouter {
             tcp,
-            local_ip,
             node_type,
             account,
             cache: Default::default(),
             resolver: Default::default(),
-            sync: Sync::new(local_ip),
-            trusted_peers: Arc::new(trusted_peers.iter().copied().collect()),
+            sync: Default::default(),
+            trusted_peers: trusted_peers.iter().copied().collect(),
             connected_peers: Default::default(),
+            connecting_peers: Default::default(),
             candidate_peers: Default::default(),
             restricted_peers: Default::default(),
             handles: Default::default(),
             is_dev,
-        })
+        })))
     }
 
     /// Attempts to connect to the given peer IP.
-    pub fn connect(&self, peer_ip: SocketAddr) {
+    pub fn connect(&self, peer_ip: SocketAddr) -> Option<JoinHandle<()>> {
+        // Return early if the attempt is against the protocol rules.
+        if let Err(forbidden_message) = self.check_connection_attempt(peer_ip) {
+            warn!("{forbidden_message}");
+            return None;
+        }
+
         let router = self.clone();
-        tokio::spawn(async move {
+        Some(tokio::spawn(async move {
             // Attempt to connect to the candidate peer.
-            debug!("Connecting to {peer_ip}...");
-            if let Err(error) = router.tcp.connect(peer_ip).await {
-                warn!("{error}");
-                // Restrict the peer, if the connection failed, and is neither trusted nor a bootstrap peer.
-                if !router.trusted_peers.contains(&peer_ip) && !router.bootstrap_peers().contains(&peer_ip) {
-                    router.insert_restricted_peer(peer_ip);
+            match router.tcp.connect(peer_ip).await {
+                // Remove the peer from the candidate peers.
+                Ok(()) => router.remove_candidate_peer(peer_ip),
+                // If the connection was not allowed, log the error.
+                Err(error) => {
+                    router.connecting_peers.lock().remove(&peer_ip);
+                    warn!("Unable to connect to '{peer_ip}' - {error}")
                 }
             }
-            // Remove the peer from the candidate peers.
-            router.remove_candidate_peer(peer_ip);
-        });
+        }))
+    }
+
+    /// Ensure we are allowed to connect to the given peer.
+    fn check_connection_attempt(&self, peer_ip: SocketAddr) -> Result<()> {
+        // Ensure the peer IP is not this node.
+        if self.is_local_ip(&peer_ip) {
+            bail!("Dropping connection attempt to '{peer_ip}' (attempted to self-connect)")
+        }
+        // Ensure the node does not surpass the maximum number of peer connections.
+        if self.number_of_connected_peers() >= self.max_connected_peers() {
+            bail!("Dropping connection attempt to '{peer_ip}' (maximum peers reached)")
+        }
+        // Ensure the node is not already connected to this peer.
+        if self.is_connected(&peer_ip) {
+            bail!("Dropping connection attempt to '{peer_ip}' (already connected)")
+        }
+        // Ensure the peer is not restricted.
+        if self.is_restricted(&peer_ip) {
+            bail!("Dropping connection attempt to '{peer_ip}' (restricted)")
+        }
+        // Ensure the node is not already connecting to this peer.
+        if !self.connecting_peers.lock().insert(peer_ip) {
+            bail!("Dropping connection attempt to '{peer_ip}' (already shaking hands as the initiator)")
+        }
+        Ok(())
     }
 
     /// Disconnects from the given peer IP, if the peer is connected.
-    pub fn disconnect(&self, peer_ip: SocketAddr) {
+    pub fn disconnect(&self, peer_ip: SocketAddr) -> JoinHandle<()> {
         let router = self.clone();
         tokio::spawn(async move {
-            // Disconnect from this peer.
-            let _disconnected = router.tcp.disconnect(peer_ip).await;
-            debug_assert!(_disconnected);
-            // TODO (howardwu): Revisit this. It appears `handle_disconnect` does not necessarily trigger.
-            //  See https://github.com/AleoHQ/snarkOS/issues/2102.
-            // Remove the peer from the connected peers.
-            router.remove_connected_peer(peer_ip);
-        });
+            if let Some(peer_addr) = router.resolve_to_ambiguous(&peer_ip) {
+                // Disconnect from this peer.
+                let _disconnected = router.tcp.disconnect(peer_addr).await;
+                debug_assert!(_disconnected);
+            }
+        })
     }
 
     /// Returns the IP address of this node.
-    pub const fn local_ip(&self) -> SocketAddr {
-        self.local_ip
+    pub fn local_ip(&self) -> SocketAddr {
+        self.tcp.listening_addr().expect("The TCP listener is not enabled")
     }
 
     /// Returns `true` if the given IP is this node.
@@ -167,12 +205,22 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the node type.
-    pub const fn node_type(&self) -> NodeType {
+    pub fn node_type(&self) -> NodeType {
         self.node_type
     }
 
-    /// Returns the Aleo address of the node.
-    pub const fn address(&self) -> Address<N> {
+    /// Returns the account private key of the node.
+    pub fn private_key(&self) -> &PrivateKey<N> {
+        self.account.private_key()
+    }
+
+    /// Returns the account view key of the node.
+    pub fn view_key(&self) -> &ViewKey<N> {
+        self.account.view_key()
+    }
+
+    /// Returns the account address of the node.
+    pub fn address(&self) -> Address<N> {
         self.account.address()
     }
 
@@ -182,7 +230,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns `true` if the node is in development mode.
-    pub const fn is_dev(&self) -> bool {
+    pub fn is_dev(&self) -> bool {
         self.is_dev
     }
 
@@ -219,6 +267,11 @@ impl<N: Network> Router<N> {
     /// Returns `true` if the given peer IP is a connected client.
     pub fn is_connected_client(&self, peer_ip: &SocketAddr) -> bool {
         self.connected_peers.read().get(peer_ip).map_or(false, |peer| peer.is_client())
+    }
+
+    /// Returns `true` if the node is currently connecting to the given peer IP.
+    pub fn is_connecting(&self, ip: &SocketAddr) -> bool {
+        self.connecting_peers.lock().contains(ip)
     }
 
     /// Returns `true` if the given IP is restricted.
@@ -321,6 +374,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Returns the list of bootstrap peers.
+    #[cfg(not(feature = "test"))]
     pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
         if self.is_dev {
             // In development mode, connect to the dedicated local beacon.
@@ -331,18 +385,24 @@ impl<N: Network> Router<N> {
         } else {
             // TODO (howardwu): Change this for Phase 3.
             vec![
-                SocketAddr::from_str("164.92.111.59:4133").unwrap(),
-                SocketAddr::from_str("159.223.204.96:4133").unwrap(),
-                SocketAddr::from_str("167.71.219.176:4133").unwrap(),
-                SocketAddr::from_str("157.245.205.209:4133").unwrap(),
-                SocketAddr::from_str("134.122.95.106:4133").unwrap(),
-                SocketAddr::from_str("161.35.24.55:4133").unwrap(),
-                SocketAddr::from_str("138.68.103.139:4133").unwrap(),
-                SocketAddr::from_str("207.154.215.49:4133").unwrap(),
-                SocketAddr::from_str("46.101.114.158:4133").unwrap(),
-                SocketAddr::from_str("138.197.190.94:4133").unwrap(),
+                SocketAddr::from_str("24.199.74.2:4133").unwrap(),
+                SocketAddr::from_str("167.172.14.86:4133").unwrap(),
+                SocketAddr::from_str("159.203.146.71:4133").unwrap(),
+                SocketAddr::from_str("188.166.201.188:4133").unwrap(),
+                SocketAddr::from_str("161.35.247.23:4133").unwrap(),
+                SocketAddr::from_str("144.126.245.162:4133").unwrap(),
+                SocketAddr::from_str("138.68.126.82:4133").unwrap(),
+                SocketAddr::from_str("170.64.252.58:4133").unwrap(),
+                SocketAddr::from_str("159.89.211.64:4133").unwrap(),
+                SocketAddr::from_str("143.244.211.239:4133").unwrap(),
             ]
         }
+    }
+
+    /// Returns the list of bootstrap peers.
+    #[cfg(feature = "test")]
+    pub fn bootstrap_peers(&self) -> Vec<SocketAddr> {
+        vec![]
     }
 
     /// Returns the list of metrics for the connected peers.
@@ -352,14 +412,15 @@ impl<N: Network> Router<N> {
 
     /// Inserts the given peer into the connected peers.
     pub fn insert_connected_peer(&self, peer: Peer<N>, peer_addr: SocketAddr) {
+        let peer_ip = peer.ip();
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
-        self.resolver.insert_peer(peer.ip(), peer_addr);
+        self.resolver.insert_peer(peer_ip, peer_addr);
         // Add an entry for this `Peer` in the connected peers.
-        self.connected_peers.write().insert(peer.ip(), peer.clone());
+        self.connected_peers.write().insert(peer_ip, peer);
         // Remove this peer from the candidate peers, if it exists.
-        self.candidate_peers.write().remove(&peer.ip());
+        self.candidate_peers.write().remove(&peer_ip);
         // Remove this peer from the restricted peers, if it exists.
-        self.restricted_peers.write().remove(&peer.ip());
+        self.restricted_peers.write().remove(&peer_ip);
     }
 
     /// Inserts the given peer IPs to the set of candidate peers.
@@ -370,20 +431,20 @@ impl<N: Network> Router<N> {
         // Compute the maximum number of candidate peers.
         let max_candidate_peers = Self::MAXIMUM_CANDIDATE_PEERS.saturating_sub(self.number_of_candidate_peers());
         // Ensure the combined number of peers does not surpass the threshold.
-        for peer_ip in peers.iter().take(max_candidate_peers) {
-            // Ensure the peer is not itself, is not already connected, and is not restricted.
-            if self.is_local_ip(peer_ip) || self.is_connected(peer_ip) || self.is_restricted(peer_ip) {
-                continue;
-            }
-            // Proceed to insert each new candidate peer IP.
-            self.candidate_peers.write().insert(*peer_ip);
-        }
+        let eligible_peers = peers
+            .iter()
+            .filter(|peer_ip| {
+                // Ensure the peer is not itself, is not already connected, and is not restricted.
+                !self.is_local_ip(peer_ip) && !self.is_connected(peer_ip) && !self.is_restricted(peer_ip)
+            })
+            .take(max_candidate_peers);
+
+        // Proceed to insert the eligible candidate peer IPs.
+        self.candidate_peers.write().extend(eligible_peers);
     }
 
     /// Inserts the given peer into the restricted peers.
     pub fn insert_restricted_peer(&self, peer_ip: SocketAddr) {
-        // Remove this peer from the connected peers, if it exists.
-        self.connected_peers.write().remove(&peer_ip);
         // Remove this peer from the candidate peers, if it exists.
         self.candidate_peers.write().remove(&peer_ip);
         // Add the peer to the restricted peers.
@@ -422,21 +483,26 @@ impl<N: Network> Router<N> {
         self.candidate_peers.write().insert(peer_ip);
     }
 
+    #[cfg(feature = "test")]
+    pub fn clear_candidate_peers(&self) {
+        self.candidate_peers.write().clear();
+    }
+
     /// Removes the given address from the candidate peers, if it exists.
     pub fn remove_candidate_peer(&self, peer_ip: SocketAddr) {
         self.candidate_peers.write().remove(&peer_ip);
     }
 
-    /// Spawns a task with the given future.
+    /// Spawns a task with the given future; it should only be used for long-running tasks.
     pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
-        self.handles.write().push(tokio::spawn(future));
+        self.handles.lock().push(tokio::spawn(future));
     }
 
     /// Shuts down the router.
     pub async fn shut_down(&self) {
         trace!("Shutting down the router...");
         // Abort the tasks.
-        self.handles.read().iter().for_each(|handle| handle.abort());
+        self.handles.lock().iter().for_each(|handle| handle.abort());
         // Close the listener.
         self.tcp.shut_down().await;
     }

@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-tcp"
-version = "2.0.2"
+version = "2.1.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A TCP stack for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -13,15 +13,34 @@ keywords = [
   "zero-knowledge"
 ]
 categories = [ "cryptography", "operating-systems" ]
-license = "GPL-3.0"
+license = "Apache-2.0"
 edition = "2021"
 
 [dependencies]
 async-trait = "0.1"
 bytes = "1"
-futures-util = { version = "0.3", features = ["sink"] }
-once_cell = { version = "1", features = ["parking_lot"] }
 parking_lot = "0.12"
-tokio = { version = "1.22", features = ["io-util", "net", "parking_lot", "rt", "sync", "time"] }
-tokio-util = { version = "0.7", features = ["codec"] }
-tracing = { version = "0.1", default-features = false }
+
+  [dependencies.futures-util]
+  version = "0.3"
+  features = [ "sink" ]
+
+  [dependencies.once_cell]
+  version = "1"
+  features = [ "parking_lot" ]
+
+  [dependencies.tokio]
+  version = "1.28"
+  features = [ "io-util", "net", "parking_lot", "rt", "sync", "time" ]
+
+  [dependencies.tokio-util]
+  version = "0.7"
+  features = [ "codec" ]
+
+  [dependencies.tracing]
+  version = "0.1"
+  default-features = false
+
+[dev-dependencies.tokio]
+version = "1.28"
+features = [ "macros" ]

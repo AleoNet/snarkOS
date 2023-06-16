@@ -1,46 +1,33 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_ledger::Ledger;
 use snarkos_node_messages::{BlockRequest, Message, NodeType, PuzzleResponse, UnconfirmedSolution};
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake, Reading, Writing},
+    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
 };
-use snarkvm::prelude::{
-    Address,
-    Block,
-    CoinbasePuzzle,
-    ConsensusStorage,
-    Header,
-    Network,
-    PrivateKey,
-    ProverSolution,
-    ViewKey,
-};
+use snarkvm::prelude::{Block, ConsensusStorage, Header, Ledger, Network, ProverSolution};
 
 use anyhow::Result;
-use parking_lot::RwLock;
+use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
     sync::{
@@ -54,8 +41,6 @@ use tokio::task::JoinHandle;
 /// A validator is a full node, capable of validating blocks.
 #[derive(Clone)]
 pub struct Validator<N: Network, C: ConsensusStorage<N>> {
-    /// The account of the node.
-    account: Account<N>,
     /// The ledger of the node.
     ledger: Ledger<N, C>,
     /// The consensus module of the node.
@@ -63,11 +48,9 @@ pub struct Validator<N: Network, C: ConsensusStorage<N>> {
     /// The router of the node.
     router: Router<N>,
     /// The REST server of the node.
-    rest: Option<Arc<Rest<N, C, Self>>>,
-    /// The coinbase puzzle.
-    coinbase_puzzle: CoinbasePuzzle<N>,
+    rest: Option<Rest<N, C, Self>>,
     /// The spawned handles.
-    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
 }
@@ -100,30 +83,26 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let router = Router::new(
             node_ip,
             NodeType::Validator,
-            account.clone(),
+            account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
             dev.is_some(),
         )
         .await?;
 
-        // Load the coinbase puzzle.
-        let coinbase_puzzle = CoinbasePuzzle::<N>::load()?;
         // Initialize the node.
         let mut node = Self {
-            account,
             ledger: ledger.clone(),
             consensus: consensus.clone(),
             router,
             rest: None,
-            coinbase_puzzle,
             handles: Default::default(),
             shutdown: Default::default(),
         };
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
-            node.rest = Some(Arc::new(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?));
+            node.rest = Some(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?);
         }
         // Initialize the sync pool.
         node.initialize_sync()?;
@@ -141,49 +120,24 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     }
 
     /// Returns the REST server.
-    pub fn rest(&self) -> &Option<Arc<Rest<N, C, Self>>> {
+    pub fn rest(&self) -> &Option<Rest<N, C, Self>> {
         &self.rest
     }
 }
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
-    /// Returns the node type.
-    fn node_type(&self) -> NodeType {
-        self.router.node_type()
-    }
-
-    /// Returns the account private key of the node.
-    fn private_key(&self) -> &PrivateKey<N> {
-        self.account.private_key()
-    }
-
-    /// Returns the account view key of the node.
-    fn view_key(&self) -> &ViewKey<N> {
-        self.account.view_key()
-    }
-
-    /// Returns the account address of the node.
-    fn address(&self) -> Address<N> {
-        self.account.address()
-    }
-
-    /// Returns `true` if the node is in development mode.
-    fn is_dev(&self) -> bool {
-        self.router.is_dev()
-    }
-
     /// Shuts down the node.
     async fn shut_down(&self) {
         info!("Shutting down...");
 
         // Shut down the sync pool.
         trace!("Shutting down the sync pool...");
-        self.shutdown.store(true, Ordering::SeqCst);
+        self.shutdown.store(true, Ordering::Relaxed);
 
         // Abort the tasks.
         trace!("Shutting down the validator...");
-        self.handles.read().iter().for_each(|handle| handle.abort());
+        self.handles.lock().iter().for_each(|handle| handle.abort());
 
         // Shut down the router.
         self.router.shut_down().await;
@@ -206,7 +160,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
 
         // Start the sync loop.
         let validator = self.clone();
-        self.handles.write().push(tokio::spawn(async move {
+        self.handles.lock().push(tokio::spawn(async move {
             loop {
                 // If the Ctrl-C handler registered the signal, stop the node.
                 if validator.shutdown.load(Ordering::Relaxed) {

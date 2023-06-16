@@ -1,23 +1,24 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use snarkos_account::Account;
 use snarkos_display::Display;
-use snarkos_node::{Node, NodeType};
-use snarkvm::prelude::{Block, ConsensusMemory, ConsensusStore, FromBytes, Network, PrivateKey, Testnet3, VM};
+use snarkos_node::{messages::NodeType, Node};
+use snarkvm::{
+    prelude::{Block, ConsensusStore, FromBytes, Network, PrivateKey, Testnet3, VM},
+    synthesizer::store::helpers::memory::ConsensusMemory,
+};
 
 use anyhow::{bail, Result};
 use clap::Parser;
@@ -40,51 +41,53 @@ const RECOMMENDED_MIN_NOFILES_LIMIT_VALIDATOR: u64 = 1024;
 /// Starts the snarkOS node.
 #[derive(Clone, Debug, Parser)]
 pub struct Start {
-    /// Specify the network of this node.
+    /// Specify the network ID of this node
     #[clap(default_value = "3", long = "network")]
     pub network: u16,
-    /// Enables development mode, specify a unique ID for this node.
-    #[clap(long)]
-    pub dev: Option<u16>,
 
-    /// Specify this as a beacon, with the given account private key for this node.
+    /// Specify this node as a beacon, with the account private key as an argument
     #[clap(long = "beacon")]
     pub beacon: Option<String>,
-    /// Specify this as a validator, with the given account private key for this node.
+    /// Specify this node as a validator, with the account private key as an argument
     #[clap(long = "validator")]
     pub validator: Option<String>,
-    /// Specify this as a prover, with the given account private key for this node.
+    /// Specify this node as a prover, with the account private key as an argument
     #[clap(long = "prover")]
     pub prover: Option<String>,
-    /// Specify this as a client, with an optional account private key for this node.
+    /// Specify this node as a client, with an optional account private key as an argument
     #[clap(long = "client")]
     pub client: Option<String>,
 
-    /// Specify the IP address and port of a peer to connect to.
-    #[clap(default_value = "", long = "connect")]
-    pub connect: String,
-    /// Specify the IP address and port for the node server.
+    /// Specify the IP address and port for the node server
     #[clap(default_value = "0.0.0.0:4133", long = "node")]
     pub node: SocketAddr,
-    /// Specify the IP address and port for the REST server.
+    /// Specify the IP address and port of a peer to connect to
+    #[clap(default_value = "", long = "connect")]
+    pub connect: String,
+
+    /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3033", long = "rest")]
     pub rest: SocketAddr,
-    /// If the flag is set, the node will not initialize the REST server.
+    /// If the flag is set, the node will not initialize the REST server
     #[clap(long)]
     pub norest: bool,
 
+    /// If the flag is set, the node will not render the display
+    #[clap(long)]
+    pub nodisplay: bool,
     /// Specify the verbosity of the node [options: 0, 1, 2, 3, 4]
     #[clap(default_value = "2", long = "verbosity")]
     pub verbosity: u8,
-    /// If the flag is set, the node will not render the display.
-    #[clap(long)]
-    pub nodisplay: bool,
-    /// Enables the node to prefetch initial blocks from a CDN.
-    #[clap(default_value = "https://testnet3.blocks.aleo.org/phase2", long = "cdn")]
-    pub cdn: String,
-    /// Specify the path to the file where logs will be stored.
+    /// Specify the path to the file where logs will be stored
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
     pub logfile: PathBuf,
+
+    /// Enables the node to prefetch initial blocks from a CDN
+    #[clap(default_value = "https://testnet3.blocks.aleo.org/phase3", long = "cdn")]
+    pub cdn: String,
+    /// Enables development mode, specify a unique ID for this node
+    #[clap(long)]
+    pub dev: Option<u16>,
 }
 
 impl Start {
@@ -164,10 +167,10 @@ impl Start {
         // and add each of them to the trusted peers. In addition, set the node IP to `4130 + dev`,
         // and the REST IP to `3030 + dev`.
         if let Some(dev) = self.dev {
-            // Until Phase 3, we only support a single beacon node. To avoid ambiguity, we require
+            // Only one beacon node is allowed in testing. To avoid ambiguity, we require
             // the beacon to be the first node in the dev network.
             if dev > 0 && self.beacon.is_some() {
-                bail!("Until Phase 3, at most one beacon at '--dev 0' is supported in development mode");
+                bail!("At most one beacon at '--dev 0' is supported in development mode");
             }
 
             // Add the dev nodes to the trusted peers.
@@ -188,7 +191,7 @@ impl Start {
             // Initialize a new VM.
             let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
             // Initialize the genesis block.
-            let genesis = Block::genesis(&vm, &beacon_private_key, &mut rng)?;
+            let genesis = vm.genesis(&beacon_private_key, &mut rng)?;
 
             // A helper method to set the account private key in the node type.
             let sample_account = |node: &mut Option<String>, is_beacon: bool| -> Result<()> {
@@ -265,9 +268,10 @@ impl Start {
             println!("🪪 Your Aleo address is {}.\n", account.address().to_string().bold());
             // Print the node type and network.
             println!(
-                "🧭 Starting {} on {} at {}.\n",
+                "🧭 Starting {} on {} {} at {}.\n",
                 node_type.description().bold(),
                 N::NAME.bold(),
+                "Phase 3".bold(),
                 self.node.to_string().bold()
             );
 
@@ -336,6 +340,7 @@ impl Start {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::commands::{Command, CLI};
     use snarkvm::prelude::Testnet3;
 
     type CurrentNetwork = Testnet3;
@@ -524,5 +529,37 @@ mod tests {
         assert!(config.prover.is_none());
         assert!(config.client.is_some());
         assert_eq!(genesis, expected_genesis);
+    }
+
+    #[test]
+    fn clap_snarkos_start() {
+        let arg_vec = vec![
+            "snarkos",
+            "start",
+            "--nodisplay",
+            "--dev",
+            "2",
+            "--validator",
+            "PRIVATE_KEY",
+            "--cdn",
+            "CDN",
+            "--connect",
+            "IP1,IP2,IP3",
+            "--rest",
+            "127.0.0.1:3033",
+        ];
+        let cli = CLI::parse_from(arg_vec);
+
+        if let Command::Start(start) = cli.command {
+            assert!(start.nodisplay);
+            assert_eq!(start.dev, Some(2));
+            assert_eq!(start.validator.as_deref(), Some("PRIVATE_KEY"));
+            assert_eq!(start.cdn, "CDN");
+            assert_eq!(start.rest, "127.0.0.1:3033".parse().unwrap());
+            assert_eq!(start.network, 3);
+            assert_eq!(start.connect, "IP1,IP2,IP3");
+        } else {
+            panic!("Unexpected result of clap parsing!");
+        }
     }
 }

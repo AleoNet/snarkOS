@@ -1,18 +1,16 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use std::{io, net::SocketAddr};
 
@@ -51,14 +49,14 @@ where
     /// messages the node can enqueue, but setting it to a large value can make the node more susceptible to DoS
     /// attacks.
     ///
-    /// The default value is 64.
-    const MESSAGE_QUEUE_DEPTH: usize = 64;
+    /// The default value is 1024.
+    const MESSAGE_QUEUE_DEPTH: usize = 1024;
 
     /// The initial size of a per-connection buffer for reading inbound messages. Can be set to the maximum expected size
     /// of the inbound message in order to only allocate it once.
     ///
-    /// The default value is 64KiB.
-    const INITIAL_BUFFER_SIZE: usize = 64 * 1024;
+    /// The default value is 1024KiB.
+    const INITIAL_BUFFER_SIZE: usize = 1024 * 1024;
 
     /// The final (deserialized) type of inbound messages.
     type Message: Send;

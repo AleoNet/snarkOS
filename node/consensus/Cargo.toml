@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-consensus"
-version = "2.0.2"
+version = "2.1.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node consensus for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -13,44 +13,32 @@ keywords = [
   "zero-knowledge"
 ]
 categories = [ "cryptography", "operating-systems" ]
-license = "GPL-3.0"
+license = "Apache-2.0"
 edition = "2021"
 
 [features]
-default = [ "parallel" ]
-parallel = [ "rayon" ]
+default = [ ]
 
 [dependencies.anyhow]
-version = "1"
-
-[dependencies.indexmap]
-version = "1.9"
-features = [ "rayon" ]
-
-[dependencies.once_cell]
-version = "1.13"
+version = "1.0.70"
 
 [dependencies.parking_lot]
 version = "0.12"
 
-[dependencies.rand]
-version = "0.8"
-
-[dependencies.rayon]
-version = "1"
-optional = true
-
-[dependencies.snarkos-node-ledger]
-path = "../ledger"
-
 [dependencies.snarkvm]
 workspace = true
 
-[dependencies.time]
-version = "0.3"
-
 [dependencies.tracing]
 version = "0.1"
+
+[dev-dependencies.indexmap]
+version = "1.9"
+
+[dev-dependencies.itertools]
+version = "0.10"
+
+[dev-dependencies.once_cell]
+version = "1.13"
 
 [dev-dependencies.tracing-test]
 version = "0.2"

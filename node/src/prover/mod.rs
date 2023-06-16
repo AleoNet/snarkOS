@@ -1,46 +1,33 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 mod router;
 
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
-use snarkos_node_messages::{Data, Message, NodeType, PuzzleResponse, UnconfirmedSolution};
+use snarkos_node_messages::{Data, Message, NodeType, UnconfirmedSolution};
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake, Reading, Writing},
+    protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
 };
-use snarkvm::prelude::{
-    Address,
-    Block,
-    CoinbasePuzzle,
-    ConsensusStorage,
-    EpochChallenge,
-    Header,
-    Network,
-    PrivateKey,
-    ProverSolution,
-    ViewKey,
-};
+use snarkvm::prelude::{Block, CoinbasePuzzle, ConsensusStorage, EpochChallenge, Header, Network, ProverSolution};
 
 use anyhow::Result;
 use colored::Colorize;
 use core::{marker::PhantomData, time::Duration};
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use rand::{rngs::OsRng, CryptoRng, Rng};
 use std::{
     net::SocketAddr,
@@ -49,14 +36,11 @@ use std::{
         Arc,
     },
 };
-use time::OffsetDateTime;
 use tokio::task::JoinHandle;
 
 /// A prover is a full node, capable of producing proofs for consensus.
 #[derive(Clone)]
 pub struct Prover<N: Network, C: ConsensusStorage<N>> {
-    /// The account of the node.
-    account: Account<N>,
     /// The router of the node.
     router: Router<N>,
     /// The genesis block.
@@ -64,7 +48,7 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     /// The coinbase puzzle.
     coinbase_puzzle: CoinbasePuzzle<N>,
     /// The latest epoch challenge.
-    latest_epoch_challenge: Arc<RwLock<Option<EpochChallenge<N>>>>,
+    latest_epoch_challenge: Arc<RwLock<Option<Arc<EpochChallenge<N>>>>>,
     /// The latest block header.
     latest_block_header: Arc<RwLock<Option<Header<N>>>>,
     /// The number of puzzle instances.
@@ -72,7 +56,7 @@ pub struct Prover<N: Network, C: ConsensusStorage<N>> {
     /// The maximum number of puzzle instances.
     max_puzzle_instances: u8,
     /// The spawned handles.
-    handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
     shutdown: Arc<AtomicBool>,
     /// PhantomData.
@@ -92,7 +76,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         let router = Router::new(
             node_ip,
             NodeType::Prover,
-            account.clone(),
+            account,
             trusted_peers,
             Self::MAXIMUM_NUMBER_OF_PEERS as u16,
             dev.is_some(),
@@ -104,7 +88,6 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         let max_puzzle_instances = num_cpus::get().saturating_sub(2).clamp(1, 6);
         // Initialize the node.
         let node = Self {
-            account,
             router,
             genesis,
             coinbase_puzzle,
@@ -129,42 +112,17 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Prover<N, C> {
-    /// Returns the node type.
-    fn node_type(&self) -> NodeType {
-        self.router.node_type()
-    }
-
-    /// Returns the account private key of the node.
-    fn private_key(&self) -> &PrivateKey<N> {
-        self.account.private_key()
-    }
-
-    /// Returns the account view key of the node.
-    fn view_key(&self) -> &ViewKey<N> {
-        self.account.view_key()
-    }
-
-    /// Returns the account address of the node.
-    fn address(&self) -> Address<N> {
-        self.account.address()
-    }
-
-    /// Returns `true` if the node is in development mode.
-    fn is_dev(&self) -> bool {
-        self.router.is_dev()
-    }
-
     /// Shuts down the node.
     async fn shut_down(&self) {
         info!("Shutting down...");
 
         // Shut down the coinbase puzzle.
         trace!("Shutting down the coinbase puzzle...");
-        self.shutdown.store(true, Ordering::SeqCst);
+        self.shutdown.store(true, Ordering::Relaxed);
 
         // Abort the tasks.
         trace!("Shutting down the prover...");
-        self.handles.read().iter().for_each(|handle| handle.abort());
+        self.handles.lock().iter().for_each(|handle| handle.abort());
 
         // Shut down the router.
         self.router.shut_down().await;
@@ -178,7 +136,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     async fn initialize_coinbase_puzzle(&self) {
         for _ in 0..self.max_puzzle_instances {
             let prover = self.clone();
-            self.handles.write().push(tokio::spawn(async move {
+            self.handles.lock().push(tokio::spawn(async move {
                 prover.coinbase_puzzle_loop().await;
             }));
         }
@@ -215,7 +173,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
                 // Execute the coinbase puzzle.
                 let prover = self.clone();
                 let result = tokio::task::spawn_blocking(move || {
-                    prover.coinbase_puzzle_iteration(challenge, coinbase_target, proof_target, &mut OsRng)
+                    prover.coinbase_puzzle_iteration(&challenge, coinbase_target, proof_target, &mut OsRng)
                 })
                 .await;
 
@@ -241,7 +199,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
     /// Performs one iteration of the coinbase puzzle.
     fn coinbase_puzzle_iteration<R: Rng + CryptoRng>(
         &self,
-        epoch_challenge: EpochChallenge<N>,
+        epoch_challenge: &EpochChallenge<N>,
         coinbase_target: u64,
         proof_target: u64,
         rng: &mut R,
@@ -261,7 +219,7 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         // Compute the prover solution.
         let result = self
             .coinbase_puzzle
-            .prove(&epoch_challenge, self.address(), rng.gen(), Some(proof_target))
+            .prove(epoch_challenge, self.address(), rng.gen(), Some(proof_target))
             .ok()
             .and_then(|solution| solution.to_target().ok().map(|solution_target| (solution_target, solution)));
 
@@ -278,25 +236,25 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
             puzzle_commitment: prover_solution.commitment(),
             solution: Data::Object(prover_solution),
         });
-        // Propagate the "UnconfirmedSolution" to the network.
-        self.propagate(message, vec![]);
+        // Propagate the "UnconfirmedSolution" to the connected validators.
+        self.propagate_to_validators(message, &[]);
     }
 
     /// Returns the current number of puzzle instances.
     fn num_puzzle_instances(&self) -> u8 {
-        self.puzzle_instances.load(Ordering::SeqCst)
+        self.puzzle_instances.load(Ordering::Relaxed)
     }
 
     /// Increments the number of puzzle instances.
     fn increment_puzzle_instances(&self) {
-        self.puzzle_instances.fetch_add(1, Ordering::SeqCst);
+        self.puzzle_instances.fetch_add(1, Ordering::Relaxed);
         #[cfg(debug_assertions)]
         trace!("Number of Instances - {}", self.num_puzzle_instances());
     }
 
     /// Decrements the number of puzzle instances.
     fn decrement_puzzle_instances(&self) {
-        self.puzzle_instances.fetch_sub(1, Ordering::SeqCst);
+        self.puzzle_instances.fetch_sub(1, Ordering::Relaxed);
         #[cfg(debug_assertions)]
         trace!("Number of Instances - {}", self.num_puzzle_instances());
     }

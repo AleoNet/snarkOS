@@ -1,23 +1,21 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use crate::{Heartbeat, Inbound, Outbound};
 use snarkos_node_messages::Message;
 use snarkos_node_tcp::{
-    protocols::{Disconnect, Handshake},
+    protocols::{Disconnect, Handshake, OnConnect},
     P2P,
 };
 use snarkvm::prelude::Network;
@@ -25,7 +23,9 @@ use snarkvm::prelude::Network;
 use core::time::Duration;
 
 #[async_trait]
-pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbound<N> + Heartbeat<N> {
+pub trait Routing<N: Network>:
+    P2P + Disconnect + OnConnect + Handshake + Inbound<N> + Outbound<N> + Heartbeat<N>
+{
     /// Initialize the routing.
     async fn initialize_routing(&self) {
         // Enable the TCP protocols.
@@ -33,10 +33,20 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
         self.enable_reading().await;
         self.enable_writing().await;
         self.enable_disconnect().await;
+        self.enable_on_connect().await;
+        // Enable the TCP listener. Note: This must be called after the above protocols.
+        self.enable_listener().await;
         // Initialize the heartbeat.
         self.initialize_heartbeat();
         // Initialize the report.
+        #[cfg(not(feature = "test"))]
         self.initialize_report();
+    }
+
+    // Start listening for inbound connections.
+    async fn enable_listener(&self) {
+        let listening_addr = self.tcp().enable_listener().await.expect("Failed to enable the TCP listener");
+        self.router().sync.set_local_ip(listening_addr);
     }
 
     /// Initialize a new instance of the heartbeat.
@@ -67,7 +77,7 @@ pub trait Routing<N: Network>: P2P + Disconnect + Handshake + Inbound<N> + Outbo
                 let url = "https://vm.aleo.org/testnet3/report";
                 let _ = reqwest::Client::new().post(url).json(&report).send().await;
                 // Sleep for a fixed duration in seconds.
-                tokio::time::sleep(Duration::from_secs(600)).await;
+                tokio::time::sleep(Duration::from_secs(6 * 60 * 60)).await;
             }
         });
     }

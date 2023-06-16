@@ -1,37 +1,26 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use super::*;
 
-use snarkos_node_messages::{
-    BlockRequest,
-    BlockResponse,
-    DataBlocks,
-    DisconnectReason,
-    Message,
-    MessageCodec,
-    Ping,
-    Pong,
-};
+use snarkos_node_messages::{BlockRequest, BlockResponse, DataBlocks, DisconnectReason, Message, MessageCodec, Pong};
 use snarkos_node_router::Routing;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{error, Header};
+use snarkvm::prelude::{error, EpochChallenge, Header};
 
-use futures_util::sink::SinkExt;
 use std::{io, net::SocketAddr};
+use tokio::task::spawn_blocking;
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Beacon<N, C> {
     /// Returns a reference to the TCP instance.
@@ -49,24 +38,35 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Beacon<N, C> {
         let conn_side = connection.side();
         let stream = self.borrow_stream(&mut connection);
         let genesis_header = self.ledger.get_header(0).map_err(|e| error(format!("{e}")))?;
-        let (peer_ip, mut framed) = self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
+        self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
+
+        Ok(connection)
+    }
+}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> OnConnect for Beacon<N, C>
+where
+    Self: Outbound<N>,
+{
+    async fn on_connect(&self, peer_addr: SocketAddr) {
+        let peer_ip = if let Some(ip) = self.router.resolve_to_listener(&peer_addr) {
+            ip
+        } else {
+            return;
+        };
 
         // Retrieve the block locators.
         let block_locators = match crate::helpers::get_block_locators(&self.ledger) {
             Ok(block_locators) => Some(block_locators),
             Err(e) => {
                 error!("Failed to get block locators: {e}");
-                return Err(error(format!("Failed to get block locators: {e}")));
+                return;
             }
         };
 
         // Send the first `Ping` message to the peer.
-        let message =
-            Message::Ping(Ping::<N> { version: Message::<N>::VERSION, node_type: self.node_type(), block_locators });
-        trace!("Sending '{}' to '{peer_ip}'", message.name());
-        framed.send(message).await?;
-
-        Ok(connection)
+        self.send_ping(peer_ip, block_locators);
     }
 }
 
@@ -74,7 +74,9 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Beacon<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> Disconnect for Beacon<N, C> {
     /// Any extra operations to be performed during a disconnect.
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
-        self.router.remove_connected_peer(peer_addr);
+        if let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) {
+            self.router.remove_connected_peer(peer_ip);
+        }
     }
 }
 
@@ -102,13 +104,15 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Beacon<N, C> {
     }
 
     /// Processes a message received from the network.
-    async fn process_message(&self, peer_ip: SocketAddr, message: Self::Message) -> io::Result<()> {
+    async fn process_message(&self, peer_addr: SocketAddr, message: Self::Message) -> io::Result<()> {
         // Process the message. Disconnect if the peer violated the protocol.
-        if let Err(error) = self.inbound(peer_ip, message).await {
-            warn!("Disconnecting from '{peer_ip}' - {error}");
-            self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
-            // Disconnect from this peer.
-            self.router().disconnect(peer_ip);
+        if let Err(error) = self.inbound(peer_addr, message).await {
+            if let Some(peer_ip) = self.router().resolve_to_listener(&peer_addr) {
+                warn!("Disconnecting from '{peer_ip}' - {error}");
+                self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
+                // Disconnect from this peer.
+                self.router().disconnect(peer_ip);
+            }
         }
         Ok(())
     }
@@ -187,11 +191,14 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
         tokio::spawn(async move {
             // Sleep for the preset time before sending a `Ping` request.
             tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
-            // Retrieve the block locators.
-            match crate::helpers::get_block_locators(&self_clone.ledger) {
-                // Send a `Ping` message to the peer.
-                Ok(block_locators) => self_clone.send_ping(peer_ip, Some(block_locators)),
-                Err(e) => error!("Failed to get block locators: {e}"),
+            // Check that the peer is still connected.
+            if self_clone.router().is_connected(&peer_ip) {
+                // Retrieve the block locators.
+                match crate::helpers::get_block_locators(&self_clone.ledger) {
+                    // Send a `Ping` message to the peer.
+                    Ok(block_locators) => self_clone.send_ping(peer_ip, Some(block_locators)),
+                    Err(e) => error!("Failed to get block locators: {e}"),
+                }
             }
         });
         true
@@ -215,36 +222,42 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
     }
 
     /// Disconnects on receipt of a `PuzzleResponse` message.
-    fn puzzle_response(&self, peer_ip: SocketAddr, _serialized: PuzzleResponse<N>, _header: Header<N>) -> bool {
+    fn puzzle_response(&self, peer_ip: SocketAddr, _epoch_challenge: EpochChallenge<N>, _header: Header<N>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }
 
-    /// Adds the unconfirmed solution to the memory pool, and propagates the solution to all peers.
+    /// Adds the unconfirmed solution to the memory pool, and propagates the solution to all connected beacons.
     async fn unconfirmed_solution(
         &self,
-        _peer_ip: SocketAddr,
-        _serialized: UnconfirmedSolution<N>,
+        peer_ip: SocketAddr,
+        serialized: UnconfirmedSolution<N>,
         solution: ProverSolution<N>,
     ) -> bool {
         // Add the unconfirmed solution to the memory pool.
-        if let Err(error) = self.consensus.add_unconfirmed_solution(&solution) {
-            trace!("[UnconfirmedSolution] {error}");
-            return true; // Maintain the connection.
+        let node = self.clone();
+        match spawn_blocking(move || node.consensus.add_unconfirmed_solution(&solution)).await {
+            Ok(Err(error)) => {
+                trace!("[UnconfirmedSolution] {error}");
+                return true; // Maintain the connection.
+            }
+            Err(error) => {
+                trace!("[UnconfirmedSolution] {error}");
+                return true; // Maintain the connection.
+            }
+            _ => {}
         }
-        // // Propagate the `UnconfirmedSolution` to connected beacons.
-        // let request = RouterRequest::MessagePropagateBeacon(Message::UnconfirmedSolution(message), vec![peer_ip]);
-        // if let Err(error) = router.process(request).await {
-        //     warn!("[UnconfirmedSolution] {error}");
-        // }
+        let message = Message::UnconfirmedSolution(serialized);
+        // Propagate the "UnconfirmedSolution" to the connected beacons.
+        self.propagate_to_beacons(message, &[peer_ip]);
         true
     }
 
-    /// Adds the unconfirmed transaction to the memory pool, and propagates the transaction to all peers.
+    /// Adds the unconfirmed transaction to the memory pool, and propagates the transaction to all connected beacons.
     fn unconfirmed_transaction(
         &self,
-        _peer_ip: SocketAddr,
-        _serialized: UnconfirmedTransaction<N>,
+        peer_ip: SocketAddr,
+        serialized: UnconfirmedTransaction<N>,
         transaction: Transaction<N>,
     ) -> bool {
         // Add the unconfirmed transaction to the memory pool.
@@ -252,11 +265,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
             trace!("[UnconfirmedTransaction] {error}");
             return true; // Maintain the connection.
         }
-        // // Propagate the `UnconfirmedTransaction`.
-        // let request = RouterRequest::MessagePropagate(Message::UnconfirmedTransaction(message), vec![peer_ip]);
-        // if let Err(error) = router.process(request).await {
-        //     warn!("[UnconfirmedTransaction] {error}");
-        // }
+        let message = Message::UnconfirmedTransaction(serialized);
+        // Propagate the "UnconfirmedTransaction" to the connected beacons.
+        self.propagate_to_beacons(message, &[peer_ip]);
         true
     }
 }

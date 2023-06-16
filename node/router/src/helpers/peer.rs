@@ -1,24 +1,21 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
-
-use snarkos_node_messages::NodeType;
+use snarkos_node_messages::{ChallengeRequest, NodeType};
 use snarkvm::prelude::{Address, Network};
 
-use parking_lot::RwLock;
-use std::{net::SocketAddr, sync::Arc, time::Instant};
+use std::{net::SocketAddr, time::Instant};
 
 /// The state for each connected peer.
 #[derive(Clone, Debug)]
@@ -27,18 +24,27 @@ pub struct Peer<N: Network> {
     peer_ip: SocketAddr,
     /// The Aleo address of the peer.
     address: Address<N>,
-    /// The message version of the peer.
-    version: u32,
     /// The node type of the peer.
     node_type: NodeType,
+    /// The message version of the peer.
+    version: u32,
+    /// The timestamp of the first message received from the peer.
+    first_seen: Instant,
     /// The timestamp of the last message received from this peer.
-    last_seen: Arc<RwLock<Instant>>,
+    last_seen: Instant,
 }
 
 impl<N: Network> Peer<N> {
     /// Initializes a new instance of `Peer`.
-    pub fn new(listening_ip: SocketAddr, address: Address<N>, version: u32, node_type: NodeType) -> Self {
-        Self { peer_ip: listening_ip, address, version, node_type, last_seen: Arc::new(RwLock::new(Instant::now())) }
+    pub fn new(listening_ip: SocketAddr, challenge_request: &ChallengeRequest<N>) -> Self {
+        Self {
+            peer_ip: listening_ip,
+            address: challenge_request.address,
+            node_type: challenge_request.node_type,
+            version: challenge_request.version,
+            first_seen: Instant::now(),
+            last_seen: Instant::now(),
+        }
     }
 
     /// Returns the IP address of the peer, with the port set to the listener port.
@@ -76,25 +82,35 @@ impl<N: Network> Peer<N> {
         self.node_type.is_client()
     }
 
+    /// Returns the message version of the peer.
+    pub const fn version(&self) -> u32 {
+        self.version
+    }
+
+    /// Returns the first seen timestamp of the peer.
+    pub fn first_seen(&self) -> Instant {
+        self.first_seen
+    }
+
     /// Returns the last seen timestamp of the peer.
     pub fn last_seen(&self) -> Instant {
-        *self.last_seen.read()
+        self.last_seen
     }
 }
 
 impl<N: Network> Peer<N> {
-    /// Updates the version.
-    pub fn set_version(&mut self, version: u32) {
-        self.version = version;
-    }
-
     /// Updates the node type.
     pub fn set_node_type(&mut self, node_type: NodeType) {
         self.node_type = node_type;
     }
 
+    /// Updates the version.
+    pub fn set_version(&mut self, version: u32) {
+        self.version = version;
+    }
+
     /// Updates the last seen timestamp of the peer.
-    pub fn set_last_seen(&self, last_seen: Instant) {
-        *self.last_seen.write() = last_seen;
+    pub fn set_last_seen(&mut self, last_seen: Instant) {
+        self.last_seen = last_seen;
     }
 }

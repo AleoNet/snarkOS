@@ -1,29 +1,32 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
-
-use crate::RestError;
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use snarkvm::prelude::*;
 
+use ::time::OffsetDateTime;
 use anyhow::{anyhow, Result};
+use axum::{
+    headers::authorization::{Authorization, Bearer},
+    http::{Request, StatusCode},
+    middleware::Next,
+    response::{IntoResponse, Response},
+    RequestPartsExt,
+    TypedHeader,
+};
 use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
 use once_cell::sync::OnceCell;
 use serde::{Deserialize, Serialize};
-use time::OffsetDateTime;
-use warp::{reject, Filter, Rejection};
 
 /// The time a jwt token is valid for.
 pub const EXPIRATION: i64 = 10 * 365 * 24 * 60 * 60; // 10 years.
@@ -32,7 +35,7 @@ pub const EXPIRATION: i64 = 10 * 365 * 24 * 60 * 60; // 10 years.
 fn jwt_secret() -> &'static Vec<u8> {
     static SECRET: OnceCell<Vec<u8>> = OnceCell::new();
     SECRET.get_or_init(|| {
-        let seed: [u8; 16] = rand::thread_rng().gen();
+        let seed: [u8; 16] = ::rand::thread_rng().gen();
         seed.to_vec()
     })
 }
@@ -67,28 +70,30 @@ impl Claims {
     }
 }
 
-/// Checks the authorization header for a valid token.
-pub fn with_auth() -> impl Filter<Extract = ((),), Error = Rejection> + Clone {
-    warp::header::<String>("authorization").and_then(|token: String| async move {
-        if !token.starts_with("Bearer ") {
-            return Err(reject::custom(RestError::Request("Invalid authorization header.".to_string())));
-        }
+pub async fn auth_middleware<B>(request: Request<B>, next: Next<B>) -> Result<Response, Response>
+where
+    B: Send,
+{
+    // Deconstruct the request to extract the auth token.
+    let (mut parts, body) = request.into_parts();
+    let auth: TypedHeader<Authorization<Bearer>> =
+        parts.extract().await.map_err(|_| StatusCode::UNAUTHORIZED.into_response())?;
 
-        // Decode the claims from the token.
-        match decode::<Claims>(
-            token.trim_start_matches("Bearer "),
-            &DecodingKey::from_secret(jwt_secret()),
-            &Validation::new(Algorithm::HS256),
-        ) {
-            Ok(decoded) => {
-                let claims = decoded.claims;
-                if claims.is_expired() {
-                    return Err(reject::custom(RestError::Request("Expired JSON Web Token.".to_string())));
-                }
-
-                Ok(())
+    match decode::<Claims>(auth.token(), &DecodingKey::from_secret(jwt_secret()), &Validation::new(Algorithm::HS256)) {
+        Ok(decoded) => {
+            let claims = decoded.claims;
+            if claims.is_expired() {
+                return Err((StatusCode::UNAUTHORIZED, "Expired JSON Web Token".to_owned()).into_response());
             }
-            Err(_) => Err(reject::custom(RestError::Request("Unauthorized caller.".to_string()))),
         }
-    })
+
+        Err(_) => {
+            return Err(StatusCode::UNAUTHORIZED.into_response());
+        }
+    }
+
+    // Reconstruct the request.
+    let request = Request::from_parts(parts, body);
+
+    Ok(next.run(request).await)
 }

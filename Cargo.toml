@@ -1,91 +1,107 @@
 [package]
 name = "snarkos"
-version = "2.0.2"
+version = "2.1.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A decentralized operating system"
 homepage = "https://aleo.org"
 repository = "https://github.com/AleoHQ/snarkOS"
 keywords = [
-    "aleo",
-    "cryptography",
-    "blockchain",
-    "decentralized",
-    "zero-knowledge"
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
 ]
 categories = [ "cryptography", "operating-systems" ]
-license = "GPL-3.0"
+license = "Apache-2.0"
 edition = "2021"
+rust-version = "1.66"
 
 [workspace]
 members = [
-    "account",
-    "cli",
-    "display",
-    "node",
-    "node/cdn",
-    "node/consensus",
-    "node/ledger",
-    "node/messages",
-    "node/rest",
-    "node/router",
-    "node/store",
-    "node/tcp",
-    ".integration",
+  "account",
+  "cli",
+  "display",
+  "node",
+  "node/cdn",
+  "node/consensus",
+  "node/env",
+  "node/messages",
+  "node/metrics",
+  "node/rest",
+  "node/router",
+  "node/tcp",
+  ".integration"
 ]
+
+[workspace.dependencies.snarkvm]
+version = "=0.12.2"
+features = [ "circuit", "console", "rocks" ]
 
 [[bin]]
 name = "snarkos"
 path = "snarkos/main.rs"
 
-[workspace.dependencies.snarkvm]
-# path = "../snarkvm"
-#git = "https://github.com/AleoHQ/snarkVM.git"
-#rev = "d27939f"
-version = "0.9.10"
-features = ["circuit", "console", "parallel"]
+[features]
+jemalloc = [ "tikv-jemallocator" ]
 
 [dependencies.anyhow]
-version = "1"
+version = "1.0.70"
 
 [dependencies.clap]
-version = "3.2"
-features = ["derive"]
+version = "4.3"
+features = [ "derive" ]
+
+[dependencies.once_cell]
+version = "1"
 
 [dependencies.snarkos-account]
 path = "./account"
+version = "=2.1.1"
 
 [dependencies.snarkos-cli]
 path = "./cli"
+version = "=2.1.1"
 
 [dependencies.snarkos-display]
 path = "./display"
+version = "=2.1.1"
 
 [dependencies.snarkos-node]
 path = "./node"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-cdn]
 path = "./node/cdn"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-consensus]
 path = "./node/consensus"
+version = "=2.1.1"
 
-[dependencies.snarkos-node-ledger]
-path = "./node/ledger"
+[dependencies.snarkos-node-env]
+path = "./node/env"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-messages]
 path = "./node/messages"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-rest]
 path = "./node/rest"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-router]
 path = "./node/router"
-
-[dependencies.snarkos-node-store]
-path = "./node/store"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-tcp]
 path = "./node/tcp"
+version = "=2.1.1"
+
+[dependencies.tikv-jemallocator]
+version = "0.5"
+optional = true
 
 [dev-dependencies.rusty-hook]
 version = "0.11.2"

@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-display"
-version = "2.0.2"
+version = "2.1.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A display for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -13,24 +13,25 @@ keywords = [
   "zero-knowledge"
 ]
 categories = [ "cryptography", "operating-systems" ]
-license = "GPL-3.0"
+license = "Apache-2.0"
 edition = "2021"
 
 [dependencies.anyhow]
-version = "1"
+version = "1.0.70"
 
 [dependencies.crossterm]
-version = "0.25"
+version = "0.26"
 
 [dependencies.snarkos-node]
 path = "../node"
+version = "=2.1.1"
 
 [dependencies.snarkvm]
 workspace = true
 
 [dependencies.tokio]
-version = "1.22"
-features = ["rt"]
+version = "1.28"
+features = [ "rt" ]
 
 [dependencies.tui]
 version = "0.19"

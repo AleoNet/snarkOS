@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node"
-version = "2.0.2"
+version = "2.1.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -13,19 +13,20 @@ keywords = [
   "zero-knowledge"
 ]
 categories = [ "cryptography", "operating-systems" ]
-license = "GPL-3.0"
+license = "Apache-2.0"
 edition = "2021"
 
 [features]
-default = [ ]
-timer = [ "aleo-std/timer", "snarkos-node-ledger/timer" ]
+default = [ "parallel" ]
+parallel = [ "rayon" ]
+timer = [ "aleo-std/timer" ]
 
 [dependencies.aleo-std]
-version = "0.1.15"
+version = "0.1.18"
 default-features = false
 
 [dependencies.anyhow]
-version = "1"
+version = "1.0.70"
 
 [dependencies.async-trait]
 version = "0.1"
@@ -35,7 +36,7 @@ version = "2"
 
 [dependencies.futures-util]
 version = "0.3"
-features = ["sink"]
+features = [ "sink" ]
 
 [dependencies.indexmap]
 version = "1"
@@ -50,35 +51,40 @@ version = "0.12"
 version = "0.8"
 default-features = false
 
+[dependencies.rayon]
+version = "1"
+optional = true
+
 [dependencies.serde_json]
 version = "1"
 
 [dependencies.snarkos-account]
 path = "../account"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-cdn]
 path = "./cdn"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-consensus]
 path = "./consensus"
-
-[dependencies.snarkos-node-ledger]
-path = "./ledger"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-messages]
 path = "./messages"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-rest]
 path = "./rest"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-router]
 path = "./router"
-
-[dependencies.snarkos-node-store]
-path = "./store"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-tcp]
 path = "./tcp"
+version = "=2.1.1"
 
 [dependencies.snarkvm]
 workspace = true
@@ -87,8 +93,8 @@ workspace = true
 version = "0.3"
 
 [dependencies.tokio]
-version = "1.22"
-features = ["rt", "signal"]
+version = "1.28"
+features = [ "rt", "signal" ]
 
 [dependencies.tokio-util]
 version = "0.7"
@@ -100,7 +106,11 @@ version = "0.1"
 version = "0.2"
 
 [dev-dependencies.pea2pea]
-version = "0.42"
+version = "0.46"
+
+[dev-dependencies.snarkos-node-router]
+path = "./router"
+features = [ "test" ]
 
 [dev-dependencies.tracing-subscriber]
 version = "0.3"

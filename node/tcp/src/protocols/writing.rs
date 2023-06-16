@@ -1,18 +1,16 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use std::{any::Any, collections::HashMap, io, net::SocketAddr, sync::Arc};
 
@@ -48,8 +46,8 @@ where
     /// messages the node can enqueue. Setting it to a large value is not recommended, as doing it might
     /// obscure potential issues with your implementation (like slow serialization) or network.
     ///
-    /// The default value is 64.
-    const MESSAGE_QUEUE_DEPTH: usize = 64;
+    /// The default value is 1024.
+    const MESSAGE_QUEUE_DEPTH: usize = 1024;
 
     /// The type of the outbound messages; unless their serialization is expensive and the message
     /// is broadcasted (in which case it would get serialized multiple times), serialization should

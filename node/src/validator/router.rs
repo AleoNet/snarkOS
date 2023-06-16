@@ -1,18 +1,16 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use super::*;
 
@@ -24,14 +22,14 @@ use snarkos_node_messages::{
     DisconnectReason,
     Message,
     MessageCodec,
-    Ping,
     Pong,
+    UnconfirmedTransaction,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{error, Network};
+use snarkvm::prelude::{error, EpochChallenge, Network, Transaction};
 
-use futures_util::sink::SinkExt;
 use std::{io, net::SocketAddr, time::Duration};
+use tokio::task::spawn_blocking;
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Validator<N, C> {
     /// Returns a reference to the TCP instance.
@@ -49,24 +47,35 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Validator<N, C> {
         let conn_side = connection.side();
         let stream = self.borrow_stream(&mut connection);
         let genesis_header = self.ledger.get_header(0).map_err(|e| error(format!("{e}")))?;
-        let (peer_ip, mut framed) = self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
+        self.router.handshake(peer_addr, stream, conn_side, genesis_header).await?;
+
+        Ok(connection)
+    }
+}
+
+#[async_trait]
+impl<N: Network, C: ConsensusStorage<N>> OnConnect for Validator<N, C>
+where
+    Self: Outbound<N>,
+{
+    async fn on_connect(&self, peer_addr: SocketAddr) {
+        let peer_ip = if let Some(ip) = self.router.resolve_to_listener(&peer_addr) {
+            ip
+        } else {
+            return;
+        };
 
         // Retrieve the block locators.
         let block_locators = match crate::helpers::get_block_locators(&self.ledger) {
             Ok(block_locators) => Some(block_locators),
             Err(e) => {
                 error!("Failed to get block locators: {e}");
-                return Err(error(format!("Failed to get block locators: {e}")));
+                return;
             }
         };
 
         // Send the first `Ping` message to the peer.
-        let message =
-            Message::Ping(Ping::<N> { version: Message::<N>::VERSION, node_type: self.node_type(), block_locators });
-        trace!("Sending '{}' to '{peer_ip}'", message.name());
-        framed.send(message).await?;
-
-        Ok(connection)
+        self.send_ping(peer_ip, block_locators);
     }
 }
 
@@ -74,7 +83,9 @@ impl<N: Network, C: ConsensusStorage<N>> Handshake for Validator<N, C> {
 impl<N: Network, C: ConsensusStorage<N>> Disconnect for Validator<N, C> {
     /// Any extra operations to be performed during a disconnect.
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
-        self.router.remove_connected_peer(peer_addr);
+        if let Some(peer_ip) = self.router.resolve_to_listener(&peer_addr) {
+            self.router.remove_connected_peer(peer_ip);
+        }
     }
 }
 
@@ -102,13 +113,15 @@ impl<N: Network, C: ConsensusStorage<N>> Reading for Validator<N, C> {
     }
 
     /// Processes a message received from the network.
-    async fn process_message(&self, peer_ip: SocketAddr, message: Self::Message) -> io::Result<()> {
+    async fn process_message(&self, peer_addr: SocketAddr, message: Self::Message) -> io::Result<()> {
         // Process the message. Disconnect if the peer violated the protocol.
-        if let Err(error) = self.inbound(peer_ip, message).await {
-            warn!("Disconnecting from '{peer_ip}' - {error}");
-            self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
-            // Disconnect from this peer.
-            self.router().disconnect(peer_ip);
+        if let Err(error) = self.inbound(peer_addr, message).await {
+            if let Some(peer_ip) = self.router().resolve_to_listener(&peer_addr) {
+                warn!("Disconnecting from '{peer_ip}' - {error}");
+                self.send(peer_ip, Message::Disconnect(DisconnectReason::ProtocolViolation.into()));
+                // Disconnect from this peer.
+                self.router().disconnect(peer_ip);
+            }
         }
         Ok(())
     }
@@ -170,11 +183,14 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         tokio::spawn(async move {
             // Sleep for the preset time before sending a `Ping` request.
             tokio::time::sleep(Duration::from_secs(Self::PING_SLEEP_IN_SECS)).await;
-            // Retrieve the block locators.
-            match crate::helpers::get_block_locators(&self_clone.ledger) {
-                // Send a `Ping` message to the peer.
-                Ok(block_locators) => self_clone.send_ping(peer_ip, Some(block_locators)),
-                Err(e) => error!("Failed to get block locators: {e}"),
+            // Check that the peer is still connected.
+            if self_clone.router().is_connected(&peer_ip) {
+                // Retrieve the block locators.
+                match crate::helpers::get_block_locators(&self_clone.ledger) {
+                    // Send a `Ping` message to the peer.
+                    Ok(block_locators) => self_clone.send_ping(peer_ip, Some(block_locators)),
+                    Err(e) => error!("Failed to get block locators: {e}"),
+                }
             }
         });
         true
@@ -198,43 +214,51 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
     }
 
     /// Disconnects on receipt of a `PuzzleResponse` message.
-    fn puzzle_response(&self, peer_ip: SocketAddr, _serialized: PuzzleResponse<N>, _header: Header<N>) -> bool {
+    fn puzzle_response(&self, peer_ip: SocketAddr, _epoch_challenge: EpochChallenge<N>, _header: Header<N>) -> bool {
         debug!("Disconnecting '{peer_ip}' for the following reason - {:?}", DisconnectReason::ProtocolViolation);
         false
     }
 
-    /// Propagates the unconfirmed solution to all connected beacons.
+    /// Propagates the unconfirmed solution to all connected beacons and validators.
     async fn unconfirmed_solution(
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedSolution<N>,
         solution: ProverSolution<N>,
     ) -> bool {
-        // Retrieve the latest epoch challenge.
-        let epoch_challenge = match self.ledger.latest_epoch_challenge() {
-            Ok(epoch_challenge) => epoch_challenge,
-            Err(error) => {
-                error!("Failed to get epoch challenge for unconfirmed solution from '{peer_ip}': {error}");
-                return false;
+        // Add the unconfirmed solution to the memory pool.
+        let node = self.clone();
+        match spawn_blocking(move || node.consensus.add_unconfirmed_solution(&solution)).await {
+            Ok(Err(error)) => {
+                trace!("[UnconfirmedSolution] {error}");
+                return true; // Maintain the connection.
             }
-        };
-
-        // Retrieve the latest proof target.
-        let proof_target = self.ledger.latest_header().proof_target();
-
-        // Ensure that the prover solution is valid for the given epoch.
-        let coinbase_puzzle = self.coinbase_puzzle.clone();
-        let is_valid = tokio::task::spawn_blocking(move || {
-            solution.verify(coinbase_puzzle.coinbase_verifying_key(), &epoch_challenge, proof_target)
-        })
-        .await;
-
-        match is_valid {
-            // If the solution is valid, propagate the `UnconfirmedSolution` to connected beacons.
-            Ok(Ok(true)) => self.propagate_to_beacons(Message::UnconfirmedSolution(serialized), vec![peer_ip]),
-            Ok(Ok(false)) | Ok(Err(_)) => (),
-            Err(error) => warn!("Failed to verify an unconfirmed solution from '{peer_ip}': {error}"),
+            Err(error) => {
+                trace!("[UnconfirmedSolution] {error}");
+                return true; // Maintain the connection.
+            }
+            _ => {}
         }
+        let message = Message::UnconfirmedSolution(serialized);
+        // Propagate the "UnconfirmedSolution" to the connected beacons.
+        self.propagate_to_beacons(message.clone(), &[peer_ip]);
+        // Propagate the "UnconfirmedSolution" to the connected validators.
+        self.propagate_to_validators(message, &[peer_ip]);
+        true
+    }
+
+    /// Handles an `UnconfirmedTransaction` message.
+    fn unconfirmed_transaction(
+        &self,
+        peer_ip: SocketAddr,
+        serialized: UnconfirmedTransaction<N>,
+        _transaction: Transaction<N>,
+    ) -> bool {
+        let message = Message::UnconfirmedTransaction(serialized);
+        // Propagate the "UnconfirmedTransaction" to the connected beacons.
+        self.propagate_to_beacons(message.clone(), &[peer_ip]);
+        // Propagate the "UnconfirmedTransaction" to the connected validators.
+        self.propagate_to_validators(message, &[peer_ip]);
         true
     }
 }

@@ -12,7 +12,8 @@ fi
 
 if [ "${VALIDATOR_PRIVATE_KEY}" == "" ]
 then
-  VALIDATOR_PRIVATE_KEY="APrivateKey1zkp8cC4jgHEBnbtu3xxs1Ndja2EMizcvTRDq5Nikdkukg1p"
+  echo "Missing account private key. (run 'snarkos account new' and try again)"
+  exit
 fi
 
 COMMAND="cargo run --release -- start --nodisplay --validator ${VALIDATOR_PRIVATE_KEY}"

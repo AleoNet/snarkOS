@@ -1,18 +1,16 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 use crate::{Outbound, Router, REDUNDANCY_FACTOR};
 use snarkos_node_messages::{DisconnectReason, Message, PeerRequest, PuzzleRequest};
@@ -153,7 +151,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
             let bootstrap = self.router().bootstrap_peers();
 
             // Initialize an RNG.
-            let rng = &mut OsRng::default();
+            let rng = &mut OsRng;
 
             // TODO (howardwu): As a validator, prioritize disconnecting from clients and provers.
             //  Remove RNG, pick the `n` oldest nodes.
@@ -167,6 +165,15 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
 
             // Proceed to send disconnect requests to these peers.
             for peer_ip in peer_ips_to_disconnect {
+                // TODO (howardwu): Remove this after specializing this function.
+                if self.router().node_type().is_prover() {
+                    if let Some(peer) = self.router().get_connected_peer(&peer_ip) {
+                        if peer.node_type().is_validator() {
+                            continue;
+                        }
+                    }
+                }
+
                 info!("Disconnecting from '{peer_ip}' (exceeded maximum connections)");
                 self.send(peer_ip, Message::Disconnect(DisconnectReason::TooManyPeers.into()));
                 // Disconnect from this peer.
@@ -176,7 +183,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
 
         if num_deficient > 0 {
             // Initialize an RNG.
-            let rng = &mut OsRng::default();
+            let rng = &mut OsRng;
 
             // Attempt to connect to more peers.
             for peer_ip in self.router().candidate_peers().into_iter().choose_multiple(rng, num_deficient) {
@@ -212,7 +219,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         // If there are not enough connected bootstrap peers, connect to more.
         if connected_bootstrap.is_empty() {
             // Initialize an RNG.
-            let rng = &mut OsRng::default();
+            let rng = &mut OsRng;
             // Attempt to connect to a bootstrap peer.
             if let Some(peer_ip) = candidate_bootstrap.into_iter().choose(rng) {
                 self.router().connect(peer_ip);
@@ -222,7 +229,7 @@ pub trait Heartbeat<N: Network>: Outbound<N> {
         let num_surplus = connected_bootstrap.len().saturating_sub(1);
         if num_surplus > 0 {
             // Initialize an RNG.
-            let rng = &mut OsRng::default();
+            let rng = &mut OsRng;
             // Proceed to send disconnect requests to these bootstrap peers.
             for peer_ip in connected_bootstrap.into_iter().choose_multiple(rng, num_surplus) {
                 info!("Disconnecting from '{peer_ip}' (exceeded maximum bootstrap)");

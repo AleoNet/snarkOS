@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-integration"
-version = "2.0.2"
+version = "2.1.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A integration testing suite for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -13,27 +13,19 @@ keywords = [
   "zero-knowledge"
 ]
 categories = [ "cryptography", "operating-systems" ]
-license = "GPL-3.0"
+license = "Apache-2.0"
 edition = "2021"
-
-[features]
-default = [ "parallel" ]
-parallel = [ "snarkos-node-cdn/parallel", "snarkos-node-ledger/parallel" ]
 
 [dev-dependencies.snarkos-node-cdn]
 path = "../node/cdn"
 
-[dev-dependencies.snarkos-node-ledger]
-path = "../node/ledger"
-
 [dev-dependencies.snarkvm]
 workspace = true
-default-features = false
-features = ["synthesizer"]
+features = [ "synthesizer" ]
 
 [dev-dependencies.tokio]
-version = "1.21"
-features = ["rt"]
+version = "1.28"
+features = [ "rt" ]
 
 [dev-dependencies.tracing]
 version = "0.1"

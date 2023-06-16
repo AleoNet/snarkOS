@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-router"
-version = "2.0.2"
+version = "2.1.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node router for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -13,11 +13,14 @@ keywords = [
   "zero-knowledge"
 ]
 categories = [ "cryptography", "operating-systems" ]
-license = "GPL-3.0"
+license = "Apache-2.0"
 edition = "2021"
 
+[features]
+test = [ ]
+
 [dependencies.anyhow]
-version = "1"
+version = "1.0.70"
 
 [dependencies.async-trait]
 version = "0.1"
@@ -32,12 +35,12 @@ version = "1"
 version = "2"
 
 [dependencies.futures]
-version = "0.3.21"
+version = "0.3.27"
 features = [ "thread-pool" ]
 
 [dependencies.indexmap]
 version = "1.9"
-features = ["rayon"]
+features = [ "rayon" ]
 
 [dependencies.itertools]
 version = "0.10"
@@ -62,12 +65,15 @@ version = "1"
 
 [dependencies.snarkos-account]
 path = "../../account"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-messages]
 path = "../messages"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-tcp]
 path = "../tcp"
+version = "=2.1.1"
 
 [dependencies.snarkvm]
 workspace = true
@@ -76,7 +82,7 @@ workspace = true
 version = "0.3"
 
 [dependencies.tokio]
-version = "1.22"
+version = "1.28"
 features = [
   "io-util",
   "macros",
@@ -97,6 +103,24 @@ version = "=0.1"
 [dependencies.tracing]
 version = "0.1"
 
+[dev-dependencies.deadline]
+version = "0.2"
+
+[dev-dependencies.futures-util]
+version = "0.3"
+features = [ "sink" ]
+
+[dev-dependencies.peak_alloc]
+version = "0.2"
+
 [dev-dependencies.snarkos-node-messages]
 path = "../messages"
 features = [ "test" ]
+
+[dev-dependencies.snarkos-node-router]
+path = "."
+features = [ "test" ]
+
+[dev-dependencies.tracing-subscriber]
+version = "0.3"
+features = [ "env-filter", "fmt" ]

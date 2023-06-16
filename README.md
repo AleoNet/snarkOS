@@ -30,7 +30,7 @@
 ## 1. Overview
 
 __snarkOS__ is a decentralized operating system for zero-knowledge applications.
-This code forms the backbone the [Aleo](https://aleo.org/) network,
+This code forms the backbone of [Aleo](https://aleo.org/) network,
 which verifies transactions and stores the encrypted state applications in a publicly-verifiable manner.
 
 ## 2. Build Guide
@@ -38,16 +38,36 @@ which verifies transactions and stores the encrypted state applications in a pub
 ### 2.1 Requirements
 
 The following are **minimum** requirements to run an Aleo node:
- - **CPU**: 16-cores (32-cores preferred)
- - **RAM**: 16GB of memory (32GB preferred)
- - **Storage**: 128GB of disk space
- - **Network**: 10 Mbps of upload **and** download bandwidth
+ - **OS**: 64-bit architectures only, latest up-to-date for security
+    - Clients: Ubuntu 20.04, macOS Ventura or later, Windows 11 or later
+    - Provers: Ubuntu 20.04, macOS Ventura or later
+    - Validators: Ubuntu 20.04, macOS Ventura or later
+ - **CPU**: 64-bit architectures only
+    - Clients: 16-cores
+    - Provers: 32-cores (64-cores preferred)
+    - Validators: 32-cores (64-cores preferred)
+ - **RAM**: DDR4 or better
+    - Clients: 16GB of memory
+    - Provers: 32GB of memory (64GB or larger preferred)
+    - Validators: 64GB of memory (128GB or larger preferred)
+ - **Storage**: PCIe Gen 3 x4, PCIe Gen 4 x2 NVME SSD, or better
+    - Clients: 64GB of disk space
+    - Provers: 128GB of disk space
+    - Validators: 2TB of disk space (4TB or larger preferred)
+ - **Network**: Symmetric, commercial, always-on
+    - Clients: 100Mbps of upload **and** download bandwidth
+    - Provers: 250Mbps of upload **and** download bandwidth
+    - Validators: 500Mbps of upload **and** download bandwidth
+- **GPU**:
+    - Clients: Not required at this time
+    - Provers: CUDA-enabled GPU (optional)
+    - Validators: Not required at this time
 
 Please note to run an Aleo Prover that is **competitive**, the machine will require more than these requirements.
 
 ### 2.2 Installation
 
-Before beginning, please ensure your machine has `Rust v1.65+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
+Before beginning, please ensure your machine has `Rust v1.66+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 
 Start by cloning this Github repository:
 ```
@@ -113,7 +133,7 @@ APrivateKey1xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 ### 1. My node is unable to compile.
 
-- Ensure your machine has `Rust v1.65+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
+- Ensure your machine has `Rust v1.66+` installed. Instructions to [install Rust can be found here.](https://www.rust-lang.org/tools/install)
 - If large errors appear during compilation, try running `cargo clean`.
 - Ensure `snarkOS` is started using `./run-client.sh` or `./run-prover.sh`.
 
@@ -153,27 +173,29 @@ SUBCOMMANDS:
 
 The following are the options for the `snarkos start` command:
 ```
-snarkos-start 
-Starts the snarkOS node
-
 USAGE:
     snarkos start [OPTIONS]
 
 OPTIONS:
-        --beacon <BEACON>          Specify this as a beacon, with the given account private key for this node
-        --client <CLIENT>          Specify this as a client, with an optional account private key for this node
-        --connect <CONNECT>        Specify the IP address and port of a peer to connect to [default: ]
-        --dev <DEV>                Enables development mode, specify a unique ID for this node
-    -h, --help                     Print help information
-        --logfile <LOGFILE>        Specify the path to the file where logs will be stored [default: /tmp/snarkos.log]
-        --network <NETWORK>        Specify the network of this node [default: 3]
-        --node <NODE>              Specify the IP address and port for the node server [default: 0.0.0.0:4133]
-        --nodisplay                If the flag is set, the node will not render the display
-        --norest                   If the flag is set, the node will not initialize the REST server
-        --prover <PROVER>          Specify this as a prover, with the given account private key for this node
-        --rest <REST>              Specify the IP address and port for the REST server [default: 0.0.0.0:3033]
-        --validator <VALIDATOR>    Specify this as a validator, with the given account private key for this node
-        --verbosity <VERBOSITY>    Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
+        --network <NETWORK_ID>           Specify the network ID of this node [default: 3]
+        
+        --beacon <PRIVATE_KEY>           Specify this node as a beacon, with the account private key as an argument
+        --validator <PRIVATE KEY>        Specify this node as a validator, with the account private key as an argument
+        --prover <PRIVATE KEY>           Specify this node as a prover, with the given account private key as an argument
+        --client <PRIVATE_KEY>           Specify this node as a client, with an optional account private key as an argument
+        
+        --node <IP:PORT>                 Specify the IP address and port for the node server [default: 0.0.0.0:4133]
+        --connect <IP:PORT>              Specify the IP address and port of a peer to connect to
+        
+        --rest <REST>                    Specify the IP address and port for the REST server [default: 0.0.0.0:3033]
+        --norest                         If the flag is set, the node will not initialize the REST server
+        
+        --nodisplay                      If the flag is set, the node will not render the display
+        --verbosity <VERBOSITY_LEVEL>    Specify the verbosity of the node [options: 0, 1, 2, 3] [default: 2]
+        --logfile <PATH>                 Specify the path to the file where logs will be stored [default: /tmp/snarkos.log]
+        
+        --dev <NODE_ID>                  Enables development mode, specify a unique ID for this node
+    -h, --help                           Print help information
 ```
 
 ## 6. Development
@@ -196,13 +218,13 @@ This procedure can be repeated to start more nodes.
 
 It is important to initialize the nodes starting from `0` and incrementing by `1` for each new node.
 
-The following is a list of options to initialize a node (replace `XX` with a number starting from `0`):
+The following is a list of options to initialize a node (replace `<NODE_ID>` with a number starting from `0`):
 ```
-cargo run --release -- start --nodisplay --dev XX --beacon ""
-cargo run --release -- start --nodisplay --dev XX --validator ""
-cargo run --release -- start --nodisplay --dev XX --prover ""
-cargo run --release -- start --nodisplay --dev XX --client ""
-cargo run --release -- start --nodisplay --dev XX
+cargo run --release -- start --nodisplay --dev <NODE_ID> --beacon ""
+cargo run --release -- start --nodisplay --dev <NODE_ID> --validator ""
+cargo run --release -- start --nodisplay --dev <NODE_ID> --prover ""
+cargo run --release -- start --nodisplay --dev <NODE_ID> --client ""
+cargo run --release -- start --nodisplay --dev <NODE_ID>
 ```
 
 When no node type is specified, the node will default to `--client`.
@@ -211,11 +233,11 @@ When no node type is specified, the node will default to `--client`.
 
 To clean up the node storage, run:
 ```
-cargo run --release -- clean --dev XX
+cargo run --release -- clean --dev <NODE_ID>
 ```
 
 ## 7. License
 
 We welcome all contributions to `snarkOS`. Please refer to the [license](#7-license) for the terms of contributions.
 
-[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](./LICENSE.md)
+[![License: GPL v3](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](./LICENSE.md)

@@ -1,18 +1,16 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
-
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
 #![recursion_limit = "256"]
 
@@ -47,28 +45,28 @@ macro_rules! test_disconnect {
             let peer_addr = peer.node().listening_addr().unwrap();
 
             // Connect the node to the test peer.
-            node.router().connect(peer_addr);
+            node.router().connect(peer_addr).unwrap().await.unwrap();
 
             // Check the peer counts.
             let node_clone = node.clone();
-            deadline!(Duration::from_secs(1), move || node_clone.router().number_of_connected_peers() == 1);
+            deadline!(Duration::from_secs(5), move || node_clone.router().number_of_connected_peers() == 1);
             let node_clone = node.clone();
-            deadline!(Duration::from_secs(1), move || node_clone.tcp().num_connected() == 1);
+            deadline!(Duration::from_secs(5), move || node_clone.tcp().num_connected() == 1);
             let peer_clone = peer.clone();
-            deadline!(Duration::from_secs(1), move || peer_clone.node().num_connected() == 1);
+            deadline!(Duration::from_secs(5), move || peer_clone.node().num_connected() == 1);
 
             // Disconnect.
             if $node_disconnects {
-                node.router().disconnect(node.tcp().connected_addrs()[0]);
+                node.router().disconnect(node.tcp().connected_addrs()[0]).await.unwrap();
             } else {
                 peer.node().disconnect(peer.node().connected_addrs()[0]).await;
             }
 
             // Check the peer counts have been updated.
             let node_clone = node.clone();
-            deadline!(Duration::from_secs(1), move || node_clone.router().number_of_connected_peers() == 0);
-            deadline!(Duration::from_secs(1), move || node.tcp().num_connected() == 0);
-            deadline!(Duration::from_secs(1), move || peer.node().num_connected() == 0);
+            deadline!(Duration::from_secs(5), move || node_clone.router().number_of_connected_peers() == 0);
+            deadline!(Duration::from_secs(5), move || node.tcp().num_connected() == 0);
+            deadline!(Duration::from_secs(5), move || peer.node().num_connected() == 0);
 
         }
     };

@@ -1,21 +1,27 @@
-// Copyright (C) 2019-2022 Aleo Systems Inc.
+// Copyright (C) 2019-2023 Aleo Systems Inc.
 // This file is part of the snarkOS library.
 
-// The snarkOS library is free software: you can redistribute it and/or modify
-// it under the terms of the GNU General Public License as published by
-// the Free Software Foundation, either version 3 of the License, or
-// (at your option) any later version.
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at:
+// http://www.apache.org/licenses/LICENSE-2.0
 
-// The snarkOS library is distributed in the hope that it will be useful,
-// but WITHOUT ANY WARRANTY; without even the implied warranty of
-// MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
-// GNU General Public License for more details.
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
 
-// You should have received a copy of the GNU General Public License
-// along with the snarkOS library. If not, see <https://www.gnu.org/licenses/>.
-
-use snarkos_node_ledger::Ledger;
-use snarkvm::prelude::{cow_to_copied, Block, ConsensusStorage, DeserializeOwned, Network};
+use snarkvm::prelude::{
+    cow_to_copied,
+    Block,
+    ConsensusStorage,
+    Deserialize,
+    DeserializeOwned,
+    Ledger,
+    Network,
+    Serialize,
+};
 
 use anyhow::{anyhow, bail, Result};
 use colored::Colorize;
@@ -46,7 +52,8 @@ pub async fn sync_ledger_with_cdn<N: Network, C: ConsensusStorage<N>>(
     // Load the blocks from the CDN into the ledger.
     let ledger_clone = ledger.clone();
     let result =
-        load_blocks(base_url, start_height, None, move |block: Block<N>| ledger_clone.add_next_block(&block)).await;
+        load_blocks(base_url, start_height, None, move |block: Block<N>| ledger_clone.advance_to_next_block(&block))
+            .await;
 
     // TODO (howardwu): Find a way to resolve integrity failures.
     // If the sync failed, check the integrity of the ledger.
@@ -92,7 +99,7 @@ pub async fn load_blocks<N: Network>(
     }
 
     // Fetch the CDN height.
-    let cdn_height = match cdn_height::<BLOCKS_PER_FILE>().await {
+    let cdn_height = match cdn_height::<BLOCKS_PER_FILE>(base_url).await {
         Ok(cdn_height) => cdn_height,
         Err(error) => return Err((start_height, error)),
     };
@@ -253,30 +260,40 @@ pub async fn load_blocks<N: Network>(
 ///
 /// Note: This function decrements the tip by a few blocks, to ensure the
 /// tip is not on a block that is not yet available on the CDN.
-async fn cdn_height<const BLOCKS_PER_FILE: u32>() -> Result<u32> {
-    const BASE_URL: &str = "https://vm.aleo.org/api";
-
+async fn cdn_height<const BLOCKS_PER_FILE: u32>(base_url: &str) -> Result<u32> {
+    // A representation of the 'latest.json' file object.
+    #[derive(Deserialize, Serialize, Debug)]
+    struct LatestState {
+        exclusive_height: u32,
+        inclusive_height: u32,
+        hash: String,
+    }
     // Create a request client.
     let client = match reqwest::Client::builder().build() {
         Ok(client) => client,
         Err(error) => bail!("Failed to create a CDN request client: {error}"),
     };
     // Prepare the URL.
-    let height_url = format!("{BASE_URL}/testnet3/latest/height");
+    let latest_json_url = format!("{base_url}/latest.json");
     // Send the request.
-    let response = match client.get(height_url).send().await {
+    let response = match client.get(latest_json_url).send().await {
         Ok(response) => response,
         Err(error) => bail!("Failed to fetch the CDN height: {error}"),
     };
     // Parse the response.
-    let text = match response.text().await {
-        Ok(text) => text,
+    let bytes = match response.bytes().await {
+        Ok(bytes) => bytes,
         Err(error) => bail!("Failed to parse the CDN height response: {error}"),
     };
-    // Parse the tip.
-    let tip = match text.parse::<u32>() {
-        Ok(tip) => tip,
-        Err(error) => bail!("Failed to parse the CDN tip: {error}"),
+    // Parse the bytes for the string.
+    let latest_state_string = match bincode::deserialize::<String>(&bytes) {
+        Ok(string) => string,
+        Err(error) => bail!("Failed to deserialize the CDN height response: {error}"),
+    };
+    // Parse the string for the tip.
+    let tip = match serde_json::from_str::<LatestState>(&latest_state_string) {
+        Ok(latest) => latest.exclusive_height,
+        Err(error) => bail!("Failed to extract the CDN height response: {error}"),
     };
     // Decrement the tip by a few blocks to ensure the CDN is caught up.
     let tip = tip.saturating_sub(10);
@@ -381,7 +398,7 @@ mod tests {
 
     type CurrentNetwork = Testnet3;
 
-    const TEST_BASE_URL: &str = "https://testnet3.blocks.aleo.org/phase2";
+    const TEST_BASE_URL: &str = "https://testnet3.blocks.aleo.org/phase3";
 
     fn check_load_blocks(start: u32, end: Option<u32>, expected: usize) {
         let blocks = Arc::new(RwLock::new(Vec::new()));
@@ -437,7 +454,7 @@ mod tests {
     fn test_cdn_height() {
         let rt = tokio::runtime::Runtime::new().unwrap();
         rt.block_on(async {
-            let height = cdn_height::<BLOCKS_PER_FILE>().await.unwrap();
+            let height = cdn_height::<BLOCKS_PER_FILE>(TEST_BASE_URL).await.unwrap();
             assert!(height > 0);
         });
     }

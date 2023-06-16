@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-rest"
-version = "0.9.0"
+version = "2.1.1"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A REST API server for a decentralized virtual machine"
 homepage = "https://aleo.org"
@@ -13,11 +13,23 @@ keywords = [
   "zero-knowledge"
 ]
 categories = [ "cryptography", "operating-systems" ]
-license = "GPL-3.0"
+license = "Apache-2.0"
 edition = "2021"
 
+[features]
+default = [ "parallel" ]
+parallel = [ "rayon" ]
+
 [dependencies.anyhow]
-version = "1"
+version = "1.0.70"
+
+[dependencies.axum]
+version = "0.6"
+features = [ "headers" ]
+
+[dependencies.axum-extra]
+version = "0.7.4"
+features = [ "erased-json" ]
 
 [dependencies.http]
 version = "0.2"
@@ -26,10 +38,13 @@ version = "0.2"
 version = "1.8"
 
 [dependencies.jsonwebtoken]
-version = "8.1.1"
+version = "8.3"
 
 [dependencies.once_cell]
-version = "1.13"
+version = "1.18"
+
+[dependencies.parking_lot]
+version = "0.12"
 
 [dependencies.serde]
 version = "1"
@@ -38,18 +53,26 @@ features = [ "derive" ]
 
 [dependencies.snarkos-node-consensus]
 path = "../consensus"
+version = "=2.1.1"
 
-[dependencies.snarkos-node-ledger]
-path = "../ledger"
+[dependencies.snarkos-node-env]
+path = "../env"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-messages]
 path = "../messages"
+version = "=2.1.1"
 
 [dependencies.snarkos-node-router]
 path = "../router"
+version = "=2.1.1"
 
 [dependencies.rand]
 version = "0.8"
+
+[dependencies.rayon]
+version = "1"
+optional = true
 
 [dependencies.snarkvm]
 workspace = true
@@ -60,8 +83,9 @@ version = "0.3"
 [dependencies.tokio]
 version = "1"
 
+[dependencies.tower-http]
+version = "0.4"
+features = [ "cors", "trace" ]
+
 [dependencies.tracing]
 version = "0.1"
-
-[dependencies.warp]
-version = "0.3"

@@ -101,6 +101,26 @@ commands:
       - clear_environment:
           cache_key: << parameters.cache_key >>
 
+  run_serial_long:
+    description: "Build and run long running tests"
+    parameters:
+      workspace_member:
+        type: string
+      cache_key:
+        type: string
+      flags:
+        type: string
+        default: ""
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: << parameters.cache_key >>
+      - run:
+          no_output_timeout: 300m
+          command: cd << parameters.workspace_member >> && RUST_MIN_STACK=67108864 cargo test << parameters.flags >>
+      - clear_environment:
+          cache_key: << parameters.cache_key >>
+
   run_parallel:
     description: "Build and run tests (in parallel)"
     parameters:
@@ -136,16 +156,16 @@ commands:
 jobs:
   integration:
     docker:
-      - image: cimg/rust:1.65
+      - image: cimg/rust:1.68
     resource_class: 2xlarge
     steps:
-      - run_serial:
+      - run_serial_long:
           workspace_member: .integration
           cache_key: snarkos-integration-cache
 
   snarkos:
     docker:
-      - image: cimg/rust:1.65
+      - image: cimg/rust:1.68
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -154,7 +174,7 @@ jobs:
 
   account:
     docker:
-      - image: cimg/rust:1.65
+      - image: cimg/rust:1.68
     resource_class: xlarge
     steps:
       - run_serial:
@@ -163,7 +183,7 @@ jobs:
 
   cli:
     docker:
-      - image: cimg/rust:1.65
+      - image: cimg/rust:1.68
     resource_class: xlarge
     steps:
       - run_serial:
@@ -172,7 +192,7 @@ jobs:
 
   display:
     docker:
-      - image: cimg/rust:1.65
+      - image: cimg/rust:1.68
     resource_class: xlarge
     steps:
       - run_serial:
@@ -181,7 +201,7 @@ jobs:
 
   node:
     docker:
-      - image: cimg/rust:1.65
+      - image: cimg/rust:1.68
     resource_class: 2xlarge
     steps:
       - run_serial:
@@ -190,7 +210,7 @@ jobs:
 
   node-cdn:
     docker:
-      - image: cimg/rust:1.65
+      - image: cimg/rust:1.68
     resource_class: xlarge
     steps:
       - run_serial:
@@ -199,25 +219,16 @@ jobs:
 
   node-consensus:
     docker:
-      - image: cimg/rust:1.65
+      - image: cimg/rust:1.68
     resource_class: 2xlarge
     steps:
       - run_serial:
           workspace_member: node/consensus
           cache_key: snarkos-node-consensus-cache
 
-  node-ledger:
-    docker:
-      - image: cimg/rust:1.65
-    resource_class: 2xlarge
-    steps:
-      - run_serial:
-          workspace_member: node/ledger
-          cache_key: snarkos-node-ledger-cache
-
   node-messages:
     docker:
-      - image: cimg/rust:1.65
+      - image: cimg/rust:1.68
     resource_class: xlarge
     steps:
       - run_serial:
@@ -226,7 +237,7 @@ jobs:
 
   node-rest:
     docker:
-      - image: cimg/rust:1.65
+      - image: cimg/rust:1.68
     resource_class: xlarge
     steps:
       - run_serial:
@@ -235,25 +246,25 @@ jobs:
 
   node-router:
     docker:
-      - image: cimg/rust:1.65
+      - image: cimg/rust:1.68
     resource_class: xlarge
     steps:
       - run_serial:
           workspace_member: node/router
           cache_key: snarkos-node-router-cache
 
-  node-store:
+  node-tcp:
     docker:
-      - image: cimg/rust:1.65
-    resource_class: 2xlarge
+      - image: cimg/rust:1.68
+    resource_class: xlarge
     steps:
       - run_serial:
-          workspace_member: node/store
-          cache_key: snarkos-node-store-cache
+          workspace_member: node/tcp
+          cache_key: snarkos-node-tcp-cache
 
   check-fmt:
     docker:
-      - image: cimg/rust:1.65
+      - image: cimg/rust:1.68
     resource_class: xlarge
     steps:
       - checkout
@@ -269,7 +280,7 @@ jobs:
 
   check-clippy:
     docker:
-      - image: cimg/rust:1.65
+      - image: cimg/rust:1.68
     resource_class: 2xlarge
     steps:
       - checkout
@@ -302,7 +313,6 @@ workflows:
 
   main-workflow:
     jobs:
-      - integration
       - snarkos
       - account
       - cli
@@ -310,11 +320,10 @@ workflows:
       - node
       - node-cdn
       - node-consensus
-      - node-ledger
       - node-messages
       - node-rest
       - node-router
-      - node-store
+      - node-tcp
       - check-fmt
       - check-clippy
 
@@ -329,3 +338,14 @@ workflows:
                 display,
                 node
               ]
+
+  scheduled-workflow:
+    triggers:
+      - schedule:
+          cron: "0 0,12 * * *"
+          filters:
+            branches:
+              only:
+                - testnet3
+    jobs:
+      - integration
