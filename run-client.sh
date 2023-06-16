@@ -3,7 +3,7 @@
 # USAGE examples: 
   # CLI :  ./run-client.sh
 
-COMMAND='cargo run --release -- --verbosity 2'
+COMMAND='cargo run --release -- start --nodisplay'
 
 for word in $*;
 do
@@ -19,7 +19,7 @@ function exit_node()
 
 trap exit_node SIGINT
 
-echo "Running client node..."
+echo "Running an Aleo client node..."
 $COMMAND &
 
 while :
@@ -30,7 +30,7 @@ do
   STATUS=$(git pull)
   
   if [ "$STATUS" != "Already up to date." ]; then
-    echo "Updated code found, rebuilding and relaunching client node"
+    echo "Updated code found, rebuilding and relaunching client"
     cargo clean
     kill -INT $!; sleep 2; $COMMAND &
   fi

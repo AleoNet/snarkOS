@@ -1,0 +1,68 @@
+[package]
+name = "snarkos-node-messages"
+version = "2.1.1"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "Node messages for a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "Apache-2.0"
+edition = "2021"
+
+[features]
+default = [ ]
+test = [ ]
+
+[dependencies.anyhow]
+version = "1.0.70"
+
+[dependencies.bincode]
+version = "1.0"
+
+[dependencies.bytes]
+version = "1"
+
+[dependencies.indexmap]
+version = "1"
+
+[dependencies.kadmium]
+version = "0.6.0"
+features = [ "codec", "sync" ]
+
+[dependencies.rayon]
+version = "1"
+
+[dependencies.serde]
+version = "1"
+
+[dependencies.snarkvm]
+workspace = true
+
+[dependencies.snow]
+version = "0.9.2"
+
+[dependencies.tokio]
+version = "1.28"
+features = [
+  "io-util",
+  "macros",
+  "net",
+  "rt-multi-thread",
+  "signal",
+  "sync",
+  "time"
+]
+
+[dependencies.tokio-util]
+version = "0.7"
+features = [ "codec" ]
+
+[dependencies.tracing]
+version = "0.1"

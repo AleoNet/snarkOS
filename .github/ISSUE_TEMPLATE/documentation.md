@@ -7,9 +7,4 @@ labels: 'documentation'
 
 ## 📚 Documentation
 
-<!--
-    Did you find a mistake in the snarkOS documentation?
-    Is there documentation about snarkOS that's missing?
--->
-
-(Write your answer here.)
+<!-- Is there documentation about snarkOS that's missing or incorrect? -->

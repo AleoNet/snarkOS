@@ -1,5 +1,42 @@
 version: 2.1
+
+orbs:
+  windows: circleci/windows@2.4.0
+
 commands:
+  check_windows:
+    description: "Runs cargo check on Windows"
+    parameters:
+      workspace_member:
+        type: string
+    steps:
+      - checkout
+      - restore_cache:
+          key: cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
+      - run:
+          name: "Install Rust and run cargo check"
+          command: |
+            $ProgressPreference = "SilentlyContinue"
+            Invoke-WebRequest -Uri "https://win.rustup.rs/" -OutFile "C:\rustup-init.exe"
+            & C:\rustup-init.exe -y --default-toolchain "stable-x86_64-pc-windows-msvc" --no-modify-path --profile minimal
+            choco install llvm -y
+            refreshenv
+            $env:Path += ";C:\Users\circleci\.cargo\bin"
+            rustc -Vv
+            cargo --version
+            rustc --version | Out-File -FilePath "rust-version"
+            if (!(Test-Path "Cargo.lock" -PathType Leaf)) {
+                cargo generate-lockfile
+            }
+            cd << parameters.workspace_member >>
+            cargo check --examples --benches --tests
+      - save_cache:
+          paths:
+            - C:\Users\circleci\.cargo\registry
+            - C:\Users\circleci\.cargo\git
+            - target
+          key: cargo-cache-{{ arch }}-{{ checksum "rust-version" }}-{{ checksum "Cargo.lock" }}
+
   setup_environment:
     description: "Setup testing environment"
     parameters:
@@ -16,13 +53,15 @@ commands:
             export WORK_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
             export SCCACHE_DIR="$CIRCLE_WORKING_DIRECTORY/.cache/sccache"
             mkdir -p "$CIRCLE_WORKING_DIRECTORY/.bin"
-            wget https://github.com/mozilla/sccache/releases/download/0.2.13/sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
-            tar -C "$CIRCLE_WORKING_DIRECTORY/.bin" -xvf sccache-0.2.13-x86_64-unknown-linux-musl.tar.gz
-            mv $CIRCLE_WORKING_DIRECTORY/.bin/sccache-0.2.13-x86_64-unknown-linux-musl/sccache $CIRCLE_WORKING_DIRECTORY/.bin/sccache
+            wget https://github.com/mozilla/sccache/releases/download/v0.3.0/sccache-v0.3.0-x86_64-unknown-linux-musl.tar.gz
+            tar -C "$CIRCLE_WORKING_DIRECTORY/.bin" -xvf sccache-v0.3.0-x86_64-unknown-linux-musl.tar.gz
+            mv $CIRCLE_WORKING_DIRECTORY/.bin/sccache-v0.3.0-x86_64-unknown-linux-musl/sccache $CIRCLE_WORKING_DIRECTORY/.bin/sccache
             export PATH="$PATH:$CIRCLE_WORKING_DIRECTORY/.bin"
             export RUSTC_WRAPPER="sccache"
             rm -rf "$CIRCLE_WORKING_DIRECTORY/.cargo/registry"
-            sudo apt-get update && sudo apt-get install -y clang llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev
+            DEBIAN_FRONTEND=noninteractive sudo apt-get update
+            DEBIAN_FRONTEND=noninteractive sudo apt-get dist-upgrade -y -o DPkg::Options::=--force-confold
+            DEBIAN_FRONTEND=noninteractive sudo apt-get install -y --no-install-recommends clang llvm-dev llvm pkg-config xz-utils make libssl-dev libssl-dev
       - restore_cache:
           keys:
             - << parameters.cache_key >>
@@ -42,24 +81,72 @@ commands:
             - .cache/sccache
             - .cargo
 
+  run_serial:
+    description: "Build and run tests"
+    parameters:
+      workspace_member:
+        type: string
+      cache_key:
+        type: string
+      flags:
+        type: string
+        default: ""
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: << parameters.cache_key >>
+      - run:
+          no_output_timeout: 30m
+          command: cd << parameters.workspace_member >> && RUST_MIN_STACK=67108864 cargo test << parameters.flags >>
+      - clear_environment:
+          cache_key: << parameters.cache_key >>
+
+  run_serial_long:
+    description: "Build and run long running tests"
+    parameters:
+      workspace_member:
+        type: string
+      cache_key:
+        type: string
+      flags:
+        type: string
+        default: ""
+    steps:
+      - checkout
+      - setup_environment:
+          cache_key: << parameters.cache_key >>
+      - run:
+          no_output_timeout: 300m
+          command: cd << parameters.workspace_member >> && RUST_MIN_STACK=67108864 cargo test << parameters.flags >>
+      - clear_environment:
+          cache_key: << parameters.cache_key >>
+
   run_parallel:
     description: "Build and run tests (in parallel)"
     parameters:
       workspace_member:
         type: string
-      features:
+      cache_key:
         type: string
+      flags:
+        type: string
+        default: ""
     steps:
+      - checkout
+      - setup_environment:
+          cache_key: << parameters.cache_key >>
       - run:
-          no_output_timeout: 30m
+          no_output_timeout: 45m
           command: |
             cd << parameters.workspace_member >>
-            cargo test --features=<< parameters.features >> -- --list --format terse | sed 's/: test//' > test_names.txt
+            cargo test -- --list --format terse | sed 's/: test//' > test_names.txt
             TEST_NAMES=$(circleci tests split test_names.txt)
             for i in $(echo $TEST_NAMES | sed "s/ / /g")
             do
-                RUST_MIN_STACK=8388608 cargo test --features=<< parameters.features >> $i
+                RUST_MIN_STACK=67108864 cargo test $i << parameters.flags >>
             done
+      - clear_environment:
+          cache_key: << parameters.cache_key >>
 
   install_rust_nightly:
     description: "Install Rust nightly toolchain"
@@ -67,56 +154,117 @@ commands:
       - run: rustup toolchain install nightly-x86_64-unknown-linux-gnu
 
 jobs:
-
-  environment:
+  integration:
     docker:
-      - image: cimg/rust:1.62
-    resource_class: xlarge
-    parallelism: 1
+      - image: cimg/rust:1.68
+    resource_class: 2xlarge
     steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-environment-cache
-      - run_parallel:
-          workspace_member: environment
-          features: ""
-      - clear_environment:
-          cache_key: snarkos-environment-cache
+      - run_serial_long:
+          workspace_member: .integration
+          cache_key: snarkos-integration-cache
 
   snarkos:
     docker:
-      - image: cimg/rust:1.62
-    resource_class: xlarge
-    parallelism: 20
+      - image: cimg/rust:1.68
+    resource_class: 2xlarge
     steps:
-      - checkout
-      - setup_environment:
-          cache_key: snarkos-stable-cache
-      - run_parallel:
+      - run_serial:
           workspace_member: .
-          features: ""
-      - clear_environment:
           cache_key: snarkos-stable-cache
 
-  # codecov:
-  #   machine:
-  #     image: ubuntu-1604:202004-01
-  #     docker_layer_caching: true
-  #   resource_class: xlarge
-  #   steps:
-  #     - attach_workspace:
-  #         at: /home/circleci/project/
-  #     - run:
-  #         name: Run kcov
-  #         command: >
-  #           cd ~/project/project/ &&
-  #           docker run --security-opt seccomp=unconfined -v ~/project/project/:/home/circleci/project/
-  #           howardwu/snarkos-codecov:2021-03-25 bash /home/circleci/project/ci/kcov.sh
-  #     - run: cd ./project/ && bash <(curl -s https://codecov.io/bash)
-
-  fmt:
+  account:
     docker:
-      - image: cimg/rust:1.62
+      - image: cimg/rust:1.68
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: account
+          cache_key: snarkos-account-cache
+
+  cli:
+    docker:
+      - image: cimg/rust:1.68
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: cli
+          cache_key: snarkos-cli-cache
+
+  display:
+    docker:
+      - image: cimg/rust:1.68
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: display
+          cache_key: snarkos-display-cache
+
+  node:
+    docker:
+      - image: cimg/rust:1.68
+    resource_class: 2xlarge
+    steps:
+      - run_serial:
+          workspace_member: node
+          cache_key: snarkos-node-cache
+
+  node-cdn:
+    docker:
+      - image: cimg/rust:1.68
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/cdn
+          cache_key: snarkos-node-cdn-cache
+
+  node-consensus:
+    docker:
+      - image: cimg/rust:1.68
+    resource_class: 2xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/consensus
+          cache_key: snarkos-node-consensus-cache
+
+  node-messages:
+    docker:
+      - image: cimg/rust:1.68
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/messages
+          cache_key: snarkos-node-messages-cache
+
+  node-rest:
+    docker:
+      - image: cimg/rust:1.68
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/rest
+          cache_key: snarkos-node-rest-cache
+
+  node-router:
+    docker:
+      - image: cimg/rust:1.68
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/router
+          cache_key: snarkos-node-router-cache
+
+  node-tcp:
+    docker:
+      - image: cimg/rust:1.68
+    resource_class: xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/tcp
+          cache_key: snarkos-node-tcp-cache
+
+  check-fmt:
+    docker:
+      - image: cimg/rust:1.68
     resource_class: xlarge
     steps:
       - checkout
@@ -130,142 +278,74 @@ jobs:
       - clear_environment:
           cache_key: snarkos-fmt-cache
 
-  clippy:
+  check-clippy:
     docker:
-      - image: cimg/rust:1.62
-    resource_class: xlarge
+      - image: cimg/rust:1.68
+    resource_class: 2xlarge
     steps:
       - checkout
-      - install_rust_nightly
       - setup_environment:
           cache_key: snarkos-clippy-cache
       - run:
-          name: Check style
+          name: Check lint
           no_output_timeout: 35m
-          command: cargo +nightly clippy --workspace --all-targets
+          command: |
+            cargo clippy --workspace --all-targets -- -D warnings
+            cargo clippy --workspace --all-targets --all-features -- -D warnings
       - clear_environment:
           cache_key: snarkos-clippy-cache
 
-
-  build-and-publish-docker-arm:
-    machine:
-      image: ubuntu-2004:202101-01
-      docker_layer_caching: true
-    resource_class: arm.large
+  verify-windows:
+    executor:
+      name: windows/default
+      size: xlarge
+    environment:
+      CARGO_NET_GIT_FETCH_WITH_CLI: "true"
+    parameters:
+      workspace_member:
+        type: string
     steps:
-      - checkout
-      - run: mkdir -p my_workspace
-      - run:
-          name: "Build snarkOS Docker Image ARM V8"
-          no_output_timeout: 2h
-          command: |
-            VERSION=$(git rev-parse --short HEAD)
-            docker build -f Dockerfile -t $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64 .
-      - run:
-          name: "Push snarkOS Docker Image ARM V8"
-          command: |
-            VERSION=$(git rev-parse --short HEAD)
-            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            # CREATE THE SHELL FILE WITH IMAGE NAME AND TAG
-            docker push $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64
-            echo "Pushed $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-arm64"
-      - run:
-          name: "Save arm64 image tag"
-          command: |
-            VERSION=$(git rev-parse --short HEAD)
-            echo "$CIRCLE_BRANCH-$VERSION-arm64" > my_workspace/docker_tag_arm
-      - persist_to_workspace:
-          root: my_workspace
-          paths:
-            - docker_tag_arm
-
-  build-and-publish-docker-amd:
-    machine:
-      image: ubuntu-2004:202101-01
-      docker_layer_caching: true
-    resource_class: xlarge
-    steps:
-      - checkout
-      - run: mkdir -p my_workspace
-      - run:
-          name: "Build snarkOS Docker Image AMD"
-          no_output_timeout: 2h
-          command: |
-            VERSION=$(git rev-parse --short HEAD)
-            docker build -f Dockerfile -t $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64 .
-      - run:
-          name: "Push snarkOS Docker Image AMD"
-          command: |
-            VERSION=$(git rev-parse --short HEAD)
-            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            docker push $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64
-            echo "Pushed $DOCKER_REPO:$CIRCLE_BRANCH-$VERSION-amd64"
-      - run:
-          name: "Save amd64 image tag"
-          command: |
-            VERSION=$(git rev-parse --short HEAD)
-            echo "$CIRCLE_BRANCH-$VERSION-amd64" > my_workspace/docker_tag_amd
-      - persist_to_workspace:
-          root: my_workspace
-          paths:
-            - docker_tag_amd
-
-  publish_snarkos_manifest:
-    machine:
-      image: ubuntu-2004:202101-01
-      docker_layer_caching: true
-    resource_class: medium
-    steps:
-      - checkout
-      - attach_workspace:
-          at: my_workspace
-      - run:
-          name: "Pull ARM Docker image"
-          command: |
-            ARM_TAG=$(cat my_workspace/docker_tag_arm)
-            echo $ARM_TAG
-            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            docker pull $DOCKER_REPO:$ARM_TAG
-      - run:
-          name: "Pull AMD Docker image"
-          command: |
-            AMD_TAG=$(cat my_workspace/docker_tag_amd)
-            echo $AMD_TAG
-            docker pull $DOCKER_REPO:$AMD_TAG
-      - run:
-          name: "Create and push Docker multi arch manifest"
-          command: |
-            ARM_TAG=$(cat my_workspace/docker_tag_arm)
-            AMD_TAG=$(cat my_workspace/docker_tag_amd)
-            echo $DOCKERHUB_TOKEN | docker login -u $DOCKERHUB_USERNAME --password-stdin
-            echo $DOCKER_REPO
-            echo $CIRCLE_BRANCH
-            echo $ARM_TAG
-            echo $AMD_TAG
-            docker manifest create $DOCKER_REPO:${CIRCLE_BRANCH}-latest --amend $DOCKER_REPO:${ARM_TAG} --amend $DOCKER_REPO:${AMD_TAG}
-            docker manifest inspect $DOCKER_REPO:${CIRCLE_BRANCH}-latest
-            docker manifest push $DOCKER_REPO:${CIRCLE_BRANCH}-latest
-            echo "Pushed $DOCKER_REPO:${CIRCLE_BRANCH}-latest"
+      - check_windows:
+          workspace_member: << parameters.workspace_member >>
 
 workflows:
+  version: 2
+
   main-workflow:
     jobs:
-      - environment
       - snarkos
-      # - codecov:
-      #     requires:
-      #       - rust-stable
-      - fmt
-      - clippy
-  build-snarkos-docker-images:
-    when:
-      or:
-        - equal: [ testnet3, << pipeline.git.branch >> ]
-        - equal: [ docker-builds, << pipeline.git.branch >> ]
+      - account
+      - cli
+      - display
+      - node
+      - node-cdn
+      - node-consensus
+      - node-messages
+      - node-rest
+      - node-router
+      - node-tcp
+      - check-fmt
+      - check-clippy
+
+  windows-workflow:
     jobs:
-      - build-and-publish-docker-arm
-      - build-and-publish-docker-amd
-      - publish_snarkos_manifest:
-          requires:
-            - build-and-publish-docker-arm
-            - build-and-publish-docker-amd
+      - verify-windows:
+          matrix:
+            parameters:
+              workspace_member: [
+                account,
+                cli,
+                display,
+                node
+              ]
+
+  scheduled-workflow:
+    triggers:
+      - schedule:
+          cron: "0 0,12 * * *"
+          filters:
+            branches:
+              only:
+                - testnet3
+    jobs:
+      - integration

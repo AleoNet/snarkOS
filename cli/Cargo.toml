@@ -1,0 +1,102 @@
+[package]
+name = "snarkos-cli"
+version = "2.1.1"
+authors = [ "The Aleo Team <hello@aleo.org>" ]
+description = "A CLI for a decentralized operating system"
+homepage = "https://aleo.org"
+repository = "https://github.com/AleoHQ/snarkOS"
+keywords = [
+  "aleo",
+  "cryptography",
+  "blockchain",
+  "decentralized",
+  "zero-knowledge"
+]
+categories = [ "cryptography", "operating-systems" ]
+license = "Apache-2.0"
+edition = "2021"
+
+[dependencies.aleo-std]
+version = "0.1.18"
+default-features = false
+
+[dependencies.anstyle]
+version = "1"
+
+[dependencies.anyhow]
+version = "1.0.70"
+
+[dependencies.clap]
+version = "4.3"
+features = [ "derive", "color", "unstable-styles" ]
+
+[dependencies.colored]
+version = "2"
+
+[dependencies.crossterm]
+version = "0.26"
+
+[dependencies.num_cpus]
+version = "1"
+
+[dependencies.parking_lot]
+version = "0.12"
+
+[dependencies.rand]
+version = "0.8"
+default-features = false
+
+[dependencies.rand_chacha]
+version = "0.3.0"
+default-features = false
+
+[dependencies.rayon]
+version = "1"
+
+[dependencies.self_update]
+version = "0.37"
+
+[dependencies.serde]
+version = "1"
+
+[dependencies.serde_json]
+version = "1"
+
+[dependencies.snarkos-account]
+path = "../account"
+version = "=2.1.1"
+
+[dependencies.snarkos-display]
+path = "../display"
+version = "=2.1.1"
+
+[dependencies.snarkos-node]
+path = "../node"
+version = "=2.1.1"
+
+[dependencies.snarkos-node-rest]
+path = "../node/rest"
+version = "=2.1.1"
+
+[dependencies.snarkvm]
+workspace = true
+
+[dependencies.thiserror]
+version = "1.0"
+
+[dependencies.tokio]
+version = "1.28"
+features = [ "rt" ]
+
+[dependencies.tracing-subscriber]
+version = "0.3"
+features = [ "env-filter" ]
+
+[dependencies.ureq]
+version = "2.7"
+
+[target."cfg(target_family = \"unix\")".dependencies.nix]
+version = "0.26"
+
+[dev-dependencies.indexmap]
+version = "1"
