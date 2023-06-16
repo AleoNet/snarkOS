@@ -112,9 +112,8 @@ pub async fn load_blocks<N: Network>(
     }
 
     // If the end height is not specified, set it to the CDN height.
-    let end_height = end_height.unwrap_or(cdn_height);
     // If the end height is greater than the CDN height, set the end height to the CDN height.
-    let end_height = if end_height > cdn_height { cdn_height } else { end_height };
+    let end_height = end_height.unwrap_or(cdn_height).min(cdn_height);
     // If the end height is less than the start height, return.
     if end_height < start_height {
         return Err((
