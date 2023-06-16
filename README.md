@@ -89,6 +89,8 @@ Lastly, install `snarkOS`:
 cargo install --path .
 ```
 
+Please ensure ports `4133/tcp` and `3033/tcp` are open on your router and OS firewall.
+
 ## 3. Run an Aleo Node
 
 ## 3a. Run an Aleo Client
