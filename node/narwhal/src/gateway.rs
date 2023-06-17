@@ -64,10 +64,13 @@ pub struct Gateway<N: Network> {
 impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
     pub fn new(shared: Arc<Shared<N>>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
-        // Initialize the worker IP.
-        let worker_ip = SocketAddr::from_str(&format!("0.0.0.0:{}", MEMORY_POOL_PORT + dev.unwrap_or(0)))?;
+        // Initialize the gateway IP.
+        let ip = match dev {
+            Some(dev) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev)),
+            None => SocketAddr::from_str(&format!("0.0.0.0:{}", MEMORY_POOL_PORT)),
+        }?;
         // Initialize the TCP stack.
-        let tcp = Tcp::new(Config::new(worker_ip, MAX_COMMITTEE_SIZE));
+        let tcp = Tcp::new(Config::new(ip, MAX_COMMITTEE_SIZE));
         // Return the gateway.
         Ok(Self {
             shared,
@@ -138,6 +141,55 @@ impl<N: Network> Gateway<N> {
         &self.connected_peers
     }
 
+    /// Attempts to connect to the given peer IP.
+    pub fn connect(&self, peer_ip: SocketAddr) -> Option<JoinHandle<()>> {
+        // Return early if the attempt is against the protocol rules.
+        if let Err(forbidden_error) = self.check_connection_attempt(peer_ip) {
+            warn!("{forbidden_error}");
+            return None;
+        }
+
+        let gateway = self.clone();
+        Some(tokio::spawn(async move {
+            // Attempt to connect to the candidate peer.
+            match gateway.tcp.connect(peer_ip).await {
+                // // Remove the peer from the candidate peers.
+                // Ok(()) => gateway.remove_candidate_peer(peer_ip),
+                Ok(()) => (),
+                // If the connection was not allowed, log the error.
+                Err(error) => {
+                    gateway.connecting_peers.lock().remove(&peer_ip);
+                    warn!("Unable to connect to '{peer_ip}' - {error}")
+                }
+            }
+        }))
+    }
+
+    /// Ensure we are allowed to connect to the given peer.
+    fn check_connection_attempt(&self, peer_ip: SocketAddr) -> Result<()> {
+        // Ensure the peer IP is not this node.
+        if self.is_local_ip(&peer_ip) {
+            bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (attempted to self-connect)")
+        }
+        // Ensure the node does not surpass the maximum number of peer connections.
+        if self.number_of_connected_peers() >= self.max_connected_peers() {
+            bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (maximum peers reached)")
+        }
+        // Ensure the node is not already connected to this peer.
+        if self.is_connected(&peer_ip) {
+            bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (already connected)")
+        }
+        // // Ensure the peer is not restricted.
+        // if self.is_restricted(&peer_ip) {
+        //     bail!("Dropping connection attempt to '{peer_ip}' (restricted)")
+        // }
+        // Ensure the node is not already connecting to this peer.
+        if !self.connecting_peers.lock().insert(peer_ip) {
+            bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (already shaking hands as the initiator)")
+        }
+        Ok(())
+    }
+
     /// Ensure the peer is allowed to connect.
     fn ensure_peer_is_allowed(&self, peer_ip: SocketAddr) -> Result<()> {
         // Ensure the peer IP is not this node.
@@ -171,11 +223,13 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Inserts the given peer into the connected peers.
-    pub fn insert_connected_peer(&self, peer_ip: SocketAddr, peer_addr: SocketAddr) {
+    fn insert_connected_peer(&self, peer_ip: SocketAddr, peer_addr: SocketAddr, address: Address<N>) {
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.insert_peer(peer_ip, peer_addr);
         // Add an entry for this peer in the connected peers.
         self.connected_peers.write().insert(peer_ip);
+        // Add this peer to the shared state.
+        self.shared.insert_peer(peer_ip, address);
         // // Remove this peer from the candidate peers, if it exists.
         // self.candidate_peers.write().remove(&peer_ip);
         // // Remove this peer from the restricted peers, if it exists.
@@ -183,13 +237,15 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Removes the connected peer and adds them to the candidate peers.
-    pub fn remove_connected_peer(&self, peer_ip: SocketAddr) {
+    fn remove_connected_peer(&self, peer_ip: SocketAddr) {
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.remove_peer(&peer_ip);
         // // Removes the peer from the sync pool.
         // self.sync.remove_peer(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().remove(&peer_ip);
+        // Remove this peer from the shared state.
+        self.shared.remove_peer(&peer_ip);
         // // Add the peer to the candidate peers.
         // self.candidate_peers.write().insert(peer_ip);
     }
@@ -502,7 +558,7 @@ impl<N: Network> Gateway<N> {
         framed.send(Event::ChallengeResponse(our_response)).await?;
 
         // Add the peer to the gateway.
-        self.insert_connected_peer(peer_ip, peer_addr);
+        self.insert_connected_peer(peer_ip, peer_addr, peer_request.address);
 
         Ok((peer_ip, framed))
     }
@@ -571,7 +627,7 @@ impl<N: Network> Gateway<N> {
         );
 
         // Add the peer to the gateway.
-        self.insert_connected_peer(peer_ip, peer_addr);
+        self.insert_connected_peer(peer_ip, peer_addr, peer_request.address);
 
         Ok((peer_ip, framed))
     }

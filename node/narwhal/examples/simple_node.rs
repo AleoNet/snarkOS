@@ -20,11 +20,12 @@ use snarkos_node_narwhal::{
     helpers::{init_primary_channels, PrimarySender},
     Primary,
     Shared,
+    MEMORY_POOL_PORT,
 };
 
 use anyhow::{bail, Result};
 use rand::SeedableRng;
-use std::{str::FromStr, sync::Arc};
+use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
@@ -91,12 +92,33 @@ pub async fn start_primary(
     let mut primary = Primary::<CurrentNetwork>::new(shared.clone(), account, Some(node_id))?;
     // Run the primary instance.
     primary.run(receiver).await?;
+    // Keep the node's connections.
+    keep_connections(&primary, node_id, num_nodes);
     // Handle the log connections.
     log_connections(&primary);
     // Handle OS signals.
     handle_signals(&primary);
     // Return the primary instance.
     Ok((primary, sender))
+}
+
+/// Actively try to keep the node's connections to all nodes.
+fn keep_connections(primary: &Primary<CurrentNetwork>, node_id: u16, num_nodes: u16) {
+    let node = primary.clone();
+    tokio::task::spawn(async move {
+        loop {
+            for i in 0..num_nodes {
+                // Initialize the gateway IP.
+                let ip = SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i)).unwrap();
+                // Check if the node is connected.
+                if i != node_id && !node.gateway().is_connected(&ip) {
+                    // Connect to the node.
+                    node.gateway().connect(ip);
+                }
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        }
+    });
 }
 
 /// Logs the node's connections.

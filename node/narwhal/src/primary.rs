@@ -54,6 +54,9 @@ impl<N: Network> Primary<N> {
     pub async fn run(&mut self, receiver: PrimaryReceiver<N>) -> Result<()> {
         info!("Starting the primary instance of the memory pool");
 
+        // Initialize the gateway.
+        self.gateway.run().await?;
+
         // Construct the worker ID.
         let id = u8::try_from(self.workers.read().len())?;
         // Construct the worker instance.

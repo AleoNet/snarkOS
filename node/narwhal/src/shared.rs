@@ -15,17 +15,21 @@
 use snarkvm::console::{prelude::*, types::Address};
 
 use parking_lot::RwLock;
-use std::collections::HashMap;
+use std::{collections::HashMap, net::SocketAddr};
 
 pub struct Shared<N: Network> {
     /// A map of `address` to `stake`.
     committee: RwLock<HashMap<Address<N>, u64>>,
+    /// A map of `peer IP` to `address`.
+    peer_addresses: RwLock<HashMap<SocketAddr, Address<N>>>,
+    /// A map of `address` to `peer IP`.
+    address_peers: RwLock<HashMap<Address<N>, SocketAddr>>,
 }
 
 impl<N: Network> Shared<N> {
     /// Initializes a new `Shared` instance.
     pub fn new() -> Self {
-        Self { committee: RwLock::new(HashMap::new()) }
+        Self { committee: Default::default(), peer_addresses: Default::default(), address_peers: Default::default() }
     }
 
     /// Adds a validator to the committee.
@@ -39,7 +43,9 @@ impl<N: Network> Shared<N> {
         self.committee.write().insert(address, stake);
         Ok(())
     }
+}
 
+impl<N: Network> Shared<N> {
     /// Returns the committee.
     pub fn committee(&self) -> &RwLock<HashMap<Address<N>, u64>> {
         &self.committee
@@ -81,5 +87,30 @@ impl<N: Network> Shared<N> {
         // Assuming `N = 3f + 1 + k`, where `0 <= k < 3`,
         // then `(N + 2) / 3 = f + 1 + k/3 = f + 1`.
         Ok(self.total_stake()?.saturating_add(2) / 3)
+    }
+}
+
+impl<N: Network> Shared<N> {
+    /// Returns the peer IP for the given address.
+    pub fn get_peer_ip(&self, address: &Address<N>) -> Option<SocketAddr> {
+        self.address_peers.read().get(address).copied()
+    }
+
+    /// Returns the address for the given peer IP.
+    pub fn get_address(&self, peer_ip: &SocketAddr) -> Option<Address<N>> {
+        self.peer_addresses.read().get(peer_ip).copied()
+    }
+
+    /// Inserts the given peer.
+    pub(crate) fn insert_peer(&self, peer_ip: SocketAddr, address: Address<N>) {
+        self.peer_addresses.write().insert(peer_ip, address);
+        self.address_peers.write().insert(address, peer_ip);
+    }
+
+    /// Removes the given peer.
+    pub(crate) fn remove_peer(&self, peer_ip: &SocketAddr) {
+        if let Some(address) = self.peer_addresses.write().remove(peer_ip) {
+            self.address_peers.write().remove(&address);
+        }
     }
 }
