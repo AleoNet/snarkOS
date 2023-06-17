@@ -12,57 +12,99 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{helpers::GatewayReceiver, Gateway, Shared, Worker};
-use snarkvm::console::prelude::*;
+use crate::{helpers::PrimaryReceiver, Gateway, Shared, Worker};
+use snarkos_node_messages::Data;
+use snarkvm::{
+    console::prelude::*,
+    prelude::{ProverSolution, PuzzleCommitment, Transaction},
+};
 
-use std::sync::Arc;
+use parking_lot::{Mutex, RwLock};
+use std::{future::Future, sync::Arc};
+use tokio::task::JoinHandle;
 
+#[derive(Clone)]
 pub struct Primary<N: Network> {
     /// The shared state.
     shared: Arc<Shared<N>>,
     /// The gateway.
     gateway: Gateway<N>,
-    /// The gateway receiver, which allows the router to forward messages to the gateway.
-    gateway_receiver: GatewayReceiver<N>,
     /// The workers.
-    workers: Vec<Worker<N>>,
+    workers: Arc<RwLock<Vec<Worker<N>>>>,
+    /// The spawned handles.
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 impl<N: Network> Primary<N> {
     /// Initializes a new primary instance.
-    pub fn new(shared: Arc<Shared<N>>, gateway_receiver: GatewayReceiver<N>) -> Result<Self> {
+    pub fn new(shared: Arc<Shared<N>>, dev: Option<u16>) -> Result<Self> {
         // Construct the gateway instance.
-        let gateway = Gateway::new(shared.clone())?;
+        let gateway = Gateway::new(shared.clone(), dev)?;
         // Return the primary instance.
-        Ok(Self { shared, gateway, gateway_receiver, workers: Vec::new() })
+        Ok(Self { shared, gateway, workers: Default::default(), handles: Default::default() })
     }
 
     /// Run the primary instance.
-    pub async fn run(&mut self) -> Result<()> {
+    pub async fn run(&mut self, receiver: PrimaryReceiver<N>) -> Result<()> {
         info!("Starting the primary instance of the memory pool");
 
         // Construct the worker ID.
-        let id = u8::try_from(self.workers.len())?;
+        let id = u8::try_from(self.workers.read().len())?;
         // Construct the worker instance.
-        let worker = Worker::new(id, self.shared.clone(), self.gateway.clone())?;
+        let mut worker = Worker::new(id, self.shared.clone(), self.gateway.clone())?;
+        // Run the worker instance.
+        worker.run().await?;
         // Add the worker to the list of workers.
-        self.workers.push(worker);
+        self.workers.write().push(worker);
 
-        // // the task for processing parsed messages
-        // let self_clone = self.clone();
-        // let inbound_processing_task = tokio::spawn(async move {
-        //     let node = self_clone.tcp();
-        //     trace!(parent: node.span(), "spawned a task for processing messages from {}", addr);
-        //     tx_processing.send(()).unwrap(); // safe; the channel was just opened
-        //
-        //     while let Some(msg) = self.gateway_receiver.rx_unconfirmed_solution.recv().await {
-        //         if let Err(e) = self_clone.process_message(addr, msg).await {
-        //             error!(parent: node.span(), "can't process a message from {}: {}", addr, e);
-        //             node.known_peers().register_failure(addr);
-        //         }
-        //     }
-        // });
+        // Start the primary handlers.
+        self.start_handlers(receiver);
 
         Ok(())
+    }
+
+    /// Starts the primary handlers.
+    pub fn start_handlers(&self, receiver: PrimaryReceiver<N>) {
+        let PrimaryReceiver { mut rx_unconfirmed_solution, mut rx_unconfirmed_transaction } = receiver;
+
+        // Process the unconfirmed solutions.
+        let self_clone = self.clone();
+        self.spawn(async move {
+            while let Some(msg) = rx_unconfirmed_solution.recv().await {
+                // TODO (howardwu): Choose the correct worker.
+                let worker = self_clone.workers.read().first().unwrap().clone();
+                // Process the unconfirmed solution.
+                if let Err(e) = worker.process_unconfirmed_solution(msg).await {
+                    // error!("can't process a message: {e}");
+                }
+            }
+        });
+
+        // Process the unconfirmed transactions.
+        let self_clone = self.clone();
+        self.spawn(async move {
+            while let Some(msg) = rx_unconfirmed_transaction.recv().await {
+                // TODO (howardwu): Choose the correct worker.
+                let worker = self_clone.workers.read().first().unwrap().clone();
+                // Process the unconfirmed transaction.
+                if let Err(e) = worker.process_unconfirmed_transaction(msg).await {
+                    // error!("can't process a message: {e}");
+                }
+            }
+        });
+    }
+
+    /// Spawns a task with the given future; it should only be used for long-running tasks.
+    pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
+        self.handles.lock().push(tokio::spawn(future));
+    }
+
+    /// Shuts down the primary.
+    pub async fn shut_down(&self) {
+        trace!("Shutting down the primary...");
+        // Abort the tasks.
+        self.handles.lock().iter().for_each(|handle| handle.abort());
+        // Close the gateway.
+        self.gateway.shut_down().await;
     }
 }

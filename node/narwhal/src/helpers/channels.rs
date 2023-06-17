@@ -12,35 +12,35 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use snarkos_node_messages::Data;
 use snarkvm::{
     console::network::*,
-    prelude::{ProverSolution, Transaction},
+    prelude::{ProverSolution, PuzzleCommitment, Transaction},
 };
 
 use tokio::sync::mpsc;
 
 const GATEWAY_CHANNEL_SIZE: usize = 1024;
 
-/// Initializes the gateway channels.
-pub fn init_gateway_channels<N: Network>() -> (GatewaySender<N>, GatewayReceiver<N>) {
+/// Initializes the primary channels.
+pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver<N>) {
     let (tx_unconfirmed_solution, rx_unconfirmed_solution) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
     let (tx_unconfirmed_transaction, rx_unconfirmed_transaction) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
 
-    let gateway_sender = GatewaySender { tx_unconfirmed_solution, tx_unconfirmed_transaction };
+    let sender = PrimarySender { tx_unconfirmed_solution, tx_unconfirmed_transaction };
+    let receiver = PrimaryReceiver { rx_unconfirmed_solution, rx_unconfirmed_transaction };
 
-    let gateway_receiver = GatewayReceiver { rx_unconfirmed_solution, rx_unconfirmed_transaction };
-
-    (gateway_sender, gateway_receiver)
+    (sender, receiver)
 }
 
 #[derive(Debug)]
-pub struct GatewaySender<N: Network> {
-    pub tx_unconfirmed_solution: mpsc::Sender<ProverSolution<N>>,
-    pub tx_unconfirmed_transaction: mpsc::Sender<Transaction<N>>,
+pub struct PrimarySender<N: Network> {
+    pub tx_unconfirmed_solution: mpsc::Sender<(PuzzleCommitment<N>, Data<ProverSolution<N>>)>,
+    pub tx_unconfirmed_transaction: mpsc::Sender<(N::TransactionID, Data<Transaction<N>>)>,
 }
 
 #[derive(Debug)]
-pub struct GatewayReceiver<N: Network> {
-    pub rx_unconfirmed_solution: mpsc::Receiver<ProverSolution<N>>,
-    pub rx_unconfirmed_transaction: mpsc::Receiver<Transaction<N>>,
+pub struct PrimaryReceiver<N: Network> {
+    pub rx_unconfirmed_solution: mpsc::Receiver<(PuzzleCommitment<N>, Data<ProverSolution<N>>)>,
+    pub rx_unconfirmed_transaction: mpsc::Receiver<(N::TransactionID, Data<Transaction<N>>)>,
 }

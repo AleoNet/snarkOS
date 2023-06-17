@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{EventCodec, GatewayReceiver, Resolver},
+    helpers::{EventCodec, PrimaryReceiver, Resolver},
     Event,
     Shared,
     CONTEXT,
@@ -54,9 +54,9 @@ pub struct Gateway<N: Network> {
 
 impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
-    pub fn new(shared: Arc<Shared<N>>) -> Result<Self> {
+    pub fn new(shared: Arc<Shared<N>>, dev: Option<u16>) -> Result<Self> {
         // Initialize the worker IP.
-        let worker_ip = SocketAddr::from_str(&format!("0.0.0.0:{MEMORY_POOL_PORT}"))?;
+        let worker_ip = SocketAddr::from_str(&format!("0.0.0.0:{}", MEMORY_POOL_PORT + dev.unwrap_or(0)))?;
         // Initialize the TCP stack.
         let tcp = Tcp::new(Config::new(worker_ip, MAX_COMMITTEE_SIZE));
         // Return the gateway.
@@ -263,6 +263,13 @@ impl<N: Network> Gateway<N> {
                 debug_assert!(_disconnected);
             }
         })
+    }
+
+    /// Shuts down the gateway.
+    pub async fn shut_down(&self) {
+        trace!("Shutting down the gateway...");
+        // Close the listener.
+        self.tcp.shut_down().await;
     }
 }
 

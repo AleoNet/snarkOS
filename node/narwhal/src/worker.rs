@@ -13,10 +13,15 @@
 // limitations under the License.
 
 use crate::{Gateway, Shared};
-use snarkvm::console::prelude::*;
+use snarkos_node_messages::Data;
+use snarkvm::{
+    console::prelude::*,
+    prelude::{ProverSolution, PuzzleCommitment, Transaction},
+};
 
 use std::sync::Arc;
 
+#[derive(Clone)]
 pub struct Worker<N: Network> {
     /// The worker ID.
     id: u8,
@@ -43,6 +48,24 @@ impl<N: Network> Worker<N> {
         // // Run the validator instance.
         // validator.run().await?;
 
+        Ok(())
+    }
+
+    /// Handles the incoming unconfirmed solution.
+    /// Note: This method assumes the incoming solution is valid.
+    pub(crate) async fn process_unconfirmed_solution(
+        &self,
+        (puzzle_commitment, prover_solution): (PuzzleCommitment<N>, Data<ProverSolution<N>>),
+    ) -> Result<()> {
+        Ok(())
+    }
+
+    /// Handles the incoming unconfirmed transaction.
+    /// Note: This method assumes the incoming transaction is valid.
+    pub(crate) async fn process_unconfirmed_transaction(
+        &self,
+        (id, transaction): (N::TransactionID, Data<Transaction<N>>),
+    ) -> Result<()> {
         Ok(())
     }
 }

@@ -18,5 +18,8 @@ pub use channels::*;
 mod codec;
 pub use codec::*;
 
+mod entry;
+pub use entry::*;
+
 mod resolver;
 pub use resolver::*;

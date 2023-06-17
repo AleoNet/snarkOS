@@ -16,6 +16,8 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
+
+
 [dependencies.anyhow]
 version = "1.0.70"
 
@@ -55,3 +57,7 @@ features = [ "codec" ]
 
 [dependencies.tracing]
 version = "0.1"
+
+[dev-dependencies.tracing-subscriber]
+version = "0.3"
+features = [ "env-filter" ]
