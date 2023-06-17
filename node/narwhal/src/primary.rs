@@ -28,8 +28,6 @@ use tokio::task::JoinHandle;
 pub struct Primary<N: Network> {
     /// The shared state.
     shared: Arc<Shared<N>>,
-    /// The account of the node.
-    account: Account<N>,
     /// The gateway.
     gateway: Gateway<N>,
     /// The workers.
@@ -42,9 +40,9 @@ impl<N: Network> Primary<N> {
     /// Initializes a new primary instance.
     pub fn new(shared: Arc<Shared<N>>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
         // Construct the gateway instance.
-        let gateway = Gateway::new(shared.clone(), dev)?;
+        let gateway = Gateway::new(shared.clone(), account, dev)?;
         // Return the primary instance.
-        Ok(Self { shared, account, gateway, workers: Default::default(), handles: Default::default() })
+        Ok(Self { shared, gateway, workers: Default::default(), handles: Default::default() })
     }
 
     /// Returns the gateway.

@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod challenge_request;
+pub use challenge_request::ChallengeRequest;
+
+mod challenge_response;
+pub use challenge_response::ChallengeResponse;
+
 mod disconnect;
 pub use disconnect::Disconnect;
 
@@ -19,7 +25,10 @@ mod worker_batch;
 pub use worker_batch::WorkerBatch;
 
 use snarkos_node_messages::{Data, DisconnectReason};
-use snarkvm::console::prelude::*;
+use snarkvm::{
+    console::prelude::*,
+    prelude::{Address, Signature},
+};
 
 use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
@@ -28,7 +37,6 @@ use std::{
     fmt::{Display, Formatter},
     io::{Read, Result as IoResult, Write},
     net::SocketAddr,
-    ops::Deref,
 };
 
 pub trait EventTrait {
@@ -44,18 +52,22 @@ pub trait EventTrait {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Event<N: Network> {
+    ChallengeRequest(ChallengeRequest<N>),
+    ChallengeResponse(ChallengeResponse<N>),
     Disconnect(Disconnect),
     WorkerBatch(WorkerBatch<N>),
 }
 
 impl<N: Network> Event<N> {
     /// The version of the event protocol; it can be incremented in order to force users to update.
-    pub const VERSION: u32 = 0;
+    pub const VERSION: u32 = 1;
 
     /// Returns the event name.
     #[inline]
     pub fn name(&self) -> String {
         match self {
+            Self::ChallengeRequest(event) => event.name(),
+            Self::ChallengeResponse(event) => event.name(),
             Self::Disconnect(event) => event.name(),
             Self::WorkerBatch(event) => event.name(),
         }
@@ -65,8 +77,10 @@ impl<N: Network> Event<N> {
     #[inline]
     pub fn id(&self) -> u16 {
         match self {
-            Self::Disconnect(..) => 0,
-            Self::WorkerBatch(..) => 1,
+            Self::ChallengeRequest(..) => 0,
+            Self::ChallengeResponse(..) => 1,
+            Self::Disconnect(..) => 2,
+            Self::WorkerBatch(..) => 3,
         }
     }
 
@@ -76,6 +90,8 @@ impl<N: Network> Event<N> {
         writer.write_all(&self.id().to_le_bytes()[..])?;
 
         match self {
+            Self::ChallengeRequest(event) => event.serialize(writer),
+            Self::ChallengeResponse(event) => event.serialize(writer),
             Self::Disconnect(event) => event.serialize(writer),
             Self::WorkerBatch(event) => event.serialize(writer),
         }
@@ -94,8 +110,10 @@ impl<N: Network> Event<N> {
 
         // Deserialize the data field.
         let event = match id {
-            0 => Self::Disconnect(EventTrait::deserialize(bytes)?),
-            1 => Self::WorkerBatch(EventTrait::deserialize(bytes)?),
+            0 => Self::ChallengeRequest(EventTrait::deserialize(bytes)?),
+            1 => Self::ChallengeResponse(EventTrait::deserialize(bytes)?),
+            2 => Self::Disconnect(EventTrait::deserialize(bytes)?),
+            3 => Self::WorkerBatch(EventTrait::deserialize(bytes)?),
             _ => bail!("Unknown event ID {id}"),
         };
 

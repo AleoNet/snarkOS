@@ -19,8 +19,10 @@ use ::bytes::{BufMut, BytesMut};
 use core::marker::PhantomData;
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
-/// The maximum size of a event that can be transmitted in the network.
-const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
+/// The maximum size of an event that can be transmitted during the handshake.
+const MAX_HANDSHAKE_SIZE: usize = 1024 * 1024; // 1 MiB
+/// The maximum size of an event that can be transmitted in the network.
+const MAX_EVENT_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
 
 /// The codec used to decode and encode network `Event`s.
 pub struct EventCodec<N: Network> {
@@ -28,10 +30,18 @@ pub struct EventCodec<N: Network> {
     _phantom: PhantomData<N>,
 }
 
+impl<N: Network> EventCodec<N> {
+    pub fn handshake() -> Self {
+        let mut codec = Self::default();
+        codec.codec.set_max_frame_length(MAX_HANDSHAKE_SIZE);
+        codec
+    }
+}
+
 impl<N: Network> Default for EventCodec<N> {
     fn default() -> Self {
         Self {
-            codec: LengthDelimitedCodec::builder().max_frame_length(MAXIMUM_MESSAGE_SIZE).little_endian().new_codec(),
+            codec: LengthDelimitedCodec::builder().max_frame_length(MAX_EVENT_SIZE).little_endian().new_codec(),
             _phantom: Default::default(),
         }
     }

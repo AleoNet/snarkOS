@@ -13,14 +13,18 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{EventCodec, PrimaryReceiver, Resolver},
+    helpers::{EventCodec, Resolver},
+    ChallengeRequest,
+    ChallengeResponse,
     Event,
+    EventTrait,
     Shared,
     CONTEXT,
     MAX_COMMITTEE_SIZE,
     MEMORY_POOL_PORT,
 };
-use snarkos_node_messages::DisconnectReason;
+use snarkos_account::Account;
+use snarkos_node_messages::{Data, DisconnectReason};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
@@ -29,16 +33,21 @@ use snarkos_node_tcp::{
     Tcp,
     P2P,
 };
-use snarkvm::console::prelude::*;
+use snarkvm::{console::prelude::*, prelude::Address};
 
+use futures::SinkExt;
 use parking_lot::{Mutex, RwLock};
 use std::{collections::HashSet, io, net::SocketAddr, sync::Arc};
-use tokio::{sync::oneshot, task::JoinHandle};
+use tokio::{net::TcpStream, sync::oneshot, task::JoinHandle};
+use tokio_stream::StreamExt;
+use tokio_util::codec::Framed;
 
 #[derive(Clone)]
 pub struct Gateway<N: Network> {
     /// The shared state.
     shared: Arc<Shared<N>>,
+    /// The account of the node.
+    account: Account<N>,
     /// The TCP stack.
     tcp: Tcp,
     /// The resolver.
@@ -54,7 +63,7 @@ pub struct Gateway<N: Network> {
 
 impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
-    pub fn new(shared: Arc<Shared<N>>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(shared: Arc<Shared<N>>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
         // Initialize the worker IP.
         let worker_ip = SocketAddr::from_str(&format!("0.0.0.0:{}", MEMORY_POOL_PORT + dev.unwrap_or(0)))?;
         // Initialize the TCP stack.
@@ -62,6 +71,7 @@ impl<N: Network> Gateway<N> {
         // Return the gateway.
         Ok(Self {
             shared,
+            account,
             tcp,
             resolver: Default::default(),
             connected_peers: Default::default(),
@@ -243,6 +253,10 @@ impl<N: Network> Gateway<N> {
         // This match statement handles the inbound event by deserializing the event,
         // checking the event is valid, and then calling the appropriate (trait) handler.
         match event {
+            Event::ChallengeRequest(..) | Event::ChallengeResponse(..) => {
+                // Disconnect as the peer is not following the protocol.
+                bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
+            }
             Event::Disconnect(disconnect) => {
                 bail!("{CONTEXT} Disconnecting peer '{peer_ip}' for the following reason: {:?}", disconnect.reason)
             }
@@ -281,49 +295,50 @@ impl<N: Network> P2P for Gateway<N> {
 }
 
 #[async_trait]
-impl<N: Network> Handshake for Gateway<N> {
-    /// Performs the handshake protocol.
-    async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
-        // Perform the handshake.
-        let peer_addr = connection.addr();
-        let conn_side = connection.side();
-        // let stream = self.borrow_stream(&mut connection);
+impl<N: Network> Reading for Gateway<N> {
+    type Codec = EventCodec<N>;
+    type Message = Event<N>;
 
-        // If this is an inbound connection, we log it, but don't know the listening address yet.
-        // Otherwise, we can immediately register the listening address.
-        let mut peer_ip = if conn_side == ConnectionSide::Initiator {
-            debug!("{CONTEXT} Gateway received a connection request from '{peer_addr}'");
-            None
-        } else {
-            debug!("{CONTEXT} Gateway is connecting to {peer_addr}...");
-            Some(peer_addr)
-        };
+    /// Creates a [`Decoder`] used to interpret messages from the network.
+    /// The `side` param indicates the connection side **from the node's perspective**.
+    fn codec(&self, _peer_addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
+        Default::default()
+    }
 
-        // Perform the handshake; we pass on a mutable reference to peer_ip in case the process is broken at any point in time.
-        if conn_side == ConnectionSide::Responder {
-            // This value is immediately guaranteed to be present, so it can be unwrapped.
-            let peer_ip = peer_ip.unwrap();
-
-            // Add the peer to the gateway.
-            self.insert_connected_peer(peer_ip, peer_addr);
-        } else {
-            // Obtain the peer's listening address.
-            peer_ip = Some(SocketAddr::new(peer_addr.ip(), MEMORY_POOL_PORT));
-            let peer_ip = peer_ip.unwrap();
-
-            // Knowing the peer's listening address, ensure it is allowed to connect.
-            if let Err(forbidden_error) = self.ensure_peer_is_allowed(peer_ip) {
-                return Err(error(format!("{forbidden_error}")));
+    /// Processes a message received from the network.
+    async fn process_message(&self, peer_addr: SocketAddr, message: Self::Message) -> io::Result<()> {
+        // Process the message. Disconnect if the peer violated the protocol.
+        if let Err(error) = self.inbound(peer_addr, message).await {
+            if let Some(peer_ip) = self.resolve_to_listener(&peer_addr) {
+                warn!("Disconnecting from '{peer_ip}' - {error}");
+                self.send(peer_ip, Event::Disconnect(DisconnectReason::ProtocolViolation.into()));
+                // Disconnect from this peer.
+                self.disconnect(peer_ip);
             }
         }
+        Ok(())
+    }
+}
 
-        // Remove the address from the collection of connecting peers (if the handshake got to the point where it's known).
-        if let Some(peer_ip) = peer_ip {
-            self.connecting_peers.lock().remove(&peer_ip);
-            info!("{CONTEXT} Gateway is connected to '{peer_ip}'");
+#[async_trait]
+impl<N: Network> Writing for Gateway<N> {
+    type Codec = EventCodec<N>;
+    type Message = Event<N>;
+
+    /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
+    /// The `side` parameter indicates the connection side **from the node's perspective**.
+    fn codec(&self, _addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
+        Default::default()
+    }
+}
+
+#[async_trait]
+impl<N: Network> Disconnect for Gateway<N> {
+    /// Any extra operations to be performed during a disconnect.
+    async fn handle_disconnect(&self, peer_addr: SocketAddr) {
+        if let Some(peer_ip) = self.resolve_to_listener(&peer_addr) {
+            self.remove_connected_peer(peer_ip);
         }
-
-        Ok(connection)
     }
 }
 
@@ -351,49 +366,262 @@ impl<N: Network> OnConnect for Gateway<N> {
 }
 
 #[async_trait]
-impl<N: Network> Writing for Gateway<N> {
-    type Codec = EventCodec<N>;
-    type Message = Event<N>;
+impl<N: Network> Handshake for Gateway<N> {
+    /// Performs the handshake protocol.
+    async fn perform_handshake(&self, mut connection: Connection) -> io::Result<Connection> {
+        // Perform the handshake.
+        let peer_addr = connection.addr();
+        let peer_side = connection.side();
+        let stream = self.borrow_stream(&mut connection);
 
-    /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
-    /// The `side` parameter indicates the connection side **from the node's perspective**.
-    fn codec(&self, _addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
-        Default::default()
+        // If this is an inbound connection, we log it, but don't know the listening address yet.
+        // Otherwise, we can immediately register the listening address.
+        let mut peer_ip = if peer_side == ConnectionSide::Initiator {
+            debug!("{CONTEXT} Gateway received a connection request from '{peer_addr}'");
+            None
+        } else {
+            debug!("{CONTEXT} Gateway is connecting to {peer_addr}...");
+            Some(peer_addr)
+        };
+
+        // Perform the handshake; we pass on a mutable reference to peer_ip in case the process is broken at any point in time.
+        let handshake_result = if peer_side == ConnectionSide::Responder {
+            self.handshake_inner_initiator(peer_addr, &mut peer_ip, stream).await
+        } else {
+            self.handshake_inner_responder(peer_addr, &mut peer_ip, stream).await
+        };
+
+        // Remove the address from the collection of connecting peers (if the handshake got to the point where it's known).
+        if let Some(ip) = peer_ip {
+            self.connecting_peers.lock().remove(&ip);
+        }
+
+        // If the handshake succeeded, announce it.
+        if let Ok((ref peer_ip, _)) = handshake_result {
+            info!("{CONTEXT} Gateway is connected to '{peer_ip}'");
+        }
+
+        Ok(connection)
     }
 }
 
-#[async_trait]
-impl<N: Network> Reading for Gateway<N> {
-    type Codec = EventCodec<N>;
-    type Message = Event<N>;
-
-    /// Creates a [`Decoder`] used to interpret messages from the network.
-    /// The `side` param indicates the connection side **from the node's perspective**.
-    fn codec(&self, _peer_addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
-        Default::default()
-    }
-
-    /// Processes a message received from the network.
-    async fn process_message(&self, peer_addr: SocketAddr, message: Self::Message) -> io::Result<()> {
-        // Process the message. Disconnect if the peer violated the protocol.
-        if let Err(error) = self.inbound(peer_addr, message).await {
-            if let Some(peer_ip) = self.resolve_to_listener(&peer_addr) {
-                warn!("Disconnecting from '{peer_ip}' - {error}");
-                self.send(peer_ip, Event::Disconnect(DisconnectReason::ProtocolViolation.into()));
-                // Disconnect from this peer.
-                self.disconnect(peer_ip);
+/// A macro unwrapping the expected handshake event or returning an error for unexpected events.
+macro_rules! expect_event {
+    ($event_ty:path, $framed:expr, $peer_addr:expr) => {
+        match $framed.try_next().await? {
+            // Received the expected event, proceed.
+            Some($event_ty(data)) => {
+                trace!("{CONTEXT} Gateway received '{}' from '{}'", data.name(), $peer_addr);
+                data
+            }
+            // Received a disconnect event, abort.
+            Some(Event::Disconnect(reason)) => return Err(error(format!("'{}' disconnected: {reason:?}", $peer_addr))),
+            // Received an unexpected event, abort.
+            Some(ty) => {
+                return Err(error(format!(
+                    "'{}' did not follow the handshake protocol: received {:?} instead of {}",
+                    $peer_addr,
+                    ty.name(),
+                    stringify!($event_ty),
+                )))
+            }
+            // Received nothing.
+            None => {
+                return Err(error(format!("'{}' disconnected before sending {:?}", $peer_addr, stringify!($event_ty),)))
             }
         }
-        Ok(())
-    }
+    };
 }
 
-#[async_trait]
-impl<N: Network> Disconnect for Gateway<N> {
-    /// Any extra operations to be performed during a disconnect.
-    async fn handle_disconnect(&self, peer_addr: SocketAddr) {
-        if let Some(peer_ip) = self.resolve_to_listener(&peer_addr) {
-            self.remove_connected_peer(peer_ip);
+/// A macro for cutting a handshake short if event verification fails.
+macro_rules! handle_verification {
+    ($result:expr, $framed:expr, $peer_addr:expr) => {
+        if let Some(reason) = $result {
+            trace!("{CONTEXT} Gateway is sending 'Disconnect' to '{}'", $peer_addr);
+            $framed.send(Event::Disconnect(reason.clone().into())).await?;
+            return Err(error(format!("Dropped '{}' for reason: {reason:?}", $peer_addr)));
         }
+    };
+}
+
+impl<N: Network> Gateway<N> {
+    /// The connection initiator side of the handshake.
+    async fn handshake_inner_initiator<'a>(
+        &'a self,
+        peer_addr: SocketAddr,
+        peer_ip: &mut Option<SocketAddr>,
+        stream: &'a mut TcpStream,
+    ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, EventCodec<N>>)> {
+        // Construct the stream.
+        let mut framed = Framed::new(stream, EventCodec::<N>::handshake());
+
+        // This value is immediately guaranteed to be present, so it can be unwrapped.
+        let peer_ip = peer_ip.unwrap();
+
+        /* Step 1: Send the challenge request. */
+
+        // Initialize an RNG.
+        let rng = &mut rand::rngs::OsRng;
+        // Sample a random nonce.
+        let our_nonce = rng.gen();
+
+        // Send a challenge request to the peer.
+        let our_request = ChallengeRequest::new(self.local_ip().port(), self.account.address(), our_nonce);
+        trace!("Sending '{}' to '{peer_addr}'", our_request.name());
+        framed.send(Event::ChallengeRequest(our_request)).await?;
+
+        /* Step 2: Receive the peer's challenge response followed by the challenge request. */
+
+        // Listen for the challenge response message.
+        let peer_response = expect_event!(Event::ChallengeResponse, framed, peer_addr);
+
+        // Listen for the challenge request message.
+        let peer_request = expect_event!(Event::ChallengeRequest, framed, peer_addr);
+
+        // Verify the challenge response. If a disconnect reason was returned, send the disconnect message and abort.
+        handle_verification!(
+            self.verify_challenge_response(peer_addr, peer_request.address, peer_response, our_nonce).await,
+            framed,
+            peer_addr
+        );
+
+        // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
+        handle_verification!(self.verify_challenge_request(peer_addr, &peer_request), framed, peer_addr);
+
+        /* Step 3: Send the challenge response. */
+
+        // Sign the counterparty nonce.
+        let our_signature = self
+            .account
+            .sign_bytes(&peer_request.nonce.to_le_bytes(), rng)
+            .map_err(|_| error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")))?;
+
+        // Send the challenge response.
+        let our_response = ChallengeResponse { signature: Data::Object(our_signature) };
+        trace!("{CONTEXT} Gateway is sending '{}' to '{peer_addr}'", our_response.name());
+        framed.send(Event::ChallengeResponse(our_response)).await?;
+
+        // Add the peer to the gateway.
+        self.insert_connected_peer(peer_ip, peer_addr);
+
+        Ok((peer_ip, framed))
+    }
+
+    /// The connection responder side of the handshake.
+    async fn handshake_inner_responder<'a>(
+        &'a self,
+        peer_addr: SocketAddr,
+        peer_ip: &mut Option<SocketAddr>,
+        stream: &'a mut TcpStream,
+    ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, EventCodec<N>>)> {
+        // Construct the stream.
+        let mut framed = Framed::new(stream, EventCodec::<N>::handshake());
+
+        /* Step 1: Receive the challenge request. */
+
+        // Listen for the challenge request message.
+        let peer_request = expect_event!(Event::ChallengeRequest, framed, peer_addr);
+
+        // Obtain the peer's listening address.
+        *peer_ip = Some(SocketAddr::new(peer_addr.ip(), peer_request.listener_port));
+        let peer_ip = peer_ip.unwrap();
+
+        // Knowing the peer's listening address, ensure it is allowed to connect.
+        if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_ip) {
+            return Err(error(format!("{forbidden_message}")));
+        }
+
+        // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
+        handle_verification!(self.verify_challenge_request(peer_addr, &peer_request), framed, peer_addr);
+
+        /* Step 2: Send the challenge response followed by own challenge request. */
+
+        // Initialize an RNG.
+        let rng = &mut rand::rngs::OsRng;
+
+        // Sign the counterparty nonce.
+        let our_signature = self
+            .account
+            .sign_bytes(&peer_request.nonce.to_le_bytes(), rng)
+            .map_err(|_| error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")))?;
+
+        // Sample a random nonce.
+        let our_nonce = rng.gen();
+
+        // Send the challenge response.
+        let our_response = ChallengeResponse { signature: Data::Object(our_signature) };
+        trace!("{CONTEXT} Gateway is sending '{}' to '{peer_addr}'", our_response.name());
+        framed.send(Event::ChallengeResponse(our_response)).await?;
+
+        // Send the challenge request.
+        let our_request = ChallengeRequest::new(self.local_ip().port(), self.account.address(), our_nonce);
+        trace!("{CONTEXT} Gateway is sending '{}' to '{peer_addr}'", our_request.name());
+        framed.send(Event::ChallengeRequest(our_request)).await?;
+
+        /* Step 3: Receive the challenge response. */
+
+        // Listen for the challenge response message.
+        let peer_response = expect_event!(Event::ChallengeResponse, framed, peer_addr);
+
+        // Verify the challenge response. If a disconnect reason was returned, send the disconnect message and abort.
+        handle_verification!(
+            self.verify_challenge_response(peer_addr, peer_request.address, peer_response, our_nonce).await,
+            framed,
+            peer_addr
+        );
+
+        // Add the peer to the gateway.
+        self.insert_connected_peer(peer_ip, peer_addr);
+
+        Ok((peer_ip, framed))
+    }
+
+    /// Verifies the given challenge request. Returns a disconnect reason if the request is invalid.
+    fn verify_challenge_request(&self, peer_addr: SocketAddr, event: &ChallengeRequest<N>) -> Option<DisconnectReason> {
+        // Retrieve the components of the challenge request.
+        let &ChallengeRequest { version, listener_port: _, address, nonce: _ } = event;
+
+        // Ensure the event protocol version is not outdated.
+        if version < Event::<N>::VERSION {
+            warn!("{CONTEXT} Gateway is dropping '{peer_addr}' on version {version} (outdated)");
+            return Some(DisconnectReason::OutdatedClientVersion);
+        }
+
+        // Ensure the address is in the committee.
+        if !self.shared.is_committee_member(&address) {
+            warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
+            return Some(DisconnectReason::ProtocolViolation);
+        }
+
+        None
+    }
+
+    /// Verifies the given challenge response. Returns a disconnect reason if the response is invalid.
+    async fn verify_challenge_response(
+        &self,
+        peer_addr: SocketAddr,
+        peer_address: Address<N>,
+        response: ChallengeResponse<N>,
+        expected_nonce: u64,
+    ) -> Option<DisconnectReason> {
+        // Retrieve the components of the challenge response.
+        let ChallengeResponse { signature } = response;
+
+        // Perform the deferred non-blocking deserialization of the signature.
+        let signature = match signature.deserialize().await {
+            Ok(signature) => signature,
+            Err(_) => {
+                warn!("{CONTEXT} Gateway handshake with '{peer_addr}' failed (cannot deserialize the signature)");
+                return Some(DisconnectReason::InvalidChallengeResponse);
+            }
+        };
+
+        // Verify the signature.
+        if !signature.verify_bytes(&peer_address, &expected_nonce.to_le_bytes()) {
+            warn!("{CONTEXT} Gateway handshake with '{peer_addr}' failed (invalid signature)");
+            return Some(DisconnectReason::InvalidChallengeResponse);
+        }
+
+        None
     }
 }

@@ -15,38 +15,37 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Disconnect {
-    pub reason: DisconnectReason,
+pub struct ChallengeRequest<N: Network> {
+    pub version: u32,
+    pub listener_port: u16,
+    pub address: Address<N>,
+    pub nonce: u64,
 }
 
-impl From<DisconnectReason> for Disconnect {
-    fn from(reason: DisconnectReason) -> Self {
-        Self { reason }
+impl<N: Network> ChallengeRequest<N> {
+    /// Creates a new `ChallengeRequest` event.
+    pub fn new(listener_port: u16, address: Address<N>, nonce: u64) -> Self {
+        Self { version: Event::<N>::VERSION, listener_port, address, nonce }
     }
 }
 
-impl EventTrait for Disconnect {
+impl<N: Network> EventTrait for ChallengeRequest<N> {
     /// Returns the event name.
     #[inline]
     fn name(&self) -> String {
-        "Disconnect".to_string()
+        "ChallengeRequest".to_string()
     }
 
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(writer, &self.reason)?)
+        Ok(bincode::serialize_into(writer, &(self.version, self.listener_port, self.address, self.nonce))?)
     }
 
     /// Deserializes the given buffer into a event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        if bytes.remaining() == 0 {
-            Ok(Self { reason: DisconnectReason::NoReasonGiven })
-        } else if let Ok(reason) = bincode::deserialize_from(&mut bytes.reader()) {
-            Ok(Self { reason })
-        } else {
-            bail!("Invalid 'Disconnect' event");
-        }
+        let (version, listener_port, address, nonce) = bincode::deserialize_from(&mut bytes.reader())?;
+        Ok(Self { version, listener_port, address, nonce })
     }
 }

@@ -15,38 +15,27 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Disconnect {
-    pub reason: DisconnectReason,
+pub struct ChallengeResponse<N: Network> {
+    pub signature: Data<Signature<N>>,
 }
 
-impl From<DisconnectReason> for Disconnect {
-    fn from(reason: DisconnectReason) -> Self {
-        Self { reason }
-    }
-}
-
-impl EventTrait for Disconnect {
+impl<N: Network> EventTrait for ChallengeResponse<N> {
     /// Returns the event name.
     #[inline]
     fn name(&self) -> String {
-        "Disconnect".to_string()
+        "ChallengeResponse".to_string()
     }
 
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(writer, &self.reason)?)
+        self.signature.serialize_blocking_into(writer)
     }
 
     /// Deserializes the given buffer into a event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        if bytes.remaining() == 0 {
-            Ok(Self { reason: DisconnectReason::NoReasonGiven })
-        } else if let Ok(reason) = bincode::deserialize_from(&mut bytes.reader()) {
-            Ok(Self { reason })
-        } else {
-            bail!("Invalid 'Disconnect' event");
-        }
+        let reader = bytes.reader();
+        Ok(Self { signature: Data::Buffer(reader.into_inner().freeze()) })
     }
 }

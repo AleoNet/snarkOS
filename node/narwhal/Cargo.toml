@@ -16,8 +16,6 @@ categories = [ "cryptography", "operating-systems" ]
 license = "Apache-2.0"
 edition = "2021"
 
-
-
 [dependencies.anyhow]
 version = "1.0.70"
 
@@ -30,8 +28,15 @@ version = "1.0"
 [dependencies.bytes]
 version = "1"
 
+[dependencies.futures]
+version = "0.3.27"
+features = [ "thread-pool" ]
+
 [dependencies.parking_lot]
 version = "0.12"
+
+[dependencies.rand]
+version = "0.8"
 
 [dependencies.serde]
 version = "1"
@@ -55,15 +60,15 @@ workspace = true
 version = "1.28"
 features = [ "rt" ]
 
+[dependencies.tokio-stream]
+version = "=0.1"
+
 [dependencies.tokio-util]
 version = "0.7"
 features = [ "codec" ]
 
 [dependencies.tracing]
 version = "0.1"
-
-[dev-dependencies.rand]
-version = "0.8"
 
 [dev-dependencies.rand_chacha]
 version = "0.3"
