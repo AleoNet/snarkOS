@@ -12,9 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{helpers::EventCodec, Event, Shared, CONTEXT, MAX_COMMITTEE_SIZE, MEMORY_POOL_PORT};
+use crate::{
+    helpers::{EventCodec, GatewayReceiver, Resolver},
+    Event,
+    Shared,
+    CONTEXT,
+    MAX_COMMITTEE_SIZE,
+    MEMORY_POOL_PORT,
+};
 use snarkos_node_messages::DisconnectReason;
-use snarkos_node_router::{Resolver, Router};
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
@@ -33,8 +39,6 @@ use tokio::{sync::oneshot, task::JoinHandle};
 pub struct Gateway<N: Network> {
     /// The shared state.
     shared: Arc<Shared<N>>,
-    /// The router.
-    router: Router<N>,
     /// The TCP stack.
     tcp: Tcp,
     /// The resolver.
@@ -50,7 +54,7 @@ pub struct Gateway<N: Network> {
 
 impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
-    pub fn new(shared: Arc<Shared<N>>, router: Router<N>) -> Result<Self> {
+    pub fn new(shared: Arc<Shared<N>>) -> Result<Self> {
         // Initialize the worker IP.
         let worker_ip = SocketAddr::from_str(&format!("0.0.0.0:{MEMORY_POOL_PORT}"))?;
         // Initialize the TCP stack.
@@ -58,7 +62,6 @@ impl<N: Network> Gateway<N> {
         // Return the gateway.
         Ok(Self {
             shared,
-            router,
             tcp,
             resolver: Default::default(),
             connected_peers: Default::default(),

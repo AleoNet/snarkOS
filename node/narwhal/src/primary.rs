@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Gateway, Shared, Worker};
-use snarkos_node_router::Router;
+use crate::{helpers::GatewayReceiver, Gateway, Shared, Worker};
 use snarkvm::console::prelude::*;
 
 use std::sync::Arc;
@@ -23,17 +22,19 @@ pub struct Primary<N: Network> {
     shared: Arc<Shared<N>>,
     /// The gateway.
     gateway: Gateway<N>,
+    /// The gateway receiver, which allows the router to forward messages to the gateway.
+    gateway_receiver: GatewayReceiver<N>,
     /// The workers.
     workers: Vec<Worker<N>>,
 }
 
 impl<N: Network> Primary<N> {
     /// Initializes a new primary instance.
-    pub fn new(shared: Arc<Shared<N>>, router: Router<N>) -> Result<Self> {
+    pub fn new(shared: Arc<Shared<N>>, gateway_receiver: GatewayReceiver<N>) -> Result<Self> {
         // Construct the gateway instance.
-        let gateway = Gateway::new(shared.clone(), router.clone())?;
+        let gateway = Gateway::new(shared.clone())?;
         // Return the primary instance.
-        Ok(Self { shared, gateway, workers: Vec::new() })
+        Ok(Self { shared, gateway, gateway_receiver, workers: Vec::new() })
     }
 
     /// Run the primary instance.
@@ -46,6 +47,21 @@ impl<N: Network> Primary<N> {
         let worker = Worker::new(id, self.shared.clone(), self.gateway.clone())?;
         // Add the worker to the list of workers.
         self.workers.push(worker);
+
+        // // the task for processing parsed messages
+        // let self_clone = self.clone();
+        // let inbound_processing_task = tokio::spawn(async move {
+        //     let node = self_clone.tcp();
+        //     trace!(parent: node.span(), "spawned a task for processing messages from {}", addr);
+        //     tx_processing.send(()).unwrap(); // safe; the channel was just opened
+        //
+        //     while let Some(msg) = self.gateway_receiver.rx_unconfirmed_solution.recv().await {
+        //         if let Err(e) = self_clone.process_message(addr, msg).await {
+        //             error!(parent: node.span(), "can't process a message from {}: {}", addr, e);
+        //             node.known_peers().register_failure(addr);
+        //         }
+        //     }
+        // });
 
         Ok(())
     }
