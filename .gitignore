@@ -5,3 +5,5 @@ storage*/
 wasm/Cargo.lock
 **/build
 **.ledger-*
+validator-*
+**.bft-storage-*/

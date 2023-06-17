@@ -12,14 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod cache;
-pub use cache::Cache;
+#![forbid(unsafe_code)]
 
-mod peer;
-pub use peer::*;
+#[macro_use]
+extern crate async_trait;
+#[macro_use]
+extern crate tracing;
 
-mod resolver;
-pub use resolver::*;
+pub mod helpers;
 
-mod sync;
-pub use sync::*;
+mod event;
+pub use event::*;
+
+mod gateway;
+pub use gateway::*;
+
+mod primary;
+pub use primary::*;
+
+mod shared;
+pub use shared::*;
+
+mod worker;
+pub use worker::*;
+
+pub const CONTEXT: &str = "[MemoryPool]";
+pub const MAX_COMMITTEE_SIZE: u16 = 128;
+pub const MEMORY_POOL_PORT: u16 = 5000;

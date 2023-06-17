@@ -12,14 +12,5 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod cache;
-pub use cache::Cache;
-
-mod peer;
-pub use peer::*;
-
-mod resolver;
-pub use resolver::*;
-
-mod sync;
-pub use sync::*;
+mod codec;
+pub use codec::*;

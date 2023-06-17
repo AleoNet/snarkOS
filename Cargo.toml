@@ -28,6 +28,7 @@ members = [
   "node/env",
   "node/messages",
   "node/metrics",
+  "node/narwhal",
   "node/rest",
   "node/router",
   "node/tcp",
@@ -85,6 +86,10 @@ version = "=2.1.1"
 
 [dependencies.snarkos-node-messages]
 path = "./node/messages"
+version = "=2.1.1"
+
+[dependencies.snarkos-node-narwhal]
+path = "./node/narwhal"
 version = "=2.1.1"
 
 [dependencies.snarkos-node-rest]
