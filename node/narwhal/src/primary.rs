@@ -44,6 +44,11 @@ impl<N: Network> Primary<N> {
         Ok(Self { shared, gateway, workers: Default::default(), handles: Default::default() })
     }
 
+    /// Returns the gateway.
+    pub fn gateway(&self) -> &Gateway<N> {
+        &self.gateway
+    }
+
     /// Run the primary instance.
     pub async fn run(&mut self, receiver: PrimaryReceiver<N>) -> Result<()> {
         info!("Starting the primary instance of the memory pool");

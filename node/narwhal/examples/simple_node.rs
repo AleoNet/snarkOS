@@ -12,7 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_node_narwhal::{helpers::init_primary_channels, Primary, Shared};
+#[macro_use]
+extern crate tracing;
+
+use snarkos_node_narwhal::{
+    helpers::{init_primary_channels, PrimarySender},
+    Primary,
+    Shared,
+};
 
 use anyhow::{bail, Result};
 use std::{str::FromStr, sync::Arc};
@@ -56,7 +63,7 @@ pub fn initialize_logger(verbosity: u8) {
 }
 
 /// Starts the primary instance.
-pub async fn start_primary(node_id: u16) -> Result<Primary<CurrentNetwork>> {
+pub async fn start_primary(node_id: u16) -> Result<(Primary<CurrentNetwork>, PrimarySender<CurrentNetwork>)> {
     // Initialize the shared state.
     let shared = Arc::new(Shared::<CurrentNetwork>::new());
     // Initialize the primary channels.
@@ -65,8 +72,42 @@ pub async fn start_primary(node_id: u16) -> Result<Primary<CurrentNetwork>> {
     let mut primary = Primary::<CurrentNetwork>::new(shared.clone(), Some(node_id))?;
     // Run the primary instance.
     primary.run(receiver).await?;
+    // Handle the log connections.
+    log_connections(&primary);
+    // Handle OS signals.
+    handle_signals(&primary);
     // Return the primary instance.
-    Ok(primary)
+    Ok((primary, sender))
+}
+
+/// Logs the node's connections.
+fn log_connections(primary: &Primary<CurrentNetwork>) {
+    let node = primary.clone();
+    tokio::task::spawn(async move {
+        loop {
+            let connections = node.gateway().connected_peers().read().clone();
+            info!("{} connections", connections.len());
+            for connection in connections {
+                debug!("  {}", connection);
+            }
+            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+        }
+    });
+}
+
+/// Handles OS signals for the node to intercept and perform a clean shutdown.
+/// Note: Only Ctrl-C is supported; it should work on both Unix-family systems and Windows.
+fn handle_signals(primary: &Primary<CurrentNetwork>) {
+    let node = primary.clone();
+    tokio::task::spawn(async move {
+        match tokio::signal::ctrl_c().await {
+            Ok(()) => {
+                node.shut_down().await;
+                std::process::exit(0);
+            }
+            Err(error) => error!("tokio::signal::ctrl_c encountered an error: {}", error),
+        }
+    });
 }
 
 #[tokio::main]
@@ -83,9 +124,12 @@ async fn main() -> Result<()> {
     let node_id = u16::from_str(&args[1])?;
 
     // Start the primary instance.
-    let _ = start_primary(node_id).await?;
+    let (primary, sender) = start_primary(node_id).await?;
 
     println!("Hello, world!");
+
+    // Note: Do not move this.
+    std::future::pending::<()>().await;
 
     Ok(())
 }
