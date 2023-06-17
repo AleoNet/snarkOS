@@ -15,6 +15,7 @@
 #[macro_use]
 extern crate tracing;
 
+use snarkos_account::Account;
 use snarkos_node_narwhal::{
     helpers::{init_primary_channels, PrimarySender},
     Primary,
@@ -22,6 +23,7 @@ use snarkos_node_narwhal::{
 };
 
 use anyhow::{bail, Result};
+use rand::SeedableRng;
 use std::{str::FromStr, sync::Arc};
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
@@ -63,13 +65,30 @@ pub fn initialize_logger(verbosity: u8) {
 }
 
 /// Starts the primary instance.
-pub async fn start_primary(node_id: u16) -> Result<(Primary<CurrentNetwork>, PrimarySender<CurrentNetwork>)> {
+pub async fn start_primary(
+    node_id: u16,
+    num_nodes: u16,
+) -> Result<(Primary<CurrentNetwork>, PrimarySender<CurrentNetwork>)> {
+    // Sample a account.
+    let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(node_id as u64))?;
+    println!("\n{account}\n");
+
     // Initialize the shared state.
     let shared = Arc::new(Shared::<CurrentNetwork>::new());
+    // Add the validators to the shared state.
+    for i in 0..num_nodes {
+        // Sample the account.
+        let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64))?;
+        // Add the validator.
+        shared.add_validator(account.address(), 1000)?;
+        println!("  Validator {}: {}", i, account.address());
+    }
+    println!();
+
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the primary instance.
-    let mut primary = Primary::<CurrentNetwork>::new(shared.clone(), Some(node_id))?;
+    let mut primary = Primary::<CurrentNetwork>::new(shared.clone(), account, Some(node_id))?;
     // Run the primary instance.
     primary.run(receiver).await?;
     // Handle the log connections.
@@ -122,9 +141,11 @@ async fn main() -> Result<()> {
 
     // Parse the node ID.
     let node_id = u16::from_str(&args[1])?;
+    // Parse the number of nodes.
+    let num_nodes = u16::from_str(&args[2])?;
 
     // Start the primary instance.
-    let (primary, sender) = start_primary(node_id).await?;
+    let (primary, sender) = start_primary(node_id, num_nodes).await?;
 
     println!("Hello, world!");
 

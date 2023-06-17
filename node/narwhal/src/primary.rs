@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::{helpers::PrimaryReceiver, Gateway, Shared, Worker};
+use snarkos_account::Account;
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::prelude::*,
@@ -27,6 +28,8 @@ use tokio::task::JoinHandle;
 pub struct Primary<N: Network> {
     /// The shared state.
     shared: Arc<Shared<N>>,
+    /// The account of the node.
+    account: Account<N>,
     /// The gateway.
     gateway: Gateway<N>,
     /// The workers.
@@ -37,11 +40,11 @@ pub struct Primary<N: Network> {
 
 impl<N: Network> Primary<N> {
     /// Initializes a new primary instance.
-    pub fn new(shared: Arc<Shared<N>>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(shared: Arc<Shared<N>>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
         // Construct the gateway instance.
         let gateway = Gateway::new(shared.clone(), dev)?;
         // Return the primary instance.
-        Ok(Self { shared, gateway, workers: Default::default(), handles: Default::default() })
+        Ok(Self { shared, account, gateway, workers: Default::default(), handles: Default::default() })
     }
 
     /// Returns the gateway.

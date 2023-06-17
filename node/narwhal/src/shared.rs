@@ -28,6 +28,18 @@ impl<N: Network> Shared<N> {
         Self { committee: RwLock::new(HashMap::new()) }
     }
 
+    /// Adds a validator to the committee.
+    pub fn add_validator(&self, address: Address<N>, stake: u64) -> Result<()> {
+        // Check if the validator is already in the committee.
+        if self.is_committee_member(&address) {
+            bail!("Validator already in committee");
+        }
+
+        // Add the validator to the committee.
+        self.committee.write().insert(address, stake);
+        Ok(())
+    }
+
     /// Returns the committee.
     pub fn committee(&self) -> &RwLock<HashMap<Address<N>, u64>> {
         &self.committee
