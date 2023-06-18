@@ -380,7 +380,7 @@ impl<N: Network> Gateway<N> {
                 }
                 Ok(())
             }
-            Event::Ping(ping) => {
+            Event::WorkerPing(ping) => {
                 // If the worker ID is not valid, disconnect.
                 if ping.worker >= MAX_WORKERS {
                     bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
@@ -388,7 +388,7 @@ impl<N: Network> Gateway<N> {
                 // Send the ping to the worker.
                 if let Some(sender) = self.worker_sender(ping.worker) {
                     // Send the ping to the worker.
-                    let _ = sender.tx_ping.send((peer_ip, ping)).await;
+                    let _ = sender.tx_worker_ping.send((peer_ip, ping)).await;
                 }
                 Ok(())
             }

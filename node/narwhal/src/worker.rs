@@ -18,8 +18,8 @@ use crate::{
     EntryResponse,
     Event,
     Gateway,
-    Ping,
     Shared,
+    WorkerPing,
     MAX_WORKERS,
 };
 use snarkos_node_messages::Data;
@@ -90,7 +90,7 @@ impl<N: Network> Worker<N> {
 impl<N: Network> Worker<N> {
     /// Starts the worker handlers.
     pub fn start_handlers(&self, receiver: WorkerReceiver<N>) {
-        let WorkerReceiver { mut rx_ping, mut rx_entry_request, mut rx_entry_response } = receiver;
+        let WorkerReceiver { rx_worker_ping: mut rx_ping, mut rx_entry_request, mut rx_entry_response } = receiver;
 
         // Broadcast a ping event periodically.
         let self_clone = self.clone();
@@ -108,7 +108,7 @@ impl<N: Network> Worker<N> {
         self.spawn(async move {
             while let Some((peer_ip, ping)) = rx_ping.recv().await {
                 // Process the ping event.
-                self_clone.process_ping(peer_ip, ping).await;
+                self_clone.process_worker_ping(peer_ip, ping).await;
             }
         });
 
@@ -136,9 +136,9 @@ impl<N: Network> Worker<N> {
     /// Broadcasts a ping event.
     pub(crate) async fn broadcast_ping(&self) {
         // Construct the ping event.
-        let ping = Ping::new(self.id, self.ready.entry_ids());
+        let ping = WorkerPing::new(self.id, self.ready.entry_ids());
         // Broadcast the ping event.
-        self.gateway.broadcast(Event::Ping(ping));
+        self.gateway.broadcast(Event::WorkerPing(ping));
     }
 
     /// Sends an entry request to the specified peer.
@@ -158,7 +158,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Handles the incoming ping event.
-    pub(crate) async fn process_ping(&self, peer_ip: SocketAddr, ping: Ping<N>) {
+    pub(crate) async fn process_worker_ping(&self, peer_ip: SocketAddr, ping: WorkerPing<N>) {
         // Ensure the ping is for this worker.
         if ping.worker != self.id {
             return;

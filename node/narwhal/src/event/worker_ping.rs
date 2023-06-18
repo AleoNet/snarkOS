@@ -15,23 +15,23 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Ping<N: Network> {
+pub struct WorkerPing<N: Network> {
     pub worker: u8,
     pub batch: Vec<EntryID<N>>,
 }
 
-impl<N: Network> Ping<N> {
+impl<N: Network> WorkerPing<N> {
     /// Initializes a new ping event.
     pub fn new(worker: u8, batch: Vec<EntryID<N>>) -> Self {
         Self { worker, batch }
     }
 }
 
-impl<N: Network> EventTrait for Ping<N> {
+impl<N: Network> EventTrait for WorkerPing<N> {
     /// Returns the event name.
     #[inline]
     fn name(&self) -> String {
-        "Ping".to_string()
+        "WorkerPing".to_string()
     }
 
     /// Serializes the event into the buffer.

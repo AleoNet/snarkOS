@@ -27,8 +27,8 @@ pub use entry_request::EntryRequest;
 mod entry_response;
 pub use entry_response::EntryResponse;
 
-mod ping;
-pub use ping::Ping;
+mod worker_ping;
+pub use worker_ping::WorkerPing;
 
 mod worker_batch;
 pub use worker_batch::WorkerBatch;
@@ -63,12 +63,17 @@ pub trait EventTrait {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Event<N: Network> {
+    // BatchPrepare(),
+    // BatchRequest(),
+    // BatchResponse(),
+    // BatchSignature(),
+    // BatchSealed(),
     ChallengeRequest(ChallengeRequest<N>),
     ChallengeResponse(ChallengeResponse<N>),
     Disconnect(Disconnect),
     EntryRequest(EntryRequest<N>),
     EntryResponse(EntryResponse<N>),
-    Ping(Ping<N>),
+    WorkerPing(WorkerPing<N>),
     WorkerBatch(WorkerBatch<N>),
 }
 
@@ -85,7 +90,7 @@ impl<N: Network> Event<N> {
             Self::Disconnect(event) => event.name(),
             Self::EntryRequest(event) => event.name(),
             Self::EntryResponse(event) => event.name(),
-            Self::Ping(event) => event.name(),
+            Self::WorkerPing(event) => event.name(),
             Self::WorkerBatch(event) => event.name(),
         }
     }
@@ -99,7 +104,7 @@ impl<N: Network> Event<N> {
             Self::Disconnect(..) => 2,
             Self::EntryRequest(..) => 3,
             Self::EntryResponse(..) => 4,
-            Self::Ping(..) => 5,
+            Self::WorkerPing(..) => 5,
             Self::WorkerBatch(..) => 6,
         }
     }
@@ -115,7 +120,7 @@ impl<N: Network> Event<N> {
             Self::Disconnect(event) => event.serialize(writer),
             Self::EntryRequest(event) => event.serialize(writer),
             Self::EntryResponse(event) => event.serialize(writer),
-            Self::Ping(event) => event.serialize(writer),
+            Self::WorkerPing(event) => event.serialize(writer),
             Self::WorkerBatch(event) => event.serialize(writer),
         }
     }
@@ -138,7 +143,7 @@ impl<N: Network> Event<N> {
             2 => Self::Disconnect(EventTrait::deserialize(bytes)?),
             3 => Self::EntryRequest(EventTrait::deserialize(bytes)?),
             4 => Self::EntryResponse(EventTrait::deserialize(bytes)?),
-            5 => Self::Ping(EventTrait::deserialize(bytes)?),
+            5 => Self::WorkerPing(EventTrait::deserialize(bytes)?),
             6 => Self::WorkerBatch(EventTrait::deserialize(bytes)?),
             _ => bail!("Unknown event ID {id}"),
         };
