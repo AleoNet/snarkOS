@@ -165,7 +165,7 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
     let tx_unconfirmed_transaction = sender.tx_unconfirmed_transaction.clone();
     tokio::task::spawn(async move {
         // This RNG samples the *same* fake transactions for all nodes.
-        let mut shared_rng = rand_chacha::ChaChaRng::seed_from_u64(0);
+        let mut shared_rng = rand_chacha::ChaChaRng::seed_from_u64(123456789);
         // This RNG samples *different* fake transactions for each node.
         let mut unique_rng = rand_chacha::ChaChaRng::seed_from_u64(node_id as u64);
 
@@ -179,7 +179,7 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
             let transaction = Data::Buffer(Bytes::from((0..1024).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
             // Return the ID and transaction.
             (id, transaction)
-        };
+        }
 
         // Intialize a counter.
         let mut counter = 0;

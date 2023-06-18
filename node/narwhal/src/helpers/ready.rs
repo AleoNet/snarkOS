@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::helpers::{Entry, EntryID};
+use snarkos_node_messages::Data;
 use snarkvm::console::prelude::*;
 
 use parking_lot::RwLock;
@@ -21,7 +22,7 @@ use std::{collections::HashMap, sync::Arc};
 #[derive(Clone, Debug)]
 pub struct Ready<N: Network> {
     /// The map of `entry IDs` to `entries`.
-    entries: Arc<RwLock<HashMap<EntryID<N>, Entry<N>>>>,
+    entries: Arc<RwLock<HashMap<EntryID<N>, Data<Entry<N>>>>>,
 }
 
 impl<N: Network> Default for Ready<N> {
@@ -42,19 +43,24 @@ impl<N: Network> Ready<N> {
         self.entries.read().len()
     }
 
-    /// Returns `true` if the ready queue contains the specified `entry ID`.
-    pub fn contains(&self, entry_id: impl Into<EntryID<N>>) -> bool {
-        self.entries.read().contains_key(&entry_id.into())
-    }
-
     /// Returns the entry IDs.
     pub fn entry_ids(&self) -> Vec<EntryID<N>> {
         self.entries.read().keys().copied().collect()
     }
 
+    /// Returns `true` if the ready queue contains the specified `entry ID`.
+    pub fn contains(&self, entry_id: impl Into<EntryID<N>>) -> bool {
+        self.entries.read().contains_key(&entry_id.into())
+    }
+
+    /// Returns the entry, given the specified `entry ID`.
+    pub fn get(&self, entry_id: impl Into<EntryID<N>>) -> Option<Data<Entry<N>>> {
+        self.entries.read().get(&entry_id.into()).cloned()
+    }
+
     /// Inserts the specified (`entry ID`, `entry`) to the ready queue.
-    pub fn insert(&self, entry_id: impl Into<EntryID<N>>, entry: impl Into<Entry<N>>) {
-        self.entries.write().insert(entry_id.into(), entry.into());
+    pub fn insert(&self, entry_id: impl Into<EntryID<N>>, entry: Data<Entry<N>>) {
+        self.entries.write().insert(entry_id.into(), entry);
     }
 
     /// Removes the specified `entry ID` from the ready queue.

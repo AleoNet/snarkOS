@@ -56,6 +56,11 @@ impl<N: Network> Pending<N> {
         self.entries.read().get(&entry_id.into()).map_or(false, |peer_ips| peer_ips.contains(&peer_ip))
     }
 
+    /// Returns the peer IPs for the specified `entry ID`.
+    pub fn get(&self, entry_id: impl Into<EntryID<N>>) -> Option<HashSet<SocketAddr>> {
+        self.entries.read().get(&entry_id.into()).cloned()
+    }
+
     /// Inserts the specified `entry ID` and `peer IP` to the pending queue.
     /// If the `entry ID` already exists, the `peer IP` is added to the existing entry.
     pub fn insert(&self, entry_id: impl Into<EntryID<N>>, peer_ip: SocketAddr) {

@@ -278,7 +278,7 @@ impl<N: Network> Gateway<N> {
     /// This function returns as soon as the event is queued to be sent,
     /// without waiting for the actual delivery; instead, the caller is provided with a [`oneshot::Receiver`]
     /// which can be used to determine when and whether the event has been delivered.
-    fn send(&self, peer_ip: SocketAddr, event: Event<N>) -> Option<oneshot::Receiver<io::Result<()>>> {
+    pub(crate) fn send(&self, peer_ip: SocketAddr, event: Event<N>) -> Option<oneshot::Receiver<io::Result<()>>> {
         // // Determine whether to send the event.
         // if !self.can_send(peer_ip, &event) {
         //     return None;
@@ -350,6 +350,30 @@ impl<N: Network> Gateway<N> {
             }
             Event::Disconnect(disconnect) => {
                 bail!("{CONTEXT} Disconnecting peer '{peer_ip}' for the following reason: {:?}", disconnect.reason)
+            }
+            Event::EntryRequest(request) => {
+                // If the worker ID is not valid, disconnect.
+                if request.worker >= MAX_WORKERS {
+                    bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
+                }
+                // Send the entry request to the worker.
+                if let Some(sender) = self.worker_sender(request.worker) {
+                    // Send the entry request to the worker.
+                    let _ = sender.tx_entry_request.send((peer_ip, request)).await;
+                }
+                Ok(())
+            }
+            Event::EntryResponse(response) => {
+                // If the worker ID is not valid, disconnect.
+                if response.worker >= MAX_WORKERS {
+                    bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
+                }
+                // Send the entry response to the worker.
+                if let Some(sender) = self.worker_sender(response.worker) {
+                    // Send the entry response to the worker.
+                    let _ = sender.tx_entry_response.send((peer_ip, response)).await;
+                }
+                Ok(())
             }
             Event::Ping(ping) => {
                 // If the worker ID is not valid, disconnect.

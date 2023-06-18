@@ -29,6 +29,20 @@ pub enum Entry<N: Network> {
     Transaction(Data<Transaction<N>>),
 }
 
+impl<N: Network> From<ProverSolution<N>> for Entry<N> {
+    /// Converts the prover solution into an entry.
+    fn from(solution: ProverSolution<N>) -> Self {
+        Self::Solution(Data::Object(solution))
+    }
+}
+
+impl<N: Network> From<Transaction<N>> for Entry<N> {
+    /// Converts the transaction into an entry.
+    fn from(transaction: Transaction<N>) -> Self {
+        Self::Transaction(Data::Object(transaction))
+    }
+}
+
 impl<N: Network> From<Data<ProverSolution<N>>> for Entry<N> {
     /// Converts the prover solution into an entry.
     fn from(solution: Data<ProverSolution<N>>) -> Self {

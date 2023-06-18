@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::Ping;
+use crate::{EntryRequest, EntryResponse, Ping};
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::network::*,
@@ -53,11 +53,15 @@ pub struct PrimaryReceiver<N: Network> {
 /// Initializes the worker channels.
 pub fn init_worker_channels<N: Network>() -> (WorkerSender<N>, WorkerReceiver<N>) {
     let (tx_ping, rx_ping) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
+    let (tx_entry_request, rx_entry_request) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
+    let (tx_entry_response, rx_entry_response) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
 
     let tx_ping = Arc::new(tx_ping);
+    let tx_entry_request = Arc::new(tx_entry_request);
+    let tx_entry_response = Arc::new(tx_entry_response);
 
-    let sender = WorkerSender { tx_ping };
-    let receiver = WorkerReceiver { rx_ping };
+    let sender = WorkerSender { tx_ping, tx_entry_request, tx_entry_response };
+    let receiver = WorkerReceiver { rx_ping, rx_entry_request, rx_entry_response };
 
     (sender, receiver)
 }
@@ -65,9 +69,13 @@ pub fn init_worker_channels<N: Network>() -> (WorkerSender<N>, WorkerReceiver<N>
 #[derive(Debug)]
 pub struct WorkerSender<N: Network> {
     pub tx_ping: Arc<mpsc::Sender<(SocketAddr, Ping<N>)>>,
+    pub tx_entry_request: Arc<mpsc::Sender<(SocketAddr, EntryRequest<N>)>>,
+    pub tx_entry_response: Arc<mpsc::Sender<(SocketAddr, EntryResponse<N>)>>,
 }
 
 #[derive(Debug)]
 pub struct WorkerReceiver<N: Network> {
     pub rx_ping: mpsc::Receiver<(SocketAddr, Ping<N>)>,
+    pub rx_entry_request: mpsc::Receiver<(SocketAddr, EntryRequest<N>)>,
+    pub rx_entry_response: mpsc::Receiver<(SocketAddr, EntryResponse<N>)>,
 }

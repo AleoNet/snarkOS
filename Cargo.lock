@@ -2882,15 +2882,20 @@ dependencies = [
  "async-trait",
  "bincode 1.3.3",
  "bytes",
+ "futures",
  "parking_lot",
+ "rand",
+ "rand_chacha",
  "serde",
+ "snarkos-account",
  "snarkos-node-messages",
- "snarkos-node-router",
  "snarkos-node-tcp",
  "snarkvm",
  "tokio",
+ "tokio-stream",
  "tokio-util",
  "tracing",
+ "tracing-subscriber 0.3.17",
 ]
 
 [[package]]

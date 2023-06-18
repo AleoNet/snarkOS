@@ -28,6 +28,13 @@ pub enum Data<T: FromBytes + ToBytes + Send + 'static> {
 }
 
 impl<T: FromBytes + ToBytes + Send + 'static> Data<T> {
+    pub fn into<T2: From<Data<T>> + From<T> + FromBytes + ToBytes + Send + 'static>(self) -> Data<T2> {
+        match self {
+            Self::Object(x) => Data::Object(x.into()),
+            Self::Buffer(bytes) => Data::Buffer(bytes),
+        }
+    }
+
     pub async fn deserialize(self) -> Result<T> {
         match self {
             Self::Object(x) => Ok(x),
