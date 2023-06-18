@@ -16,15 +16,18 @@
 extern crate tracing;
 
 use snarkos_account::Account;
+use snarkos_node_messages::Data;
 use snarkos_node_narwhal::{
     helpers::{init_primary_channels, PrimarySender},
     Primary,
     Shared,
     MEMORY_POOL_PORT,
 };
+use snarkvm::prelude::{Field, Uniform};
 
+use ::bytes::Bytes;
 use anyhow::{bail, Result};
-use rand::SeedableRng;
+use rand::{Rng, SeedableRng};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
@@ -32,6 +35,8 @@ use tracing_subscriber::{
 };
 
 type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+/**************************************************************************************************/
 
 /// Initializes the logger.
 pub fn initialize_logger(verbosity: u8) {
@@ -64,6 +69,8 @@ pub fn initialize_logger(verbosity: u8) {
         .with(tracing_subscriber::fmt::Layer::default().with_target(verbosity > 2).with_filter(filter))
         .try_init();
 }
+
+/**************************************************************************************************/
 
 /// Starts the primary instance.
 pub async fn start_primary(
@@ -151,6 +158,28 @@ fn handle_signals(primary: &Primary<CurrentNetwork>) {
     });
 }
 
+/**************************************************************************************************/
+
+/// Fires *fake* unconfirmed transactions at the node.
+fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>) {
+    let tx_unconfirmed_transaction = sender.tx_unconfirmed_transaction.clone();
+    tokio::task::spawn(async move {
+        let mut rng = rand_chacha::ChaChaRng::seed_from_u64(0);
+        loop {
+            // Sample a random fake transaction ID.
+            let id = Field::<CurrentNetwork>::rand(&mut rng).into();
+            // Sample random fake transaction bytes.
+            let transaction = Data::Buffer(Bytes::from((0..1024).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
+            // Send the fake transaction.
+            if let Err(e) = tx_unconfirmed_transaction.send((id, transaction)).await {
+                error!("Failed to send unconfirmed transaction: {e}");
+            }
+        }
+    });
+}
+
+/**************************************************************************************************/
+
 #[tokio::main]
 async fn main() -> Result<()> {
     initialize_logger(3);
@@ -168,6 +197,9 @@ async fn main() -> Result<()> {
 
     // Start the primary instance.
     let (primary, sender) = start_primary(node_id, num_nodes).await?;
+
+    // Fire unconfirmed transactions.
+    fire_unconfirmed_transactions(&sender);
 
     println!("Hello, world!");
 

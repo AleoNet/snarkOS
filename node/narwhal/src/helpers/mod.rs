@@ -21,5 +21,11 @@ pub use codec::*;
 mod entry;
 pub use entry::*;
 
+mod pending;
+pub use pending::*;
+
+mod ready;
+pub use ready::*;
+
 mod resolver;
 pub use resolver::*;

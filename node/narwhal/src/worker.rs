@@ -12,7 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{Gateway, Shared};
+use crate::{
+    helpers::{Pending, Ready},
+    Gateway,
+    Shared,
+};
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::prelude::*,
@@ -29,18 +33,22 @@ pub struct Worker<N: Network> {
     shared: Arc<Shared<N>>,
     /// The gateway.
     gateway: Gateway<N>,
+    /// The ready queue.
+    ready: Ready<N>,
+    /// The pending queue.
+    pending: Pending<N>,
 }
 
 impl<N: Network> Worker<N> {
     /// Initializes a new worker instance.
     pub fn new(id: u8, shared: Arc<Shared<N>>, gateway: Gateway<N>) -> Result<Self> {
         // Return the worker.
-        Ok(Self { id, shared, gateway })
+        Ok(Self { id, shared, gateway, ready: Default::default(), pending: Default::default() })
     }
 
     /// Run the worker instance.
     pub async fn run(&mut self) -> Result<(), Error> {
-        info!("Starting worker instance {} of the memory pool", self.id);
+        info!("Starting worker instance {} of the memory pool...", self.id);
 
         // // Create the validator instance.
         // let mut validator = Validator::new(self.shared.clone());
@@ -52,20 +60,31 @@ impl<N: Network> Worker<N> {
     }
 
     /// Handles the incoming unconfirmed solution.
-    /// Note: This method assumes the incoming solution is valid.
+    /// Note: This method assumes the incoming solution is valid; it is the caller's responsibility.
     pub(crate) async fn process_unconfirmed_solution(
         &self,
         (puzzle_commitment, prover_solution): (PuzzleCommitment<N>, Data<ProverSolution<N>>),
     ) -> Result<()> {
+        trace!("Worker {} received unconfirmed solution '{puzzle_commitment}'", self.id);
+        // Remove the puzzle commitment from the pending queue.
+        self.pending.remove(puzzle_commitment);
+        // Adds the prover solution to the ready queue.
+        self.ready.insert(puzzle_commitment, prover_solution);
         Ok(())
     }
 
     /// Handles the incoming unconfirmed transaction.
-    /// Note: This method assumes the incoming transaction is valid.
+    /// Note: This method assumes the incoming transaction is valid; it is the caller's responsibility.
     pub(crate) async fn process_unconfirmed_transaction(
         &self,
         (id, transaction): (N::TransactionID, Data<Transaction<N>>),
     ) -> Result<()> {
+        trace!("Worker {} received unconfirmed transaction '{id}'", self.id);
+        // Remove the transaction from the pending queue.
+        self.pending.remove(&id);
+        // Adds the transaction to the ready queue.
+        self.ready.insert(&id, transaction);
+
         Ok(())
     }
 }

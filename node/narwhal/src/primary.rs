@@ -52,7 +52,7 @@ impl<N: Network> Primary<N> {
 
     /// Run the primary instance.
     pub async fn run(&mut self, receiver: PrimaryReceiver<N>) -> Result<()> {
-        info!("Starting the primary instance of the memory pool");
+        info!("Starting the primary instance of the memory pool...");
 
         // Initialize the gateway.
         self.gateway.run().await?;

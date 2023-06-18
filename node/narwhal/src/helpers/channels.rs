@@ -18,6 +18,7 @@ use snarkvm::{
     prelude::{ProverSolution, PuzzleCommitment, Transaction},
 };
 
+use std::sync::Arc;
 use tokio::sync::mpsc;
 
 const GATEWAY_CHANNEL_SIZE: usize = 1024;
@@ -27,6 +28,9 @@ pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver
     let (tx_unconfirmed_solution, rx_unconfirmed_solution) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
     let (tx_unconfirmed_transaction, rx_unconfirmed_transaction) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
 
+    let tx_unconfirmed_solution = Arc::new(tx_unconfirmed_solution);
+    let tx_unconfirmed_transaction = Arc::new(tx_unconfirmed_transaction);
+
     let sender = PrimarySender { tx_unconfirmed_solution, tx_unconfirmed_transaction };
     let receiver = PrimaryReceiver { rx_unconfirmed_solution, rx_unconfirmed_transaction };
 
@@ -35,8 +39,8 @@ pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver
 
 #[derive(Debug)]
 pub struct PrimarySender<N: Network> {
-    pub tx_unconfirmed_solution: mpsc::Sender<(PuzzleCommitment<N>, Data<ProverSolution<N>>)>,
-    pub tx_unconfirmed_transaction: mpsc::Sender<(N::TransactionID, Data<Transaction<N>>)>,
+    pub tx_unconfirmed_solution: Arc<mpsc::Sender<(PuzzleCommitment<N>, Data<ProverSolution<N>>)>>,
+    pub tx_unconfirmed_transaction: Arc<mpsc::Sender<(N::TransactionID, Data<Transaction<N>>)>>,
 }
 
 #[derive(Debug)]

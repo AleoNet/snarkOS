@@ -15,15 +15,51 @@
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::prelude::*,
-    prelude::{ProverSolution, Transaction},
+    prelude::{ProverSolution, PuzzleCommitment, Transaction},
 };
 
-#[derive(Debug)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+pub enum EntryID<N: Network> {
+    /// A prover solution.
+    Solution(PuzzleCommitment<N>),
+    /// A transaction.
+    Transaction(N::TransactionID),
+}
+
+impl<N: Network> From<PuzzleCommitment<N>> for EntryID<N> {
+    /// Converts the puzzle commitment into an entry ID.
+    fn from(puzzle_commitment: PuzzleCommitment<N>) -> Self {
+        Self::Solution(puzzle_commitment)
+    }
+}
+
+impl<N: Network> From<&N::TransactionID> for EntryID<N> {
+    /// Converts the transaction ID into an entry ID.
+    fn from(transaction_id: &N::TransactionID) -> Self {
+        Self::Transaction(*transaction_id)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Entry<N: Network> {
     /// A prover solution.
     Solution(Data<ProverSolution<N>>),
     /// A transaction.
     Transaction(Data<Transaction<N>>),
+}
+
+impl<N: Network> From<Data<ProverSolution<N>>> for Entry<N> {
+    /// Converts the prover solution into an entry.
+    fn from(solution: Data<ProverSolution<N>>) -> Self {
+        Self::Solution(solution)
+    }
+}
+
+impl<N: Network> From<Data<Transaction<N>>> for Entry<N> {
+    /// Converts the transaction into an entry.
+    fn from(transaction: Data<Transaction<N>>) -> Self {
+        Self::Transaction(transaction)
+    }
 }
 
 impl<N: Network> FromBytes for Entry<N> {

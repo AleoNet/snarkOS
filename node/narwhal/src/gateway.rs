@@ -84,7 +84,7 @@ impl<N: Network> Gateway<N> {
 
     /// Run the gateway.
     pub async fn run(&mut self) -> Result<()> {
-        info!("Starting the gateway for the memory pool");
+        debug!("Starting the gateway for the memory pool...");
 
         // Enable the TCP protocols.
         self.enable_handshake().await;
@@ -96,6 +96,8 @@ impl<N: Network> Gateway<N> {
         let _listening_addr = self.tcp.enable_listener().await.expect("Failed to enable the TCP listener");
         // // Initialize the heartbeat.
         // self.initialize_heartbeat();
+
+        info!("Started the gateway for the memory pool at '{}'", self.local_ip());
 
         Ok(())
     }
