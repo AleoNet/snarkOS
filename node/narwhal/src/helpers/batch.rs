@@ -26,15 +26,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::{Ready, Transmission, TransmissionID};
+use crate::helpers::{Transmission, TransmissionID};
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::prelude::*,
     prelude::{Address, Field, PrivateKey, Signature},
 };
 
-use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
+use time::OffsetDateTime;
 
 #[derive(Clone, Debug)]
 pub struct SealedBatch<N: Network> {
@@ -75,6 +75,8 @@ pub struct Batch<N: Network> {
     batch_id: Field<N>,
     /// The round number.
     round: u64,
+    /// The timestamp.
+    timestamp: i64,
     /// The map of `transmission IDs` to `transmissions`.
     transmissions: HashMap<TransmissionID<N>, Data<Transmission<N>>>,
     /// The batch certificates of the previous round.
@@ -96,12 +98,14 @@ impl<N: Network> Batch<N> {
         ensure!(round != 0 || previous_certificates.is_empty(), "Invalid round number");
         // If the round is not zero, then there should be at least one previous certificate.
         ensure!(round == 0 || !previous_certificates.is_empty(), "Invalid round number");
+        // Checkpoint the timestamp for the batch.
+        let timestamp = OffsetDateTime::now_utc().unix_timestamp();
         // Compute the batch ID.
-        let batch_id = Self::compute_batch_id(round, &transmissions, &previous_certificates)?;
+        let batch_id = Self::compute_batch_id(round, timestamp, &transmissions, &previous_certificates)?;
         // Sign the preimage.
         let signature = private_key.sign(&[batch_id], rng)?;
         // Return the batch.
-        Ok(Self { batch_id, round, transmissions, previous_certificates, signature })
+        Ok(Self { batch_id, round, timestamp, transmissions, previous_certificates, signature })
     }
 
     /// Returns the batch ID.
@@ -114,6 +118,11 @@ impl<N: Network> Batch<N> {
         self.round
     }
 
+    /// Returns the timestamp.
+    pub const fn timestamp(&self) -> i64 {
+        self.timestamp
+    }
+
     /// Returns the transmissions.
     pub const fn transmissions(&self) -> &HashMap<TransmissionID<N>, Data<Transmission<N>>> {
         &self.transmissions
@@ -122,6 +131,11 @@ impl<N: Network> Batch<N> {
     /// Returns the batch certificates for the previous round.
     pub const fn previous_certificates(&self) -> &Vec<BatchCertificate<N>> {
         &self.previous_certificates
+    }
+
+    /// Returns the signature.
+    pub const fn signature(&self) -> &Signature<N> {
+        &self.signature
     }
 
     /// Returns the number of transmissions in the batch.
@@ -149,12 +163,15 @@ impl<N: Network> Batch<N> {
     /// Returns the batch ID.
     pub fn compute_batch_id(
         round: u64,
+        timestamp: i64,
         transmissions: &HashMap<TransmissionID<N>, Data<Transmission<N>>>,
         previous_certificates: &[BatchCertificate<N>],
     ) -> Result<Field<N>> {
         let mut preimage = Vec::new();
         // Insert the round number.
         preimage.extend_from_slice(&round.to_bytes_le()?);
+        // Insert the timestamp.
+        preimage.extend_from_slice(&timestamp.to_bytes_le()?);
         // Insert the number of transmissions.
         preimage.extend_from_slice(&u64::try_from(transmissions.len())?.to_bytes_le()?);
         // Insert the transmission IDs.

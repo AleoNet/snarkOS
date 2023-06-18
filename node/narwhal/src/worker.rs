@@ -169,6 +169,8 @@ impl<N: Network> Worker<N> {
         if self.ready.contains(transmission_id) {
             return;
         }
+        // Check if the transmission ID already exists in the ledger.
+        // TODO (howardwu): Add a ledger service.
         // Check if the transmission ID exists in the pending queue.
         if !self.pending.contains(transmission_id) {
             // TODO (howardwu): Limit the number of open requests we send to a peer.
@@ -226,7 +228,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Handles the incoming unconfirmed solution.
-    /// Note: This method assumes the incoming solution is valid; it is the caller's responsibility.
+    /// Note: This method assumes the incoming solution is valid and does not exist in the ledger.
     pub(crate) async fn process_unconfirmed_solution(
         &self,
         puzzle_commitment: PuzzleCommitment<N>,
@@ -241,7 +243,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Handles the incoming unconfirmed transaction.
-    /// Note: This method assumes the incoming transaction is valid; it is the caller's responsibility.
+    /// Note: This method assumes the incoming transaction is valid and does not exist in the ledger.
     pub(crate) async fn process_unconfirmed_transaction(
         &self,
         transaction_id: N::TransactionID,
