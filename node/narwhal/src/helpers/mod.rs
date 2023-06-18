@@ -15,6 +15,9 @@
 mod batch;
 pub use batch::*;
 
+mod batch_certificate;
+pub use batch_certificate::*;
+
 mod channels;
 pub use channels::*;
 

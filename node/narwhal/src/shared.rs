@@ -12,15 +12,19 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::{BatchCertificate, SealedBatch};
+use crate::helpers::{Batch, BatchCertificate, PrimarySender, SealedBatch};
 use snarkvm::console::{prelude::*, types::Address};
 
 use parking_lot::RwLock;
 use std::{
     collections::HashMap,
     net::SocketAddr,
-    sync::atomic::{AtomicU32, AtomicU64, Ordering},
+    sync::{
+        atomic::{AtomicU32, AtomicU64, Ordering},
+        Arc,
+    },
 };
+use tokio::sync::OnceCell;
 
 pub struct Shared<N: Network> {
     /// A map of `address` to `stake`.
@@ -29,6 +33,10 @@ pub struct Shared<N: Network> {
     round: AtomicU64,
     /// The current block height.
     height: AtomicU32,
+    /// The primary sender.
+    primary_sender: Arc<OnceCell<PrimarySender<N>>>,
+    /// A map of `address` to `proposed batches`.
+    proposed_batches: RwLock<HashMap<Address<N>, Batch<N>>>,
     /// A map of `round` number to a map of `addresses` to `sealed batches`.
     sealed_batches: RwLock<HashMap<u64, HashMap<Address<N>, SealedBatch<N>>>>,
     /// A map of `peer IP` to `address`.
@@ -44,10 +52,62 @@ impl<N: Network> Shared<N> {
             committee: Default::default(),
             round: AtomicU64::new(round),
             height: AtomicU32::new(height),
+            primary_sender: Default::default(),
+            proposed_batches: Default::default(),
             sealed_batches: Default::default(),
             peer_addresses: Default::default(),
             address_peers: Default::default(),
         }
+    }
+
+    /// Returns the primary sender.
+    pub fn primary_sender(&self) -> &PrimarySender<N> {
+        self.primary_sender.get().expect("Primary sender not set")
+    }
+
+    /// Sets the primary sender.
+    pub fn set_primary_sender(&self, primary_sender: PrimarySender<N>) {
+        self.primary_sender.set(primary_sender).expect("Primary sender already set");
+    }
+
+    /// Stores the proposed batch.
+    pub fn store_proposed_batch(&self, peer_ip: SocketAddr, batch: Batch<N>) {
+        self.get_address(&peer_ip).map(|address| {
+            self.proposed_batches.write().insert(address, batch);
+        });
+    }
+
+    /// Stores the sealed batch.
+    pub fn store_sealed_batch(&self, peer_ip: SocketAddr, certificate: BatchCertificate<N>) {
+        // Retrieve the address of the peer.
+        let Some(address) = self.get_address(&peer_ip) else {
+            warn!("No address for peer '{peer_ip}'");
+            return;
+        };
+        // Remove the proposed batch.
+        let Some(batch) = self.proposed_batches.write().remove(&address) else {
+            warn!("No proposed batch for peer '{peer_ip}'");
+            return;
+        };
+        // Ensure the batch IDs match.
+        if batch.batch_id() != certificate.batch_id {
+            warn!("Batch ID mismatch for the batch from peer '{peer_ip}'");
+            return;
+        }
+        // Retrieve the round.
+        let round = batch.round();
+        // Create the sealed batch.
+        let sealed_batch = SealedBatch::new(batch, certificate);
+        // Store the sealed batch.
+        self.sealed_batches.write().entry(round).or_default().insert(address, sealed_batch);
+    }
+
+    /// Stores the sealed batch.
+    pub fn store_sealed_batch_from_primary(&self, address: Address<N>, sealed_batch: SealedBatch<N>) {
+        // Retrieve the round.
+        let round = sealed_batch.batch().round();
+        // Store the sealed batch.
+        self.sealed_batches.write().entry(round).or_default().insert(address, sealed_batch);
     }
 
     /// Adds a validator to the committee.
@@ -56,7 +116,6 @@ impl<N: Network> Shared<N> {
         if self.is_committee_member(&address) {
             bail!("Validator already in committee");
         }
-
         // Add the validator to the committee.
         self.committee.write().insert(address, stake);
         Ok(())

@@ -102,7 +102,7 @@ pub async fn start_primary(
     // Initialize the primary instance.
     let mut primary = Primary::<CurrentNetwork>::new(shared.clone(), account, Some(node_id))?;
     // Run the primary instance.
-    primary.run(receiver).await?;
+    primary.run(sender.clone(), receiver).await?;
     // Keep the node's connections.
     keep_connections(&primary, node_id, num_nodes);
     // Handle the log connections.

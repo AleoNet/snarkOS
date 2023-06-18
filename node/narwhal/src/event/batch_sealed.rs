@@ -15,29 +15,37 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct WorkerBatch<N: Network> {
-    pub worker_id: u8,
-    pub batch: Data<N::TransactionID>,
+pub struct BatchSealed<N: Network> {
+    pub certificate: Data<BatchCertificate<N>>,
 }
 
-impl<N: Network> EventTrait for WorkerBatch<N> {
+impl<N: Network> BatchSealed<N> {
+    /// Initializes a new batch sealed event.
+    pub fn new(certificate: Data<BatchCertificate<N>>) -> Self {
+        Self { certificate }
+    }
+}
+
+impl<N: Network> EventTrait for BatchSealed<N> {
     /// Returns the event name.
     #[inline]
     fn name(&self) -> String {
-        "WorkerBatch".to_string()
+        "BatchSealed".to_string()
     }
 
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.worker_id.to_bytes_le()?)?;
-        self.batch.serialize_blocking_into(writer)
+        self.certificate.serialize_blocking_into(writer)
     }
 
     /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
-        Ok(Self { worker_id: u8::read_le(&mut reader)?, batch: Data::Buffer(reader.into_inner().freeze()) })
+
+        let certificate = Data::Buffer(reader.into_inner().freeze());
+
+        Ok(Self { certificate })
     }
 }

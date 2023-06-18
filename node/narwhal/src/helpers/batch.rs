@@ -26,13 +26,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::{Transmission, TransmissionID};
+use crate::helpers::{BatchCertificate, Transmission, TransmissionID};
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::prelude::*,
     prelude::{Address, Field, PrivateKey, Signature},
 };
 
+use ::bytes::Bytes;
 use std::{collections::HashMap, sync::Arc};
 use time::OffsetDateTime;
 
@@ -61,15 +62,7 @@ impl<N: Network> SealedBatch<N> {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct BatchCertificate<N: Network> {
-    /// The batch ID.
-    batch_id: Field<N>,
-    /// The `signatures` of the batch ID from the committee.
-    signatures: Vec<Signature<N>>,
-}
-
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Batch<N: Network> {
     /// The batch ID, defined as the hash of the round number, transmission IDs, and previous batch certificates.
     batch_id: Field<N>,
@@ -106,6 +99,14 @@ impl<N: Network> Batch<N> {
         let signature = private_key.sign(&[batch_id], rng)?;
         // Return the batch.
         Ok(Self { batch_id, round, timestamp, transmissions, previous_certificates, signature })
+    }
+
+    /// Returns the sealed batch.
+    pub fn seal(self, signatures: Vec<Signature<N>>) -> SealedBatch<N> {
+        // Create the batch certificate.
+        let certificate = BatchCertificate { batch_id: self.batch_id, signatures };
+        // Return the sealed batch.
+        SealedBatch::new(self, certificate)
     }
 
     /// Returns the batch ID.
@@ -193,5 +194,103 @@ impl<N: Network> Batch<N> {
         }
         // Hash the preimage.
         N::hash_bhp1024(&preimage.to_bits_le())
+    }
+}
+
+impl<N: Network> FromBytes for Batch<N> {
+    /// Reads the batch from the buffer.
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        // Read the version.
+        let version = u8::read_le(&mut reader)?;
+        // Ensure the version is valid.
+        if version != 0 {
+            return Err(error("Invalid batch version"));
+        }
+
+        // Read the batch ID.
+        let batch_id = Field::read_le(&mut reader)?;
+        // Read the round number.
+        let round = u64::read_le(&mut reader)?;
+        // Read the timestamp.
+        let timestamp = i64::read_le(&mut reader)?;
+
+        // Read the number of transmissions.
+        let num_transmissions = u32::read_le(&mut reader)?;
+        // Read the transmissions.
+        let mut transmissions = HashMap::new();
+        for _ in 0..num_transmissions {
+            // Read the transmission ID.
+            let transmission_id = TransmissionID::read_le(&mut reader)?;
+            // Read the number of bytes.
+            let num_bytes = u32::read_le(&mut reader)?;
+            // Read the bytes.
+            let mut bytes = Vec::with_capacity(num_bytes as usize);
+            for _ in 0..num_bytes {
+                bytes.push(u8::read_le(&mut reader)?);
+            }
+            // Insert the transmission.
+            transmissions.insert(transmission_id, Data::Buffer(Bytes::from(bytes)));
+        }
+
+        // Read the number of previous certificates.
+        let num_previous_certificates = u32::read_le(&mut reader)?;
+        // Read the previous certificates.
+        let mut previous_certificates = Vec::new();
+        for _ in 0..num_previous_certificates {
+            // Read the certificate.
+            previous_certificates.push(BatchCertificate::read_le(&mut reader)?);
+        }
+
+        // Read the signature.
+        let signature = Signature::read_le(&mut reader)?;
+
+        // Return the batch.
+        Ok(Self { batch_id, round, timestamp, transmissions, previous_certificates, signature })
+    }
+}
+
+impl<N: Network> ToBytes for Batch<N> {
+    /// Writes the batch to the buffer.
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        // Write the version.
+        0u8.write_le(&mut writer)?;
+        // Write the batch ID.
+        self.batch_id.write_le(&mut writer)?;
+        // Write the round number.
+        self.round.write_le(&mut writer)?;
+        // Write the timestamp.
+        self.timestamp.write_le(&mut writer)?;
+        // Write the number of transmissions.
+        u32::try_from(self.transmissions.len()).map_err(|e| error(e.to_string()))?.write_le(&mut writer)?;
+        // Write the transmissions.
+        for (transmission_id, transmission) in &self.transmissions {
+            // Write the transmission ID.
+            transmission_id.write_le(&mut writer)?;
+            // Write the transmission.
+            match transmission {
+                Data::Object(x) => {
+                    let bytes = x.to_bytes_le().map_err(|e| error(e.to_string()))?;
+                    // Write the number of bytes.
+                    u32::try_from(bytes.len()).map_err(|e| error(e.to_string()))?.write_le(&mut writer)?;
+                    // Write the bytes.
+                    writer.write_all(&bytes)?;
+                }
+                Data::Buffer(bytes) => {
+                    // Write the number of bytes.
+                    u32::try_from(bytes.len()).map_err(|e| error(e.to_string()))?.write_le(&mut writer)?;
+                    // Write the bytes.
+                    writer.write_all(bytes)?;
+                }
+            }
+        }
+        // Write the number of previous certificates.
+        u32::try_from(self.previous_certificates.len()).map_err(|e| error(e.to_string()))?.write_le(&mut writer)?;
+        // Write the previous certificates.
+        for certificate in &self.previous_certificates {
+            // Write the certificate.
+            certificate.write_le(&mut writer)?;
+        }
+        // Write the signature.
+        self.signature.write_le(&mut writer)
     }
 }

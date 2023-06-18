@@ -15,40 +15,37 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TransmissionResponse<N: Network> {
-    pub transmission_id: TransmissionID<N>,
-    pub transmission: Data<Transmission<N>>,
+pub struct BatchSignature<N: Network> {
+    pub batch_id: Field<N>,
+    pub signature: Signature<N>,
 }
 
-impl<N: Network> TransmissionResponse<N> {
-    /// Initializes a new transmission response event.
-    pub fn new(transmission_id: TransmissionID<N>, transmission: Data<Transmission<N>>) -> Self {
-        Self { transmission_id, transmission }
+impl<N: Network> BatchSignature<N> {
+    /// Initializes a new batch signature event.
+    pub fn new(batch_id: Field<N>, signature: Signature<N>) -> Self {
+        Self { batch_id, signature }
     }
 }
 
-impl<N: Network> EventTrait for TransmissionResponse<N> {
+impl<N: Network> EventTrait for BatchSignature<N> {
     /// Returns the event name.
     #[inline]
     fn name(&self) -> String {
-        "TransmissionResponse".to_string()
+        "BatchSignature".to_string()
     }
 
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.transmission_id.to_bytes_le()?)?;
-        self.transmission.serialize_blocking_into(writer)
+        writer.write_all(&self.batch_id.to_bytes_le()?)?;
+        writer.write_all(&self.signature.to_bytes_le()?)?;
+        Ok(())
     }
 
     /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
-
-        let transmission_id = TransmissionID::read_le(&mut reader)?;
-        let transmission = Data::Buffer(reader.into_inner().freeze());
-
-        Ok(Self { transmission_id, transmission })
+        Ok(Self { batch_id: Field::read_le(&mut reader)?, signature: Signature::read_le(&mut reader)? })
     }
 }

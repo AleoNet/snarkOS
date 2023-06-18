@@ -12,6 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod batch_propose;
+pub use batch_propose::BatchPropose;
+
+mod batch_signature;
+pub use batch_signature::BatchSignature;
+
+mod batch_sealed;
+pub use batch_sealed::BatchSealed;
+
 mod challenge_request;
 pub use challenge_request::ChallengeRequest;
 
@@ -30,14 +39,11 @@ pub use transmission_response::TransmissionResponse;
 mod worker_ping;
 pub use worker_ping::WorkerPing;
 
-mod worker_batch;
-pub use worker_batch::WorkerBatch;
-
-use crate::helpers::{Transmission, TransmissionID};
+use crate::helpers::{Batch, BatchCertificate, Transmission, TransmissionID};
 use snarkos_node_messages::{Data, DisconnectReason};
 use snarkvm::{
     console::prelude::{FromBytes, Network, ToBytes},
-    prelude::{Address, Signature},
+    prelude::{Address, Field, Signature},
 };
 
 use ::bytes::{Buf, BytesMut};
@@ -63,18 +69,15 @@ pub trait EventTrait {
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Event<N: Network> {
-    // BatchPrepare(),
-    // BatchRequest(),
-    // BatchResponse(),
-    // BatchSignature(),
-    // BatchSealed(),
+    BatchPropose(BatchPropose<N>),
+    BatchSignature(BatchSignature<N>),
+    BatchSealed(BatchSealed<N>),
     ChallengeRequest(ChallengeRequest<N>),
     ChallengeResponse(ChallengeResponse<N>),
     Disconnect(Disconnect),
     TransmissionRequest(TransmissionRequest<N>),
     TransmissionResponse(TransmissionResponse<N>),
     WorkerPing(WorkerPing<N>),
-    WorkerBatch(WorkerBatch<N>),
 }
 
 impl<N: Network> Event<N> {
@@ -85,13 +88,15 @@ impl<N: Network> Event<N> {
     #[inline]
     pub fn name(&self) -> String {
         match self {
+            Self::BatchPropose(event) => event.name(),
+            Self::BatchSignature(event) => event.name(),
+            Self::BatchSealed(event) => event.name(),
             Self::ChallengeRequest(event) => event.name(),
             Self::ChallengeResponse(event) => event.name(),
             Self::Disconnect(event) => event.name(),
             Self::TransmissionRequest(event) => event.name(),
             Self::TransmissionResponse(event) => event.name(),
             Self::WorkerPing(event) => event.name(),
-            Self::WorkerBatch(event) => event.name(),
         }
     }
 
@@ -99,13 +104,15 @@ impl<N: Network> Event<N> {
     #[inline]
     pub fn id(&self) -> u16 {
         match self {
-            Self::ChallengeRequest(..) => 0,
-            Self::ChallengeResponse(..) => 1,
-            Self::Disconnect(..) => 2,
-            Self::TransmissionRequest(..) => 3,
-            Self::TransmissionResponse(..) => 4,
-            Self::WorkerPing(..) => 5,
-            Self::WorkerBatch(..) => 6,
+            Self::BatchPropose(..) => 0,
+            Self::BatchSignature(..) => 1,
+            Self::BatchSealed(..) => 2,
+            Self::ChallengeRequest(..) => 3,
+            Self::ChallengeResponse(..) => 4,
+            Self::Disconnect(..) => 5,
+            Self::TransmissionRequest(..) => 6,
+            Self::TransmissionResponse(..) => 7,
+            Self::WorkerPing(..) => 8,
         }
     }
 
@@ -115,13 +122,15 @@ impl<N: Network> Event<N> {
         writer.write_all(&self.id().to_le_bytes()[..])?;
 
         match self {
+            Self::BatchPropose(event) => event.serialize(writer),
+            Self::BatchSignature(event) => event.serialize(writer),
+            Self::BatchSealed(event) => event.serialize(writer),
             Self::ChallengeRequest(event) => event.serialize(writer),
             Self::ChallengeResponse(event) => event.serialize(writer),
             Self::Disconnect(event) => event.serialize(writer),
             Self::TransmissionRequest(event) => event.serialize(writer),
             Self::TransmissionResponse(event) => event.serialize(writer),
             Self::WorkerPing(event) => event.serialize(writer),
-            Self::WorkerBatch(event) => event.serialize(writer),
         }
     }
 
@@ -138,13 +147,15 @@ impl<N: Network> Event<N> {
 
         // Deserialize the data field.
         let event = match id {
-            0 => Self::ChallengeRequest(EventTrait::deserialize(bytes)?),
-            1 => Self::ChallengeResponse(EventTrait::deserialize(bytes)?),
-            2 => Self::Disconnect(EventTrait::deserialize(bytes)?),
-            3 => Self::TransmissionRequest(EventTrait::deserialize(bytes)?),
-            4 => Self::TransmissionResponse(EventTrait::deserialize(bytes)?),
-            5 => Self::WorkerPing(EventTrait::deserialize(bytes)?),
-            6 => Self::WorkerBatch(EventTrait::deserialize(bytes)?),
+            0 => Self::BatchPropose(BatchPropose::deserialize(bytes)?),
+            1 => Self::BatchSignature(BatchSignature::deserialize(bytes)?),
+            2 => Self::BatchSealed(BatchSealed::deserialize(bytes)?),
+            3 => Self::ChallengeRequest(EventTrait::deserialize(bytes)?),
+            4 => Self::ChallengeResponse(EventTrait::deserialize(bytes)?),
+            5 => Self::Disconnect(EventTrait::deserialize(bytes)?),
+            6 => Self::TransmissionRequest(EventTrait::deserialize(bytes)?),
+            7 => Self::TransmissionResponse(EventTrait::deserialize(bytes)?),
+            8 => Self::WorkerPing(EventTrait::deserialize(bytes)?),
             _ => bail!("Unknown event ID {id}"),
         };
 

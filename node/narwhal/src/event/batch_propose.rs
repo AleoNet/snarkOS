@@ -15,30 +15,28 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct TransmissionResponse<N: Network> {
-    pub transmission_id: TransmissionID<N>,
-    pub transmission: Data<Transmission<N>>,
+pub struct BatchPropose<N: Network> {
+    pub batch: Data<Batch<N>>,
 }
 
-impl<N: Network> TransmissionResponse<N> {
-    /// Initializes a new transmission response event.
-    pub fn new(transmission_id: TransmissionID<N>, transmission: Data<Transmission<N>>) -> Self {
-        Self { transmission_id, transmission }
+impl<N: Network> BatchPropose<N> {
+    /// Initializes a new batch propose event.
+    pub fn new(batch: Data<Batch<N>>) -> Self {
+        Self { batch }
     }
 }
 
-impl<N: Network> EventTrait for TransmissionResponse<N> {
+impl<N: Network> EventTrait for BatchPropose<N> {
     /// Returns the event name.
     #[inline]
     fn name(&self) -> String {
-        "TransmissionResponse".to_string()
+        "BatchPropose".to_string()
     }
 
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.transmission_id.to_bytes_le()?)?;
-        self.transmission.serialize_blocking_into(writer)
+        self.batch.serialize_blocking_into(writer)
     }
 
     /// Deserializes the given buffer into an event.
@@ -46,9 +44,8 @@ impl<N: Network> EventTrait for TransmissionResponse<N> {
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
 
-        let transmission_id = TransmissionID::read_le(&mut reader)?;
-        let transmission = Data::Buffer(reader.into_inner().freeze());
+        let batch = Data::Buffer(reader.into_inner().freeze());
 
-        Ok(Self { transmission_id, transmission })
+        Ok(Self { batch })
     }
 }

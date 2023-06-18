@@ -358,6 +358,21 @@ impl<N: Network> Gateway<N> {
         // This match statement handles the inbound event by deserializing the event,
         // checking the event is valid, and then calling the appropriate (trait) handler.
         match event {
+            Event::BatchPropose(batch_propose) => {
+                // Send the batch propose to the primary.
+                let _ = self.shared.primary_sender().tx_batch_propose.send((peer_ip, batch_propose)).await;
+                Ok(())
+            }
+            Event::BatchSignature(batch_signature) => {
+                // Send the batch signature to the primary.
+                let _ = self.shared.primary_sender().tx_batch_signature.send((peer_ip, batch_signature)).await;
+                Ok(())
+            }
+            Event::BatchSealed(batch_sealed) => {
+                // Send the batch certificate to the primary.
+                let _ = self.shared.primary_sender().tx_batch_sealed.send((peer_ip, batch_sealed.certificate)).await;
+                Ok(())
+            }
             Event::ChallengeRequest(..) | Event::ChallengeResponse(..) => {
                 // Disconnect as the peer is not following the protocol.
                 bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
@@ -407,10 +422,6 @@ impl<N: Network> Gateway<N> {
                     }
                 }
                 Ok(())
-            }
-            Event::WorkerBatch(..) => {
-                // Disconnect as the peer is not following the protocol.
-                bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
             }
         }
     }
