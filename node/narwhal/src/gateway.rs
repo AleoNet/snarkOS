@@ -118,6 +118,11 @@ impl<N: Network> Gateway<N> {
         Ok(())
     }
 
+    /// Returns the account of the node.
+    pub const fn account(&self) -> &Account<N> {
+        &self.account
+    }
+
     /// Returns the worker sender for the given worker ID.
     pub fn worker_sender(&self, worker_id: u8) -> Option<&WorkerSender<N>> {
         self.worker_senders.get().and_then(|senders| senders.get(&worker_id))

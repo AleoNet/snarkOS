@@ -38,6 +38,11 @@ impl<N: Network> Ready<N> {
         Self { entries: Default::default() }
     }
 
+    /// Returns the entries.
+    pub const fn entries(&self) -> &Arc<RwLock<HashMap<EntryID<N>, Data<Entry<N>>>>> {
+        &self.entries
+    }
+
     /// Returns the number of entries in the ready queue.
     pub fn len(&self) -> usize {
         self.entries.read().len()
@@ -66,5 +71,10 @@ impl<N: Network> Ready<N> {
     /// Removes the specified `entry ID` from the ready queue.
     pub fn remove(&self, entry_id: impl Into<EntryID<N>>) {
         self.entries.write().remove(&entry_id.into());
+    }
+
+    /// Removes the entries and returns them.
+    pub fn drain(&self) -> HashMap<EntryID<N>, Data<Entry<N>>> {
+        self.entries.write().drain().map(|(k, v)| (k, v)).collect()
     }
 }

@@ -12,14 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::helpers::{BatchCertificate, SealedBatch};
 use snarkvm::console::{prelude::*, types::Address};
 
 use parking_lot::RwLock;
-use std::{collections::HashMap, net::SocketAddr};
+use std::{
+    collections::HashMap,
+    net::SocketAddr,
+    sync::atomic::{AtomicU32, AtomicU64, Ordering},
+};
 
 pub struct Shared<N: Network> {
     /// A map of `address` to `stake`.
     committee: RwLock<HashMap<Address<N>, u64>>,
+    /// The current round number.
+    round: AtomicU64,
+    /// The current block height.
+    height: AtomicU32,
+    /// A map of `round` number to a map of `addresses` to `sealed batches`.
+    sealed_batches: RwLock<HashMap<u64, HashMap<Address<N>, SealedBatch<N>>>>,
     /// A map of `peer IP` to `address`.
     peer_addresses: RwLock<HashMap<SocketAddr, Address<N>>>,
     /// A map of `address` to `peer IP`.
@@ -28,8 +39,15 @@ pub struct Shared<N: Network> {
 
 impl<N: Network> Shared<N> {
     /// Initializes a new `Shared` instance.
-    pub fn new() -> Self {
-        Self { committee: Default::default(), peer_addresses: Default::default(), address_peers: Default::default() }
+    pub fn new(round: u64, height: u32) -> Self {
+        Self {
+            committee: Default::default(),
+            round: AtomicU64::new(round),
+            height: AtomicU32::new(height),
+            sealed_batches: Default::default(),
+            peer_addresses: Default::default(),
+            address_peers: Default::default(),
+        }
     }
 
     /// Adds a validator to the committee.
@@ -42,6 +60,53 @@ impl<N: Network> Shared<N> {
         // Add the validator to the committee.
         self.committee.write().insert(address, stake);
         Ok(())
+    }
+}
+
+impl<N: Network> Shared<N> {
+    /// Returns the current round number.
+    pub fn round(&self) -> u64 {
+        self.round.load(Ordering::Relaxed)
+    }
+
+    /// Returns the current block height.
+    pub fn height(&self) -> u32 {
+        self.height.load(Ordering::Relaxed)
+    }
+
+    /// Returns the sealed batches for the given round.
+    pub fn sealed_batches(&self, round: u64) -> Option<HashMap<Address<N>, SealedBatch<N>>> {
+        self.sealed_batches.read().get(&round).cloned()
+    }
+
+    /// Returns the previous batch certificates for the given round.
+    pub fn previous_certificates(&self, round: u64) -> Option<Vec<BatchCertificate<N>>> {
+        // The genesis round does not require batch certificates.
+        if round == 0 {
+            return None;
+        }
+        // Retrieve the previous round's sealed batches.
+        let sealed_batches = self.sealed_batches.read();
+        let Some(batches) = sealed_batches.get(&(round - 1)) else {
+            return None;
+        };
+        // Retrieve the certificates.
+        let mut certificates = Vec::new();
+        for batch in batches.values() {
+            certificates.push(batch.certificate().clone());
+        }
+        // Return the certificates.
+        Some(certificates)
+    }
+
+    /// Increments the round number.
+    pub fn increment_round(&self) {
+        self.round.fetch_add(1, Ordering::Relaxed);
+    }
+
+    /// Increments the block height.
+    pub fn increment_height(&self) {
+        self.height.fetch_add(1, Ordering::Relaxed);
     }
 }
 

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{init_worker_channels, PrimaryReceiver},
+    helpers::{init_worker_channels, Batch, PrimaryReceiver},
     Gateway,
     Shared,
     Worker,
@@ -84,6 +84,32 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
+    /// Returns the batch for the current round.
+    ///
+    /// This method performs the following steps:
+    /// 1. Drain the workers.
+    /// 2. Construct the batch.
+    /// 3. Broadcast the batch (w/ entry IDs, not entries) to all validators for signing.
+    pub fn prepare_batch(&self) -> Result<Batch<N>> {
+        // Initialize the RNG.
+        let mut rng = rand::thread_rng();
+
+        // TODO (howardwu): Choose the correct worker.
+        let worker = self.workers.read().first().unwrap().clone();
+        // Transition the worker to the next round.
+        let entries = worker.next_round();
+
+        // Retrieve the current round.
+        let round = self.shared.round();
+        // Retrieve the previous certificates.
+        let previous_certificates = self.shared.previous_certificates(round).unwrap_or_default();
+
+        // Return the batch.
+        Batch::new(self.gateway.account().private_key(), round, entries, previous_certificates, &mut rng)
+    }
+}
+
+impl<N: Network> Primary<N> {
     /// Starts the primary handlers.
     pub fn start_handlers(&self, receiver: PrimaryReceiver<N>) {
         let PrimaryReceiver { mut rx_unconfirmed_solution, mut rx_unconfirmed_transaction } = receiver;

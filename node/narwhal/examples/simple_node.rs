@@ -82,7 +82,7 @@ pub async fn start_primary(
     println!("\n{account}\n");
 
     // Initialize the shared state.
-    let shared = Arc::new(Shared::<CurrentNetwork>::new());
+    let shared = Arc::new(Shared::<CurrentNetwork>::new(0u64, 0u32));
     // Add the validators to the shared state.
     for i in 0..num_nodes {
         // Sample the account.

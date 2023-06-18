@@ -29,7 +29,7 @@ use snarkvm::{
 };
 
 use parking_lot::Mutex;
-use std::{future::Future, net::SocketAddr, sync::Arc};
+use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc};
 use tokio::task::JoinHandle;
 
 fn fmt_id(id: String) -> String {
@@ -76,13 +76,18 @@ impl<N: Network> Worker<N> {
     /// Run the worker instance.
     pub async fn run(&mut self, receiver: WorkerReceiver<N>) -> Result<(), Error> {
         info!("Starting worker instance {} of the memory pool...", self.id);
-
         // Start the worker handlers.
         self.start_handlers(receiver);
-
         Ok(())
     }
 
+    /// Transitions the worker to the next round.
+    pub(crate) fn next_round(&self) -> HashMap<EntryID<N>, Data<Entry<N>>> {
+        self.ready.drain()
+    }
+}
+
+impl<N: Network> Worker<N> {
     /// Starts the worker handlers.
     pub fn start_handlers(&self, receiver: WorkerReceiver<N>) {
         let WorkerReceiver { mut rx_ping, mut rx_entry_request, mut rx_entry_response } = receiver;
