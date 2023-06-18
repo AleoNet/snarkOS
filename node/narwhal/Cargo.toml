@@ -41,6 +41,10 @@ version = "0.8"
 [dependencies.serde]
 version = "1"
 
+[dependencies.sha2]
+version = "0.10"
+default-features = false
+
 [dependencies.snarkos-account]
 path = "../../account"
 version = "=2.1.1"

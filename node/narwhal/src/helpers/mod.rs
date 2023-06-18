@@ -27,6 +27,9 @@ pub use entry::*;
 mod entry_id;
 pub use entry_id::*;
 
+mod partition;
+pub use partition::*;
+
 mod pending;
 pub use pending::*;
 

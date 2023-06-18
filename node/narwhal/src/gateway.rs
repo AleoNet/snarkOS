@@ -21,7 +21,6 @@ use crate::{
     Shared,
     CONTEXT,
     MAX_COMMITTEE_SIZE,
-    MAX_WORKERS,
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
@@ -121,6 +120,12 @@ impl<N: Network> Gateway<N> {
     /// Returns the account of the node.
     pub const fn account(&self) -> &Account<N> {
         &self.account
+    }
+
+    /// Returns the number of workers.
+    pub fn num_workers(&self) -> u8 {
+        u8::try_from(self.worker_senders.get().expect("Missing worker senders in gateway").len())
+            .expect("Too many workers")
     }
 
     /// Returns the worker sender for the given worker ID.
@@ -358,7 +363,7 @@ impl<N: Network> Gateway<N> {
             }
             Event::EntryRequest(request) => {
                 // If the worker ID is not valid, disconnect.
-                if request.worker >= MAX_WORKERS {
+                if request.worker >= self.num_workers() {
                     bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
                 }
                 // Send the entry request to the worker.
@@ -370,7 +375,7 @@ impl<N: Network> Gateway<N> {
             }
             Event::EntryResponse(response) => {
                 // If the worker ID is not valid, disconnect.
-                if response.worker >= MAX_WORKERS {
+                if response.worker >= self.num_workers() {
                     bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
                 }
                 // Send the entry response to the worker.
@@ -382,7 +387,7 @@ impl<N: Network> Gateway<N> {
             }
             Event::WorkerPing(ping) => {
                 // If the worker ID is not valid, disconnect.
-                if ping.worker >= MAX_WORKERS {
+                if ping.worker >= self.num_workers() {
                     bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
                 }
                 // Send the ping to the worker.

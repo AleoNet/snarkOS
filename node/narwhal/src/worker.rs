@@ -20,6 +20,7 @@ use crate::{
     Gateway,
     WorkerPing,
     MAX_WORKERS,
+    WORKER_PING_INTERVAL,
 };
 use snarkos_node_messages::Data;
 use snarkvm::{
@@ -77,8 +78,8 @@ impl<N: Network> Worker<N> {
         Ok(())
     }
 
-    /// Transitions the worker to the next round.
-    pub(crate) fn next_round(&self) -> HashMap<EntryID<N>, Data<Entry<N>>> {
+    /// Drains the ready queue.
+    pub(crate) fn drain(&self) -> HashMap<EntryID<N>, Data<Entry<N>>> {
         self.ready.drain()
     }
 }
@@ -95,7 +96,7 @@ impl<N: Network> Worker<N> {
                 // Broadcast the ping event.
                 self_clone.broadcast_ping().await;
                 // Wait for the next interval.
-                tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(WORKER_PING_INTERVAL)).await;
             }
         });
 
@@ -174,7 +175,7 @@ impl<N: Network> Worker<N> {
             }
             // Check if the entry ID exists in the pending queue for the specified peer IP.
             if !self.pending.contains_peer(*entry_id, peer_ip) {
-                debug!(
+                trace!(
                     "Worker {} - Found new entry ID '{}' from peer '{peer_ip}'",
                     self.id,
                     fmt_id(entry_id.to_string())
@@ -205,11 +206,11 @@ impl<N: Network> Worker<N> {
                 // let entry = response.entry.deserialize().await?;
                 // TODO: Validate the entry.
 
-                debug!("Worker {} - Received entry '{}' from peer '{peer_ip}'", self.id, fmt_id(entry_id.to_string()));
                 // Remove the peer IP from the pending queue.
                 self.pending.remove(entry_id);
                 // Insert the entry into the ready queue.
                 self.ready.insert(entry_id, response.entry);
+                debug!("Worker {} - Added entry '{}' from peer '{peer_ip}'", self.id, fmt_id(entry_id.to_string()));
             }
         }
         Ok(())
@@ -219,13 +220,14 @@ impl<N: Network> Worker<N> {
     /// Note: This method assumes the incoming solution is valid; it is the caller's responsibility.
     pub(crate) async fn process_unconfirmed_solution(
         &self,
-        (puzzle_commitment, prover_solution): (PuzzleCommitment<N>, Data<ProverSolution<N>>),
+        puzzle_commitment: PuzzleCommitment<N>,
+        prover_solution: Data<ProverSolution<N>>,
     ) -> Result<()> {
-        trace!("Worker {} - Unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment.to_string()));
         // Remove the puzzle commitment from the pending queue.
         self.pending.remove(puzzle_commitment);
         // Adds the prover solution to the ready queue.
         self.ready.insert(puzzle_commitment, prover_solution.into());
+        debug!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment.to_string()));
         Ok(())
     }
 
@@ -233,14 +235,14 @@ impl<N: Network> Worker<N> {
     /// Note: This method assumes the incoming transaction is valid; it is the caller's responsibility.
     pub(crate) async fn process_unconfirmed_transaction(
         &self,
-        (transaction_id, transaction): (N::TransactionID, Data<Transaction<N>>),
+        transaction_id: N::TransactionID,
+        transaction: Data<Transaction<N>>,
     ) -> Result<()> {
-        trace!("Worker {} - Unconfirmed transaction '{}'", self.id, fmt_id(transaction_id.to_string()));
         // Remove the transaction from the pending queue.
         self.pending.remove(&transaction_id);
         // Adds the transaction to the ready queue.
         self.ready.insert(&transaction_id, transaction.into());
-
+        debug!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id.to_string()));
         Ok(())
     }
 

@@ -38,8 +38,9 @@ pub use worker::*;
 
 pub const CONTEXT: &str = "[MemoryPool]";
 pub const MAX_COMMITTEE_SIZE: u16 = 128;
-pub const MAX_WORKERS: u8 = 1;
+pub const MAX_WORKERS: u8 = 10;
 pub const MEMORY_POOL_PORT: u16 = 5000;
+pub const WORKER_PING_INTERVAL: u64 = 1000; // ms
 
 // TODO (howardwu): Switch the worker's `EntryID` to use or include a sha256/blake2s hash.
 // TODO (howardwu): Implement sha256/blake2s hashing on `Data::Bytes`, so we can compare IDs without deserializing.
