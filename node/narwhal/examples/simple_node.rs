@@ -174,6 +174,7 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>) {
             if let Err(e) = tx_unconfirmed_transaction.send((id, transaction)).await {
                 error!("Failed to send unconfirmed transaction: {e}");
             }
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
     });
 }

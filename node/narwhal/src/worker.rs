@@ -25,6 +25,10 @@ use snarkvm::{
 
 use std::sync::Arc;
 
+fn fmt_id(id: String) -> String {
+    id.chars().take(12).collect::<String>()
+}
+
 #[derive(Clone)]
 pub struct Worker<N: Network> {
     /// The worker ID.
@@ -65,7 +69,7 @@ impl<N: Network> Worker<N> {
         &self,
         (puzzle_commitment, prover_solution): (PuzzleCommitment<N>, Data<ProverSolution<N>>),
     ) -> Result<()> {
-        trace!("Worker {} received unconfirmed solution '{puzzle_commitment}'", self.id);
+        trace!("Worker {} - Unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment.to_string()));
         // Remove the puzzle commitment from the pending queue.
         self.pending.remove(puzzle_commitment);
         // Adds the prover solution to the ready queue.
@@ -77,13 +81,13 @@ impl<N: Network> Worker<N> {
     /// Note: This method assumes the incoming transaction is valid; it is the caller's responsibility.
     pub(crate) async fn process_unconfirmed_transaction(
         &self,
-        (id, transaction): (N::TransactionID, Data<Transaction<N>>),
+        (transaction_id, transaction): (N::TransactionID, Data<Transaction<N>>),
     ) -> Result<()> {
-        trace!("Worker {} received unconfirmed transaction '{id}'", self.id);
+        trace!("Worker {} - Unconfirmed transaction '{}'", self.id, fmt_id(transaction_id.to_string()));
         // Remove the transaction from the pending queue.
-        self.pending.remove(&id);
+        self.pending.remove(&transaction_id);
         // Adds the transaction to the ready queue.
-        self.ready.insert(&id, transaction);
+        self.ready.insert(&transaction_id, transaction);
 
         Ok(())
     }
