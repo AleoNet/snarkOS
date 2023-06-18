@@ -18,7 +18,6 @@ use crate::{
     EntryResponse,
     Event,
     Gateway,
-    Shared,
     WorkerPing,
     MAX_WORKERS,
 };
@@ -33,15 +32,19 @@ use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc};
 use tokio::task::JoinHandle;
 
 fn fmt_id(id: String) -> String {
-    id.chars().take(16).collect::<String>()
+    let mut formatted_id = id.chars().take(16).collect::<String>();
+
+    if id.chars().count() > 16 {
+        formatted_id.push_str("..");
+    }
+
+    formatted_id
 }
 
 #[derive(Clone)]
 pub struct Worker<N: Network> {
     /// The worker ID.
     id: u8,
-    /// The shared state.
-    shared: Arc<Shared<N>>,
     /// The gateway.
     gateway: Gateway<N>,
     /// The ready queue.
@@ -54,18 +57,11 @@ pub struct Worker<N: Network> {
 
 impl<N: Network> Worker<N> {
     /// Initializes a new worker instance.
-    pub fn new(id: u8, shared: Arc<Shared<N>>, gateway: Gateway<N>) -> Result<Self> {
+    pub fn new(id: u8, gateway: Gateway<N>) -> Result<Self> {
         // Ensure the worker ID is valid.
         ensure!(id < MAX_WORKERS, "Invalid worker ID '{id}'");
         // Return the worker.
-        Ok(Self {
-            id,
-            shared,
-            gateway,
-            ready: Default::default(),
-            pending: Default::default(),
-            handles: Default::default(),
-        })
+        Ok(Self { id, gateway, ready: Default::default(), pending: Default::default(), handles: Default::default() })
     }
 
     /// Returns the worker ID.
@@ -89,7 +85,7 @@ impl<N: Network> Worker<N> {
 
 impl<N: Network> Worker<N> {
     /// Starts the worker handlers.
-    pub fn start_handlers(&self, receiver: WorkerReceiver<N>) {
+    fn start_handlers(&self, receiver: WorkerReceiver<N>) {
         let WorkerReceiver { rx_worker_ping: mut rx_ping, mut rx_entry_request, mut rx_entry_response } = receiver;
 
         // Broadcast a ping event periodically.
@@ -134,7 +130,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Broadcasts a ping event.
-    pub(crate) async fn broadcast_ping(&self) {
+    async fn broadcast_ping(&self) {
         // Construct the ping event.
         let ping = WorkerPing::new(self.id, self.ready.entry_ids());
         // Broadcast the ping event.
@@ -142,7 +138,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Sends an entry request to the specified peer.
-    pub(crate) async fn send_entry_request(&self, peer_ip: SocketAddr, entry_id: EntryID<N>) {
+    async fn send_entry_request(&self, peer_ip: SocketAddr, entry_id: EntryID<N>) {
         // Construct the entry request.
         let entry_request = EntryRequest::new(self.id, entry_id);
         // Send the entry request to the peer.
@@ -150,7 +146,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Sends an entry response to the specified peer.
-    pub(crate) async fn send_entry_response(&self, peer_ip: SocketAddr, entry_id: EntryID<N>, entry: Data<Entry<N>>) {
+    async fn send_entry_response(&self, peer_ip: SocketAddr, entry_id: EntryID<N>, entry: Data<Entry<N>>) {
         // Construct the entry response.
         let entry_response = EntryResponse::new(self.id, entry_id, entry);
         // Send the entry response to the peer.
@@ -158,7 +154,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Handles the incoming ping event.
-    pub(crate) async fn process_worker_ping(&self, peer_ip: SocketAddr, ping: WorkerPing<N>) {
+    async fn process_worker_ping(&self, peer_ip: SocketAddr, ping: WorkerPing<N>) {
         // Ensure the ping is for this worker.
         if ping.worker != self.id {
             return;
@@ -190,7 +186,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Handles the incoming entry request.
-    pub(crate) async fn process_entry_request(&self, peer_ip: SocketAddr, request: EntryRequest<N>) {
+    async fn process_entry_request(&self, peer_ip: SocketAddr, request: EntryRequest<N>) {
         // Check if the entry ID exists in the ready queue.
         if let Some(entry) = self.ready.get(request.entry_id) {
             // Send the entry response to the peer.
@@ -199,7 +195,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Handles the incoming entry response.
-    pub(crate) async fn process_entry_response(&self, peer_ip: SocketAddr, response: EntryResponse<N>) -> Result<()> {
+    async fn process_entry_response(&self, peer_ip: SocketAddr, response: EntryResponse<N>) -> Result<()> {
         let entry_id = response.entry_id;
         // Check if the entry ID exists in the pending queue.
         if let Some(peer_ips) = self.pending.get(entry_id) {
@@ -249,12 +245,12 @@ impl<N: Network> Worker<N> {
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
-    pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
+    fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
         self.handles.lock().push(tokio::spawn(future));
     }
 
     /// Shuts down the worker.
-    pub fn shut_down(&self) {
+    pub(crate) fn shut_down(&self) {
         trace!("Shutting down worker {}...", self.id);
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());

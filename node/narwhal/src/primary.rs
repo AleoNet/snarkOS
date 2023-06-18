@@ -64,7 +64,7 @@ impl<N: Network> Primary<N> {
         // Construct the worker channels.
         let (tx_worker, rx_worker) = init_worker_channels();
         // Construct the worker instance.
-        let mut worker = Worker::new(id, self.shared.clone(), self.gateway.clone())?;
+        let mut worker = Worker::new(id, self.gateway.clone())?;
         // Run the worker instance.
         worker.run(rx_worker).await?;
         // Add the worker to the list of workers.
@@ -111,7 +111,7 @@ impl<N: Network> Primary<N> {
 
 impl<N: Network> Primary<N> {
     /// Starts the primary handlers.
-    pub fn start_handlers(&self, receiver: PrimaryReceiver<N>) {
+    fn start_handlers(&self, receiver: PrimaryReceiver<N>) {
         let PrimaryReceiver { mut rx_unconfirmed_solution, mut rx_unconfirmed_transaction } = receiver;
 
         // Process the unconfirmed solutions.
@@ -142,7 +142,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
-    pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
+    fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
         self.handles.lock().push(tokio::spawn(future));
     }
 
