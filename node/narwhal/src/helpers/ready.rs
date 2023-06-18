@@ -37,6 +37,21 @@ impl<N: Network> Ready<N> {
         Self { entries: Default::default() }
     }
 
+    /// Returns the number of entries in the ready queue.
+    pub fn len(&self) -> usize {
+        self.entries.read().len()
+    }
+
+    /// Returns `true` if the ready queue contains the specified `entry ID`.
+    pub fn contains(&self, entry_id: impl Into<EntryID<N>>) -> bool {
+        self.entries.read().contains_key(&entry_id.into())
+    }
+
+    /// Returns the entry IDs.
+    pub fn entry_ids(&self) -> Vec<EntryID<N>> {
+        self.entries.read().keys().copied().collect()
+    }
+
     /// Inserts the specified (`entry ID`, `entry`) to the ready queue.
     pub fn insert(&self, entry_id: impl Into<EntryID<N>>, entry: impl Into<Entry<N>>) {
         self.entries.write().insert(entry_id.into(), entry.into());
@@ -45,13 +60,5 @@ impl<N: Network> Ready<N> {
     /// Removes the specified `entry ID` from the ready queue.
     pub fn remove(&self, entry_id: impl Into<EntryID<N>>) {
         self.entries.write().remove(&entry_id.into());
-    }
-}
-
-impl<N: Network> Deref for Ready<N> {
-    type Target = RwLock<HashMap<EntryID<N>, Entry<N>>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.entries
     }
 }

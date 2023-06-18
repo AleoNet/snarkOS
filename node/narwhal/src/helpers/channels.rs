@@ -12,16 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::Ping;
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::network::*,
     prelude::{ProverSolution, PuzzleCommitment, Transaction},
 };
 
-use std::sync::Arc;
+use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::mpsc;
 
-const GATEWAY_CHANNEL_SIZE: usize = 1024;
+const GATEWAY_CHANNEL_SIZE: usize = 8192;
 
 /// Initializes the primary channels.
 pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver<N>) {
@@ -47,4 +48,26 @@ pub struct PrimarySender<N: Network> {
 pub struct PrimaryReceiver<N: Network> {
     pub rx_unconfirmed_solution: mpsc::Receiver<(PuzzleCommitment<N>, Data<ProverSolution<N>>)>,
     pub rx_unconfirmed_transaction: mpsc::Receiver<(N::TransactionID, Data<Transaction<N>>)>,
+}
+
+/// Initializes the worker channels.
+pub fn init_worker_channels<N: Network>() -> (WorkerSender<N>, WorkerReceiver<N>) {
+    let (tx_ping, rx_ping) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
+
+    let tx_ping = Arc::new(tx_ping);
+
+    let sender = WorkerSender { tx_ping };
+    let receiver = WorkerReceiver { rx_ping };
+
+    (sender, receiver)
+}
+
+#[derive(Debug)]
+pub struct WorkerSender<N: Network> {
+    pub tx_ping: Arc<mpsc::Sender<(SocketAddr, Ping<N>)>>,
+}
+
+#[derive(Debug)]
+pub struct WorkerReceiver<N: Network> {
+    pub rx_ping: mpsc::Receiver<(SocketAddr, Ping<N>)>,
 }

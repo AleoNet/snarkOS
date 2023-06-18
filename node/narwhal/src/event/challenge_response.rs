@@ -32,7 +32,7 @@ impl<N: Network> EventTrait for ChallengeResponse<N> {
         self.signature.serialize_blocking_into(writer)
     }
 
-    /// Deserializes the given buffer into a event.
+    /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let reader = bytes.reader();

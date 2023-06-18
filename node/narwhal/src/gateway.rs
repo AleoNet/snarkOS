@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{EventCodec, Resolver},
+    helpers::{EventCodec, Resolver, WorkerSender},
     ChallengeRequest,
     ChallengeResponse,
     Event,
@@ -21,6 +21,7 @@ use crate::{
     Shared,
     CONTEXT,
     MAX_COMMITTEE_SIZE,
+    MAX_WORKERS,
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
@@ -37,8 +38,17 @@ use snarkvm::{console::prelude::*, prelude::Address};
 
 use futures::SinkExt;
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashSet, io, net::SocketAddr, sync::Arc};
-use tokio::{net::TcpStream, sync::oneshot, task::JoinHandle};
+use std::{
+    collections::{HashMap, HashSet},
+    io,
+    net::SocketAddr,
+    sync::Arc,
+};
+use tokio::{
+    net::TcpStream,
+    sync::{oneshot, OnceCell},
+    task::JoinHandle,
+};
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
 
@@ -48,6 +58,8 @@ pub struct Gateway<N: Network> {
     shared: Arc<Shared<N>>,
     /// The account of the node.
     account: Account<N>,
+    /// The worker senders.
+    worker_senders: Arc<OnceCell<HashMap<u8, WorkerSender<N>>>>,
     /// The TCP stack.
     tcp: Tcp,
     /// The resolver.
@@ -75,6 +87,7 @@ impl<N: Network> Gateway<N> {
         Ok(Self {
             shared,
             account,
+            worker_senders: Default::default(),
             tcp,
             resolver: Default::default(),
             connected_peers: Default::default(),
@@ -83,8 +96,11 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Run the gateway.
-    pub async fn run(&mut self) -> Result<()> {
+    pub async fn run(&mut self, worker_senders: HashMap<u8, WorkerSender<N>>) -> Result<()> {
         debug!("Starting the gateway for the memory pool...");
+
+        // Set the worker senders.
+        self.worker_senders.set(worker_senders).expect("The worker senders are already set");
 
         // Enable the TCP protocols.
         self.enable_handshake().await;
@@ -100,6 +116,11 @@ impl<N: Network> Gateway<N> {
         info!("Started the gateway for the memory pool at '{}'", self.local_ip());
 
         Ok(())
+    }
+
+    /// Returns the worker sender for the given worker ID.
+    pub fn worker_sender(&self, worker_id: u8) -> Option<&WorkerSender<N>> {
+        self.worker_senders.get().and_then(|senders| senders.get(&worker_id))
     }
 
     /// Returns the IP address of this node.
@@ -292,6 +313,18 @@ impl<N: Network> Gateway<N> {
         result.ok()
     }
 
+    /// Broadcasts the given event to all connected peers.
+    pub(crate) fn broadcast(&self, event: Event<N>) {
+        // Ensure there are connected peers.
+        if self.number_of_connected_peers() > 0 {
+            // Iterate through all connected peers.
+            for peer_ip in self.connected_peers.read().iter() {
+                // Send the event to the peer.
+                self.send(*peer_ip, event.clone());
+            }
+        }
+    }
+
     /// Handles the inbound event from the peer.
     async fn inbound(&self, peer_addr: SocketAddr, event: Event<N>) -> Result<()> {
         // Retrieve the listener IP for the peer.
@@ -317,6 +350,18 @@ impl<N: Network> Gateway<N> {
             }
             Event::Disconnect(disconnect) => {
                 bail!("{CONTEXT} Disconnecting peer '{peer_ip}' for the following reason: {:?}", disconnect.reason)
+            }
+            Event::Ping(ping) => {
+                // If the worker ID is not valid, disconnect.
+                if ping.worker >= MAX_WORKERS {
+                    bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
+                }
+                // Send the ping to the worker.
+                if let Some(sender) = self.worker_sender(ping.worker) {
+                    // Send the ping to the worker.
+                    let _ = sender.tx_ping.send((peer_ip, ping));
+                }
+                Ok(())
             }
             Event::WorkerBatch(..) => {
                 // Disconnect as the peer is not following the protocol.
@@ -402,24 +447,8 @@ impl<N: Network> Disconnect for Gateway<N> {
 
 #[async_trait]
 impl<N: Network> OnConnect for Gateway<N> {
-    async fn on_connect(&self, peer_addr: SocketAddr) {
-        let _peer_ip = if let Some(ip) = self.resolve_to_listener(&peer_addr) {
-            ip
-        } else {
-            return;
-        };
-
-        // // Retrieve the block locators.
-        // let block_locators = match crate::helpers::get_block_locators(&self.ledger) {
-        //     Ok(block_locators) => Some(block_locators),
-        //     Err(e) => {
-        //         error!("Failed to get block locators: {e}");
-        //         return;
-        //     }
-        // };
-        //
-        // // Send the first `Ping` message to the peer.
-        // self.send_ping(peer_ip, block_locators);
+    async fn on_connect(&self, _peer_addr: SocketAddr) {
+        return;
     }
 }
 

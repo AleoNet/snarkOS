@@ -21,17 +21,22 @@ pub use challenge_response::ChallengeResponse;
 mod disconnect;
 pub use disconnect::Disconnect;
 
+mod ping;
+pub use ping::Ping;
+
 mod worker_batch;
 pub use worker_batch::WorkerBatch;
 
+use crate::helpers::EntryID;
 use snarkos_node_messages::{Data, DisconnectReason};
 use snarkvm::{
-    console::prelude::*,
+    console::prelude::{FromBytes, Network, ToBytes},
     prelude::{Address, Signature},
 };
 
 use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
+use serde::{Deserialize, Serialize};
 use std::{
     fmt,
     fmt::{Display, Formatter},
@@ -55,6 +60,7 @@ pub enum Event<N: Network> {
     ChallengeRequest(ChallengeRequest<N>),
     ChallengeResponse(ChallengeResponse<N>),
     Disconnect(Disconnect),
+    Ping(Ping<N>),
     WorkerBatch(WorkerBatch<N>),
 }
 
@@ -69,6 +75,7 @@ impl<N: Network> Event<N> {
             Self::ChallengeRequest(event) => event.name(),
             Self::ChallengeResponse(event) => event.name(),
             Self::Disconnect(event) => event.name(),
+            Self::Ping(event) => event.name(),
             Self::WorkerBatch(event) => event.name(),
         }
     }
@@ -80,7 +87,8 @@ impl<N: Network> Event<N> {
             Self::ChallengeRequest(..) => 0,
             Self::ChallengeResponse(..) => 1,
             Self::Disconnect(..) => 2,
-            Self::WorkerBatch(..) => 3,
+            Self::Ping(..) => 3,
+            Self::WorkerBatch(..) => 4,
         }
     }
 
@@ -93,6 +101,7 @@ impl<N: Network> Event<N> {
             Self::ChallengeRequest(event) => event.serialize(writer),
             Self::ChallengeResponse(event) => event.serialize(writer),
             Self::Disconnect(event) => event.serialize(writer),
+            Self::Ping(event) => event.serialize(writer),
             Self::WorkerBatch(event) => event.serialize(writer),
         }
     }
@@ -113,7 +122,8 @@ impl<N: Network> Event<N> {
             0 => Self::ChallengeRequest(EventTrait::deserialize(bytes)?),
             1 => Self::ChallengeResponse(EventTrait::deserialize(bytes)?),
             2 => Self::Disconnect(EventTrait::deserialize(bytes)?),
-            3 => Self::WorkerBatch(EventTrait::deserialize(bytes)?),
+            3 => Self::Ping(EventTrait::deserialize(bytes)?),
+            4 => Self::WorkerBatch(EventTrait::deserialize(bytes)?),
             _ => bail!("Unknown event ID {id}"),
         };
 

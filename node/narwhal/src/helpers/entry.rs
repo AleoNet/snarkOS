@@ -14,31 +14,12 @@
 
 use snarkos_node_messages::Data;
 use snarkvm::{
-    console::prelude::*,
-    prelude::{ProverSolution, PuzzleCommitment, Transaction},
+    console::prelude::{error, FromBytes, FromBytesDeserializer, Network, ToBytes, ToBytesSerializer},
+    prelude::{ProverSolution, Transaction},
 };
 
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum EntryID<N: Network> {
-    /// A prover solution.
-    Solution(PuzzleCommitment<N>),
-    /// A transaction.
-    Transaction(N::TransactionID),
-}
-
-impl<N: Network> From<PuzzleCommitment<N>> for EntryID<N> {
-    /// Converts the puzzle commitment into an entry ID.
-    fn from(puzzle_commitment: PuzzleCommitment<N>) -> Self {
-        Self::Solution(puzzle_commitment)
-    }
-}
-
-impl<N: Network> From<&N::TransactionID> for EntryID<N> {
-    /// Converts the transaction ID into an entry ID.
-    fn from(transaction_id: &N::TransactionID) -> Self {
-        Self::Transaction(*transaction_id)
-    }
-}
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use std::io::{Read, Result as IoResult, Write};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Entry<N: Network> {
@@ -63,7 +44,7 @@ impl<N: Network> From<Data<Transaction<N>>> for Entry<N> {
 }
 
 impl<N: Network> FromBytes for Entry<N> {
-    /// Reads the prover solution from the buffer.
+    /// Reads the entry from the buffer.
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         // Read the version.
         let version = u8::read_le(&mut reader)?;
@@ -80,13 +61,13 @@ impl<N: Network> FromBytes for Entry<N> {
                 // Read the prover solution.
                 let solution = ProverSolution::read_le(&mut reader)?;
                 // Return the prover solution.
-                Ok(Entry::Solution(Data::Object(solution)))
+                Ok(Self::Solution(Data::Object(solution)))
             }
             1 => {
                 // Read the transaction.
                 let transaction = Transaction::read_le(&mut reader)?;
                 // Return the transaction.
-                Ok(Entry::Transaction(Data::Object(transaction)))
+                Ok(Self::Transaction(Data::Object(transaction)))
             }
             2.. => Err(error("Invalid worker entry variant")),
         }
@@ -94,20 +75,34 @@ impl<N: Network> FromBytes for Entry<N> {
 }
 
 impl<N: Network> ToBytes for Entry<N> {
-    /// Writes the prover solution to the buffer.
+    /// Writes the entry to the buffer.
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         // Write the version.
         0u8.write_le(&mut writer)?;
         // Write the entry.
         match self {
-            Entry::Solution(solution) => {
+            Self::Solution(solution) => {
                 0u8.write_le(&mut writer)?;
                 solution.serialize_blocking_into(&mut writer).map_err(|e| error(e.to_string()))
             }
-            Entry::Transaction(transaction) => {
+            Self::Transaction(transaction) => {
                 1u8.write_le(&mut writer)?;
                 transaction.serialize_blocking_into(&mut writer).map_err(|e| error(e.to_string()))
             }
         }
+    }
+}
+
+impl<N: Network> Serialize for Entry<N> {
+    #[inline]
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        ToBytesSerializer::serialize_with_size_encoding(self, serializer)
+    }
+}
+
+impl<'de, N: Network> Deserialize<'de> for Entry<N> {
+    #[inline]
+    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "entry")
     }
 }

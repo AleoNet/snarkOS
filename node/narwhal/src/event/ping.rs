@@ -15,38 +15,45 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Disconnect {
-    pub reason: DisconnectReason,
+pub struct Ping<N: Network> {
+    pub worker: u8,
+    pub batch: Vec<EntryID<N>>,
 }
 
-impl From<DisconnectReason> for Disconnect {
-    fn from(reason: DisconnectReason) -> Self {
-        Self { reason }
+impl<N: Network> Ping<N> {
+    /// Initializes a new ping event.
+    pub fn new(worker: u8, batch: Vec<EntryID<N>>) -> Self {
+        Self { worker, batch }
     }
 }
 
-impl EventTrait for Disconnect {
+impl<N: Network> EventTrait for Ping<N> {
     /// Returns the event name.
     #[inline]
     fn name(&self) -> String {
-        "Disconnect".to_string()
+        "Ping".to_string()
     }
 
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(writer, &self.reason)?)
+        writer.write_all(&self.worker.to_bytes_le()?)?;
+        writer.write_all(&(self.batch.len() as u32).to_bytes_le()?)?;
+        writer.write_all(&self.batch.to_bytes_le()?)?;
+        Ok(())
     }
 
     /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        if bytes.remaining() == 0 {
-            Ok(Self { reason: DisconnectReason::NoReasonGiven })
-        } else if let Ok(reason) = bincode::deserialize_from(&mut bytes.reader()) {
-            Ok(Self { reason })
-        } else {
-            bail!("Invalid 'Disconnect' event");
+        let mut reader = bytes.reader();
+
+        let worker = u8::read_le(&mut reader)?;
+        let num_entries = u32::read_le(&mut reader)?;
+        let mut batch = Vec::with_capacity(num_entries as usize);
+        for _ in 0..num_entries {
+            batch.push(EntryID::read_le(&mut reader)?);
         }
+        Ok(Self { worker, batch })
     }
 }

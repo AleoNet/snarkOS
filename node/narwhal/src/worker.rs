@@ -13,9 +13,12 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{Pending, Ready},
+    helpers::{Pending, Ready, WorkerReceiver},
+    Event,
     Gateway,
+    Ping,
     Shared,
+    MAX_WORKERS,
 };
 use snarkos_node_messages::Data;
 use snarkvm::{
@@ -23,10 +26,12 @@ use snarkvm::{
     prelude::{ProverSolution, PuzzleCommitment, Transaction},
 };
 
-use std::sync::Arc;
+use parking_lot::Mutex;
+use std::{future::Future, net::SocketAddr, sync::Arc};
+use tokio::task::JoinHandle;
 
 fn fmt_id(id: String) -> String {
-    id.chars().take(12).collect::<String>()
+    id.chars().take(16).collect::<String>()
 }
 
 #[derive(Clone)]
@@ -41,26 +46,97 @@ pub struct Worker<N: Network> {
     ready: Ready<N>,
     /// The pending queue.
     pending: Pending<N>,
+    /// The spawned handles.
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 impl<N: Network> Worker<N> {
     /// Initializes a new worker instance.
     pub fn new(id: u8, shared: Arc<Shared<N>>, gateway: Gateway<N>) -> Result<Self> {
+        // Ensure the worker ID is valid.
+        ensure!(id < MAX_WORKERS, "Invalid worker ID '{id}'");
         // Return the worker.
-        Ok(Self { id, shared, gateway, ready: Default::default(), pending: Default::default() })
+        Ok(Self {
+            id,
+            shared,
+            gateway,
+            ready: Default::default(),
+            pending: Default::default(),
+            handles: Default::default(),
+        })
+    }
+
+    /// Returns the worker ID.
+    pub const fn id(&self) -> u8 {
+        self.id
     }
 
     /// Run the worker instance.
-    pub async fn run(&mut self) -> Result<(), Error> {
+    pub async fn run(&mut self, receiver: WorkerReceiver<N>) -> Result<(), Error> {
         info!("Starting worker instance {} of the memory pool...", self.id);
 
-        // // Create the validator instance.
-        // let mut validator = Validator::new(self.shared.clone());
-        //
-        // // Run the validator instance.
-        // validator.run().await?;
+        // Start the worker handlers.
+        self.start_handlers(receiver);
 
         Ok(())
+    }
+
+    /// Starts the worker handlers.
+    pub fn start_handlers(&self, receiver: WorkerReceiver<N>) {
+        let WorkerReceiver { mut rx_ping } = receiver;
+
+        // Broadcast a ping event periodically.
+        let self_clone = self.clone();
+        self.spawn(async move {
+            loop {
+                // Broadcast the ping event.
+                self_clone.broadcast_ping().await;
+                // Wait for the next interval.
+                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            }
+        });
+
+        // Process the ping events.
+        let self_clone = self.clone();
+        self.spawn(async move {
+            while let Some((peer_ip, ping)) = rx_ping.recv().await {
+                // Process the ping event.
+                self_clone.process_ping(peer_ip, ping).await;
+            }
+        });
+    }
+
+    /// Broadcasts a ping event.
+    pub(crate) async fn broadcast_ping(&self) {
+        // Construct the ping event.
+        let ping = Ping::new(self.id, self.ready.entry_ids());
+        // Broadcast the ping event.
+        self.gateway.broadcast(Event::Ping(ping));
+    }
+
+    /// Handles the incoming ping event.
+    pub(crate) async fn process_ping(&self, peer_ip: SocketAddr, ping: Ping<N>) {
+        // Ensure the ping is for this worker.
+        if ping.worker != self.id {
+            return;
+        }
+
+        // Iterate through the batch.
+        for entry_id in &ping.batch {
+            // Check if the entry ID exists in the ready queue.
+            if self.ready.contains(*entry_id) {
+                continue;
+            }
+            // Check if the entry ID exists in the pending queue.
+            if !self.pending.contains(*entry_id) {
+                // TODO (howardwu): Send a request to the peer to fetch the entry.
+            }
+            // Check if the entry ID exists in the pending queue for the specified peer IP.
+            if !self.pending.contains_peer(*entry_id, peer_ip) {
+                // Insert the entry ID into the pending queue.
+                self.pending.insert(*entry_id, peer_ip);
+            }
+        }
     }
 
     /// Handles the incoming unconfirmed solution.
@@ -90,5 +166,17 @@ impl<N: Network> Worker<N> {
         self.ready.insert(&transaction_id, transaction);
 
         Ok(())
+    }
+
+    /// Spawns a task with the given future; it should only be used for long-running tasks.
+    pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
+        self.handles.lock().push(tokio::spawn(future));
+    }
+
+    /// Shuts down the worker.
+    pub fn shut_down(&self) {
+        trace!("Shutting down worker {}...", self.id);
+        // Abort the tasks.
+        self.handles.lock().iter().for_each(|handle| handle.abort());
     }
 }

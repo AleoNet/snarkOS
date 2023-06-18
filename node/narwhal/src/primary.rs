@@ -12,7 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{helpers::PrimaryReceiver, Gateway, Shared, Worker};
+use crate::{
+    helpers::{init_worker_channels, PrimaryReceiver},
+    Gateway,
+    Shared,
+    Worker,
+};
 use snarkos_account::Account;
 use snarkos_node_messages::Data;
 use snarkvm::{
@@ -21,7 +26,7 @@ use snarkvm::{
 };
 
 use parking_lot::{Mutex, RwLock};
-use std::{future::Future, sync::Arc};
+use std::{collections::HashMap, future::Future, sync::Arc};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -54,17 +59,24 @@ impl<N: Network> Primary<N> {
     pub async fn run(&mut self, receiver: PrimaryReceiver<N>) -> Result<()> {
         info!("Starting the primary instance of the memory pool...");
 
-        // Initialize the gateway.
-        self.gateway.run().await?;
-
         // Construct the worker ID.
         let id = u8::try_from(self.workers.read().len())?;
+        // Construct the worker channels.
+        let (tx_worker, rx_worker) = init_worker_channels();
         // Construct the worker instance.
         let mut worker = Worker::new(id, self.shared.clone(), self.gateway.clone())?;
         // Run the worker instance.
-        worker.run().await?;
+        worker.run(rx_worker).await?;
         // Add the worker to the list of workers.
         self.workers.write().push(worker);
+
+        // Construct a map of the worker senders.
+        let mut tx_workers = HashMap::new();
+        // Add the worker sender to the map.
+        tx_workers.insert(id, tx_worker);
+
+        // Initialize the gateway.
+        self.gateway.run(tx_workers).await?;
 
         // Start the primary handlers.
         self.start_handlers(receiver);
@@ -84,7 +96,7 @@ impl<N: Network> Primary<N> {
                 let worker = self_clone.workers.read().first().unwrap().clone();
                 // Process the unconfirmed solution.
                 if let Err(e) = worker.process_unconfirmed_solution(msg).await {
-                    // error!("can't process a message: {e}");
+                    error!("Worker {} failed process a message: {e}", worker.id());
                 }
             }
         });
@@ -97,7 +109,7 @@ impl<N: Network> Primary<N> {
                 let worker = self_clone.workers.read().first().unwrap().clone();
                 // Process the unconfirmed transaction.
                 if let Err(e) = worker.process_unconfirmed_transaction(msg).await {
-                    // error!("can't process a message: {e}");
+                    error!("Worker {} failed process a message: {e}", worker.id());
                 }
             }
         });
@@ -111,6 +123,11 @@ impl<N: Network> Primary<N> {
     /// Shuts down the primary.
     pub async fn shut_down(&self) {
         trace!("Shutting down the primary...");
+        // Iterate through the workers.
+        self.workers.read().iter().for_each(|worker| {
+            // Shut down the worker.
+            worker.shut_down();
+        });
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
         // Close the gateway.

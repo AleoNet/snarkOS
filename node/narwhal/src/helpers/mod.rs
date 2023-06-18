@@ -21,6 +21,9 @@ pub use codec::*;
 mod entry;
 pub use entry::*;
 
+mod entry_id;
+pub use entry_id::*;
+
 mod pending;
 pub use pending::*;
 

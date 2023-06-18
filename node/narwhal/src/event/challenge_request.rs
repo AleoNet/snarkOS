@@ -42,7 +42,7 @@ impl<N: Network> EventTrait for ChallengeRequest<N> {
         Ok(bincode::serialize_into(writer, &(self.version, self.listener_port, self.address, self.nonce))?)
     }
 
-    /// Deserializes the given buffer into a event.
+    /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let (version, listener_port, address, nonce) = bincode::deserialize_from(&mut bytes.reader())?;
