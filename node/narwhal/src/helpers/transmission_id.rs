@@ -14,7 +14,7 @@
 
 use snarkvm::{
     console::prelude::{error, FromBytes, FromBytesDeserializer, Network, ToBytes, ToBytesSerializer},
-    prelude::PuzzleCommitment,
+    prelude::{PuzzleCommitment, Ratify},
 };
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
@@ -25,6 +25,8 @@ use std::{
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TransmissionID<N: Network> {
+    /// A ratification.
+    Ratification,
     /// A prover solution.
     Solution(PuzzleCommitment<N>),
     /// A transaction.
@@ -49,6 +51,7 @@ impl<N: Network> Display for TransmissionID<N> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Ratification => write!(f, "ratification"),
             Self::Solution(id) => write!(f, "{}", id),
             Self::Transaction(id) => write!(f, "{}", id),
         }
@@ -62,9 +65,10 @@ impl<N: Network> FromBytes for TransmissionID<N> {
         let variant = u8::read_le(&mut reader)?;
         // Match the variant.
         match variant {
-            0 => Ok(Self::Solution(FromBytes::read_le(&mut reader)?)),
-            1 => Ok(Self::Transaction(FromBytes::read_le(&mut reader)?)),
-            2.. => Err(error("Invalid worker transmission ID variant")),
+            0 => Ok(Self::Ratification),
+            1 => Ok(Self::Solution(FromBytes::read_le(&mut reader)?)),
+            2 => Ok(Self::Transaction(FromBytes::read_le(&mut reader)?)),
+            3.. => Err(error("Invalid worker transmission ID variant")),
         }
     }
 }
@@ -74,12 +78,13 @@ impl<N: Network> ToBytes for TransmissionID<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         // Write the transmission.
         match self {
+            Self::Ratification => 0u8.write_le(&mut writer),
             Self::Solution(id) => {
-                0u8.write_le(&mut writer)?;
+                1u8.write_le(&mut writer)?;
                 id.write_le(&mut writer)
             }
             Self::Transaction(id) => {
-                1u8.write_le(&mut writer)?;
+                2u8.write_le(&mut writer)?;
                 id.write_le(&mut writer)
             }
         }

@@ -23,6 +23,8 @@ use std::io::{Read, Result as IoResult, Write};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Transmission<N: Network> {
+    /// A ratification.
+    Ratification,
     /// A prover solution.
     Solution(Data<ProverSolution<N>>),
     /// A transaction.
@@ -71,19 +73,20 @@ impl<N: Network> FromBytes for Transmission<N> {
         let variant = u8::read_le(&mut reader)?;
         // Match the variant.
         match variant {
-            0 => {
+            0 => Ok(Self::Ratification),
+            1 => {
                 // Read the prover solution.
                 let solution = ProverSolution::read_le(&mut reader)?;
                 // Return the prover solution.
                 Ok(Self::Solution(Data::Object(solution)))
             }
-            1 => {
+            2 => {
                 // Read the transaction.
                 let transaction = Transaction::read_le(&mut reader)?;
                 // Return the transaction.
                 Ok(Self::Transaction(Data::Object(transaction)))
             }
-            2.. => Err(error("Invalid worker transmission variant")),
+            3.. => Err(error("Invalid worker transmission variant")),
         }
     }
 }
@@ -95,12 +98,13 @@ impl<N: Network> ToBytes for Transmission<N> {
         0u8.write_le(&mut writer)?;
         // Write the transmission.
         match self {
+            Self::Ratification => 0u8.write_le(&mut writer),
             Self::Solution(solution) => {
-                0u8.write_le(&mut writer)?;
+                1u8.write_le(&mut writer)?;
                 solution.serialize_blocking_into(&mut writer).map_err(|e| error(e.to_string()))
             }
             Self::Transaction(transaction) => {
-                1u8.write_le(&mut writer)?;
+                2u8.write_le(&mut writer)?;
                 transaction.serialize_blocking_into(&mut writer).map_err(|e| error(e.to_string()))
             }
         }
