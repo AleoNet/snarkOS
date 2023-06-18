@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{TransmissionRequest, TransmissionResponse, WorkerPing};
+use crate::{helpers::TransmissionID, TransmissionRequest, TransmissionResponse};
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::network::*,
@@ -68,14 +68,14 @@ pub fn init_worker_channels<N: Network>() -> (WorkerSender<N>, WorkerReceiver<N>
 
 #[derive(Debug)]
 pub struct WorkerSender<N: Network> {
-    pub tx_worker_ping: Arc<mpsc::Sender<(SocketAddr, WorkerPing<N>)>>,
+    pub tx_worker_ping: Arc<mpsc::Sender<(SocketAddr, TransmissionID<N>)>>,
     pub tx_transmission_request: Arc<mpsc::Sender<(SocketAddr, TransmissionRequest<N>)>>,
     pub tx_transmission_response: Arc<mpsc::Sender<(SocketAddr, TransmissionResponse<N>)>>,
 }
 
 #[derive(Debug)]
 pub struct WorkerReceiver<N: Network> {
-    pub rx_worker_ping: mpsc::Receiver<(SocketAddr, WorkerPing<N>)>,
+    pub rx_worker_ping: mpsc::Receiver<(SocketAddr, TransmissionID<N>)>,
     pub rx_transmission_request: mpsc::Receiver<(SocketAddr, TransmissionRequest<N>)>,
     pub rx_transmission_response: mpsc::Receiver<(SocketAddr, TransmissionResponse<N>)>,
 }

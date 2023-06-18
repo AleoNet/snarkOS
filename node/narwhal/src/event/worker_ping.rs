@@ -16,14 +16,13 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WorkerPing<N: Network> {
-    pub worker: u8,
     pub batch: Vec<TransmissionID<N>>,
 }
 
 impl<N: Network> WorkerPing<N> {
     /// Initializes a new ping event.
-    pub fn new(worker: u8, batch: Vec<TransmissionID<N>>) -> Self {
-        Self { worker, batch }
+    pub fn new(batch: Vec<TransmissionID<N>>) -> Self {
+        Self { batch }
     }
 }
 
@@ -37,7 +36,6 @@ impl<N: Network> EventTrait for WorkerPing<N> {
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.worker.to_bytes_le()?)?;
         writer.write_all(&(self.batch.len() as u32).to_bytes_le()?)?;
         writer.write_all(&self.batch.to_bytes_le()?)?;
         Ok(())
@@ -48,12 +46,12 @@ impl<N: Network> EventTrait for WorkerPing<N> {
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
 
-        let worker = u8::read_le(&mut reader)?;
         let num_transmissions = u32::read_le(&mut reader)?;
         let mut batch = Vec::with_capacity(num_transmissions as usize);
         for _ in 0..num_transmissions {
             batch.push(TransmissionID::read_le(&mut reader)?);
         }
-        Ok(Self { worker, batch })
+
+        Ok(Self { batch })
     }
 }

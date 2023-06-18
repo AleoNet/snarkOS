@@ -194,7 +194,7 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(1)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
     });
 }
@@ -203,7 +203,7 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    initialize_logger(2);
+    initialize_logger(1);
 
     // Retrieve the command-line arguments.
     let args: Vec<String> = std::env::args().collect();

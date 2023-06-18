@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{EventCodec, Resolver, WorkerSender},
+    helpers::{assign_to_worker, EventCodec, Resolver, WorkerSender},
     ChallengeRequest,
     ChallengeResponse,
     Event,
@@ -129,7 +129,7 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Returns the worker sender for the given worker ID.
-    pub fn worker_sender(&self, worker_id: u8) -> Option<&WorkerSender<N>> {
+    pub fn get_worker_sender(&self, worker_id: u8) -> Option<&WorkerSender<N>> {
         self.worker_senders.get().and_then(|senders| senders.get(&worker_id))
     }
 
@@ -362,38 +362,45 @@ impl<N: Network> Gateway<N> {
                 bail!("{CONTEXT} Disconnecting peer '{peer_ip}' for the following reason: {:?}", disconnect.reason)
             }
             Event::TransmissionRequest(request) => {
-                // If the worker ID is not valid, disconnect.
-                if request.worker >= self.num_workers() {
-                    bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
-                }
+                // TODO (howardwu): Add rate limiting checks on this event, on a per-peer basis.
+                // Determine the worker ID.
+                let Ok(worker_id) = assign_to_worker(request.transmission_id, self.num_workers()) else {
+                    warn!("{CONTEXT} Unable to assign transmission ID '{}' to a worker", request.transmission_id);
+                    return Ok(());
+                };
                 // Send the transmission request to the worker.
-                if let Some(sender) = self.worker_sender(request.worker) {
+                if let Some(sender) = self.get_worker_sender(worker_id) {
                     // Send the transmission request to the worker.
                     let _ = sender.tx_transmission_request.send((peer_ip, request)).await;
                 }
                 Ok(())
             }
             Event::TransmissionResponse(response) => {
-                // If the worker ID is not valid, disconnect.
-                if response.worker >= self.num_workers() {
-                    bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
-                }
+                // Determine the worker ID.
+                let Ok(worker_id) = assign_to_worker(response.transmission_id, self.num_workers()) else {
+                    warn!("{CONTEXT} Unable to assign transmission ID '{}' to a worker", response.transmission_id);
+                    return Ok(());
+                };
                 // Send the transmission response to the worker.
-                if let Some(sender) = self.worker_sender(response.worker) {
+                if let Some(sender) = self.get_worker_sender(worker_id) {
                     // Send the transmission response to the worker.
                     let _ = sender.tx_transmission_response.send((peer_ip, response)).await;
                 }
                 Ok(())
             }
             Event::WorkerPing(ping) => {
-                // If the worker ID is not valid, disconnect.
-                if ping.worker >= self.num_workers() {
-                    bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
-                }
-                // Send the ping to the worker.
-                if let Some(sender) = self.worker_sender(ping.worker) {
+                let num_workers = self.num_workers();
+                for transmission_id in ping.batch {
+                    // Determine the worker ID.
+                    let Ok(worker_id) = assign_to_worker(transmission_id, num_workers) else {
+                        warn!("{CONTEXT} Unable to assign transmission ID '{transmission_id}' to a worker");
+                        continue;
+                    };
                     // Send the ping to the worker.
-                    let _ = sender.tx_worker_ping.send((peer_ip, ping)).await;
+                    if let Some(sender) = self.get_worker_sender(worker_id) {
+                        // Send the ping to the worker.
+                        let _ = sender.tx_worker_ping.send((peer_ip, transmission_id)).await;
+                    }
                 }
                 Ok(())
             }

@@ -16,14 +16,13 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TransmissionRequest<N: Network> {
-    pub worker: u8,
     pub transmission_id: TransmissionID<N>,
 }
 
 impl<N: Network> TransmissionRequest<N> {
     /// Initializes a new transmission request event.
-    pub fn new(worker: u8, transmission_id: TransmissionID<N>) -> Self {
-        Self { worker, transmission_id }
+    pub fn new(transmission_id: TransmissionID<N>) -> Self {
+        Self { transmission_id }
     }
 }
 
@@ -37,7 +36,6 @@ impl<N: Network> EventTrait for TransmissionRequest<N> {
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.worker.to_bytes_le()?)?;
         writer.write_all(&self.transmission_id.to_bytes_le()?)?;
         Ok(())
     }
@@ -47,9 +45,8 @@ impl<N: Network> EventTrait for TransmissionRequest<N> {
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
 
-        let worker = u8::read_le(&mut reader)?;
         let transmission_id = TransmissionID::read_le(&mut reader)?;
 
-        Ok(Self { worker, transmission_id })
+        Ok(Self { transmission_id })
     }
 }

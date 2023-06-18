@@ -36,6 +36,9 @@ The workers are simple entry replicators that receive transactions from the netw
 In order to function properly, workers must be synced to the latest round, and capable of performing verification
 on the entries they receive from other validators' workers.
 
+## Test Cases
+
+- Two validators, one with X workers, another with Y workers. Check that they are compatible.
 
 ## Open Questions
 

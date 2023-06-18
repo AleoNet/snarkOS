@@ -104,9 +104,9 @@ impl<N: Network> Worker<N> {
         // Process the ping events.
         let self_clone = self.clone();
         self.spawn(async move {
-            while let Some((peer_ip, ping)) = rx_ping.recv().await {
+            while let Some((peer_ip, transmission_id)) = rx_ping.recv().await {
                 // Process the ping event.
-                self_clone.process_worker_ping(peer_ip, ping).await;
+                self_clone.process_worker_ping(peer_ip, transmission_id).await;
             }
         });
 
@@ -137,7 +137,7 @@ impl<N: Network> Worker<N> {
     /// Broadcasts a ping event.
     async fn broadcast_ping(&self) {
         // Construct the ping event.
-        let ping = WorkerPing::new(self.id, self.ready.transmission_ids());
+        let ping = WorkerPing::new(self.ready.transmission_ids());
         // Broadcast the ping event.
         self.gateway.broadcast(Event::WorkerPing(ping));
     }
@@ -145,7 +145,7 @@ impl<N: Network> Worker<N> {
     /// Sends an transmission request to the specified peer.
     async fn send_transmission_request(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
         // Construct the transmission request.
-        let transmission_request = TransmissionRequest::new(self.id, transmission_id);
+        let transmission_request = TransmissionRequest::new(transmission_id);
         // Send the transmission request to the peer.
         self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_request));
     }
@@ -158,40 +158,32 @@ impl<N: Network> Worker<N> {
         transmission: Data<Transmission<N>>,
     ) {
         // Construct the transmission response.
-        let transmission_response = TransmissionResponse::new(self.id, transmission_id, transmission);
+        let transmission_response = TransmissionResponse::new(transmission_id, transmission);
         // Send the transmission response to the peer.
         self.gateway.send(peer_ip, Event::TransmissionResponse(transmission_response));
     }
 
     /// Handles the incoming ping event.
-    async fn process_worker_ping(&self, peer_ip: SocketAddr, ping: WorkerPing<N>) {
-        // Ensure the ping is for this worker.
-        if ping.worker != self.id {
+    async fn process_worker_ping(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
+        // Check if the transmission ID exists in the ready queue.
+        if self.ready.contains(transmission_id) {
             return;
         }
-
-        // Iterate through the batch.
-        for transmission_id in &ping.batch {
-            // Check if the transmission ID exists in the ready queue.
-            if self.ready.contains(*transmission_id) {
-                continue;
-            }
-            // Check if the transmission ID exists in the pending queue.
-            if !self.pending.contains(*transmission_id) {
-                // TODO (howardwu): Limit the number of open requests we send to a peer.
-                // Send an transmission request to the peer.
-                self.send_transmission_request(peer_ip, *transmission_id).await;
-            }
-            // Check if the transmission ID exists in the pending queue for the specified peer IP.
-            if !self.pending.contains_peer(*transmission_id, peer_ip) {
-                trace!(
-                    "Worker {} - Found new transmission ID '{}' from peer '{peer_ip}'",
-                    self.id,
-                    fmt_id(transmission_id.to_string())
-                );
-                // Insert the transmission ID into the pending queue.
-                self.pending.insert(*transmission_id, peer_ip);
-            }
+        // Check if the transmission ID exists in the pending queue.
+        if !self.pending.contains(transmission_id) {
+            // TODO (howardwu): Limit the number of open requests we send to a peer.
+            // Send an transmission request to the peer.
+            self.send_transmission_request(peer_ip, transmission_id).await;
+        }
+        // Check if the transmission ID exists in the pending queue for the specified peer IP.
+        if !self.pending.contains_peer(transmission_id, peer_ip) {
+            trace!(
+                "Worker {} - Found new transmission ID '{}' from peer '{peer_ip}'",
+                self.id,
+                fmt_id(transmission_id.to_string())
+            );
+            // Insert the transmission ID into the pending queue.
+            self.pending.insert(transmission_id, peer_ip);
         }
     }
 

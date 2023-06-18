@@ -18,13 +18,6 @@ use snarkvm::prelude::{Network, ToBytes};
 use anyhow::Result;
 use sha2::{Digest, Sha256};
 
-fn sha256(data: &[u8]) -> [u8; 32] {
-    let digest = Sha256::digest(data);
-    let mut ret = [0u8; 32];
-    ret.copy_from_slice(&digest);
-    ret
-}
-
 fn double_sha256(data: &[u8]) -> [u8; 32] {
     let digest = Sha256::digest(Sha256::digest(data));
     let mut ret = [0u8; 32];
