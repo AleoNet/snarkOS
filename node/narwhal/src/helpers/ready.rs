@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::{Transmission, TransmissionID};
+use crate::helpers::{to_target, Transmission, TransmissionID};
 use snarkos_node_messages::Data;
 use snarkvm::console::prelude::*;
 
@@ -23,6 +23,8 @@ use std::{collections::HashMap, sync::Arc};
 pub struct Ready<N: Network> {
     /// The map of `transmission IDs` to `transmissions`.
     transmissions: Arc<RwLock<HashMap<TransmissionID<N>, Data<Transmission<N>>>>>,
+    /// The cumulative proof target in the ready queue.
+    cumulative_proof_target: Arc<RwLock<u128>>,
 }
 
 impl<N: Network> Default for Ready<N> {
@@ -35,12 +37,17 @@ impl<N: Network> Default for Ready<N> {
 impl<N: Network> Ready<N> {
     /// Initializes a new instance of the ready queue.
     pub fn new() -> Self {
-        Self { transmissions: Default::default() }
+        Self { transmissions: Default::default(), cumulative_proof_target: Default::default() }
     }
 
     /// Returns the transmissions.
     pub const fn transmissions(&self) -> &Arc<RwLock<HashMap<TransmissionID<N>, Data<Transmission<N>>>>> {
         &self.transmissions
+    }
+
+    /// Returns the cumulative proof target.
+    pub fn cumulative_proof_target(&self) -> u128 {
+        *self.cumulative_proof_target.read()
     }
 
     /// Returns the number of transmissions in the ready queue.
@@ -64,17 +71,47 @@ impl<N: Network> Ready<N> {
     }
 
     /// Inserts the specified (`transmission ID`, `transmission`) to the ready queue.
-    pub fn insert(&self, transmission_id: impl Into<TransmissionID<N>>, transmission: Data<Transmission<N>>) {
-        self.transmissions.write().insert(transmission_id.into(), transmission);
+    pub fn insert(
+        &self,
+        transmission_id: impl Into<TransmissionID<N>>,
+        transmission: Data<Transmission<N>>,
+    ) -> Result<()> {
+        let transmission_id = transmission_id.into();
+        // Check if the transmission ID is for a prover solution.
+        if let TransmissionID::Solution(commitment) = &transmission_id {
+            // Increment the cumulative proof target.
+            let mut cumulative_proof_target = self.cumulative_proof_target.write();
+            *cumulative_proof_target = cumulative_proof_target.saturating_add(to_target(commitment)? as u128);
+            drop(cumulative_proof_target);
+        }
+        // Insert the transmission.
+        self.transmissions.write().insert(transmission_id, transmission);
+        Ok(())
     }
 
     /// Removes the specified `transmission ID` from the ready queue.
-    pub fn remove(&self, transmission_id: impl Into<TransmissionID<N>>) {
-        self.transmissions.write().remove(&transmission_id.into());
+    pub fn remove(&self, transmission_id: impl Into<TransmissionID<N>>) -> Result<()> {
+        let transmission_id = transmission_id.into();
+        // Check if the transmission ID is for a prover solution.
+        if let TransmissionID::Solution(commitment) = &transmission_id {
+            // Decrement the cumulative proof target.
+            let mut cumulative_proof_target = self.cumulative_proof_target.write();
+            *cumulative_proof_target = cumulative_proof_target.saturating_sub(to_target(commitment)? as u128);
+            drop(cumulative_proof_target);
+        }
+        // Remove the transmission.
+        self.transmissions.write().remove(&transmission_id);
+        Ok(())
     }
 
     /// Removes the transmissions and returns them.
     pub fn drain(&self) -> HashMap<TransmissionID<N>, Data<Transmission<N>>> {
-        self.transmissions.write().drain().map(|(k, v)| (k, v)).collect()
+        // Acquire the write locks (simultaneously).
+        let mut cumulative_proof_target = self.cumulative_proof_target.write();
+        let mut transmissions = self.transmissions.write();
+        // Reset the cumulative proof target.
+        *cumulative_proof_target = 0;
+        // Drain the transmissions.
+        transmissions.drain().map(|(k, v)| (k, v)).collect()
     }
 }

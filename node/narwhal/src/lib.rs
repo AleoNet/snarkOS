@@ -45,3 +45,5 @@ pub const WORKER_PING_INTERVAL: u64 = 200; // ms
 // TODO (howardwu): Switch the worker's `TransmissionID` to use or include a sha256/blake2s hash.
 // TODO (howardwu): Implement sha256/blake2s hashing on `Data::Bytes`, so we can compare IDs without deserializing.
 //  This is needed by the worker in `process_event_response` to guarantee integrity of the transmission.
+
+// TODO (howardwu): Add a mechanism to keep validators connected (add reconnect logic).

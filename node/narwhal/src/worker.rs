@@ -216,7 +216,7 @@ impl<N: Network> Worker<N> {
                 // Remove the peer IP from the pending queue.
                 self.pending.remove(transmission_id);
                 // Insert the transmission into the ready queue.
-                self.ready.insert(transmission_id, response.transmission);
+                self.ready.insert(transmission_id, response.transmission)?;
                 debug!(
                     "Worker {} - Added transmission '{}' from peer '{peer_ip}'",
                     self.id,
@@ -237,7 +237,7 @@ impl<N: Network> Worker<N> {
         // Remove the puzzle commitment from the pending queue.
         self.pending.remove(puzzle_commitment);
         // Adds the prover solution to the ready queue.
-        self.ready.insert(puzzle_commitment, prover_solution.into());
+        self.ready.insert(puzzle_commitment, prover_solution.into())?;
         debug!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment.to_string()));
         Ok(())
     }
@@ -252,7 +252,7 @@ impl<N: Network> Worker<N> {
         // Remove the transaction from the pending queue.
         self.pending.remove(&transaction_id);
         // Adds the transaction to the ready queue.
-        self.ready.insert(&transaction_id, transaction.into());
+        self.ready.insert(&transaction_id, transaction.into())?;
         debug!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id.to_string()));
         Ok(())
     }

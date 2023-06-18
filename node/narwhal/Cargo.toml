@@ -80,6 +80,10 @@ version = "0.1"
 [dev-dependencies.rand_chacha]
 version = "0.3"
 
+[dev-dependencies.snarkvm]
+workspace = true
+features = ["algorithms", "curves"]
+
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
 features = [ "env-filter" ]

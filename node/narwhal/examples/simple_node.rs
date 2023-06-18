@@ -23,7 +23,11 @@ use snarkos_node_narwhal::{
     Shared,
     MEMORY_POOL_PORT,
 };
-use snarkvm::prelude::{Field, Network, Transaction, Uniform};
+use snarkvm::{
+    algorithms::polycommit::kzg10::KZGCommitment,
+    curves::PairingEngine,
+    prelude::{Environment, Field, Network, ProverSolution, PuzzleCommitment, Transaction, Uniform},
+};
 
 use ::bytes::Bytes;
 use anyhow::{bail, Result};
@@ -160,6 +164,45 @@ fn handle_signals(primary: &Primary<CurrentNetwork>) {
 
 /**************************************************************************************************/
 
+/// Fires *fake* unconfirmed solutions at the node.
+fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_id: u16) {
+    let tx_unconfirmed_solution = sender.tx_unconfirmed_solution.clone();
+    tokio::task::spawn(async move {
+        // This RNG samples the *same* fake solutions for all nodes.
+        let mut shared_rng = rand_chacha::ChaChaRng::seed_from_u64(123456789);
+        // This RNG samples *different* fake solutions for each node.
+        let mut unique_rng = rand_chacha::ChaChaRng::seed_from_u64(node_id as u64);
+
+        // A closure to generate a commitment and solution.
+        fn sample(mut rng: impl Rng) -> (PuzzleCommitment<CurrentNetwork>, Data<ProverSolution<CurrentNetwork>>) {
+            // Sample a random fake puzzle commitment.
+            let kzg = <<CurrentNetwork as Environment>::PairingCurve as PairingEngine>::G1Affine::rand(&mut rng);
+            let commitment = PuzzleCommitment::<CurrentNetwork>::new(KZGCommitment(kzg));
+            // Sample random fake solution bytes.
+            let solution = Data::Buffer(Bytes::from((0..1024).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
+            // Return the ID and solution.
+            (commitment, solution)
+        }
+
+        // Initialize a counter.
+        let mut counter = 0;
+
+        loop {
+            // Sample a random fake puzzle commitment and solution.
+            let (commitment, solution) =
+                if counter % 2 == 0 { sample(&mut shared_rng) } else { sample(&mut unique_rng) };
+            // Send the fake solution.
+            if let Err(e) = tx_unconfirmed_solution.send((commitment, solution)).await {
+                error!("Failed to send unconfirmed solution: {e}");
+            }
+            // Increment the counter.
+            counter += 1;
+            // Sleep briefly.
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+        }
+    });
+}
+
 /// Fires *fake* unconfirmed transactions at the node.
 fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id: u16) {
     let tx_unconfirmed_transaction = sender.tx_unconfirmed_transaction.clone();
@@ -181,7 +224,7 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
             (id, transaction)
         }
 
-        // Intialize a counter.
+        // Initialize a counter.
         let mut counter = 0;
 
         loop {
@@ -194,7 +237,7 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
         }
     });
 }
@@ -203,7 +246,7 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    initialize_logger(1);
+    initialize_logger(3);
 
     // Retrieve the command-line arguments.
     let args: Vec<String> = std::env::args().collect();
@@ -219,6 +262,8 @@ async fn main() -> Result<()> {
     // Start the primary instance.
     let (primary, sender) = start_primary(node_id, num_nodes).await?;
 
+    // Fire unconfirmed solutions.
+    fire_unconfirmed_solutions(&sender, node_id);
     // Fire unconfirmed transactions.
     fire_unconfirmed_transactions(&sender, node_id);
 

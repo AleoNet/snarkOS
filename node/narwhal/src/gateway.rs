@@ -39,6 +39,7 @@ use futures::SinkExt;
 use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{HashMap, HashSet},
+    future::Future,
     io,
     net::SocketAddr,
     sync::Arc,
@@ -70,6 +71,8 @@ pub struct Gateway<N: Network> {
     /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
     /// attempt to connect to each other). This set is used to prevent this from happening.
     connecting_peers: Arc<Mutex<HashSet<SocketAddr>>>,
+    /// The spawned handles.
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 impl<N: Network> Gateway<N> {
@@ -91,6 +94,7 @@ impl<N: Network> Gateway<N> {
             resolver: Default::default(),
             connected_peers: Default::default(),
             connecting_peers: Default::default(),
+            handles: Default::default(),
         })
     }
 
@@ -289,17 +293,17 @@ impl<N: Network> Gateway<N> {
     /// without waiting for the actual delivery; instead, the caller is provided with a [`oneshot::Receiver`]
     /// which can be used to determine when and whether the event has been delivered.
     pub(crate) fn send(&self, peer_ip: SocketAddr, event: Event<N>) -> Option<oneshot::Receiver<io::Result<()>>> {
+        // TODO (howardwu): Add a way to delay (likely with spawn) the sending of an event,
+        //  if you've requested from this peer IP too many times already.
+
         // // Determine whether to send the event.
         // if !self.can_send(peer_ip, &event) {
         //     return None;
         // }
         // Resolve the listener IP to the (ambiguous) peer address.
-        let peer_addr = match self.resolve_to_ambiguous(&peer_ip) {
-            Some(peer_addr) => peer_addr,
-            None => {
-                warn!("Unable to resolve the listener IP address '{peer_ip}'");
-                return None;
-            }
+        let Some(peer_addr) = self.resolve_to_ambiguous(&peer_ip) else {
+            warn!("Unable to resolve the listener IP address '{peer_ip}'");
+            return None;
         };
         // // If the event type is a block request, add it to the cache.
         // if let Event::BlockRequest(request) = event {
@@ -423,9 +427,16 @@ impl<N: Network> Gateway<N> {
         })
     }
 
+    /// Spawns a task with the given future; it should only be used for long-running tasks.
+    fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
+        self.handles.lock().push(tokio::spawn(future));
+    }
+
     /// Shuts down the gateway.
     pub async fn shut_down(&self) {
         trace!("Shutting down the gateway...");
+        // Abort the tasks.
+        self.handles.lock().iter().for_each(|handle| handle.abort());
         // Close the listener.
         self.tcp.shut_down().await;
     }
