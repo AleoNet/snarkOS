@@ -21,11 +21,11 @@ pub use challenge_response::ChallengeResponse;
 mod disconnect;
 pub use disconnect::Disconnect;
 
-mod entry_request;
-pub use entry_request::EntryRequest;
+mod transmission_request;
+pub use transmission_request::TransmissionRequest;
 
-mod entry_response;
-pub use entry_response::EntryResponse;
+mod transmission_response;
+pub use transmission_response::TransmissionResponse;
 
 mod worker_ping;
 pub use worker_ping::WorkerPing;
@@ -33,7 +33,7 @@ pub use worker_ping::WorkerPing;
 mod worker_batch;
 pub use worker_batch::WorkerBatch;
 
-use crate::helpers::{Entry, EntryID};
+use crate::helpers::{Transmission, TransmissionID};
 use snarkos_node_messages::{Data, DisconnectReason};
 use snarkvm::{
     console::prelude::{FromBytes, Network, ToBytes},
@@ -71,8 +71,8 @@ pub enum Event<N: Network> {
     ChallengeRequest(ChallengeRequest<N>),
     ChallengeResponse(ChallengeResponse<N>),
     Disconnect(Disconnect),
-    EntryRequest(EntryRequest<N>),
-    EntryResponse(EntryResponse<N>),
+    TransmissionRequest(TransmissionRequest<N>),
+    TransmissionResponse(TransmissionResponse<N>),
     WorkerPing(WorkerPing<N>),
     WorkerBatch(WorkerBatch<N>),
 }
@@ -88,8 +88,8 @@ impl<N: Network> Event<N> {
             Self::ChallengeRequest(event) => event.name(),
             Self::ChallengeResponse(event) => event.name(),
             Self::Disconnect(event) => event.name(),
-            Self::EntryRequest(event) => event.name(),
-            Self::EntryResponse(event) => event.name(),
+            Self::TransmissionRequest(event) => event.name(),
+            Self::TransmissionResponse(event) => event.name(),
             Self::WorkerPing(event) => event.name(),
             Self::WorkerBatch(event) => event.name(),
         }
@@ -102,8 +102,8 @@ impl<N: Network> Event<N> {
             Self::ChallengeRequest(..) => 0,
             Self::ChallengeResponse(..) => 1,
             Self::Disconnect(..) => 2,
-            Self::EntryRequest(..) => 3,
-            Self::EntryResponse(..) => 4,
+            Self::TransmissionRequest(..) => 3,
+            Self::TransmissionResponse(..) => 4,
             Self::WorkerPing(..) => 5,
             Self::WorkerBatch(..) => 6,
         }
@@ -118,8 +118,8 @@ impl<N: Network> Event<N> {
             Self::ChallengeRequest(event) => event.serialize(writer),
             Self::ChallengeResponse(event) => event.serialize(writer),
             Self::Disconnect(event) => event.serialize(writer),
-            Self::EntryRequest(event) => event.serialize(writer),
-            Self::EntryResponse(event) => event.serialize(writer),
+            Self::TransmissionRequest(event) => event.serialize(writer),
+            Self::TransmissionResponse(event) => event.serialize(writer),
             Self::WorkerPing(event) => event.serialize(writer),
             Self::WorkerBatch(event) => event.serialize(writer),
         }
@@ -141,8 +141,8 @@ impl<N: Network> Event<N> {
             0 => Self::ChallengeRequest(EventTrait::deserialize(bytes)?),
             1 => Self::ChallengeResponse(EventTrait::deserialize(bytes)?),
             2 => Self::Disconnect(EventTrait::deserialize(bytes)?),
-            3 => Self::EntryRequest(EventTrait::deserialize(bytes)?),
-            4 => Self::EntryResponse(EventTrait::deserialize(bytes)?),
+            3 => Self::TransmissionRequest(EventTrait::deserialize(bytes)?),
+            4 => Self::TransmissionResponse(EventTrait::deserialize(bytes)?),
             5 => Self::WorkerPing(EventTrait::deserialize(bytes)?),
             6 => Self::WorkerBatch(EventTrait::deserialize(bytes)?),
             _ => bail!("Unknown event ID {id}"),

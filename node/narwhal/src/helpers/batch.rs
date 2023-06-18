@@ -26,7 +26,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::{Entry, EntryID, Ready};
+use crate::helpers::{Ready, Transmission, TransmissionID};
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::prelude::*,
@@ -71,12 +71,12 @@ pub struct BatchCertificate<N: Network> {
 
 #[derive(Clone, Debug)]
 pub struct Batch<N: Network> {
-    /// The batch ID, defined as the hash of the round number, entry IDs, and previous batch certificates.
+    /// The batch ID, defined as the hash of the round number, transmission IDs, and previous batch certificates.
     batch_id: Field<N>,
     /// The round number.
     round: u64,
-    /// The map of `entry IDs` to `entries`.
-    entries: HashMap<EntryID<N>, Data<Entry<N>>>,
+    /// The map of `transmission IDs` to `transmissions`.
+    transmissions: HashMap<TransmissionID<N>, Data<Transmission<N>>>,
     /// The batch certificates of the previous round.
     previous_certificates: Vec<BatchCertificate<N>>,
     /// The signature of the batch ID from the creator.
@@ -88,7 +88,7 @@ impl<N: Network> Batch<N> {
     pub fn new<R: Rng + CryptoRng>(
         private_key: &PrivateKey<N>,
         round: u64,
-        entries: HashMap<EntryID<N>, Data<Entry<N>>>,
+        transmissions: HashMap<TransmissionID<N>, Data<Transmission<N>>>,
         previous_certificates: Vec<BatchCertificate<N>>,
         rng: &mut R,
     ) -> Result<Self> {
@@ -97,11 +97,11 @@ impl<N: Network> Batch<N> {
         // If the round is not zero, then there should be at least one previous certificate.
         ensure!(round == 0 || !previous_certificates.is_empty(), "Invalid round number");
         // Compute the batch ID.
-        let batch_id = Self::compute_batch_id(round, &entries, &previous_certificates)?;
+        let batch_id = Self::compute_batch_id(round, &transmissions, &previous_certificates)?;
         // Sign the preimage.
         let signature = private_key.sign(&[batch_id], rng)?;
         // Return the batch.
-        Ok(Self { batch_id, round, entries, previous_certificates, signature })
+        Ok(Self { batch_id, round, transmissions, previous_certificates, signature })
     }
 
     /// Returns the batch ID.
@@ -114,9 +114,9 @@ impl<N: Network> Batch<N> {
         self.round
     }
 
-    /// Returns the entries.
-    pub const fn entries(&self) -> &HashMap<EntryID<N>, Data<Entry<N>>> {
-        &self.entries
+    /// Returns the transmissions.
+    pub const fn transmissions(&self) -> &HashMap<TransmissionID<N>, Data<Transmission<N>>> {
+        &self.transmissions
     }
 
     /// Returns the batch certificates for the previous round.
@@ -124,24 +124,24 @@ impl<N: Network> Batch<N> {
         &self.previous_certificates
     }
 
-    /// Returns the number of entries in the batch.
+    /// Returns the number of transmissions in the batch.
     pub fn len(&self) -> usize {
-        self.entries.len()
+        self.transmissions.len()
     }
 
-    /// Returns the entry IDs.
-    pub fn entry_ids(&self) -> Vec<EntryID<N>> {
-        self.entries.keys().copied().collect()
+    /// Returns the transmission IDs.
+    pub fn transmission_ids(&self) -> Vec<TransmissionID<N>> {
+        self.transmissions.keys().copied().collect()
     }
 
-    /// Returns `true` if the batch contains the specified `entry ID`.
-    pub fn contains(&self, entry_id: impl Into<EntryID<N>>) -> bool {
-        self.entries.contains_key(&entry_id.into())
+    /// Returns `true` if the batch contains the specified `transmission ID`.
+    pub fn contains(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
+        self.transmissions.contains_key(&transmission_id.into())
     }
 
-    /// Returns the entry, given the specified `entry ID`.
-    pub fn get(&self, entry_id: impl Into<EntryID<N>>) -> Option<&Data<Entry<N>>> {
-        self.entries.get(&entry_id.into())
+    /// Returns the transmission, given the specified `transmission ID`.
+    pub fn get(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<&Data<Transmission<N>>> {
+        self.transmissions.get(&transmission_id.into())
     }
 }
 
@@ -149,17 +149,17 @@ impl<N: Network> Batch<N> {
     /// Returns the batch ID.
     pub fn compute_batch_id(
         round: u64,
-        entries: &HashMap<EntryID<N>, Data<Entry<N>>>,
+        transmissions: &HashMap<TransmissionID<N>, Data<Transmission<N>>>,
         previous_certificates: &[BatchCertificate<N>],
     ) -> Result<Field<N>> {
         let mut preimage = Vec::new();
         // Insert the round number.
         preimage.extend_from_slice(&round.to_bytes_le()?);
-        // Insert the number of entries.
-        preimage.extend_from_slice(&u64::try_from(entries.len())?.to_bytes_le()?);
-        // Insert the entry IDs.
-        for entry_id in entries.keys() {
-            preimage.extend_from_slice(&entry_id.to_bytes_le()?);
+        // Insert the number of transmissions.
+        preimage.extend_from_slice(&u64::try_from(transmissions.len())?.to_bytes_le()?);
+        // Insert the transmission IDs.
+        for transmission_id in transmissions.keys() {
+            preimage.extend_from_slice(&transmission_id.to_bytes_le()?);
         }
         // Insert the number of previous certificates.
         preimage.extend_from_slice(&u64::try_from(previous_certificates.len())?.to_bytes_le()?);

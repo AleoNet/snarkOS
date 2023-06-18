@@ -13,11 +13,11 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{Entry, EntryID, Pending, Ready, WorkerReceiver},
-    EntryRequest,
-    EntryResponse,
+    helpers::{Pending, Ready, Transmission, TransmissionID, WorkerReceiver},
     Event,
     Gateway,
+    TransmissionRequest,
+    TransmissionResponse,
     WorkerPing,
     MAX_WORKERS,
     WORKER_PING_INTERVAL,
@@ -79,7 +79,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Drains the ready queue.
-    pub(crate) fn drain(&self) -> HashMap<EntryID<N>, Data<Entry<N>>> {
+    pub(crate) fn drain(&self) -> HashMap<TransmissionID<N>, Data<Transmission<N>>> {
         self.ready.drain()
     }
 }
@@ -87,7 +87,8 @@ impl<N: Network> Worker<N> {
 impl<N: Network> Worker<N> {
     /// Starts the worker handlers.
     fn start_handlers(&self, receiver: WorkerReceiver<N>) {
-        let WorkerReceiver { rx_worker_ping: mut rx_ping, mut rx_entry_request, mut rx_entry_response } = receiver;
+        let WorkerReceiver { rx_worker_ping: mut rx_ping, mut rx_transmission_request, mut rx_transmission_response } =
+            receiver;
 
         // Broadcast a ping event periodically.
         let self_clone = self.clone();
@@ -109,22 +110,25 @@ impl<N: Network> Worker<N> {
             }
         });
 
-        // Process the entry requests.
+        // Process the transmission requests.
         let self_clone = self.clone();
         self.spawn(async move {
-            while let Some((peer_ip, entry_request)) = rx_entry_request.recv().await {
-                // Process the entry request.
-                self_clone.process_entry_request(peer_ip, entry_request).await;
+            while let Some((peer_ip, transmission_request)) = rx_transmission_request.recv().await {
+                // Process the transmission request.
+                self_clone.process_transmission_request(peer_ip, transmission_request).await;
             }
         });
 
-        // Process the entry responses.
+        // Process the transmission responses.
         let self_clone = self.clone();
         self.spawn(async move {
-            while let Some((peer_ip, entry_response)) = rx_entry_response.recv().await {
-                // Process the entry response.
-                if let Err(e) = self_clone.process_entry_response(peer_ip, entry_response).await {
-                    error!("Worker {} failed to process entry response from peer '{peer_ip}': {e}", self_clone.id);
+            while let Some((peer_ip, transmission_response)) = rx_transmission_response.recv().await {
+                // Process the transmission response.
+                if let Err(e) = self_clone.process_transmission_response(peer_ip, transmission_response).await {
+                    error!(
+                        "Worker {} failed to process transmission response from peer '{peer_ip}': {e}",
+                        self_clone.id
+                    );
                 }
             }
         });
@@ -133,25 +137,30 @@ impl<N: Network> Worker<N> {
     /// Broadcasts a ping event.
     async fn broadcast_ping(&self) {
         // Construct the ping event.
-        let ping = WorkerPing::new(self.id, self.ready.entry_ids());
+        let ping = WorkerPing::new(self.id, self.ready.transmission_ids());
         // Broadcast the ping event.
         self.gateway.broadcast(Event::WorkerPing(ping));
     }
 
-    /// Sends an entry request to the specified peer.
-    async fn send_entry_request(&self, peer_ip: SocketAddr, entry_id: EntryID<N>) {
-        // Construct the entry request.
-        let entry_request = EntryRequest::new(self.id, entry_id);
-        // Send the entry request to the peer.
-        self.gateway.send(peer_ip, Event::EntryRequest(entry_request));
+    /// Sends an transmission request to the specified peer.
+    async fn send_transmission_request(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
+        // Construct the transmission request.
+        let transmission_request = TransmissionRequest::new(self.id, transmission_id);
+        // Send the transmission request to the peer.
+        self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_request));
     }
 
-    /// Sends an entry response to the specified peer.
-    async fn send_entry_response(&self, peer_ip: SocketAddr, entry_id: EntryID<N>, entry: Data<Entry<N>>) {
-        // Construct the entry response.
-        let entry_response = EntryResponse::new(self.id, entry_id, entry);
-        // Send the entry response to the peer.
-        self.gateway.send(peer_ip, Event::EntryResponse(entry_response));
+    /// Sends an transmission response to the specified peer.
+    async fn send_transmission_response(
+        &self,
+        peer_ip: SocketAddr,
+        transmission_id: TransmissionID<N>,
+        transmission: Data<Transmission<N>>,
+    ) {
+        // Construct the transmission response.
+        let transmission_response = TransmissionResponse::new(self.id, transmission_id, transmission);
+        // Send the transmission response to the peer.
+        self.gateway.send(peer_ip, Event::TransmissionResponse(transmission_response));
     }
 
     /// Handles the incoming ping event.
@@ -162,55 +171,63 @@ impl<N: Network> Worker<N> {
         }
 
         // Iterate through the batch.
-        for entry_id in &ping.batch {
-            // Check if the entry ID exists in the ready queue.
-            if self.ready.contains(*entry_id) {
+        for transmission_id in &ping.batch {
+            // Check if the transmission ID exists in the ready queue.
+            if self.ready.contains(*transmission_id) {
                 continue;
             }
-            // Check if the entry ID exists in the pending queue.
-            if !self.pending.contains(*entry_id) {
+            // Check if the transmission ID exists in the pending queue.
+            if !self.pending.contains(*transmission_id) {
                 // TODO (howardwu): Limit the number of open requests we send to a peer.
-                // Send an entry request to the peer.
-                self.send_entry_request(peer_ip, *entry_id).await;
+                // Send an transmission request to the peer.
+                self.send_transmission_request(peer_ip, *transmission_id).await;
             }
-            // Check if the entry ID exists in the pending queue for the specified peer IP.
-            if !self.pending.contains_peer(*entry_id, peer_ip) {
+            // Check if the transmission ID exists in the pending queue for the specified peer IP.
+            if !self.pending.contains_peer(*transmission_id, peer_ip) {
                 trace!(
-                    "Worker {} - Found new entry ID '{}' from peer '{peer_ip}'",
+                    "Worker {} - Found new transmission ID '{}' from peer '{peer_ip}'",
                     self.id,
-                    fmt_id(entry_id.to_string())
+                    fmt_id(transmission_id.to_string())
                 );
-                // Insert the entry ID into the pending queue.
-                self.pending.insert(*entry_id, peer_ip);
+                // Insert the transmission ID into the pending queue.
+                self.pending.insert(*transmission_id, peer_ip);
             }
         }
     }
 
-    /// Handles the incoming entry request.
-    async fn process_entry_request(&self, peer_ip: SocketAddr, request: EntryRequest<N>) {
-        // Check if the entry ID exists in the ready queue.
-        if let Some(entry) = self.ready.get(request.entry_id) {
-            // Send the entry response to the peer.
-            self.send_entry_response(peer_ip, request.entry_id, entry).await;
+    /// Handles the incoming transmission request.
+    async fn process_transmission_request(&self, peer_ip: SocketAddr, request: TransmissionRequest<N>) {
+        // Check if the transmission ID exists in the ready queue.
+        if let Some(transmission) = self.ready.get(request.transmission_id) {
+            // Send the transmission response to the peer.
+            self.send_transmission_response(peer_ip, request.transmission_id, transmission).await;
         }
     }
 
-    /// Handles the incoming entry response.
-    async fn process_entry_response(&self, peer_ip: SocketAddr, response: EntryResponse<N>) -> Result<()> {
-        let entry_id = response.entry_id;
-        // Check if the entry ID exists in the pending queue.
-        if let Some(peer_ips) = self.pending.get(entry_id) {
+    /// Handles the incoming transmission response.
+    async fn process_transmission_response(
+        &self,
+        peer_ip: SocketAddr,
+        response: TransmissionResponse<N>,
+    ) -> Result<()> {
+        let transmission_id = response.transmission_id;
+        // Check if the transmission ID exists in the pending queue.
+        if let Some(peer_ips) = self.pending.get(transmission_id) {
             // Check if the peer IP exists in the pending queue.
             if peer_ips.contains(&peer_ip) {
-                // // Deserialize the entry.
-                // let entry = response.entry.deserialize().await?;
-                // TODO: Validate the entry.
+                // // Deserialize the transmission.
+                // let transmission = response.transmission.deserialize().await?;
+                // TODO: Validate the transmission.
 
                 // Remove the peer IP from the pending queue.
-                self.pending.remove(entry_id);
-                // Insert the entry into the ready queue.
-                self.ready.insert(entry_id, response.entry);
-                debug!("Worker {} - Added entry '{}' from peer '{peer_ip}'", self.id, fmt_id(entry_id.to_string()));
+                self.pending.remove(transmission_id);
+                // Insert the transmission into the ready queue.
+                self.ready.insert(transmission_id, response.transmission);
+                debug!(
+                    "Worker {} - Added transmission '{}' from peer '{peer_ip}'",
+                    self.id,
+                    fmt_id(transmission_id.to_string())
+                );
             }
         }
         Ok(())

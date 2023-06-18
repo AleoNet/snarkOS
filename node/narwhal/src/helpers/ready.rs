@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::{Entry, EntryID};
+use crate::helpers::{Transmission, TransmissionID};
 use snarkos_node_messages::Data;
 use snarkvm::console::prelude::*;
 
@@ -21,8 +21,8 @@ use std::{collections::HashMap, sync::Arc};
 
 #[derive(Clone, Debug)]
 pub struct Ready<N: Network> {
-    /// The map of `entry IDs` to `entries`.
-    entries: Arc<RwLock<HashMap<EntryID<N>, Data<Entry<N>>>>>,
+    /// The map of `transmission IDs` to `transmissions`.
+    transmissions: Arc<RwLock<HashMap<TransmissionID<N>, Data<Transmission<N>>>>>,
 }
 
 impl<N: Network> Default for Ready<N> {
@@ -35,46 +35,46 @@ impl<N: Network> Default for Ready<N> {
 impl<N: Network> Ready<N> {
     /// Initializes a new instance of the ready queue.
     pub fn new() -> Self {
-        Self { entries: Default::default() }
+        Self { transmissions: Default::default() }
     }
 
-    /// Returns the entries.
-    pub const fn entries(&self) -> &Arc<RwLock<HashMap<EntryID<N>, Data<Entry<N>>>>> {
-        &self.entries
+    /// Returns the transmissions.
+    pub const fn transmissions(&self) -> &Arc<RwLock<HashMap<TransmissionID<N>, Data<Transmission<N>>>>> {
+        &self.transmissions
     }
 
-    /// Returns the number of entries in the ready queue.
+    /// Returns the number of transmissions in the ready queue.
     pub fn len(&self) -> usize {
-        self.entries.read().len()
+        self.transmissions.read().len()
     }
 
-    /// Returns the entry IDs.
-    pub fn entry_ids(&self) -> Vec<EntryID<N>> {
-        self.entries.read().keys().copied().collect()
+    /// Returns the transmission IDs.
+    pub fn transmission_ids(&self) -> Vec<TransmissionID<N>> {
+        self.transmissions.read().keys().copied().collect()
     }
 
-    /// Returns `true` if the ready queue contains the specified `entry ID`.
-    pub fn contains(&self, entry_id: impl Into<EntryID<N>>) -> bool {
-        self.entries.read().contains_key(&entry_id.into())
+    /// Returns `true` if the ready queue contains the specified `transmission ID`.
+    pub fn contains(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
+        self.transmissions.read().contains_key(&transmission_id.into())
     }
 
-    /// Returns the entry, given the specified `entry ID`.
-    pub fn get(&self, entry_id: impl Into<EntryID<N>>) -> Option<Data<Entry<N>>> {
-        self.entries.read().get(&entry_id.into()).cloned()
+    /// Returns the transmission, given the specified `transmission ID`.
+    pub fn get(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<Data<Transmission<N>>> {
+        self.transmissions.read().get(&transmission_id.into()).cloned()
     }
 
-    /// Inserts the specified (`entry ID`, `entry`) to the ready queue.
-    pub fn insert(&self, entry_id: impl Into<EntryID<N>>, entry: Data<Entry<N>>) {
-        self.entries.write().insert(entry_id.into(), entry);
+    /// Inserts the specified (`transmission ID`, `transmission`) to the ready queue.
+    pub fn insert(&self, transmission_id: impl Into<TransmissionID<N>>, transmission: Data<Transmission<N>>) {
+        self.transmissions.write().insert(transmission_id.into(), transmission);
     }
 
-    /// Removes the specified `entry ID` from the ready queue.
-    pub fn remove(&self, entry_id: impl Into<EntryID<N>>) {
-        self.entries.write().remove(&entry_id.into());
+    /// Removes the specified `transmission ID` from the ready queue.
+    pub fn remove(&self, transmission_id: impl Into<TransmissionID<N>>) {
+        self.transmissions.write().remove(&transmission_id.into());
     }
 
-    /// Removes the entries and returns them.
-    pub fn drain(&self) -> HashMap<EntryID<N>, Data<Entry<N>>> {
-        self.entries.write().drain().map(|(k, v)| (k, v)).collect()
+    /// Removes the transmissions and returns them.
+    pub fn drain(&self) -> HashMap<TransmissionID<N>, Data<Transmission<N>>> {
+        self.transmissions.write().drain().map(|(k, v)| (k, v)).collect()
     }
 }

@@ -21,12 +21,6 @@ pub use channels::*;
 mod codec;
 pub use codec::*;
 
-mod entry;
-pub use entry::*;
-
-mod entry_id;
-pub use entry_id::*;
-
 mod partition;
 pub use partition::*;
 
@@ -38,3 +32,9 @@ pub use ready::*;
 
 mod resolver;
 pub use resolver::*;
+
+mod transmission;
+pub use transmission::*;
+
+mod transmission_id;
+pub use transmission_id::*;

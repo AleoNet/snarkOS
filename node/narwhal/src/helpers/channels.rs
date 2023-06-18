@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{EntryRequest, EntryResponse, WorkerPing};
+use crate::{TransmissionRequest, TransmissionResponse, WorkerPing};
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::network::*,
@@ -53,15 +53,15 @@ pub struct PrimaryReceiver<N: Network> {
 /// Initializes the worker channels.
 pub fn init_worker_channels<N: Network>() -> (WorkerSender<N>, WorkerReceiver<N>) {
     let (tx_worker_ping, rx_worker_ping) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
-    let (tx_entry_request, rx_entry_request) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
-    let (tx_entry_response, rx_entry_response) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
+    let (tx_transmission_request, rx_transmission_request) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
+    let (tx_transmission_response, rx_transmission_response) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
 
     let tx_worker_ping = Arc::new(tx_worker_ping);
-    let tx_entry_request = Arc::new(tx_entry_request);
-    let tx_entry_response = Arc::new(tx_entry_response);
+    let tx_transmission_request = Arc::new(tx_transmission_request);
+    let tx_transmission_response = Arc::new(tx_transmission_response);
 
-    let sender = WorkerSender { tx_worker_ping, tx_entry_request, tx_entry_response };
-    let receiver = WorkerReceiver { rx_worker_ping, rx_entry_request, rx_entry_response };
+    let sender = WorkerSender { tx_worker_ping, tx_transmission_request, tx_transmission_response };
+    let receiver = WorkerReceiver { rx_worker_ping, rx_transmission_request, rx_transmission_response };
 
     (sender, receiver)
 }
@@ -69,13 +69,13 @@ pub fn init_worker_channels<N: Network>() -> (WorkerSender<N>, WorkerReceiver<N>
 #[derive(Debug)]
 pub struct WorkerSender<N: Network> {
     pub tx_worker_ping: Arc<mpsc::Sender<(SocketAddr, WorkerPing<N>)>>,
-    pub tx_entry_request: Arc<mpsc::Sender<(SocketAddr, EntryRequest<N>)>>,
-    pub tx_entry_response: Arc<mpsc::Sender<(SocketAddr, EntryResponse<N>)>>,
+    pub tx_transmission_request: Arc<mpsc::Sender<(SocketAddr, TransmissionRequest<N>)>>,
+    pub tx_transmission_response: Arc<mpsc::Sender<(SocketAddr, TransmissionResponse<N>)>>,
 }
 
 #[derive(Debug)]
 pub struct WorkerReceiver<N: Network> {
     pub rx_worker_ping: mpsc::Receiver<(SocketAddr, WorkerPing<N>)>,
-    pub rx_entry_request: mpsc::Receiver<(SocketAddr, EntryRequest<N>)>,
-    pub rx_entry_response: mpsc::Receiver<(SocketAddr, EntryResponse<N>)>,
+    pub rx_transmission_request: mpsc::Receiver<(SocketAddr, TransmissionRequest<N>)>,
+    pub rx_transmission_response: mpsc::Receiver<(SocketAddr, TransmissionResponse<N>)>,
 }

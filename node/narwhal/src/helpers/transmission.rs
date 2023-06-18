@@ -22,49 +22,49 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::io::{Read, Result as IoResult, Write};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Entry<N: Network> {
+pub enum Transmission<N: Network> {
     /// A prover solution.
     Solution(Data<ProverSolution<N>>),
     /// A transaction.
     Transaction(Data<Transaction<N>>),
 }
 
-impl<N: Network> From<ProverSolution<N>> for Entry<N> {
-    /// Converts the prover solution into an entry.
+impl<N: Network> From<ProverSolution<N>> for Transmission<N> {
+    /// Converts the prover solution into an transmission.
     fn from(solution: ProverSolution<N>) -> Self {
         Self::Solution(Data::Object(solution))
     }
 }
 
-impl<N: Network> From<Transaction<N>> for Entry<N> {
-    /// Converts the transaction into an entry.
+impl<N: Network> From<Transaction<N>> for Transmission<N> {
+    /// Converts the transaction into an transmission.
     fn from(transaction: Transaction<N>) -> Self {
         Self::Transaction(Data::Object(transaction))
     }
 }
 
-impl<N: Network> From<Data<ProverSolution<N>>> for Entry<N> {
-    /// Converts the prover solution into an entry.
+impl<N: Network> From<Data<ProverSolution<N>>> for Transmission<N> {
+    /// Converts the prover solution into an transmission.
     fn from(solution: Data<ProverSolution<N>>) -> Self {
         Self::Solution(solution)
     }
 }
 
-impl<N: Network> From<Data<Transaction<N>>> for Entry<N> {
-    /// Converts the transaction into an entry.
+impl<N: Network> From<Data<Transaction<N>>> for Transmission<N> {
+    /// Converts the transaction into an transmission.
     fn from(transaction: Data<Transaction<N>>) -> Self {
         Self::Transaction(transaction)
     }
 }
 
-impl<N: Network> FromBytes for Entry<N> {
-    /// Reads the entry from the buffer.
+impl<N: Network> FromBytes for Transmission<N> {
+    /// Reads the transmission from the buffer.
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         // Read the version.
         let version = u8::read_le(&mut reader)?;
         // Ensure the version is valid.
         if version != 0 {
-            return Err(error("Invalid worker entry version"));
+            return Err(error("Invalid worker transmission version"));
         }
 
         // Read the variant.
@@ -83,17 +83,17 @@ impl<N: Network> FromBytes for Entry<N> {
                 // Return the transaction.
                 Ok(Self::Transaction(Data::Object(transaction)))
             }
-            2.. => Err(error("Invalid worker entry variant")),
+            2.. => Err(error("Invalid worker transmission variant")),
         }
     }
 }
 
-impl<N: Network> ToBytes for Entry<N> {
-    /// Writes the entry to the buffer.
+impl<N: Network> ToBytes for Transmission<N> {
+    /// Writes the transmission to the buffer.
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         // Write the version.
         0u8.write_le(&mut writer)?;
-        // Write the entry.
+        // Write the transmission.
         match self {
             Self::Solution(solution) => {
                 0u8.write_le(&mut writer)?;
@@ -107,16 +107,16 @@ impl<N: Network> ToBytes for Entry<N> {
     }
 }
 
-impl<N: Network> Serialize for Entry<N> {
+impl<N: Network> Serialize for Transmission<N> {
     #[inline]
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         ToBytesSerializer::serialize_with_size_encoding(self, serializer)
     }
 }
 
-impl<'de, N: Network> Deserialize<'de> for Entry<N> {
+impl<'de, N: Network> Deserialize<'de> for Transmission<N> {
     #[inline]
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "entry")
+        FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "transmission")
     }
 }

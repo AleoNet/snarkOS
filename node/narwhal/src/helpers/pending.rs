@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::EntryID;
+use crate::helpers::TransmissionID;
 use snarkvm::console::prelude::*;
 
 use parking_lot::RwLock;
@@ -24,8 +24,8 @@ use std::{
 
 #[derive(Clone, Debug)]
 pub struct Pending<N: Network> {
-    /// The map of pending `entry IDs` to `peer IPs` that have the entry.
-    entries: Arc<RwLock<HashMap<EntryID<N>, HashSet<SocketAddr>>>>,
+    /// The map of pending `transmission IDs` to `peer IPs` that have the transmission.
+    transmissions: Arc<RwLock<HashMap<TransmissionID<N>, HashSet<SocketAddr>>>>,
 }
 
 impl<N: Network> Default for Pending<N> {
@@ -38,37 +38,37 @@ impl<N: Network> Default for Pending<N> {
 impl<N: Network> Pending<N> {
     /// Initializes a new instance of the pending queue.
     pub fn new() -> Self {
-        Self { entries: Default::default() }
+        Self { transmissions: Default::default() }
     }
 
-    /// Returns the number of entries in the pending queue.
+    /// Returns the number of transmissions in the pending queue.
     pub fn len(&self) -> usize {
-        self.entries.read().len()
+        self.transmissions.read().len()
     }
 
-    /// Returns `true` if the pending queue contains the specified `entry ID`.
-    pub fn contains(&self, entry_id: impl Into<EntryID<N>>) -> bool {
-        self.entries.read().contains_key(&entry_id.into())
+    /// Returns `true` if the pending queue contains the specified `transmission ID`.
+    pub fn contains(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
+        self.transmissions.read().contains_key(&transmission_id.into())
     }
 
-    /// Returns `true` if the pending queue contains the specified `entry ID` for the specified `peer IP`.
-    pub fn contains_peer(&self, entry_id: impl Into<EntryID<N>>, peer_ip: SocketAddr) -> bool {
-        self.entries.read().get(&entry_id.into()).map_or(false, |peer_ips| peer_ips.contains(&peer_ip))
+    /// Returns `true` if the pending queue contains the specified `transmission ID` for the specified `peer IP`.
+    pub fn contains_peer(&self, transmission_id: impl Into<TransmissionID<N>>, peer_ip: SocketAddr) -> bool {
+        self.transmissions.read().get(&transmission_id.into()).map_or(false, |peer_ips| peer_ips.contains(&peer_ip))
     }
 
-    /// Returns the peer IPs for the specified `entry ID`.
-    pub fn get(&self, entry_id: impl Into<EntryID<N>>) -> Option<HashSet<SocketAddr>> {
-        self.entries.read().get(&entry_id.into()).cloned()
+    /// Returns the peer IPs for the specified `transmission ID`.
+    pub fn get(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<HashSet<SocketAddr>> {
+        self.transmissions.read().get(&transmission_id.into()).cloned()
     }
 
-    /// Inserts the specified `entry ID` and `peer IP` to the pending queue.
-    /// If the `entry ID` already exists, the `peer IP` is added to the existing entry.
-    pub fn insert(&self, entry_id: impl Into<EntryID<N>>, peer_ip: SocketAddr) {
-        self.entries.write().entry(entry_id.into()).or_default().insert(peer_ip);
+    /// Inserts the specified `transmission ID` and `peer IP` to the pending queue.
+    /// If the `transmission ID` already exists, the `peer IP` is added to the existing transmission.
+    pub fn insert(&self, transmission_id: impl Into<TransmissionID<N>>, peer_ip: SocketAddr) {
+        self.transmissions.write().entry(transmission_id.into()).or_default().insert(peer_ip);
     }
 
-    /// Removes the specified `entry ID` from the pending queue.
-    pub fn remove(&self, entry_id: impl Into<EntryID<N>>) {
-        self.entries.write().remove(&entry_id.into());
+    /// Removes the specified `transmission ID` from the pending queue.
+    pub fn remove(&self, transmission_id: impl Into<TransmissionID<N>>) {
+        self.transmissions.write().remove(&transmission_id.into());
     }
 }

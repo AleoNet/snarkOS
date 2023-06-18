@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::EntryID;
+use crate::helpers::TransmissionID;
 use snarkvm::prelude::{Network, ToBytes};
 
 use anyhow::Result;
@@ -39,10 +39,10 @@ pub fn sha256d_to_u128(data: &[u8]) -> u128 {
     u128::from_le_bytes(hash)
 }
 
-/// Returns the worker ID for the given entry ID.
-pub fn assign_to_worker<N: Network>(entry_id: impl Into<EntryID<N>>, num_workers: u8) -> Result<u8> {
-    // Hash the entry ID to a u128.
-    let hash = sha256d_to_u128(&entry_id.into().to_bytes_le()?);
+/// Returns the worker ID for the given transmission ID.
+pub fn assign_to_worker<N: Network>(transmission_id: impl Into<TransmissionID<N>>, num_workers: u8) -> Result<u8> {
+    // Hash the transmission ID to a u128.
+    let hash = sha256d_to_u128(&transmission_id.into().to_bytes_le()?);
     // Convert the hash to a worker ID.
     let worker_id = (hash % num_workers as u128) as u8;
     // Return the worker ID.

@@ -24,28 +24,28 @@ use std::{
 };
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-pub enum EntryID<N: Network> {
+pub enum TransmissionID<N: Network> {
     /// A prover solution.
     Solution(PuzzleCommitment<N>),
     /// A transaction.
     Transaction(N::TransactionID),
 }
 
-impl<N: Network> From<PuzzleCommitment<N>> for EntryID<N> {
-    /// Converts the puzzle commitment into an entry ID.
+impl<N: Network> From<PuzzleCommitment<N>> for TransmissionID<N> {
+    /// Converts the puzzle commitment into an transmission ID.
     fn from(puzzle_commitment: PuzzleCommitment<N>) -> Self {
         Self::Solution(puzzle_commitment)
     }
 }
 
-impl<N: Network> From<&N::TransactionID> for EntryID<N> {
-    /// Converts the transaction ID into an entry ID.
+impl<N: Network> From<&N::TransactionID> for TransmissionID<N> {
+    /// Converts the transaction ID into an transmission ID.
     fn from(transaction_id: &N::TransactionID) -> Self {
         Self::Transaction(*transaction_id)
     }
 }
 
-impl<N: Network> Display for EntryID<N> {
+impl<N: Network> Display for TransmissionID<N> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
@@ -55,8 +55,8 @@ impl<N: Network> Display for EntryID<N> {
     }
 }
 
-impl<N: Network> FromBytes for EntryID<N> {
-    /// Reads the entry ID from the buffer.
+impl<N: Network> FromBytes for TransmissionID<N> {
+    /// Reads the transmission ID from the buffer.
     fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         // Read the variant.
         let variant = u8::read_le(&mut reader)?;
@@ -64,15 +64,15 @@ impl<N: Network> FromBytes for EntryID<N> {
         match variant {
             0 => Ok(Self::Solution(FromBytes::read_le(&mut reader)?)),
             1 => Ok(Self::Transaction(FromBytes::read_le(&mut reader)?)),
-            2.. => Err(error("Invalid worker entry ID variant")),
+            2.. => Err(error("Invalid worker transmission ID variant")),
         }
     }
 }
 
-impl<N: Network> ToBytes for EntryID<N> {
-    /// Writes the entry ID to the buffer.
+impl<N: Network> ToBytes for TransmissionID<N> {
+    /// Writes the transmission ID to the buffer.
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        // Write the entry.
+        // Write the transmission.
         match self {
             Self::Solution(id) => {
                 0u8.write_le(&mut writer)?;
@@ -86,16 +86,16 @@ impl<N: Network> ToBytes for EntryID<N> {
     }
 }
 
-impl<N: Network> Serialize for EntryID<N> {
+impl<N: Network> Serialize for TransmissionID<N> {
     #[inline]
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         ToBytesSerializer::serialize_with_size_encoding(self, serializer)
     }
 }
 
-impl<'de, N: Network> Deserialize<'de> for EntryID<N> {
+impl<'de, N: Network> Deserialize<'de> for TransmissionID<N> {
     #[inline]
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "entry ID")
+        FromBytesDeserializer::<Self>::deserialize_with_size_encoding(deserializer, "transmission ID")
     }
 }

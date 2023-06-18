@@ -98,17 +98,17 @@ impl<N: Network> Primary<N> {
     /// This method performs the following steps:
     /// 1. Drain the workers.
     /// 2. Construct the batch.
-    /// 3. Broadcast the batch (w/ entry IDs, not entries) to all validators for signing.
+    /// 3. Broadcast the batch (w/ transmission IDs, not transmissions) to all validators for signing.
     pub fn prepare_batch(&self) -> Result<Batch<N>> {
         // Initialize the RNG.
         let mut rng = rand::thread_rng();
 
-        // Initialize a map of the entries.
-        let mut entries = HashMap::new();
+        // Initialize a map of the transmissions.
+        let mut transmissions = HashMap::new();
         // Drain the workers.
         for worker in self.workers.read().iter() {
-            // Transition the worker to the next round, and add their entries to the map.
-            entries.extend(worker.drain());
+            // Transition the worker to the next round, and add their transmissions to the map.
+            transmissions.extend(worker.drain());
         }
 
         // Retrieve the current round.
@@ -117,7 +117,7 @@ impl<N: Network> Primary<N> {
         let previous_certificates = self.shared.previous_certificates(round).unwrap_or_default();
 
         // Return the batch.
-        Batch::new(self.gateway.account().private_key(), round, entries, previous_certificates, &mut rng)
+        Batch::new(self.gateway.account().private_key(), round, transmissions, previous_certificates, &mut rng)
     }
 }
 

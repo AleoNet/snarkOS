@@ -15,30 +15,30 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct EntryRequest<N: Network> {
+pub struct TransmissionRequest<N: Network> {
     pub worker: u8,
-    pub entry_id: EntryID<N>,
+    pub transmission_id: TransmissionID<N>,
 }
 
-impl<N: Network> EntryRequest<N> {
-    /// Initializes a new entry request event.
-    pub fn new(worker: u8, entry_id: EntryID<N>) -> Self {
-        Self { worker, entry_id }
+impl<N: Network> TransmissionRequest<N> {
+    /// Initializes a new transmission request event.
+    pub fn new(worker: u8, transmission_id: TransmissionID<N>) -> Self {
+        Self { worker, transmission_id }
     }
 }
 
-impl<N: Network> EventTrait for EntryRequest<N> {
+impl<N: Network> EventTrait for TransmissionRequest<N> {
     /// Returns the event name.
     #[inline]
     fn name(&self) -> String {
-        "EntryRequest".to_string()
+        "TransmissionRequest".to_string()
     }
 
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
         writer.write_all(&self.worker.to_bytes_le()?)?;
-        writer.write_all(&self.entry_id.to_bytes_le()?)?;
+        writer.write_all(&self.transmission_id.to_bytes_le()?)?;
         Ok(())
     }
 
@@ -48,8 +48,8 @@ impl<N: Network> EventTrait for EntryRequest<N> {
         let mut reader = bytes.reader();
 
         let worker = u8::read_le(&mut reader)?;
-        let entry_id = EntryID::read_le(&mut reader)?;
+        let transmission_id = TransmissionID::read_le(&mut reader)?;
 
-        Ok(Self { worker, entry_id })
+        Ok(Self { worker, transmission_id })
     }
 }

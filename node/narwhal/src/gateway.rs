@@ -259,7 +259,7 @@ impl<N: Network> Gateway<N> {
     fn insert_connected_peer(&self, peer_ip: SocketAddr, peer_addr: SocketAddr, address: Address<N>) {
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.insert_peer(peer_ip, peer_addr);
-        // Add an entry for this peer in the connected peers.
+        // Add an transmission for this peer in the connected peers.
         self.connected_peers.write().insert(peer_ip);
         // Add this peer to the shared state.
         self.shared.insert_peer(peer_ip, address);
@@ -361,27 +361,27 @@ impl<N: Network> Gateway<N> {
             Event::Disconnect(disconnect) => {
                 bail!("{CONTEXT} Disconnecting peer '{peer_ip}' for the following reason: {:?}", disconnect.reason)
             }
-            Event::EntryRequest(request) => {
+            Event::TransmissionRequest(request) => {
                 // If the worker ID is not valid, disconnect.
                 if request.worker >= self.num_workers() {
                     bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
                 }
-                // Send the entry request to the worker.
+                // Send the transmission request to the worker.
                 if let Some(sender) = self.worker_sender(request.worker) {
-                    // Send the entry request to the worker.
-                    let _ = sender.tx_entry_request.send((peer_ip, request)).await;
+                    // Send the transmission request to the worker.
+                    let _ = sender.tx_transmission_request.send((peer_ip, request)).await;
                 }
                 Ok(())
             }
-            Event::EntryResponse(response) => {
+            Event::TransmissionResponse(response) => {
                 // If the worker ID is not valid, disconnect.
                 if response.worker >= self.num_workers() {
                     bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
                 }
-                // Send the entry response to the worker.
+                // Send the transmission response to the worker.
                 if let Some(sender) = self.worker_sender(response.worker) {
-                    // Send the entry response to the worker.
-                    let _ = sender.tx_entry_response.send((peer_ip, response)).await;
+                    // Send the transmission response to the worker.
+                    let _ = sender.tx_transmission_response.send((peer_ip, response)).await;
                 }
                 Ok(())
             }
