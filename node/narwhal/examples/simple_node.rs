@@ -23,7 +23,7 @@ use snarkos_node_narwhal::{
     Shared,
     MEMORY_POOL_PORT,
 };
-use snarkvm::prelude::{Field, Uniform};
+use snarkvm::prelude::{Field, Network, Transaction, Uniform};
 
 use ::bytes::Bytes;
 use anyhow::{bail, Result};
@@ -161,20 +161,40 @@ fn handle_signals(primary: &Primary<CurrentNetwork>) {
 /**************************************************************************************************/
 
 /// Fires *fake* unconfirmed transactions at the node.
-fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>) {
+fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id: u16) {
     let tx_unconfirmed_transaction = sender.tx_unconfirmed_transaction.clone();
     tokio::task::spawn(async move {
-        let mut rng = rand_chacha::ChaChaRng::seed_from_u64(0);
-        loop {
+        // This RNG samples the *same* fake transactions for all nodes.
+        let mut shared_rng = rand_chacha::ChaChaRng::seed_from_u64(0);
+        // This RNG samples *different* fake transactions for each node.
+        let mut unique_rng = rand_chacha::ChaChaRng::seed_from_u64(node_id as u64);
+
+        // A closure to generate an ID and transaction.
+        fn sample(
+            mut rng: impl Rng,
+        ) -> (<CurrentNetwork as Network>::TransactionID, Data<Transaction<CurrentNetwork>>) {
             // Sample a random fake transaction ID.
             let id = Field::<CurrentNetwork>::rand(&mut rng).into();
             // Sample random fake transaction bytes.
             let transaction = Data::Buffer(Bytes::from((0..1024).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
+            // Return the ID and transaction.
+            (id, transaction)
+        };
+
+        // Intialize a counter.
+        let mut counter = 0;
+
+        loop {
+            // Sample a random fake transaction ID and transaction.
+            let (id, transaction) = if counter % 2 == 0 { sample(&mut shared_rng) } else { sample(&mut unique_rng) };
             // Send the fake transaction.
             if let Err(e) = tx_unconfirmed_transaction.send((id, transaction)).await {
                 error!("Failed to send unconfirmed transaction: {e}");
             }
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            // Increment the counter.
+            counter += 1;
+            // Sleep briefly.
+            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
         }
     });
 }
@@ -200,7 +220,7 @@ async fn main() -> Result<()> {
     let (primary, sender) = start_primary(node_id, num_nodes).await?;
 
     // Fire unconfirmed transactions.
-    fire_unconfirmed_transactions(&sender);
+    fire_unconfirmed_transactions(&sender, node_id);
 
     println!("Hello, world!");
 

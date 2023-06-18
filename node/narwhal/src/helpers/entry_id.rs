@@ -49,8 +49,8 @@ impl<N: Network> Display for EntryID<N> {
     #[inline]
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Solution(id) => write!(f, "Solution({})", id),
-            Self::Transaction(id) => write!(f, "Transaction({})", id),
+            Self::Solution(id) => write!(f, "{}", id),
+            Self::Transaction(id) => write!(f, "{}", id),
         }
     }
 }

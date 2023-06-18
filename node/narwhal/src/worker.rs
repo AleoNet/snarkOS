@@ -92,7 +92,7 @@ impl<N: Network> Worker<N> {
                 // Broadcast the ping event.
                 self_clone.broadcast_ping().await;
                 // Wait for the next interval.
-                tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+                tokio::time::sleep(std::time::Duration::from_millis(500)).await;
             }
         });
 
@@ -133,6 +133,11 @@ impl<N: Network> Worker<N> {
             }
             // Check if the entry ID exists in the pending queue for the specified peer IP.
             if !self.pending.contains_peer(*entry_id, peer_ip) {
+                debug!(
+                    "Worker {} - Found new entry ID '{}' from peer '{peer_ip}'",
+                    self.id,
+                    fmt_id(entry_id.to_string())
+                );
                 // Insert the entry ID into the pending queue.
                 self.pending.insert(*entry_id, peer_ip);
             }

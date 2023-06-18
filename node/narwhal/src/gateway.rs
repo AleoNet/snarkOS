@@ -359,7 +359,7 @@ impl<N: Network> Gateway<N> {
                 // Send the ping to the worker.
                 if let Some(sender) = self.worker_sender(ping.worker) {
                     // Send the ping to the worker.
-                    let _ = sender.tx_ping.send((peer_ip, ping));
+                    let _ = sender.tx_ping.send((peer_ip, ping)).await;
                 }
                 Ok(())
             }
