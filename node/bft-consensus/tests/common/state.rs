@@ -23,7 +23,7 @@ use std::{
 
 use async_trait::async_trait;
 use narwhal_executor::ExecutionState;
-use narwhal_types::ConsensusOutput;
+use narwhal_types::{CertificateAPI, ConsensusOutput, HeaderAPI};
 use parking_lot::Mutex;
 use rand::prelude::{IteratorRandom, Rng, SliceRandom};
 use snarkos_node_bft_consensus::batched_transactions;
@@ -141,9 +141,9 @@ impl TestBftExecutionState {
 impl ExecutionState for TestBftExecutionState {
     async fn handle_consensus_output(&self, consensus_output: ConsensusOutput) {
         // Register and log some useful information.
-        let mut leader = consensus_output.sub_dag.leader.header.author.to_string();
+        let mut leader = consensus_output.sub_dag.leader.header().author().to_string();
         leader.truncate(8);
-        let round = consensus_output.sub_dag.round();
+        let round = consensus_output.sub_dag.leader_round();
 
         // Collect the batched transactions.
         let mut transactions = Vec::new();

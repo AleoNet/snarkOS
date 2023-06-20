@@ -75,11 +75,9 @@ pub fn generate_consensus_instances(
 
     // Generate the Committee.
     let committee = committee_setup.generate_committee();
-    let committee = Arc::new(ArcSwap::from_pointee(committee));
 
     // Generate the WorkerCache.
     let worker_cache = committee_setup.generate_worker_cache();
-    let worker_cache = Arc::new(ArcSwap::from_pointee(worker_cache));
 
     // Create the consensus objects.
     let mut consensus_objects = Vec::with_capacity(committee_setup.primaries.len());
@@ -109,8 +107,8 @@ pub fn generate_consensus_instances(
             parameters: parameters.clone(),
             primary_store,
             worker_stores,
-            committee: Arc::clone(&committee),
-            worker_cache: Arc::clone(&worker_cache),
+            committee: committee.clone(),
+            worker_cache: worker_cache.clone(),
             state: state.clone(),
             validator: Default::default(),
         };

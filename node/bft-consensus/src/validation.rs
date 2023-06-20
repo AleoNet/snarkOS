@@ -14,7 +14,7 @@
 
 use anyhow::{bail, Result};
 use bytes::BytesMut;
-use narwhal_types::Batch;
+use narwhal_types::{Batch, BatchAPI};
 use tracing::*;
 
 use snarkos_node_consensus::Consensus as AleoConsensus;
@@ -25,6 +25,7 @@ use snarkvm::prelude::{ConsensusStorage, Network};
 #[derive(Clone)]
 pub struct TransactionValidator<N: Network, C: ConsensusStorage<N>>(pub AleoConsensus<N, C>);
 
+#[async_trait::async_trait]
 impl<N: Network, C: ConsensusStorage<N>> narwhal_worker::TransactionValidator for TransactionValidator<N, C> {
     type Error = anyhow::Error;
 
@@ -53,8 +54,8 @@ impl<N: Network, C: ConsensusStorage<N>> narwhal_worker::TransactionValidator fo
     }
 
     /// Determines if this batch can be voted on
-    fn validate_batch(&self, batch: &Batch) -> Result<(), Self::Error> {
-        for transaction in &batch.transactions {
+    async fn validate_batch(&self, batch: &Batch) -> Result<(), Self::Error> {
+        for transaction in batch.transactions() {
             self.validate(transaction)?;
         }
 

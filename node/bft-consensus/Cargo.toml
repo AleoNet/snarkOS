@@ -27,13 +27,15 @@ snarkos-node-tcp = { path = "../tcp" }
 snarkvm = { workspace = true }
 
 # below are the dependencies for BFT
+mysten-network.workspace = true
 narwhal-config.workspace = true
 narwhal-crypto.workspace = true
 narwhal-executor.workspace = true
+narwhal-network.workspace = true
 narwhal-node.workspace = true
 narwhal-worker.workspace = true
 narwhal-types.workspace = true
-fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "235211dc8195590f5353d38135f5ee51a267521e" }
+fastcrypto = { git = "https://github.com/MystenLabs/fastcrypto", rev = "84fd7c7428c5f59185aecc56a2e0a006e8e07de1" }
 rand = { version = "0.8.5", features = ["small_rng"] }
 arc-swap = "1.5.1"
 anyhow = "1"

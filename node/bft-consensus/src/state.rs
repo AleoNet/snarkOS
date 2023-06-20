@@ -20,9 +20,10 @@ use std::{
 use anyhow::bail;
 use async_trait::async_trait;
 use bytes::BytesMut;
+use narwhal_config::Committee;
 use narwhal_crypto::PublicKey;
 use narwhal_executor::ExecutionState;
-use narwhal_types::ConsensusOutput;
+use narwhal_types::{BatchAPI, CertificateAPI, ConsensusOutput, HeaderAPI};
 use parking_lot::Mutex;
 use tracing::*;
 
@@ -37,6 +38,7 @@ use snarkvm::prelude::{ConsensusStorage, Network};
 pub struct BftExecutionState<N: Network, C: ConsensusStorage<N>> {
     primary_pub: PublicKey,
     router: Router<N>,
+    committee: Committee,
     consensus: AleoConsensus<N, C>,
     pub last_output: Arc<Mutex<Option<ConsensusOutput>>>,
     initial_last_executed_sub_dag_index: u64,
@@ -46,10 +48,18 @@ impl<N: Network, C: ConsensusStorage<N>> BftExecutionState<N, C> {
     pub fn new(
         primary_pub: PublicKey,
         router: Router<N>,
+        committee: Committee,
         consensus: AleoConsensus<N, C>,
         initial_last_executed_sub_dag_index: u64,
     ) -> Self {
-        Self { primary_pub, router, consensus, last_output: Default::default(), initial_last_executed_sub_dag_index }
+        Self {
+            primary_pub,
+            router,
+            committee,
+            consensus,
+            last_output: Default::default(),
+            initial_last_executed_sub_dag_index,
+        }
     }
 }
 
@@ -59,9 +69,9 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
     async fn handle_consensus_output(&self, consensus_output: ConsensusOutput) {
         *self.last_output.lock() = Some(consensus_output.clone());
 
-        let leader = &consensus_output.sub_dag.leader.header.author;
-        let mut leader_id = leader.to_string();
-        leader_id.truncate(8);
+        let leader_id = &consensus_output.sub_dag.leader.header().author();
+        // let mut leader_id = leader.to_string();
+        // leader_id.truncate(8);
 
         let mut validator_id = self.primary_pub.to_string();
         validator_id.truncate(8);
@@ -69,7 +79,7 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
         debug!(
             "Consensus (id: {}) output for round {}: {} batches, leader: {}",
             validator_id,
-            consensus_output.sub_dag.leader.header.round,
+            consensus_output.sub_dag.leader.header().round(),
             consensus_output.sub_dag.num_batches(),
             leader_id,
         );
@@ -79,7 +89,13 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
             return;
         }
 
-        if self.primary_pub != *leader {
+        // Figure out the id for this authority
+        let authority = self
+            .committee
+            .authority_by_key(&self.primary_pub)
+            .unwrap_or_else(|| panic!("Our node with key {:?} should be in committee", self.primary_pub));
+
+        if authority.id() != *leader_id {
             debug!("I'm not the current leader (id: {}), yielding block production.", validator_id);
             return;
         }
@@ -216,7 +232,7 @@ pub fn batched_transactions(consensus_output: &ConsensusOutput) -> impl Iterator
     let deduplicated_txs = consensus_output
         .batches
         .iter()
-        .flat_map(|batches| batches.1.iter().flat_map(|batch| batch.transactions.iter()))
+        .flat_map(|batches| batches.1.iter().flat_map(|batch| batch.transactions().iter()))
         .collect::<HashSet<_>>();
     deduplicated_txs.into_iter()
 }

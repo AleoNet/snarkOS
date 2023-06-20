@@ -18,6 +18,7 @@ use narwhal_types::Batch;
 #[derive(Default, Clone)]
 pub struct TestTransactionValidator;
 
+#[async_trait::async_trait]
 impl narwhal_worker::TransactionValidator for TestTransactionValidator {
     type Error = anyhow::Error;
 
@@ -26,7 +27,7 @@ impl narwhal_worker::TransactionValidator for TestTransactionValidator {
         Ok(())
     }
 
-    fn validate_batch(&self, _batch: &Batch) -> Result<(), Self::Error> {
+    async fn validate_batch(&self, _batch: &Batch) -> Result<(), Self::Error> {
         Ok(())
     }
 }
