@@ -14,6 +14,8 @@
 
 use super::*;
 
+use bincode::Options;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ping<N: Network> {
     pub version: u32,
@@ -37,8 +39,10 @@ impl<N: Network> MessageTrait for Ping<N> {
     /// Deserializes the given buffer into a message.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
+        let options =
+            bincode::options().with_limit(MAXIMUM_MESSAGE_SIZE as u64).with_fixint_encoding().allow_trailing_bytes();
         let mut reader = bytes.reader();
-        let (version, node_type, block_locators) = bincode::deserialize_from(&mut reader)?;
+        let (version, node_type, block_locators) = options.deserialize_from(&mut reader)?;
         Ok(Self { version, node_type, block_locators })
     }
 }
