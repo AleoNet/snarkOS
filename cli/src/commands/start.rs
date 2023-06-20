@@ -61,8 +61,8 @@ pub struct Start {
     /// Specify the node's account private key.
     #[clap(long = "private-key")]
     pub private_key: Option<String>,
-    /// Specify the path to the node's account private key.
-    #[clap(long = "private-key-path")]
+    /// Specify the path to a file containing the node's account private key.
+    #[clap(long = "private-key-file")]
     pub private_key_path: Option<PathBuf>,
 
     /// Specify the IP address and port for the node server
@@ -170,6 +170,11 @@ impl Start {
 
     /// Read the private key directly from an argument or from a filesystem location.
     fn parse_private_key(&mut self) -> Result<()> {
+        // Ensure only one private key flag is provided to the CLI.
+        if self.private_key.is_some() && self.private_key_path.is_some() {
+            bail!("Both the private key string and file path flags were specified, please pick only one");
+        }
+
         // If the private key is provided directly, don't do anything else.
         if self.private_key.is_some() {
             return Ok(());
