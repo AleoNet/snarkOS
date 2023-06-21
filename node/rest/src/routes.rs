@@ -17,7 +17,7 @@ use super::*;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use snarkos_node_env::ENV_INFO;
-use snarkvm::prelude::Transaction;
+use snarkvm::prelude::{Identifier, Plaintext, Transaction};
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
@@ -140,6 +140,26 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_program(id)?))
     }
 
+    // GET /testnet3/program/{programID}/mappings
+    pub(crate) async fn get_mapping_names(
+        State(rest): State<Self>,
+        Path(id): Path<ProgramID<N>>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_mapping_names_speculative(&id)?))
+    }
+
+    // GET /testnet3/program/{programID}/mapping/{mappingName}/{mappingKey}
+    pub(crate) async fn get_mapping_value(
+        State(rest): State<Self>,
+        Path((id, name, key)): Path<(ProgramID<N>, Identifier<N>, Plaintext<N>)>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_value_speculative(
+            &id,
+            &name,
+            &key,
+        )?))
+    }
+
     // GET /testnet3/statePath/{commitment}
     pub(crate) async fn get_state_path_for_commitment(
         State(rest): State<Self>,
@@ -183,6 +203,16 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     ) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.find_block_hash(&tx_id)?))
     }
+
+    /*
+    // GET /testnet3/find/mappingValue/{mappingKey}
+    pub(crate) async fn find_mapping_key(
+        State(rest): State<Self>,
+        Path(mapping_key): Path<Field<N>>,
+    ) -> Result<ErasedJson, RestError> {
+        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_value_from_key_id_speculative(&mapping_key)?))
+    }
+     */
 
     // GET /testnet3/find/transactionID/deployment/{programID}
     pub(crate) async fn find_transaction_id_from_program_id(
