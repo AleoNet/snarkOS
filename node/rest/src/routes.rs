@@ -153,11 +153,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Path((id, name, key)): Path<(ProgramID<N>, Identifier<N>, Plaintext<N>)>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_value_speculative(
-            &id,
-            &name,
-            &key,
-        )?))
+        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_value_speculative(&id, &name, &key)?))
     }
 
     // GET /testnet3/statePath/{commitment}
@@ -203,16 +199,6 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
     ) -> Result<ErasedJson, RestError> {
         Ok(ErasedJson::pretty(rest.ledger.find_block_hash(&tx_id)?))
     }
-
-    /*
-    // GET /testnet3/find/mappingValue/{mappingKey}
-    pub(crate) async fn find_mapping_key(
-        State(rest): State<Self>,
-        Path(mapping_key): Path<Field<N>>,
-    ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_value_from_key_id_speculative(&mapping_key)?))
-    }
-     */
 
     // GET /testnet3/find/transactionID/deployment/{programID}
     pub(crate) async fn find_transaction_id_from_program_id(

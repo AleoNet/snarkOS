@@ -120,24 +120,24 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
 
             // GET ../find/..
             .route("/testnet3/find/blockHash/:tx_id", get(Self::find_block_hash))
-            //.route("/testnet3/find/mappingKey/:mapping_key", get(Self::find_mapping_key))
             .route("/testnet3/find/transactionID/deployment/:program_id", get(Self::find_transaction_id_from_program_id))
             .route("/testnet3/find/transactionID/:transition_id", get(Self::find_transaction_id_from_transition_id))
             .route("/testnet3/find/transitionID/:input_or_output_id", get(Self::find_transition_id))
-
 
             // GET ../peers/..
             .route("/testnet3/peers/count", get(Self::get_peers_count))
             .route("/testnet3/peers/all", get(Self::get_peers_all))
             .route("/testnet3/peers/all/metrics", get(Self::get_peers_all_metrics))
 
+            // GET ../program/..
+            .route("/testnet3/program/:id", get(Self::get_program))
+            .route("/testnet3/program/:id/mappings", get(Self::get_mapping_names))
+            .route("/testnet3/program/:id/mapping/:name/:key", get(Self::get_mapping_value))
+
             // GET misc endpoints.
             .route("/testnet3/blocks", get(Self::get_blocks))
             .route("/testnet3/height/:hash", get(Self::get_height))
             .route("/testnet3/memoryPool/transactions", get(Self::get_memory_pool_transactions))
-            .route("/testnet3/program/:id", get(Self::get_program))
-            .route("/testnet3/program/:id/mappings", get(Self::get_mapping_names))
-            .route("/testnet3/program/:id/mapping/:name/:key", get(Self::get_mapping_value))
             .route("/testnet3/statePath/:commitment", get(Self::get_state_path_for_commitment))
             .route("/testnet3/beacons", get(Self::get_beacons))
             .route("/testnet3/node/address", get(Self::get_node_address))
