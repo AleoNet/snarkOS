@@ -68,6 +68,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
     ) -> Result<Self> {
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
+        if let Ok(num) = std::env::var("REMOVE_BLOCKS") {
+            let num: u32 = num.parse()?;
+            ledger.vm().block_store().remove_last_n(num)?;
+        }
         // Initialize the CDN.
         if let Some(base_url) = cdn {
             // Sync the ledger with the CDN.
