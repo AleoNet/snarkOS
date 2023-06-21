@@ -105,6 +105,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Initialize the consensus.
         let consensus = Consensus::new(ledger.clone(), dev.is_some())?;
 
+        ledger.insert_committee_member(account.clone().address());
+
         // Initialize the node router.
         let router = Router::new(
             node_ip,

@@ -77,6 +77,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             public_key: public_key.clone(),
             signature,
             last_executed_sub_dag_index,
+            aleo_address: self.address(),
         }));
         framed.send(message).await?;
 
@@ -103,6 +104,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // TODO: in future we could error here if it already exists in the collection but that
         // logic is probably best implemented when dynamic committees are being considered.
         self.connected_committee_members.write().insert(peer_ip, consensus_id.public_key);
+
+        // 3.5
+        // add the peer to the ledger's `current_committee`
+        self.ledger.insert_committee_member(consensus_id.aleo_address);
 
         // 4.
         // If quorum is reached, start the consensus but only if it hasn't already been started.
