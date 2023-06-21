@@ -23,16 +23,12 @@ use snarkos_node_consensus::Consensus;
 use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
 use snarkvm::{
     console::{
-        account::{Address, PrivateKey, ViewKey},
+        account::{Address, PrivateKey},
         network::{prelude::*, Testnet3},
-        program::{Entry, Identifier, Literal, Plaintext, Value},
+        program::Value,
     },
-    prelude::{Ledger, RecordsFilter, TestRng},
-    synthesizer::{
-        block::{Block, Transaction},
-        program::Program,
-        store::helpers::rocksdb::ConsensusDB,
-    },
+    prelude::{Ledger, TestRng},
+    synthesizer::{block::Block, store::helpers::rocksdb::ConsensusDB},
 };
 use tikv_jemallocator::Jemalloc;
 use tokio::sync::mpsc;
@@ -71,14 +67,13 @@ async fn main() {
 
     // Initialize the beacon private key.
     let creator_private_key = PrivateKey::<CurrentNetwork>::from_str(&private_key).unwrap();
-    let creator_view_key = ViewKey::try_from(&creator_private_key).unwrap();
     // Initialize the genesis block.
     let genesis = Block::from_bytes_le(Testnet3::genesis_bytes()).unwrap();
 
     // Initialize the consensus to generate transactions.
     let ledger = CurrentLedger::load(genesis, None).unwrap();
     let consensus = CurrentConsensus::new(ledger, false).unwrap();
-    let genesis_address: Address<Testnet3> = *consensus.beacons().keys().next().unwrap();
+    let genesis_address: Address<Testnet3> = *consensus.ledger().latest_committee().first().unwrap();
 
     // Create the initial block or start producing transactions.
     if arg == EXPECTED_ARGS[0] {
