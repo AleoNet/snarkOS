@@ -26,7 +26,10 @@ use snarkos_node_messages::{
     NodeType,
 };
 use snarkos_node_router::expect_message;
-use snarkvm::prelude::{error, Address, Block, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork};
+use snarkvm::{
+    prelude::{error, Address, Block, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork},
+    utilities::Uniform,
+};
 
 use std::{
     io,
@@ -126,7 +129,7 @@ impl TestPeer {
 #[async_trait::async_trait]
 impl Handshake for TestPeer {
     async fn perform_handshake(&self, mut conn: Connection) -> io::Result<Connection> {
-        let rng = &mut TestRng::default();
+        let mut rng = &mut TestRng::default();
 
         let local_ip = self.node().listening_addr().expect("listening address should be present");
 
@@ -192,11 +195,12 @@ impl Handshake for TestPeer {
 
         let public_key = kp.public();
         let signature = kp.private().sign_bytes(public_key.to_bytes().as_slice(), rng).unwrap();
-
+        let aleo_address = Address::<CurrentNetwork>::new(Uniform::rand(&mut rng));
         let message = Message::ConsensusId(Box::new(ConsensusId {
             public_key: public_key.clone(),
             signature,
             last_executed_sub_dag_index: 0,
+            aleo_address,
         }));
         framed.send(message).await?;
 

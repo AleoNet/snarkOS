@@ -28,7 +28,6 @@ use snarkvm::{
     prelude::{Ledger, RecordsFilter, TestRng},
     synthesizer::{
         block::{Block, Transaction},
-        program::Program,
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
         vm::VM,
     },
@@ -46,7 +45,7 @@ pub(crate) mod test_helpers {
     use snarkvm::{
         console::{account::PrivateKey, network::Testnet3, program::Value},
         prelude::TestRng,
-        synthesizer::{process::FinalizeGlobalState, store::helpers::memory::ConsensusMemory, Block},
+        synthesizer::{process::FinalizeGlobalState, store::helpers::memory::ConsensusMemory, Block, Program},
     };
 
     use once_cell::sync::OnceCell;
