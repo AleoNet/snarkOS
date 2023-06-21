@@ -129,7 +129,7 @@ pub enum Message<N: Network> {
     UnconfirmedSolution(UnconfirmedSolution<N>),
     UnconfirmedTransaction(UnconfirmedTransaction<N>),
     NewBlock(NewBlock<N>),
-    ConsensusId(Box<ConsensusId>),
+    ConsensusId(Box<ConsensusId<N>>),
 }
 
 impl<N: Network> Message<N> {
