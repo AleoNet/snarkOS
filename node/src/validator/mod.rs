@@ -69,8 +69,11 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
         if let Ok(num) = std::env::var("REMOVE_BLOCKS") {
+            tracing::info!("remove {num} blocks");
             let num: u32 = num.parse()?;
             ledger.vm().block_store().remove_last_n(num)?;
+            let latest_height = ledger.latest_height();
+            tracing::info!("latest height: {latest_height}");
         }
         // Initialize the CDN.
         if let Some(base_url) = cdn {
