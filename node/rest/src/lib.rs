@@ -143,6 +143,15 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/node/address", get(Self::get_node_address))
             .route("/testnet3/node/env", get(Self::get_env_info))
 
+            // GET izar bridge
+            .route("/testnet3/bridge/balance/:address", get(Self::get_balance))
+
+            // GET mori
+            .route("/testnet3/mori/node/:node_id", get(Self::get_mori_node))
+
+            // GET generic
+            .route("/testnet3/mapping/:program_id/:mapping_name/:key", get(Self::read_mapping_by_key_id))
+
             // Pass in `Rest` to make things convenient.
             .with_state(self.clone())
             // Enable tower-http tracing.
