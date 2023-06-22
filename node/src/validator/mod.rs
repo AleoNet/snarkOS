@@ -142,7 +142,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             node.rest = Some(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?);
         }
         // Initialize the sync pool.
-        node.initialize_sync()?;
+        // node.initialize_sync()?;
         // Initialize the routing.
         node.initialize_routing().await;
         // Initialize the signal handler.
@@ -289,6 +289,7 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Validator<N, C> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
+    #[allow(dead_code)]
     /// Initializes the sync pool.
     fn initialize_sync(&self) -> Result<()> {
         // Retrieve the canon locators.

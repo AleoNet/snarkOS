@@ -29,7 +29,6 @@ use tracing::*;
 use snarkos_node_consensus::Consensus as AleoConsensus;
 use snarkos_node_messages::{Data, Message, NewBlock};
 use snarkos_node_router::Router;
-use snarkos_node_tcp::protocols::Writing;
 use snarkvm::prelude::{ConsensusStorage, Network};
 
 // The state available to the BFT consensus.
@@ -79,10 +78,10 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
             return;
         }
 
-        if self.primary_pub != *leader {
-            debug!("I'm not the current leader (id: {}), yielding block production.", validator_id);
-            return;
-        }
+        // if self.primary_pub != *leader {
+        //     debug!("I'm not the current leader (id: {}), yielding block production.", validator_id);
+        //     return;
+        // }
 
         debug!("I'm the current leader (id: {}); producing a block.", validator_id);
 
@@ -193,7 +192,7 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
         ));
 
         // Broadcast the new block.
-        self.router.broadcast(message).unwrap();
+        self.router.broadcast_to_non_validators(message).unwrap();
     }
 
     async fn last_executed_sub_dag_index(&self) -> u64 {

@@ -47,7 +47,7 @@ use anyhow::{bail, Result};
 use core::str::FromStr;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashSet, future::Future, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
+use std::{collections::HashSet, future::Future, io, net::SocketAddr, ops::Deref, sync::Arc, time::Instant};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -518,6 +518,17 @@ impl<N: Network> Router<N> {
     /// Spawns a task with the given future; it should only be used for long-running tasks.
     pub fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
         self.handles.lock().push(tokio::spawn(future));
+    }
+
+    /// Broadcasts the provided message to all connected non-validator peers.
+    pub fn broadcast_to_non_validators(&self, message: <Router<N> as Writing>::Message) -> io::Result<()> {
+        let connected_clients = self.connected_clients();
+        let connected_provers = self.connected_provers();
+        let connected = connected_clients.iter().chain(connected_provers.iter());
+        for peer in connected {
+            self.unicast(*peer, message.clone())?;
+        }
+        Ok(())
     }
 
     /// Shuts down the router.
