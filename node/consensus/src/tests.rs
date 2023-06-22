@@ -22,7 +22,7 @@ use snarkvm::{
     prelude::{Ledger, RecordsFilter, TestRng},
     synthesizer::{
         block::{Block, Transaction},
-        program::Program,
+        process::Program,
         store::ConsensusStore,
         vm::VM,
     },
