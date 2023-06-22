@@ -145,7 +145,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Path(id): Path<ProgramID<N>>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_mapping_names_speculative(&id)?))
+        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_mapping_names_confirmed(&id)?))
     }
 
     // GET /testnet3/program/{programID}/mapping/{mappingName}/{mappingKey}
@@ -153,7 +153,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         State(rest): State<Self>,
         Path((id, name, key)): Path<(ProgramID<N>, Identifier<N>, Plaintext<N>)>,
     ) -> Result<ErasedJson, RestError> {
-        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_value_speculative(&id, &name, &key)?))
+        Ok(ErasedJson::pretty(rest.ledger.vm().finalize_store().get_value_confirmed(&id, &name, &key)?))
     }
 
     // GET /testnet3/statePath/{commitment}
