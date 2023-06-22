@@ -180,9 +180,13 @@ impl Start {
             bail!("Both the private key string and file path flags were specified, please pick only one");
         }
 
-        // If the private key is provided directly, don't do anything else.
-        if self.private_key.is_some() {
-            return Ok(());
+        // If the private key is provided directly, don't do anything else; make sure it's non-empty too.
+        if let Some(private_key) = &self.private_key {
+            if private_key.is_empty() {
+                bail!("The private-key argument can't be empty");
+            } else {
+                return Ok(());
+            }
         }
 
         // If a filesystem path to the private key is provided, attempt to
