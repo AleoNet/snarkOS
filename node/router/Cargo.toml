@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-router"
-version = "2.1.1"
+version = "2.1.2"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A node router for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -65,15 +65,15 @@ version = "1"
 
 [dependencies.snarkos-account]
 path = "../../account"
-version = "=2.1.1"
+version = "=2.1.2"
 
 [dependencies.snarkos-node-messages]
 path = "../messages"
-version = "=2.1.1"
+version = "=2.1.2"
 
 [dependencies.snarkos-node-tcp]
 path = "../tcp"
-version = "=2.1.1"
+version = "=2.1.2"
 
 [dependencies.snarkvm]
 workspace = true
