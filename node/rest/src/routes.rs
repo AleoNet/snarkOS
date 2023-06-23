@@ -20,8 +20,9 @@ use serde::{Deserialize, Serialize};
 use snarkos_node_env::ENV_INFO;
 use snarkvm::{
     console::types::string::Integer,
-    prelude::{Identifier, Plaintext, Transaction},
+    prelude::{Address, Identifier, Plaintext, Transaction},
 };
+use std::str::FromStr;
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
