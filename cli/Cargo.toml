@@ -99,4 +99,4 @@ version = "2.7"
 version = "0.26"
 
 [dev-dependencies.indexmap]
-version = "1"
+version = "2"

@@ -39,7 +39,7 @@ version = "0.3"
 features = [ "sink" ]
 
 [dependencies.indexmap]
-version = "1"
+version = "2"
 
 [dependencies.num_cpus]
 version = "1"

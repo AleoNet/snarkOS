@@ -30,7 +30,7 @@ version = "1.0"
 version = "1"
 
 [dependencies.indexmap]
-version = "1"
+version = "2"
 
 [dependencies.kadmium]
 version = "0.6.0"
