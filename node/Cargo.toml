@@ -57,6 +57,7 @@ optional = true
 
 [dependencies.serde_json]
 version = "1"
+features = [ "preserve_order" ]
 
 [dependencies.snarkos-account]
 path = "../account"
