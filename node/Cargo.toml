@@ -39,7 +39,7 @@ version = "0.3"
 features = [ "sink" ]
 
 [dependencies.indexmap]
-version = "1"
+version = "2.0"
 
 [dependencies.num_cpus]
 version = "1"
@@ -57,6 +57,7 @@ optional = true
 
 [dependencies.serde_json]
 version = "1"
+features = [ "preserve_order" ]
 
 [dependencies.snarkos-account]
 path = "../account"

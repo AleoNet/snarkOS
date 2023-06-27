@@ -61,6 +61,7 @@ version = "1"
 
 [dependencies.serde_json]
 version = "1"
+features = [ "preserve_order" ]
 
 [dependencies.snarkos-account]
 path = "../account"
@@ -99,4 +100,4 @@ version = "2.7"
 version = "0.26"
 
 [dev-dependencies.indexmap]
-version = "1"
+version = "2.0"
