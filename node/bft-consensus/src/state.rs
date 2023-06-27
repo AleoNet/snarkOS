@@ -70,8 +70,6 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
         *self.last_output.lock() = Some(consensus_output.clone());
 
         let leader_id = &consensus_output.sub_dag.leader.header().author();
-        // let mut leader_id = leader.to_string();
-        // leader_id.truncate(8);
 
         let mut validator_id = self.primary_pub.to_string();
         validator_id.truncate(8);

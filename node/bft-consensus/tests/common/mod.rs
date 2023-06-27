@@ -20,9 +20,8 @@ pub use state::*;
 pub use transaction::*;
 pub use validation::*;
 
-use std::{sync::Arc, time::Duration};
+use std::time::Duration;
 
-use arc_swap::ArcSwap;
 use narwhal_config::Parameters;
 use narwhal_node::NodeStorage;
 use tracing::*;

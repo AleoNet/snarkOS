@@ -23,7 +23,7 @@ use std::{
 #[cfg(not(feature = "test"))]
 use aleo_std::aleo_dir;
 use mysten_network::multiaddr::Multiaddr;
-use narwhal_config::{Authority, Committee, CommitteeBuilder, WorkerCache, WorkerIndex, WorkerInfo};
+use narwhal_config::{Committee, CommitteeBuilder, WorkerCache, WorkerIndex, WorkerInfo};
 use narwhal_crypto::{EncodeDecodeBase64, KeyPair as NarwhalKeyPair, NetworkKeyPair, PublicKey};
 use rand::prelude::ThreadRng;
 use tracing::*;

@@ -48,13 +48,6 @@ default = [ "jemalloc" ]
 jemalloc = [ "tikv-jemallocator" ]
 
 [workspace.dependencies]
-#narwhal-types       = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-types" }
-#narwhal-config      = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-config" }
-#narwhal-crypto      = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-crypto" }
-#narwhal-executor    = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-executor" }
-#narwhal-node        = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-node"}
-#narwhal-worker      = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-worker"}
-
 mysten-network      = { git = "https://github.com/eqlabs/bullshark-bft/", package = "mysten-network", branch = "partial-backports-v3" }
 narwhal-types       = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-types", branch = "partial-backports-v3" }
 narwhal-config      = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-config", branch = "partial-backports-v3" }
@@ -63,15 +56,6 @@ narwhal-executor    = { git = "https://github.com/eqlabs/bullshark-bft/", packag
 narwhal-network     = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-network" ,branch = "partial-backports-v3" }
 narwhal-node        = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-node", branch = "partial-backports-v3" }
 narwhal-worker      = { git = "https://github.com/eqlabs/bullshark-bft/", package = "narwhal-worker", branch = "partial-backports-v3" }
-
-#mysten-network      = { path = "../bullshark-bft/crates/mysten-network" }
-#narwhal-types       = { path = "../bullshark-bft/narwhal/types" }
-#narwhal-config      = { path = "../bullshark-bft/narwhal/config" }
-#narwhal-crypto      = { path = "../bullshark-bft/narwhal/crypto" }
-#narwhal-executor    = { path = "../bullshark-bft/narwhal/executor"}
-#narwhal-network     = { path = "../bullshark-bft/narwhal/network" }
-#narwhal-node        = { path = "../bullshark-bft/narwhal/node" }
-#narwhal-worker      = { path = "../bullshark-bft/narwhal/worker" }
 
 [dependencies.anyhow]
 version = "1.0.70"

@@ -16,15 +16,15 @@ pub mod setup;
 mod state;
 mod validation;
 
-use setup::*;
+
 
 pub use state::{batched_transactions, sort_transactions, BftExecutionState};
 pub use validation::TransactionValidator;
 
 use anyhow::Result;
-use arc_swap::ArcSwap;
-use multiaddr::Protocol;
-use narwhal_config::{Committee, Import, Parameters, WorkerCache};
+
+
+use narwhal_config::{Committee, Parameters, WorkerCache};
 use narwhal_crypto::{KeyPair as NarwhalKeyPair, NetworkKeyPair};
 use narwhal_executor::ExecutionState;
 use narwhal_network::client::NetworkClient;
@@ -35,11 +35,11 @@ use narwhal_node::{
     NodeStorage,
 };
 use narwhal_types::TransactionsClient;
-use std::{net::IpAddr, sync::Arc};
+use std::{sync::Arc};
 use tonic::transport::Channel;
 use tracing::*;
 
-use snarkvm::prelude::{ConsensusStorage, Network};
+
 
 // An instance of BFT consensus that hasn't been started yet.
 pub struct InertConsensusInstance<S: ExecutionState, V: narwhal_worker::TransactionValidator> {
@@ -188,20 +188,7 @@ impl<T: ExecutionState> RunningConsensusInstance<T> {
             Vec::with_capacity(self.worker_cache.workers.values().map(|worker_index| worker_index.0.len()).sum());
         for worker_set in self.worker_cache.workers.values() {
             for worker_info in worker_set.0.values() {
-                // Construct an address usable by the tonic channel based on the worker's tx Multiaddr.
-                // let mut tx_ip = None;
-                // let mut tx_port = None;
-                // for component in &worker_info.transactions {
-                //     match component {
-                //         Protocol::Ip4(ip) => tx_ip = Some(IpAddr::V4(ip)),
-                //         Protocol::Ip6(ip) => tx_ip = Some(IpAddr::V6(ip)),
-                //         Protocol::Tcp(port) => tx_port = Some(port),
-                //         _ => {} // TODO: do we expect other combinations?
-                //     }
-                // }
                 // // TODO: these may be known in advance, but shouldn't be trusted when we switch to a dynamic committee
-                // let tx_ip = tx_ip.unwrap();
-                // let tx_port = tx_port.unwrap();
                 let addr = mysten_network::multiaddr::to_socket_addr(&worker_info.transactions).unwrap();
                 let tx_ip = addr.ip();
                 let tx_port = addr.port();
