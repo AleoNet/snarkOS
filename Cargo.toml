@@ -36,7 +36,9 @@ members = [
 ]
 
 [workspace.dependencies.snarkvm]
-version = "=0.12.5"
+git = "https://github.com/joske/snarkvm"
+branch = "median_timestamp"
+# version = "=0.12.5"
 features = [ "circuit", "console", "rocks" ]
 
 [[bin]]

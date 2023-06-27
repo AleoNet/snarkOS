@@ -33,6 +33,7 @@ use snarkvm::{
     },
 };
 use std::{net::SocketAddr, time::Duration};
+use time::OffsetDateTime;
 use tokio::sync::mpsc;
 use tracing_subscriber::filter::{EnvFilter, LevelFilter};
 use tracing_test::traced_test;
@@ -325,8 +326,10 @@ fn test_ledger_deploy() {
     // Compute a confirmed transactions to reuse later.
     let transactions = consensus.ledger.vm().speculate(sample_finalize_state(1), [transaction.clone()].iter()).unwrap();
 
+    let timestamp = OffsetDateTime::now_utc().unix_timestamp();
     // Propose the next block.
-    let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
+    let next_block = consensus.propose_next_block(&private_key, rng, timestamp).unwrap();
+    assert_eq!(next_block.timestamp(), timestamp);
 
     // Ensure the block is a valid next block.
     consensus.check_next_block(&next_block).unwrap();
@@ -361,8 +364,10 @@ fn test_ledger_execute() {
     let transaction = crate::tests::test_helpers::sample_execution_transaction(rng);
     consensus.add_unconfirmed_transaction(transaction.clone()).unwrap();
 
+    let timestamp = OffsetDateTime::now_utc().unix_timestamp();
     // Propose the next block.
-    let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
+    let next_block = consensus.propose_next_block(&private_key, rng, timestamp).unwrap();
+    assert_eq!(next_block.timestamp(), timestamp);
 
     // Ensure the block is a valid next block.
     consensus.check_next_block(&next_block).unwrap();
@@ -429,8 +434,10 @@ fn test_ledger_execute_many() {
         }
         assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), NUM_GENESIS * (1 << (height - 1)));
 
+        let timestamp = OffsetDateTime::now_utc().unix_timestamp();
         // Propose the next block.
-        let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
+        let next_block = consensus.propose_next_block(&private_key, rng, timestamp).unwrap();
+        assert_eq!(next_block.timestamp(), timestamp);
 
         // Ensure the block is a valid next block.
         consensus.check_next_block(&next_block).unwrap();
@@ -497,7 +504,8 @@ fn test_coinbase_target() {
     consensus.add_unconfirmed_transaction(transaction).unwrap();
 
     // Ensure that the ledger can't create a block that satisfies the coinbase target.
-    let proposed_block = consensus.propose_next_block(&private_key, rng).unwrap();
+    let proposed_block =
+        consensus.propose_next_block(&private_key, rng, OffsetDateTime::now_utc().unix_timestamp()).unwrap();
     // Ensure the block does not contain a coinbase solution.
     assert!(proposed_block.coinbase().is_none());
 
@@ -525,7 +533,10 @@ fn test_coinbase_target() {
     }
 
     // Ensure that the ledger can create a block that satisfies the coinbase target.
-    let proposed_block = consensus.propose_next_block(&private_key, rng).unwrap();
+    let timestamp = OffsetDateTime::now_utc().unix_timestamp();
+    let proposed_block = consensus.propose_next_block(&private_key, rng, timestamp).unwrap();
+    assert_eq!(proposed_block.timestamp(), timestamp);
+
     // Ensure the block contains a coinbase solution.
     assert!(proposed_block.coinbase().is_some());
 }

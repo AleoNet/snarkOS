@@ -130,8 +130,15 @@ impl<N: Network, C: ConsensusStorage<N>> ExecutionState for BftExecutionState<N,
                 return Ok(None);
             }
 
+            // Timestamps are on the batches, not the transactions. We assume every batch contains
+            // at least one valid transaction.
+            let mut timestamps =
+                consensus_output.sub_dag.certificates.iter().map(|cert| cert.metadata.created_at).collect::<Vec<_>>();
+            timestamps.sort();
+            let median: i64 = timestamps[timestamps.len() / 2].try_into().unwrap();
+
             // Propose a new block.
-            let next_block = match consensus.propose_next_block(&private_key, &mut rand::thread_rng()) {
+            let next_block = match consensus.propose_next_block(&private_key, &mut rand::thread_rng(), median) {
                 Ok(block) => block,
                 Err(error) => bail!("Failed to propose the next block: {error}"),
             };

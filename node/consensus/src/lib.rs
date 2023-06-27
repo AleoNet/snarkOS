@@ -123,7 +123,12 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     }
 
     /// Returns a candidate for the next block in the ledger.
-    pub fn propose_next_block<R: Rng + CryptoRng>(&self, private_key: &PrivateKey<N>, rng: &mut R) -> Result<Block<N>> {
+    pub fn propose_next_block<R: Rng + CryptoRng>(
+        &self,
+        private_key: &PrivateKey<N>,
+        rng: &mut R,
+        median_timestamp: i64,
+    ) -> Result<Block<N>> {
         // Retrieve the latest block.
         let latest_block = self.ledger.latest_block();
         // Retrieve the latest height.
@@ -140,7 +145,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             self.memory_pool.candidate_solutions(self, latest_height, latest_proof_target, latest_coinbase_target)?;
 
         // Prepare the next block.
-        self.ledger.prepare_advance_to_next_block(private_key, transactions, prover_solutions, rng)
+        self.ledger.prepare_advance_to_next_block(private_key, transactions, prover_solutions, rng, median_timestamp)
     }
 
     /// Advances the ledger to the next block.

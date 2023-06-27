@@ -318,7 +318,11 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         // Propose the next block.
         let beacon = self.clone();
         let next_block = match tokio::task::spawn_blocking(move || {
-            let next_block = beacon.consensus.propose_next_block(beacon.private_key(), &mut rand::thread_rng())?;
+            let next_block = beacon.consensus.propose_next_block(
+                beacon.private_key(),
+                &mut rand::thread_rng(),
+                OffsetDateTime::now_utc().unix_timestamp(),
+            )?;
 
             // Ensure the block is a valid next block.
             if let Err(error) = beacon.consensus.check_next_block(&next_block) {
