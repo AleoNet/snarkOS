@@ -222,6 +222,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         let bft_execution_state = BftExecutionState::new(
             primary_pub,
             self.router.clone(),
+            self.committee.clone(),
             self.consensus.clone(),
             initial_last_executed_sub_dag_index,
         );

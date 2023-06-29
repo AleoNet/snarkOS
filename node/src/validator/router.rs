@@ -88,7 +88,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         };
 
         // Check the advertised public key exists in the committee.
-        if !self.committee.keys().contains(&&consensus_id.public_key) {
+        if !self.committee.keys().contains(&consensus_id.public_key) {
             return Err(error(format!("'{peer_ip}' is not part of the committee")));
         }
 

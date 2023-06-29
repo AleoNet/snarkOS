@@ -16,30 +16,27 @@ pub mod setup;
 mod state;
 mod validation;
 
-
-
+use snarkvm::{prelude::Network, synthesizer::ConsensusStorage};
 pub use state::{batched_transactions, sort_transactions, BftExecutionState};
 pub use validation::TransactionValidator;
 
 use anyhow::Result;
-
-
-use narwhal_config::{Committee, Parameters, WorkerCache};
+use narwhal_config::{Committee, Import, Parameters, WorkerCache};
 use narwhal_crypto::{KeyPair as NarwhalKeyPair, NetworkKeyPair};
 use narwhal_executor::ExecutionState;
 use narwhal_network::client::NetworkClient;
 use narwhal_node::{
-    // keypair_file::{read_authority_keypair_from_file, read_network_keypair_from_file},
+    keypair_file::{read_authority_keypair_from_file, read_network_keypair_from_file},
     primary_node::PrimaryNode,
     worker_node::WorkerNode,
     NodeStorage,
 };
 use narwhal_types::TransactionsClient;
-use std::{sync::Arc};
+use std::sync::Arc;
 use tonic::transport::Channel;
 use tracing::*;
 
-
+use crate::setup::{primary_storage_dir, worker_storage_dir, workspace_dir};
 
 // An instance of BFT consensus that hasn't been started yet.
 pub struct InertConsensusInstance<S: ExecutionState, V: narwhal_worker::TransactionValidator> {
@@ -57,70 +54,70 @@ pub struct InertConsensusInstance<S: ExecutionState, V: narwhal_worker::Transact
 
 impl<S: ExecutionState + Send + Sync + 'static, V: narwhal_worker::TransactionValidator> InertConsensusInstance<S, V> {
     // Creates a BFT consensus instance based on filesystem configuration.
-    // pub fn load<N: Network, C: ConsensusStorage<N>>(state: S, validator: V, dev: Option<u16>) -> Result<Self> {
-    //     fn dev_subpath(dev: Option<u16>) -> &'static str {
-    //         if dev.is_some() { ".dev/" } else { "" }
-    //     }
+    pub fn load<N: Network, C: ConsensusStorage<N>>(state: S, validator: V, dev: Option<u16>) -> Result<Self> {
+        fn dev_subpath(dev: Option<u16>) -> &'static str {
+            if dev.is_some() { ".dev/" } else { "" }
+        }
 
-    //     // If we're running dev mode, potentially use a different primary ID than 0.
-    //     let primary_id = if let Some(dev_id) = dev { dev_id } else { 0 };
+        // If we're running dev mode, potentially use a different primary ID than 0.
+        let primary_id = if let Some(dev_id) = dev { dev_id } else { 0 };
 
-    //     let base_path = format!("{}/node/bft-consensus/committee/{}", workspace_dir(), dev_subpath(dev));
+        let base_path = format!("{}/node/bft-consensus/committee/{}", workspace_dir(), dev_subpath(dev));
 
-    //     // Load the primary's keys.
-    //     let primary_key_file = format!("{base_path}.primary-{primary_id}-key.json");
-    //     let primary_keypair =
-    //         read_authority_keypair_from_file(primary_key_file).expect("Failed to load the node's primary keypair");
-    //     let primary_network_key_file = format!("{base_path}.primary-{primary_id}-network.json");
-    //     let network_keypair = read_network_keypair_from_file(primary_network_key_file)
-    //         .expect("Failed to load the node's primary network keypair");
+        // Load the primary's keys.
+        let primary_key_file = format!("{base_path}.primary-{primary_id}-key.json");
+        let primary_keypair =
+            read_authority_keypair_from_file(primary_key_file).expect("Failed to load the node's primary keypair");
+        let primary_network_key_file = format!("{base_path}.primary-{primary_id}-network.json");
+        let network_keypair = read_network_keypair_from_file(primary_network_key_file)
+            .expect("Failed to load the node's primary network keypair");
 
-    //     // Load the workers' keys.
-    //     // TODO: extend to multiple workers
-    //     let mut worker_keypairs = vec![];
-    //     for worker_id in 0..1 {
-    //         let worker_key_file = format!("{base_path}.worker-{primary_id}-{worker_id}-network.json");
-    //         let worker_keypair =
-    //             read_network_keypair_from_file(worker_key_file).expect("Failed to load the node's worker keypair");
+        // Load the workers' keys.
+        // TODO: extend to multiple workers
+        let mut worker_keypairs = vec![];
+        for worker_id in 0..1 {
+            let worker_key_file = format!("{base_path}.worker-{primary_id}-{worker_id}-network.json");
+            let worker_keypair =
+                read_network_keypair_from_file(worker_key_file).expect("Failed to load the node's worker keypair");
 
-    //         worker_keypairs.push(worker_keypair);
-    //     }
+            worker_keypairs.push(worker_keypair);
+        }
 
-    //     // Read the shared files describing the committee, workers and parameters.
-    //     let committee_file = format!("{base_path}.committee.json");
-    //     let committee = Committee::import(&committee_file).expect("Failed to load the committee information").into();
-    //     let workers_file = format!("{base_path}.workers.json");
-    //     let worker_cache = WorkerCache::import(&workers_file).expect("Failed to load the worker information").into();
-    //     let parameters_file = format!("{base_path}.parameters.json");
-    //     let parameters = Parameters::import(&parameters_file).expect("Failed to load the node's parameters");
+        // Read the shared files describing the committee, workers and parameters.
+        let committee_file = format!("{base_path}.committee.json");
+        let committee = Committee::import(&committee_file).expect("Failed to load the committee information");
+        let workers_file = format!("{base_path}.workers.json");
+        let worker_cache = WorkerCache::import(&workers_file).expect("Failed to load the worker information");
+        let parameters_file = format!("{base_path}.parameters.json");
+        let parameters = Parameters::import(&parameters_file).expect("Failed to load the node's parameters");
 
-    //     // Create the primary storage instance.
-    //     let primary_store_path = primary_storage_dir(N::ID, dev);
-    //     let primary_store = NodeStorage::reopen(primary_store_path);
+        // Create the primary storage instance.
+        let primary_store_path = primary_storage_dir(N::ID, dev);
+        let primary_store = NodeStorage::reopen(primary_store_path);
 
-    //     // Create the worker storage instance(s).
-    //     // TODO: extend to multiple workers
-    //     let mut worker_stores = vec![];
-    //     for worker_id in 0..1 {
-    //         let mut worker_store_path = worker_storage_dir(N::ID, worker_id, dev);
-    //         worker_store_path.push(format!("worker-{worker_id}"));
-    //         let worker_store = NodeStorage::reopen(worker_store_path);
-    //         worker_stores.push(worker_store);
-    //     }
+        // Create the worker storage instance(s).
+        // TODO: extend to multiple workers
+        let mut worker_stores = vec![];
+        for worker_id in 0..1 {
+            let mut worker_store_path = worker_storage_dir(N::ID, worker_id, dev);
+            worker_store_path.push(format!("worker-{worker_id}"));
+            let worker_store = NodeStorage::reopen(worker_store_path);
+            worker_stores.push(worker_store);
+        }
 
-    //     Ok(Self {
-    //         primary_keypair,
-    //         network_keypair,
-    //         worker_keypairs,
-    //         parameters,
-    //         primary_store,
-    //         worker_stores,
-    //         committee,
-    //         worker_cache,
-    //         state,
-    //         validator,
-    //     })
-    // }
+        Ok(Self {
+            primary_keypair,
+            network_keypair,
+            worker_keypairs,
+            parameters,
+            primary_store,
+            worker_stores,
+            committee,
+            worker_cache,
+            state,
+            validator,
+        })
+    }
 
     /// Start the primary and worker node(s).
     pub async fn start(self) -> Result<RunningConsensusInstance<S>> {
