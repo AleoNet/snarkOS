@@ -32,7 +32,8 @@ members = [
   "node/rest",
   "node/router",
   "node/tcp",
-  ".integration"
+  ".integration",
+  "tx_generator",
 ]
 
 [workspace.dependencies.snarkvm]
