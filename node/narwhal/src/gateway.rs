@@ -24,7 +24,7 @@ use crate::{
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
-use snarkos_node_messages::{Data, DisconnectReason};
+use snarkos_node_messages::DisconnectReason;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
@@ -33,17 +33,12 @@ use snarkos_node_tcp::{
     Tcp,
     P2P,
 };
-use snarkvm::{console::prelude::*, prelude::Address};
+use snarkvm::{console::prelude::*, ledger::narwhal::Data, prelude::Address};
 
 use futures::SinkExt;
+use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
-use std::{
-    collections::{HashMap, HashSet},
-    future::Future,
-    io,
-    net::SocketAddr,
-    sync::Arc,
-};
+use std::{future::Future, io, net::SocketAddr, sync::Arc};
 use tokio::{
     net::TcpStream,
     sync::{oneshot, OnceCell},
@@ -59,18 +54,18 @@ pub struct Gateway<N: Network> {
     /// The account of the node.
     account: Account<N>,
     /// The worker senders.
-    worker_senders: Arc<OnceCell<HashMap<u8, WorkerSender<N>>>>,
+    worker_senders: Arc<OnceCell<IndexMap<u8, WorkerSender<N>>>>,
     /// The TCP stack.
     tcp: Tcp,
     /// The resolver.
     resolver: Arc<Resolver>,
     /// The map of connected peer IPs to their peer handlers.
-    connected_peers: Arc<RwLock<HashSet<SocketAddr>>>,
+    connected_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of handshaking peers. While `Tcp` already recognizes the connecting IP addresses
     /// and prevents duplicate outbound connection attempts to the same IP address, it is unable to
     /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
     /// attempt to connect to each other). This set is used to prevent this from happening.
-    connecting_peers: Arc<Mutex<HashSet<SocketAddr>>>,
+    connecting_peers: Arc<Mutex<IndexSet<SocketAddr>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -99,7 +94,7 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Run the gateway.
-    pub async fn run(&mut self, worker_senders: HashMap<u8, WorkerSender<N>>) -> Result<()> {
+    pub async fn run(&mut self, worker_senders: IndexMap<u8, WorkerSender<N>>) -> Result<()> {
         debug!("Starting the gateway for the memory pool...");
 
         // Set the worker senders.
@@ -174,7 +169,7 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Returns the list of connected peers.
-    pub fn connected_peers(&self) -> &RwLock<HashSet<SocketAddr>> {
+    pub fn connected_peers(&self) -> &RwLock<IndexSet<SocketAddr>> {
         &self.connected_peers
     }
 
@@ -195,7 +190,7 @@ impl<N: Network> Gateway<N> {
                 Ok(()) => (),
                 // If the connection was not allowed, log the error.
                 Err(error) => {
-                    gateway.connecting_peers.lock().remove(&peer_ip);
+                    gateway.connecting_peers.lock().shift_remove(&peer_ip);
                     warn!("Unable to connect to '{peer_ip}' - {error}")
                 }
             }
@@ -280,7 +275,7 @@ impl<N: Network> Gateway<N> {
         // // Removes the peer from the sync pool.
         // self.sync.remove_peer(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
-        self.connected_peers.write().remove(&peer_ip);
+        self.connected_peers.write().shift_remove(&peer_ip);
         // Remove this peer from the shared state.
         self.shared.remove_peer(&peer_ip);
         // // Add the peer to the candidate peers.
@@ -543,7 +538,7 @@ impl<N: Network> Handshake for Gateway<N> {
 
         // Remove the address from the collection of connecting peers (if the handshake got to the point where it's known).
         if let Some(ip) = peer_ip {
-            self.connecting_peers.lock().remove(&ip);
+            self.connecting_peers.lock().shift_remove(&ip);
         }
 
         // If the handshake succeeded, announce it.

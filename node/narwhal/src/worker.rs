@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{Pending, Ready, Transmission, TransmissionID, WorkerReceiver},
+    helpers::{Pending, Ready, WorkerReceiver},
     Event,
     Gateway,
     TransmissionRequest,
@@ -22,17 +22,18 @@ use crate::{
     MAX_WORKERS,
     WORKER_PING_INTERVAL,
 };
-use snarkos_node_messages::Data;
 use snarkvm::{
     console::prelude::*,
+    ledger::narwhal::{Data, Transmission, TransmissionID},
     prelude::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
     },
 };
 
+use indexmap::IndexMap;
 use parking_lot::Mutex;
-use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc};
+use std::{future::Future, net::SocketAddr, sync::Arc};
 use tokio::task::JoinHandle;
 
 fn fmt_id(id: String) -> String {
@@ -82,7 +83,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Drains the ready queue.
-    pub(crate) fn drain(&self) -> HashMap<TransmissionID<N>, Data<Transmission<N>>> {
+    pub(crate) fn drain(&self) -> IndexMap<TransmissionID<N>, Transmission<N>> {
         self.ready.drain()
     }
 }
@@ -158,7 +159,7 @@ impl<N: Network> Worker<N> {
         &self,
         peer_ip: SocketAddr,
         transmission_id: TransmissionID<N>,
-        transmission: Data<Transmission<N>>,
+        transmission: Transmission<N>,
     ) {
         // Construct the transmission response.
         let transmission_response = TransmissionResponse::new(transmission_id, transmission);
@@ -240,7 +241,7 @@ impl<N: Network> Worker<N> {
         // Remove the puzzle commitment from the pending queue.
         self.pending.remove(puzzle_commitment);
         // Adds the prover solution to the ready queue.
-        self.ready.insert(puzzle_commitment, prover_solution.into())?;
+        self.ready.insert(puzzle_commitment, Transmission::Solution(prover_solution))?;
         debug!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment.to_string()));
         Ok(())
     }
@@ -255,7 +256,7 @@ impl<N: Network> Worker<N> {
         // Remove the transaction from the pending queue.
         self.pending.remove(&transaction_id);
         // Adds the transaction to the ready queue.
-        self.ready.insert(&transaction_id, transaction.into())?;
+        self.ready.insert(&transaction_id, Transmission::Transaction(transaction))?;
         debug!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id.to_string()));
         Ok(())
     }

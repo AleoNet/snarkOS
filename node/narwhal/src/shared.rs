@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::{Batch, BatchCertificate, PrimarySender, SealedBatch};
-use snarkvm::console::{prelude::*, types::Address};
+use crate::helpers::PrimarySender;
+use snarkvm::{
+    console::{prelude::*, types::Address},
+    ledger::narwhal::{Batch, BatchCertificate},
+};
 
+use indexmap::IndexSet;
 use parking_lot::RwLock;
 use std::{
     collections::HashMap,
@@ -25,6 +29,32 @@ use std::{
     },
 };
 use tokio::sync::OnceCell;
+
+/// TODO (howardwu): Move this into snarkVM, or alternatively, delete this.
+#[derive(Clone, Debug)]
+pub struct SealedBatch<N: Network> {
+    /// The batch.
+    batch: Batch<N>,
+    /// The batch certificate.
+    certificate: BatchCertificate<N>,
+}
+
+impl<N: Network> SealedBatch<N> {
+    /// Initializes a new sealed batch.
+    pub fn new(batch: Batch<N>, certificate: BatchCertificate<N>) -> Self {
+        Self { batch, certificate }
+    }
+
+    /// Returns the batch.
+    pub const fn batch(&self) -> &Batch<N> {
+        &self.batch
+    }
+
+    /// Returns the batch certificate.
+    pub const fn certificate(&self) -> &BatchCertificate<N> {
+        &self.certificate
+    }
+}
 
 pub struct Shared<N: Network> {
     /// A map of `address` to `stake`.
@@ -90,7 +120,7 @@ impl<N: Network> Shared<N> {
             return;
         };
         // Ensure the batch IDs match.
-        if batch.batch_id() != certificate.batch_id {
+        if batch.batch_id() != certificate.batch_id() {
             warn!("Batch ID mismatch for the batch from peer '{peer_ip}'");
             return;
         }
@@ -139,7 +169,7 @@ impl<N: Network> Shared<N> {
     }
 
     /// Returns the previous batch certificates for the given round.
-    pub fn previous_certificates(&self, round: u64) -> Option<Vec<BatchCertificate<N>>> {
+    pub fn previous_certificates(&self, round: u64) -> Option<IndexSet<BatchCertificate<N>>> {
         // The genesis round does not require batch certificates.
         if round == 0 {
             return None;
@@ -150,9 +180,9 @@ impl<N: Network> Shared<N> {
             return None;
         };
         // Retrieve the certificates.
-        let mut certificates = Vec::new();
+        let mut certificates = IndexSet::new();
         for batch in batches.values() {
-            certificates.push(batch.certificate().clone());
+            certificates.insert(batch.certificate().clone());
         }
         // Return the certificates.
         Some(certificates)

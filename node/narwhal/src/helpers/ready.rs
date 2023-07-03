@@ -12,17 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::{to_target, Transmission, TransmissionID};
-use snarkos_node_messages::Data;
-use snarkvm::console::prelude::*;
+use crate::helpers::to_target;
+use snarkvm::{
+    console::prelude::*,
+    ledger::narwhal::{Transmission, TransmissionID},
+};
 
+use indexmap::IndexMap;
 use parking_lot::RwLock;
-use std::{collections::HashMap, sync::Arc};
+use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct Ready<N: Network> {
     /// The map of `transmission IDs` to `transmissions`.
-    transmissions: Arc<RwLock<HashMap<TransmissionID<N>, Data<Transmission<N>>>>>,
+    transmissions: Arc<RwLock<IndexMap<TransmissionID<N>, Transmission<N>>>>,
     /// The cumulative proof target in the ready queue.
     cumulative_proof_target: Arc<RwLock<u128>>,
 }
@@ -41,7 +44,7 @@ impl<N: Network> Ready<N> {
     }
 
     /// Returns the transmissions.
-    pub const fn transmissions(&self) -> &Arc<RwLock<HashMap<TransmissionID<N>, Data<Transmission<N>>>>> {
+    pub const fn transmissions(&self) -> &Arc<RwLock<IndexMap<TransmissionID<N>, Transmission<N>>>> {
         &self.transmissions
     }
 
@@ -66,16 +69,12 @@ impl<N: Network> Ready<N> {
     }
 
     /// Returns the transmission, given the specified `transmission ID`.
-    pub fn get(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<Data<Transmission<N>>> {
+    pub fn get(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<Transmission<N>> {
         self.transmissions.read().get(&transmission_id.into()).cloned()
     }
 
     /// Inserts the specified (`transmission ID`, `transmission`) to the ready queue.
-    pub fn insert(
-        &self,
-        transmission_id: impl Into<TransmissionID<N>>,
-        transmission: Data<Transmission<N>>,
-    ) -> Result<()> {
+    pub fn insert(&self, transmission_id: impl Into<TransmissionID<N>>, transmission: Transmission<N>) -> Result<()> {
         let transmission_id = transmission_id.into();
         // Check if the transmission ID is for a prover solution.
         if let TransmissionID::Solution(commitment) = &transmission_id {
@@ -105,13 +104,17 @@ impl<N: Network> Ready<N> {
     }
 
     /// Removes the transmissions and returns them.
-    pub fn drain(&self) -> HashMap<TransmissionID<N>, Data<Transmission<N>>> {
+    pub fn drain(&self) -> IndexMap<TransmissionID<N>, Transmission<N>> {
         // Acquire the write locks (simultaneously).
         let mut cumulative_proof_target = self.cumulative_proof_target.write();
         let mut transmissions = self.transmissions.write();
         // Reset the cumulative proof target.
         *cumulative_proof_target = 0;
-        // Drain the transmissions.
-        transmissions.drain().map(|(k, v)| (k, v)).collect()
+        // Save the transmissions.
+        let result = transmissions.clone();
+        // Reset the transmissions.
+        transmissions.clear();
+        // Return the transmissions.
+        result
     }
 }

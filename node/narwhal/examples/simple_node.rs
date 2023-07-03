@@ -16,19 +16,21 @@
 extern crate tracing;
 
 use snarkos_account::Account;
-use snarkos_node_messages::Data;
 use snarkos_node_narwhal::{
     helpers::{init_primary_channels, PrimarySender},
     Primary,
     Shared,
     MEMORY_POOL_PORT,
 };
-use snarkvm::prelude::{
-    block::Transaction,
-    coinbase::{ProverSolution, PuzzleCommitment},
-    Field,
-    Network,
-    Uniform,
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+        Field,
+        Network,
+        Uniform,
+    },
 };
 
 use ::bytes::Bytes;

@@ -18,12 +18,13 @@ use super::*;
 pub struct BatchSignature<N: Network> {
     pub batch_id: Field<N>,
     pub signature: Signature<N>,
+    pub timestamp: i64,
 }
 
 impl<N: Network> BatchSignature<N> {
     /// Initializes a new batch signature event.
-    pub fn new(batch_id: Field<N>, signature: Signature<N>) -> Self {
-        Self { batch_id, signature }
+    pub fn new(batch_id: Field<N>, signature: Signature<N>, timestamp: i64) -> Self {
+        Self { batch_id, signature, timestamp }
     }
 }
 
@@ -39,6 +40,7 @@ impl<N: Network> EventTrait for BatchSignature<N> {
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
         writer.write_all(&self.batch_id.to_bytes_le()?)?;
         writer.write_all(&self.signature.to_bytes_le()?)?;
+        writer.write_all(&self.timestamp.to_bytes_le()?)?;
         Ok(())
     }
 
@@ -46,6 +48,10 @@ impl<N: Network> EventTrait for BatchSignature<N> {
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
-        Ok(Self { batch_id: Field::read_le(&mut reader)?, signature: Signature::read_le(&mut reader)? })
+        Ok(Self {
+            batch_id: Field::read_le(&mut reader)?,
+            signature: Signature::read_le(&mut reader)?,
+            timestamp: i64::read_le(&mut reader)?,
+        })
     }
 }

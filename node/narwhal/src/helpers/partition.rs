@@ -12,8 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::TransmissionID;
-use snarkvm::prelude::{Network, ToBytes};
+use snarkvm::{
+    ledger::narwhal::TransmissionID,
+    prelude::{Network, ToBytes},
+};
 
 use anyhow::Result;
 use sha2::{Digest, Sha256};

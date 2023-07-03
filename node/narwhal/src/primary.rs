@@ -13,29 +13,28 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{assign_to_worker, init_worker_channels, Batch, PrimaryReceiver, PrimarySender},
+    helpers::{assign_to_worker, init_worker_channels, PrimaryReceiver, PrimarySender},
     BatchPropose,
     BatchSealed,
     BatchSignature,
     Event,
     Gateway,
+    SealedBatch,
     Shared,
     Worker,
     MAX_WORKERS,
 };
 use snarkos_account::Account;
-use snarkos_node_messages::Data;
 use snarkvm::{
     console::prelude::*,
-    prelude::{
-        block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
-        Signature,
-    },
+    ledger::narwhal::{Batch, BatchCertificate, Data},
+    prelude::{Field, Signature},
 };
 
+use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashMap, future::Future, net::SocketAddr, sync::Arc};
+use std::{future::Future, net::SocketAddr, sync::Arc};
+use time::OffsetDateTime;
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
@@ -47,7 +46,7 @@ pub struct Primary<N: Network> {
     /// The workers.
     workers: Arc<RwLock<Vec<Worker<N>>>>,
     /// The currently-proposed batch, along with its signatures.
-    proposed_batch: Arc<RwLock<Option<(Batch<N>, Vec<Signature<N>>)>>>,
+    proposed_batch: Arc<RwLock<Option<(Batch<N>, IndexMap<Signature<N>, i64>)>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -85,7 +84,7 @@ impl<N: Network> Primary<N> {
         self.shared.set_primary_sender(sender);
 
         // Construct a map of the worker senders.
-        let mut tx_workers = HashMap::new();
+        let mut tx_workers = IndexMap::new();
 
         // Initialize the workers.
         for _ in 0..MAX_WORKERS {
@@ -124,7 +123,7 @@ impl<N: Network> Primary<N> {
         let mut rng = rand::thread_rng();
 
         // Initialize a map of the transmissions.
-        let mut transmissions = HashMap::new();
+        let mut transmissions = IndexMap::new();
         // Drain the workers.
         for worker in self.workers.read().iter() {
             // TODO (howardwu): Perform one final filter against the ledger service.
@@ -141,7 +140,7 @@ impl<N: Network> Primary<N> {
             Batch::new(self.gateway.account().private_key(), round, transmissions, previous_certificates, &mut rng)?;
 
         // Set the proposed batch.
-        *self.proposed_batch.write() = Some((batch.clone(), vec![]));
+        *self.proposed_batch.write() = Some((batch.clone(), Default::default()));
 
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(BatchPropose::new(Data::Object(batch))));
@@ -298,21 +297,30 @@ impl<N: Network> Primary<N> {
                 if is_ready {
                     // Retrieve the batch and signatures, clearing the proposed batch.
                     let (batch, signatures) = self_clone.proposed_batch.write().take().unwrap();
-                    // Seal the batch.
-                    let sealed_batch = batch.seal(signatures);
-                    // Fetch the certificate.
-                    let certificate = sealed_batch.certificate().clone();
-                    // Fetch the address.
-                    let address = self_clone.gateway.account().address();
-                    // Store the sealed batch in the shared state.
-                    self_clone.shared.store_sealed_batch_from_primary(address, sealed_batch);
+                    // Compute the batch header.
+                    if let Ok(header) = batch.to_header() {
+                        // Create the batch certificate.
+                        if let Ok(certificate) = BatchCertificate::from(header, signatures) {
+                            // Seal the batch.
+                            let sealed_batch = SealedBatch::new(batch, certificate.clone());
 
-                    // Create a batch sealed event.
-                    let event = BatchSealed::new(Data::Object(certificate));
-                    // Broadcast the sealed batch to all validators.
-                    self_clone.gateway.broadcast(Event::BatchSealed(event));
-                    // TODO: Increment the round.
-                    info!("\n\n\n\nA batch has been sealed!\n\n\n");
+                            // Fetch the address.
+                            let address = self_clone.gateway.account().address();
+                            // Store the sealed batch in the shared state.
+                            self_clone.shared.store_sealed_batch_from_primary(address, sealed_batch);
+
+                            // Create a batch sealed event.
+                            let event = BatchSealed::new(Data::Object(certificate));
+                            // Broadcast the sealed batch to all validators.
+                            self_clone.gateway.broadcast(Event::BatchSealed(event));
+                            // TODO: Increment the round.
+                            info!("\n\n\n\nA batch has been sealed!\n\n\n");
+                        } else {
+                            // TODO (howardwu): Figure out how to handle a failed certificate.
+                        }
+                    } else {
+                        // TODO (howardwu): Figure out how to handle a failed header.
+                    }
                 }
 
                 // Sleep briefly.
@@ -335,10 +343,12 @@ impl<N: Network> Primary<N> {
 
         // Initialize an RNG.
         let rng = &mut rand::thread_rng();
+        // Generate a timestamp.
+        let timestamp = OffsetDateTime::now_utc().unix_timestamp();
         // Sign the batch ID.
-        let signature = self.gateway.account().sign(&[batch.batch_id()], rng)?;
+        let signature = self.gateway.account().sign(&[batch.batch_id(), Field::from_u64(timestamp as u64)], rng)?;
         // Broadcast the signature back to the validator.
-        self.gateway.send(peer_ip, Event::BatchSignature(BatchSignature::new(batch.batch_id(), signature)));
+        self.gateway.send(peer_ip, Event::BatchSignature(BatchSignature::new(batch.batch_id(), signature, timestamp)));
         Ok(())
     }
 
@@ -349,7 +359,7 @@ impl<N: Network> Primary<N> {
         batch_signature: BatchSignature<N>,
     ) -> Result<()> {
         // Retrieve the batch ID and signature.
-        let BatchSignature { batch_id, signature } = batch_signature;
+        let BatchSignature { batch_id, signature, timestamp } = batch_signature;
 
         // Ensure the batch ID matches the currently proposed batch.
         if Some(batch_id) != self.proposed_batch.read().as_ref().map(|(batch, _)| batch.batch_id()) {
@@ -367,7 +377,7 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
         // Verify the signature.
-        if !signature.verify(&address, &[batch_id]) {
+        if !signature.verify(&address, &[batch_id, Field::from_u64(timestamp as u64)]) {
             warn!("Received an invalid batch signature from peer '{peer_ip}'");
             return Ok(());
         }
@@ -375,7 +385,7 @@ impl<N: Network> Primary<N> {
         // Add the signature to the batch.
         if let Some((_, signatures)) = self.proposed_batch.write().as_mut() {
             info!("Added a batch signature from peer '{peer_ip}'");
-            signatures.push(signature);
+            signatures.insert(signature, timestamp);
         }
         Ok(())
     }

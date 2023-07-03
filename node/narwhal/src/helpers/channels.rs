@@ -12,16 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{
-    helpers::{BatchCertificate, TransmissionID},
-    BatchPropose,
-    BatchSignature,
-    TransmissionRequest,
-    TransmissionResponse,
-};
-use snarkos_node_messages::Data;
+use crate::{BatchPropose, BatchSignature, TransmissionRequest, TransmissionResponse};
 use snarkvm::{
     console::network::*,
+    ledger::narwhal::{BatchCertificate, Data, TransmissionID},
     prelude::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},

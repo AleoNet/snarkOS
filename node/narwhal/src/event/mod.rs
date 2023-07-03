@@ -39,16 +39,15 @@ pub use transmission_response::TransmissionResponse;
 mod worker_ping;
 pub use worker_ping::WorkerPing;
 
-use crate::helpers::{Batch, BatchCertificate, Transmission, TransmissionID};
-use snarkos_node_messages::{Data, DisconnectReason};
+use snarkos_node_messages::DisconnectReason;
 use snarkvm::{
     console::prelude::{FromBytes, Network, ToBytes},
+    ledger::narwhal::{Batch, BatchCertificate, Data, Transmission, TransmissionID},
     prelude::{Address, Field, Signature},
 };
 
 use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
-use serde::{Deserialize, Serialize};
 use std::{
     fmt,
     fmt::{Display, Formatter},

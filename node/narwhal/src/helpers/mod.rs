@@ -12,12 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod batch;
-pub use batch::*;
-
-mod batch_certificate;
-pub use batch_certificate::*;
-
 mod channels;
 pub use channels::*;
 
@@ -38,9 +32,3 @@ pub use resolver::*;
 
 mod target;
 pub use target::*;
-
-mod transmission;
-pub use transmission::*;
-
-mod transmission_id;
-pub use transmission_id::*;

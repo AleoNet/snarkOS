@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::TransmissionID;
-use snarkvm::console::prelude::*;
+use snarkvm::{console::prelude::*, ledger::narwhal::TransmissionID};
 
 use parking_lot::RwLock;
 use std::{

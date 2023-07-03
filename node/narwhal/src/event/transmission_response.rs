@@ -17,12 +17,12 @@ use super::*;
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct TransmissionResponse<N: Network> {
     pub transmission_id: TransmissionID<N>,
-    pub transmission: Data<Transmission<N>>,
+    pub transmission: Transmission<N>,
 }
 
 impl<N: Network> TransmissionResponse<N> {
     /// Initializes a new transmission response event.
-    pub fn new(transmission_id: TransmissionID<N>, transmission: Data<Transmission<N>>) -> Self {
+    pub fn new(transmission_id: TransmissionID<N>, transmission: Transmission<N>) -> Self {
         Self { transmission_id, transmission }
     }
 }
@@ -38,7 +38,8 @@ impl<N: Network> EventTrait for TransmissionResponse<N> {
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
         writer.write_all(&self.transmission_id.to_bytes_le()?)?;
-        self.transmission.serialize_blocking_into(writer)
+        writer.write_all(&self.transmission.to_bytes_le()?)?;
+        Ok(())
     }
 
     /// Deserializes the given buffer into an event.
@@ -47,7 +48,7 @@ impl<N: Network> EventTrait for TransmissionResponse<N> {
         let mut reader = bytes.reader();
 
         let transmission_id = TransmissionID::read_le(&mut reader)?;
-        let transmission = Data::Buffer(reader.into_inner().freeze());
+        let transmission = Transmission::read_le(&mut reader)?;
 
         Ok(Self { transmission_id, transmission })
     }
