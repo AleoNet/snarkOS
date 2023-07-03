@@ -19,6 +19,7 @@ use crate::{
     TransmissionRequest,
     TransmissionResponse,
     WorkerPing,
+    MAX_REQUESTS_PER_TRANSMISSION,
     MAX_WORKERS,
     WORKER_PING_INTERVAL,
 };
@@ -78,17 +79,17 @@ impl<N: Network> Worker<N> {
         })
     }
 
-    /// Returns the worker ID.
-    pub const fn id(&self) -> u8 {
-        self.id
-    }
-
     /// Run the worker instance.
     pub async fn run(&mut self, receiver: WorkerReceiver<N>) -> Result<(), Error> {
         info!("Starting worker instance {} of the memory pool...", self.id);
         // Start the worker handlers.
         self.start_handlers(receiver);
         Ok(())
+    }
+
+    /// Returns the worker ID.
+    pub const fn id(&self) -> u8 {
+        self.id
     }
 
     /// Drains the ready queue.
@@ -98,10 +99,100 @@ impl<N: Network> Worker<N> {
 }
 
 impl<N: Network> Worker<N> {
+    /// Handles the incoming ping event.
+    async fn process_worker_ping(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
+        // Check if the transmission ID exists in the ready queue or in storage.
+        if self.ready.contains(transmission_id) || self.storage.contains(transmission_id) {
+            return;
+        }
+        // Check if the transmission ID already exists in the ledger.
+        // TODO (howardwu): Add a ledger service.
+
+        // Retrieve the peer IPs that we have requested this transmission ID from.
+        let peer_ips = self.pending.get(transmission_id).unwrap_or_default();
+
+        // Check if the number of requests is within the limit, and we have not requested from this peer IP.
+        if peer_ips.len() < MAX_REQUESTS_PER_TRANSMISSION && peer_ips.contains(&peer_ip) {
+            trace!(
+                "Worker {} - Found a new transmission ID '{}' from peer '{peer_ip}'",
+                self.id,
+                fmt_id(transmission_id.to_string())
+            );
+            // Insert the transmission ID into the pending queue.
+            self.pending.insert(transmission_id, peer_ip);
+            // TODO (howardwu): Limit the number of open requests we send to a peer.
+            // Send an transmission request to the peer.
+            self.send_transmission_request(peer_ip, transmission_id).await;
+        }
+    }
+
+    /// Handles the incoming transmission request.
+    async fn process_transmission_request(&self, peer_ip: SocketAddr, request: TransmissionRequest<N>) {
+        // Check if the transmission ID exists in the ready queue.
+        if let Some(transmission) = self.storage.get(request.transmission_id) {
+            // Send the transmission response to the peer.
+            self.send_transmission_response(peer_ip, request.transmission_id, transmission).await;
+        }
+    }
+
+    /// Handles the incoming transmission response.
+    async fn process_transmission_response(
+        &self,
+        peer_ip: SocketAddr,
+        response: TransmissionResponse<N>,
+    ) -> Result<()> {
+        // Check if the peer IP exists in the pending queue for the given transmission ID.
+        if self.pending.get(response.transmission_id).unwrap_or_default().contains(&peer_ip) {
+            // Remove the transmission ID from the pending queue.
+            if self.pending.remove(response.transmission_id) {
+                // TODO: Validate the transmission.
+                // Insert the transmission into the ready queue.
+                self.ready.insert(response.transmission_id, response.transmission)?;
+                debug!(
+                    "Worker {} - Added transmission '{}' from peer '{peer_ip}'",
+                    self.id,
+                    fmt_id(response.transmission_id.to_string())
+                );
+            }
+        }
+        Ok(())
+    }
+
+    /// Handles the incoming unconfirmed solution.
+    /// Note: This method assumes the incoming solution is valid and does not exist in the ledger.
+    pub(crate) async fn process_unconfirmed_solution(
+        &self,
+        puzzle_commitment: PuzzleCommitment<N>,
+        prover_solution: Data<ProverSolution<N>>,
+    ) -> Result<()> {
+        // Remove the puzzle commitment from the pending queue.
+        self.pending.remove(puzzle_commitment);
+        // Adds the prover solution to the ready queue.
+        self.ready.insert(puzzle_commitment, Transmission::Solution(prover_solution))?;
+        debug!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment.to_string()));
+        Ok(())
+    }
+
+    /// Handles the incoming unconfirmed transaction.
+    /// Note: This method assumes the incoming transaction is valid and does not exist in the ledger.
+    pub(crate) async fn process_unconfirmed_transaction(
+        &self,
+        transaction_id: N::TransactionID,
+        transaction: Data<Transaction<N>>,
+    ) -> Result<()> {
+        // Remove the transaction from the pending queue.
+        self.pending.remove(&transaction_id);
+        // Adds the transaction to the ready queue.
+        self.ready.insert(&transaction_id, Transmission::Transaction(transaction))?;
+        debug!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id.to_string()));
+        Ok(())
+    }
+}
+
+impl<N: Network> Worker<N> {
     /// Starts the worker handlers.
     fn start_handlers(&self, receiver: WorkerReceiver<N>) {
-        let WorkerReceiver { rx_worker_ping: mut rx_ping, mut rx_transmission_request, mut rx_transmission_response } =
-            receiver;
+        let WorkerReceiver { mut rx_worker_ping, mut rx_transmission_request, mut rx_transmission_response } = receiver;
 
         // Broadcast a ping event periodically.
         let self_clone = self.clone();
@@ -117,7 +208,7 @@ impl<N: Network> Worker<N> {
         // Process the ping events.
         let self_clone = self.clone();
         self.spawn(async move {
-            while let Some((peer_ip, transmission_id)) = rx_ping.recv().await {
+            while let Some((peer_ip, transmission_id)) = rx_worker_ping.recv().await {
                 // Process the ping event.
                 self_clone.process_worker_ping(peer_ip, transmission_id).await;
             }
@@ -174,100 +265,6 @@ impl<N: Network> Worker<N> {
         let transmission_response = TransmissionResponse::new(transmission_id, transmission);
         // Send the transmission response to the peer.
         self.gateway.send(peer_ip, Event::TransmissionResponse(transmission_response));
-    }
-
-    /// Handles the incoming ping event.
-    async fn process_worker_ping(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
-        // Check if the transmission ID exists in the ready queue.
-        if self.ready.contains(transmission_id) {
-            return;
-        }
-        // Check if the transmission ID already exists in the ledger.
-        // TODO (howardwu): Add a ledger service.
-        // Check if the transmission ID exists in the pending queue.
-        if !self.pending.contains(transmission_id) {
-            // TODO (howardwu): Limit the number of open requests we send to a peer.
-            // Send an transmission request to the peer.
-            self.send_transmission_request(peer_ip, transmission_id).await;
-        }
-        // Check if the transmission ID exists in the pending queue for the specified peer IP.
-        if !self.pending.contains_peer(transmission_id, peer_ip) {
-            trace!(
-                "Worker {} - Found new transmission ID '{}' from peer '{peer_ip}'",
-                self.id,
-                fmt_id(transmission_id.to_string())
-            );
-            // Insert the transmission ID into the pending queue.
-            self.pending.insert(transmission_id, peer_ip);
-        }
-    }
-
-    /// Handles the incoming transmission request.
-    async fn process_transmission_request(&self, peer_ip: SocketAddr, request: TransmissionRequest<N>) {
-        // Check if the transmission ID exists in the ready queue.
-        if let Some(transmission) = self.ready.get(request.transmission_id) {
-            // Send the transmission response to the peer.
-            self.send_transmission_response(peer_ip, request.transmission_id, transmission).await;
-        }
-    }
-
-    /// Handles the incoming transmission response.
-    async fn process_transmission_response(
-        &self,
-        peer_ip: SocketAddr,
-        response: TransmissionResponse<N>,
-    ) -> Result<()> {
-        let transmission_id = response.transmission_id;
-        // Check if the transmission ID exists in the pending queue.
-        if let Some(peer_ips) = self.pending.get(transmission_id) {
-            // Check if the peer IP exists in the pending queue.
-            if peer_ips.contains(&peer_ip) {
-                // // Deserialize the transmission.
-                // let transmission = response.transmission.deserialize().await?;
-                // TODO: Validate the transmission.
-
-                // Remove the peer IP from the pending queue.
-                self.pending.remove(transmission_id);
-                // Insert the transmission into the ready queue.
-                self.ready.insert(transmission_id, response.transmission)?;
-                debug!(
-                    "Worker {} - Added transmission '{}' from peer '{peer_ip}'",
-                    self.id,
-                    fmt_id(transmission_id.to_string())
-                );
-            }
-        }
-        Ok(())
-    }
-
-    /// Handles the incoming unconfirmed solution.
-    /// Note: This method assumes the incoming solution is valid and does not exist in the ledger.
-    pub(crate) async fn process_unconfirmed_solution(
-        &self,
-        puzzle_commitment: PuzzleCommitment<N>,
-        prover_solution: Data<ProverSolution<N>>,
-    ) -> Result<()> {
-        // Remove the puzzle commitment from the pending queue.
-        self.pending.remove(puzzle_commitment);
-        // Adds the prover solution to the ready queue.
-        self.ready.insert(puzzle_commitment, Transmission::Solution(prover_solution))?;
-        debug!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment.to_string()));
-        Ok(())
-    }
-
-    /// Handles the incoming unconfirmed transaction.
-    /// Note: This method assumes the incoming transaction is valid and does not exist in the ledger.
-    pub(crate) async fn process_unconfirmed_transaction(
-        &self,
-        transaction_id: N::TransactionID,
-        transaction: Data<Transaction<N>>,
-    ) -> Result<()> {
-        // Remove the transaction from the pending queue.
-        self.pending.remove(&transaction_id);
-        // Adds the transaction to the ready queue.
-        self.ready.insert(&transaction_id, Transmission::Transaction(transaction))?;
-        debug!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id.to_string()));
-        Ok(())
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.

@@ -37,10 +37,17 @@ mod worker;
 pub use worker::*;
 
 pub const CONTEXT: &str = "[MemoryPool]";
+
+/// The maximum number of nodes that can be in a committee.
 pub const MAX_COMMITTEE_SIZE: u16 = 128;
+/// The maximum number of requests that can be made to retrieve a transmission.
+pub const MAX_REQUESTS_PER_TRANSMISSION: usize = 5;
+/// The maximum number of workers that can be spawned.
 pub const MAX_WORKERS: u8 = 5;
+/// The port on which the memory pool listens for incoming connections.
 pub const MEMORY_POOL_PORT: u16 = 5000;
-pub const WORKER_PING_INTERVAL: u64 = 200; // ms
+/// The frequency at which each worker broadcasts a ping to every other node.
+pub const WORKER_PING_INTERVAL: u64 = 5000; // ms
 
 // TODO (howardwu): Switch the worker's `TransmissionID` to use or include a sha256/blake2s hash.
 // TODO (howardwu): Implement sha256/blake2s hashing on `Data::Bytes`, so we can compare IDs without deserializing.

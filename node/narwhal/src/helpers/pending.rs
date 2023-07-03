@@ -67,7 +67,9 @@ impl<N: Network> Pending<N> {
     }
 
     /// Removes the specified `transmission ID` from the pending queue.
-    pub fn remove(&self, transmission_id: impl Into<TransmissionID<N>>) {
-        self.transmissions.write().remove(&transmission_id.into());
+    /// If the `transmission ID` exists and is removed, `true` is returned.
+    /// If the `transmission ID` does not exist, `false` is returned.
+    pub fn remove(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
+        self.transmissions.write().remove(&transmission_id.into()).is_some()
     }
 }
