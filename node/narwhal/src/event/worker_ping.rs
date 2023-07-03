@@ -16,13 +16,13 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WorkerPing<N: Network> {
-    pub batch: Vec<TransmissionID<N>>,
+    pub transmission_ids: IndexSet<TransmissionID<N>>,
 }
 
 impl<N: Network> WorkerPing<N> {
     /// Initializes a new ping event.
-    pub fn new(batch: Vec<TransmissionID<N>>) -> Self {
-        Self { batch }
+    pub fn new(transmission_ids: IndexSet<TransmissionID<N>>) -> Self {
+        Self { transmission_ids }
     }
 }
 
@@ -36,8 +36,10 @@ impl<N: Network> EventTrait for WorkerPing<N> {
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&(self.batch.len() as u32).to_bytes_le()?)?;
-        writer.write_all(&self.batch.to_bytes_le()?)?;
+        writer.write_all(&(self.transmission_ids.len() as u32).to_bytes_le()?)?;
+        for transmission_id in &self.transmission_ids {
+            writer.write_all(&transmission_id.to_bytes_le()?)?;
+        }
         Ok(())
     }
 
@@ -47,11 +49,11 @@ impl<N: Network> EventTrait for WorkerPing<N> {
         let mut reader = bytes.reader();
 
         let num_transmissions = u32::read_le(&mut reader)?;
-        let mut batch = Vec::with_capacity(num_transmissions as usize);
+        let mut transmission_ids = IndexSet::with_capacity(num_transmissions as usize);
         for _ in 0..num_transmissions {
-            batch.push(TransmissionID::read_le(&mut reader)?);
+            transmission_ids.insert(TransmissionID::read_le(&mut reader)?);
         }
 
-        Ok(Self { batch })
+        Ok(Self { transmission_ids })
     }
 }

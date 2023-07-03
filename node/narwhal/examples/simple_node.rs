@@ -17,7 +17,7 @@ extern crate tracing;
 
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
-    helpers::{init_primary_channels, PrimarySender},
+    helpers::{init_primary_channels, PrimarySender, Storage},
     Primary,
     Shared,
     MEMORY_POOL_PORT,
@@ -100,11 +100,13 @@ pub async fn start_primary(
         println!("  Validator {}: {}", i, account.address());
     }
     println!();
+    // Initialize the storage.
+    let storage = Storage::new();
 
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the primary instance.
-    let mut primary = Primary::<CurrentNetwork>::new(shared.clone(), account, Some(node_id))?;
+    let mut primary = Primary::<CurrentNetwork>::new(shared.clone(), storage, account, Some(node_id))?;
     // Run the primary instance.
     primary.run(sender.clone(), receiver).await?;
     // Keep the node's connections.

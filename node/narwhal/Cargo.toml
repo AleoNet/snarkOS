@@ -34,7 +34,7 @@ features = [ "thread-pool" ]
 
 [dependencies.indexmap]
 version = "2.0"
-features = [ "serde" ]
+features = [ "serde", "rayon" ]
 
 [dependencies.parking_lot]
 version = "0.12"

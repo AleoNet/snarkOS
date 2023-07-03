@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{assign_to_worker, init_worker_channels, PrimaryReceiver, PrimarySender},
+    helpers::{assign_to_worker, init_worker_channels, PrimaryReceiver, PrimarySender, Storage},
     BatchPropose,
     BatchSealed,
     BatchSignature,
@@ -43,6 +43,8 @@ pub struct Primary<N: Network> {
     shared: Arc<Shared<N>>,
     /// The gateway.
     gateway: Gateway<N>,
+    /// The storage.
+    storage: Storage<N>,
     /// The workers.
     workers: Arc<RwLock<Vec<Worker<N>>>>,
     /// The currently-proposed batch, along with its signatures.
@@ -53,13 +55,14 @@ pub struct Primary<N: Network> {
 
 impl<N: Network> Primary<N> {
     /// Initializes a new primary instance.
-    pub fn new(shared: Arc<Shared<N>>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(shared: Arc<Shared<N>>, storage: Storage<N>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
         // Construct the gateway instance.
         let gateway = Gateway::new(shared.clone(), account, dev)?;
         // Return the primary instance.
         Ok(Self {
             shared,
             gateway,
+            storage,
             workers: Default::default(),
             proposed_batch: Default::default(),
             handles: Default::default(),
@@ -93,7 +96,7 @@ impl<N: Network> Primary<N> {
             // Construct the worker channels.
             let (tx_worker, rx_worker) = init_worker_channels();
             // Construct the worker instance.
-            let mut worker = Worker::new(id, self.gateway.clone())?;
+            let mut worker = Worker::new(id, self.gateway.clone(), self.storage.clone())?;
             // Run the worker instance.
             worker.run(rx_worker).await?;
             // Add the worker to the list of workers.

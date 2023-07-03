@@ -48,6 +48,7 @@ use snarkvm::{
 
 use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
+use indexmap::IndexSet;
 use std::{
     fmt,
     fmt::{Display, Formatter},

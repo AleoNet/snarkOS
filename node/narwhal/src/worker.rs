@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{Pending, Ready, WorkerReceiver},
+    helpers::{Pending, Ready, Storage, WorkerReceiver},
     Event,
     Gateway,
     TransmissionRequest,
@@ -52,6 +52,8 @@ pub struct Worker<N: Network> {
     id: u8,
     /// The gateway.
     gateway: Gateway<N>,
+    /// The storage.
+    storage: Storage<N>,
     /// The ready queue.
     ready: Ready<N>,
     /// The pending queue.
@@ -62,11 +64,18 @@ pub struct Worker<N: Network> {
 
 impl<N: Network> Worker<N> {
     /// Initializes a new worker instance.
-    pub fn new(id: u8, gateway: Gateway<N>) -> Result<Self> {
+    pub fn new(id: u8, gateway: Gateway<N>, storage: Storage<N>) -> Result<Self> {
         // Ensure the worker ID is valid.
         ensure!(id < MAX_WORKERS, "Invalid worker ID '{id}'");
         // Return the worker.
-        Ok(Self { id, gateway, ready: Default::default(), pending: Default::default(), handles: Default::default() })
+        Ok(Self {
+            id,
+            gateway,
+            storage: storage.clone(),
+            ready: Ready::new(storage),
+            pending: Default::default(),
+            handles: Default::default(),
+        })
     }
 
     /// Returns the worker ID.
