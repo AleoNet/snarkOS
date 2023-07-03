@@ -23,7 +23,7 @@ use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 const MAXIMUM_HANDSHAKE_MESSAGE_SIZE: usize = 1024 * 1024; // 1 MiB
 
 /// The maximum size of a message that can be transmitted in the network.
-const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
+pub(crate) const MAXIMUM_MESSAGE_SIZE: usize = 128 * 1024 * 1024; // 128 MiB
 
 /// The codec used to decode and encode network `Message`s.
 pub struct MessageCodec<N: Network> {

@@ -27,8 +27,7 @@ use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
 use snarkos_node_router::Routing;
 use snarkvm::{
     console::{program::ProgramID, types::Field},
-    prelude::{cfg_into_iter, Ledger, Network},
-    synthesizer::ConsensusStorage,
+    prelude::{cfg_into_iter, store::ConsensusStorage, Ledger, Network},
 };
 
 use anyhow::Result;
@@ -129,11 +128,15 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/peers/all", get(Self::get_peers_all))
             .route("/testnet3/peers/all/metrics", get(Self::get_peers_all_metrics))
 
+            // GET ../program/..
+            .route("/testnet3/program/:id", get(Self::get_program))
+            .route("/testnet3/program/:id/mappings", get(Self::get_mapping_names))
+            .route("/testnet3/program/:id/mapping/:name/:key", get(Self::get_mapping_value))
+
             // GET misc endpoints.
             .route("/testnet3/blocks", get(Self::get_blocks))
             .route("/testnet3/height/:hash", get(Self::get_height))
             .route("/testnet3/memoryPool/transactions", get(Self::get_memory_pool_transactions))
-            .route("/testnet3/program/:id", get(Self::get_program))
             .route("/testnet3/statePath/:commitment", get(Self::get_state_path_for_commitment))
             .route("/testnet3/beacons", get(Self::get_beacons))
             .route("/testnet3/node/address", get(Self::get_node_address))

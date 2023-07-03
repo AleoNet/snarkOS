@@ -15,7 +15,7 @@
 use snarkos_account::Account;
 use snarkos_node_messages::{ChallengeRequest, ChallengeResponse, Data, Message, MessageCodec, MessageTrait, NodeType};
 use snarkos_node_router::expect_message;
-use snarkvm::prelude::{error, Address, Block, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork};
+use snarkvm::prelude::{block::Block, error, Address, FromBytes, Network, TestRng, Testnet3 as CurrentNetwork};
 
 use std::{
     io,

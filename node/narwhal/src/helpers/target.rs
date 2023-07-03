@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkvm::prelude::{Network, PuzzleCommitment, ToBytes};
+use snarkvm::prelude::{coinbase::PuzzleCommitment, Network, ToBytes};
 
 use anyhow::Result;
 use sha2::{Digest, Sha256};

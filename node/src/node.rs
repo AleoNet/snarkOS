@@ -15,9 +15,13 @@
 use crate::{traits::NodeInterface, Beacon, Client, Prover, Validator};
 use snarkos_account::Account;
 use snarkos_node_messages::NodeType;
-use snarkvm::{
-    prelude::{Address, Block, Network, PrivateKey, ViewKey},
-    synthesizer::store::helpers::{memory::ConsensusMemory, rocksdb::ConsensusDB},
+use snarkvm::prelude::{
+    block::Block,
+    store::helpers::{memory::ConsensusMemory, rocksdb::ConsensusDB},
+    Address,
+    Network,
+    PrivateKey,
+    ViewKey,
 };
 
 use anyhow::Result;

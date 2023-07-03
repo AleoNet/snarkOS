@@ -15,7 +15,7 @@
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::prelude::{error, FromBytes, FromBytesDeserializer, Network, ToBytes, ToBytesSerializer},
-    prelude::{ProverSolution, Transaction},
+    prelude::{block::Transaction, coinbase::ProverSolution},
 };
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

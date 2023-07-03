@@ -22,7 +22,10 @@ use crate::{
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::network::*,
-    prelude::{ProverSolution, PuzzleCommitment, Transaction},
+    prelude::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+    },
 };
 
 use std::{net::SocketAddr, sync::Arc};

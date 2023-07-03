@@ -25,7 +25,10 @@ use crate::{
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::prelude::*,
-    prelude::{ProverSolution, PuzzleCommitment, Transaction},
+    prelude::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+    },
 };
 
 use parking_lot::Mutex;

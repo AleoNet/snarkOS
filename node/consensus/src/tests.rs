@@ -19,12 +19,14 @@ use snarkvm::{
         network::{prelude::*, Testnet3},
         program::{Entry, Identifier, Literal, Plaintext, Value},
     },
-    prelude::{Ledger, RecordsFilter, TestRng},
-    synthesizer::{
+    prelude::{
         block::{Block, Transaction},
-        program::Program,
         store::ConsensusStore,
-        vm::VM,
+        Ledger,
+        Program,
+        RecordsFilter,
+        TestRng,
+        VM,
     },
 };
 
@@ -40,8 +42,7 @@ pub(crate) mod test_helpers {
     use crate::Consensus;
     use snarkvm::{
         console::{account::PrivateKey, network::Testnet3, program::Value},
-        prelude::TestRng,
-        synthesizer::{process::FinalizeGlobalState, store::helpers::memory::ConsensusMemory, Block},
+        prelude::{block::Block, store::helpers::memory::ConsensusMemory, FinalizeGlobalState, TestRng},
     };
 
     use once_cell::sync::OnceCell;

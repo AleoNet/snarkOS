@@ -69,18 +69,14 @@ mod unconfirmed_transaction;
 pub use unconfirmed_transaction::UnconfirmedTransaction;
 
 use snarkvm::prelude::{
+    block::{Block, Header, Transaction},
+    coinbase::{EpochChallenge, ProverSolution, PuzzleCommitment},
     error,
     Address,
-    Block,
-    EpochChallenge,
     FromBytes,
-    Header,
     Network,
-    ProverSolution,
-    PuzzleCommitment,
     Signature,
     ToBytes,
-    Transaction,
 };
 
 use ::bytes::{Buf, BytesMut};

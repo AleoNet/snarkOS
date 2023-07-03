@@ -24,7 +24,7 @@ use snarkos_node_messages::{
     MessageTrait,
 };
 use snarkos_node_tcp::{ConnectionSide, Tcp, P2P};
-use snarkvm::prelude::{error, Address, Header, Network};
+use snarkvm::prelude::{block::Header, error, Address, Network};
 
 use anyhow::{bail, Result};
 use futures::SinkExt;

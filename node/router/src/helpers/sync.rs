@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use snarkos_node_messages::BlockLocators;
-use snarkvm::prelude::{Block, Network};
+use snarkvm::prelude::{block::Block, Network};
 
 use anyhow::{bail, ensure, Result};
 use colored::Colorize;

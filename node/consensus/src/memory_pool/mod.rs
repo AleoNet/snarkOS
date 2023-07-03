@@ -16,9 +16,13 @@ mod solutions;
 mod transactions;
 
 use crate::Consensus;
-use snarkvm::{
-    ledger::anchor_block_height,
-    prelude::{ConsensusStorage, Itertools, Network, ProverSolution, PuzzleCommitment, Transaction},
+use snarkvm::prelude::{
+    anchor_block_height,
+    block::Transaction,
+    coinbase::{ProverSolution, PuzzleCommitment},
+    store::ConsensusStorage,
+    Itertools,
+    Network,
 };
 
 use anyhow::{anyhow, Result};

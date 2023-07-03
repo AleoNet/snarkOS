@@ -15,9 +15,14 @@
 use snarkos_account::Account;
 use snarkos_display::Display;
 use snarkos_node::{messages::NodeType, Node};
-use snarkvm::{
-    prelude::{Block, ConsensusStore, FromBytes, Network, PrivateKey, Testnet3, VM},
-    synthesizer::store::helpers::memory::ConsensusMemory,
+use snarkvm::prelude::{
+    block::Block,
+    store::{helpers::memory::ConsensusMemory, ConsensusStore},
+    FromBytes,
+    Network,
+    PrivateKey,
+    Testnet3,
+    VM,
 };
 
 use anyhow::{bail, Result};

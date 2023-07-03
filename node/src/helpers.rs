@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use snarkos_node_messages::{BlockLocators, CHECKPOINT_INTERVAL, NUM_RECENTS};
-use snarkvm::prelude::{ConsensusStorage, Ledger, Network};
+use snarkvm::prelude::{store::ConsensusStorage, Ledger, Network};
 
 use anyhow::Result;
 use indexmap::IndexMap;

@@ -27,7 +27,11 @@ use snarkos_account::Account;
 use snarkos_node_messages::Data;
 use snarkvm::{
     console::prelude::*,
-    prelude::{ProverSolution, PuzzleCommitment, Signature, Transaction},
+    prelude::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+        Signature,
+    },
 };
 
 use parking_lot::{Mutex, RwLock};

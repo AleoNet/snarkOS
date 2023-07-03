@@ -17,7 +17,7 @@ use super::*;
 use snarkos_node_messages::{BlockRequest, BlockResponse, DataBlocks, DisconnectReason, Message, MessageCodec, Pong};
 use snarkos_node_router::Routing;
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{error, EpochChallenge, Header};
+use snarkvm::prelude::{block::Header, coinbase::EpochChallenge, error};
 
 use std::{io, net::SocketAddr};
 use tokio::task::spawn_blocking;

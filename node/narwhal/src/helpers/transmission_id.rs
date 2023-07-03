@@ -14,7 +14,7 @@
 
 use snarkvm::{
     console::prelude::{error, FromBytes, FromBytesDeserializer, Network, ToBytes, ToBytesSerializer},
-    prelude::PuzzleCommitment,
+    prelude::coinbase::PuzzleCommitment,
 };
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer};

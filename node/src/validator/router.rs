@@ -26,7 +26,7 @@ use snarkos_node_messages::{
     UnconfirmedTransaction,
 };
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{error, EpochChallenge, Network, Transaction};
+use snarkvm::prelude::{block::Transaction, coinbase::EpochChallenge, error, Network};
 
 use std::{io, net::SocketAddr, time::Duration};
 use tokio::task::spawn_blocking;

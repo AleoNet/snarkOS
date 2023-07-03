@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-cli"
-version = "2.1.1"
+version = "2.1.4"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A CLI for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -61,22 +61,23 @@ version = "1"
 
 [dependencies.serde_json]
 version = "1"
+features = [ "preserve_order" ]
 
 [dependencies.snarkos-account]
 path = "../account"
-version = "=2.1.1"
+version = "=2.1.4"
 
 [dependencies.snarkos-display]
 path = "../display"
-version = "=2.1.1"
+version = "=2.1.4"
 
 [dependencies.snarkos-node]
 path = "../node"
-version = "=2.1.1"
+version = "=2.1.4"
 
 [dependencies.snarkos-node-rest]
 path = "../node/rest"
-version = "=2.1.1"
+version = "=2.1.4"
 
 [dependencies.snarkvm]
 workspace = true
@@ -99,4 +100,4 @@ version = "2.7"
 version = "0.26"
 
 [dev-dependencies.indexmap]
-version = "1"
+version = "2.0"

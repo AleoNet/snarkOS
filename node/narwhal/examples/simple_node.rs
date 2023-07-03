@@ -26,7 +26,14 @@ use snarkos_node_narwhal::{
 use snarkvm::{
     algorithms::polycommit::kzg10::KZGCommitment,
     curves::PairingEngine,
-    prelude::{Environment, Field, Network, ProverSolution, PuzzleCommitment, Transaction, Uniform},
+    prelude::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+        Environment,
+        Field,
+        Network,
+        Uniform,
+    },
 };
 
 use ::bytes::Bytes;

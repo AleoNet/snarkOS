@@ -24,7 +24,13 @@ use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     P2P,
 };
-use snarkvm::prelude::{Block, ConsensusStorage, Header, Ledger, Network, ProverSolution};
+use snarkvm::prelude::{
+    block::{Block, Header},
+    coinbase::ProverSolution,
+    store::ConsensusStorage,
+    Ledger,
+    Network,
+};
 
 use anyhow::Result;
 use parking_lot::Mutex;
