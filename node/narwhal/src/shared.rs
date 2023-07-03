@@ -102,9 +102,9 @@ impl<N: Network> Shared<N> {
 
     /// Stores the proposed batch.
     pub fn store_proposed_batch(&self, peer_ip: SocketAddr, batch: Batch<N>) {
-        self.get_address(&peer_ip).map(|address| {
+        if let Some(address) = self.get_address(&peer_ip) {
             self.proposed_batches.write().insert(address, batch);
-        });
+        }
     }
 
     /// Stores the sealed batch.
