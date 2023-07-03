@@ -25,15 +25,15 @@ use snarkvm::{
 use std::{net::SocketAddr, sync::Arc};
 use tokio::sync::mpsc;
 
-const GATEWAY_CHANNEL_SIZE: usize = 8192;
+const MAX_CHANNEL_SIZE: usize = 8192;
 
 /// Initializes the primary channels.
 pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver<N>) {
-    let (tx_batch_propose, rx_batch_propose) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
-    let (tx_batch_signature, rx_batch_signature) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
-    let (tx_batch_sealed, rx_batch_sealed) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
-    let (tx_unconfirmed_solution, rx_unconfirmed_solution) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
-    let (tx_unconfirmed_transaction, rx_unconfirmed_transaction) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
+    let (tx_batch_propose, rx_batch_propose) = mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_batch_signature, rx_batch_signature) = mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_batch_sealed, rx_batch_sealed) = mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_unconfirmed_solution, rx_unconfirmed_solution) = mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_unconfirmed_transaction, rx_unconfirmed_transaction) = mpsc::channel(MAX_CHANNEL_SIZE);
 
     let tx_batch_propose = Arc::new(tx_batch_propose);
     let tx_batch_signature = Arc::new(tx_batch_signature);
@@ -79,9 +79,9 @@ pub struct PrimaryReceiver<N: Network> {
 
 /// Initializes the worker channels.
 pub fn init_worker_channels<N: Network>() -> (WorkerSender<N>, WorkerReceiver<N>) {
-    let (tx_worker_ping, rx_worker_ping) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
-    let (tx_transmission_request, rx_transmission_request) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
-    let (tx_transmission_response, rx_transmission_response) = mpsc::channel(GATEWAY_CHANNEL_SIZE);
+    let (tx_worker_ping, rx_worker_ping) = mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_transmission_request, rx_transmission_request) = mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_transmission_response, rx_transmission_response) = mpsc::channel(MAX_CHANNEL_SIZE);
 
     let tx_worker_ping = Arc::new(tx_worker_ping);
     let tx_transmission_request = Arc::new(tx_transmission_request);
