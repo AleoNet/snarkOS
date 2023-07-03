@@ -23,17 +23,12 @@ use snarkos_node_narwhal::{
     Shared,
     MEMORY_POOL_PORT,
 };
-use snarkvm::{
-    algorithms::polycommit::kzg10::KZGCommitment,
-    curves::PairingEngine,
-    prelude::{
-        block::Transaction,
-        coinbase::{ProverSolution, PuzzleCommitment},
-        Environment,
-        Field,
-        Network,
-        Uniform,
-    },
+use snarkvm::prelude::{
+    block::Transaction,
+    coinbase::{ProverSolution, PuzzleCommitment},
+    Field,
+    Network,
+    Uniform,
 };
 
 use ::bytes::Bytes;
@@ -183,8 +178,8 @@ fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_id: u
         // A closure to generate a commitment and solution.
         fn sample(mut rng: impl Rng) -> (PuzzleCommitment<CurrentNetwork>, Data<ProverSolution<CurrentNetwork>>) {
             // Sample a random fake puzzle commitment.
-            let kzg = <<CurrentNetwork as Environment>::PairingCurve as PairingEngine>::G1Affine::rand(&mut rng);
-            let commitment = PuzzleCommitment::<CurrentNetwork>::new(KZGCommitment(kzg));
+            // TODO (howardwu): Use a mutex to bring in the real 'proof target' and change this sampling to a while loop.
+            let commitment = PuzzleCommitment::<CurrentNetwork>::from_g1_affine(rng.gen());
             // Sample random fake solution bytes.
             let solution = Data::Buffer(Bytes::from((0..1024).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
             // Return the ID and solution.
