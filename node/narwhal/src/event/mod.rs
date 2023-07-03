@@ -49,12 +49,7 @@ use snarkvm::{
 use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
 use indexmap::IndexSet;
-use std::{
-    fmt,
-    fmt::{Display, Formatter},
-    io::{Read, Result as IoResult, Write},
-    net::SocketAddr,
-};
+use std::io::{Read, Result as IoResult, Write};
 
 pub trait EventTrait {
     /// Returns the event name.

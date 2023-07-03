@@ -40,6 +40,11 @@ impl<N: Network> Pending<N> {
         Self { transmissions: Default::default() }
     }
 
+    /// Returns `true` if the pending queue is empty.
+    pub fn is_empty(&self) -> bool {
+        self.transmissions.read().is_empty()
+    }
+
     /// Returns the number of transmissions in the pending queue.
     pub fn len(&self) -> usize {
         self.transmissions.read().len()

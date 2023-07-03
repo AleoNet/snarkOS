@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![forbid(unsafe_code)]
+#![allow(clippy::type_complexity)]
 
 #[macro_use]
 extern crate async_trait;

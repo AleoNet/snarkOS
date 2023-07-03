@@ -38,14 +38,19 @@ impl<N: Network> Ready<N> {
         Self { storage, transmission_ids: Default::default(), cumulative_proof_target: Default::default() }
     }
 
-    /// Returns the cumulative proof target.
-    pub fn cumulative_proof_target(&self) -> u128 {
-        *self.cumulative_proof_target.read()
+    /// Returns `true` if the ready queue is empty.
+    pub fn is_empty(&self) -> bool {
+        self.transmission_ids.read().is_empty()
     }
 
     /// Returns the number of transmissions in the ready queue.
     pub fn len(&self) -> usize {
         self.transmission_ids.read().len()
+    }
+
+    /// Returns the cumulative proof target.
+    pub fn cumulative_proof_target(&self) -> u128 {
+        *self.cumulative_proof_target.read()
     }
 
     /// Returns the transmission IDs.
@@ -122,10 +127,7 @@ impl<N: Network> Ready<N> {
 mod tests {
     use super::*;
     use crate::helpers::Storage;
-    use snarkvm::{
-        ledger::{coinbase::PuzzleCommitment, narwhal::Data},
-        prelude::Network,
-    };
+    use snarkvm::ledger::{coinbase::PuzzleCommitment, narwhal::Data};
 
     use ::bytes::Bytes;
 
@@ -182,7 +184,7 @@ mod tests {
         let transmissions = ready.drain();
 
         // Check the number of transmissions.
-        assert_eq!(ready.len(), 0);
+        assert!(ready.is_empty());
         // Check the cumulative proof target.
         assert_eq!(ready.cumulative_proof_target(), 0);
         // Check the transmission IDs.
