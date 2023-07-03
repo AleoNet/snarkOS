@@ -29,6 +29,3 @@ pub use ready::*;
 
 mod resolver;
 pub use resolver::*;
-
-mod target;
-pub use target::*;

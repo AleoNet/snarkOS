@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::to_target;
 use snarkvm::{
     console::prelude::*,
     ledger::narwhal::{Transmission, TransmissionID},
@@ -80,7 +79,7 @@ impl<N: Network> Ready<N> {
         if let TransmissionID::Solution(commitment) = &transmission_id {
             // Increment the cumulative proof target.
             let mut cumulative_proof_target = self.cumulative_proof_target.write();
-            *cumulative_proof_target = cumulative_proof_target.saturating_add(to_target(commitment)? as u128);
+            *cumulative_proof_target = cumulative_proof_target.saturating_add(commitment.to_target()? as u128);
             drop(cumulative_proof_target);
         }
         // Insert the transmission.
@@ -95,7 +94,7 @@ impl<N: Network> Ready<N> {
         if let TransmissionID::Solution(commitment) = &transmission_id {
             // Decrement the cumulative proof target.
             let mut cumulative_proof_target = self.cumulative_proof_target.write();
-            *cumulative_proof_target = cumulative_proof_target.saturating_sub(to_target(commitment)? as u128);
+            *cumulative_proof_target = cumulative_proof_target.saturating_sub(commitment.to_target()? as u128);
             drop(cumulative_proof_target);
         }
         // Remove the transmission.
