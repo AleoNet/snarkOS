@@ -202,7 +202,7 @@ fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_id: u
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
         }
     });
 }
@@ -241,7 +241,7 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(20)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
         }
     });
 }

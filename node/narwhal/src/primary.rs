@@ -131,13 +131,14 @@ impl<N: Network> Primary<N> {
             transmissions.extend(worker.drain());
         }
 
+        // Retrieve the private key.
+        let private_key = self.gateway.account().private_key();
         // Retrieve the current round.
         let round = self.shared.round();
         // Retrieve the previous certificates.
         let previous_certificates = self.shared.previous_certificates(round).unwrap_or_default();
         // Sign the batch.
-        let batch =
-            Batch::new(self.gateway.account().private_key(), round, transmissions, previous_certificates, &mut rng)?;
+        let batch = Batch::new(private_key, round, transmissions, previous_certificates, &mut rng)?;
 
         // Set the proposed batch.
         *self.proposed_batch.write() = Some((batch.clone(), Default::default()));
@@ -317,9 +318,11 @@ impl<N: Network> Primary<N> {
                             info!("\n\n\n\nA batch has been sealed!\n\n\n");
                         } else {
                             // TODO (howardwu): Figure out how to handle a failed certificate.
+                            error!("Failed to create a batch certificate")
                         }
                     } else {
                         // TODO (howardwu): Figure out how to handle a failed header.
+                        error!("Failed to create a batch header")
                     }
                 }
 
