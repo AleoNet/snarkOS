@@ -17,7 +17,7 @@ use super::*;
 use rayon::prelude::*;
 use serde::{Deserialize, Serialize};
 use snarkos_node_env::ENV_INFO;
-use snarkvm::prelude::{Identifier, Plaintext, Transaction};
+use snarkvm::prelude::{block::Transaction, Identifier, Plaintext};
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]

@@ -30,7 +30,11 @@ use snarkos_node_tcp::{
     Tcp,
     P2P,
 };
-use snarkvm::prelude::{Block, EpochChallenge, Header, Network, ProverSolution, Transaction};
+use snarkvm::prelude::{
+    block::{Block, Header, Transaction},
+    coinbase::{EpochChallenge, ProverSolution},
+    Network,
+};
 
 use async_trait::async_trait;
 use std::{io, net::SocketAddr};

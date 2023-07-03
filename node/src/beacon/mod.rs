@@ -33,17 +33,16 @@ use snarkos_node_tcp::{
     P2P,
 };
 use snarkvm::prelude::{
-    Block,
-    ConsensusStorage,
+    block::{Block, Transaction},
+    coinbase::ProverSolution,
+    store::ConsensusStorage,
     Entry,
     Identifier,
     Ledger,
     Literal,
     Network,
     Plaintext,
-    ProverSolution,
     RecordMap,
-    Transaction,
     Value,
     Zero,
 };
@@ -444,9 +443,10 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::{
-        prelude::{ConsensusStore, Testnet3, VM},
-        synthesizer::store::helpers::memory::ConsensusMemory,
+    use snarkvm::prelude::{
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        Testnet3,
+        VM,
     };
 
     use rand::SeedableRng;

@@ -30,7 +30,7 @@ pub use transfer_private::*;
 use snarkvm::{
     file::{AleoFile, Manifest},
     package::Package,
-    prelude::{Program, ProgramID, ToBytes, Transaction},
+    prelude::{block::Transaction, Program, ProgramID, ToBytes},
 };
 
 use anyhow::{bail, ensure, Result};
