@@ -224,16 +224,8 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
-        // Check if the proposed batch is expired.
-        let mut is_expired = false;
-        if let Some((batch, _)) = self.proposed_batch.read().as_ref() {
-            // If the batch is expired, clear it.
-            is_expired = now().saturating_sub(batch.timestamp()) > MAX_EXPIRATION_TIME;
-        }
-        // If the batch is expired, clear it.
-        if is_expired {
-            *self.proposed_batch.write() = None;
-        }
+        // Ensure the proposed batch has not expired, and clear the proposed batch if it has expired.
+        self.check_proposed_batch_for_expiration();
 
         // Add the signature to the batch, and attempt to certify the batch if enough signatures have been received.
         if let Some((_, signatures)) = self.proposed_batch.write().as_mut() {
@@ -387,6 +379,9 @@ impl<N: Network> Primary<N> {
             // Sleep.
             tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
             loop {
+                // Check if the proposed batch has expired, and clear it if it has expired.
+                self_clone.check_proposed_batch_for_expiration();
+
                 // If there is a proposed batch, wait for it to be sealed.
                 if self_clone.proposed_batch.read().is_some() {
                     // Sleep briefly, but longer than if there were no batch.
@@ -400,6 +395,20 @@ impl<N: Network> Primary<N> {
                 }
             }
         });
+    }
+
+    /// Checks if the proposed batch is expired, and clears the proposed batch if it has expired.
+    fn check_proposed_batch_for_expiration(&self) {
+        // Check if the proposed batch is expired.
+        let mut is_expired = false;
+        if let Some((batch, _)) = self.proposed_batch.read().as_ref() {
+            // If the batch is expired, clear it.
+            is_expired = now().saturating_sub(batch.timestamp()) > MAX_EXPIRATION_TIME;
+        }
+        // If the batch is expired, clear it.
+        if is_expired {
+            *self.proposed_batch.write() = None;
+        }
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
