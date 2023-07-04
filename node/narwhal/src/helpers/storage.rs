@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{helpers::Committee, MAX_GC_ROUNDS};
+use crate::helpers::Committee;
 use snarkvm::{
     ledger::narwhal::{BatchCertificate, Transmission, TransmissionID},
     prelude::{Address, Field, Network},
@@ -43,10 +43,12 @@ use std::sync::{
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network> {
     /* Once per round */
-    /// The `round` for which garbage collection has occurred **up to** (inclusive).
-    gc_round: Arc<AtomicU64>,
     /// The map of `round` to `committee`.
     committees: Arc<RwLock<IndexMap<u64, Committee<N>>>>,
+    /// The `round` for which garbage collection has occurred **up to** (inclusive).
+    gc_round: Arc<AtomicU64>,
+    /// The maximum number of rounds to keep in storage.
+    max_gc_rounds: u64,
     /* Once per batch */
     /// The map of `round` to a list of `(certificate ID, batch ID, address)` entries.
     rounds: Arc<RwLock<IndexMap<u64, IndexSet<(Field<N>, Field<N>, Address<N>)>>>>,
@@ -59,19 +61,13 @@ pub struct Storage<N: Network> {
     transmissions: Arc<RwLock<IndexMap<TransmissionID<N>, Transmission<N>>>>,
 }
 
-impl<N: Network> Default for Storage<N> {
-    /// Initializes a new instance of storage.
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<N: Network> Storage<N> {
     /// Initializes a new instance of storage.
-    pub fn new() -> Self {
+    pub fn new(max_gc_rounds: u64) -> Self {
         Self {
-            gc_round: Arc::new(AtomicU64::new(0)),
             committees: Default::default(),
+            gc_round: Arc::new(AtomicU64::new(0)),
+            max_gc_rounds,
             rounds: Default::default(),
             certificates: Default::default(),
             batch_ids: Default::default(),
@@ -132,7 +128,7 @@ impl<N: Network> Storage<N> {
         // Fetch the current GC round.
         let current_gc_round = self.gc_round();
         // Compute the next GC round.
-        let next_gc_round = round.saturating_sub(MAX_GC_ROUNDS);
+        let next_gc_round = round.saturating_sub(self.max_gc_rounds);
         // Check if storage needs to be garbage collected.
         if next_gc_round > current_gc_round {
             // Remove the GC round(s) from storage.
@@ -363,12 +359,14 @@ mod tests {
         assert_eq!(storage.transmissions_iter().collect::<Vec<_>>(), transmissions);
     }
 
+    // TODO (howardwu): Testing with 'max_gc_rounds' set to '0' should ensure everything is cleared after insertion.
+
     #[test]
     fn test_certificate_insert_remove() {
         let rng = &mut TestRng::default();
 
         // Create a new storage.
-        let storage = Storage::<CurrentNetwork>::new();
+        let storage = Storage::<CurrentNetwork>::new(1);
         // Ensure the storage is empty.
         assert!(is_empty(&storage));
 

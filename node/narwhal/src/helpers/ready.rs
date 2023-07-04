@@ -138,7 +138,7 @@ mod tests {
         let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
 
         // Initialize the ready queue.
-        let ready = Ready::<CurrentNetwork>::new(Storage::new());
+        let ready = Ready::<CurrentNetwork>::new(Storage::new(1));
 
         // Initialize the commitments.
         let commitment_1 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));

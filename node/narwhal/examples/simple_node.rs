@@ -19,6 +19,7 @@ use snarkos_account::Account;
 use snarkos_node_narwhal::{
     helpers::{init_primary_channels, Committee, PrimarySender, Storage},
     Primary,
+    MAX_GC_ROUNDS,
     MEMORY_POOL_PORT,
 };
 use snarkvm::{
@@ -105,7 +106,7 @@ pub async fn start_primary(
     // Initialize the committee.
     let committee = Arc::new(RwLock::new(Committee::<CurrentNetwork>::new(1u64, members)?));
     // Initialize the storage.
-    let storage = Storage::new();
+    let storage = Storage::new(MAX_GC_ROUNDS);
 
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
