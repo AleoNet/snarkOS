@@ -16,13 +16,13 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BatchPropose<N: Network> {
-    pub batch: Data<Batch<N>>,
+    pub batch_header: Data<BatchHeader<N>>,
 }
 
 impl<N: Network> BatchPropose<N> {
     /// Initializes a new batch propose event.
-    pub fn new(batch: Data<Batch<N>>) -> Self {
-        Self { batch }
+    pub fn new(batch_header: Data<BatchHeader<N>>) -> Self {
+        Self { batch_header }
     }
 }
 
@@ -36,7 +36,7 @@ impl<N: Network> EventTrait for BatchPropose<N> {
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.batch.serialize_blocking_into(writer)
+        self.batch_header.serialize_blocking_into(writer)
     }
 
     /// Deserializes the given buffer into an event.
@@ -44,8 +44,8 @@ impl<N: Network> EventTrait for BatchPropose<N> {
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let mut reader = bytes.reader();
 
-        let batch = Data::Buffer(reader.into_inner().freeze());
+        let batch_header = Data::Buffer(reader.into_inner().freeze());
 
-        Ok(Self { batch })
+        Ok(Self { batch_header })
     }
 }

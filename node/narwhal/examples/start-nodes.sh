@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Default number of nodes to spin up
-default_num_nodes=2
+default_num_nodes=4
 
 # Command to run for each node
 command="cargo +stable r --release --example simple_node"

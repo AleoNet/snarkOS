@@ -100,10 +100,8 @@ impl<N: Network> Ready<N> {
         let mut transmission_ids = self.transmission_ids.write();
         // Reset the cumulative proof target.
         *cumulative_proof_target = 0;
-        // Save the transmission IDs.
-        let ids = transmission_ids.clone();
-        // Reset the transmission IDs.
-        transmission_ids.clear();
+        // Drain the transmission IDs.
+        let ids = transmission_ids.drain(..).collect::<Vec<_>>();
         // Drop the write locks.
         drop(transmission_ids);
         drop(cumulative_proof_target);

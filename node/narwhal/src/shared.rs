@@ -13,12 +13,8 @@
 // limitations under the License.
 
 use crate::helpers::PrimarySender;
-use snarkvm::{
-    console::{prelude::*, types::Address},
-    ledger::narwhal::{Batch, BatchCertificate},
-};
+use snarkvm::console::{prelude::*, types::Address};
 
-use indexmap::IndexSet;
 use parking_lot::RwLock;
 use std::{
     collections::HashMap,
@@ -30,32 +26,6 @@ use std::{
 };
 use tokio::sync::OnceCell;
 
-/// TODO (howardwu): Move this into snarkVM, or alternatively, delete this.
-#[derive(Clone, Debug)]
-pub struct SealedBatch<N: Network> {
-    /// The batch.
-    batch: Batch<N>,
-    /// The batch certificate.
-    certificate: BatchCertificate<N>,
-}
-
-impl<N: Network> SealedBatch<N> {
-    /// Initializes a new sealed batch.
-    pub fn new(batch: Batch<N>, certificate: BatchCertificate<N>) -> Self {
-        Self { batch, certificate }
-    }
-
-    /// Returns the batch.
-    pub const fn batch(&self) -> &Batch<N> {
-        &self.batch
-    }
-
-    /// Returns the batch certificate.
-    pub const fn certificate(&self) -> &BatchCertificate<N> {
-        &self.certificate
-    }
-}
-
 pub struct Shared<N: Network> {
     /// A map of `address` to `stake`.
     committee: RwLock<HashMap<Address<N>, u64>>,
@@ -65,10 +35,6 @@ pub struct Shared<N: Network> {
     height: AtomicU32,
     /// The primary sender.
     primary_sender: Arc<OnceCell<PrimarySender<N>>>,
-    /// A map of `address` to `proposed batches`.
-    proposed_batches: RwLock<HashMap<Address<N>, Batch<N>>>,
-    /// A map of `round` number to a map of `addresses` to `sealed batches`.
-    sealed_batches: RwLock<HashMap<u64, HashMap<Address<N>, SealedBatch<N>>>>,
     /// A map of `peer IP` to `address`.
     peer_addresses: RwLock<HashMap<SocketAddr, Address<N>>>,
     /// A map of `address` to `peer IP`.
@@ -83,8 +49,6 @@ impl<N: Network> Shared<N> {
             round: AtomicU64::new(round),
             height: AtomicU32::new(height),
             primary_sender: Default::default(),
-            proposed_batches: Default::default(),
-            sealed_batches: Default::default(),
             peer_addresses: Default::default(),
             address_peers: Default::default(),
         }
@@ -98,46 +62,6 @@ impl<N: Network> Shared<N> {
     /// Sets the primary sender.
     pub fn set_primary_sender(&self, primary_sender: PrimarySender<N>) {
         self.primary_sender.set(primary_sender).expect("Primary sender already set");
-    }
-
-    /// Stores the proposed batch.
-    pub fn store_proposed_batch(&self, peer_ip: SocketAddr, batch: Batch<N>) {
-        if let Some(address) = self.get_address(&peer_ip) {
-            self.proposed_batches.write().insert(address, batch);
-        }
-    }
-
-    /// Stores the certified batch.
-    pub fn store_sealed_batch(&self, peer_ip: SocketAddr, certificate: BatchCertificate<N>) {
-        // Retrieve the address of the peer.
-        let Some(address) = self.get_address(&peer_ip) else {
-            warn!("No address for peer '{peer_ip}'");
-            return;
-        };
-        // Remove the proposed batch.
-        let Some(batch) = self.proposed_batches.write().remove(&address) else {
-            warn!("No proposed batch for peer '{peer_ip}'");
-            return;
-        };
-        // Ensure the batch IDs match.
-        if batch.batch_id() != certificate.batch_id() {
-            warn!("Batch ID mismatch for the batch from peer '{peer_ip}'");
-            return;
-        }
-        // Retrieve the round.
-        let round = batch.round();
-        // Create the sealed batch.
-        let sealed_batch = SealedBatch::new(batch, certificate);
-        // Store the sealed batch.
-        self.sealed_batches.write().entry(round).or_default().insert(address, sealed_batch);
-    }
-
-    /// Stores the sealed batch.
-    pub fn store_sealed_batch_from_primary(&self, address: Address<N>, sealed_batch: SealedBatch<N>) {
-        // Retrieve the round.
-        let round = sealed_batch.batch().round();
-        // Store the sealed batch.
-        self.sealed_batches.write().entry(round).or_default().insert(address, sealed_batch);
     }
 
     /// Adds a validator to the committee.
@@ -161,31 +85,6 @@ impl<N: Network> Shared<N> {
     /// Returns the current block height.
     pub fn height(&self) -> u32 {
         self.height.load(Ordering::Relaxed)
-    }
-
-    /// Returns the sealed batches for the given round.
-    pub fn sealed_batches(&self, round: u64) -> Option<HashMap<Address<N>, SealedBatch<N>>> {
-        self.sealed_batches.read().get(&round).cloned()
-    }
-
-    /// Returns the previous batch certificates for the given round.
-    pub fn previous_certificates(&self, round: u64) -> Option<IndexSet<BatchCertificate<N>>> {
-        // The genesis round does not require batch certificates.
-        if round == 0 {
-            return None;
-        }
-        // Retrieve the previous round's sealed batches.
-        let sealed_batches = self.sealed_batches.read();
-        let Some(batches) = sealed_batches.get(&(round - 1)) else {
-            return None;
-        };
-        // Retrieve the certificates.
-        let mut certificates = IndexSet::new();
-        for batch in batches.values() {
-            certificates.insert(batch.certificate().clone());
-        }
-        // Return the certificates.
-        Some(certificates)
     }
 
     /// Increments the round number.

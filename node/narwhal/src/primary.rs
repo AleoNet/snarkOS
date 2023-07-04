@@ -19,7 +19,6 @@ use crate::{
     BatchSignature,
     Event,
     Gateway,
-    SealedBatch,
     Shared,
     Worker,
     MAX_EXPIRATION_TIME,
@@ -147,7 +146,7 @@ impl<N: Network> Primary<N> {
         // Retrieve the current round.
         let round = self.shared.round();
         // Retrieve the previous certificates.
-        let previous_certificates = self.shared.previous_certificates(round).unwrap_or_default();
+        let previous_certificates = self.storage.get_round(round.saturating_sub(1)).unwrap_or_default();
         // Sign the batch.
         let batch = Batch::new(private_key, round, transmissions, previous_certificates, &mut rng)?;
 
@@ -155,7 +154,7 @@ impl<N: Network> Primary<N> {
         *self.proposed_batch.write() = Some((batch.clone(), Default::default()));
 
         // Broadcast the batch to all validators for signing.
-        self.gateway.broadcast(Event::BatchPropose(BatchPropose::new(Data::Object(batch))));
+        self.gateway.broadcast(Event::BatchPropose(BatchPropose::new(Data::Object(batch.to_header()?))));
         Ok(())
     }
 
@@ -166,24 +165,26 @@ impl<N: Network> Primary<N> {
     /// 2. Sign the batch.
     /// 3. Broadcast the signature back to the validator.
     async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
-        // // Retrieve the current round.
-        // let round = self.shared.round();
-        // Deserialize the batch.
-        let batch = batch_propose.batch.deserialize().await?;
+        // Deserialize the batch header.
+        let batch_header = batch_propose.batch_header.deserialize().await?;
+        // Retrieve the batch ID.
+        let batch_id = batch_header.batch_id();
 
-        // TODO (howardwu): Verify the batch.
-
-        // Store the proposed batch in the shared state.
-        self.shared.store_proposed_batch(peer_ip, batch.clone());
+        // TODO (howardwu): Ensure the round is within range. If not, do not sign.
+        // TODO (howardwu): Ensure the address is in the committee of the specified round. If not, do not sign.
+        // TODO (howardwu): Ensure the timestamp is within range. If not, do not sign.
+        // TODO (howardwu): Ensure I have all of the transmissions. If not, request them before signing.
+        // TODO (howardwu): Ensure I have all of the previous certificates. If not, request them before signing.
+        // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not sign.
 
         // Initialize an RNG.
         let rng = &mut rand::thread_rng();
         // Generate a timestamp.
         let timestamp = now();
         // Sign the batch ID.
-        let signature = self.gateway.account().sign(&[batch.batch_id(), Field::from_u64(timestamp as u64)], rng)?;
+        let signature = self.gateway.account().sign(&[batch_id, Field::from_u64(timestamp as u64)], rng)?;
         // Broadcast the signature back to the validator.
-        self.gateway.send(peer_ip, Event::BatchSignature(BatchSignature::new(batch.batch_id(), signature, timestamp)));
+        self.gateway.send(peer_ip, Event::BatchSignature(BatchSignature::new(batch_id, signature, timestamp)));
         Ok(())
     }
 
@@ -266,20 +267,15 @@ impl<N: Network> Primary<N> {
             return Ok(());
         };
 
-        // Seal the batch.
-        let sealed_batch = SealedBatch::new(batch, certificate.clone());
-
-        // Fetch the address.
-        let address = self.gateway.account().address();
-        // Store the certified batch in the shared state.
-        self.shared.store_sealed_batch_from_primary(address, sealed_batch);
+        // Store the certified batch.
+        self.storage.insert_certificate(certificate.clone())?;
 
         // Create a batch certified event.
         let event = BatchCertified::new(Data::Object(certificate));
-        // Broadcast the sealed batch to all validators.
+        // Broadcast the certified batch to all validators.
         self.gateway.broadcast(Event::BatchCertified(event));
         // TODO: Increment the round.
-        info!("\n\n\n\n\nA batch has been sealed!\n\n\n\n");
+        info!("\n\n\n\n\nA batch has been certified!\n\n\n\n");
 
         Ok(())
     }
@@ -304,7 +300,7 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((peer_ip, batch_propose)) = rx_batch_propose.recv().await {
                 if let Err(e) = self_clone.process_batch_propose_from_peer(peer_ip, batch_propose).await {
-                    error!("Failed to process a batch propose from peer '{peer_ip}': {e}");
+                    warn!("Failed to process a batch propose from peer '{peer_ip}': {e}");
                 }
             }
         });
@@ -314,7 +310,7 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
                 if let Err(e) = self_clone.process_batch_signature_from_peer(peer_ip, batch_signature).await {
-                    error!("Failed to process a batch signature from peer '{peer_ip}': {e}");
+                    warn!("Failed to process a batch signature from peer '{peer_ip}': {e}");
                 }
             }
         });
@@ -325,11 +321,14 @@ impl<N: Network> Primary<N> {
             while let Some((peer_ip, batch_certificate)) = rx_batch_certified.recv().await {
                 // Deserialize the batch certificate.
                 let Ok(batch_certificate) = batch_certificate.deserialize().await else {
-                    error!("Failed to deserialize the batch certificate from peer '{peer_ip}'");
+                    warn!("Failed to deserialize the batch certificate from peer '{peer_ip}'");
                     continue;
                 };
-                // Store the certified batch in the shared state.
-                self_clone.shared.store_sealed_batch(peer_ip, batch_certificate);
+                // Store the batch certificate.
+                if let Err(e) = self_clone.storage.insert_certificate(batch_certificate) {
+                    warn!("Failed to store the batch certificate from peer '{peer_ip}' - {e}");
+                    continue;
+                }
             }
         });
 
@@ -382,7 +381,7 @@ impl<N: Network> Primary<N> {
                 // Check if the proposed batch has expired, and clear it if it has expired.
                 self_clone.check_proposed_batch_for_expiration();
 
-                // If there is a proposed batch, wait for it to be sealed.
+                // If there is a proposed batch, wait for it to be certified.
                 if self_clone.proposed_batch.read().is_some() {
                     // Sleep briefly, but longer than if there were no batch.
                     tokio::time::sleep(std::time::Duration::from_millis(1000)).await;

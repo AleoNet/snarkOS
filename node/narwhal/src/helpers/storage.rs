@@ -13,17 +13,22 @@
 // limitations under the License.
 
 use snarkvm::{
-    ledger::narwhal::{Transmission, TransmissionID},
-    prelude::Network,
+    ledger::narwhal::{BatchCertificate, Transmission, TransmissionID},
+    prelude::{Address, Field, Network},
 };
 
-use indexmap::IndexMap;
+use anyhow::{bail, Result};
+use indexmap::{IndexMap, IndexSet};
 use parking_lot::RwLock;
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network> {
-    /// The map of `transmission IDs` to `transmissions`.
+    /// The map of `round` to a list of `(certificate ID, address)` entries.
+    rounds: Arc<RwLock<IndexMap<u64, IndexSet<(Field<N>, Address<N>)>>>>,
+    /// The map of `certificate ID` to `certificate`.
+    certificates: Arc<RwLock<IndexMap<Field<N>, BatchCertificate<N>>>>,
+    /// The map of `transmission ID` to `transmission`.
     transmissions: Arc<RwLock<IndexMap<TransmissionID<N>, Transmission<N>>>>,
 }
 
@@ -37,7 +42,69 @@ impl<N: Network> Default for Storage<N> {
 impl<N: Network> Storage<N> {
     /// Initializes a new instance of storage.
     pub fn new() -> Self {
-        Self { transmissions: Default::default() }
+        Self { rounds: Default::default(), certificates: Default::default(), transmissions: Default::default() }
+    }
+}
+
+impl<N: Network> Storage<N> {
+    /// Returns `true` if the storage contains the specified `certificate ID`.
+    pub fn contains_certificate(&self, certificate_id: Field<N>) -> bool {
+        // Check if the certificate ID exists in storage.
+        self.certificates.read().contains_key(&certificate_id)
+    }
+
+    /// Returns the certificate for the given `certificate ID`.
+    /// If the certificate ID does not exist in storage, `None` is returned.
+    pub fn get_certificate(&self, certificate_id: Field<N>) -> Option<BatchCertificate<N>> {
+        // Get the batch certificate.
+        self.certificates.read().get(&certificate_id).cloned()
+    }
+
+    /// Returns the certificates for the given `round`.
+    /// If the round does not exist in storage, `None` is returned.
+    pub fn get_round(&self, round: u64) -> Option<IndexSet<BatchCertificate<N>>> {
+        // The genesis round does not have batch certificates.
+        if round == 0 {
+            return None;
+        }
+        // Retrieve the round.
+        let Some(entries) = self.rounds.read().get(&round).cloned() else {
+            return None;
+        };
+        // Retrieve the certificates.
+        let certificates = entries
+            .iter()
+            .flat_map(|(certificate_id, _)| self.certificates.read().get(certificate_id).cloned())
+            .collect();
+        // Return the certificates.
+        Some(certificates)
+    }
+
+    /// Inserts the given `round` to (`certificate ID`, `certificate`) entry into storage.
+    pub fn insert_certificate(&self, certificate: BatchCertificate<N>) -> Result<()> {
+        // Retrieve the round.
+        let round = certificate.round();
+        // Compute the certificate ID.
+        let certificate_id = certificate.to_id()?;
+        // Compute the address of the batch creator.
+        let address = certificate.to_address();
+        // Ensure the certificate ID does not already exist in storage.
+        if !self.certificates.read().contains_key(&certificate_id) {
+            bail!("Certificate {certificate_id} already exists in storage");
+        }
+
+        // TODO (howardwu): Ensure the certificate is well-formed. If not, do not store.
+        // TODO (howardwu): Ensure the round is within range. If not, do not store.
+        // TODO (howardwu): Ensure the address is in the committee of the specified round. If not, do not store.
+        // TODO (howardwu): Ensure I have all of the transmissions. If not, request them before storing.
+        // TODO (howardwu): Ensure I have all of the previous certificates. If not, request them before storing.
+        // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not store.
+
+        // Insert the round to certificate ID entry.
+        self.rounds.write().entry(round).or_default().insert((certificate_id, address));
+        // Insert the certificate.
+        self.certificates.write().insert(certificate_id, certificate);
+        Ok(())
     }
 }
 

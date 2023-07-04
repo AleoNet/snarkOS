@@ -42,7 +42,7 @@ pub use worker_ping::WorkerPing;
 use snarkos_node_messages::DisconnectReason;
 use snarkvm::{
     console::prelude::{FromBytes, Network, ToBytes},
-    ledger::narwhal::{Batch, BatchCertificate, Data, Transmission, TransmissionID},
+    ledger::narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
     prelude::{Address, Field, Signature},
 };
 
