@@ -15,22 +15,22 @@
 use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BatchSealed<N: Network> {
+pub struct BatchCertified<N: Network> {
     pub certificate: Data<BatchCertificate<N>>,
 }
 
-impl<N: Network> BatchSealed<N> {
-    /// Initializes a new batch sealed event.
+impl<N: Network> BatchCertified<N> {
+    /// Initializes a new batch certified event.
     pub fn new(certificate: Data<BatchCertificate<N>>) -> Self {
         Self { certificate }
     }
 }
 
-impl<N: Network> EventTrait for BatchSealed<N> {
+impl<N: Network> EventTrait for BatchCertified<N> {
     /// Returns the event name.
     #[inline]
     fn name(&self) -> String {
-        "BatchSealed".to_string()
+        "BatchCertified".to_string()
     }
 
     /// Serializes the event into the buffer.

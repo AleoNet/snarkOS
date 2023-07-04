@@ -31,27 +31,27 @@ const MAX_CHANNEL_SIZE: usize = 8192;
 pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver<N>) {
     let (tx_batch_propose, rx_batch_propose) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_batch_signature, rx_batch_signature) = mpsc::channel(MAX_CHANNEL_SIZE);
-    let (tx_batch_sealed, rx_batch_sealed) = mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_batch_certified, rx_batch_certified) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_unconfirmed_solution, rx_unconfirmed_solution) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_unconfirmed_transaction, rx_unconfirmed_transaction) = mpsc::channel(MAX_CHANNEL_SIZE);
 
     let tx_batch_propose = Arc::new(tx_batch_propose);
     let tx_batch_signature = Arc::new(tx_batch_signature);
-    let tx_batch_sealed = Arc::new(tx_batch_sealed);
+    let tx_batch_certified = Arc::new(tx_batch_certified);
     let tx_unconfirmed_solution = Arc::new(tx_unconfirmed_solution);
     let tx_unconfirmed_transaction = Arc::new(tx_unconfirmed_transaction);
 
     let sender = PrimarySender {
         tx_batch_propose,
         tx_batch_signature,
-        tx_batch_sealed,
+        tx_batch_certified,
         tx_unconfirmed_solution,
         tx_unconfirmed_transaction,
     };
     let receiver = PrimaryReceiver {
         rx_batch_propose,
         rx_batch_signature,
-        rx_batch_sealed,
+        rx_batch_certified,
         rx_unconfirmed_solution,
         rx_unconfirmed_transaction,
     };
@@ -63,7 +63,7 @@ pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver
 pub struct PrimarySender<N: Network> {
     pub tx_batch_propose: Arc<mpsc::Sender<(SocketAddr, BatchPropose<N>)>>,
     pub tx_batch_signature: Arc<mpsc::Sender<(SocketAddr, BatchSignature<N>)>>,
-    pub tx_batch_sealed: Arc<mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>)>>,
+    pub tx_batch_certified: Arc<mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>)>>,
     pub tx_unconfirmed_solution: Arc<mpsc::Sender<(PuzzleCommitment<N>, Data<ProverSolution<N>>)>>,
     pub tx_unconfirmed_transaction: Arc<mpsc::Sender<(N::TransactionID, Data<Transaction<N>>)>>,
 }
@@ -72,7 +72,7 @@ pub struct PrimarySender<N: Network> {
 pub struct PrimaryReceiver<N: Network> {
     pub rx_batch_propose: mpsc::Receiver<(SocketAddr, BatchPropose<N>)>,
     pub rx_batch_signature: mpsc::Receiver<(SocketAddr, BatchSignature<N>)>,
-    pub rx_batch_sealed: mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>)>,
+    pub rx_batch_certified: mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>)>,
     pub rx_unconfirmed_solution: mpsc::Receiver<(PuzzleCommitment<N>, Data<ProverSolution<N>>)>,
     pub rx_unconfirmed_transaction: mpsc::Receiver<(N::TransactionID, Data<Transaction<N>>)>,
 }

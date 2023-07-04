@@ -14,8 +14,8 @@
 
 use crate::{
     helpers::{assign_to_worker, init_worker_channels, PrimaryReceiver, PrimarySender, Storage},
+    BatchCertified,
     BatchPropose,
-    BatchSealed,
     BatchSignature,
     Event,
     Gateway,
@@ -193,8 +193,8 @@ impl<N: Network> Primary<N> {
     /// 1. Verify the signature, ensuring it corresponds to the proposed batch.
     /// 2. Ensure the proposed batch has not expired.
     /// 3. Store the signature.
-    /// 4. Seal the batch if enough signatures have been received.
-    /// 5. Broadcast the sealed batch to all validators.
+    /// 4. Certify the batch if enough signatures have been received.
+    /// 5. Broadcast the batch certificate to all validators.
     async fn process_batch_signature_from_peer(
         &self,
         peer_ip: SocketAddr,
@@ -235,27 +235,27 @@ impl<N: Network> Primary<N> {
             *self.proposed_batch.write() = None;
         }
 
-        // Add the signature to the batch, and attempt to seal the batch if enough signatures have been received.
+        // Add the signature to the batch, and attempt to certify the batch if enough signatures have been received.
         if let Some((_, signatures)) = self.proposed_batch.write().as_mut() {
             // Add the signature to the batch.
             signatures.insert(signature, timestamp);
             info!("Added a batch signature from peer '{peer_ip}'");
         }
 
-        // Check if the batch is ready to be sealed.
+        // Check if the batch is ready to be certified.
         let mut is_ready = true;
         if let Some((_batch, _signatures)) = self.proposed_batch.read().as_ref() {
-            // If the batch is ready to be sealed, seal it.
+            // If the batch is ready to be certified, then certify it.
             // TODO (howardwu): Compute the threshold.
             // if signatures.len() >= self.shared.committee_size() {
             // }
         }
-        // If the batch is not ready to be sealed, return early.
+        // If the batch is not ready to be certified, return early.
         if !is_ready {
             return Ok(());
         }
 
-        /* Proceeding to seal the batch. */
+        /* Proceeding to certify the batch. */
 
         // Retrieve the batch and signatures, clearing the proposed batch.
         let (batch, signatures) = self.proposed_batch.write().take().unwrap();
@@ -279,13 +279,13 @@ impl<N: Network> Primary<N> {
 
         // Fetch the address.
         let address = self.gateway.account().address();
-        // Store the sealed batch in the shared state.
+        // Store the certified batch in the shared state.
         self.shared.store_sealed_batch_from_primary(address, sealed_batch);
 
-        // Create a batch sealed event.
-        let event = BatchSealed::new(Data::Object(certificate));
+        // Create a batch certified event.
+        let event = BatchCertified::new(Data::Object(certificate));
         // Broadcast the sealed batch to all validators.
-        self.gateway.broadcast(Event::BatchSealed(event));
+        self.gateway.broadcast(Event::BatchCertified(event));
         // TODO: Increment the round.
         info!("\n\n\n\n\nA batch has been sealed!\n\n\n\n");
 
@@ -299,7 +299,7 @@ impl<N: Network> Primary<N> {
         let PrimaryReceiver {
             mut rx_batch_propose,
             mut rx_batch_signature,
-            mut rx_batch_sealed,
+            mut rx_batch_certified,
             mut rx_unconfirmed_solution,
             mut rx_unconfirmed_transaction,
         } = receiver;
@@ -327,16 +327,16 @@ impl<N: Network> Primary<N> {
             }
         });
 
-        // Process the sealed batch.
+        // Process the certified batch.
         let self_clone = self.clone();
         self.spawn(async move {
-            while let Some((peer_ip, batch_certificate)) = rx_batch_sealed.recv().await {
+            while let Some((peer_ip, batch_certificate)) = rx_batch_certified.recv().await {
                 // Deserialize the batch certificate.
                 let Ok(batch_certificate) = batch_certificate.deserialize().await else {
                     error!("Failed to deserialize the batch certificate from peer '{peer_ip}'");
                     continue;
                 };
-                // Store the sealed batch in the shared state.
+                // Store the certified batch in the shared state.
                 self_clone.shared.store_sealed_batch(peer_ip, batch_certificate);
             }
         });

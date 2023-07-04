@@ -107,7 +107,7 @@ impl<N: Network> Shared<N> {
         }
     }
 
-    /// Stores the sealed batch.
+    /// Stores the certified batch.
     pub fn store_sealed_batch(&self, peer_ip: SocketAddr, certificate: BatchCertificate<N>) {
         // Retrieve the address of the peer.
         let Some(address) = self.get_address(&peer_ip) else {

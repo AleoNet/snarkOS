@@ -363,9 +363,10 @@ impl<N: Network> Gateway<N> {
                 let _ = self.shared.primary_sender().tx_batch_signature.send((peer_ip, batch_signature)).await;
                 Ok(())
             }
-            Event::BatchSealed(batch_sealed) => {
+            Event::BatchCertified(batch_certified) => {
                 // Send the batch certificate to the primary.
-                let _ = self.shared.primary_sender().tx_batch_sealed.send((peer_ip, batch_sealed.certificate)).await;
+                let _ =
+                    self.shared.primary_sender().tx_batch_certified.send((peer_ip, batch_certified.certificate)).await;
                 Ok(())
             }
             Event::ChallengeRequest(..) | Event::ChallengeResponse(..) => {

@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+mod batch_certified;
+pub use batch_certified::BatchCertified;
+
 mod batch_propose;
 pub use batch_propose::BatchPropose;
 
 mod batch_signature;
 pub use batch_signature::BatchSignature;
-
-mod batch_sealed;
-pub use batch_sealed::BatchSealed;
 
 mod challenge_request;
 pub use challenge_request::ChallengeRequest;
@@ -66,7 +66,7 @@ pub trait EventTrait {
 pub enum Event<N: Network> {
     BatchPropose(BatchPropose<N>),
     BatchSignature(BatchSignature<N>),
-    BatchSealed(BatchSealed<N>),
+    BatchCertified(BatchCertified<N>),
     ChallengeRequest(ChallengeRequest<N>),
     ChallengeResponse(ChallengeResponse<N>),
     Disconnect(Disconnect),
@@ -85,7 +85,7 @@ impl<N: Network> Event<N> {
         match self {
             Self::BatchPropose(event) => event.name(),
             Self::BatchSignature(event) => event.name(),
-            Self::BatchSealed(event) => event.name(),
+            Self::BatchCertified(event) => event.name(),
             Self::ChallengeRequest(event) => event.name(),
             Self::ChallengeResponse(event) => event.name(),
             Self::Disconnect(event) => event.name(),
@@ -101,7 +101,7 @@ impl<N: Network> Event<N> {
         match self {
             Self::BatchPropose(..) => 0,
             Self::BatchSignature(..) => 1,
-            Self::BatchSealed(..) => 2,
+            Self::BatchCertified(..) => 2,
             Self::ChallengeRequest(..) => 3,
             Self::ChallengeResponse(..) => 4,
             Self::Disconnect(..) => 5,
@@ -119,7 +119,7 @@ impl<N: Network> Event<N> {
         match self {
             Self::BatchPropose(event) => event.serialize(writer),
             Self::BatchSignature(event) => event.serialize(writer),
-            Self::BatchSealed(event) => event.serialize(writer),
+            Self::BatchCertified(event) => event.serialize(writer),
             Self::ChallengeRequest(event) => event.serialize(writer),
             Self::ChallengeResponse(event) => event.serialize(writer),
             Self::Disconnect(event) => event.serialize(writer),
@@ -144,7 +144,7 @@ impl<N: Network> Event<N> {
         let event = match id {
             0 => Self::BatchPropose(BatchPropose::deserialize(bytes)?),
             1 => Self::BatchSignature(BatchSignature::deserialize(bytes)?),
-            2 => Self::BatchSealed(BatchSealed::deserialize(bytes)?),
+            2 => Self::BatchCertified(BatchCertified::deserialize(bytes)?),
             3 => Self::ChallengeRequest(EventTrait::deserialize(bytes)?),
             4 => Self::ChallengeResponse(EventTrait::deserialize(bytes)?),
             5 => Self::Disconnect(EventTrait::deserialize(bytes)?),
