@@ -151,7 +151,8 @@ impl<N: Network> Primary<N> {
         // Retrieve the current round.
         let round = self.committee.round();
         // Retrieve the previous certificates.
-        let previous_certificates = self.storage.get_round(round.saturating_sub(1)).unwrap_or_default();
+        let previous_certificates =
+            self.storage.get_certificates_for_round(round.saturating_sub(1)).unwrap_or_default();
         // Sign the batch.
         let batch = Batch::new(private_key, round, transmissions, previous_certificates, &mut rng)?;
 

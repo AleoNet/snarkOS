@@ -89,12 +89,34 @@ impl<N: Network> Storage<N> {
 }
 
 impl<N: Network> Storage<N> {
+    /// Returns `true` if the storage contains the specified `round`.
+    pub fn contains_round(&self, round: u64) -> bool {
+        // Check if the round exists in storage.
+        self.rounds.read().contains_key(&round)
+    }
+
+    /// Returns the round for the given `certificate ID`.
+    /// If the certificate ID does not exist in storage, `None` is returned.
+    pub fn get_round_for_certificate(&self, certificate_id: Field<N>) -> Option<u64> {
+        // Get the round.
+        self.certificates.read().get(&certificate_id).map(|certificate| certificate.round())
+    }
+
+    /// Returns the round for the given `batch ID`.
+    /// If the batch ID does not exist in storage, `None` is returned.
+    pub fn get_round_for_batch(&self, batch_id: Field<N>) -> Option<u64> {
+        // Get the round.
+        self.batch_ids.read().get(&batch_id).cloned()
+    }
+}
+
+impl<N: Network> Storage<N> {
     /// Returns `true` if the storage contains the specified `batch ID`.
     pub fn contains_batch(&self, batch_id: Field<N>) -> bool {
         // Check if the batch ID exists in storage.
         self.batch_ids.read().contains_key(&batch_id)
     }
-    
+
     /// Returns `true` if the storage contains the specified `certificate ID`.
     pub fn contains_certificate(&self, certificate_id: Field<N>) -> bool {
         // Check if the certificate ID exists in storage.
@@ -110,7 +132,7 @@ impl<N: Network> Storage<N> {
 
     /// Returns the certificates for the given `round`.
     /// If the round does not exist in storage, `None` is returned.
-    pub fn get_round(&self, round: u64) -> Option<IndexSet<BatchCertificate<N>>> {
+    pub fn get_certificates_for_round(&self, round: u64) -> Option<IndexSet<BatchCertificate<N>>> {
         // The genesis round does not have batch certificates.
         if round == 0 {
             return None;
@@ -274,7 +296,7 @@ mod tests {
         // Ensure the storage is not empty.
         assert!(!is_empty(&storage));
         // Ensure the certificate is stored in the correct round.
-        assert_eq!(storage.get_round(round), Some(indexset! { certificate.clone() }));
+        assert_eq!(storage.get_certificates_for_round(round), Some(indexset! { certificate.clone() }));
 
         // Check that the underlying storage representation is correct.
         {
@@ -300,6 +322,6 @@ mod tests {
         // Ensure the storage is empty.
         assert!(is_empty(&storage));
         // Ensure the certificate is no longer stored in the round.
-        assert_eq!(storage.get_round(round), None);
+        assert_eq!(storage.get_certificates_for_round(round), None);
     }
 }
