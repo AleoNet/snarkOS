@@ -107,7 +107,7 @@ version = "0.1"
 version = "0.2"
 
 [dev-dependencies.pea2pea]
-version = "0.46"
+version = "0.48"
 
 [dev-dependencies.snarkos-node-router]
 path = "./router"
