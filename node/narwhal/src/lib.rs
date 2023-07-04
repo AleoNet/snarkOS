@@ -39,10 +39,12 @@ pub use worker::*;
 
 pub const CONTEXT: &str = "[MemoryPool]";
 
+/// The maximum number of milliseconds to wait before proposing a batch.
+pub const MAX_BATCH_DELAY: u64 = 2500; // ms
 /// The maximum number of nodes that can be in a committee.
 pub const MAX_COMMITTEE_SIZE: u16 = 128;
 /// The maximum number of seconds before a proposed batch is considered expired.
-pub const MAX_EXPIRATION_TIME: i64 = 15; // seconds
+pub const MAX_EXPIRATION_TIME: i64 = 10; // seconds
 /// The maximum number of requests that can be made to retrieve a transmission.
 pub const MAX_REQUESTS_PER_TRANSMISSION: usize = 5;
 /// The maximum number of workers that can be spawned.

@@ -21,6 +21,7 @@ use crate::{
     Event,
     Gateway,
     Worker,
+    MAX_BATCH_DELAY,
     MAX_EXPIRATION_TIME,
     MAX_WORKERS,
 };
@@ -146,21 +147,41 @@ impl<N: Network> Primary<N> {
             transmissions.extend(worker.drain());
         }
 
+        // TODO (howardwu): Switch this for dynamic committees.
+        // let committee = self.storage.get_committee_for_round(round.saturating_sub(1));
+        let committee = self.committee.read().clone();
+
         // Retrieve the private key.
         let private_key = self.gateway.account().private_key();
         // Retrieve the current round.
-        let round = self.committee.read().round();
+        let round = committee.round();
         // Retrieve the previous certificates.
         let previous_certificates =
             self.storage.get_certificates_for_round(round.saturating_sub(1)).unwrap_or_default();
+
+        // Compute the cumulative amount of stake for the previous certificates.
+        let mut stake = 0u64;
+        for certificate in previous_certificates.iter() {
+            stake = stake.saturating_add(committee.get_stake(certificate.to_address()));
+        }
+        // Ensure the previous certificates reach the quorum threshold.
+        // Note: Primary starts at round 1, and round 0 contains no certificates, by definition.
+        if round > 1 && stake < committee.quorum_threshold()? {
+            return Ok(());
+        }
+
+        /* Proceeding to sign & propose the batch. */
+
         // Sign the batch.
         let batch = Batch::new(private_key, round, transmissions, previous_certificates, &mut rng)?;
+        // Retrieve the batch header.
+        let header = batch.to_header()?;
 
         // Set the proposed batch.
         *self.proposed_batch.write() = Some((batch.clone(), Default::default()));
 
         // Broadcast the batch to all validators for signing.
-        self.gateway.broadcast(Event::BatchPropose(BatchPropose::new(Data::Object(batch.to_header()?))));
+        self.gateway.broadcast(Event::BatchPropose(BatchPropose::new(Data::Object(header))));
         Ok(())
     }
 
@@ -398,16 +419,15 @@ impl<N: Network> Primary<N> {
         let self_clone = self.clone();
         self.spawn(async move {
             // TODO: Implement proper timeouts to propose a batch. Need to sync the primaries.
-            // Sleep.
-            tokio::time::sleep(std::time::Duration::from_millis(5000)).await;
             loop {
+                // Sleep briefly, but longer than if there were no batch.
+                tokio::time::sleep(std::time::Duration::from_millis(MAX_BATCH_DELAY)).await;
+
                 // Check if the proposed batch has expired, and clear it if it has expired.
                 self_clone.check_proposed_batch_for_expiration();
 
                 // If there is a proposed batch, wait for it to be certified.
                 if self_clone.proposed_batch.read().is_some() {
-                    // Sleep briefly, but longer than if there were no batch.
-                    tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
                     continue;
                 }
 

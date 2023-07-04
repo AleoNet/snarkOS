@@ -16,6 +16,7 @@ use snarkvm::console::{prelude::*, types::Address};
 
 use indexmap::IndexMap;
 
+#[derive(Clone, Debug)]
 pub struct Committee<N: Network> {
     /// The current round number.
     round: u64,
