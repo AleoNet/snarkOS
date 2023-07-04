@@ -45,7 +45,7 @@ fn now() -> i64 {
 #[derive(Clone)]
 pub struct Primary<N: Network> {
     /// The committee.
-    committee: Arc<Committee<N>>,
+    committee: Arc<RwLock<Committee<N>>>,
     /// The gateway.
     gateway: Gateway<N>,
     /// The storage.
@@ -61,7 +61,7 @@ pub struct Primary<N: Network> {
 impl<N: Network> Primary<N> {
     /// Initializes a new primary instance.
     pub fn new(
-        committee: Arc<Committee<N>>,
+        committee: Arc<RwLock<Committee<N>>>,
         storage: Storage<N>,
         account: Account<N>,
         dev: Option<u16>,
@@ -149,7 +149,7 @@ impl<N: Network> Primary<N> {
         // Retrieve the private key.
         let private_key = self.gateway.account().private_key();
         // Retrieve the current round.
-        let round = self.committee.round();
+        let round = self.committee.read().round();
         // Retrieve the previous certificates.
         let previous_certificates =
             self.storage.get_certificates_for_round(round.saturating_sub(1)).unwrap_or_default();
@@ -225,7 +225,7 @@ impl<N: Network> Primary<N> {
             return Ok(());
         };
         // Ensure the address is in the committee.
-        if !self.committee.is_committee_member(address) {
+        if !self.committee.read().is_committee_member(address) {
             warn!("Received a batch signature from a non-committee peer '{peer_ip}'");
             return Ok(());
         }
@@ -251,10 +251,10 @@ impl<N: Network> Primary<N> {
             // Compute the cumulative amount of stake, thus far.
             let mut stake = 0u64;
             for signature in signatures.keys().chain([batch.signature()].into_iter()) {
-                stake = stake.saturating_add(self.committee.get_stake(signature.to_address()));
+                stake = stake.saturating_add(self.committee.read().get_stake(signature.to_address()));
             }
             // Check if the batch has reached the threshold.
-            if stake >= self.committee.quorum_threshold()? {
+            if stake >= self.committee.read().quorum_threshold()? {
                 info!("Quorum threshold reached, preparing to certify the batch");
                 is_ready = true;
             }
@@ -291,10 +291,14 @@ impl<N: Network> Primary<N> {
         // Broadcast the certified batch to all validators.
         self.gateway.broadcast(Event::BatchCertified(event));
 
-        info!("\n\n\n\n\nOur batch for round {} has been certified!\n\n\n\n", self.committee.round());
+        info!("\n\n\n\n\nOur batch for round {} has been certified!\n\n\n\n", self.committee.read().round());
 
-        // Increment the round.
-        self.committee.increment_round();
+        // Acquire the write lock for the committee.
+        let mut committee = self.committee.write();
+        // Construct the committee for the next round.
+        let next_committee = (*committee).to_next_round()?;
+        // Update the committee.
+        *committee = next_committee;
 
         Ok(())
     }

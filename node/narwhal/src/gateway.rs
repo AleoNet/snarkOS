@@ -50,7 +50,7 @@ use tokio_util::codec::Framed;
 #[derive(Clone)]
 pub struct Gateway<N: Network> {
     /// The committee.
-    committee: Arc<Committee<N>>,
+    committee: Arc<RwLock<Committee<N>>>,
     /// The account of the node.
     account: Account<N>,
     /// The TCP stack.
@@ -74,7 +74,7 @@ pub struct Gateway<N: Network> {
 
 impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
-    pub fn new(committee: Arc<Committee<N>>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(committee: Arc<RwLock<Committee<N>>>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
         // Initialize the gateway IP.
         let ip = match dev {
             Some(dev) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev)),
@@ -115,7 +115,6 @@ impl<N: Network> Gateway<N> {
         // self.initialize_heartbeat();
 
         info!("Started the gateway for the memory pool at '{}'", self.local_ip());
-
         Ok(())
     }
 
@@ -747,7 +746,7 @@ impl<N: Network> Gateway<N> {
         }
 
         // Ensure the address is in the committee.
-        if !self.committee.is_committee_member(address) {
+        if !self.committee.read().is_committee_member(address) {
             warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
             return Some(DisconnectReason::ProtocolViolation);
         }

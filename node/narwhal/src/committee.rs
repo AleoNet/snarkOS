@@ -14,68 +14,62 @@
 
 use snarkvm::console::{prelude::*, types::Address};
 
-use parking_lot::RwLock;
-use std::{
-    collections::HashMap,
-    sync::atomic::{AtomicU64, Ordering},
-};
+use indexmap::IndexMap;
 
 pub struct Committee<N: Network> {
     /// The current round number.
-    round: AtomicU64,
+    round: u64,
     /// A map of `address` to `stake`.
-    members: RwLock<HashMap<Address<N>, u64>>,
+    members: IndexMap<Address<N>, u64>,
 }
 
 impl<N: Network> Committee<N> {
     /// Initializes a new `Committee` instance.
-    pub fn new(round: u64) -> Self {
-        Self { round: AtomicU64::new(round), members: Default::default() }
+    pub fn new(round: u64, members: IndexMap<Address<N>, u64>) -> Result<Self> {
+        // Ensure the round is nonzero.
+        ensure!(round > 0, "Round must be nonzero");
+        // Ensure there are at least 4 members.
+        ensure!(members.len() >= 4, "Committee must have at least 4 members");
+        // Return the new committee.
+        Ok(Self { round, members })
+    }
+
+    /// Returns a new `Committee` instance for the next round.
+    /// TODO (howardwu): Add arguments for members 1) to be added, and 2) to be removed.
+    pub fn to_next_round(&self) -> Result<Self> {
+        // Increment the round number.
+        let Some(round) = self.round.checked_add(1) else {
+            bail!("Overflow when incrementing round number in committee");
+        };
+        // Return the new committee.
+        Ok(Self { round, members: self.members.clone() })
     }
 }
 
 impl<N: Network> Committee<N> {
     /// Returns the current round number.
     pub fn round(&self) -> u64 {
-        self.round.load(Ordering::Relaxed)
-    }
-
-    /// Increments the round number.
-    pub fn increment_round(&self) {
-        self.round.fetch_add(1, Ordering::Relaxed);
-    }
-}
-
-impl<N: Network> Committee<N> {
-    /// Adds a member to the committee.
-    pub fn add_member(&self, address: Address<N>, stake: u64) -> Result<()> {
-        // Check if the member is already in the committee.
-        if self.is_committee_member(address) {
-            bail!("Validator {address} is already a committee member");
-        }
-        // Add the member to the committee.
-        self.members.write().insert(address, stake);
-        Ok(())
+        self.round
     }
 
     /// Returns the committee members alongside their stake.
-    pub fn members(&self) -> &RwLock<HashMap<Address<N>, u64>> {
+    pub fn members(&self) -> &IndexMap<Address<N>, u64> {
         &self.members
     }
 
     /// Returns the number of validators in the committee.
     pub fn committee_size(&self) -> usize {
-        self.members.read().len()
+        self.members.len()
     }
 
     /// Returns `true` if the given address is in the committee.
     pub fn is_committee_member(&self, address: Address<N>) -> bool {
-        self.members.read().contains_key(&address)
+        self.members.contains_key(&address)
     }
 
     /// Returns the amount of stake for the given address.
     pub fn get_stake(&self, address: Address<N>) -> u64 {
-        self.members.read().get(&address).copied().unwrap_or_default()
+        self.members.get(&address).copied().unwrap_or_default()
     }
 
     /// Returns the amount of stake required to reach the availability threshold `(f + 1)`.
@@ -96,7 +90,7 @@ impl<N: Network> Committee<N> {
     pub fn total_stake(&self) -> Result<u64> {
         // Compute the total power of the committee.
         let mut power = 0u64;
-        for stake in self.members.read().values() {
+        for stake in self.members.values() {
             // Accumulate the stake, checking for overflow.
             power = match power.checked_add(*stake) {
                 Some(power) => power,

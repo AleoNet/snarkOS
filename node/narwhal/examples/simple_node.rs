@@ -35,6 +35,8 @@ use snarkvm::{
 
 use ::bytes::Bytes;
 use anyhow::{bail, Result};
+use indexmap::IndexMap;
+use parking_lot::RwLock;
 use rand::{Rng, SeedableRng};
 use std::{net::SocketAddr, str::FromStr, sync::Arc};
 use tracing_subscriber::{
@@ -89,17 +91,20 @@ pub async fn start_primary(
     let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(node_id as u64))?;
     println!("\n{account}\n");
 
-    // Initialize the committee.
-    let committee = Arc::new(Committee::<CurrentNetwork>::new(0u64));
-    // Add the validators to the committee.
+    // Initialize a map for the committee members.
+    let mut members = IndexMap::with_capacity(num_nodes as usize);
+    // Add the validators as members.
     for i in 0..num_nodes {
         // Sample the account.
         let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64))?;
         // Add the validator.
-        committee.add_member(account.address(), 1000)?;
+        members.insert(account.address(), 1000);
         println!("  Validator {}: {}", i, account.address());
     }
     println!();
+
+    // Initialize the committee.
+    let committee = Arc::new(RwLock::new(Committee::<CurrentNetwork>::new(1u64, members)?));
     // Initialize the storage.
     let storage = Storage::new();
 
