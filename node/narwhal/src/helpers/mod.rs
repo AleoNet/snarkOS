@@ -32,3 +32,13 @@ pub use resolver::*;
 
 mod storage;
 pub use storage::*;
+
+/// Formats an ID into a truncated identifier (for logging purposes).
+pub fn fmt_id(id: impl ToString) -> String {
+    let id = id.to_string();
+    let mut formatted_id = id.chars().take(16).collect::<String>();
+    if id.chars().count() > 16 {
+        formatted_id.push_str("..");
+    }
+    formatted_id
+}

@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{Pending, Ready, Storage, WorkerReceiver},
+    helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
     Event,
     Gateway,
     TransmissionRequest,
@@ -36,16 +36,6 @@ use indexmap::IndexMap;
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc};
 use tokio::task::JoinHandle;
-
-fn fmt_id(id: String) -> String {
-    let mut formatted_id = id.chars().take(16).collect::<String>();
-
-    if id.chars().count() > 16 {
-        formatted_id.push_str("..");
-    }
-
-    formatted_id
-}
 
 #[derive(Clone)]
 pub struct Worker<N: Network> {
@@ -116,7 +106,7 @@ impl<N: Network> Worker<N> {
             trace!(
                 "Worker {} - Found a new transmission ID '{}' from peer '{peer_ip}'",
                 self.id,
-                fmt_id(transmission_id.to_string())
+                fmt_id(transmission_id)
             );
             // Insert the transmission ID into the pending queue.
             self.pending.insert(transmission_id, peer_ip);
@@ -151,7 +141,7 @@ impl<N: Network> Worker<N> {
                 trace!(
                     "Worker {} - Added transmission '{}' from peer '{peer_ip}'",
                     self.id,
-                    fmt_id(response.transmission_id.to_string())
+                    fmt_id(response.transmission_id)
                 );
             }
         }
@@ -169,7 +159,7 @@ impl<N: Network> Worker<N> {
         self.pending.remove(puzzle_commitment);
         // Adds the prover solution to the ready queue.
         self.ready.insert(puzzle_commitment, Transmission::Solution(prover_solution))?;
-        trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment.to_string()));
+        trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment));
         Ok(())
     }
 
@@ -184,7 +174,7 @@ impl<N: Network> Worker<N> {
         self.pending.remove(&transaction_id);
         // Adds the transaction to the ready queue.
         self.ready.insert(&transaction_id, Transmission::Transaction(transaction))?;
-        trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id.to_string()));
+        trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));
         Ok(())
     }
 }
