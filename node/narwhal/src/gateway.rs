@@ -13,10 +13,9 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{assign_to_worker, EventCodec, PrimarySender, Resolver, WorkerSender},
+    helpers::{assign_to_worker, Committee, EventCodec, PrimarySender, Resolver, WorkerSender},
     ChallengeRequest,
     ChallengeResponse,
-    Committee,
     Event,
     EventTrait,
     CONTEXT,

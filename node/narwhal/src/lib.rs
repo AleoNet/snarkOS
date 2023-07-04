@@ -22,9 +22,6 @@ extern crate tracing;
 
 pub mod helpers;
 
-mod committee;
-pub use committee::*;
-
 mod event;
 pub use event::*;
 

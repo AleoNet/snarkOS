@@ -18,6 +18,9 @@ pub use channels::*;
 mod codec;
 pub use codec::*;
 
+mod committee;
+pub use committee::*;
+
 mod partition;
 pub use partition::*;
 

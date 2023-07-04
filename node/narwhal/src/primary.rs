@@ -13,11 +13,10 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{assign_to_worker, init_worker_channels, PrimaryReceiver, PrimarySender, Storage},
+    helpers::{assign_to_worker, init_worker_channels, Committee, PrimaryReceiver, PrimarySender, Storage},
     BatchCertified,
     BatchPropose,
     BatchSignature,
-    Committee,
     Event,
     Gateway,
     Worker,

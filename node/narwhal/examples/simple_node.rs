@@ -17,8 +17,7 @@ extern crate tracing;
 
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
-    helpers::{init_primary_channels, PrimarySender, Storage},
-    Committee,
+    helpers::{init_primary_channels, Committee, PrimarySender, Storage},
     Primary,
     MEMORY_POOL_PORT,
 };
