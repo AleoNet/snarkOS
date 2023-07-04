@@ -428,19 +428,15 @@ impl<N: Network> Primary<N> {
         // Initialize the batch proposer.
         let self_clone = self.clone();
         self.spawn(async move {
-            // TODO: Implement proper timeouts to propose a batch. Need to sync the primaries.
             loop {
                 // Sleep briefly, but longer than if there were no batch.
                 tokio::time::sleep(std::time::Duration::from_millis(MAX_BATCH_DELAY)).await;
-
                 // Check if the proposed batch has expired, and clear it if it has expired.
                 self_clone.check_proposed_batch_for_expiration();
-
                 // If there is a proposed batch, wait for it to be certified.
                 if self_clone.proposed_batch.read().is_some() {
                     continue;
                 }
-
                 // If there is no proposed batch, propose one.
                 if let Err(e) = self_clone.propose_batch() {
                     error!("Failed to propose a batch: {e}");
