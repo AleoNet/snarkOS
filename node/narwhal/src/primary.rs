@@ -211,7 +211,11 @@ impl<N: Network> Primary<N> {
 
         // Ensure the batch ID matches the currently proposed batch.
         if Some(batch_id) != self.proposed_batch.read().as_ref().map(|(batch, _)| batch.batch_id()) {
-            warn!("Received a batch signature for an unknown batch ID '{batch_id}' from peer '{peer_ip}'");
+            // Log the batch mismatch.
+            match self.storage.contains_batch(batch_id) {
+                true => trace!("Received a batch signature for an already certified batch from peer '{peer_ip}'"),
+                false => warn!("Received a batch signature for an unknown batch from peer '{peer_ip}'"),
+            }
             return Ok(());
         }
         // Retrieve the address of the peer.

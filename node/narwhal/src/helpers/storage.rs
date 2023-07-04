@@ -89,6 +89,12 @@ impl<N: Network> Storage<N> {
 }
 
 impl<N: Network> Storage<N> {
+    /// Returns `true` if the storage contains the specified `batch ID`.
+    pub fn contains_batch(&self, batch_id: Field<N>) -> bool {
+        // Check if the batch ID exists in storage.
+        self.batch_ids.read().contains_key(&batch_id)
+    }
+    
     /// Returns `true` if the storage contains the specified `certificate ID`.
     pub fn contains_certificate(&self, certificate_id: Field<N>) -> bool {
         // Check if the certificate ID exists in storage.
