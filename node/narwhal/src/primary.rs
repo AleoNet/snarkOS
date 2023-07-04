@@ -268,14 +268,14 @@ impl<N: Network> Primary<N> {
         };
 
         // Create the batch certificate.
-        let Ok(certificate) = BatchCertificate::from(header, signatures.clone()) else {
+        let Ok(certificate) = BatchCertificate::from(header, signatures) else {
             // TODO (howardwu): Figure out how to handle a failed certificate.
             error!("Failed to create a batch certificate");
             return Ok(());
         };
 
         // Seal the batch.
-        let sealed_batch = SealedBatch::new(batch.clone(), certificate.clone());
+        let sealed_batch = SealedBatch::new(batch, certificate.clone());
 
         // Fetch the address.
         let address = self.gateway.account().address();
