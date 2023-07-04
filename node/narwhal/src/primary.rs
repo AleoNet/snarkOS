@@ -155,8 +155,19 @@ impl<N: Network> Primary<N> {
         // Sign the batch.
         let batch = Batch::new(private_key, round, transmissions, previous_certificates, &mut rng)?;
 
-        // Set the proposed batch.
-        *self.proposed_batch.write() = Some((batch.clone(), Default::default()));
+        // Initialize an RNG.
+        let rng = &mut rand::thread_rng();
+        // Generate a timestamp.
+        let timestamp = now();
+        // Sign the batch ID.
+        let signature = self.gateway.account().sign(&[batch.batch_id(), Field::from_u64(timestamp as u64)], rng)?;
+
+        // Set the proposed batch. The signature and timestamp need to be precomputed to include own
+        // stake in quorum threshold computations as BatchPropose and BatchSignature events are not
+        // broadcasted locally.
+        let mut signature_map = IndexMap::new();
+        signature_map.insert(signature, timestamp);
+        *self.proposed_batch.write() = Some((batch.clone(), signature_map));
 
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(BatchPropose::new(Data::Object(batch.to_header()?))));
@@ -248,6 +259,7 @@ impl<N: Network> Primary<N> {
             for signature in signatures.keys() {
                 stake = stake.saturating_add(self.committee.get_stake(&signature.to_address()));
             }
+            debug!("Stake {stake}/{}", self.committee.quorum_threshold()?);
             // Check if the batch has reached the threshold.
             if stake >= self.committee.quorum_threshold()? {
                 info!("Quorum threshold reached, preparing to certify the batch");

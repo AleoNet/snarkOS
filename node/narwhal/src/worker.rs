@@ -169,7 +169,7 @@ impl<N: Network> Worker<N> {
         self.pending.remove(puzzle_commitment);
         // Adds the prover solution to the ready queue.
         self.ready.insert(puzzle_commitment, Transmission::Solution(prover_solution))?;
-        debug!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment.to_string()));
+        trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment.to_string()));
         Ok(())
     }
 
@@ -184,7 +184,7 @@ impl<N: Network> Worker<N> {
         self.pending.remove(&transaction_id);
         // Adds the transaction to the ready queue.
         self.ready.insert(&transaction_id, Transmission::Transaction(transaction))?;
-        debug!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id.to_string()));
+        trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id.to_string()));
         Ok(())
     }
 }
