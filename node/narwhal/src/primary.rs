@@ -242,10 +242,10 @@ impl<N: Network> Primary<N> {
 
         // Check if the batch is ready to be certified.
         let mut is_ready = false;
-        if let Some((_batch, signatures)) = self.proposed_batch.read().as_ref() {
+        if let Some((batch, signatures)) = self.proposed_batch.read().as_ref() {
             // Compute the cumulative amount of stake, thus far.
             let mut stake = 0u64;
-            for signature in signatures.keys() {
+            for signature in signatures.keys().chain([batch.signature()].into_iter()) {
                 stake = stake.saturating_add(self.committee.get_stake(&signature.to_address()));
             }
             // Check if the batch has reached the threshold.
