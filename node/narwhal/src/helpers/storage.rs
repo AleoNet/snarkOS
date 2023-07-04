@@ -173,6 +173,27 @@ impl<N: Network> Storage<N> {
         // TODO (howardwu): Ensure I have all of the previous certificates. If not, request them before storing.
         // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not store.
 
+        // Requesting! Awaiting!
+
+        /* Proceed to store the certificate. */
+
+        // // Ensure storage contains all declared transmissions.
+        // for transmission_id in certificate.transmission_ids() {
+        //     if !self.transmissions.read().contains_key(transmission_id) {
+        //         bail!("Missing transmission {transmission_id} for certificate {certificate_id}");
+        //     }
+        // }
+        //
+        // // Ensure storage contains all declared previous certificates (up to GC).
+        // for previous_certificate_id in certificate.previous_certificate_ids() {
+        //     // If the certificate's round is greater than the GC round, ensure the previous certificate exists.
+        //     if round > self.gc_round() {
+        //         if !self.certificates.read().contains_key(previous_certificate_id) {
+        //             bail!("Missing previous certificate {previous_certificate_id} for certificate {certificate_id}");
+        //         }
+        //     }
+        // }
+
         // Insert the round to certificate ID entry.
         self.rounds.write().entry(round).or_default().insert((certificate_id, batch_id, address));
         // Insert the certificate.
