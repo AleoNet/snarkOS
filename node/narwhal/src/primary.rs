@@ -171,7 +171,7 @@ impl<N: Network> Primary<N> {
                 is_ready = true;
             }
         }
-        // If the batch is not ready to be certified, return early.
+        // If the batch is not ready to be proposed, return early.
         if !is_ready {
             return Ok(());
         }
@@ -437,7 +437,7 @@ impl<N: Network> Primary<N> {
                 if self_clone.proposed_batch.read().is_some() {
                     continue;
                 }
-                // If there is no proposed batch, propose one.
+                // If there is no proposed batch, attempt to propose a batch.
                 if let Err(e) = self_clone.propose_batch() {
                     error!("Failed to propose a batch: {e}");
                 }
