@@ -131,7 +131,7 @@ fn keep_connections(primary: &Primary<CurrentNetwork>, node_id: u16, num_nodes: 
                 // Initialize the gateway IP.
                 let ip = SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i)).unwrap();
                 // Check if the node is connected.
-                if i != node_id && !node.gateway().is_connected(&ip) {
+                if i != node_id && !node.gateway().is_connected(ip) {
                     // Connect to the node.
                     node.gateway().connect(ip);
                 }

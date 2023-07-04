@@ -220,12 +220,12 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
         // Retrieve the address of the peer.
-        let Some(address) = self.committee.get_address(&peer_ip) else {
+        let Some(address) = self.committee.get_address(peer_ip) else {
             warn!("Received a batch signature from a disconnected peer '{peer_ip}'");
             return Ok(());
         };
         // Ensure the address is in the committee.
-        if !self.committee.is_committee_member(&address) {
+        if !self.committee.is_committee_member(address) {
             warn!("Received a batch signature from a non-committee peer '{peer_ip}'");
             return Ok(());
         }
@@ -251,7 +251,7 @@ impl<N: Network> Primary<N> {
             // Compute the cumulative amount of stake, thus far.
             let mut stake = 0u64;
             for signature in signatures.keys().chain([batch.signature()].into_iter()) {
-                stake = stake.saturating_add(self.committee.get_stake(&signature.to_address()));
+                stake = stake.saturating_add(self.committee.get_stake(signature.to_address()));
             }
             // Check if the batch has reached the threshold.
             if stake >= self.committee.quorum_threshold()? {

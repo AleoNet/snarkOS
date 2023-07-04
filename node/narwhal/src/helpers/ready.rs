@@ -86,7 +86,6 @@ impl<N: Network> Ready<N> {
                 // Increment the cumulative proof target.
                 let mut cumulative_proof_target = self.cumulative_proof_target.write();
                 *cumulative_proof_target = cumulative_proof_target.saturating_add(commitment.to_target()? as u128);
-                drop(cumulative_proof_target);
             }
         }
         // Return whether the transmission is new.
@@ -95,16 +94,16 @@ impl<N: Network> Ready<N> {
 
     /// Removes the transmissions and returns them.
     pub fn drain(&self) -> IndexMap<TransmissionID<N>, Transmission<N>> {
-        // Acquire the write locks (simultaneously).
-        let mut cumulative_proof_target = self.cumulative_proof_target.write();
-        let mut transmission_ids = self.transmission_ids.write();
-        // Reset the cumulative proof target.
-        *cumulative_proof_target = 0;
-        // Drain the transmission IDs.
-        let ids = transmission_ids.drain(..).collect::<Vec<_>>();
-        // Drop the write locks.
-        drop(transmission_ids);
-        drop(cumulative_proof_target);
+        // Scope the locks.
+        let ids = {
+            // Acquire the write locks (simultaneously).
+            let mut cumulative_proof_target = self.cumulative_proof_target.write();
+            let mut transmission_ids = self.transmission_ids.write();
+            // Reset the cumulative proof target.
+            *cumulative_proof_target = 0;
+            // Drain the transmission IDs.
+            transmission_ids.drain(..).collect::<Vec<_>>()
+        };
 
         // Initialize a map for the transmissions.
         let mut transmissions = IndexMap::with_capacity(ids.len());
