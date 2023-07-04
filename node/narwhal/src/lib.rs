@@ -42,6 +42,8 @@ pub const MAX_BATCH_DELAY: u64 = 2500; // ms
 pub const MAX_COMMITTEE_SIZE: u16 = 128;
 /// The maximum number of seconds before a proposed batch is considered expired.
 pub const MAX_EXPIRATION_TIME: i64 = 10; // seconds
+/// The maximum number of round to store before garbage collecting.
+pub const MAX_GC_ROUNDS: u64 = 50;
 /// The maximum number of requests that can be made to retrieve a transmission.
 pub const MAX_REQUESTS_PER_TRANSMISSION: usize = 5;
 /// The maximum number of workers that can be spawned.

@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::Committee;
+use crate::{helpers::Committee, MAX_GC_ROUNDS};
 use snarkvm::{
     ledger::narwhal::{BatchCertificate, Transmission, TransmissionID},
     prelude::{Address, Field, Network},
@@ -21,7 +21,10 @@ use snarkvm::{
 use anyhow::{bail, Result};
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::RwLock;
-use std::sync::Arc;
+use std::sync::{
+    atomic::{AtomicU64, Ordering},
+    Arc,
+};
 
 /// The storage for the memory pool.
 ///
@@ -40,6 +43,8 @@ use std::sync::Arc;
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network> {
     /* Once per round */
+    /// The `round` for which garbage collection has occurred **up to** (inclusive).
+    gc_round: Arc<AtomicU64>,
     /// The map of `round` to `committee`.
     committees: Arc<RwLock<IndexMap<u64, Committee<N>>>>,
     /* Once per batch */
@@ -65,6 +70,7 @@ impl<N: Network> Storage<N> {
     /// Initializes a new instance of storage.
     pub fn new() -> Self {
         Self {
+            gc_round: Arc::new(AtomicU64::new(0)),
             committees: Default::default(),
             rounds: Default::default(),
             certificates: Default::default(),
@@ -102,6 +108,12 @@ impl<N: Network> Storage<N> {
 }
 
 impl<N: Network> Storage<N> {
+    /// Returns the `round` that garbage collection has occurred **up to** (inclusive).
+    pub fn gc_round(&self) -> u64 {
+        // Get the GC round.
+        self.gc_round.load(Ordering::Relaxed)
+    }
+
     /// Returns the `committee` for the given `round`.
     /// If the round does not exist in storage, `None` is returned.
     pub fn get_committee_for_round(&self, round: u64) -> Option<Committee<N>> {
@@ -110,13 +122,38 @@ impl<N: Network> Storage<N> {
     }
 
     /// Insert the given `committee` into storage.
+    /// Note: This method is only called once per round, upon certification of the primary's batch.
     pub fn insert_committee(&self, committee: Committee<N>) {
+        // Retrieve the round.
+        let round = committee.round();
         // Insert the committee into storage.
-        self.committees.write().insert(committee.round(), committee);
+        self.committees.write().insert(round, committee);
+
+        // Fetch the current GC round.
+        let current_gc_round = self.gc_round();
+        // Compute the next GC round.
+        let next_gc_round = round.saturating_sub(MAX_GC_ROUNDS);
+        // Check if storage needs to be garbage collected.
+        if next_gc_round > current_gc_round {
+            // Remove the GC round(s) from storage.
+            for gc_round in current_gc_round..next_gc_round {
+                // TODO (howardwu): Handle removal of transmissions.
+                // Iterate over the certificates for the GC round.
+                for certificate in self.get_certificates_for_round(gc_round).iter() {
+                    // Remove the certificate from storage.
+                    self.remove_certificate(certificate.certificate_id());
+                }
+                // Remove the GC round from the committee.
+                self.remove_committee(gc_round);
+            }
+            // Update the GC round.
+            self.gc_round.store(next_gc_round, Ordering::Relaxed);
+        }
     }
 
     /// Removes the committee for the given `round` from storage.
-    pub fn remove_committee(&self, round: u64) {
+    /// Note: This method should only be called by garbage collection.
+    fn remove_committee(&self, round: u64) {
         // Remove the committee from storage.
         self.committees.write().remove(&round);
     }
@@ -164,22 +201,18 @@ impl<N: Network> Storage<N> {
 
     /// Returns the certificates for the given `round`.
     /// If the round does not exist in storage, `None` is returned.
-    pub fn get_certificates_for_round(&self, round: u64) -> Option<IndexSet<BatchCertificate<N>>> {
+    pub fn get_certificates_for_round(&self, round: u64) -> IndexSet<BatchCertificate<N>> {
         // The genesis round does not have batch certificates.
         if round == 0 {
-            return None;
+            return Default::default();
         }
-        // Retrieve the round.
-        let Some(entries) = self.rounds.read().get(&round).cloned() else {
-            return None;
-        };
         // Retrieve the certificates.
-        let certificates = entries
-            .iter()
-            .flat_map(|(certificate_id, _, _)| self.certificates.read().get(certificate_id).cloned())
-            .collect();
-        // Return the certificates.
-        Some(certificates)
+        if let Some(entries) = self.rounds.read().get(&round) {
+            let certificates = self.certificates.read();
+            entries.iter().flat_map(|(certificate_id, _, _)| certificates.get(certificate_id).cloned()).collect()
+        } else {
+            Default::default()
+        }
     }
 
     /// Inserts the given `certificate` into storage.
@@ -187,8 +220,8 @@ impl<N: Network> Storage<N> {
     pub fn insert_certificate(&self, certificate: BatchCertificate<N>) -> Result<()> {
         // Retrieve the round.
         let round = certificate.round();
-        // Compute the certificate ID.
-        let certificate_id = certificate.to_id()?;
+        // Retrieve the certificate ID.
+        let certificate_id = certificate.certificate_id();
         // Retrieve the batch ID.
         let batch_id = certificate.batch_id();
         // Compute the address of the batch creator.
@@ -237,10 +270,14 @@ impl<N: Network> Storage<N> {
 
     /// Removes the given `certificate ID` from storage.
     /// This method triggers updates to the `rounds`, `certificates`, and `batch_ids` maps.
-    pub fn remove_certificate(&self, certificate_id: Field<N>) -> Result<()> {
+    ///
+    /// If the certificate was successfully removed, `true` is returned.
+    /// If the certificate did not exist in storage, `false` is returned.
+    pub fn remove_certificate(&self, certificate_id: Field<N>) -> bool {
         // Retrieve the certificate.
         let Some(certificate) = self.get_certificate(certificate_id) else {
-            bail!("Certificate {certificate_id} does not exist in storage");
+            warn!("Certificate {certificate_id} does not exist in storage");
+            return false;
         };
         // Retrieve the round.
         let round = certificate.round();
@@ -259,7 +296,9 @@ impl<N: Network> Storage<N> {
         self.certificates.write().remove(&certificate_id);
         // Remove the batch ID.
         self.batch_ids.write().remove(&batch_id);
-        Ok(())
+        // TODO (howardwu): Remove the transmissions.
+        // Return successfully.
+        true
     }
 }
 
@@ -335,8 +374,8 @@ mod tests {
 
         // Create a new certificate.
         let certificate = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(rng);
-        // Compute the certificate ID.
-        let certificate_id = certificate.to_id().unwrap();
+        // Retrieve the certificate ID.
+        let certificate_id = certificate.certificate_id();
         // Retrieve the round.
         let round = certificate.round();
         // Retrieve the batch ID.
@@ -349,7 +388,7 @@ mod tests {
         // Ensure the storage is not empty.
         assert!(!is_empty(&storage));
         // Ensure the certificate is stored in the correct round.
-        assert_eq!(storage.get_certificates_for_round(round), Some(indexset! { certificate.clone() }));
+        assert_eq!(storage.get_certificates_for_round(round), indexset! { certificate.clone() });
 
         // Check that the underlying storage representation is correct.
         {
@@ -371,10 +410,10 @@ mod tests {
         assert_eq!(certificate, candidate_certificate);
 
         // Remove the certificate.
-        storage.remove_certificate(certificate_id).unwrap();
+        assert!(storage.remove_certificate(certificate_id));
         // Ensure the storage is empty.
         assert!(is_empty(&storage));
         // Ensure the certificate is no longer stored in the round.
-        assert_eq!(storage.get_certificates_for_round(round), None);
+        assert!(storage.get_certificates_for_round(round).is_empty());
     }
 }

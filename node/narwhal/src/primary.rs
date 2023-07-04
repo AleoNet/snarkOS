@@ -153,8 +153,7 @@ impl<N: Network> Primary<N> {
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
         // Retrieve the previous certificates.
-        let previous_certificates =
-            self.storage.get_certificates_for_round(round.saturating_sub(1)).unwrap_or_default();
+        let previous_certificates = self.storage.get_certificates_for_round(previous_round);
 
         // Check if the batch is ready to be proposed.
         let mut is_ready = false;
@@ -308,7 +307,7 @@ impl<N: Network> Primary<N> {
         };
 
         // Create the batch certificate.
-        let Ok(certificate) = BatchCertificate::from(header, signatures) else {
+        let Ok(certificate) = BatchCertificate::new(header, signatures) else {
             // TODO (howardwu): Figure out how to handle a failed certificate.
             error!("Failed to create a batch certificate");
             return Ok(());
