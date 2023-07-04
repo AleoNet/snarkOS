@@ -155,12 +155,11 @@ impl<N: Network> Primary<N> {
         // Sign the batch.
         let batch = Batch::new(private_key, round, transmissions, previous_certificates, &mut rng)?;
 
-        // Initialize an RNG.
-        let rng = &mut rand::thread_rng();
         // Generate a timestamp.
         let timestamp = now();
         // Sign the batch ID.
-        let signature = self.gateway.account().sign(&[batch.batch_id(), Field::from_u64(timestamp as u64)], rng)?;
+        let signature =
+            self.gateway.account().sign(&[batch.batch_id(), Field::from_u64(timestamp as u64)], &mut rng)?;
 
         // Set the proposed batch. The signature and timestamp need to be precomputed to include own
         // stake in quorum threshold computations as BatchPropose and BatchSignature events are not
@@ -168,6 +167,7 @@ impl<N: Network> Primary<N> {
         let mut signature_map = IndexMap::new();
         signature_map.insert(signature, timestamp);
         *self.proposed_batch.write() = Some((batch.clone(), signature_map));
+        debug!("Proposed batch: {:?}", batch.batch_id());
 
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(BatchPropose::new(Data::Object(batch.to_header()?))));
@@ -248,7 +248,7 @@ impl<N: Network> Primary<N> {
         if let Some((_, signatures)) = self.proposed_batch.write().as_mut() {
             // Add the signature to the batch.
             signatures.insert(signature, timestamp);
-            debug!("Added a batch signature from peer '{peer_ip}'");
+            debug!("Added a batch signature {} from peer '{peer_ip}'", batch_id);
         }
 
         // Check if the batch is ready to be certified.
@@ -298,7 +298,7 @@ impl<N: Network> Primary<N> {
         // Broadcast the certified batch to all validators.
         self.gateway.broadcast(Event::BatchCertified(event));
 
-        info!("\n\n\n\n\nOur batch for round {} has been certified!\n\n\n\n", self.committee.round());
+        info!("\n\n\n\n\nOur batch {batch_id} for round {} has been certified!\n\n\n\n", self.committee.round());
 
         // Increment the round.
         self.committee.increment_round();
