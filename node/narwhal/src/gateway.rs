@@ -138,24 +138,24 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Returns `true` if the given IP is this node.
-    pub fn is_local_ip(&self, ip: &SocketAddr) -> bool {
-        *ip == self.local_ip()
+    pub fn is_local_ip(&self, ip: SocketAddr) -> bool {
+        ip == self.local_ip()
             || (ip.ip().is_unspecified() || ip.ip().is_loopback()) && ip.port() == self.local_ip().port()
     }
 
     /// Returns the listener IP address from the (ambiguous) peer address.
-    pub fn resolve_to_listener(&self, peer_addr: &SocketAddr) -> Option<SocketAddr> {
+    pub fn resolve_to_listener(&self, peer_addr: SocketAddr) -> Option<SocketAddr> {
         self.resolver.get_listener(peer_addr)
     }
 
     /// Returns the (ambiguous) peer address from the listener IP address.
-    pub fn resolve_to_ambiguous(&self, peer_ip: &SocketAddr) -> Option<SocketAddr> {
+    pub fn resolve_to_ambiguous(&self, peer_ip: SocketAddr) -> Option<SocketAddr> {
         self.resolver.get_ambiguous(peer_ip)
     }
 
     /// Returns `true` if the node is connected to the given peer IP.
-    pub fn is_connected(&self, ip: &SocketAddr) -> bool {
-        self.connected_peers.read().contains(ip)
+    pub fn is_connected(&self, ip: SocketAddr) -> bool {
+        self.connected_peers.read().contains(&ip)
     }
 
     /// Returns the maximum number of connected peers.
@@ -200,7 +200,7 @@ impl<N: Network> Gateway<N> {
     /// Ensure we are allowed to connect to the given peer.
     fn check_connection_attempt(&self, peer_ip: SocketAddr) -> Result<()> {
         // Ensure the peer IP is not this node.
-        if self.is_local_ip(&peer_ip) {
+        if self.is_local_ip(peer_ip) {
             bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (attempted to self-connect)")
         }
         // Ensure the node does not surpass the maximum number of peer connections.
@@ -208,7 +208,7 @@ impl<N: Network> Gateway<N> {
             bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (maximum peers reached)")
         }
         // Ensure the node is not already connected to this peer.
-        if self.is_connected(&peer_ip) {
+        if self.is_connected(peer_ip) {
             bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (already connected)")
         }
         // // Ensure the peer is not restricted.
@@ -225,7 +225,7 @@ impl<N: Network> Gateway<N> {
     /// Ensure the peer is allowed to connect.
     fn ensure_peer_is_allowed(&self, peer_ip: SocketAddr) -> Result<()> {
         // Ensure the peer IP is not this node.
-        if self.is_local_ip(&peer_ip) {
+        if self.is_local_ip(peer_ip) {
             bail!("{CONTEXT} Dropping connection request from '{peer_ip}' (attempted to self-connect)")
         }
         // Ensure the node is not already connecting to this peer.
@@ -233,7 +233,7 @@ impl<N: Network> Gateway<N> {
             bail!("{CONTEXT} Dropping connection request from '{peer_ip}' (already shaking hands as the initiator)")
         }
         // Ensure the node is not already connected to this peer.
-        if self.is_connected(&peer_ip) {
+        if self.is_connected(peer_ip) {
             bail!("{CONTEXT} Dropping connection request from '{peer_ip}' (already connected)")
         }
         // // Ensure the peer is not restricted.
@@ -271,13 +271,13 @@ impl<N: Network> Gateway<N> {
     /// Removes the connected peer and adds them to the candidate peers.
     fn remove_connected_peer(&self, peer_ip: SocketAddr) {
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
-        self.resolver.remove_peer(&peer_ip);
+        self.resolver.remove_peer(peer_ip);
         // // Removes the peer from the sync pool.
         // self.sync.remove_peer(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().shift_remove(&peer_ip);
         // Remove this peer from the committee.
-        self.committee.remove_peer(&peer_ip);
+        self.committee.remove_peer(peer_ip);
         // // Add the peer to the candidate peers.
         // self.candidate_peers.write().insert(peer_ip);
     }
@@ -296,7 +296,7 @@ impl<N: Network> Gateway<N> {
         //     return None;
         // }
         // Resolve the listener IP to the (ambiguous) peer address.
-        let Some(peer_addr) = self.resolve_to_ambiguous(&peer_ip) else {
+        let Some(peer_addr) = self.resolve_to_ambiguous(peer_ip) else {
             warn!("Unable to resolve the listener IP address '{peer_ip}'");
             return None;
         };
@@ -337,7 +337,7 @@ impl<N: Network> Gateway<N> {
     /// Handles the inbound event from the peer.
     async fn inbound(&self, peer_addr: SocketAddr, event: Event<N>) -> Result<()> {
         // Retrieve the listener IP for the peer.
-        let peer_ip = match self.resolve_to_listener(&peer_addr) {
+        let peer_ip = match self.resolve_to_listener(peer_addr) {
             Some(peer_ip) => peer_ip,
             None => bail!("{CONTEXT} Unable to resolve the (ambiguous) peer address '{peer_addr}'"),
         };
@@ -430,7 +430,7 @@ impl<N: Network> Gateway<N> {
     pub fn disconnect(&self, peer_ip: SocketAddr) -> JoinHandle<()> {
         let gateway = self.clone();
         tokio::spawn(async move {
-            if let Some(peer_addr) = gateway.resolve_to_ambiguous(&peer_ip) {
+            if let Some(peer_addr) = gateway.resolve_to_ambiguous(peer_ip) {
                 // Disconnect from this peer.
                 let _disconnected = gateway.tcp.disconnect(peer_addr).await;
                 debug_assert!(_disconnected);
@@ -475,7 +475,7 @@ impl<N: Network> Reading for Gateway<N> {
     async fn process_message(&self, peer_addr: SocketAddr, message: Self::Message) -> io::Result<()> {
         // Process the message. Disconnect if the peer violated the protocol.
         if let Err(error) = self.inbound(peer_addr, message).await {
-            if let Some(peer_ip) = self.resolve_to_listener(&peer_addr) {
+            if let Some(peer_ip) = self.resolve_to_listener(peer_addr) {
                 warn!("Disconnecting from '{peer_ip}' - {error}");
                 self.send(peer_ip, Event::Disconnect(DisconnectReason::ProtocolViolation.into()));
                 // Disconnect from this peer.
@@ -502,7 +502,7 @@ impl<N: Network> Writing for Gateway<N> {
 impl<N: Network> Disconnect for Gateway<N> {
     /// Any extra operations to be performed during a disconnect.
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
-        if let Some(peer_ip) = self.resolve_to_listener(&peer_addr) {
+        if let Some(peer_ip) = self.resolve_to_listener(peer_addr) {
             self.remove_connected_peer(peer_ip);
         }
     }
@@ -738,7 +738,7 @@ impl<N: Network> Gateway<N> {
         }
 
         // Ensure the address is in the committee.
-        if !self.committee.is_committee_member(&address) {
+        if !self.committee.is_committee_member(address) {
             warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
             return Some(DisconnectReason::ProtocolViolation);
         }

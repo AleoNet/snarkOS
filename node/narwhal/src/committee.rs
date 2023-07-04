@@ -68,7 +68,7 @@ impl<N: Network> Committee<N> {
     /// Adds a validator to the committee.
     pub fn add_validator(&self, address: Address<N>, stake: u64) -> Result<()> {
         // Check if the validator is already in the committee.
-        if self.is_committee_member(&address) {
+        if self.is_committee_member(address) {
             bail!("Validator already in committee");
         }
         // Add the validator to the committee.
@@ -87,13 +87,13 @@ impl<N: Network> Committee<N> {
     }
 
     /// Returns `true` if the given address is in the committee.
-    pub fn is_committee_member(&self, address: &Address<N>) -> bool {
-        self.committee.read().contains_key(address)
+    pub fn is_committee_member(&self, address: Address<N>) -> bool {
+        self.committee.read().contains_key(&address)
     }
 
     /// Returns the amount of stake for the given address.
-    pub fn get_stake(&self, address: &Address<N>) -> u64 {
-        self.committee.read().get(address).copied().unwrap_or_default()
+    pub fn get_stake(&self, address: Address<N>) -> u64 {
+        self.committee.read().get(&address).copied().unwrap_or_default()
     }
 
     /// Returns the total amount of stake in the committee.
@@ -127,13 +127,13 @@ impl<N: Network> Committee<N> {
 
 impl<N: Network> Committee<N> {
     /// Returns the peer IP for the given address.
-    pub fn get_peer_ip(&self, address: &Address<N>) -> Option<SocketAddr> {
-        self.address_peers.read().get(address).copied()
+    pub fn get_peer_ip(&self, address: Address<N>) -> Option<SocketAddr> {
+        self.address_peers.read().get(&address).copied()
     }
 
     /// Returns the address for the given peer IP.
-    pub fn get_address(&self, peer_ip: &SocketAddr) -> Option<Address<N>> {
-        self.peer_addresses.read().get(peer_ip).copied()
+    pub fn get_address(&self, peer_ip: SocketAddr) -> Option<Address<N>> {
+        self.peer_addresses.read().get(&peer_ip).copied()
     }
 
     /// Inserts the given peer.
@@ -143,8 +143,8 @@ impl<N: Network> Committee<N> {
     }
 
     /// Removes the given peer.
-    pub(crate) fn remove_peer(&self, peer_ip: &SocketAddr) {
-        if let Some(address) = self.peer_addresses.write().remove(peer_ip) {
+    pub(crate) fn remove_peer(&self, peer_ip: SocketAddr) {
+        if let Some(address) = self.peer_addresses.write().remove(&peer_ip) {
             self.address_peers.write().remove(&address);
         }
     }
