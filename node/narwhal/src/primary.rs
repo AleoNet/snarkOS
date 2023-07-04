@@ -178,7 +178,7 @@ impl<N: Network> Primary<N> {
         let header = batch.to_header()?;
 
         // Set the proposed batch.
-        *self.proposed_batch.write() = Some((batch.clone(), Default::default()));
+        *self.proposed_batch.write() = Some((batch, Default::default()));
 
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(BatchPropose::new(Data::Object(header))));
