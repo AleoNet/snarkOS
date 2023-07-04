@@ -128,9 +128,9 @@ impl<N: Network> Worker<N> {
 
     /// Handles the incoming transmission request.
     async fn process_transmission_request(&self, peer_ip: SocketAddr, request: TransmissionRequest<N>) {
-        // Check if the transmission ID exists in the ready queue.
+        // Attempt to retrieve the transmission.
         if let Some(transmission) = self.storage.get_transmission(request.transmission_id) {
-            // Send the transmission response to the peer.
+            // Send the transmission to the peer.
             self.send_transmission_response(peer_ip, request.transmission_id, transmission).await;
         }
     }
