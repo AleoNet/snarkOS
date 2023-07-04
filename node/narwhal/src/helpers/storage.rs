@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::helpers::Committee;
 use snarkvm::{
     ledger::narwhal::{BatchCertificate, Transmission, TransmissionID},
     prelude::{Address, Field, Network},
@@ -25,7 +26,8 @@ use std::sync::Arc;
 /// The storage for the memory pool.
 ///
 /// The storage is used to store the following:
-/// - `round` to `certificate ID` entries.
+/// - `round` to `committee` entries.
+/// - `round` to `(certificate ID, batch ID, address)` entries.
 /// - `certificate ID` to `certificate` entries.
 /// - `batch ID` to `round` entries.
 /// - `transmission ID` to `transmission` entries.
@@ -37,12 +39,17 @@ use std::sync::Arc;
 ///   - The `certificate` triggers updates to the `rounds`, `certificates`, and `batch_ids` maps.
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network> {
+    /* Once per round */
+    /// The map of `round` to `committee`.
+    committees: Arc<RwLock<IndexMap<u64, Committee<N>>>>,
+    /* Once per batch */
     /// The map of `round` to a list of `(certificate ID, batch ID, address)` entries.
     rounds: Arc<RwLock<IndexMap<u64, IndexSet<(Field<N>, Field<N>, Address<N>)>>>>,
     /// The map of `certificate ID` to `certificate`.
     certificates: Arc<RwLock<IndexMap<Field<N>, BatchCertificate<N>>>>,
     /// The map of `batch ID` to `round`.
     batch_ids: Arc<RwLock<IndexMap<Field<N>, u64>>>,
+    /* Once per transmission */
     /// The map of `transmission ID` to `transmission`.
     transmissions: Arc<RwLock<IndexMap<TransmissionID<N>, Transmission<N>>>>,
 }
@@ -58,6 +65,7 @@ impl<N: Network> Storage<N> {
     /// Initializes a new instance of storage.
     pub fn new() -> Self {
         Self {
+            committees: Default::default(),
             rounds: Default::default(),
             certificates: Default::default(),
             batch_ids: Default::default(),
@@ -67,6 +75,11 @@ impl<N: Network> Storage<N> {
 }
 
 impl<N: Network> Storage<N> {
+    /// Returns an iterator over the `committees` map.
+    pub fn committees_iter(&self) -> impl Iterator<Item = (u64, Committee<N>)> {
+        self.committees.read().clone().into_iter()
+    }
+
     /// Returns an iterator over the `rounds` map.
     pub fn rounds_iter(&self) -> impl Iterator<Item = (u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)> {
         self.rounds.read().clone().into_iter()
@@ -89,10 +102,43 @@ impl<N: Network> Storage<N> {
 }
 
 impl<N: Network> Storage<N> {
+    /// Returns the `committee` for the given `round`.
+    /// If the round does not exist in storage, `None` is returned.
+    pub fn get_committee_for_round(&self, round: u64) -> Option<Committee<N>> {
+        // Get the committee from storage.
+        self.committees.read().get(&round).cloned()
+    }
+
+    /// Insert the given `committee` into storage.
+    pub fn insert_committee(&self, committee: Committee<N>) {
+        // Insert the committee into storage.
+        self.committees.write().insert(committee.round(), committee);
+    }
+
+    /// Removes the committee for the given `round` from storage.
+    pub fn remove_committee(&self, round: u64) {
+        // Remove the committee from storage.
+        self.committees.write().remove(&round);
+    }
+}
+
+impl<N: Network> Storage<N> {
     /// Returns `true` if the storage contains the specified `round`.
     pub fn contains_round(&self, round: u64) -> bool {
         // Check if the round exists in storage.
         self.rounds.read().contains_key(&round)
+    }
+
+    /// Returns `true` if the storage contains the specified `certificate ID`.
+    pub fn contains_certificate(&self, certificate_id: Field<N>) -> bool {
+        // Check if the certificate ID exists in storage.
+        self.certificates.read().contains_key(&certificate_id)
+    }
+
+    /// Returns `true` if the storage contains the specified `batch ID`.
+    pub fn contains_batch(&self, batch_id: Field<N>) -> bool {
+        // Check if the batch ID exists in storage.
+        self.batch_ids.read().contains_key(&batch_id)
     }
 
     /// Returns the round for the given `certificate ID`.
@@ -107,20 +153,6 @@ impl<N: Network> Storage<N> {
     pub fn get_round_for_batch(&self, batch_id: Field<N>) -> Option<u64> {
         // Get the round.
         self.batch_ids.read().get(&batch_id).cloned()
-    }
-}
-
-impl<N: Network> Storage<N> {
-    /// Returns `true` if the storage contains the specified `batch ID`.
-    pub fn contains_batch(&self, batch_id: Field<N>) -> bool {
-        // Check if the batch ID exists in storage.
-        self.batch_ids.read().contains_key(&batch_id)
-    }
-
-    /// Returns `true` if the storage contains the specified `certificate ID`.
-    pub fn contains_certificate(&self, certificate_id: Field<N>) -> bool {
-        // Check if the certificate ID exists in storage.
-        self.certificates.read().contains_key(&certificate_id)
     }
 
     /// Returns the certificate for the given `certificate ID`.

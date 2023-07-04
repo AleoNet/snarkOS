@@ -146,30 +146,40 @@ impl<N: Network> Primary<N> {
             transmissions.extend(worker.drain());
         }
 
-        // TODO (howardwu): Switch this for dynamic committees.
-        // let committee = self.storage.get_committee_for_round(round.saturating_sub(1));
-        let committee = self.committee.read().clone();
-
         // Retrieve the private key.
         let private_key = self.gateway.account().private_key();
         // Retrieve the current round.
-        let round = committee.round();
+        let round = self.committee.read().round();
+        // Compute the previous round.
+        let previous_round = round.saturating_sub(1);
         // Retrieve the previous certificates.
         let previous_certificates =
             self.storage.get_certificates_for_round(round.saturating_sub(1)).unwrap_or_default();
 
-        // Compute the cumulative amount of stake for the previous certificates.
-        let mut stake = 0u64;
-        for certificate in previous_certificates.iter() {
-            stake = stake.saturating_add(committee.get_stake(certificate.to_address()));
+        // Check if the batch is ready to be proposed.
+        let mut is_ready = false;
+        if previous_round == 0 {
+            // Note: The primary starts at round 1, and round 0 contains no certificates, by definition.
+            is_ready = true;
+        } else if let Some(committee) = self.storage.get_committee_for_round(previous_round) {
+            // Compute the cumulative amount of stake for the previous certificates.
+            let mut stake = 0u64;
+            for certificate in previous_certificates.iter() {
+                stake = stake.saturating_add(committee.get_stake(certificate.to_address()));
+            }
+            // Check if the previous certificates have reached quorum threshold.
+            if stake >= committee.quorum_threshold()? {
+                is_ready = true;
+            }
         }
-        // Ensure the previous certificates reach the quorum threshold.
-        // Note: Primary starts at round 1, and round 0 contains no certificates, by definition.
-        if round > 1 && stake < committee.quorum_threshold()? {
+        // If the batch is not ready to be certified, return early.
+        if !is_ready {
             return Ok(());
         }
 
         /* Proceeding to sign & propose the batch. */
+
+        debug!("Proposing a batch for round {round}...");
 
         // Sign the batch.
         let batch = Batch::new(private_key, round, transmissions, previous_certificates, &mut rng)?;
@@ -273,9 +283,8 @@ impl<N: Network> Primary<N> {
             for signature in signatures.keys().chain([batch.signature()].into_iter()) {
                 stake = stake.saturating_add(self.committee.read().get_stake(signature.to_address()));
             }
-            // Check if the batch has reached the threshold.
+            // Check if the batch has reached quorum threshold.
             if stake >= self.committee.read().quorum_threshold()? {
-                info!("Quorum threshold reached, preparing to certify the batch");
                 is_ready = true;
             }
         }
@@ -285,6 +294,8 @@ impl<N: Network> Primary<N> {
         }
 
         /* Proceeding to certify the batch. */
+
+        info!("Quorum threshold reached - Preparing to certify our batch...");
 
         // Retrieve the batch and signatures, clearing the proposed batch.
         let (batch, signatures) = self.proposed_batch.write().take().unwrap();
@@ -311,15 +322,16 @@ impl<N: Network> Primary<N> {
         // Broadcast the certified batch to all validators.
         self.gateway.broadcast(Event::BatchCertified(event));
 
-        info!("\n\n\n\n\nOur batch for round {} has been certified!\n\n\n\n", self.committee.read().round());
-
         // Acquire the write lock for the committee.
         let mut committee = self.committee.write();
+        // Store the (now expired) committee into storage, as this round has been certified.
+        self.storage.insert_committee((*committee).clone());
         // Construct the committee for the next round.
         let next_committee = (*committee).to_next_round()?;
         // Update the committee.
         *committee = next_committee;
 
+        info!("\n\n\n\n\nOur batch for round {} has been certified!\n\n\n\n", committee.round() - 1);
         Ok(())
     }
 }
