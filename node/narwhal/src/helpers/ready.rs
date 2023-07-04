@@ -65,7 +65,7 @@ impl<N: Network> Ready<N> {
 
     /// Returns the transmission, given the specified `transmission ID`.
     pub fn get(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<Transmission<N>> {
-        self.storage.get(transmission_id)
+        self.storage.get_transmission(transmission_id)
     }
 
     /// Inserts the specified (`transmission ID`, `transmission`) to the ready queue.
@@ -74,13 +74,13 @@ impl<N: Network> Ready<N> {
         let transmission_id = transmission_id.into();
 
         // Determine if the transmission is new.
-        let is_new = !self.contains(transmission_id) && !self.storage.contains(transmission_id);
+        let is_new = !self.contains(transmission_id) && !self.storage.contains_transmission(transmission_id);
         // If the transmission is new, insert it.
         if is_new {
             // Insert the transmission ID.
             self.transmission_ids.write().insert(transmission_id);
             // Insert the transmission.
-            self.storage.insert(transmission_id, transmission);
+            self.storage.insert_transmission(transmission_id, transmission);
             // Check if the transmission ID is for a prover solution.
             if let TransmissionID::Solution(commitment) = &transmission_id {
                 // Increment the cumulative proof target.
@@ -113,7 +113,7 @@ impl<N: Network> Ready<N> {
         // Iterate through the transmission IDs.
         for transmission_id in ids.iter() {
             // Retrieve the transmission.
-            if let Some(transmission) = self.storage.get(*transmission_id) {
+            if let Some(transmission) = self.storage.get_transmission(*transmission_id) {
                 // Insert the transmission.
                 transmissions.insert(*transmission_id, transmission);
             }

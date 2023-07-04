@@ -39,23 +39,25 @@ impl<N: Network> Storage<N> {
     pub fn new() -> Self {
         Self { transmissions: Default::default() }
     }
+}
 
+impl<N: Network> Storage<N> {
     /// Returns `true` if the storage contains the specified `transmission ID`.
-    pub fn contains(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
+    pub fn contains_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
         // Check if the transmission ID exists in storage.
         self.transmissions.read().contains_key(&transmission_id.into())
     }
 
     /// Returns the transmission for the given `transmission ID`.
     /// If the transmission ID does not exist in storage, `None` is returned.
-    pub fn get(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<Transmission<N>> {
+    pub fn get_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<Transmission<N>> {
         // Get the transmission.
         self.transmissions.read().get(&transmission_id.into()).cloned()
     }
 
     /// Inserts the given (`transmission ID`, `transmission`) into storage.
     /// If the transmission ID already exists in storage, the existing transmission is returned.
-    pub fn insert(
+    pub fn insert_transmission(
         &self,
         transmission_id: impl Into<TransmissionID<N>>,
         transmission: Transmission<N>,

@@ -102,7 +102,7 @@ impl<N: Network> Worker<N> {
     /// Handles the incoming ping event.
     async fn process_worker_ping(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
         // Check if the transmission ID exists in the ready queue or in storage.
-        if self.ready.contains(transmission_id) || self.storage.contains(transmission_id) {
+        if self.ready.contains(transmission_id) || self.storage.contains_transmission(transmission_id) {
             return;
         }
         // Check if the transmission ID already exists in the ledger.
@@ -129,7 +129,7 @@ impl<N: Network> Worker<N> {
     /// Handles the incoming transmission request.
     async fn process_transmission_request(&self, peer_ip: SocketAddr, request: TransmissionRequest<N>) {
         // Check if the transmission ID exists in the ready queue.
-        if let Some(transmission) = self.storage.get(request.transmission_id) {
+        if let Some(transmission) = self.storage.get_transmission(request.transmission_id) {
             // Send the transmission response to the peer.
             self.send_transmission_response(peer_ip, request.transmission_id, transmission).await;
         }

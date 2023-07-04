@@ -266,7 +266,7 @@ async fn main() -> Result<()> {
     let num_nodes = u16::from_str(&args[2])?;
 
     // Start the primary instance.
-    let (primary, sender) = start_primary(node_id, num_nodes).await?;
+    let (_primary, sender) = start_primary(node_id, num_nodes).await?;
 
     // Fire unconfirmed solutions.
     fire_unconfirmed_solutions(&sender, node_id);

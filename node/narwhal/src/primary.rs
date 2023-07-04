@@ -22,6 +22,7 @@ use crate::{
     SealedBatch,
     Shared,
     Worker,
+    MAX_EXPIRATION_TIME,
     MAX_WORKERS,
 };
 use snarkos_account::Account;
@@ -36,6 +37,11 @@ use parking_lot::{Mutex, RwLock};
 use std::{future::Future, net::SocketAddr, sync::Arc};
 use time::OffsetDateTime;
 use tokio::task::JoinHandle;
+
+/// Returns the current UTC epoch timestamp.
+fn now() -> i64 {
+    OffsetDateTime::now_utc().unix_timestamp()
+}
 
 #[derive(Clone)]
 pub struct Primary<N: Network> {
@@ -67,16 +73,6 @@ impl<N: Network> Primary<N> {
             proposed_batch: Default::default(),
             handles: Default::default(),
         })
-    }
-
-    /// Returns the gateway.
-    pub const fn gateway(&self) -> &Gateway<N> {
-        &self.gateway
-    }
-
-    /// Returns the number of workers.
-    pub fn num_workers(&self) -> u8 {
-        u8::try_from(self.workers.read().len()).expect("Too many workers")
     }
 
     /// Run the primary instance.
@@ -114,6 +110,18 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
+    /// Returns the gateway.
+    pub const fn gateway(&self) -> &Gateway<N> {
+        &self.gateway
+    }
+
+    /// Returns the number of workers.
+    pub fn num_workers(&self) -> u8 {
+        u8::try_from(self.workers.read().len()).expect("Too many workers")
+    }
+}
+
+impl<N: Network> Primary<N> {
     /// Proposes the batch for the current round.
     ///
     /// This method performs the following steps:
@@ -150,6 +158,139 @@ impl<N: Network> Primary<N> {
         self.gateway.broadcast(Event::BatchPropose(BatchPropose::new(Data::Object(batch))));
         Ok(())
     }
+
+    /// Processes a batch propose from a peer.
+    ///
+    /// This method performs the following steps:
+    /// 1. Verify the batch.
+    /// 2. Sign the batch.
+    /// 3. Broadcast the signature back to the validator.
+    async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
+        // // Retrieve the current round.
+        // let round = self.shared.round();
+        // Deserialize the batch.
+        let batch = batch_propose.batch.deserialize().await?;
+
+        // TODO (howardwu): Verify the batch.
+
+        // Store the proposed batch in the shared state.
+        self.shared.store_proposed_batch(peer_ip, batch.clone());
+
+        // Initialize an RNG.
+        let rng = &mut rand::thread_rng();
+        // Generate a timestamp.
+        let timestamp = now();
+        // Sign the batch ID.
+        let signature = self.gateway.account().sign(&[batch.batch_id(), Field::from_u64(timestamp as u64)], rng)?;
+        // Broadcast the signature back to the validator.
+        self.gateway.send(peer_ip, Event::BatchSignature(BatchSignature::new(batch.batch_id(), signature, timestamp)));
+        Ok(())
+    }
+
+    /// Processes a batch signature from a peer.
+    ///
+    /// This method performs the following steps:
+    /// 1. Verify the signature, ensuring it corresponds to the proposed batch.
+    /// 2. Ensure the proposed batch has not expired.
+    /// 3. Store the signature.
+    /// 4. Seal the batch if enough signatures have been received.
+    /// 5. Broadcast the sealed batch to all validators.
+    async fn process_batch_signature_from_peer(
+        &self,
+        peer_ip: SocketAddr,
+        batch_signature: BatchSignature<N>,
+    ) -> Result<()> {
+        // Retrieve the batch ID and signature.
+        let BatchSignature { batch_id, signature, timestamp } = batch_signature;
+
+        // Ensure the batch ID matches the currently proposed batch.
+        if Some(batch_id) != self.proposed_batch.read().as_ref().map(|(batch, _)| batch.batch_id()) {
+            warn!("Received a batch signature for an unknown batch ID '{batch_id}' from peer '{peer_ip}'");
+            return Ok(());
+        }
+        // Retrieve the address of the peer.
+        let Some(address) = self.shared.get_address(&peer_ip) else {
+            warn!("Received a batch signature from a disconnected peer '{peer_ip}'");
+            return Ok(());
+        };
+        // Ensure the address is in the committee.
+        if !self.shared.is_committee_member(&address) {
+            warn!("Received a batch signature from a non-committee peer '{peer_ip}'");
+            return Ok(());
+        }
+        // Verify the signature.
+        if !signature.verify(&address, &[batch_id, Field::from_u64(timestamp as u64)]) {
+            warn!("Received an invalid batch signature from peer '{peer_ip}'");
+            return Ok(());
+        }
+
+        // Check if the proposed batch is expired.
+        let mut is_expired = false;
+        if let Some((batch, _)) = self.proposed_batch.read().as_ref() {
+            // If the batch is expired, clear it.
+            is_expired = now().saturating_sub(batch.timestamp()) > MAX_EXPIRATION_TIME;
+        }
+        // If the batch is expired, clear it.
+        if is_expired {
+            *self.proposed_batch.write() = None;
+        }
+
+        // Add the signature to the batch, and attempt to seal the batch if enough signatures have been received.
+        if let Some((_, signatures)) = self.proposed_batch.write().as_mut() {
+            // Add the signature to the batch.
+            signatures.insert(signature, timestamp);
+            info!("Added a batch signature from peer '{peer_ip}'");
+        }
+
+        // Check if the batch is ready to be sealed.
+        let mut is_ready = true;
+        if let Some((_batch, _signatures)) = self.proposed_batch.read().as_ref() {
+            // If the batch is ready to be sealed, seal it.
+            // TODO (howardwu): Compute the threshold.
+            // if signatures.len() >= self.shared.committee_size() {
+            // }
+        }
+        // If the batch is not ready to be sealed, return early.
+        if !is_ready {
+            return Ok(());
+        }
+
+        /* Proceeding to seal the batch. */
+
+        // Retrieve the batch and signatures, clearing the proposed batch.
+        let (batch, signatures) = self.proposed_batch.write().take().unwrap();
+
+        // Compute the batch header.
+        let Ok(header) = batch.to_header() else {
+            // TODO (howardwu): Figure out how to handle a failed header.
+            error!("Failed to create a batch header");
+            return Ok(());
+        };
+
+        // Create the batch certificate.
+        let Ok(certificate) = BatchCertificate::from(header, signatures.clone()) else {
+            // TODO (howardwu): Figure out how to handle a failed certificate.
+            error!("Failed to create a batch certificate");
+            return Ok(());
+        };
+
+        // Seal the batch.
+        let sealed_batch = SealedBatch::new(batch.clone(), certificate.clone());
+
+        // Fetch the address.
+        let address = self.gateway.account().address();
+        // Store the sealed batch in the shared state.
+        self.shared.store_sealed_batch_from_primary(address, sealed_batch);
+
+        // Create a batch sealed event.
+        let event = BatchSealed::new(Data::Object(certificate));
+        // Broadcast the sealed batch to all validators.
+        self.gateway.broadcast(Event::BatchSealed(event));
+        // TODO: Increment the round.
+        info!("\n\n\n\n\nA batch has been sealed!\n\n\n\n");
+
+        Ok(())
+    }
 }
 
 impl<N: Network> Primary<N> {
@@ -165,8 +306,6 @@ impl<N: Network> Primary<N> {
 
         // Start the batch proposer.
         self.start_batch_proposer();
-        // Start the batch sealer.
-        self.start_batch_sealer();
 
         // Process the proposed batch.
         let self_clone = self.clone();
@@ -261,139 +400,6 @@ impl<N: Network> Primary<N> {
                 }
             }
         });
-    }
-
-    /// Starts the batch sealer.
-    fn start_batch_sealer(&self) {
-        // Initialize the batch sealer.
-        let self_clone = self.clone();
-        self.spawn(async move {
-            loop {
-                // Initialize flags to track operations to perform after reading.
-                let mut is_expired = false;
-                let mut is_ready = false;
-
-                // If there is no batch, wait for one to be proposed.
-                if self_clone.proposed_batch.read().is_none() {
-                    // Sleep briefly, but longer than if there were a batch.
-                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
-                    continue;
-                }
-
-                // If there is a batch, check if it is expired or ready to be sealed.
-                if let Some((batch, signatures)) = self_clone.proposed_batch.read().clone() {
-                    // TODO (howardwu): Use stake checks.
-                    // // If the batch is expired, clear it.
-                    // is_expired = batch.timestamp() + BATCH_EXPIRATION
-                    //     < SystemTime::now().duration_since(UNIX_EPOCH).unwrap().as_secs();
-                    // // If the batch is ready to be sealed, seal it.
-                    // is_ready = signatures.len() >= self_clone.shared.num_validators();
-                    if !signatures.is_empty() {
-                        is_ready = true;
-                    }
-                }
-
-                // If the batch is expired, clear it.
-                if is_expired {
-                    *self_clone.proposed_batch.write() = None;
-                }
-                // If the batch is ready to be sealed, seal it.
-                if is_ready {
-                    // Retrieve the batch and signatures, clearing the proposed batch.
-                    let (batch, signatures) = self_clone.proposed_batch.write().take().unwrap();
-                    // Compute the batch header.
-                    if let Ok(header) = batch.to_header() {
-                        // Create the batch certificate.
-                        if let Ok(certificate) = BatchCertificate::from(header, signatures) {
-                            // Seal the batch.
-                            let sealed_batch = SealedBatch::new(batch, certificate.clone());
-
-                            // Fetch the address.
-                            let address = self_clone.gateway.account().address();
-                            // Store the sealed batch in the shared state.
-                            self_clone.shared.store_sealed_batch_from_primary(address, sealed_batch);
-
-                            // Create a batch sealed event.
-                            let event = BatchSealed::new(Data::Object(certificate));
-                            // Broadcast the sealed batch to all validators.
-                            self_clone.gateway.broadcast(Event::BatchSealed(event));
-                            // TODO: Increment the round.
-                            info!("\n\n\n\nA batch has been sealed!\n\n\n");
-                        } else {
-                            // TODO (howardwu): Figure out how to handle a failed certificate.
-                            error!("Failed to create a batch certificate")
-                        }
-                    } else {
-                        // TODO (howardwu): Figure out how to handle a failed header.
-                        error!("Failed to create a batch header")
-                    }
-                }
-
-                // Sleep briefly.
-                tokio::time::sleep(std::time::Duration::from_millis(50)).await;
-            }
-        });
-    }
-
-    /// Processes a batch propose from a peer.
-    async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
-        // // Retrieve the current round.
-        // let round = self.shared.round();
-        // Deserialize the batch.
-        let batch = batch_propose.batch.deserialize().await?;
-
-        // TODO (howardwu): Verify the batch.
-
-        // Store the proposed batch in the shared state.
-        self.shared.store_proposed_batch(peer_ip, batch.clone());
-
-        // Initialize an RNG.
-        let rng = &mut rand::thread_rng();
-        // Generate a timestamp.
-        let timestamp = OffsetDateTime::now_utc().unix_timestamp();
-        // Sign the batch ID.
-        let signature = self.gateway.account().sign(&[batch.batch_id(), Field::from_u64(timestamp as u64)], rng)?;
-        // Broadcast the signature back to the validator.
-        self.gateway.send(peer_ip, Event::BatchSignature(BatchSignature::new(batch.batch_id(), signature, timestamp)));
-        Ok(())
-    }
-
-    /// Processes a batch signature from a peer.
-    async fn process_batch_signature_from_peer(
-        &self,
-        peer_ip: SocketAddr,
-        batch_signature: BatchSignature<N>,
-    ) -> Result<()> {
-        // Retrieve the batch ID and signature.
-        let BatchSignature { batch_id, signature, timestamp } = batch_signature;
-
-        // Ensure the batch ID matches the currently proposed batch.
-        if Some(batch_id) != self.proposed_batch.read().as_ref().map(|(batch, _)| batch.batch_id()) {
-            warn!("Received a batch signature for an unknown batch ID '{batch_id}' from peer '{peer_ip}'");
-            return Ok(());
-        }
-        // Retrieve the address of the peer.
-        let Some(address) = self.shared.get_address(&peer_ip) else {
-            warn!("Received a batch signature from a disconnected peer '{peer_ip}'");
-            return Ok(());
-        };
-        // Ensure the address is in the committee.
-        if !self.shared.is_committee_member(&address) {
-            warn!("Received a batch signature from a non-committee peer '{peer_ip}'");
-            return Ok(());
-        }
-        // Verify the signature.
-        if !signature.verify(&address, &[batch_id, Field::from_u64(timestamp as u64)]) {
-            warn!("Received an invalid batch signature from peer '{peer_ip}'");
-            return Ok(());
-        }
-
-        // Add the signature to the batch.
-        if let Some((_, signatures)) = self.proposed_batch.write().as_mut() {
-            info!("Added a batch signature from peer '{peer_ip}'");
-            signatures.insert(signature, timestamp);
-        }
-        Ok(())
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
