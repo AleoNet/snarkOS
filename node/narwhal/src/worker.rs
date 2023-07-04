@@ -112,7 +112,7 @@ impl<N: Network> Worker<N> {
         let peer_ips = self.pending.get(transmission_id).unwrap_or_default();
 
         // Check if the number of requests is within the limit, and we have not requested from this peer IP.
-        if peer_ips.len() < MAX_REQUESTS_PER_TRANSMISSION && peer_ips.contains(&peer_ip) {
+        if peer_ips.len() < MAX_REQUESTS_PER_TRANSMISSION && !peer_ips.contains(&peer_ip) {
             trace!(
                 "Worker {} - Found a new transmission ID '{}' from peer '{peer_ip}'",
                 self.id,
@@ -148,7 +148,7 @@ impl<N: Network> Worker<N> {
                 // TODO: Validate the transmission.
                 // Insert the transmission into the ready queue.
                 self.ready.insert(response.transmission_id, response.transmission)?;
-                debug!(
+                trace!(
                     "Worker {} - Added transmission '{}' from peer '{peer_ip}'",
                     self.id,
                     fmt_id(response.transmission_id.to_string())

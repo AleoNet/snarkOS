@@ -124,7 +124,7 @@ fn keep_connections(primary: &Primary<CurrentNetwork>, node_id: u16, num_nodes: 
     let node = primary.clone();
     tokio::task::spawn(async move {
         // Sleep briefly to ensure the other nodes are ready to connect.
-        tokio::time::sleep(std::time::Duration::from_secs(node_id as u64)).await;
+        tokio::time::sleep(std::time::Duration::from_millis(100 * node_id as u64)).await;
         // Start the loop.
         loop {
             for i in 0..num_nodes {
@@ -207,7 +207,7 @@ fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_id: u
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(450)).await;
         }
     });
 }
@@ -246,7 +246,7 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(450)).await;
         }
     });
 }

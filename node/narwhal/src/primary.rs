@@ -403,7 +403,7 @@ impl<N: Network> Primary<N> {
                 // If there is a proposed batch, wait for it to be certified.
                 if self_clone.proposed_batch.read().is_some() {
                     // Sleep briefly, but longer than if there were no batch.
-                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                    tokio::time::sleep(std::time::Duration::from_millis(2500)).await;
                     continue;
                 }
 
