@@ -107,3 +107,8 @@ features = [ "fs", "trace" ]
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
 features = [ "env-filter" ]
+
+[dev-dependencies]
+test-strategy = "0.3.0"
+proptest = "1.0.0"
+rand_xorshift = "0.3.0"

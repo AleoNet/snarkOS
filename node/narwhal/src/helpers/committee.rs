@@ -117,3 +117,93 @@ impl<N: Network> Committee<N> {
         Ok(power)
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+    use crate::helpers::Committee;
+    use anyhow::Result;
+    use indexmap::IndexMap;
+    use proptest::sample::size_range;
+    use rand::SeedableRng;
+    use snarkos_account::Account;
+    use snarkvm::prelude::Testnet3;
+    use test_strategy::{proptest, Arbitrary};
+
+    type N = Testnet3;
+
+    #[derive(Arbitrary, Debug)]
+    pub struct CommitteeInput {
+        #[strategy(0u64..)]
+        pub round: u64,
+        #[any(size_range(0..32).lift())]
+        pub validators: Vec<Validator>,
+    }
+
+    #[derive(Arbitrary, Debug, Clone)]
+    pub struct Validator {
+        #[strategy(..5_000_000_000u64)]
+        pub stake: u64,
+        account_seed: u64,
+    }
+
+    impl Validator {
+        pub fn get_account(&self) -> Account<N> {
+            match Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(self.account_seed)) {
+                Ok(account) => account,
+                Err(err) => panic!("Failed to create account {err}"),
+            }
+        }
+    }
+
+    impl CommitteeInput {
+        pub fn to_committee(&self) -> Result<Committee<N>> {
+            let mut index_map = IndexMap::new();
+            for validator in self.validators.iter() {
+                index_map.insert(validator.get_account().address(), validator.stake);
+            }
+            Committee::new(self.round, index_map)
+        }
+
+        pub fn is_valid(&self) -> bool {
+            self.round > 0 && self.validators.len() >= 4
+        }
+    }
+
+    #[proptest]
+    fn committee_members(input: CommitteeInput) {
+        let committee = match input.to_committee() {
+            Ok(committee) => {
+                assert!(input.is_valid());
+                committee
+            }
+            Err(err) => {
+                assert!(!input.is_valid());
+                match err.to_string().as_str() {
+                    "Round must be nonzero" => assert_eq!(input.round, 0),
+                    "Committee must have at least 4 members" => assert!(input.validators.len() < 4),
+                    _ => panic!("Unexpected error: {err}"),
+                }
+                return Ok(());
+            }
+        };
+
+        let validators = input.validators;
+
+        let mut total_stake = 0;
+        for v in validators.iter() {
+            total_stake += v.stake;
+        }
+
+        assert_eq!(committee.committee_size(), validators.len());
+        assert_eq!(committee.total_stake().unwrap(), total_stake);
+        for v in validators.iter() {
+            let address = v.get_account().address();
+            assert!(committee.is_committee_member(address));
+            assert_eq!(committee.get_stake(address), v.stake);
+        }
+        let quorum_threshold = committee.quorum_threshold().unwrap();
+        let availability_threshold = committee.availability_threshold().unwrap();
+        // (2f + 1) + (f + 1) - 1 = 3f + 1 = N
+        assert_eq!(quorum_threshold + availability_threshold - 1, total_stake);
+    }
+}
