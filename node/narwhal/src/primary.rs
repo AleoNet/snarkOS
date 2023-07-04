@@ -84,7 +84,7 @@ impl<N: Network> Primary<N> {
         info!("Starting the primary instance of the memory pool...");
 
         // Set the primary sender.
-        self.committee.set_primary_sender(sender);
+        self.gateway.set_primary_sender(sender);
 
         // Construct a map of the worker senders.
         let mut tx_workers = IndexMap::new();
@@ -220,7 +220,7 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
         // Retrieve the address of the peer.
-        let Some(address) = self.committee.get_address(peer_ip) else {
+        let Some(address) = self.gateway.resolver().get_address(peer_ip) else {
             warn!("Received a batch signature from a disconnected peer '{peer_ip}'");
             return Ok(());
         };

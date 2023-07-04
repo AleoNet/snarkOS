@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{assign_to_worker, EventCodec, Resolver, WorkerSender},
+    helpers::{assign_to_worker, EventCodec, PrimarySender, Resolver, WorkerSender},
     ChallengeRequest,
     ChallengeResponse,
     Committee,
@@ -53,12 +53,10 @@ pub struct Gateway<N: Network> {
     committee: Arc<Committee<N>>,
     /// The account of the node.
     account: Account<N>,
-    /// The worker senders.
-    worker_senders: Arc<OnceCell<IndexMap<u8, WorkerSender<N>>>>,
     /// The TCP stack.
     tcp: Tcp,
     /// The resolver.
-    resolver: Arc<Resolver>,
+    resolver: Arc<Resolver<N>>,
     /// The map of connected peer IPs to their peer handlers.
     connected_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of handshaking peers. While `Tcp` already recognizes the connecting IP addresses
@@ -66,6 +64,10 @@ pub struct Gateway<N: Network> {
     /// prevent simultaneous "two-way" connections between two peers (i.e. both nodes simultaneously
     /// attempt to connect to each other). This set is used to prevent this from happening.
     connecting_peers: Arc<Mutex<IndexSet<SocketAddr>>>,
+    /// The primary sender.
+    primary_sender: Arc<OnceCell<PrimarySender<N>>>,
+    /// The worker senders.
+    worker_senders: Arc<OnceCell<IndexMap<u8, WorkerSender<N>>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -84,11 +86,12 @@ impl<N: Network> Gateway<N> {
         Ok(Self {
             committee,
             account,
-            worker_senders: Default::default(),
             tcp,
             resolver: Default::default(),
             connected_peers: Default::default(),
             connecting_peers: Default::default(),
+            primary_sender: Default::default(),
+            worker_senders: Default::default(),
             handles: Default::default(),
         })
     }
@@ -121,17 +124,6 @@ impl<N: Network> Gateway<N> {
         &self.account
     }
 
-    /// Returns the number of workers.
-    pub fn num_workers(&self) -> u8 {
-        u8::try_from(self.worker_senders.get().expect("Missing worker senders in gateway").len())
-            .expect("Too many workers")
-    }
-
-    /// Returns the worker sender for the given worker ID.
-    pub fn get_worker_sender(&self, worker_id: u8) -> Option<&WorkerSender<N>> {
-        self.worker_senders.get().and_then(|senders| senders.get(&worker_id))
-    }
-
     /// Returns the IP address of this node.
     pub fn local_ip(&self) -> SocketAddr {
         self.tcp.listening_addr().expect("The TCP listener is not enabled")
@@ -141,6 +133,32 @@ impl<N: Network> Gateway<N> {
     pub fn is_local_ip(&self, ip: SocketAddr) -> bool {
         ip == self.local_ip()
             || (ip.ip().is_unspecified() || ip.ip().is_loopback()) && ip.port() == self.local_ip().port()
+    }
+
+    /// Returns the resolver.
+    pub fn resolver(&self) -> &Resolver<N> {
+        &self.resolver
+    }
+
+    /// Returns the primary sender.
+    pub fn primary_sender(&self) -> &PrimarySender<N> {
+        self.primary_sender.get().expect("Primary sender not set")
+    }
+
+    /// Sets the primary sender.
+    pub fn set_primary_sender(&self, primary_sender: PrimarySender<N>) {
+        self.primary_sender.set(primary_sender).expect("Primary sender already set");
+    }
+
+    /// Returns the number of workers.
+    pub fn num_workers(&self) -> u8 {
+        u8::try_from(self.worker_senders.get().expect("Missing worker senders in gateway").len())
+            .expect("Too many workers")
+    }
+
+    /// Returns the worker sender for the given worker ID.
+    pub fn get_worker_sender(&self, worker_id: u8) -> Option<&WorkerSender<N>> {
+        self.worker_senders.get().and_then(|senders| senders.get(&worker_id))
     }
 
     /// Returns the listener IP address from the (ambiguous) peer address.
@@ -257,11 +275,9 @@ impl<N: Network> Gateway<N> {
     /// Inserts the given peer into the connected peers.
     fn insert_connected_peer(&self, peer_ip: SocketAddr, peer_addr: SocketAddr, address: Address<N>) {
         // Adds a bidirectional map between the listener address and (ambiguous) peer address.
-        self.resolver.insert_peer(peer_ip, peer_addr);
+        self.resolver.insert_peer(peer_ip, peer_addr, address);
         // Add an transmission for this peer in the connected peers.
         self.connected_peers.write().insert(peer_ip);
-        // Add this peer to the committee.
-        self.committee.insert_peer(peer_ip, address);
         // // Remove this peer from the candidate peers, if it exists.
         // self.candidate_peers.write().remove(&peer_ip);
         // // Remove this peer from the restricted peers, if it exists.
@@ -276,8 +292,6 @@ impl<N: Network> Gateway<N> {
         // self.sync.remove_peer(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().shift_remove(&peer_ip);
-        // Remove this peer from the committee.
-        self.committee.remove_peer(peer_ip);
         // // Add the peer to the candidate peers.
         // self.candidate_peers.write().insert(peer_ip);
     }
@@ -355,22 +369,17 @@ impl<N: Network> Gateway<N> {
         match event {
             Event::BatchPropose(batch_propose) => {
                 // Send the batch propose to the primary.
-                let _ = self.committee.primary_sender().tx_batch_propose.send((peer_ip, batch_propose)).await;
+                let _ = self.primary_sender().tx_batch_propose.send((peer_ip, batch_propose)).await;
                 Ok(())
             }
             Event::BatchSignature(batch_signature) => {
                 // Send the batch signature to the primary.
-                let _ = self.committee.primary_sender().tx_batch_signature.send((peer_ip, batch_signature)).await;
+                let _ = self.primary_sender().tx_batch_signature.send((peer_ip, batch_signature)).await;
                 Ok(())
             }
             Event::BatchCertified(batch_certified) => {
                 // Send the batch certificate to the primary.
-                let _ = self
-                    .committee
-                    .primary_sender()
-                    .tx_batch_certified
-                    .send((peer_ip, batch_certified.certificate))
-                    .await;
+                let _ = self.primary_sender().tx_batch_certified.send((peer_ip, batch_certified.certificate)).await;
                 Ok(())
             }
             Event::ChallengeRequest(..) | Event::ChallengeResponse(..) => {

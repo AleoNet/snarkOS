@@ -96,7 +96,7 @@ pub async fn start_primary(
         // Sample the account.
         let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64))?;
         // Add the validator.
-        committee.add_validator(account.address(), 1000)?;
+        committee.add_member(account.address(), 1000)?;
         println!("  Validator {}: {}", i, account.address());
     }
     println!();

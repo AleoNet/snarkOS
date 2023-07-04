@@ -12,43 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::PrimarySender;
 use snarkvm::console::{prelude::*, types::Address};
 
 use parking_lot::RwLock;
 use std::{
     collections::HashMap,
-    net::SocketAddr,
-    sync::{
-        atomic::{AtomicU64, Ordering},
-        Arc,
-    },
+    sync::atomic::{AtomicU64, Ordering},
 };
-use tokio::sync::OnceCell;
 
 pub struct Committee<N: Network> {
-    /// A map of `address` to `stake`.
-    committee: RwLock<HashMap<Address<N>, u64>>,
     /// The current round number.
     round: AtomicU64,
-    /// A map of `peer IP` to `address`.
-    peer_addresses: RwLock<HashMap<SocketAddr, Address<N>>>,
-    /// A map of `address` to `peer IP`.
-    address_peers: RwLock<HashMap<Address<N>, SocketAddr>>,
-    /// The primary sender.
-    primary_sender: Arc<OnceCell<PrimarySender<N>>>,
+    /// A map of `address` to `stake`.
+    members: RwLock<HashMap<Address<N>, u64>>,
 }
 
 impl<N: Network> Committee<N> {
     /// Initializes a new `Committee` instance.
     pub fn new(round: u64) -> Self {
-        Self {
-            committee: Default::default(),
-            round: AtomicU64::new(round),
-            peer_addresses: Default::default(),
-            address_peers: Default::default(),
-            primary_sender: Default::default(),
-        }
+        Self { round: AtomicU64::new(round), members: Default::default() }
     }
 }
 
@@ -65,49 +47,42 @@ impl<N: Network> Committee<N> {
 }
 
 impl<N: Network> Committee<N> {
-    /// Adds a validator to the committee.
-    pub fn add_validator(&self, address: Address<N>, stake: u64) -> Result<()> {
-        // Check if the validator is already in the committee.
+    /// Adds a member to the committee.
+    pub fn add_member(&self, address: Address<N>, stake: u64) -> Result<()> {
+        // Check if the member is already in the committee.
         if self.is_committee_member(address) {
-            bail!("Validator already in committee");
+            bail!("Validator {address} is already a committee member");
         }
-        // Add the validator to the committee.
-        self.committee.write().insert(address, stake);
+        // Add the member to the committee.
+        self.members.write().insert(address, stake);
         Ok(())
     }
 
-    /// Returns the committee.
-    pub fn committee(&self) -> &RwLock<HashMap<Address<N>, u64>> {
-        &self.committee
+    /// Returns the committee members alongside their stake.
+    pub fn members(&self) -> &RwLock<HashMap<Address<N>, u64>> {
+        &self.members
     }
 
     /// Returns the number of validators in the committee.
     pub fn committee_size(&self) -> usize {
-        self.committee.read().len()
+        self.members.read().len()
     }
 
     /// Returns `true` if the given address is in the committee.
     pub fn is_committee_member(&self, address: Address<N>) -> bool {
-        self.committee.read().contains_key(&address)
+        self.members.read().contains_key(&address)
     }
 
     /// Returns the amount of stake for the given address.
     pub fn get_stake(&self, address: Address<N>) -> u64 {
-        self.committee.read().get(&address).copied().unwrap_or_default()
+        self.members.read().get(&address).copied().unwrap_or_default()
     }
 
-    /// Returns the total amount of stake in the committee.
-    pub fn total_stake(&self) -> Result<u64> {
-        // Compute the total power of the committee.
-        let mut power = 0u64;
-        for stake in self.committee.read().values() {
-            // Accumulate the stake, checking for overflow.
-            power = match power.checked_add(*stake) {
-                Some(power) => power,
-                None => bail!("Failed to calculate total stake - overflow detected"),
-            };
-        }
-        Ok(power)
+    /// Returns the amount of stake required to reach the availability threshold `(f + 1)`.
+    pub fn availability_threshold(&self) -> Result<u64> {
+        // Assuming `N = 3f + 1 + k`, where `0 <= k < 3`,
+        // then `(N + 2) / 3 = f + 1 + k/3 = f + 1`.
+        Ok(self.total_stake()?.saturating_add(2) / 3)
     }
 
     /// Returns the amount of stake required to reach a quorum threshold `(2f + 1)`.
@@ -117,47 +92,17 @@ impl<N: Network> Committee<N> {
         Ok(self.total_stake()?.saturating_mul(2) / 3 + 1)
     }
 
-    /// Returns the amount of stake required to reach the availability threshold `(f + 1)`.
-    pub fn availability_threshold(&self) -> Result<u64> {
-        // Assuming `N = 3f + 1 + k`, where `0 <= k < 3`,
-        // then `(N + 2) / 3 = f + 1 + k/3 = f + 1`.
-        Ok(self.total_stake()?.saturating_add(2) / 3)
-    }
-}
-
-impl<N: Network> Committee<N> {
-    /// Returns the peer IP for the given address.
-    pub fn get_peer_ip(&self, address: Address<N>) -> Option<SocketAddr> {
-        self.address_peers.read().get(&address).copied()
-    }
-
-    /// Returns the address for the given peer IP.
-    pub fn get_address(&self, peer_ip: SocketAddr) -> Option<Address<N>> {
-        self.peer_addresses.read().get(&peer_ip).copied()
-    }
-
-    /// Inserts the given peer.
-    pub(crate) fn insert_peer(&self, peer_ip: SocketAddr, address: Address<N>) {
-        self.peer_addresses.write().insert(peer_ip, address);
-        self.address_peers.write().insert(address, peer_ip);
-    }
-
-    /// Removes the given peer.
-    pub(crate) fn remove_peer(&self, peer_ip: SocketAddr) {
-        if let Some(address) = self.peer_addresses.write().remove(&peer_ip) {
-            self.address_peers.write().remove(&address);
+    /// Returns the total amount of stake in the committee `(3f + 1)`.
+    pub fn total_stake(&self) -> Result<u64> {
+        // Compute the total power of the committee.
+        let mut power = 0u64;
+        for stake in self.members.read().values() {
+            // Accumulate the stake, checking for overflow.
+            power = match power.checked_add(*stake) {
+                Some(power) => power,
+                None => bail!("Failed to calculate total stake - overflow detected"),
+            };
         }
-    }
-}
-
-impl<N: Network> Committee<N> {
-    /// Returns the primary sender.
-    pub fn primary_sender(&self) -> &PrimarySender<N> {
-        self.primary_sender.get().expect("Primary sender not set")
-    }
-
-    /// Sets the primary sender.
-    pub fn set_primary_sender(&self, primary_sender: PrimarySender<N>) {
-        self.primary_sender.set(primary_sender).expect("Primary sender already set");
+        Ok(power)
     }
 }
