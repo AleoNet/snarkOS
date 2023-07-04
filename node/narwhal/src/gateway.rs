@@ -16,9 +16,9 @@ use crate::{
     helpers::{assign_to_worker, EventCodec, Resolver, WorkerSender},
     ChallengeRequest,
     ChallengeResponse,
+    Committee,
     Event,
     EventTrait,
-    Shared,
     CONTEXT,
     MAX_COMMITTEE_SIZE,
     MEMORY_POOL_PORT,
@@ -49,8 +49,8 @@ use tokio_util::codec::Framed;
 
 #[derive(Clone)]
 pub struct Gateway<N: Network> {
-    /// The shared state.
-    shared: Arc<Shared<N>>,
+    /// The committee.
+    committee: Arc<Committee<N>>,
     /// The account of the node.
     account: Account<N>,
     /// The worker senders.
@@ -72,7 +72,7 @@ pub struct Gateway<N: Network> {
 
 impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
-    pub fn new(shared: Arc<Shared<N>>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(committee: Arc<Committee<N>>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
         // Initialize the gateway IP.
         let ip = match dev {
             Some(dev) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev)),
@@ -82,7 +82,7 @@ impl<N: Network> Gateway<N> {
         let tcp = Tcp::new(Config::new(ip, MAX_COMMITTEE_SIZE));
         // Return the gateway.
         Ok(Self {
-            shared,
+            committee,
             account,
             worker_senders: Default::default(),
             tcp,
@@ -260,8 +260,8 @@ impl<N: Network> Gateway<N> {
         self.resolver.insert_peer(peer_ip, peer_addr);
         // Add an transmission for this peer in the connected peers.
         self.connected_peers.write().insert(peer_ip);
-        // Add this peer to the shared state.
-        self.shared.insert_peer(peer_ip, address);
+        // Add this peer to the committee.
+        self.committee.insert_peer(peer_ip, address);
         // // Remove this peer from the candidate peers, if it exists.
         // self.candidate_peers.write().remove(&peer_ip);
         // // Remove this peer from the restricted peers, if it exists.
@@ -276,8 +276,8 @@ impl<N: Network> Gateway<N> {
         // self.sync.remove_peer(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().shift_remove(&peer_ip);
-        // Remove this peer from the shared state.
-        self.shared.remove_peer(&peer_ip);
+        // Remove this peer from the committee.
+        self.committee.remove_peer(&peer_ip);
         // // Add the peer to the candidate peers.
         // self.candidate_peers.write().insert(peer_ip);
     }
@@ -355,18 +355,22 @@ impl<N: Network> Gateway<N> {
         match event {
             Event::BatchPropose(batch_propose) => {
                 // Send the batch propose to the primary.
-                let _ = self.shared.primary_sender().tx_batch_propose.send((peer_ip, batch_propose)).await;
+                let _ = self.committee.primary_sender().tx_batch_propose.send((peer_ip, batch_propose)).await;
                 Ok(())
             }
             Event::BatchSignature(batch_signature) => {
                 // Send the batch signature to the primary.
-                let _ = self.shared.primary_sender().tx_batch_signature.send((peer_ip, batch_signature)).await;
+                let _ = self.committee.primary_sender().tx_batch_signature.send((peer_ip, batch_signature)).await;
                 Ok(())
             }
             Event::BatchCertified(batch_certified) => {
                 // Send the batch certificate to the primary.
-                let _ =
-                    self.shared.primary_sender().tx_batch_certified.send((peer_ip, batch_certified.certificate)).await;
+                let _ = self
+                    .committee
+                    .primary_sender()
+                    .tx_batch_certified
+                    .send((peer_ip, batch_certified.certificate))
+                    .await;
                 Ok(())
             }
             Event::ChallengeRequest(..) | Event::ChallengeResponse(..) => {
@@ -734,7 +738,7 @@ impl<N: Network> Gateway<N> {
         }
 
         // Ensure the address is in the committee.
-        if !self.shared.is_committee_member(&address) {
+        if !self.committee.is_committee_member(&address) {
             warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
             return Some(DisconnectReason::ProtocolViolation);
         }

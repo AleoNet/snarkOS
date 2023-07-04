@@ -17,9 +17,9 @@ use crate::{
     BatchCertified,
     BatchPropose,
     BatchSignature,
+    Committee,
     Event,
     Gateway,
-    Shared,
     Worker,
     MAX_EXPIRATION_TIME,
     MAX_WORKERS,
@@ -44,8 +44,8 @@ fn now() -> i64 {
 
 #[derive(Clone)]
 pub struct Primary<N: Network> {
-    /// The shared state.
-    shared: Arc<Shared<N>>,
+    /// The committee.
+    committee: Arc<Committee<N>>,
     /// The gateway.
     gateway: Gateway<N>,
     /// The storage.
@@ -60,12 +60,17 @@ pub struct Primary<N: Network> {
 
 impl<N: Network> Primary<N> {
     /// Initializes a new primary instance.
-    pub fn new(shared: Arc<Shared<N>>, storage: Storage<N>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(
+        committee: Arc<Committee<N>>,
+        storage: Storage<N>,
+        account: Account<N>,
+        dev: Option<u16>,
+    ) -> Result<Self> {
         // Construct the gateway instance.
-        let gateway = Gateway::new(shared.clone(), account, dev)?;
+        let gateway = Gateway::new(committee.clone(), account, dev)?;
         // Return the primary instance.
         Ok(Self {
-            shared,
+            committee,
             gateway,
             storage,
             workers: Default::default(),
@@ -79,7 +84,7 @@ impl<N: Network> Primary<N> {
         info!("Starting the primary instance of the memory pool...");
 
         // Set the primary sender.
-        self.shared.set_primary_sender(sender);
+        self.committee.set_primary_sender(sender);
 
         // Construct a map of the worker senders.
         let mut tx_workers = IndexMap::new();
@@ -144,7 +149,7 @@ impl<N: Network> Primary<N> {
         // Retrieve the private key.
         let private_key = self.gateway.account().private_key();
         // Retrieve the current round.
-        let round = self.shared.round();
+        let round = self.committee.round();
         // Retrieve the previous certificates.
         let previous_certificates = self.storage.get_round(round.saturating_sub(1)).unwrap_or_default();
         // Sign the batch.
@@ -210,12 +215,12 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
         // Retrieve the address of the peer.
-        let Some(address) = self.shared.get_address(&peer_ip) else {
+        let Some(address) = self.committee.get_address(&peer_ip) else {
             warn!("Received a batch signature from a disconnected peer '{peer_ip}'");
             return Ok(());
         };
         // Ensure the address is in the committee.
-        if !self.shared.is_committee_member(&address) {
+        if !self.committee.is_committee_member(&address) {
             warn!("Received a batch signature from a non-committee peer '{peer_ip}'");
             return Ok(());
         }
@@ -232,16 +237,22 @@ impl<N: Network> Primary<N> {
         if let Some((_, signatures)) = self.proposed_batch.write().as_mut() {
             // Add the signature to the batch.
             signatures.insert(signature, timestamp);
-            info!("Added a batch signature from peer '{peer_ip}'");
+            debug!("Added a batch signature from peer '{peer_ip}'");
         }
 
         // Check if the batch is ready to be certified.
-        let mut is_ready = true;
-        if let Some((_batch, _signatures)) = self.proposed_batch.read().as_ref() {
-            // If the batch is ready to be certified, then certify it.
-            // TODO (howardwu): Compute the threshold.
-            // if signatures.len() >= self.shared.committee_size() {
-            // }
+        let mut is_ready = false;
+        if let Some((_batch, signatures)) = self.proposed_batch.read().as_ref() {
+            // Compute the cumulative amount of stake, thus far.
+            let mut stake = 0u64;
+            for signature in signatures.keys() {
+                stake = stake.saturating_add(self.committee.get_stake(&signature.to_address()));
+            }
+            // Check if the batch has reached the threshold.
+            if stake >= self.committee.quorum_threshold()? {
+                info!("Quorum threshold reached, preparing to certify the batch");
+                is_ready = true;
+            }
         }
         // If the batch is not ready to be certified, return early.
         if !is_ready {
@@ -274,8 +285,11 @@ impl<N: Network> Primary<N> {
         let event = BatchCertified::new(Data::Object(certificate));
         // Broadcast the certified batch to all validators.
         self.gateway.broadcast(Event::BatchCertified(event));
-        // TODO: Increment the round.
-        info!("\n\n\n\n\nA batch has been certified!\n\n\n\n");
+
+        info!("\n\n\n\n\nOur batch for round {} has been certified!\n\n\n\n", self.committee.round());
+
+        // Increment the round.
+        self.committee.increment_round();
 
         Ok(())
     }

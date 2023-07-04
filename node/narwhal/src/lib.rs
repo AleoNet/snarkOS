@@ -22,6 +22,9 @@ extern crate tracing;
 
 pub mod helpers;
 
+mod committee;
+pub use committee::*;
+
 mod event;
 pub use event::*;
 
@@ -30,9 +33,6 @@ pub use gateway::*;
 
 mod primary;
 pub use primary::*;
-
-mod shared;
-pub use shared::*;
 
 mod worker;
 pub use worker::*;

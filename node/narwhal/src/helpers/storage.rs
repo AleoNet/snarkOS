@@ -89,7 +89,7 @@ impl<N: Network> Storage<N> {
         // Compute the address of the batch creator.
         let address = certificate.to_address();
         // Ensure the certificate ID does not already exist in storage.
-        if !self.certificates.read().contains_key(&certificate_id) {
+        if self.certificates.read().contains_key(&certificate_id) {
             bail!("Certificate {certificate_id} already exists in storage");
         }
 

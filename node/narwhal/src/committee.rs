@@ -20,50 +20,51 @@ use std::{
     collections::HashMap,
     net::SocketAddr,
     sync::{
-        atomic::{AtomicU32, AtomicU64, Ordering},
+        atomic::{AtomicU64, Ordering},
         Arc,
     },
 };
 use tokio::sync::OnceCell;
 
-pub struct Shared<N: Network> {
+pub struct Committee<N: Network> {
     /// A map of `address` to `stake`.
     committee: RwLock<HashMap<Address<N>, u64>>,
     /// The current round number.
     round: AtomicU64,
-    /// The current block height.
-    height: AtomicU32,
-    /// The primary sender.
-    primary_sender: Arc<OnceCell<PrimarySender<N>>>,
     /// A map of `peer IP` to `address`.
     peer_addresses: RwLock<HashMap<SocketAddr, Address<N>>>,
     /// A map of `address` to `peer IP`.
     address_peers: RwLock<HashMap<Address<N>, SocketAddr>>,
+    /// The primary sender.
+    primary_sender: Arc<OnceCell<PrimarySender<N>>>,
 }
 
-impl<N: Network> Shared<N> {
-    /// Initializes a new `Shared` instance.
-    pub fn new(round: u64, height: u32) -> Self {
+impl<N: Network> Committee<N> {
+    /// Initializes a new `Committee` instance.
+    pub fn new(round: u64) -> Self {
         Self {
             committee: Default::default(),
             round: AtomicU64::new(round),
-            height: AtomicU32::new(height),
-            primary_sender: Default::default(),
             peer_addresses: Default::default(),
             address_peers: Default::default(),
+            primary_sender: Default::default(),
         }
     }
+}
 
-    /// Returns the primary sender.
-    pub fn primary_sender(&self) -> &PrimarySender<N> {
-        self.primary_sender.get().expect("Primary sender not set")
+impl<N: Network> Committee<N> {
+    /// Returns the current round number.
+    pub fn round(&self) -> u64 {
+        self.round.load(Ordering::Relaxed)
     }
 
-    /// Sets the primary sender.
-    pub fn set_primary_sender(&self, primary_sender: PrimarySender<N>) {
-        self.primary_sender.set(primary_sender).expect("Primary sender already set");
+    /// Increments the round number.
+    pub fn increment_round(&self) {
+        self.round.fetch_add(1, Ordering::Relaxed);
     }
+}
 
+impl<N: Network> Committee<N> {
     /// Adds a validator to the committee.
     pub fn add_validator(&self, address: Address<N>, stake: u64) -> Result<()> {
         // Check if the validator is already in the committee.
@@ -74,31 +75,7 @@ impl<N: Network> Shared<N> {
         self.committee.write().insert(address, stake);
         Ok(())
     }
-}
 
-impl<N: Network> Shared<N> {
-    /// Returns the current round number.
-    pub fn round(&self) -> u64 {
-        self.round.load(Ordering::Relaxed)
-    }
-
-    /// Returns the current block height.
-    pub fn height(&self) -> u32 {
-        self.height.load(Ordering::Relaxed)
-    }
-
-    /// Increments the round number.
-    pub fn increment_round(&self) {
-        self.round.fetch_add(1, Ordering::Relaxed);
-    }
-
-    /// Increments the block height.
-    pub fn increment_height(&self) {
-        self.height.fetch_add(1, Ordering::Relaxed);
-    }
-}
-
-impl<N: Network> Shared<N> {
     /// Returns the committee.
     pub fn committee(&self) -> &RwLock<HashMap<Address<N>, u64>> {
         &self.committee
@@ -112,6 +89,11 @@ impl<N: Network> Shared<N> {
     /// Returns `true` if the given address is in the committee.
     pub fn is_committee_member(&self, address: &Address<N>) -> bool {
         self.committee.read().contains_key(address)
+    }
+
+    /// Returns the amount of stake for the given address.
+    pub fn get_stake(&self, address: &Address<N>) -> u64 {
+        self.committee.read().get(address).copied().unwrap_or_default()
     }
 
     /// Returns the total amount of stake in the committee.
@@ -143,7 +125,7 @@ impl<N: Network> Shared<N> {
     }
 }
 
-impl<N: Network> Shared<N> {
+impl<N: Network> Committee<N> {
     /// Returns the peer IP for the given address.
     pub fn get_peer_ip(&self, address: &Address<N>) -> Option<SocketAddr> {
         self.address_peers.read().get(address).copied()
@@ -165,5 +147,17 @@ impl<N: Network> Shared<N> {
         if let Some(address) = self.peer_addresses.write().remove(peer_ip) {
             self.address_peers.write().remove(&address);
         }
+    }
+}
+
+impl<N: Network> Committee<N> {
+    /// Returns the primary sender.
+    pub fn primary_sender(&self) -> &PrimarySender<N> {
+        self.primary_sender.get().expect("Primary sender not set")
+    }
+
+    /// Sets the primary sender.
+    pub fn set_primary_sender(&self, primary_sender: PrimarySender<N>) {
+        self.primary_sender.set(primary_sender).expect("Primary sender already set");
     }
 }

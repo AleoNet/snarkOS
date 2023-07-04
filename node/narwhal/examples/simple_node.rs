@@ -18,8 +18,8 @@ extern crate tracing;
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
     helpers::{init_primary_channels, PrimarySender, Storage},
+    Committee,
     Primary,
-    Shared,
     MEMORY_POOL_PORT,
 };
 use snarkvm::{
@@ -89,14 +89,14 @@ pub async fn start_primary(
     let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(node_id as u64))?;
     println!("\n{account}\n");
 
-    // Initialize the shared state.
-    let shared = Arc::new(Shared::<CurrentNetwork>::new(0u64, 0u32));
-    // Add the validators to the shared state.
+    // Initialize the committee.
+    let committee = Arc::new(Committee::<CurrentNetwork>::new(0u64));
+    // Add the validators to the committee.
     for i in 0..num_nodes {
         // Sample the account.
         let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64))?;
         // Add the validator.
-        shared.add_validator(account.address(), 1000)?;
+        committee.add_validator(account.address(), 1000)?;
         println!("  Validator {}: {}", i, account.address());
     }
     println!();
@@ -106,7 +106,7 @@ pub async fn start_primary(
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the primary instance.
-    let mut primary = Primary::<CurrentNetwork>::new(shared.clone(), storage, account, Some(node_id))?;
+    let mut primary = Primary::<CurrentNetwork>::new(committee.clone(), storage, account, Some(node_id))?;
     // Run the primary instance.
     primary.run(sender.clone(), receiver).await?;
     // Keep the node's connections.
@@ -123,6 +123,9 @@ pub async fn start_primary(
 fn keep_connections(primary: &Primary<CurrentNetwork>, node_id: u16, num_nodes: u16) {
     let node = primary.clone();
     tokio::task::spawn(async move {
+        // Sleep briefly to ensure the other nodes are ready to connect.
+        tokio::time::sleep(std::time::Duration::from_secs(node_id as u64)).await;
+        // Start the loop.
         loop {
             for i in 0..num_nodes {
                 // Initialize the gateway IP.
@@ -204,7 +207,7 @@ fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_id: u
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
         }
     });
 }
@@ -243,7 +246,7 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(250)).await;
         }
     });
 }
@@ -252,7 +255,7 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    initialize_logger(3);
+    initialize_logger(1);
 
     // Retrieve the command-line arguments.
     let args: Vec<String> = std::env::args().collect();
