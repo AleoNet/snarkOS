@@ -13,10 +13,12 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{assign_to_worker, init_worker_channels, Committee, PrimaryReceiver, PrimarySender, Storage},
+    helpers::{assign_to_worker, fmt_id, init_worker_channels, Committee, PrimaryReceiver, PrimarySender, Storage},
     BatchCertified,
     BatchPropose,
     BatchSignature,
+    CertificateRequest,
+    CertificateResponse,
     Event,
     Gateway,
     Worker,
@@ -398,6 +400,38 @@ impl<N: Network> Primary<N> {
         info!("\n\n\n\nOur batch for round {} has been certified!\n\n\n", committee.round() - 1);
         Ok(())
     }
+
+    /// Handles the incoming certificate request.
+    fn process_certificate_request(&self, peer_ip: SocketAddr, request: CertificateRequest<N>) {
+        // Attempt to retrieve the certificate.
+        if let Some(certificate) = self.storage.get_certificate(request.certificate_id) {
+            // Send the certificate to the peer.
+            self.send_certificate_response(peer_ip, certificate);
+        }
+    }
+
+    // /// Handles the incoming certificate response.
+    // async fn process_certificate_response(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) -> Result<()> {
+    //     let certificate_id = response.certificate.certificate_id();
+    //     // Check if the peer IP exists in the pending queue for the given certificate ID.
+    //     if self.pending.get(certificate_id).unwrap_or_default().contains(&peer_ip) {
+    //         // Remove the certificate ID from the pending queue.
+    //         if self.pending.remove(certificate_id) {
+    //             // TODO: Validate the certificate.
+    //             // Insert the certificate into the ready queue.
+    //             // self.storage.insert_certificate(response.certificate)?;
+    //             trace!("Primary - Added certificate '{}' from peer '{peer_ip}'", fmt_id(certificate_id));
+    //             // Check if any callbacks exists for the certificate ID.
+    //             if let Some(callbacks) = self.callbacks.lock().remove(&certificate_id) {
+    //                 for callback in callbacks {
+    //                     // Send a notification to the callback.
+    //                     callback.send(()).ok();
+    //                 }
+    //             }
+    //         }
+    //     }
+    //     Ok(())
+    // }
 }
 
 impl<N: Network> Primary<N> {
@@ -587,6 +621,20 @@ impl<N: Network> Primary<N> {
         }
         // Return after receiving all of the transmissions.
         Ok(())
+    }
+
+    /// Sends an certificate request to the specified peer.
+    fn send_certificate_request(&self, peer_ip: SocketAddr, certificate_id: Field<N>) {
+        // Send the certificate request to the peer.
+        self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into()));
+    }
+
+    /// Sends an certificate response to the specified peer.
+    fn send_certificate_response(&self, peer_ip: SocketAddr, certificate: BatchCertificate<N>) {
+        // Construct the certificate response.
+        let certificate_response = CertificateResponse::new(certificate);
+        // Send the certificate response to the peer.
+        self.gateway.send(peer_ip, Event::CertificateResponse(certificate_response));
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
