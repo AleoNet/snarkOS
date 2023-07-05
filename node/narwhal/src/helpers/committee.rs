@@ -36,7 +36,7 @@ impl<N: Network> Committee<N> {
     }
 
     /// Returns a new `Committee` instance for the next round.
-    /// TODO (howardwu): Add arguments for members 1) to be added, and 2) to be removed.
+    /// TODO (howardwu): Add arguments for members (and stake) 1) to be added, 2) to be updated, and 3) to be removed.
     pub fn to_next_round(&self) -> Result<Self> {
         // Increment the round number.
         let Some(round) = self.round.checked_add(1) else {

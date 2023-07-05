@@ -21,7 +21,8 @@ use crate::{
     Gateway,
     Worker,
     MAX_BATCH_DELAY,
-    MAX_EXPIRATION_TIME,
+    MAX_EXPIRATION_TIME_IN_SECS,
+    MAX_TIMESTAMP_DELTA_IN_SECS,
     MAX_WORKERS,
 };
 use snarkos_account::Account;
@@ -197,6 +198,12 @@ impl<N: Network> Primary<N> {
     ///
     /// This method performs the following steps:
     /// 1. Verify the batch.
+    ///   - Ensure the round is within range.
+    ///   - Ensure the address is a member of the committee.
+    ///   - Ensure the timestamp is within range.
+    ///   - Ensure we have all of the transmissions.
+    ///   - Ensure we have all of the previous certificates.
+    ///   - Ensure the previous certificates have reached quorum threshold.
     /// 2. Sign the batch.
     /// 3. Broadcast the signature back to the validator.
     async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
@@ -204,13 +211,42 @@ impl<N: Network> Primary<N> {
         let batch_header = batch_propose.batch_header.deserialize().await?;
         // Retrieve the batch ID.
         let batch_id = batch_header.batch_id();
+        // Retrieve the round.
+        let round = batch_header.round();
+        // Retrieve the address.
+        let address = batch_header.to_address();
+        // Retrieve the timestamp.
+        let timestamp = batch_header.timestamp();
 
-        // TODO (howardwu): Ensure the round is within range. If not, do not sign.
-        // TODO (howardwu): Ensure the address is in the committee of the specified round. If not, do not sign.
-        // TODO (howardwu): Ensure the timestamp is within range. If not, do not sign.
+        // Ensure the round in the proposed batch is within GC range of the current round.
+        if self.committee.read().round() + self.storage.max_gc_rounds() <= round {
+            bail!("Round {round} is too far in the future")
+        }
+        // Retrieve the committee for the specified round.
+        // If the committee cannot be found, it means this round has exceed GC depth and we should not sign it.
+        let Some(committee) = self.storage.get_committee_for_round(round) else {
+            bail!("Round {round} has exceeded the maximum GC depth")
+        };
+        // Ensure the address is a member of the committee.
+        if !committee.is_committee_member(address) {
+            bail!("Address {address} is not a member of the committee")
+        }
+
+        // Ensure the timestamp is within range.
+        if timestamp > (now() + MAX_TIMESTAMP_DELTA_IN_SECS) {
+            bail!("Timestamp {timestamp} is too far in the future")
+        }
+        // TODO (howardwu): Ensure the timestamp is after the previous timestamp. (Needs Bullshark committee)
+        // // Ensure the timestamp is after the previous timestamp.
+        // if timestamp <= self.committee.read().previous_timestamp() {
+        //     bail!("Timestamp {timestamp} for the proposed batch must be after the previous round timestamp")
+        // }
+
         // TODO (howardwu): Ensure I have all of the transmissions. If not, request them before signing.
         // TODO (howardwu): Ensure I have all of the previous certificates. If not, request them before signing.
         // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not sign.
+
+        /* Proceeding to sign the batch. */
 
         // Initialize an RNG.
         let rng = &mut rand::thread_rng();
@@ -321,6 +357,8 @@ impl<N: Network> Primary<N> {
         // Broadcast the certified batch to all validators.
         self.gateway.broadcast(Event::BatchCertified(event));
 
+        // TODO (howardwu): Move this logic to Bullshark, as:
+        //  1. We need to know which members (and stake) to add, update, and remove.
         // Acquire the write lock for the committee.
         let mut committee = self.committee.write();
         // Store the (now expired) committee into storage, as this round has been certified.
@@ -330,7 +368,7 @@ impl<N: Network> Primary<N> {
         // Update the committee.
         *committee = next_committee;
 
-        info!("\n\n\n\n\nOur batch for round {} has been certified!\n\n\n\n", committee.round() - 1);
+        info!("\n\n\n\nOur batch for round {} has been certified!\n\n\n", committee.round() - 1);
         Ok(())
     }
 }
@@ -354,7 +392,7 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((peer_ip, batch_propose)) = rx_batch_propose.recv().await {
                 if let Err(e) = self_clone.process_batch_propose_from_peer(peer_ip, batch_propose).await {
-                    warn!("Failed to process a batch propose from peer '{peer_ip}': {e}");
+                    warn!("Invalid proposed batch from peer '{peer_ip}' - {e}");
                 }
             }
         });
@@ -364,7 +402,7 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
                 if let Err(e) = self_clone.process_batch_signature_from_peer(peer_ip, batch_signature).await {
-                    warn!("Failed to process a batch signature from peer '{peer_ip}': {e}");
+                    warn!("Failed to process a batch signature from peer '{peer_ip}' - {e}");
                 }
             }
         });
@@ -399,7 +437,7 @@ impl<N: Network> Primary<N> {
                 let worker = self_clone.workers.read()[worker_id as usize].clone();
                 // Process the unconfirmed solution.
                 if let Err(e) = worker.process_unconfirmed_solution(puzzle_commitment, prover_solution).await {
-                    error!("Worker {} failed process a message: {e}", worker.id());
+                    error!("Worker {} failed process a message - {e}", worker.id());
                 }
             }
         });
@@ -417,7 +455,7 @@ impl<N: Network> Primary<N> {
                 let worker = self_clone.workers.read()[worker_id as usize].clone();
                 // Process the unconfirmed transaction.
                 if let Err(e) = worker.process_unconfirmed_transaction(transaction_id, transaction).await {
-                    error!("Worker {} failed process a message: {e}", worker.id());
+                    error!("Worker {} failed process a message - {e}", worker.id());
                 }
             }
         });
@@ -439,7 +477,7 @@ impl<N: Network> Primary<N> {
                 }
                 // If there is no proposed batch, attempt to propose a batch.
                 if let Err(e) = self_clone.propose_batch() {
-                    error!("Failed to propose a batch: {e}");
+                    error!("Failed to propose a batch - {e}");
                 }
             }
         });
@@ -451,7 +489,7 @@ impl<N: Network> Primary<N> {
         let mut is_expired = false;
         if let Some((batch, _)) = self.proposed_batch.read().as_ref() {
             // If the batch is expired, clear it.
-            is_expired = now().saturating_sub(batch.timestamp()) > MAX_EXPIRATION_TIME;
+            is_expired = now().saturating_sub(batch.timestamp()) > MAX_EXPIRATION_TIME_IN_SECS;
         }
         // If the batch is expired, clear it.
         if is_expired {

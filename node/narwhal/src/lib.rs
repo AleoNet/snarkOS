@@ -39,17 +39,19 @@ pub const CONTEXT: &str = "[MemoryPool]";
 /// The maximum number of milliseconds to wait before proposing a batch.
 pub const MAX_BATCH_DELAY: u64 = 2500; // ms
 /// The maximum number of nodes that can be in a committee.
-pub const MAX_COMMITTEE_SIZE: u16 = 128;
+pub const MAX_COMMITTEE_SIZE: u16 = 128; // members
 /// The maximum number of seconds before a proposed batch is considered expired.
-pub const MAX_EXPIRATION_TIME: i64 = 10; // seconds
+pub const MAX_EXPIRATION_TIME_IN_SECS: i64 = 10; // seconds
 /// The maximum number of round to store before garbage collecting.
-pub const MAX_GC_ROUNDS: u64 = 50;
+pub const MAX_GC_ROUNDS: u64 = 50; // rounds
 /// The maximum number of requests that can be made to retrieve a transmission.
-pub const MAX_REQUESTS_PER_TRANSMISSION: usize = 5;
+pub const MAX_REQUESTS_PER_TRANSMISSION: usize = 5; // requests
+/// The maximum number of seconds before the timestamp is considered expired.
+pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of workers that can be spawned.
-pub const MAX_WORKERS: u8 = 3;
+pub const MAX_WORKERS: u8 = 3; // workers
 /// The port on which the memory pool listens for incoming connections.
-pub const MEMORY_POOL_PORT: u16 = 5000;
+pub const MEMORY_POOL_PORT: u16 = 5000; // port
 /// The frequency at which each worker broadcasts a ping to every other node.
 pub const WORKER_PING_INTERVAL: u64 = 1000; // ms
 

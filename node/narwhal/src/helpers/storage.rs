@@ -110,6 +110,11 @@ impl<N: Network> Storage<N> {
         self.gc_round.load(Ordering::Relaxed)
     }
 
+    /// Returns the maximum number of rounds to keep in storage.
+    pub fn max_gc_rounds(&self) -> u64 {
+        self.max_gc_rounds
+    }
+
     /// Returns the `committee` for the given `round`.
     /// If the round does not exist in storage, `None` is returned.
     pub fn get_committee_for_round(&self, round: u64) -> Option<Committee<N>> {
