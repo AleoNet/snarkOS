@@ -802,11 +802,12 @@ mod tests {
         MAX_COMMITTEE_SIZE,
         MEMORY_POOL_PORT,
     };
+    use indexmap::IndexMap;
     use parking_lot::RwLock;
     use snarkos_node_tcp::P2P;
     use snarkvm::prelude::Testnet3;
     use std::{
-        net::{IpAddr, Ipv4Addr},
+        net::{IpAddr, Ipv4Addr, SocketAddr},
         sync::Arc,
     };
     use test_strategy::{proptest, Arbitrary};
@@ -857,5 +858,27 @@ mod tests {
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.max_connections, MAX_COMMITTEE_SIZE);
         assert_eq!(gateway.account().address(), address);
+    }
+
+    #[proptest(async = "tokio")]
+    async fn gateway_start(#[filter(|x| x.dev.is_some())] input: GatewayInput) {
+        let Some(dev) = input.dev else { unreachable!() };
+        let mut gateway = input.to_gateway();
+        let tcp_config = gateway.tcp().config();
+        assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
+        assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + (dev as u16)));
+
+        match gateway.run(IndexMap::new()).await {
+            Ok(_) => {
+                assert_eq!(
+                    gateway.local_ip(),
+                    SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), MEMORY_POOL_PORT + (dev as u16))
+                );
+                assert_eq!(gateway.num_workers(), 0);
+            }
+            Err(err) => {
+                panic!("Shouldn't fail because of {err}");
+            }
+        }
     }
 }

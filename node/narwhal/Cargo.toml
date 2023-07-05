@@ -109,6 +109,5 @@ version = "0.3"
 features = [ "env-filter" ]
 
 [dev-dependencies]
-test-strategy = "0.3.0"
+test-strategy = { git = "https://github.com/frozenlib/test-strategy/", branch = "master"}
 proptest = "1.0.0"
-rand_xorshift = "0.3.0"
