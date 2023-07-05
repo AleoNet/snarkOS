@@ -219,6 +219,7 @@ impl<N: Network> Primary<N> {
     ///   - Ensure we have all of the previous certificates.
     ///   - Ensure the previous certificates are valid.
     ///   - Ensure the previous certificates have reached quorum threshold.
+    ///   - Ensure we have not already signed the batch ID.
     /// 2. Sign the batch.
     /// 3. Broadcast the signature back to the validator.
     async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
@@ -265,6 +266,7 @@ impl<N: Network> Primary<N> {
         // TODO (howardwu): Ensure I have all of the previous certificates. If not, request them before signing.
         // TODO (howardwu): Ensure the previous certificates are for round-1. If not, do not sign.
         // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not sign.
+        // TODO (howardwu): Ensure I have not signed this batch ID before. If so, do not sign.
 
         /* Proceeding to sign the batch. */
 
