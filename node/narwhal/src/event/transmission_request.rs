@@ -21,8 +21,15 @@ pub struct TransmissionRequest<N: Network> {
 
 impl<N: Network> TransmissionRequest<N> {
     /// Initializes a new transmission request event.
-    pub fn new(transmission_id: TransmissionID<N>) -> Self {
+    pub const fn new(transmission_id: TransmissionID<N>) -> Self {
         Self { transmission_id }
+    }
+}
+
+impl<N: Network> From<TransmissionID<N>> for TransmissionRequest<N> {
+    /// Initializes a new transmission request event.
+    fn from(transmission_id: TransmissionID<N>) -> Self {
+        Self::new(transmission_id)
     }
 }
 

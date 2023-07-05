@@ -422,9 +422,9 @@ impl<N: Network> Gateway<N> {
                         warn!("{CONTEXT} Unable to assign transmission ID '{transmission_id}' to a worker");
                         continue;
                     };
-                    // Send the ping to the worker.
+                    // Send the transmission ID to the worker.
                     if let Some(sender) = self.get_worker_sender(worker_id) {
-                        // Send the ping to the worker.
+                        // Send the transmission ID to the worker.
                         let _ = sender.tx_worker_ping.send((peer_ip, transmission_id)).await;
                     }
                 }

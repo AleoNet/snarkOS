@@ -90,7 +90,7 @@ impl<N: Network> Worker<N> {
 
 impl<N: Network> Worker<N> {
     /// Handles the incoming ping event.
-    async fn process_worker_ping(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
+    async fn process_transmission_id(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
         // Check if the transmission ID exists in the ready queue or in storage.
         if self.ready.contains(transmission_id) || self.storage.contains_transmission(transmission_id) {
             return;
@@ -200,7 +200,7 @@ impl<N: Network> Worker<N> {
         self.spawn(async move {
             while let Some((peer_ip, transmission_id)) = rx_worker_ping.recv().await {
                 // Process the ping event.
-                self_clone.process_worker_ping(peer_ip, transmission_id).await;
+                self_clone.process_transmission_id(peer_ip, transmission_id).await;
             }
         });
 
@@ -238,10 +238,8 @@ impl<N: Network> Worker<N> {
 
     /// Sends an transmission request to the specified peer.
     async fn send_transmission_request(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
-        // Construct the transmission request.
-        let transmission_request = TransmissionRequest::new(transmission_id);
         // Send the transmission request to the peer.
-        self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_request));
+        self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into()));
     }
 
     /// Sends an transmission response to the specified peer.
