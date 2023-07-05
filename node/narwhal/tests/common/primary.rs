@@ -22,57 +22,52 @@ use snarkos_node_narwhal::{
 
 use tracing::*;
 
-use anyhow::Result;
-
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 use rand::SeedableRng;
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::Arc};
 
 use crate::common::CurrentNetwork;
 
-/// Starts the primary instance.
-pub async fn start_primary(
-    node_id: u16,
-    num_nodes: u16,
-) -> Result<(Primary<CurrentNetwork>, PrimarySender<CurrentNetwork>)> {
-    // Sample a account.
-    let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(node_id as u64))?;
-    println!("\n{account}\n");
+// Initializes a new test committee.
+pub fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<CurrentNetwork>) {
+    const INITIAL_STAKE: u64 = 1000;
 
-    // Initialize a map for the committee members.
-    let mut members = IndexMap::with_capacity(num_nodes as usize);
-    // Add the validators as members.
-    for i in 0..num_nodes {
+    let mut accounts = Vec::with_capacity(n as usize);
+    let mut members = IndexMap::with_capacity(n as usize);
+    for i in 0..n {
         // Sample the account.
-        let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64))?;
-        // Add the validator.
-        members.insert(account.address(), 1000);
-        println!("  Validator {}: {}", i, account.address());
+        let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64)).unwrap();
+        members.insert(account.address(), INITIAL_STAKE);
+        accounts.push(account);
+        // TODO(nkls): use tracing instead.
+        // println!("  Validator {}: {}", i, account.address());
     }
-    println!();
-
     // Initialize the committee.
-    let committee = Arc::new(RwLock::new(Committee::<CurrentNetwork>::new(1u64, members)?));
-    // Initialize the storage.
-    let storage = Storage::new(MAX_GC_ROUNDS);
+    let committee = Committee::<CurrentNetwork>::new(1u64, members).unwrap();
 
-    // Initialize the primary channels.
-    let (sender, receiver) = init_primary_channels();
-    // Initialize the primary instance.
-    let mut primary = Primary::<CurrentNetwork>::new(committee.clone(), storage, account, Some(node_id))?;
-    // Run the primary instance.
-    primary.run(sender.clone(), receiver).await?;
-    // Keep the node's connections.
-    keep_connections(&primary, node_id, num_nodes);
-    // Handle the log connections.
-    log_connections(&primary);
-    // Handle OS signals.
-    handle_signals(&primary);
-    // Return the primary instance.
-    Ok((primary, sender))
+    (accounts, committee)
 }
 
+pub async fn start_n_primaries(n: u16) -> HashMap<u16, (Primary<CurrentNetwork>, PrimarySender<CurrentNetwork>)> {
+    let mut primaries = HashMap::with_capacity(n as usize);
+    let (accounts, committee) = new_test_committee(n);
+
+    for (n, account) in accounts.into_iter().enumerate() {
+        let storage = Storage::new(MAX_GC_ROUNDS);
+        let (sender, receiver) = init_primary_channels();
+        let mut primary =
+            Primary::<CurrentNetwork>::new(Arc::new(RwLock::new(committee.clone())), storage, account, Some(n as u16))
+                .unwrap();
+
+        primary.run(sender.clone(), receiver).await.unwrap();
+        primaries.insert(n as u16, (primary, sender));
+    }
+
+    primaries
+}
+
+// TODO(nkls): should be handled by the gateway or on the snarkOS level.
 /// Actively try to keep the node's connections to all nodes.
 fn keep_connections(primary: &Primary<CurrentNetwork>, node_id: u16, num_nodes: u16) {
     let node = primary.clone();
@@ -106,21 +101,6 @@ fn log_connections(primary: &Primary<CurrentNetwork>) {
                 debug!("  {}", connection);
             }
             tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-        }
-    });
-}
-
-/// Handles OS signals for the node to intercept and perform a clean shutdown.
-/// Note: Only Ctrl-C is supported; it should work on both Unix-family systems and Windows.
-fn handle_signals(primary: &Primary<CurrentNetwork>) {
-    let node = primary.clone();
-    tokio::task::spawn(async move {
-        match tokio::signal::ctrl_c().await {
-            Ok(()) => {
-                node.shut_down().await;
-                std::process::exit(0);
-            }
-            Err(error) => error!("tokio::signal::ctrl_c encountered an error: {}", error),
         }
     });
 }

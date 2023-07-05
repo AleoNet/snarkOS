@@ -13,3 +13,16 @@
 // limitations under the License.
 
 mod common;
+
+use crate::common::primary::start_n_primaries;
+
+#[tokio::test]
+async fn test_state_coherence() {
+    crate::common::utils::initialize_logger(0);
+
+    const N: u16 = 4;
+
+    let primaries = start_n_primaries(N).await;
+
+    // std::future::pending::<()>().await;
+}
