@@ -821,26 +821,33 @@ mod tests {
         dev: Option<u8>,
     }
 
+    impl GatewayInput {
+        pub fn to_gateway(&self) -> Gateway<N> {
+            let committee = self.committee_input.to_committee().unwrap();
+            let account = self.node_validator.get_account();
+            let dev = match self.dev {
+                None => None,
+                Some(dev) => Some(dev as u16),
+            };
+            Gateway::new(Arc::new(RwLock::new(committee)), account, dev).unwrap()
+        }
+    }
+
     #[proptest]
     fn gateway_initialization(input: GatewayInput) {
-        let GatewayInput { committee_input, node_validator, dev } = input;
-        let committee = committee_input.to_committee().unwrap();
-        let account = node_validator.get_account();
+        let account = input.node_validator.get_account();
         let address = account.address();
 
-        let gateway = match dev {
+        let gateway = match input.dev {
             Some(dev) => {
-                let dev_option = Some(dev as u16);
-                let gateway = Gateway::new(Arc::new(RwLock::new(committee)), account, dev_option).unwrap();
+                let gateway = input.to_gateway();
                 let tcp_config = gateway.tcp().config();
-                let expected_port = MEMORY_POOL_PORT + (dev as u16);
                 assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
-                assert_eq!(tcp_config.desired_listening_port, Some(expected_port));
+                assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + (dev as u16)));
                 gateway
             }
             None => {
-                let gateway = Gateway::new(Arc::new(RwLock::new(committee)), account, None).unwrap();
-
+                let gateway = input.to_gateway();
                 let tcp_config = gateway.tcp().config();
                 assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
                 assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT));
