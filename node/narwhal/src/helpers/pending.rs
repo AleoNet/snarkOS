@@ -12,77 +12,79 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkvm::{console::prelude::*, ledger::narwhal::TransmissionID};
-
 use parking_lot::RwLock;
 use std::{
     collections::{HashMap, HashSet},
+    hash::Hash,
     net::SocketAddr,
     sync::Arc,
 };
 
 #[derive(Clone, Debug)]
-pub struct Pending<N: Network> {
+pub struct Pending<T: PartialEq + Eq + Hash> {
     /// The map of pending `transmission IDs` to `peer IPs` that have the transmission.
-    transmissions: Arc<RwLock<HashMap<TransmissionID<N>, HashSet<SocketAddr>>>>,
+    pending: Arc<RwLock<HashMap<T, HashSet<SocketAddr>>>>,
 }
 
-impl<N: Network> Default for Pending<N> {
+impl<T: PartialEq + Eq + Hash> Default for Pending<T> {
     /// Initializes a new instance of the pending queue.
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<N: Network> Pending<N> {
+impl<T: PartialEq + Eq + Hash> Pending<T> {
     /// Initializes a new instance of the pending queue.
     pub fn new() -> Self {
-        Self { transmissions: Default::default() }
+        Self { pending: Default::default() }
     }
 
     /// Returns `true` if the pending queue is empty.
     pub fn is_empty(&self) -> bool {
-        self.transmissions.read().is_empty()
+        self.pending.read().is_empty()
     }
 
-    /// Returns the number of transmissions in the pending queue.
+    /// Returns the number of pending in the pending queue.
     pub fn len(&self) -> usize {
-        self.transmissions.read().len()
+        self.pending.read().len()
     }
 
     /// Returns `true` if the pending queue contains the specified `transmission ID`.
-    pub fn contains(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
-        self.transmissions.read().contains_key(&transmission_id.into())
+    pub fn contains(&self, item: impl Into<T>) -> bool {
+        self.pending.read().contains_key(&item.into())
     }
 
     /// Returns `true` if the pending queue contains the specified `transmission ID` for the specified `peer IP`.
-    pub fn contains_peer(&self, transmission_id: impl Into<TransmissionID<N>>, peer_ip: SocketAddr) -> bool {
-        self.transmissions.read().get(&transmission_id.into()).map_or(false, |peer_ips| peer_ips.contains(&peer_ip))
+    pub fn contains_peer(&self, item: impl Into<T>, peer_ip: SocketAddr) -> bool {
+        self.pending.read().get(&item.into()).map_or(false, |peer_ips| peer_ips.contains(&peer_ip))
     }
 
     /// Returns the peer IPs for the specified `transmission ID`.
-    pub fn get(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<HashSet<SocketAddr>> {
-        self.transmissions.read().get(&transmission_id.into()).cloned()
+    pub fn get(&self, item: impl Into<T>) -> Option<HashSet<SocketAddr>> {
+        self.pending.read().get(&item.into()).cloned()
     }
 
     /// Inserts the specified `transmission ID` and `peer IP` to the pending queue.
     /// If the `transmission ID` already exists, the `peer IP` is added to the existing transmission.
-    pub fn insert(&self, transmission_id: impl Into<TransmissionID<N>>, peer_ip: SocketAddr) {
-        self.transmissions.write().entry(transmission_id.into()).or_default().insert(peer_ip);
+    pub fn insert(&self, item: impl Into<T>, peer_ip: SocketAddr) {
+        self.pending.write().entry(item.into()).or_default().insert(peer_ip);
     }
 
     /// Removes the specified `transmission ID` from the pending queue.
     /// If the `transmission ID` exists and is removed, `true` is returned.
     /// If the `transmission ID` does not exist, `false` is returned.
-    pub fn remove(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
-        self.transmissions.write().remove(&transmission_id.into()).is_some()
+    pub fn remove(&self, item: impl Into<T>) -> bool {
+        self.pending.write().remove(&item.into()).is_some()
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::ledger::coinbase::PuzzleCommitment;
+    use snarkvm::{
+        ledger::{coinbase::PuzzleCommitment, narwhal::TransmissionID},
+        prelude::{Rng, TestRng},
+    };
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -91,7 +93,7 @@ mod tests {
         let rng = &mut TestRng::default();
 
         // Initialize the ready queue.
-        let pending = Pending::<CurrentNetwork>::new();
+        let pending = Pending::<TransmissionID<CurrentNetwork>>::new();
 
         // Check initially empty.
         assert!(pending.is_empty());

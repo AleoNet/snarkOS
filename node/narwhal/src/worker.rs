@@ -48,7 +48,7 @@ pub struct Worker<N: Network> {
     /// The ready queue.
     ready: Ready<N>,
     /// The pending queue.
-    pending: Pending<N>,
+    pending: Pending<TransmissionID<N>>,
     /// The callback queue.
     /// TODO (howardwu): Expire callbacks that have not been called after a certain amount of time,
     ///  or clear the callbacks that are older than a certain round.
