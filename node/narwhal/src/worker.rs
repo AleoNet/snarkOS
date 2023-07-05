@@ -35,7 +35,7 @@ use snarkvm::{
 use indexmap::IndexMap;
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc};
-use tokio::task::JoinHandle;
+use tokio::{sync::oneshot, task::JoinHandle};
 
 #[derive(Clone)]
 pub struct Worker<N: Network> {
@@ -49,6 +49,10 @@ pub struct Worker<N: Network> {
     ready: Ready<N>,
     /// The pending queue.
     pending: Pending<N>,
+    /// The callback queue.
+    /// TODO (howardwu): Expire callbacks that have not been called after a certain amount of time,
+    ///  or clear the callbacks that are older than a certain round.
+    callbacks: Arc<Mutex<IndexMap<TransmissionID<N>, oneshot::Sender<()>>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -65,6 +69,7 @@ impl<N: Network> Worker<N> {
             storage: storage.clone(),
             ready: Ready::new(storage),
             pending: Default::default(),
+            callbacks: Default::default(),
             handles: Default::default(),
         })
     }
@@ -89,8 +94,13 @@ impl<N: Network> Worker<N> {
 }
 
 impl<N: Network> Worker<N> {
-    /// Handles the incoming ping event.
-    async fn process_transmission_id(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
+    /// Handles the incoming transmission ID.
+    pub(crate) fn process_transmission_id(
+        &self,
+        peer_ip: SocketAddr,
+        transmission_id: TransmissionID<N>,
+        callback: Option<oneshot::Sender<()>>,
+    ) {
         // Check if the transmission ID exists in the ready queue or in storage.
         if self.ready.contains(transmission_id) || self.storage.contains_transmission(transmission_id) {
             return;
@@ -110,18 +120,22 @@ impl<N: Network> Worker<N> {
             );
             // Insert the transmission ID into the pending queue.
             self.pending.insert(transmission_id, peer_ip);
+            // If a callback is provided, insert it into the callback queue.
+            if let Some(callback) = callback {
+                self.callbacks.lock().insert(transmission_id, callback);
+            }
             // TODO (howardwu): Limit the number of open requests we send to a peer.
             // Send an transmission request to the peer.
-            self.send_transmission_request(peer_ip, transmission_id).await;
+            self.send_transmission_request(peer_ip, transmission_id);
         }
     }
 
     /// Handles the incoming transmission request.
-    async fn process_transmission_request(&self, peer_ip: SocketAddr, request: TransmissionRequest<N>) {
+    fn process_transmission_request(&self, peer_ip: SocketAddr, request: TransmissionRequest<N>) {
         // Attempt to retrieve the transmission.
         if let Some(transmission) = self.storage.get_transmission(request.transmission_id) {
             // Send the transmission to the peer.
-            self.send_transmission_response(peer_ip, request.transmission_id, transmission).await;
+            self.send_transmission_response(peer_ip, request.transmission_id, transmission);
         }
     }
 
@@ -143,6 +157,11 @@ impl<N: Network> Worker<N> {
                     self.id,
                     fmt_id(response.transmission_id)
                 );
+                // Check if a callback exists for the transmission ID.
+                if let Some(callback) = self.callbacks.lock().remove(&response.transmission_id) {
+                    // Send a notification to the callback.
+                    callback.send(()).ok();
+                }
             }
         }
         Ok(())
@@ -189,7 +208,7 @@ impl<N: Network> Worker<N> {
         self.spawn(async move {
             loop {
                 // Broadcast the ping event.
-                self_clone.broadcast_ping().await;
+                self_clone.broadcast_ping();
                 // Wait for the next interval.
                 tokio::time::sleep(std::time::Duration::from_millis(WORKER_PING_INTERVAL)).await;
             }
@@ -200,7 +219,7 @@ impl<N: Network> Worker<N> {
         self.spawn(async move {
             while let Some((peer_ip, transmission_id)) = rx_worker_ping.recv().await {
                 // Process the ping event.
-                self_clone.process_transmission_id(peer_ip, transmission_id).await;
+                self_clone.process_transmission_id(peer_ip, transmission_id, None);
             }
         });
 
@@ -209,7 +228,7 @@ impl<N: Network> Worker<N> {
         self.spawn(async move {
             while let Some((peer_ip, transmission_request)) = rx_transmission_request.recv().await {
                 // Process the transmission request.
-                self_clone.process_transmission_request(peer_ip, transmission_request).await;
+                self_clone.process_transmission_request(peer_ip, transmission_request);
             }
         });
 
@@ -229,7 +248,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Broadcasts a ping event.
-    async fn broadcast_ping(&self) {
+    fn broadcast_ping(&self) {
         // Construct the ping event.
         let ping = WorkerPing::new(self.ready.transmission_ids());
         // Broadcast the ping event.
@@ -237,13 +256,13 @@ impl<N: Network> Worker<N> {
     }
 
     /// Sends an transmission request to the specified peer.
-    async fn send_transmission_request(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
+    fn send_transmission_request(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
         // Send the transmission request to the peer.
         self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into()));
     }
 
     /// Sends an transmission response to the specified peer.
-    async fn send_transmission_response(
+    fn send_transmission_response(
         &self,
         peer_ip: SocketAddr,
         transmission_id: TransmissionID<N>,

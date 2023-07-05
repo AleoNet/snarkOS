@@ -28,15 +28,16 @@ use crate::{
 use snarkos_account::Account;
 use snarkvm::{
     console::prelude::*,
-    ledger::narwhal::{Batch, BatchCertificate, Data},
+    ledger::narwhal::{Batch, BatchCertificate, BatchHeader, Data},
     prelude::{Field, Signature},
 };
 
+use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
 use std::{future::Future, net::SocketAddr, sync::Arc};
 use time::OffsetDateTime;
-use tokio::task::JoinHandle;
+use tokio::{sync::oneshot, task::JoinHandle};
 
 /// Returns the current UTC epoch timestamp.
 fn now() -> i64 {
@@ -225,9 +226,11 @@ impl<N: Network> Primary<N> {
         }
         // Retrieve the committee for the specified round.
         // If the committee cannot be found, it means this round has exceed GC depth and we should not sign it.
-        let Some(committee) = self.storage.get_committee_for_round(round) else {
-            bail!("Round {round} has exceeded the maximum GC depth")
-        };
+        let committee = self.committee.read().clone();
+        // TODO (howardwu): Enable this code to turn on dynamic committees.
+        // let Some(committee) = self.storage.get_committee_for_round(round) else {
+        //     bail!("Round {round} has exceeded the maximum GC depth")
+        // };
         // Ensure the address is a member of the committee.
         if !committee.is_committee_member(address) {
             bail!("Address {address} is not a member of the committee")
@@ -243,7 +246,9 @@ impl<N: Network> Primary<N> {
         //     bail!("Timestamp {timestamp} for the proposed batch must be after the previous round timestamp")
         // }
 
-        // TODO (howardwu): Ensure I have all of the transmissions. If not, request them before signing.
+        // Ensure the primary has all of the transmissions.
+        self.fetch_missing_transmissions(peer_ip, batch_header).await?;
+
         // TODO (howardwu): Ensure I have all of the previous certificates. If not, request them before signing.
         // TODO (howardwu): Ensure the previous certificates are for round-1. If not, do not sign.
         // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not sign.
@@ -497,6 +502,46 @@ impl<N: Network> Primary<N> {
         if is_expired {
             *self.proposed_batch.write() = None;
         }
+    }
+
+    /// Fetches any missing transmissions for the specified batch header from the specified peer.
+    async fn fetch_missing_transmissions(&self, peer_ip: SocketAddr, batch_header: BatchHeader<N>) -> Result<()> {
+        // Initialize a list for the missing transmissions.
+        let mut fetch_transmissions = FuturesUnordered::new();
+
+        // Retrieve the number of workers.
+        let num_workers = self.gateway.num_workers();
+        // Iterate through the transmission IDs.
+        for transmission_id in batch_header.transmission_ids() {
+            // If we do not have the transmission, request it.
+            if !self.storage.contains_transmission(*transmission_id) {
+                // Determine the worker ID.
+                let Ok(worker_id) = assign_to_worker(*transmission_id, num_workers) else {
+                    bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
+                };
+                // Initialize a oneshot channel.
+                let (callback_sender, callback_receiver) = oneshot::channel();
+                // Retrieve the worker.
+                match self.workers.read().get(worker_id as usize) {
+                    Some(worker) => {
+                        // Send the transmission ID to the worker.
+                        worker.process_transmission_id(peer_ip, *transmission_id, Some(callback_sender));
+                        // Push the callback onto the list.
+                        fetch_transmissions.push(callback_receiver);
+                    }
+                    None => bail!("Unable to find worker {worker_id}"),
+                }
+            }
+        }
+
+        // Wait for all of the transmissions to be fetched.
+        while let Some(result) = fetch_transmissions.next().await {
+            if let Err(e) = result {
+                bail!("Unable to fetch transmission: {e}")
+            }
+        }
+        // Return after receiving all of the transmissions.
+        Ok(())
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
