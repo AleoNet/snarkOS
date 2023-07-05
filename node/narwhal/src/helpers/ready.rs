@@ -194,9 +194,9 @@ mod tests {
         // Check the transmissions.
         assert_eq!(
             transmissions,
-            vec![(commitment_1, solution_1), (commitment_2, solution_2), (commitment_3, solution_3),]
+            vec![(commitment_1, solution_1), (commitment_2, solution_2), (commitment_3, solution_3)]
                 .into_iter()
-                .collect::<IndexMap<TransmissionID<_>, Transmission<_>>>()
+                .collect::<IndexMap<_, _>>()
         );
     }
 }
