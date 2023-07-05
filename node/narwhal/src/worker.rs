@@ -95,6 +95,7 @@ impl<N: Network> Worker<N> {
 
 impl<N: Network> Worker<N> {
     /// Handles the incoming transmission ID.
+    /// This method includes an optional callback that is handled by `Worker::process_transmission_response`.
     pub(crate) fn process_transmission_id(
         &self,
         peer_ip: SocketAddr,

@@ -235,22 +235,18 @@ impl<N: Network> Storage<N> {
         // TODO (howardwu): Ensure the certificate is well-formed. If not, do not store.
         // TODO (howardwu): Ensure the round is within range. If not, do not store.
         // TODO (howardwu): Ensure the address is in the committee of the specified round. If not, do not store.
-        // TODO (howardwu): Ensure I have all of the transmissions. If not, request them before storing.
-        // TODO (howardwu): Ensure I have all of the previous certificates. If not, request them before storing.
+        // TODO (howardwu): Ensure I have all of the transmissions. If not, do not store.
+        // TODO (howardwu): Ensure I have all of the previous certificates. If not, do not store.
         // TODO (howardwu): Ensure the previous certificates are for round-1. If not, do not store.
         // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not store.
 
-        // Requesting! Awaiting!
+        // Ensure storage contains all declared transmissions.
+        for transmission_id in certificate.transmission_ids() {
+            if !self.contains_transmission(*transmission_id) {
+                bail!("Missing transmission {transmission_id} for certificate {certificate_id}");
+            }
+        }
 
-        /* Proceed to store the certificate. */
-
-        // // Ensure storage contains all declared transmissions.
-        // for transmission_id in certificate.transmission_ids() {
-        //     if !self.transmissions.read().contains_key(transmission_id) {
-        //         bail!("Missing transmission {transmission_id} for certificate {certificate_id}");
-        //     }
-        // }
-        //
         // // Ensure storage contains all declared previous certificates (up to GC).
         // for previous_certificate_id in certificate.previous_certificate_ids() {
         //     // If the certificate's round is greater than the GC round, ensure the previous certificate exists.
@@ -260,6 +256,8 @@ impl<N: Network> Storage<N> {
         //         }
         //     }
         // }
+
+        /* Proceed to store the certificate. */
 
         // Insert the round to certificate ID entry.
         self.rounds.write().entry(round).or_default().insert((certificate_id, batch_id, address));

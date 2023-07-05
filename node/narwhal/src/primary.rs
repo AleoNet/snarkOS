@@ -247,7 +247,7 @@ impl<N: Network> Primary<N> {
         // }
 
         // Ensure the primary has all of the transmissions.
-        self.fetch_missing_transmissions(peer_ip, batch_header).await?;
+        self.fetch_missing_transmissions(peer_ip, &batch_header).await?;
 
         // TODO (howardwu): Ensure I have all of the previous certificates. If not, request them before signing.
         // TODO (howardwu): Ensure the previous certificates are for round-1. If not, do not sign.
@@ -424,7 +424,7 @@ impl<N: Network> Primary<N> {
                     continue;
                 };
                 // Store the batch certificate.
-                if let Err(e) = self_clone.storage.insert_certificate(batch_certificate) {
+                if let Err(e) = self_clone.store_certificate(peer_ip, batch_certificate).await {
                     warn!("Failed to store the batch certificate from peer '{peer_ip}' - {e}");
                     continue;
                 }
@@ -504,8 +504,33 @@ impl<N: Network> Primary<N> {
         }
     }
 
+    /// Stores the given batch certificate, after ensuring:
+    /// - The certificate is well-formed.
+    /// - The round is within range.
+    /// - The address is in the committee of the specified round.
+    /// - We have all of the transmissions.
+    /// - We have all of the previous certificates.
+    /// - The previous certificates are valid.
+    /// - The previous certificates have reached quorum threshold.
+    async fn store_certificate(&self, peer_ip: SocketAddr, certificate: BatchCertificate<N>) -> Result<()> {
+        // TODO (howardwu): Ensure the certificate is well-formed. If not, do not store.
+        // TODO (howardwu): Ensure the round is within range. If not, do not store.
+        // TODO (howardwu): Ensure the address is in the committee of the specified round. If not, do not store.
+        // TODO (howardwu): Ensure I have all of the previous certificates. If not, request them before storing.
+        // TODO (howardwu): Ensure the previous certificates are for round-1. If not, do not store.
+        // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not store.
+
+        // Ensure the primary has all of the transmissions.
+        self.fetch_missing_transmissions(peer_ip, certificate.batch_header()).await?;
+
+        // Store the certificate.
+        self.storage.insert_certificate(certificate)?;
+        // Return success.
+        Ok(())
+    }
+
     /// Fetches any missing transmissions for the specified batch header from the specified peer.
-    async fn fetch_missing_transmissions(&self, peer_ip: SocketAddr, batch_header: BatchHeader<N>) -> Result<()> {
+    async fn fetch_missing_transmissions(&self, peer_ip: SocketAddr, batch_header: &BatchHeader<N>) -> Result<()> {
         // Initialize a list for the missing transmissions.
         let mut fetch_transmissions = FuturesUnordered::new();
 
