@@ -234,6 +234,11 @@ impl<N: Network> Primary<N> {
         // Retrieve the timestamp.
         let timestamp = batch_header.timestamp();
 
+        // Ensure this batch ID is new.
+        if self.storage.contains_batch(batch_id) {
+            bail!("Batch ID {batch_id} has already been processed")
+        }
+
         // Ensure the round in the proposed batch is within GC range of the current round.
         if self.committee.read().round() + self.storage.max_gc_rounds() <= round {
             bail!("Round {round} is too far in the future")
