@@ -76,6 +76,7 @@ impl<N: Network> Gateway<N> {
     pub fn new(committee: Arc<RwLock<Committee<N>>>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
         // Initialize the gateway IP.
         let ip = match dev {
+            // TODO change dev to Option<u8>, otherwise there is potential overflow
             Some(dev) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev)),
             None => SocketAddr::from_str(&format!("0.0.0.0:{}", MEMORY_POOL_PORT)),
         }?;
@@ -791,5 +792,63 @@ impl<N: Network> Gateway<N> {
         }
 
         None
+    }
+}
+
+mod tests {
+    use crate::{
+        helpers::tests::{CommitteeInput, Validator},
+        Gateway,
+        MAX_COMMITTEE_SIZE,
+        MEMORY_POOL_PORT,
+    };
+    use parking_lot::RwLock;
+    use snarkos_node_tcp::P2P;
+    use snarkvm::prelude::Testnet3;
+    use std::{
+        net::{IpAddr, Ipv4Addr},
+        sync::Arc,
+    };
+    use test_strategy::{proptest, Arbitrary};
+
+    type N = Testnet3;
+
+    #[derive(Arbitrary, Debug)]
+    struct GatewayInput {
+        #[filter(CommitteeInput::is_valid)]
+        committee_input: CommitteeInput,
+        node_validator: Validator,
+        dev: Option<u8>,
+    }
+
+    #[proptest]
+    fn gateway_initialization(input: GatewayInput) {
+        let GatewayInput { committee_input, node_validator, dev } = input;
+        let committee = committee_input.to_committee().unwrap();
+        let account = node_validator.get_account();
+        let address = account.address();
+
+        let gateway = match dev {
+            Some(dev) => {
+                let dev_option = Some(dev as u16);
+                let gateway = Gateway::new(Arc::new(RwLock::new(committee)), account, dev_option).unwrap();
+                let tcp_config = gateway.tcp().config();
+                let expected_port = MEMORY_POOL_PORT + (dev as u16);
+                assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
+                assert_eq!(tcp_config.desired_listening_port, Some(expected_port));
+                gateway
+            }
+            None => {
+                let gateway = Gateway::new(Arc::new(RwLock::new(committee)), account, None).unwrap();
+
+                let tcp_config = gateway.tcp().config();
+                assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
+                assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT));
+                gateway
+            }
+        };
+        let tcp_config = gateway.tcp().config();
+        assert_eq!(tcp_config.max_connections, MAX_COMMITTEE_SIZE);
+        assert_eq!(gateway.account().address(), address);
     }
 }
