@@ -170,6 +170,18 @@ pub mod tests {
     }
 
     #[proptest]
+    fn committee_advance(#[filter(CommitteeInput::is_valid)] input: CommitteeInput) {
+        let committee = input.to_committee().unwrap();
+        let current_round = input.round;
+        let current_members = committee.members();
+        assert_eq!(committee.round(), current_round);
+
+        let committee = committee.to_next_round().unwrap();
+        assert_eq!(committee.round(), current_round + 1);
+        assert_eq!(committee.members(), current_members);
+    }
+
+    #[proptest]
     fn committee_members(input: CommitteeInput) {
         let committee = match input.to_committee() {
             Ok(committee) => {
