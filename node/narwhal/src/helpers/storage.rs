@@ -337,7 +337,7 @@ impl<N: Network> Storage<N> {
                 .map_or(true, |certificate_ids| certificate_ids.is_empty())
             {
                 // Remove the entry for the transmission ID.
-                self.transmissions.write().remove(transmission_id);
+                self.transmission_ids.write().remove(transmission_id);
                 // Remove the transmission.
                 self.remove_transmission(*transmission_id);
             }
@@ -373,7 +373,7 @@ impl<N: Network> Storage<N> {
     }
 
     /// Removes the given `transmission ID` from storage.
-    pub fn remove_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) {
+    fn remove_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) {
         // Remove the transmission.
         self.transmissions.write().remove(&transmission_id.into());
     }
