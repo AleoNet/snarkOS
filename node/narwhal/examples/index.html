@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <style>
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+    </style>
+</head>
+<body>
+<script src="https://d3js.org/d3.v6.min.js"></script>
+<script>
+    // Size of the SVG canvas
+    const width = window.innerWidth;
+    const height = window.innerHeight / 2;
+    const radius = 5; // radius of nodes
+    const columns = 10; // Updated value to show the number of rounds
+    const rows = 4; // Update value to show the number of nodes
+    const cellWidth = width / columns;
+    const cellHeight = height / rows;
+
+    // Create the SVG canvas
+    const svg = d3.select("body")
+        .append("svg")
+        .attr("width", width)
+        .attr("height", height);
+
+    function exampleResponse() {
+        const nodes = [];
+        for (let column = 0; column < 10; column++) { // loop for rounds
+            for (let row = 0; row < 4; row++) { // loop for nodes
+                nodes.push({
+                    "id": `node${row}-${column}`,
+                    "column": column,
+                    "row": row
+                });
+            }
+        }
+
+        const links = [];
+        for (let column = 1; column < 10; column++) {
+            for (let row = 0; row < 4; row++) {
+                // choose randomly 3 or 4 nodes from the previous round
+                const prevNodes = [...Array(4).keys()];
+                const numLinks = Math.floor(Math.random() * 2) + 3; // random number either 3 or 4
+                for (let i = 0; i < numLinks; i++) {
+                    const randIndex = Math.floor(Math.random() * prevNodes.length);
+                    const targetRow = prevNodes.splice(randIndex, 1)[0];
+                    links.push({
+                        "source": `node${row}-${column}`,
+                        "target": `node${targetRow}-${column - 1}`,
+                        "color": "black"
+                    });
+                }
+            }
+        }
+
+        return {
+            "nodes": nodes,
+            "links": links
+        };
+    }
+
+    // Fetch data from the server
+    async function fetchData() {
+        // const response = await d3.json("http://127.0.0.1:3000/dag");
+        // const response = {
+        //     "nodes": [
+        //         {"id": "node0-0", "column": 0, "row": 0},
+        //         {"id": "node1-0", "column": 0, "row": 1},
+        //         {"id": "node2-0", "column": 0, "row": 2},
+        //         {"id": "node3-0", "column": 0, "row": 3},
+        //         {"id": "node0-1", "column": 1, "row": 0},
+        //         {"id": "node1-1", "column": 1, "row": 1},
+        //         {"id": "node2-1", "column": 1, "row": 2},
+        //         {"id": "node3-1", "column": 1, "row": 3},
+        //         // More nodes...
+        //     ],
+        //     "links": [
+        //         {"source": "node0-0", "target": "node0-1", "color": "black"},
+        //         {"source": "node0-0", "target": "node1-1", "color": "black"},
+        //         {"source": "node0-0", "target": "node3-1", "color": "black"},
+        //         {"source": "node1-0", "target": "node0-1", "color": "black"},
+        //         {"source": "node1-0", "target": "node1-1", "color": "black"},
+        //         {"source": "node1-0", "target": "node2-1", "color": "black"},
+        //         {"source": "node2-0", "target": "node1-1", "color": "black"},
+        //         {"source": "node2-0", "target": "node2-1", "color": "black"},
+        //         {"source": "node3-0", "target": "node2-1", "color": "black"},
+        //         {"source": "node3-0", "target": "node3-1", "color": "black"},
+        //         // More links...
+        //     ]
+        // };
+        const response = exampleResponse();
+
+        // Map node ids to node objects for easier lookup
+        const nodeById = new Map(response.nodes.map(node => [node.id, node]));
+
+        // Replace source and target ids in links with the actual objects
+        response.links.forEach(link => {
+            link.source = nodeById.get(link.source);
+            link.target = nodeById.get(link.target);
+        });
+
+        const nodes = response.nodes;
+        const links = response.links;
+
+        updateGraph(nodes, links);
+    }
+
+    function updateGraph(nodes, links) {
+        // Update nodes
+        const node = svg.selectAll("circle")
+            .data(nodes, d => d.id)
+            .join("circle")
+            .attr("r", radius)
+            .attr("cx", d => d.column * cellWidth + cellWidth / 2) // position nodes in the middle of their cell
+            .attr("cy", d => d.row * cellHeight + cellHeight / 2);
+
+        // Update links
+        svg.selectAll("line")
+            .data(links, d => `${d.source.id}-${d.target.id}`)
+            .join("line")
+            .style("stroke", d => d.color)
+            .attr("x1", d => d.source.column * cellWidth + cellWidth / 2)
+            .attr("y1", d => d.source.row * cellHeight + cellHeight / 2)
+            .attr("x2", d => d.target.column * cellWidth + cellWidth / 2)
+            .attr("y2", d => d.target.row * cellHeight + cellHeight / 2);
+
+        // Update row labels
+        svg.selectAll("rowLabel")
+            .data([...new Set(nodes.map(n => n.row))]) // unique rows
+            .join("text")
+            .attr("x", 0)
+            .attr("y", d => d * cellHeight + cellHeight / 2)
+            .text(d => `Node ${d}`);
+
+        // Update column labels
+        svg.selectAll("columnLabel")
+            .data([...new Set(nodes.map(n => n.column))]) // unique columns
+            .join("text")
+            .attr("x", d => d * cellWidth + cellWidth / 2)
+            .attr("y", 20) // set y coordinate so that labels are on top
+            .style("text-anchor", "middle") // centering the text
+            .text(d => `Round ${d}`);
+    }
+
+    // Fetch new data every second
+    d3.interval(fetchData, 1000);
+
+    // Initial fetch
+    fetchData();
+</script>
+</body>
+</html>
