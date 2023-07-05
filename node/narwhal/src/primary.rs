@@ -203,6 +203,7 @@ impl<N: Network> Primary<N> {
     ///   - Ensure the timestamp is within range.
     ///   - Ensure we have all of the transmissions.
     ///   - Ensure we have all of the previous certificates.
+    ///   - Ensure the previous certificates are valid.
     ///   - Ensure the previous certificates have reached quorum threshold.
     /// 2. Sign the batch.
     /// 3. Broadcast the signature back to the validator.
@@ -244,6 +245,7 @@ impl<N: Network> Primary<N> {
 
         // TODO (howardwu): Ensure I have all of the transmissions. If not, request them before signing.
         // TODO (howardwu): Ensure I have all of the previous certificates. If not, request them before signing.
+        // TODO (howardwu): Ensure the previous certificates are for round-1. If not, do not sign.
         // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not sign.
 
         /* Proceeding to sign the batch. */

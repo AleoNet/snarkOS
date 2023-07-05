@@ -237,6 +237,7 @@ impl<N: Network> Storage<N> {
         // TODO (howardwu): Ensure the address is in the committee of the specified round. If not, do not store.
         // TODO (howardwu): Ensure I have all of the transmissions. If not, request them before storing.
         // TODO (howardwu): Ensure I have all of the previous certificates. If not, request them before storing.
+        // TODO (howardwu): Ensure the previous certificates are for round-1. If not, do not store.
         // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not store.
 
         // Requesting! Awaiting!
