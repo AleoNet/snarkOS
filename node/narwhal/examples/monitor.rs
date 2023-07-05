@@ -12,14 +12,25 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use axum::Router;
+use axum::{
+    routing::get,
+    Router
+};
 use std::net::SocketAddr;
+use tower_http::{
+    services::{ServeDir, ServeFile}
+};
 
-const SERVER_URL: &str = "127.0.0.1:6000";
+const SERVER_URL: &str = "127.0.0.1:6060";
 
 async fn start_server() {
+    // Serve the 'assets/' directory.
+    let serve_dir = ServeDir::new("assets").fallback(ServeFile::new("assets/index.html"));
+
     // Initialize the routes.
-    let router = Router::new().nest("/static", axum_static::static_router("/"));
+    let router = Router::new()
+        .route("/", get(|| async { "Hello, World!" }))
+        .fallback_service(serve_dir);
 
     // Run the server.
     println!("Starting server at '{SERVER_URL}'...");
@@ -31,6 +42,8 @@ async fn start_server() {
 
 #[tokio::main]
 async fn main() {
-    tokio::spawn(|| async { start_server().await });
-    open::that(&format!("http://{SERVER_URL}"));
+    tokio::spawn(async move { start_server().await });
+    open::that(&format!("http://{SERVER_URL}/assets/index.html")).expect("Failed to open website");
+    // Note: Do not move this.
+    std::future::pending::<()>().await;
 }

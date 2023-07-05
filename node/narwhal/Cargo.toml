@@ -90,9 +90,6 @@ version = "0.7.4"
 default-features = false
 features = [ "erased-json" ]
 
-[dev-dependencies.axum_static]
-version = "1.2"
-
 [dev-dependencies.open]
 version = "4"
 
@@ -102,6 +99,10 @@ version = "0.3"
 [dev-dependencies.snarkvm]
 workspace = true
 features = [ "test-helpers" ]
+
+[dev-dependencies.tower-http]
+version = "0.4"
+features = [ "fs", "trace" ]
 
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
