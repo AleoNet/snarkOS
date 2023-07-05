@@ -12,31 +12,36 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use parking_lot::RwLock;
+use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
     net::SocketAddr,
     sync::Arc,
 };
+use tokio::sync::oneshot;
 
 #[derive(Clone, Debug)]
 pub struct Pending<T: PartialEq + Eq + Hash> {
-    /// The map of pending `transmission IDs` to `peer IPs` that have the transmission.
+    /// The map of pending `items` to `peer IPs` that have the item.
     pending: Arc<RwLock<HashMap<T, HashSet<SocketAddr>>>>,
+    /// The optional callback queue.
+    /// TODO (howardwu): Expire callbacks that have not been called after a certain amount of time,
+    ///  or clear the callbacks that are older than a certain round.
+    callbacks: Arc<Mutex<HashMap<T, Vec<oneshot::Sender<()>>>>>,
 }
 
-impl<T: PartialEq + Eq + Hash> Default for Pending<T> {
+impl<T: Copy + Clone + PartialEq + Eq + Hash> Default for Pending<T> {
     /// Initializes a new instance of the pending queue.
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: PartialEq + Eq + Hash> Pending<T> {
+impl<T: Copy + Clone + PartialEq + Eq + Hash> Pending<T> {
     /// Initializes a new instance of the pending queue.
     pub fn new() -> Self {
-        Self { pending: Default::default() }
+        Self { pending: Default::default(), callbacks: Default::default() }
     }
 
     /// Returns `true` if the pending queue is empty.
@@ -49,32 +54,50 @@ impl<T: PartialEq + Eq + Hash> Pending<T> {
         self.pending.read().len()
     }
 
-    /// Returns `true` if the pending queue contains the specified `transmission ID`.
+    /// Returns `true` if the pending queue contains the specified `item`.
     pub fn contains(&self, item: impl Into<T>) -> bool {
         self.pending.read().contains_key(&item.into())
     }
 
-    /// Returns `true` if the pending queue contains the specified `transmission ID` for the specified `peer IP`.
+    /// Returns `true` if the pending queue contains the specified `item` for the specified `peer IP`.
     pub fn contains_peer(&self, item: impl Into<T>, peer_ip: SocketAddr) -> bool {
         self.pending.read().get(&item.into()).map_or(false, |peer_ips| peer_ips.contains(&peer_ip))
     }
 
-    /// Returns the peer IPs for the specified `transmission ID`.
+    /// Returns the peer IPs for the specified `item`.
     pub fn get(&self, item: impl Into<T>) -> Option<HashSet<SocketAddr>> {
         self.pending.read().get(&item.into()).cloned()
     }
 
-    /// Inserts the specified `transmission ID` and `peer IP` to the pending queue.
-    /// If the `transmission ID` already exists, the `peer IP` is added to the existing transmission.
-    pub fn insert(&self, item: impl Into<T>, peer_ip: SocketAddr) {
-        self.pending.write().entry(item.into()).or_default().insert(peer_ip);
+    /// Inserts the specified `item` and `peer IP` to the pending queue.
+    /// In addition, an optional `callback` may be provided, that is triggered upon removal.
+    /// If the `item` already exists, the `peer IP` is added to the existing entry.
+    pub fn insert(&self, item: impl Into<T>, peer_ip: SocketAddr, callback: Option<oneshot::Sender<()>>) {
+        let item = item.into();
+        // Insert the peer IP into the pending queue.
+        self.pending.write().entry(item).or_default().insert(peer_ip);
+        // If a callback is provided, insert it into the callback queue.
+        if let Some(callback) = callback {
+            self.callbacks.lock().entry(item).or_default().push(callback);
+        }
     }
 
-    /// Removes the specified `transmission ID` from the pending queue.
-    /// If the `transmission ID` exists and is removed, `true` is returned.
-    /// If the `transmission ID` does not exist, `false` is returned.
+    /// Removes the specified `item` from the pending queue.
+    /// If the `item` exists and is removed, `true` is returned.
+    /// If the `item` does not exist, `false` is returned.
     pub fn remove(&self, item: impl Into<T>) -> bool {
-        self.pending.write().remove(&item.into()).is_some()
+        let item = item.into();
+        // Remove the item from the pending queue.
+        let result = self.pending.write().remove(&item).is_some();
+        // Remove the callback for the item, and process any remaining callbacks.
+        if let Some(callbacks) = self.callbacks.lock().remove(&item) {
+            for callback in callbacks {
+                // Send a notification to the callback.
+                callback.send(()).ok();
+            }
+        }
+        // Return the result.
+        result
     }
 }
 
@@ -110,15 +133,15 @@ mod tests {
         let addr_3 = SocketAddr::from(([127, 0, 0, 1], 3456));
 
         // Insert the commitments.
-        pending.insert(commitment_1, addr_1);
-        pending.insert(commitment_2, addr_2);
-        pending.insert(commitment_3, addr_3);
+        pending.insert(commitment_1, addr_1, None);
+        pending.insert(commitment_2, addr_2, None);
+        pending.insert(commitment_3, addr_3, None);
 
         // Check the number of SocketAddrs.
         assert_eq!(pending.len(), 3);
         assert!(!pending.is_empty());
 
-        // Check the transmission IDs.
+        // Check the items.
         let ids = vec![commitment_1, commitment_2, commitment_3];
         let peers = vec![addr_1, addr_2, addr_3];
 

@@ -13,7 +13,16 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{assign_to_worker, fmt_id, init_worker_channels, Committee, PrimaryReceiver, PrimarySender, Storage},
+    helpers::{
+        assign_to_worker,
+        fmt_id,
+        init_worker_channels,
+        Committee,
+        Pending,
+        PrimaryReceiver,
+        PrimarySender,
+        Storage,
+    },
     BatchCertified,
     BatchPropose,
     BatchSignature,
@@ -58,6 +67,8 @@ pub struct Primary<N: Network> {
     workers: Arc<RwLock<Vec<Worker<N>>>>,
     /// The currently-proposed batch, along with its signatures.
     proposed_batch: Arc<RwLock<Option<(Batch<N>, IndexMap<Signature<N>, i64>)>>>,
+    /// The pending certificates queue.
+    pending: Pending<Field<N>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -79,6 +90,7 @@ impl<N: Network> Primary<N> {
             storage,
             workers: Default::default(),
             proposed_batch: Default::default(),
+            pending: Default::default(),
             handles: Default::default(),
         })
     }
@@ -136,6 +148,21 @@ impl<N: Network> Primary<N> {
     /// Returns the number of workers.
     pub fn num_workers(&self) -> u8 {
         u8::try_from(self.workers.read().len()).expect("Too many workers")
+    }
+
+    /// Returns the workers.
+    pub const fn workers(&self) -> &Arc<RwLock<Vec<Worker<N>>>> {
+        &self.workers
+    }
+
+    /// Returns the proposed batch.
+    pub fn proposed_batch(&self) -> Option<Batch<N>> {
+        self.proposed_batch.read().as_ref().map(|(batch, _)| batch.clone())
+    }
+
+    /// Returns the pending certificates queue.
+    pub const fn pending(&self) -> &Pending<Field<N>> {
+        &self.pending
     }
 }
 
@@ -410,28 +437,21 @@ impl<N: Network> Primary<N> {
         }
     }
 
-    // /// Handles the incoming certificate response.
-    // async fn process_certificate_response(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) -> Result<()> {
-    //     let certificate_id = response.certificate.certificate_id();
-    //     // Check if the peer IP exists in the pending queue for the given certificate ID.
-    //     if self.pending.get(certificate_id).unwrap_or_default().contains(&peer_ip) {
-    //         // Remove the certificate ID from the pending queue.
-    //         if self.pending.remove(certificate_id) {
-    //             // TODO: Validate the certificate.
-    //             // Insert the certificate into the ready queue.
-    //             // self.storage.insert_certificate(response.certificate)?;
-    //             trace!("Primary - Added certificate '{}' from peer '{peer_ip}'", fmt_id(certificate_id));
-    //             // Check if any callbacks exists for the certificate ID.
-    //             if let Some(callbacks) = self.callbacks.lock().remove(&certificate_id) {
-    //                 for callback in callbacks {
-    //                     // Send a notification to the callback.
-    //                     callback.send(()).ok();
-    //                 }
-    //             }
-    //         }
-    //     }
-    //     Ok(())
-    // }
+    /// Handles the incoming certificate response.
+    async fn process_certificate_response(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) -> Result<()> {
+        let certificate_id = response.certificate.certificate_id();
+        // Check if the peer IP exists in the pending queue for the given certificate ID.
+        if self.pending.get(certificate_id).unwrap_or_default().contains(&peer_ip) {
+            // TODO: Validate the certificate.
+            // TODO: Fetch missing transactions?
+            // Insert the certificate into storage.
+            // self.storage.insert_certificate(response.certificate)?;
+            // Remove the certificate ID from the pending queue.
+            self.pending.remove(certificate_id);
+            trace!("Primary - Added certificate '{}' from peer '{peer_ip}'", fmt_id(certificate_id));
+        }
+        Ok(())
+    }
 }
 
 impl<N: Network> Primary<N> {

@@ -47,12 +47,8 @@ pub struct Worker<N: Network> {
     storage: Storage<N>,
     /// The ready queue.
     ready: Ready<N>,
-    /// The pending queue.
+    /// The pending transmissions queue.
     pending: Pending<TransmissionID<N>>,
-    /// The callback queue.
-    /// TODO (howardwu): Expire callbacks that have not been called after a certain amount of time,
-    ///  or clear the callbacks that are older than a certain round.
-    callbacks: Arc<Mutex<IndexMap<TransmissionID<N>, Vec<oneshot::Sender<()>>>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -69,7 +65,6 @@ impl<N: Network> Worker<N> {
             storage: storage.clone(),
             ready: Ready::new(storage),
             pending: Default::default(),
-            callbacks: Default::default(),
             handles: Default::default(),
         })
     }
@@ -95,7 +90,7 @@ impl<N: Network> Worker<N> {
 
 impl<N: Network> Worker<N> {
     /// Handles the incoming transmission ID.
-    /// This method includes an optional callback that is handled by `Worker::process_transmission_response`.
+    /// This method includes an optional callback handled during `Worker::process_transmission_response`.
     pub(crate) fn process_transmission_id(
         &self,
         peer_ip: SocketAddr,
@@ -120,11 +115,7 @@ impl<N: Network> Worker<N> {
                 fmt_id(transmission_id)
             );
             // Insert the transmission ID into the pending queue.
-            self.pending.insert(transmission_id, peer_ip);
-            // If a callback is provided, insert it into the callback queue.
-            if let Some(callback) = callback {
-                self.callbacks.lock().entry(transmission_id).or_default().push(callback);
-            }
+            self.pending.insert(transmission_id, peer_ip, callback);
             // TODO (howardwu): Limit the number of open requests we send to a peer.
             // Send an transmission request to the peer.
             self.send_transmission_request(peer_ip, transmission_id);
@@ -148,24 +139,16 @@ impl<N: Network> Worker<N> {
     ) -> Result<()> {
         // Check if the peer IP exists in the pending queue for the given transmission ID.
         if self.pending.get(response.transmission_id).unwrap_or_default().contains(&peer_ip) {
+            // TODO: Validate the transmission.
+            // Insert the transmission into the ready queue.
+            self.ready.insert(response.transmission_id, response.transmission)?;
             // Remove the transmission ID from the pending queue.
-            if self.pending.remove(response.transmission_id) {
-                // TODO: Validate the transmission.
-                // Insert the transmission into the ready queue.
-                self.ready.insert(response.transmission_id, response.transmission)?;
-                trace!(
-                    "Worker {} - Added transmission '{}' from peer '{peer_ip}'",
-                    self.id,
-                    fmt_id(response.transmission_id)
-                );
-                // Check if any callbacks exists for the transmission ID.
-                if let Some(callbacks) = self.callbacks.lock().remove(&response.transmission_id) {
-                    for callback in callbacks {
-                        // Send a notification to the callback.
-                        callback.send(()).ok();
-                    }
-                }
-            }
+            self.pending.remove(response.transmission_id);
+            trace!(
+                "Worker {} - Added transmission '{}' from peer '{peer_ip}'",
+                self.id,
+                fmt_id(response.transmission_id)
+            );
         }
         Ok(())
     }
