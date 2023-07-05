@@ -35,6 +35,14 @@ use snarkvm::{
 
 use ::bytes::Bytes;
 use anyhow::{bail, Result};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    response::{IntoResponse, Response},
+    routing::get,
+    Router,
+};
+use axum_extra::response::ErasedJson;
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 use rand::{Rng, SeedableRng};
@@ -258,6 +266,54 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
 
 /**************************************************************************************************/
 
+/// An enum of error handlers for the REST API server.
+pub struct RestError(pub String);
+
+impl IntoResponse for RestError {
+    fn into_response(self) -> Response {
+        (StatusCode::INTERNAL_SERVER_ERROR, format!("Something went wrong: {}", self.0)).into_response()
+    }
+}
+
+impl From<anyhow::Error> for RestError {
+    fn from(err: anyhow::Error) -> Self {
+        Self(err.to_string())
+    }
+}
+
+/// Returns the current round.
+async fn get_current_round(State(primary): State<Primary<CurrentNetwork>>) -> Result<ErasedJson, RestError> {
+    Ok(ErasedJson::pretty(primary.committee().read().round()))
+}
+
+/// Returns the certificates for the given round.
+async fn get_certificates_for_round(
+    State(primary): State<Primary<CurrentNetwork>>,
+    Path(round): Path<u64>,
+) -> Result<ErasedJson, RestError> {
+    Ok(ErasedJson::pretty(primary.storage().get_certificates_for_round(round)))
+}
+
+/// Starts up a local server for monitoring the node.
+async fn start_server(primary: Primary<CurrentNetwork>) {
+    // Initialize the routes.
+    let router = Router::new()
+        .route("/", get(|| async { "Hello, World!" }))
+        .route("/round/current", get(get_current_round))
+        .route("/certificates/:round", get(get_certificates_for_round))
+        // Pass in the `Primary` to access state.
+        .with_state(primary);
+
+    // Run the server with hyper on '127.0.0.1:3000'.
+    info!("Starting the server at '127.0.0.1:3000...'");
+    axum::Server::bind(&"127.0.0.1:3000".parse().unwrap())
+        .serve(router.into_make_service_with_connect_info::<SocketAddr>())
+        .await
+        .unwrap();
+}
+
+/**************************************************************************************************/
+
 #[tokio::main]
 async fn main() -> Result<()> {
     initialize_logger(1);
@@ -274,7 +330,9 @@ async fn main() -> Result<()> {
     let num_nodes = u16::from_str(&args[2])?;
 
     // Start the primary instance.
-    let (_primary, sender) = start_primary(node_id, num_nodes).await?;
+    let (primary, sender) = start_primary(node_id, num_nodes).await?;
+    // Start the monitoring server.
+    start_server(primary).await;
 
     // Fire unconfirmed solutions.
     fire_unconfirmed_solutions(&sender, node_id);

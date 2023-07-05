@@ -116,9 +116,19 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
+    /// Returns the committee.
+    pub const fn committee(&self) -> &Arc<RwLock<Committee<N>>> {
+        &self.committee
+    }
+
     /// Returns the gateway.
     pub const fn gateway(&self) -> &Gateway<N> {
         &self.gateway
+    }
+
+    /// Returns the storage.
+    pub const fn storage(&self) -> &Storage<N> {
+        &self.storage
     }
 
     /// Returns the number of workers.
