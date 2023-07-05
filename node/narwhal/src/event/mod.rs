@@ -21,6 +21,12 @@ pub use batch_propose::BatchPropose;
 mod batch_signature;
 pub use batch_signature::BatchSignature;
 
+mod certificate_request;
+pub use certificate_request::CertificateRequest;
+
+mod certificate_response;
+pub use certificate_response::CertificateResponse;
+
 mod challenge_request;
 pub use challenge_request::ChallengeRequest;
 
@@ -67,6 +73,8 @@ pub enum Event<N: Network> {
     BatchPropose(BatchPropose<N>),
     BatchSignature(BatchSignature<N>),
     BatchCertified(BatchCertified<N>),
+    CertificateRequest(CertificateRequest<N>),
+    CertificateResponse(CertificateResponse<N>),
     ChallengeRequest(ChallengeRequest<N>),
     ChallengeResponse(ChallengeResponse<N>),
     Disconnect(Disconnect),
@@ -86,6 +94,8 @@ impl<N: Network> Event<N> {
             Self::BatchPropose(event) => event.name(),
             Self::BatchSignature(event) => event.name(),
             Self::BatchCertified(event) => event.name(),
+            Self::CertificateRequest(event) => event.name(),
+            Self::CertificateResponse(event) => event.name(),
             Self::ChallengeRequest(event) => event.name(),
             Self::ChallengeResponse(event) => event.name(),
             Self::Disconnect(event) => event.name(),
@@ -102,12 +112,14 @@ impl<N: Network> Event<N> {
             Self::BatchPropose(..) => 0,
             Self::BatchSignature(..) => 1,
             Self::BatchCertified(..) => 2,
-            Self::ChallengeRequest(..) => 3,
-            Self::ChallengeResponse(..) => 4,
-            Self::Disconnect(..) => 5,
-            Self::TransmissionRequest(..) => 6,
-            Self::TransmissionResponse(..) => 7,
-            Self::WorkerPing(..) => 8,
+            Self::CertificateRequest(..) => 3,
+            Self::CertificateResponse(..) => 4,
+            Self::ChallengeRequest(..) => 5,
+            Self::ChallengeResponse(..) => 6,
+            Self::Disconnect(..) => 7,
+            Self::TransmissionRequest(..) => 8,
+            Self::TransmissionResponse(..) => 9,
+            Self::WorkerPing(..) => 10,
         }
     }
 
@@ -120,6 +132,8 @@ impl<N: Network> Event<N> {
             Self::BatchPropose(event) => event.serialize(writer),
             Self::BatchSignature(event) => event.serialize(writer),
             Self::BatchCertified(event) => event.serialize(writer),
+            Self::CertificateRequest(event) => event.serialize(writer),
+            Self::CertificateResponse(event) => event.serialize(writer),
             Self::ChallengeRequest(event) => event.serialize(writer),
             Self::ChallengeResponse(event) => event.serialize(writer),
             Self::Disconnect(event) => event.serialize(writer),
@@ -145,12 +159,14 @@ impl<N: Network> Event<N> {
             0 => Self::BatchPropose(BatchPropose::deserialize(bytes)?),
             1 => Self::BatchSignature(BatchSignature::deserialize(bytes)?),
             2 => Self::BatchCertified(BatchCertified::deserialize(bytes)?),
-            3 => Self::ChallengeRequest(EventTrait::deserialize(bytes)?),
-            4 => Self::ChallengeResponse(EventTrait::deserialize(bytes)?),
-            5 => Self::Disconnect(EventTrait::deserialize(bytes)?),
-            6 => Self::TransmissionRequest(EventTrait::deserialize(bytes)?),
-            7 => Self::TransmissionResponse(EventTrait::deserialize(bytes)?),
-            8 => Self::WorkerPing(EventTrait::deserialize(bytes)?),
+            3 => Self::CertificateRequest(CertificateRequest::deserialize(bytes)?),
+            4 => Self::CertificateResponse(CertificateResponse::deserialize(bytes)?),
+            5 => Self::ChallengeRequest(EventTrait::deserialize(bytes)?),
+            6 => Self::ChallengeResponse(EventTrait::deserialize(bytes)?),
+            7 => Self::Disconnect(EventTrait::deserialize(bytes)?),
+            8 => Self::TransmissionRequest(EventTrait::deserialize(bytes)?),
+            9 => Self::TransmissionResponse(EventTrait::deserialize(bytes)?),
+            10 => Self::WorkerPing(EventTrait::deserialize(bytes)?),
             _ => bail!("Unknown event ID {id}"),
         };
 
