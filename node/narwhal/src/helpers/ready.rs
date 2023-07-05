@@ -199,4 +199,28 @@ mod tests {
                 .collect::<IndexMap<_, _>>()
         );
     }
+
+    #[test]
+    fn test_ready_duplicate() {
+        let rng = &mut TestRng::default();
+
+        // Sample random fake bytes.
+        let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
+
+        // Initialize the ready queue.
+        let ready = Ready::<CurrentNetwork>::new(Storage::new(1));
+
+        // Initialize the commitments.
+        let commitment = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+
+        // Initialize the solutions.
+        let solution = Transmission::Solution(data(rng));
+
+        // Insert the commitments.
+        assert!(ready.insert(commitment, solution.clone()).unwrap());
+        assert!(!ready.insert(commitment, solution).unwrap());
+
+        // Check the number of transmissions.
+        assert_eq!(ready.len(), 1);
+    }
 }
