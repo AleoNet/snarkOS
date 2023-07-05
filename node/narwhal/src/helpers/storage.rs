@@ -296,7 +296,10 @@ impl<N: Network> Storage<N> {
         self.certificates.write().remove(&certificate_id);
         // Remove the batch ID.
         self.batch_ids.write().remove(&batch_id);
-        // TODO (howardwu): Remove the transmissions.
+        // Remove the transmissions.
+        for id in certificate.transmission_ids() {
+            self.remove_transmission(*id);
+        }
         // Return successfully.
         true
     }
@@ -326,12 +329,20 @@ impl<N: Network> Storage<N> {
         // Insert the transmission.
         self.transmissions.write().insert(transmission_id.into(), transmission)
     }
+
+    /// Removes the given `transmission ID` from storage.
+    pub fn remove_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) {
+        // Remove the transmission.
+        self.transmissions.write().remove(&transmission_id.into());
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::TestRng;
+    use bytes::Bytes;
+    use rand::Rng;
+    use snarkvm::prelude::{narwhal::Data, TestRng};
 
     use indexmap::indexset;
 
@@ -385,6 +396,16 @@ mod tests {
         // Compute the address of the batch creator.
         let address = certificate.to_address();
 
+        // Construct sample 'transmissions' and insert them into storage.
+        let mut transmissions = vec![];
+        for id in certificate.transmission_ids() {
+            let solution = Data::Buffer(Bytes::from((0..1024).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
+            // Append the solution.
+            let transmission = Transmission::Solution(solution);
+            transmissions.push((*id, transmission.clone()));
+            storage.insert_transmission(*id, transmission);
+        }
+
         // Insert the certificate.
         storage.insert_certificate(certificate.clone()).unwrap();
         // Ensure the storage is not empty.
@@ -400,8 +421,6 @@ mod tests {
             let certificates = vec![(certificate_id, certificate.clone())];
             // Construct the expected layout for 'batch_ids'.
             let batch_ids = vec![(batch_id, round)];
-            // Construct the expected layout for 'transmissions'.
-            let transmissions = vec![];
             // Assert the storage is well-formed.
             assert_storage(&storage, rounds, certificates, batch_ids, transmissions);
         }
