@@ -30,7 +30,7 @@ use std::sync::{
 ///
 /// The storage is used to store the following:
 /// - `round` to `committee` entries.
-/// - `round` to `(certificate ID, batch ID, address)` entries.
+/// - `round` to `(certificate ID, batch ID, author)` entries.
 /// - `certificate ID` to `certificate` entries.
 /// - `batch ID` to `round` entries.
 /// - `transmission ID` to `certificate IDs` entries.
@@ -54,7 +54,7 @@ pub struct Storage<N: Network> {
     /// The maximum number of rounds to keep in storage.
     max_gc_rounds: u64,
     /* Once per batch */
-    /// The map of `round` to a list of `(certificate ID, batch ID, address)` entries.
+    /// The map of `round` to a list of `(certificate ID, batch ID, author)` entries.
     rounds: Arc<RwLock<IndexMap<u64, IndexSet<(Field<N>, Field<N>, Address<N>)>>>>,
     /// The map of `certificate ID` to `certificate`.
     certificates: Arc<RwLock<IndexMap<Field<N>, BatchCertificate<N>>>>,
@@ -89,7 +89,7 @@ impl<N: Network> Storage<N> {
         self.committees.read().clone().into_iter()
     }
 
-    /// Returns an iterator over the `(round, (certificate ID, batch ID, address))` entries.
+    /// Returns an iterator over the `(round, (certificate ID, batch ID, author))` entries.
     pub fn rounds_iter(&self) -> impl Iterator<Item = (u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)> {
         self.rounds.read().clone().into_iter()
     }
@@ -242,8 +242,8 @@ impl<N: Network> Storage<N> {
         let certificate_id = certificate.certificate_id();
         // Retrieve the batch ID.
         let batch_id = certificate.batch_id();
-        // Compute the address of the batch creator.
-        let address = certificate.to_address();
+        // Retrieve the author of the batch.
+        let author = certificate.author();
 
         // Ensure the certificate ID does not already exist in storage.
         if self.contains_certificate(certificate_id) {
@@ -283,7 +283,7 @@ impl<N: Network> Storage<N> {
         /* Proceed to store the certificate. */
 
         // Insert the round to certificate ID entry.
-        self.rounds.write().entry(round).or_default().insert((certificate_id, batch_id, address));
+        self.rounds.write().entry(round).or_default().insert((certificate_id, batch_id, author));
         // Insert the certificate.
         self.certificates.write().insert(certificate_id, certificate.clone());
         // Insert the batch ID.
@@ -311,11 +311,11 @@ impl<N: Network> Storage<N> {
         let round = certificate.round();
         // Retrieve the batch ID.
         let batch_id = certificate.batch_id();
-        // Compute the address of the batch creator.
-        let address = certificate.to_address();
+        // Compute the author of the batch.
+        let author = certificate.author();
 
         // Remove the round to certificate ID entry.
-        self.rounds.write().entry(round).or_default().remove(&(certificate_id, batch_id, address));
+        self.rounds.write().entry(round).or_default().remove(&(certificate_id, batch_id, author));
         // If the round is empty, remove it.
         if self.rounds.read().get(&round).map_or(false, |entries| entries.is_empty()) {
             self.rounds.write().remove(&round);
@@ -486,8 +486,8 @@ mod tests {
         let round = certificate.round();
         // Retrieve the batch ID.
         let batch_id = certificate.batch_id();
-        // Compute the address of the batch creator.
-        let address = certificate.to_address();
+        // Retrieve the author of the batch.
+        let author = certificate.author();
 
         // Construct the sample 'transmissions' and insert them into storage.
         let mut transmissions = vec![];
@@ -511,7 +511,7 @@ mod tests {
         // Check that the underlying storage representation is correct.
         {
             // Construct the expected layout for 'rounds'.
-            let rounds = vec![(round, indexset! { (certificate_id, batch_id, address) })];
+            let rounds = vec![(round, indexset! { (certificate_id, batch_id, author) })];
             // Construct the expected layout for 'certificates'.
             let certificates = vec![(certificate_id, certificate.clone())];
             // Construct the expected layout for 'batch_ids'.

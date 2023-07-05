@@ -179,7 +179,7 @@ impl<N: Network> Primary<N> {
             // Compute the cumulative amount of stake for the previous certificates.
             let mut stake = 0u64;
             for certificate in previous_certificates.iter() {
-                stake = stake.saturating_add(committee.get_stake(certificate.to_address()));
+                stake = stake.saturating_add(committee.get_stake(certificate.author()));
             }
             // Check if the previous certificates have reached quorum threshold.
             if stake >= committee.quorum_threshold()? {
@@ -229,14 +229,14 @@ impl<N: Network> Primary<N> {
         let batch_id = batch_header.batch_id();
         // Retrieve the round.
         let round = batch_header.round();
-        // Retrieve the address.
-        let address = batch_header.to_address();
+        // Retrieve the author.
+        let author = batch_header.author();
         // Retrieve the timestamp.
         let timestamp = batch_header.timestamp();
 
         // Ensure this batch ID is new.
         if self.storage.contains_batch(batch_id) {
-            bail!("Batch ID {batch_id} has already been processed")
+            bail!("Batch ID has already been processed")
         }
 
         // Ensure the round in the proposed batch is within GC range of the current round.
@@ -250,9 +250,9 @@ impl<N: Network> Primary<N> {
         // let Some(committee) = self.storage.get_committee_for_round(round) else {
         //     bail!("Round {round} has exceeded the maximum GC depth")
         // };
-        // Ensure the address is a member of the committee.
-        if !committee.is_committee_member(address) {
-            bail!("Address {address} is not a member of the committee")
+        // Ensure the author is a member of the committee.
+        if !committee.is_committee_member(author) {
+            bail!("{author} is not a member of the committee")
         }
 
         // Ensure the timestamp is within range.
