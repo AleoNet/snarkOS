@@ -33,13 +33,17 @@ use std::sync::{
 /// - `round` to `(certificate ID, batch ID, address)` entries.
 /// - `certificate ID` to `certificate` entries.
 /// - `batch ID` to `round` entries.
+/// - `transmission ID` to `certificate IDs` entries.
 /// - `transmission ID` to `transmission` entries.
 ///
 /// The chain of events is as follows:
 /// 1. A `transmission` is received.
-/// 2. The `transmission` is added to the `transmissions` map.
+/// 2. The `transmission` is inserted into the `transmissions` map.
 /// 3. After a `batch` is ready to be stored:
-///   - The `certificate` triggers updates to the `rounds`, `certificates`, and `batch_ids` maps.
+///   - The `certificate` is inserted, triggering updates to the
+///     `rounds`, `certificates`, `batch_ids`, and `transmission_ids` maps.
+/// 4. After a `round` is certified:
+///  - The `committee` is inserted into the `committees` map.
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network> {
     /* Once per round */
@@ -56,6 +60,8 @@ pub struct Storage<N: Network> {
     certificates: Arc<RwLock<IndexMap<Field<N>, BatchCertificate<N>>>>,
     /// The map of `batch ID` to `round`.
     batch_ids: Arc<RwLock<IndexMap<Field<N>, u64>>>,
+    /// The map of `transmission ID` to `certificate IDs`.
+    transmission_ids: Arc<RwLock<IndexMap<TransmissionID<N>, IndexSet<Field<N>>>>>,
     /* Once per transmission */
     /// The map of `transmission ID` to `transmission`.
     transmissions: Arc<RwLock<IndexMap<TransmissionID<N>, Transmission<N>>>>,
@@ -71,33 +77,39 @@ impl<N: Network> Storage<N> {
             rounds: Default::default(),
             certificates: Default::default(),
             batch_ids: Default::default(),
+            transmission_ids: Default::default(),
             transmissions: Default::default(),
         }
     }
 }
 
 impl<N: Network> Storage<N> {
-    /// Returns an iterator over the `committees` map.
+    /// Returns an iterator over the `(round, committee)` entries.
     pub fn committees_iter(&self) -> impl Iterator<Item = (u64, Committee<N>)> {
         self.committees.read().clone().into_iter()
     }
 
-    /// Returns an iterator over the `rounds` map.
+    /// Returns an iterator over the `(round, (certificate ID, batch ID, address))` entries.
     pub fn rounds_iter(&self) -> impl Iterator<Item = (u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)> {
         self.rounds.read().clone().into_iter()
     }
 
-    /// Returns an iterator over the `certificates` map.
+    /// Returns an iterator over the `(certificate ID, certificate)` entries.
     pub fn certificates_iter(&self) -> impl Iterator<Item = (Field<N>, BatchCertificate<N>)> {
         self.certificates.read().clone().into_iter()
     }
 
-    /// Returns an iterator over the `batch IDs` map.
+    /// Returns an iterator over the `(batch ID, round)` entries.
     pub fn batch_ids_iter(&self) -> impl Iterator<Item = (Field<N>, u64)> {
         self.batch_ids.read().clone().into_iter()
     }
 
-    /// Returns an iterator over the `transmissions` map.
+    /// Returns an iterator over the `(transmission ID, certificate IDs)` entries.
+    pub fn transmission_ids_iter(&self) -> impl Iterator<Item = (TransmissionID<N>, IndexSet<Field<N>>)> {
+        self.transmission_ids.read().clone().into_iter()
+    }
+
+    /// Returns an iterator over the `(transmission ID, transmission)` entries.
     pub fn transmissions_iter(&self) -> impl Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
         self.transmissions.read().clone().into_iter()
     }
@@ -218,6 +230,11 @@ impl<N: Network> Storage<N> {
 
     /// Inserts the given `certificate` into storage.
     /// This method triggers updates to the `rounds`, `certificates`, and `batch_ids` maps.
+    ///
+    /// This method ensures the following invariants:
+    /// - The certificate ID does not already exist in storage.
+    /// - The batch ID does not already exist in storage.
+    /// - The certificate is well-formed.
     pub fn insert_certificate(&self, certificate: BatchCertificate<N>) -> Result<()> {
         // Retrieve the round.
         let round = certificate.round();
@@ -227,9 +244,14 @@ impl<N: Network> Storage<N> {
         let batch_id = certificate.batch_id();
         // Compute the address of the batch creator.
         let address = certificate.to_address();
+
         // Ensure the certificate ID does not already exist in storage.
-        if self.certificates.read().contains_key(&certificate_id) {
+        if self.contains_certificate(certificate_id) {
             bail!("Certificate {certificate_id} already exists in storage");
+        }
+        // Ensure the batch ID does not already exist in storage.
+        if self.contains_batch(batch_id) {
+            bail!("Batch {batch_id} already exists in storage");
         }
 
         // TODO (howardwu): Ensure the certificate is well-formed. If not, do not store.
@@ -240,8 +262,9 @@ impl<N: Network> Storage<N> {
         // TODO (howardwu): Ensure the previous certificates are for round-1. If not, do not store.
         // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not store.
 
-        // Ensure storage contains all declared transmissions.
+        // Iterate over the transmission IDs.
         for transmission_id in certificate.transmission_ids() {
+            // Ensure storage contains the declared transmission ID.
             if !self.contains_transmission(*transmission_id) {
                 bail!("Missing transmission {transmission_id} for certificate {certificate_id}");
             }
@@ -262,9 +285,14 @@ impl<N: Network> Storage<N> {
         // Insert the round to certificate ID entry.
         self.rounds.write().entry(round).or_default().insert((certificate_id, batch_id, address));
         // Insert the certificate.
-        self.certificates.write().insert(certificate_id, certificate);
+        self.certificates.write().insert(certificate_id, certificate.clone());
         // Insert the batch ID.
         self.batch_ids.write().insert(batch_id, round);
+        // TODO (howardwu): Clean this up for performance.
+        // Insert the transmission IDs.
+        for transmission_id in certificate.transmission_ids() {
+            self.transmission_ids.write().entry(*transmission_id).or_default().insert(certificate_id);
+        }
         Ok(())
     }
 
@@ -296,7 +324,24 @@ impl<N: Network> Storage<N> {
         self.certificates.write().remove(&certificate_id);
         // Remove the batch ID.
         self.batch_ids.write().remove(&batch_id);
-        // TODO (howardwu): Remove the transmissions.
+        // TODO (howardwu): Clean this up for performance.
+        // Iterate over the transmission IDs.
+        for transmission_id in certificate.transmission_ids() {
+            // Remove the certificate ID for the transmission ID.
+            self.transmission_ids.write().entry(*transmission_id).or_default().remove(&certificate_id);
+            // If this is the last certificate ID for the transmission ID, remove the transmission.
+            if self
+                .transmission_ids
+                .read()
+                .get(transmission_id)
+                .map_or(true, |certificate_ids| certificate_ids.is_empty())
+            {
+                // Remove the entry for the transmission ID.
+                self.transmissions.write().remove(transmission_id);
+                // Remove the transmission.
+                self.remove_transmission(*transmission_id);
+            }
+        }
         // Return successfully.
         true
     }
@@ -326,12 +371,23 @@ impl<N: Network> Storage<N> {
         // Insert the transmission.
         self.transmissions.write().insert(transmission_id.into(), transmission)
     }
+
+    /// Removes the given `transmission ID` from storage.
+    pub fn remove_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) {
+        // Remove the transmission.
+        self.transmissions.write().remove(&transmission_id.into());
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use snarkvm::prelude::TestRng;
+    use snarkvm::{
+        ledger::narwhal::Data,
+        prelude::{Rng, TestRng},
+    };
+
+    use ::bytes::Bytes;
 
     use indexmap::indexset;
 
@@ -339,7 +395,8 @@ mod tests {
 
     /// Returns `true` if the storage is empty.
     fn is_empty<N: Network>(storage: &Storage<N>) -> bool {
-        storage.rounds.read().is_empty()
+        storage.committees.read().is_empty()
+            && storage.rounds.read().is_empty()
             && storage.certificates.read().is_empty()
             && storage.batch_ids.read().is_empty()
             && storage.transmissions.read().is_empty()
@@ -348,11 +405,14 @@ mod tests {
     /// Asserts that the storage matches the expected layout.
     fn assert_storage<N: Network>(
         storage: &Storage<N>,
+        committees: Vec<(u64, Committee<N>)>,
         rounds: Vec<(u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)>,
         certificates: Vec<(Field<N>, BatchCertificate<N>)>,
         batch_ids: Vec<(Field<N>, u64)>,
         transmissions: Vec<(TransmissionID<N>, Transmission<N>)>,
     ) {
+        // Ensure the committees are well-formed.
+        assert_eq!(storage.committees_iter().collect::<Vec<_>>(), committees);
         // Ensure the rounds are well-formed.
         assert_eq!(storage.rounds_iter().collect::<Vec<_>>(), rounds);
         // Ensure the certificates are well-formed.
@@ -363,7 +423,51 @@ mod tests {
         assert_eq!(storage.transmissions_iter().collect::<Vec<_>>(), transmissions);
     }
 
+    /// Samples a random transmission.
+    fn sample_transmission(rng: &mut TestRng) -> Transmission<CurrentNetwork> {
+        // Sample random fake solution bytes.
+        let s = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
+        // Sample random fake transaction bytes.
+        let t = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..2048).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
+        // Sample a random transmission.
+        match rng.gen::<bool>() {
+            true => Transmission::Solution(s(rng)),
+            false => Transmission::Transaction(t(rng)),
+        }
+    }
+
     // TODO (howardwu): Testing with 'max_gc_rounds' set to '0' should ensure everything is cleared after insertion.
+
+    #[test]
+    fn test_certificate_duplicate() {
+        let rng = &mut TestRng::default();
+
+        // Create a new storage.
+        let storage = Storage::<CurrentNetwork>::new(1);
+        // Ensure the storage is empty.
+        assert!(is_empty(&storage));
+
+        // Create a new certificate.
+        let certificate = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(rng);
+
+        // Construct the sample 'transmissions' and insert them into storage.
+        let mut transmissions = vec![];
+        for transmission_id in certificate.transmission_ids() {
+            // Initialize the transmission.
+            let transmission = sample_transmission(rng);
+            // Insert the transmission.
+            transmissions.push((*transmission_id, transmission.clone()));
+            storage.insert_transmission(*transmission_id, transmission);
+        }
+
+        // Insert the certificate.
+        storage.insert_certificate(certificate.clone()).unwrap();
+        // Ensure the certificate exists in storage.
+        assert!(storage.contains_certificate(certificate.certificate_id()));
+
+        // Insert the certificate again.
+        assert!(storage.insert_certificate(certificate).is_err());
+    }
 
     #[test]
     fn test_certificate_insert_remove() {
@@ -385,10 +489,22 @@ mod tests {
         // Compute the address of the batch creator.
         let address = certificate.to_address();
 
+        // Construct the sample 'transmissions' and insert them into storage.
+        let mut transmissions = vec![];
+        for transmission_id in certificate.transmission_ids() {
+            // Initialize the transmission.
+            let transmission = sample_transmission(rng);
+            // Insert the transmission.
+            transmissions.push((*transmission_id, transmission.clone()));
+            storage.insert_transmission(*transmission_id, transmission);
+        }
+
         // Insert the certificate.
         storage.insert_certificate(certificate.clone()).unwrap();
         // Ensure the storage is not empty.
         assert!(!is_empty(&storage));
+        // Ensure the certificate exists in storage.
+        assert!(storage.contains_certificate(certificate_id));
         // Ensure the certificate is stored in the correct round.
         assert_eq!(storage.get_certificates_for_round(round), indexset! { certificate.clone() });
 
@@ -400,10 +516,8 @@ mod tests {
             let certificates = vec![(certificate_id, certificate.clone())];
             // Construct the expected layout for 'batch_ids'.
             let batch_ids = vec![(batch_id, round)];
-            // Construct the expected layout for 'transmissions'.
-            let transmissions = vec![];
             // Assert the storage is well-formed.
-            assert_storage(&storage, rounds, certificates, batch_ids, transmissions);
+            assert_storage(&storage, vec![], rounds, certificates, batch_ids, transmissions);
         }
 
         // Retrieve the certificate.
@@ -415,6 +529,8 @@ mod tests {
         assert!(storage.remove_certificate(certificate_id));
         // Ensure the storage is empty.
         assert!(is_empty(&storage));
+        // Ensure the certificate does not exist in storage.
+        assert!(!storage.contains_certificate(certificate_id));
         // Ensure the certificate is no longer stored in the round.
         assert!(storage.get_certificates_for_round(round).is_empty());
     }

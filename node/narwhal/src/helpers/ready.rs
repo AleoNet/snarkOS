@@ -134,7 +134,7 @@ mod tests {
     fn test_ready() {
         let rng = &mut TestRng::default();
 
-        // Sample random fake solution bytes.
+        // Sample random fake bytes.
         let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
 
         // Initialize the ready queue.
