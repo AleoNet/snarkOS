@@ -12,14 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use axum::{
-    routing::get,
-    Router
-};
+use axum::{routing::get, Router};
 use std::net::SocketAddr;
-use tower_http::{
-    services::{ServeDir, ServeFile}
-};
+use tower_http::services::{ServeDir, ServeFile};
 
 const SERVER_URL: &str = "127.0.0.1:6060";
 
@@ -28,9 +23,7 @@ async fn start_server() {
     let serve_dir = ServeDir::new("assets").fallback(ServeFile::new("assets/index.html"));
 
     // Initialize the routes.
-    let router = Router::new()
-        .route("/", get(|| async { "Hello, World!" }))
-        .fallback_service(serve_dir);
+    let router = Router::new().route("/", get(|| async { "Hello, World!" })).fallback_service(serve_dir);
 
     // Run the server.
     println!("Starting server at '{SERVER_URL}'...");

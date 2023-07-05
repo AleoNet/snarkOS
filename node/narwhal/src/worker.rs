@@ -52,7 +52,7 @@ pub struct Worker<N: Network> {
     /// The callback queue.
     /// TODO (howardwu): Expire callbacks that have not been called after a certain amount of time,
     ///  or clear the callbacks that are older than a certain round.
-    callbacks: Arc<Mutex<IndexMap<TransmissionID<N>, oneshot::Sender<()>>>>,
+    callbacks: Arc<Mutex<IndexMap<TransmissionID<N>, Vec<oneshot::Sender<()>>>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -123,7 +123,7 @@ impl<N: Network> Worker<N> {
             self.pending.insert(transmission_id, peer_ip);
             // If a callback is provided, insert it into the callback queue.
             if let Some(callback) = callback {
-                self.callbacks.lock().insert(transmission_id, callback);
+                self.callbacks.lock().entry(transmission_id).or_default().push(callback);
             }
             // TODO (howardwu): Limit the number of open requests we send to a peer.
             // Send an transmission request to the peer.
@@ -158,10 +158,12 @@ impl<N: Network> Worker<N> {
                     self.id,
                     fmt_id(response.transmission_id)
                 );
-                // Check if a callback exists for the transmission ID.
-                if let Some(callback) = self.callbacks.lock().remove(&response.transmission_id) {
-                    // Send a notification to the callback.
-                    callback.send(()).ok();
+                // Check if any callbacks exists for the transmission ID.
+                if let Some(callbacks) = self.callbacks.lock().remove(&response.transmission_id) {
+                    for callback in callbacks {
+                        // Send a notification to the callback.
+                        callback.send(()).ok();
+                    }
                 }
             }
         }
