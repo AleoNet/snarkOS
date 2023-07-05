@@ -295,7 +295,7 @@ async fn get_certificates_for_round(
 }
 
 /// Starts up a local server for monitoring the node.
-async fn start_server(primary: Primary<CurrentNetwork>) {
+async fn start_server(primary: Primary<CurrentNetwork>, node_id: u16) {
     // Initialize the routes.
     let router = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
@@ -304,9 +304,12 @@ async fn start_server(primary: Primary<CurrentNetwork>) {
         // Pass in the `Primary` to access state.
         .with_state(primary);
 
-    // Run the server with hyper on '127.0.0.1:3000'.
-    info!("Starting the server at '127.0.0.1:3000...'");
-    axum::Server::bind(&"127.0.0.1:3000".parse().unwrap())
+    // Construct the IP address and port.
+    let addr = format!("127.0.0.1:{}", 3000 + node_id);
+
+    // Run the server.
+    info!("Starting the server at '{addr}'...");
+    axum::Server::bind(&addr.parse().unwrap())
         .serve(router.into_make_service_with_connect_info::<SocketAddr>())
         .await
         .unwrap();
@@ -331,8 +334,6 @@ async fn main() -> Result<()> {
 
     // Start the primary instance.
     let (primary, sender) = start_primary(node_id, num_nodes).await?;
-    // Start the monitoring server.
-    start_server(primary).await;
 
     // Fire unconfirmed solutions.
     fire_unconfirmed_solutions(&sender, node_id);
@@ -341,8 +342,9 @@ async fn main() -> Result<()> {
 
     println!("Hello, world!");
 
-    // Note: Do not move this.
-    std::future::pending::<()>().await;
-
+    // Start the monitoring server.
+    start_server(primary, node_id).await;
+    // // Note: Do not move this.
+    // std::future::pending::<()>().await;
     Ok(())
 }

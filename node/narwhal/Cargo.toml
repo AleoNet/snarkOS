@@ -90,6 +90,12 @@ version = "0.7.4"
 default-features = false
 features = [ "erased-json" ]
 
+[dev-dependencies.axum_static]
+version = "1.2"
+
+[dev-dependencies.open]
+version = "4"
+
 [dev-dependencies.rand_chacha]
 version = "0.3"
 
