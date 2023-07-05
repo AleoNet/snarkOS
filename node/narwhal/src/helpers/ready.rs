@@ -167,20 +167,19 @@ mod tests {
         assert_eq!(ready.cumulative_proof_target(), expected_cumulative_proof_target);
 
         // Check the transmission IDs.
-        let ids = vec![commitment_1, commitment_2, commitment_3].into_iter().collect::<IndexSet<TransmissionID<_>>>();
-        assert_eq!(ready.transmission_ids(), ids);
+        let transmission_ids = vec![commitment_1, commitment_2, commitment_3].into_iter().collect::<IndexSet<_>>();
+        assert_eq!(ready.transmission_ids(), transmission_ids);
+        transmission_ids.iter().for_each(|id| assert!(ready.contains(*id)));
 
-        for id in ids {
-            assert!(ready.contains(id));
-        }
-        let unknown_id = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
-        assert!(!ready.contains(unknown_id));
+        // Check that an unknown commitment is not in the ready queue.
+        let commitment_unknown = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        assert!(!ready.contains(commitment_unknown));
 
         // Check the transmissions.
         assert_eq!(ready.get(commitment_1), Some(solution_1.clone()));
         assert_eq!(ready.get(commitment_2), Some(solution_2.clone()));
         assert_eq!(ready.get(commitment_3), Some(solution_3.clone()));
-        assert_eq!(ready.get(unknown_id), None);
+        assert_eq!(ready.get(commitment_unknown), None);
 
         // Drain the ready queue.
         let transmissions = ready.drain();

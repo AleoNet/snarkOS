@@ -108,9 +108,9 @@ mod tests {
         let addr_3 = SocketAddr::from(([127, 0, 0, 1], 3456));
 
         // Insert the commitments.
-        pending.insert(commitment_1, addr_1.clone());
-        pending.insert(commitment_2, addr_2.clone());
-        pending.insert(commitment_3, addr_3.clone());
+        pending.insert(commitment_1, addr_1);
+        pending.insert(commitment_2, addr_2);
+        pending.insert(commitment_3, addr_3);
 
         // Check the number of SocketAddrs.
         assert_eq!(pending.len(), 3);
@@ -118,7 +118,7 @@ mod tests {
 
         // Check the transmission IDs.
         let ids = vec![commitment_1, commitment_2, commitment_3];
-        let peers = vec![addr_1.clone(), addr_2.clone(), addr_3.clone()];
+        let peers = vec![addr_1, addr_2, addr_3];
 
         for i in 0..3 {
             let id = ids[i];
@@ -129,9 +129,9 @@ mod tests {
         assert!(!pending.contains(unknown_id));
 
         // Check get.
-        assert_eq!(pending.get(commitment_1), Some(HashSet::from([addr_1.clone()])));
-        assert_eq!(pending.get(commitment_2), Some(HashSet::from([addr_2.clone()])));
-        assert_eq!(pending.get(commitment_3), Some(HashSet::from([addr_3.clone()])));
+        assert_eq!(pending.get(commitment_1), Some(HashSet::from([addr_1])));
+        assert_eq!(pending.get(commitment_2), Some(HashSet::from([addr_2])));
+        assert_eq!(pending.get(commitment_3), Some(HashSet::from([addr_3])));
         assert_eq!(pending.get(unknown_id), None);
 
         // Check remove.
