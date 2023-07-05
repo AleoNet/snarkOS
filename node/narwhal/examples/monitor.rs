@@ -36,7 +36,7 @@ async fn start_server() {
 #[tokio::main]
 async fn main() {
     tokio::spawn(async move { start_server().await });
-    open::that(&format!("http://{SERVER_URL}/assets/index.html")).expect("Failed to open website");
+    open::that(format!("http://{SERVER_URL}/assets/index.html")).expect("Failed to open website");
     // Note: Do not move this.
     std::future::pending::<()>().await;
 }
