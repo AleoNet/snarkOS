@@ -78,3 +78,69 @@ impl<N: Network> Pending<N> {
         self.transmissions.write().remove(&transmission_id.into()).is_some()
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use snarkvm::ledger::coinbase::PuzzleCommitment;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    #[test]
+    fn test_pending() {
+        let rng = &mut TestRng::default();
+
+        // Initialize the ready queue.
+        let pending = Pending::<CurrentNetwork>::new();
+
+        // Check initially empty.
+        assert!(pending.is_empty());
+        assert_eq!(pending.len(), 0);
+
+        // Initialize the commitments.
+        let commitment_1 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        let commitment_2 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        let commitment_3 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+
+        // Initialize the SocketAddrs.
+        let addr_1 = SocketAddr::from(([127, 0, 0, 1], 1234));
+        let addr_2 = SocketAddr::from(([127, 0, 0, 1], 2345));
+        let addr_3 = SocketAddr::from(([127, 0, 0, 1], 3456));
+
+        // Insert the commitments.
+        pending.insert(commitment_1, addr_1.clone());
+        pending.insert(commitment_2, addr_2.clone());
+        pending.insert(commitment_3, addr_3.clone());
+
+        // Check the number of SocketAddrs.
+        assert_eq!(pending.len(), 3);
+        assert!(!pending.is_empty());
+
+        // Check the transmission IDs.
+        let ids = vec![commitment_1, commitment_2, commitment_3];
+        let peers = vec![addr_1.clone(), addr_2.clone(), addr_3.clone()];
+
+        for i in 0..3 {
+            let id = ids[i];
+            assert!(pending.contains(id));
+            assert!(pending.contains_peer(id, peers[i]));
+        }
+        let unknown_id = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        assert!(!pending.contains(unknown_id));
+
+        // Check get.
+        assert_eq!(pending.get(commitment_1), Some(HashSet::from([addr_1.clone()])));
+        assert_eq!(pending.get(commitment_2), Some(HashSet::from([addr_2.clone()])));
+        assert_eq!(pending.get(commitment_3), Some(HashSet::from([addr_3.clone()])));
+        assert_eq!(pending.get(unknown_id), None);
+
+        // Check remove.
+        assert!(pending.remove(commitment_1));
+        assert!(pending.remove(commitment_2));
+        assert!(pending.remove(commitment_3));
+        assert!(!pending.remove(unknown_id));
+
+        // Check empty again.
+        assert!(pending.is_empty());
+    }
+}
