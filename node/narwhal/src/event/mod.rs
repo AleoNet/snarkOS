@@ -47,7 +47,7 @@ pub use worker_ping::WorkerPing;
 
 use snarkos_node_messages::DisconnectReason;
 use snarkvm::{
-    console::prelude::{FromBytes, Network, ToBytes},
+    console::prelude::{FromBytes, Network, ToBytes, Write},
     ledger::narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
     prelude::{Address, Field, Signature},
 };
@@ -55,7 +55,6 @@ use snarkvm::{
 use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
 use indexmap::IndexSet;
-use std::io::{Read, Result as IoResult, Write};
 
 pub trait EventTrait {
     /// Returns the event name.

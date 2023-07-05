@@ -42,7 +42,7 @@ impl<N: Network> EventTrait for BatchCertified<N> {
     /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
+        let reader = bytes.reader();
 
         let certificate = Data::Buffer(reader.into_inner().freeze());
 

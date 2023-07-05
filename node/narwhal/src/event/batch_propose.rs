@@ -42,7 +42,7 @@ impl<N: Network> EventTrait for BatchPropose<N> {
     /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
+        let reader = bytes.reader();
 
         let batch_header = Data::Buffer(reader.into_inner().freeze());
 
