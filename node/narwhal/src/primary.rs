@@ -162,7 +162,10 @@ impl<N: Network> Primary<N> {
         if previous_round == 0 {
             // Note: The primary starts at round 1, and round 0 contains no certificates, by definition.
             is_ready = true;
-        } else if let Some(committee) = self.storage.get_committee_for_round(previous_round) {
+        } else {
+            let committee = self.committee.read().clone();
+            // TODO (howardwu): Enable this code to turn on dynamic committees.
+            // } else if let Some(committee) = self.storage.get_committee_for_round(previous_round) {
             // Compute the cumulative amount of stake for the previous certificates.
             let mut stake = 0u64;
             for certificate in previous_certificates.iter() {
