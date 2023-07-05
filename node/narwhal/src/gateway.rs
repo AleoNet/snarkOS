@@ -795,11 +795,19 @@ impl<N: Network> Gateway<N> {
     }
 }
 
-mod tests {
+#[cfg(test)]
+pub mod gateway_tests {
     use crate::{
-        helpers::tests::{CommitteeInput, Validator},
+        helpers::{
+            committee_tests::{CommitteeInput, Validator},
+            init_worker_channels,
+            storage_tests::StorageInput,
+            WorkerSender,
+        },
         Gateway,
+        Worker,
         MAX_COMMITTEE_SIZE,
+        MAX_WORKERS,
         MEMORY_POOL_PORT,
     };
     use indexmap::IndexMap;
@@ -814,12 +822,15 @@ mod tests {
 
     type N = Testnet3;
 
-    #[derive(Arbitrary, Debug)]
-    struct GatewayInput {
+    #[derive(Arbitrary, Debug, Clone)]
+    pub struct GatewayInput {
         #[filter(CommitteeInput::is_valid)]
-        committee_input: CommitteeInput,
-        node_validator: Validator,
-        dev: Option<u8>,
+        pub committee_input: CommitteeInput,
+        pub node_validator: Validator,
+        pub dev: Option<u8>,
+        #[strategy(0..MAX_WORKERS)]
+        pub workers_count: u8,
+        pub worker_storage: StorageInput,
     }
 
     impl GatewayInput {
@@ -831,6 +842,30 @@ mod tests {
                 Some(dev) => Some(dev as u16),
             };
             Gateway::new(Arc::new(RwLock::new(committee)), account, dev).unwrap()
+        }
+
+        pub async fn generate_workers(
+            &self,
+            gateway: &Gateway<N>,
+        ) -> (IndexMap<u8, Worker<N>>, IndexMap<u8, WorkerSender<N>>) {
+            // Construct a map of the worker senders.
+            let mut tx_workers = IndexMap::new();
+            let mut workers = IndexMap::new();
+
+            // Initialize the workers.
+            for id in 0..self.workers_count {
+                // Construct the worker channels.
+                let (tx_worker, rx_worker) = init_worker_channels();
+                // Construct the worker instance.
+                let mut worker = Worker::new(id, gateway.clone(), self.worker_storage.to_storage()).unwrap();
+                // Run the worker instance.
+                worker.run(rx_worker).await.unwrap();
+
+                // Add the worker and the worker sender to maps
+                workers.insert(id, worker);
+                tx_workers.insert(id, tx_worker);
+            }
+            (workers, tx_workers)
         }
     }
 
@@ -863,18 +898,20 @@ mod tests {
     #[proptest(async = "tokio")]
     async fn gateway_start(#[filter(|x| x.dev.is_some())] input: GatewayInput) {
         let Some(dev) = input.dev else { unreachable!() };
+        println!("{input:?}");
         let mut gateway = input.to_gateway();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
         assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + (dev as u16)));
 
-        match gateway.run(IndexMap::new()).await {
+        let (workers, worker_senders) = input.generate_workers(&gateway).await;
+        match gateway.run(worker_senders).await {
             Ok(_) => {
                 assert_eq!(
                     gateway.local_ip(),
                     SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), MEMORY_POOL_PORT + (dev as u16))
                 );
-                assert_eq!(gateway.num_workers(), 0);
+                assert_eq!(gateway.num_workers(), workers.len() as u8);
             }
             Err(err) => {
                 panic!("Shouldn't fail because of {err}");

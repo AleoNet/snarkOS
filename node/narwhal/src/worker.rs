@@ -266,3 +266,18 @@ impl<N: Network> Worker<N> {
         self.handles.lock().iter().for_each(|handle| handle.abort());
     }
 }
+
+#[cfg(test)]
+mod worker_tests {
+    use crate::{gateway_tests::GatewayInput, helpers::storage_tests::StorageInput, Gateway, Worker, MAX_WORKERS};
+    use snarkvm::prelude::Testnet3;
+    use test_strategy::Arbitrary;
+
+    type N = Testnet3;
+
+    #[derive(Arbitrary, Debug, Clone)]
+    pub struct WorkerInput {
+        pub id: u8,
+        pub storage: StorageInput,
+    }
+}

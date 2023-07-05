@@ -119,7 +119,7 @@ impl<N: Network> Committee<N> {
 }
 
 #[cfg(test)]
-pub mod tests {
+pub mod committee_tests {
     use crate::helpers::Committee;
     use anyhow::Result;
     use indexmap::IndexMap;
@@ -131,7 +131,7 @@ pub mod tests {
 
     type N = Testnet3;
 
-    #[derive(Arbitrary, Debug)]
+    #[derive(Arbitrary, Debug, Clone)]
     pub struct CommitteeInput {
         #[strategy(0u64..)]
         pub round: u64,

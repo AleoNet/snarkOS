@@ -406,7 +406,7 @@ impl<N: Network> Storage<N> {
 }
 
 #[cfg(test)]
-mod tests {
+pub mod storage_tests {
     use super::*;
     use snarkvm::{
         ledger::narwhal::Data,
@@ -416,6 +416,7 @@ mod tests {
     use ::bytes::Bytes;
 
     use indexmap::indexset;
+    use test_strategy::Arbitrary;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -559,5 +560,16 @@ mod tests {
         assert!(!storage.contains_certificate(certificate_id));
         // Ensure the certificate is no longer stored in the round.
         assert!(storage.get_certificates_for_round(round).is_empty());
+    }
+
+    #[derive(Arbitrary, Debug, Clone)]
+    pub struct StorageInput {
+        pub gc_rounds: u64,
+    }
+
+    impl StorageInput {
+        pub fn to_storage(&self) -> Storage<CurrentNetwork> {
+            Storage::new(self.gc_rounds)
+        }
     }
 }
