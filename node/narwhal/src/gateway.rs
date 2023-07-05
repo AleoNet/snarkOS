@@ -380,9 +380,15 @@ impl<N: Network> Gateway<N> {
                 let _ = self.primary_sender().tx_batch_certified.send((peer_ip, batch_certified.certificate)).await;
                 Ok(())
             }
-            Event::CertificateRequest(..) | Event::CertificateResponse(..) => {
-                // Disconnect as the peer is not following the protocol.
-                bail!("{CONTEXT} Peer '{peer_ip}' is not following the protocol")
+            Event::CertificateRequest(certificate_request) => {
+                // Send the certificate request to the primary.
+                let _ = self.primary_sender().tx_certificate_request.send((peer_ip, certificate_request)).await;
+                Ok(())
+            }
+            Event::CertificateResponse(certificate_response) => {
+                // Send the certificate response to the primary.
+                let _ = self.primary_sender().tx_certificate_response.send((peer_ip, certificate_response)).await;
+                Ok(())
             }
             Event::ChallengeRequest(..) | Event::ChallengeResponse(..) => {
                 // Disconnect as the peer is not following the protocol.

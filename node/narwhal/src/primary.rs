@@ -46,7 +46,7 @@ use snarkvm::{
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
-use std::{future::Future, net::SocketAddr, sync::Arc};
+use std::{collections::HashSet, future::Future, net::SocketAddr, sync::Arc};
 use time::OffsetDateTime;
 use tokio::{sync::oneshot, task::JoinHandle};
 
@@ -175,20 +175,14 @@ impl<N: Network> Primary<N> {
     /// 3. Set the batch in the primary.
     /// 4. Broadcast the batch to all validators for signing.
     pub fn propose_batch(&self) -> Result<()> {
-        // Initialize the RNG.
-        let mut rng = rand::thread_rng();
-
         // Initialize a map of the transmissions.
         let mut transmissions = IndexMap::new();
         // Drain the workers.
         for worker in self.workers.read().iter() {
             // TODO (howardwu): Perform one final filter against the ledger service.
-            // Transition the worker to the next round, and add their transmissions to the map.
             transmissions.extend(worker.drain());
         }
 
-        // Retrieve the private key.
-        let private_key = self.gateway.account().private_key();
         // Retrieve the current round.
         let round = self.committee.read().round();
         // Compute the previous round.
@@ -197,43 +191,36 @@ impl<N: Network> Primary<N> {
         let previous_certificates = self.storage.get_certificates_for_round(previous_round);
 
         // Check if the batch is ready to be proposed.
-        let mut is_ready = false;
-        if previous_round == 0 {
-            // Note: The primary starts at round 1, and round 0 contains no certificates, by definition.
-            is_ready = true;
-        } else {
-            let committee = self.committee.read().clone();
-            // TODO (howardwu): Enable this code to turn on dynamic committees.
-            // } else if let Some(committee) = self.storage.get_committee_for_round(previous_round) {
-            // Compute the cumulative amount of stake for the previous certificates.
-            let mut stake = 0u64;
-            for certificate in previous_certificates.iter() {
-                stake = stake.saturating_add(committee.get_stake(certificate.author()));
-            }
-            // Check if the previous certificates have reached quorum threshold.
-            if stake >= committee.quorum_threshold()? {
+        // Note: The primary starts at round 1, and round 0 contains no certificates, by definition.
+        let mut is_ready = previous_round == 0;
+        // If the previous round is not 0, check if the previous certificates have reached the quorum threshold.
+        if let Some(committee) = self.storage.get_committee_for_round(previous_round) {
+            // Construct a set over the authors.
+            let authors = previous_certificates.iter().map(BatchCertificate::author).collect();
+            // Check if the previous certificates have reached the quorum threshold.
+            if committee.is_quorum_threshold_reached(&authors)? {
                 is_ready = true;
             }
         }
+
         // If the batch is not ready to be proposed, return early.
-        if !is_ready {
-            return Ok(());
+        match is_ready {
+            true => debug!("Proposing a batch for round {round}..."),
+            false => return Ok(()),
         }
 
         /* Proceeding to sign & propose the batch. */
 
-        debug!("Proposing a batch for round {round}...");
-
+        // Initialize the RNG.
+        let mut rng = rand::thread_rng();
+        // Retrieve the private key.
+        let private_key = self.gateway.account().private_key();
         // Sign the batch.
         let batch = Batch::new(private_key, round, transmissions, previous_certificates, &mut rng)?;
-        // Retrieve the batch header.
-        let header = batch.to_header()?;
-
+        // Broadcast the batch to all validators for signing.
+        self.gateway.broadcast(Event::BatchPropose(BatchPropose::new(Data::Object(batch.to_header()?))));
         // Set the proposed batch.
         *self.proposed_batch.write() = Some((batch, Default::default()));
-
-        // Broadcast the batch to all validators for signing.
-        self.gateway.broadcast(Event::BatchPropose(BatchPropose::new(Data::Object(header))));
         Ok(())
     }
 
@@ -246,8 +233,8 @@ impl<N: Network> Primary<N> {
     ///   - Ensure the timestamp is within range.
     ///   - Ensure we have all of the transmissions.
     ///   - Ensure we have all of the previous certificates.
-    ///   - Ensure the previous certificates are valid.
-    ///   - Ensure the previous certificates have reached quorum threshold.
+    ///   - Ensure the previous certificates are for the previous round (i.e. round - 1).
+    ///   - Ensure the previous certificates have reached the quorum threshold.
     ///   - Ensure we have not already signed the batch ID.
     /// 2. Sign the batch.
     /// 3. Broadcast the signature back to the validator.
@@ -294,12 +281,42 @@ impl<N: Network> Primary<N> {
         //     bail!("Timestamp {timestamp} for the proposed batch must be after the previous round timestamp")
         // }
 
-        // Ensure the primary has all of the transmissions.
-        self.fetch_missing_transmissions(peer_ip, &batch_header).await?;
+        // Compute the previous round.
+        let previous_round = round.saturating_sub(1);
 
-        // TODO (howardwu): Ensure I have all of the previous certificates. If not, request them before signing.
-        // TODO (howardwu): Ensure the previous certificates are for round-1. If not, do not sign.
-        // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not sign.
+        if previous_round > 0 {
+            // Ensure the primary has all of the transmissions.
+            self.fetch_missing_transmissions(peer_ip, &batch_header).await?;
+            // Ensure the primary has all of the previous certificates.
+            self.fetch_missing_certificates(peer_ip, &batch_header).await?;
+
+            // Initialize a set of the previous authors.
+            let mut previous_authors = HashSet::with_capacity(batch_header.previous_certificate_ids().len());
+
+            // Retrieve the previous certificates.
+            for previous_certificate_id in batch_header.previous_certificate_ids() {
+                // Retrieve the previous certificate.
+                let Some(previous_certificate) = self.storage.get_certificate(*previous_certificate_id) else {
+                    bail!("Missing previous certificate for a proposed batch from peer {peer_ip} in round {round}");
+                };
+                // Ensure the previous certificate is for the previous round.
+                if previous_certificate.round() != previous_round {
+                    bail!("Previous certificate for a proposed batch from peer {peer_ip} is for the wrong round");
+                }
+                // Insert the author of the previous certificate.
+                previous_authors.insert(previous_certificate.author());
+            }
+
+            // Ensure the previous certificates have reached the quorum threshold.
+            let Some(previous_committee) = self.storage.get_committee_for_round(previous_round) else {
+                bail!("Missing the committee for the previous round {previous_round}")
+            };
+            // Ensure the previous certificates have reached the quorum threshold.
+            if !previous_committee.is_quorum_threshold_reached(&previous_authors)? {
+                bail!("Previous certificates for a proposed batch from peer {peer_ip} did not reach quorum threshold");
+            }
+        }
+
         // TODO (howardwu): Ensure I have not signed this batch ID before. If so, do not sign.
 
         /* Proceeding to sign the batch. */
@@ -369,24 +386,21 @@ impl<N: Network> Primary<N> {
         // Check if the batch is ready to be certified.
         let mut is_ready = false;
         if let Some((batch, signatures)) = self.proposed_batch.read().as_ref() {
-            // Compute the cumulative amount of stake, thus far.
-            let mut stake = 0u64;
-            for signature in signatures.keys().chain([batch.signature()].into_iter()) {
-                stake = stake.saturating_add(self.committee.read().get_stake(signature.to_address()));
-            }
-            // Check if the batch has reached quorum threshold.
-            if stake >= self.committee.read().quorum_threshold()? {
+            // Construct an iterator over the addresses.
+            let addresses = signatures.keys().chain([batch.signature()].into_iter()).map(Signature::to_address);
+            // Check if the batch has reached the quorum threshold.
+            if self.committee.read().is_quorum_threshold_reached(&addresses.collect())? {
                 is_ready = true;
             }
         }
+
         // If the batch is not ready to be certified, return early.
-        if !is_ready {
-            return Ok(());
+        match is_ready {
+            true => info!("Quorum threshold reached - Preparing to certify our batch..."),
+            false => return Ok(()),
         }
 
         /* Proceeding to certify the batch. */
-
-        info!("Quorum threshold reached - Preparing to certify our batch...");
 
         // Retrieve the batch and signatures, clearing the proposed batch.
         let (batch, signatures) = self.proposed_batch.write().take().unwrap();
@@ -438,14 +452,14 @@ impl<N: Network> Primary<N> {
     }
 
     /// Handles the incoming certificate response.
-    async fn process_certificate_response(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) -> Result<()> {
+    fn process_certificate_response(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) -> Result<()> {
         let certificate_id = response.certificate.certificate_id();
         // Check if the peer IP exists in the pending queue for the given certificate ID.
         if self.pending.get(certificate_id).unwrap_or_default().contains(&peer_ip) {
             // TODO: Validate the certificate.
             // TODO: Fetch missing transactions?
             // Insert the certificate into storage.
-            // self.storage.insert_certificate(response.certificate)?;
+            self.storage.insert_certificate(response.certificate)?;
             // Remove the certificate ID from the pending queue.
             self.pending.remove(certificate_id);
             trace!("Primary - Added certificate '{}' from peer '{peer_ip}'", fmt_id(certificate_id));
@@ -461,6 +475,8 @@ impl<N: Network> Primary<N> {
             mut rx_batch_propose,
             mut rx_batch_signature,
             mut rx_batch_certified,
+            mut rx_certificate_request,
+            mut rx_certificate_response,
             mut rx_unconfirmed_solution,
             mut rx_unconfirmed_transaction,
         } = receiver;
@@ -501,6 +517,24 @@ impl<N: Network> Primary<N> {
                 if let Err(e) = self_clone.store_certificate(peer_ip, batch_certificate).await {
                     warn!("Failed to store the batch certificate from peer '{peer_ip}' - {e}");
                     continue;
+                }
+            }
+        });
+
+        // Process the certificate request.
+        let self_clone = self.clone();
+        self.spawn(async move {
+            while let Some((peer_ip, certificate_request)) = rx_certificate_request.recv().await {
+                self_clone.process_certificate_request(peer_ip, certificate_request);
+            }
+        });
+
+        // Process the certificate response.
+        let self_clone = self.clone();
+        self.spawn(async move {
+            while let Some((peer_ip, certificate_response)) = rx_certificate_response.recv().await {
+                if let Err(e) = self_clone.process_certificate_response(peer_ip, certificate_response) {
+                    warn!("Failed to process a certificate response from peer '{peer_ip}' - {e}");
                 }
             }
         });
@@ -588,14 +622,25 @@ impl<N: Network> Primary<N> {
     /// - The previous certificates have reached quorum threshold.
     async fn store_certificate(&self, peer_ip: SocketAddr, certificate: BatchCertificate<N>) -> Result<()> {
         // TODO (howardwu): Ensure the certificate is well-formed. If not, do not store.
-        // TODO (howardwu): Ensure the round is within range. If not, do not store.
         // TODO (howardwu): Ensure the address is in the committee of the specified round. If not, do not store.
-        // TODO (howardwu): Ensure I have all of the previous certificates. If not, request them before storing.
         // TODO (howardwu): Ensure the previous certificates are for round-1. If not, do not store.
         // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not store.
 
+        // Retrieve the GC round.
+        let gc_round = self.storage.gc_round();
+        // If the certificate is for a round less than or equal to the GC round, do not store it.
+        if certificate.round() <= gc_round {
+            return Ok(());
+        }
+
         // Ensure the primary has all of the transmissions.
         self.fetch_missing_transmissions(peer_ip, certificate.batch_header()).await?;
+
+        // Check if the previous round is above the GC round.
+        if certificate.round() > gc_round + 1 {
+            // Ensure the primary has all of the previous certificates.
+            self.fetch_missing_certificates(peer_ip, certificate.batch_header()).await?;
+        }
 
         // Store the certificate.
         self.storage.insert_certificate(certificate)?;
@@ -640,6 +685,39 @@ impl<N: Network> Primary<N> {
             }
         }
         // Return after receiving all of the transmissions.
+        Ok(())
+    }
+
+    /// Fetches any missing certificates for the specified batch header from the specified peer.
+    async fn fetch_missing_certificates(&self, peer_ip: SocketAddr, batch_header: &BatchHeader<N>) -> Result<()> {
+        // Initialize a list for the missing certificates.
+        let mut fetch_certificates = FuturesUnordered::new();
+
+        // Iterate through the certificate IDs.
+        for certificate_id in batch_header.previous_certificate_ids() {
+            // If we do not have the certificate, request it.
+            if !self.storage.contains_certificate(*certificate_id) {
+                trace!("Primary - Found a new certificate ID '{}' from peer '{peer_ip}'", fmt_id(certificate_id));
+
+                // Initialize a oneshot channel.
+                let (callback_sender, callback_receiver) = oneshot::channel();
+                // Insert the certificate ID into the pending queue.
+                self.pending.insert(*certificate_id, peer_ip, Some(callback_sender));
+                // TODO (howardwu): Limit the number of open requests we send to a peer.
+                // Send an certificate request to the peer.
+                self.send_certificate_request(peer_ip, *certificate_id);
+                // Push the callback onto the list.
+                fetch_certificates.push(callback_receiver);
+            }
+        }
+
+        // Wait for all of the certificates to be fetched.
+        while let Some(result) = fetch_certificates.next().await {
+            if let Err(e) = result {
+                bail!("Unable to fetch certificate: {e}")
+            }
+        }
+        // Return after receiving all of the certificates.
         Ok(())
     }
 

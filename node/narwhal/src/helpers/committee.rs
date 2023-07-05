@@ -15,6 +15,7 @@
 use snarkvm::console::{prelude::*, types::Address};
 
 use indexmap::IndexMap;
+use std::collections::HashSet;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Committee<N: Network> {
@@ -66,6 +67,21 @@ impl<N: Network> Committee<N> {
     /// Returns `true` if the given address is in the committee.
     pub fn is_committee_member(&self, address: Address<N>) -> bool {
         self.members.contains_key(&address)
+    }
+
+    /// Returns `true` if the combined stake for the given addresses reaches the quorum threshold.
+    /// This method takes in a `HashSet` to guarantee that the given addresses are unique.
+    pub fn is_quorum_threshold_reached(&self, addresses: &HashSet<Address<N>>) -> Result<bool> {
+        // Compute the combined stake for the given addresses.
+        let mut stake = 0u64;
+        for address in addresses {
+            stake = match stake.checked_add(self.get_stake(*address)) {
+                Some(stake) => stake,
+                None => bail!("Overflow when computing combined stake to check quorum threshold"),
+            };
+        }
+        // Return whether the combined stake reaches the quorum threshold.
+        Ok(stake >= self.quorum_threshold()?)
     }
 
     /// Returns the amount of stake for the given address.

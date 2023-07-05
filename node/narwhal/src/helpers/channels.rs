@@ -12,7 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::{BatchPropose, BatchSignature, TransmissionRequest, TransmissionResponse};
+use crate::{
+    BatchPropose,
+    BatchSignature,
+    CertificateRequest,
+    CertificateResponse,
+    TransmissionRequest,
+    TransmissionResponse,
+};
 use snarkvm::{
     console::network::*,
     ledger::narwhal::{BatchCertificate, Data, TransmissionID},
@@ -32,12 +39,16 @@ pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver
     let (tx_batch_propose, rx_batch_propose) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_batch_signature, rx_batch_signature) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_batch_certified, rx_batch_certified) = mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_certificate_request, rx_certificate_request) = mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_certificate_response, rx_certificate_response) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_unconfirmed_solution, rx_unconfirmed_solution) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_unconfirmed_transaction, rx_unconfirmed_transaction) = mpsc::channel(MAX_CHANNEL_SIZE);
 
     let tx_batch_propose = Arc::new(tx_batch_propose);
     let tx_batch_signature = Arc::new(tx_batch_signature);
     let tx_batch_certified = Arc::new(tx_batch_certified);
+    let tx_certificate_request = Arc::new(tx_certificate_request);
+    let tx_certificate_response = Arc::new(tx_certificate_response);
     let tx_unconfirmed_solution = Arc::new(tx_unconfirmed_solution);
     let tx_unconfirmed_transaction = Arc::new(tx_unconfirmed_transaction);
 
@@ -45,6 +56,8 @@ pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver
         tx_batch_propose,
         tx_batch_signature,
         tx_batch_certified,
+        tx_certificate_request,
+        tx_certificate_response,
         tx_unconfirmed_solution,
         tx_unconfirmed_transaction,
     };
@@ -52,6 +65,8 @@ pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver
         rx_batch_propose,
         rx_batch_signature,
         rx_batch_certified,
+        rx_certificate_request,
+        rx_certificate_response,
         rx_unconfirmed_solution,
         rx_unconfirmed_transaction,
     };
@@ -64,6 +79,8 @@ pub struct PrimarySender<N: Network> {
     pub tx_batch_propose: Arc<mpsc::Sender<(SocketAddr, BatchPropose<N>)>>,
     pub tx_batch_signature: Arc<mpsc::Sender<(SocketAddr, BatchSignature<N>)>>,
     pub tx_batch_certified: Arc<mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>)>>,
+    pub tx_certificate_request: Arc<mpsc::Sender<(SocketAddr, CertificateRequest<N>)>>,
+    pub tx_certificate_response: Arc<mpsc::Sender<(SocketAddr, CertificateResponse<N>)>>,
     pub tx_unconfirmed_solution: Arc<mpsc::Sender<(PuzzleCommitment<N>, Data<ProverSolution<N>>)>>,
     pub tx_unconfirmed_transaction: Arc<mpsc::Sender<(N::TransactionID, Data<Transaction<N>>)>>,
 }
@@ -73,6 +90,8 @@ pub struct PrimaryReceiver<N: Network> {
     pub rx_batch_propose: mpsc::Receiver<(SocketAddr, BatchPropose<N>)>,
     pub rx_batch_signature: mpsc::Receiver<(SocketAddr, BatchSignature<N>)>,
     pub rx_batch_certified: mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>)>,
+    pub rx_certificate_request: mpsc::Receiver<(SocketAddr, CertificateRequest<N>)>,
+    pub rx_certificate_response: mpsc::Receiver<(SocketAddr, CertificateResponse<N>)>,
     pub rx_unconfirmed_solution: mpsc::Receiver<(PuzzleCommitment<N>, Data<ProverSolution<N>>)>,
     pub rx_unconfirmed_transaction: mpsc::Receiver<(N::TransactionID, Data<Transaction<N>>)>,
 }

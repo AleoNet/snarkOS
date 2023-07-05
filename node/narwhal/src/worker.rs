@@ -132,11 +132,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Handles the incoming transmission response.
-    async fn process_transmission_response(
-        &self,
-        peer_ip: SocketAddr,
-        response: TransmissionResponse<N>,
-    ) -> Result<()> {
+    fn process_transmission_response(&self, peer_ip: SocketAddr, response: TransmissionResponse<N>) -> Result<()> {
         // Check if the peer IP exists in the pending queue for the given transmission ID.
         if self.pending.get(response.transmission_id).unwrap_or_default().contains(&peer_ip) {
             // TODO: Validate the transmission.
@@ -204,7 +200,6 @@ impl<N: Network> Worker<N> {
         let self_clone = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, transmission_id)) = rx_worker_ping.recv().await {
-                // Process the ping event.
                 self_clone.process_transmission_id(peer_ip, transmission_id, None);
             }
         });
@@ -213,7 +208,6 @@ impl<N: Network> Worker<N> {
         let self_clone = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, transmission_request)) = rx_transmission_request.recv().await {
-                // Process the transmission request.
                 self_clone.process_transmission_request(peer_ip, transmission_request);
             }
         });
@@ -223,7 +217,7 @@ impl<N: Network> Worker<N> {
         self.spawn(async move {
             while let Some((peer_ip, transmission_response)) = rx_transmission_response.recv().await {
                 // Process the transmission response.
-                if let Err(e) = self_clone.process_transmission_response(peer_ip, transmission_response).await {
+                if let Err(e) = self_clone.process_transmission_response(peer_ip, transmission_response) {
                     error!(
                         "Worker {} failed to process transmission response from peer '{peer_ip}': {e}",
                         self_clone.id

@@ -234,7 +234,10 @@ impl<N: Network> Storage<N> {
     /// This method ensures the following invariants:
     /// - The certificate ID does not already exist in storage.
     /// - The batch ID does not already exist in storage.
-    /// - The certificate is well-formed.
+    /// - All transmissions declared in the certificate exist in storage (up to GC).
+    /// - All previous certificates declared in the certificate exist in storage (up to GC).
+    /// - All previous certificates are for the previous round (i.e. round - 1).
+    /// - The previous certificates reached the quorum threshold (2f+1).
     pub fn insert_certificate(&self, certificate: BatchCertificate<N>) -> Result<()> {
         // Retrieve the round.
         let round = certificate.round();
@@ -255,30 +258,53 @@ impl<N: Network> Storage<N> {
         }
 
         // TODO (howardwu): Ensure the certificate is well-formed. If not, do not store.
-        // TODO (howardwu): Ensure the round is within range. If not, do not store.
         // TODO (howardwu): Ensure the address is in the committee of the specified round. If not, do not store.
-        // TODO (howardwu): Ensure I have all of the transmissions. If not, do not store.
-        // TODO (howardwu): Ensure I have all of the previous certificates. If not, do not store.
-        // TODO (howardwu): Ensure the previous certificates are for round-1. If not, do not store.
         // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not store.
 
-        // Iterate over the transmission IDs.
-        for transmission_id in certificate.transmission_ids() {
-            // Ensure storage contains the declared transmission ID.
-            if !self.contains_transmission(*transmission_id) {
-                bail!("Missing transmission {transmission_id} for certificate {certificate_id}");
+        // Retrieve the GC round.
+        let gc_round = self.gc_round();
+        // Compute the previous round.
+        let previous_round = round.saturating_sub(1);
+
+        // Check if the previous round is within range of the GC round.
+        if previous_round > gc_round {
+            // Ensure the previous round exists in storage.
+            if !self.contains_round(previous_round) {
+                bail!("Missing state for the previous round {previous_round} in storage (gc={gc_round})");
             }
         }
 
-        // // Ensure storage contains all declared previous certificates (up to GC).
-        // for previous_certificate_id in certificate.previous_certificate_ids() {
-        //     // If the certificate's round is greater than the GC round, ensure the previous certificate exists.
-        //     if round > self.gc_round() {
-        //         if !self.certificates.read().contains_key(previous_certificate_id) {
-        //             bail!("Missing previous certificate {previous_certificate_id} for certificate {certificate_id}");
-        //         }
-        //     }
-        // }
+        // If the certificate's round is greater than the GC round, ensure the transmissions exists.
+        if round > gc_round {
+            // Ensure storage contains all declared transmissions (up to GC).
+            for transmission_id in certificate.transmission_ids() {
+                // Ensure storage contains the declared transmission ID.
+                if !self.contains_transmission(*transmission_id) {
+                    bail!("Missing transmission {transmission_id} for certificate in round {round} (gc={gc_round})");
+                }
+            }
+        }
+
+        // If the certificate's *previous* round is greater than the GC round, ensure the previous certificates exists.
+        if previous_round > gc_round {
+            // Retrieve the committee for the previous round.
+            let Some(previous_committee) = self.get_committee_for_round(previous_round) else {
+                bail!("Missing committee for the previous round {previous_round} in storage (gc={gc_round})");
+            };
+            // Ensure storage contains all declared previous certificates (up to GC).
+            for previous_certificate_id in certificate.previous_certificate_ids() {
+                // Retrieve the previous certificate.
+                let Some(previous_certificate) = self.get_certificate(*previous_certificate_id) else {
+                    bail!("Missing previous certificate for certificate in round {round} (gc={gc_round})");
+                };
+                // Ensure the previous certificate is for the previous round.
+                if previous_certificate.round() != previous_round {
+                    bail!(
+                        "Previous certificate for round {previous_round} found in certificate for round {round} (gc={gc_round})"
+                    );
+                }
+            }
+        }
 
         /* Proceed to store the certificate. */
 
