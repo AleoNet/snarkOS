@@ -194,7 +194,10 @@ impl CommitteeSetup {
 
         // Write the primary and worker files to the filesystem.
         for (_, (_, primary)) in self.primaries.iter().enumerate() {
-            let primary_addr: Ipv4Addr = if let multiaddr::Protocol::Ip4(addr) = primary.address.clone().pop().unwrap()
+            let mut primary_addr = primary.address.clone();
+            let _port = primary_addr.pop().unwrap();
+
+            let primary_addr: Ipv4Addr = if let multiaddr::Protocol::Ip4(addr) = primary_addr.pop().unwrap()
             {
                 addr
             } else {
