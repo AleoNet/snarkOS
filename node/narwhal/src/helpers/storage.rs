@@ -314,10 +314,13 @@ impl<N: Network> Storage<N> {
         self.certificates.write().insert(certificate_id, certificate.clone());
         // Insert the batch ID.
         self.batch_ids.write().insert(batch_id, round);
-        // TODO (howardwu): Clean this up for performance.
-        // Insert the transmission IDs.
-        for transmission_id in certificate.transmission_ids() {
-            self.transmission_ids.write().entry(*transmission_id).or_default().insert(certificate_id);
+        // Scope and acquire the write lock.
+        {
+            let mut transmission_ids = self.transmission_ids.write();
+            // Insert the transmission IDs.
+            for transmission_id in certificate.transmission_ids() {
+                transmission_ids.entry(*transmission_id).or_default().insert(certificate_id);
+            }
         }
         Ok(())
     }
@@ -340,32 +343,35 @@ impl<N: Network> Storage<N> {
         // Compute the author of the batch.
         let author = certificate.author();
 
-        // Remove the round to certificate ID entry.
-        self.rounds.write().entry(round).or_default().remove(&(certificate_id, batch_id, author));
-        // If the round is empty, remove it.
-        if self.rounds.read().get(&round).map_or(false, |entries| entries.is_empty()) {
-            self.rounds.write().remove(&round);
+        // Scope and acquire the write lock.
+        {
+            let mut rounds = self.rounds.write();
+            // Remove the round to certificate ID entry.
+            rounds.entry(round).or_default().remove(&(certificate_id, batch_id, author));
+            // If the round is empty, remove it.
+            if rounds.get(&round).map_or(false, |entries| entries.is_empty()) {
+                rounds.remove(&round);
+            }
         }
         // Remove the certificate.
         self.certificates.write().remove(&certificate_id);
         // Remove the batch ID.
         self.batch_ids.write().remove(&batch_id);
-        // TODO (howardwu): Clean this up for performance.
-        // Iterate over the transmission IDs.
-        for transmission_id in certificate.transmission_ids() {
-            // Remove the certificate ID for the transmission ID.
-            self.transmission_ids.write().entry(*transmission_id).or_default().remove(&certificate_id);
-            // If this is the last certificate ID for the transmission ID, remove the transmission.
-            if self
-                .transmission_ids
-                .read()
-                .get(transmission_id)
-                .map_or(true, |certificate_ids| certificate_ids.is_empty())
-            {
-                // Remove the entry for the transmission ID.
-                self.transmission_ids.write().remove(transmission_id);
-                // Remove the transmission.
-                self.remove_transmission(*transmission_id);
+
+        // Scope and acquire the write lock.
+        {
+            let mut transmission_ids = self.transmission_ids.write();
+            // Iterate over the transmission IDs.
+            for transmission_id in certificate.transmission_ids() {
+                // Remove the certificate ID for the transmission ID.
+                transmission_ids.entry(*transmission_id).or_default().remove(&certificate_id);
+                // If this is the last certificate ID for the transmission ID, remove the transmission.
+                if transmission_ids.get(transmission_id).map_or(true, |certificate_ids| certificate_ids.is_empty()) {
+                    // Remove the entry for the transmission ID.
+                    transmission_ids.remove(transmission_id);
+                    // Remove the transmission.
+                    self.remove_transmission(*transmission_id);
+                }
             }
         }
         // Return successfully.
