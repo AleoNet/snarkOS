@@ -14,15 +14,29 @@
 
 mod common;
 
-use crate::common::primary::start_n_primaries;
+use crate::common::{
+    primary::start_n_primaries,
+    utils::{fire_unconfirmed_solutions, fire_unconfirmed_transactions},
+};
 
 #[tokio::test]
 async fn test_state_coherence() {
-    crate::common::utils::initialize_logger(0);
+    // crate::common::utils::initialize_logger(0);
 
     const N: u16 = 4;
-
     let primaries = start_n_primaries(N).await;
+
+    // Start the tx cannons for each primary.
+    for (id, primary) in primaries {
+        let sender = primary.1;
+        // Fire unconfirmed solutions.
+        fire_unconfirmed_solutions(&sender, id);
+        // Fire unconfirmed transactions.
+        fire_unconfirmed_transactions(&sender, id);
+    }
+
+    // TODO(nkls): the easiest would be to assert on the anchor or bullshark's output, once
+    // implemented.
 
     // std::future::pending::<()>().await;
 }
