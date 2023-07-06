@@ -362,7 +362,7 @@ impl<N: Network> Primary<N> {
         // Ensure the primary has all of the transmissions.
         self.fetch_missing_transmissions(peer_ip, certificate.batch_header()).await?;
         // Ensure the primary has all of the previous certificates.
-        self.fetch_missing_certificates(peer_ip, certificate.batch_header()).await?;
+        self.fetch_missing_previous_certificates(peer_ip, certificate.batch_header()).await?;
 
         // Check if the certificate needs to be stored.
         if !self.storage.contains_certificate(certificate.certificate_id()) {
@@ -594,7 +594,7 @@ impl<N: Network> Primary<N> {
         // TODO (howardwu): Refactor this.
         if self.committee.read().round() < round {
             // Ensure the primary has all of the certificates.
-            self.fetch_missing_certificates(peer_ip, &header).await?;
+            self.fetch_missing_previous_certificates(peer_ip, header).await?;
         }
         // Ensure the round in the proposed batch matches the committee round.
         // TODO (howardwu): Narwhal paper implies `round`, Bullshark paper implies `round + 1`.
@@ -619,9 +619,9 @@ impl<N: Network> Primary<N> {
         self.check_timestamp_for_liveness(timestamp)?;
 
         // Ensure the primary has all of the transmissions.
-        self.fetch_missing_transmissions(peer_ip, &header).await?;
+        self.fetch_missing_transmissions(peer_ip, header).await?;
         // Ensure the primary has all of the previous certificates.
-        self.fetch_missing_certificates(peer_ip, &header).await?;
+        self.fetch_missing_previous_certificates(peer_ip, header).await?;
 
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
@@ -762,7 +762,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Fetches any missing previous certificates for the specified batch header from the specified peer.
-    async fn fetch_missing_certificates(&self, peer_ip: SocketAddr, header: &BatchHeader<N>) -> Result<()> {
+    async fn fetch_missing_previous_certificates(&self, peer_ip: SocketAddr, header: &BatchHeader<N>) -> Result<()> {
         // If the previous round is 0, or is <= the GC round, return early.
         if header.round() == 1 || header.round() <= self.storage.gc_round() + 1 {
             return Ok(());
