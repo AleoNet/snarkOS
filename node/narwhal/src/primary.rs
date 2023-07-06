@@ -38,7 +38,7 @@ use crate::{
 use snarkos_account::Account;
 use snarkvm::{
     console::prelude::*,
-    ledger::narwhal::{Batch, BatchCertificate, BatchHeader, Data},
+    ledger::narwhal::{Batch, BatchCertificate, BatchHeader},
     prelude::{Field, Signature},
 };
 
@@ -233,7 +233,7 @@ impl<N: Network> Primary<N> {
         // Sign the batch.
         let batch = Batch::new(private_key, round, transmissions, previous_certificates, rng)?;
         // Broadcast the batch to all validators for signing.
-        self.gateway.broadcast(Event::BatchPropose(BatchPropose::new(Data::Object(batch.to_header()?))));
+        self.gateway.broadcast(Event::BatchPropose(batch.to_header()?.into()));
         // Set the proposed batch.
         *self.proposed_batch.write() = Some((batch, Default::default()));
         Ok(())
@@ -246,15 +246,41 @@ impl<N: Network> Primary<N> {
     /// 2. Sign the batch.
     /// 3. Broadcast the signature back to the validator.
     async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
+        let BatchPropose { round: batch_round, batch_header } = batch_propose;
+
+        // Check if the primary is still signing for the round declared in the batch.
+        if let Some(round) = self.proposed_batch.read().as_ref().map(|(batch, _)| batch.round()) {
+            if round != batch_round {
+                bail!("Our primary is no longer signing for round {round}");
+            }
+        }
+
+        // Retrieve the committee round.
+        let committee_round = self.committee.read().round();
+        // Ensure the round in the proposed batch matches the committee round.
+        // TODO (howardwu): Narwhal paper implies `round`, Bullshark paper implies `round + 1`.
+        if committee_round > batch_round + 1 {
+            // The primary is no longer signing past rounds.
+            bail!("Primary is on round {committee_round}, and no longer signing for round {batch_round}")
+        }
+
+        // TODO (howardwu): Ensure I have not signed this round for this author before. If so, do not sign.
+
         // Deserialize the batch header.
-        let batch_header = batch_propose.batch_header.deserialize().await?;
+        let batch_header = batch_header.deserialize().await?;
+        // Ensure the round matches in the batch header.
+        if batch_round != batch_header.round() {
+            bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
+        }
         // Ensure the batch header from the peer is valid.
-        let batch_id = self.fetch_and_check_batch_from_peer(peer_ip, &batch_header).await?;
+        self.fetch_and_check_batch_from_peer(peer_ip, &batch_header).await?;
 
         /* Proceeding to sign the batch. */
 
         // Initialize an RNG.
         let rng = &mut rand::thread_rng();
+        // Retrieve the batch ID.
+        let batch_id = batch_header.batch_id();
         // Generate a timestamp.
         let timestamp = now();
         // Sign the batch ID.
@@ -567,49 +593,32 @@ impl<N: Network> Primary<N> {
     ///   - Ensure the previous certificates are for the previous round (i.e. round - 1).
     ///   - Ensure the previous certificates have reached the quorum threshold.
     ///   - Ensure we have not already signed the batch ID.
-    async fn fetch_and_check_batch_from_peer(&self, peer_ip: SocketAddr, header: &BatchHeader<N>) -> Result<Field<N>> {
+    async fn fetch_and_check_batch_from_peer(&self, peer_ip: SocketAddr, header: &BatchHeader<N>) -> Result<()> {
         // Retrieve the batch ID.
         let batch_id = header.batch_id();
         // Retrieve the round.
-        let round = header.round();
+        let batch_round = header.round();
         // Retrieve the author.
         let author = header.author();
         // Retrieve the timestamp.
         let timestamp = header.timestamp();
 
-        // TODO (howardwu): Ensure I have not signed this round for this author before. If so, do not sign.
-
         // Ensure this batch ID is new.
         if self.storage.contains_batch(batch_id) {
-            match ((self.committee.read().round() as i64) - round as i64).abs() > 2 {
-                true => bail!("Batch ID has already been processed for round {round}"),
-                false => bail!("Recently stored this batch ID for round {round}"),
+            match ((self.committee.read().round() as i64) - batch_round as i64).abs() > 2 {
+                true => bail!("Batch ID has already been processed for round {batch_round}"),
+                false => return Ok(()),
             }
         }
+
         // Ensure the round in the proposed batch is within GC range of the committee round.
-        if self.committee.read().round() + self.storage.max_gc_rounds() <= round {
-            bail!("Round {round} is too far in the future")
+        if self.committee.read().round() + self.storage.max_gc_rounds() <= batch_round {
+            bail!("Round {batch_round} is too far in the future")
         }
-
-        // TODO (howardwu): Refactor this.
-        if self.committee.read().round() < round {
-            // Ensure the primary has all of the certificates.
-            self.fetch_missing_previous_certificates(peer_ip, header).await?;
-        }
-        // Ensure the round in the proposed batch matches the committee round.
-        // TODO (howardwu): Narwhal paper implies `round`, Bullshark paper implies `round + 1`.
-        if self.committee.read().round() > round + 1 {
-            // The primary is no longer signing past rounds.
-            bail!("Primary is on round {}, and no longer signing for round {round}", self.committee.read().round())
-        }
-
-        // Retrieve the committee for the specified round.
         // If the committee cannot be found, it means this round has exceed GC depth and we should not sign it.
-        let committee = self.committee.read().clone();
-        // TODO (howardwu): Enable this code to turn on dynamic committees.
-        // let Some(committee) = self.storage.get_committee_for_round(round) else {
-        //     bail!("Round {round} has exceeded the maximum GC depth")
-        // };
+        let Some(committee) = self.storage.get_committee_for_round(batch_round) else {
+            bail!("Round {batch_round} has exceeded the maximum GC depth")
+        };
         // Ensure the author is a member of the committee.
         if !committee.is_committee_member(author) {
             bail!("{author} is not a member of the committee")
@@ -624,7 +633,7 @@ impl<N: Network> Primary<N> {
         self.fetch_missing_previous_certificates(peer_ip, header).await?;
 
         // Compute the previous round.
-        let previous_round = round.saturating_sub(1);
+        let previous_round = batch_round.saturating_sub(1);
 
         if previous_round > 0 {
             // Initialize a set of the previous authors.
@@ -634,11 +643,11 @@ impl<N: Network> Primary<N> {
             for previous_certificate_id in header.previous_certificate_ids() {
                 // Retrieve the previous certificate.
                 let Some(previous_certificate) = self.storage.get_certificate(*previous_certificate_id) else {
-                    bail!("Missing previous certificate for a proposed batch from peer {peer_ip} in round {round}");
+                    bail!("Missing previous certificate for a batch in round {batch_round}");
                 };
                 // Ensure the previous certificate is for the previous round.
                 if previous_certificate.round() != previous_round {
-                    bail!("Previous certificate for a proposed batch from peer {peer_ip} is for the wrong round");
+                    bail!("Previous certificate in a batch from round {batch_round} is for the wrong round");
                 }
                 // Insert the author of the previous certificate.
                 previous_authors.insert(previous_certificate.author());
@@ -653,8 +662,7 @@ impl<N: Network> Primary<N> {
                 bail!("Previous certificates for a proposed batch from peer {peer_ip} did not reach quorum threshold");
             }
         }
-
-        Ok(batch_id)
+        Ok(())
     }
 
     /// Sanity checks the batch signature from a peer.
@@ -773,8 +781,17 @@ impl<N: Network> Primary<N> {
 
         // Iterate through the previous certificate IDs.
         for certificate_id in header.previous_certificate_ids() {
+            // TODO (howardwu): This conditional can be simplified, however the logic here is still unstable.
+            //  As such, only update this after we have finished implementing the 'syncing' logic.
             // If we do not have the previous certificate, request it.
-            if !self.pending.contains(*certificate_id) && !self.storage.contains_certificate(*certificate_id) {
+            if self.pending.contains(*certificate_id) && !self.storage.contains_certificate(*certificate_id) {
+                // Initialize a oneshot channel.
+                let (callback_sender, callback_receiver) = oneshot::channel();
+                // Insert the certificate ID into the pending queue.
+                self.pending.insert(*certificate_id, peer_ip, Some(callback_sender));
+                // Push the callback onto the list.
+                fetch_certificates.push(callback_receiver);
+            } else if !self.pending.contains(*certificate_id) && !self.storage.contains_certificate(*certificate_id) {
                 trace!("Primary - Found a new certificate ID '{}' from peer '{peer_ip}'", fmt_id(certificate_id));
 
                 // Initialize a oneshot channel.
