@@ -3008,6 +3008,7 @@ dependencies = [
  "bytes",
  "futures",
  "indexmap 2.0.0",
+ "itertools",
  "open",
  "parking_lot",
  "rand",
