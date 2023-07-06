@@ -40,7 +40,7 @@ pub fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<Cu
         let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64)).unwrap();
 
         // TODO(nkls): use tracing instead.
-        println!("  Validator {}: {}", i, account.address());
+        info!("Validator {}: {}", i, account.address());
 
         members.insert(account.address(), INITIAL_STAKE);
         accounts.push(account);

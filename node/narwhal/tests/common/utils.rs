@@ -84,7 +84,9 @@ pub fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_i
             // TODO (howardwu): Use a mutex to bring in the real 'proof target' and change this sampling to a while loop.
             let commitment = PuzzleCommitment::<CurrentNetwork>::from_g1_affine(rng.gen());
             // Sample random fake solution bytes.
-            let solution = Data::Buffer(Bytes::from((0..1024).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
+            let mut vec = vec![0u8; 1024];
+            rng.fill_bytes(&mut vec);
+            let solution = Data::Buffer(Bytes::from(vec));
             // Return the ID and solution.
             (commitment, solution)
         }
@@ -124,7 +126,9 @@ pub fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, nod
             // Sample a random fake transaction ID.
             let id = Field::<CurrentNetwork>::rand(&mut rng).into();
             // Sample random fake transaction bytes.
-            let transaction = Data::Buffer(Bytes::from((0..1024).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
+            let mut vec = vec![0u8; 1024];
+            rng.fill_bytes(&mut vec);
+            let transaction = Data::Buffer(Bytes::from(vec));
             // Return the ID and transaction.
             (id, transaction)
         }

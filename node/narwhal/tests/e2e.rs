@@ -21,7 +21,7 @@ use crate::common::{
 
 #[tokio::test]
 async fn test_state_coherence() {
-    // crate::common::utils::initialize_logger(0);
+    crate::common::utils::initialize_logger(0);
 
     const N: u16 = 4;
     let primaries = start_n_primaries(N).await;
@@ -38,5 +38,5 @@ async fn test_state_coherence() {
     // TODO(nkls): the easiest would be to assert on the anchor or bullshark's output, once
     // implemented.
 
-    // std::future::pending::<()>().await;
+    std::future::pending::<()>().await;
 }
