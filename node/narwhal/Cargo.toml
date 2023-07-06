@@ -90,6 +90,9 @@ version = "0.7.4"
 default-features = false
 features = [ "erased-json" ]
 
+[dev-dependencies.itertools]
+version = "0.11"
+
 [dev-dependencies.open]
 version = "4"
 
