@@ -14,7 +14,7 @@
 
 use super::*;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct BatchSignature<N: Network> {
     pub batch_id: Field<N>,
     pub signature: Signature<N>,

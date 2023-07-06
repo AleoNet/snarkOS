@@ -39,6 +39,7 @@ on the entries they receive from other validators' workers.
 ## Test Cases
 
 - Two validators, one with X workers, another with Y workers. Check that they are compatible.
+- If a primary sees that f+1 other primaries have certified this round, it should skip to the next round if it has not been certified yet.
 
 ## Open Questions
 

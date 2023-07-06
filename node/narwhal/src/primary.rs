@@ -23,7 +23,6 @@ use crate::{
         PrimarySender,
         Storage,
     },
-    BatchCertified,
     BatchPropose,
     BatchSignature,
     CertificateRequest,
@@ -366,8 +365,8 @@ impl<N: Network> Primary<N> {
     /// Processes a batch signature from a peer.
     ///
     /// This method performs the following steps:
-    /// 1. Verify the signature, ensuring it corresponds to the proposed batch.
-    /// 2. Ensure the proposed batch has not expired.
+    /// 1. Ensure the proposed batch has not expired.
+    /// 2. Verify the signature, ensuring it corresponds to the proposed batch.
     /// 3. Store the signature.
     /// 4. Certify the batch if enough signatures have been received.
     /// 5. Broadcast the batch certificate to all validators.
@@ -376,38 +375,15 @@ impl<N: Network> Primary<N> {
         peer_ip: SocketAddr,
         batch_signature: BatchSignature<N>,
     ) -> Result<()> {
-        // Retrieve the batch ID and signature.
-        let BatchSignature { batch_id, signature, timestamp } = batch_signature;
-
-        // Ensure the batch ID matches the currently proposed batch.
-        if Some(batch_id) != self.proposed_batch.read().as_ref().map(|(batch, _)| batch.batch_id()) {
-            // Log the batch mismatch.
-            match self.storage.contains_batch(batch_id) {
-                true => trace!("Received a batch signature for an already certified batch from peer '{peer_ip}'"),
-                false => warn!("Received a batch signature for an unknown batch from peer '{peer_ip}'"),
-            }
-            return Ok(());
-        }
-        // Retrieve the address of the peer.
-        let Some(address) = self.gateway.resolver().get_address(peer_ip) else {
-            warn!("Received a batch signature from a disconnected peer '{peer_ip}'");
-            return Ok(());
-        };
-        // Ensure the address is in the committee.
-        if !self.committee.read().is_committee_member(address) {
-            warn!("Received a batch signature from a non-committee peer '{peer_ip}'");
-            return Ok(());
-        }
-        // Verify the signature.
-        if !signature.verify(&address, &[batch_id, Field::from_u64(timestamp as u64)]) {
-            warn!("Received an invalid batch signature from peer '{peer_ip}'");
-            return Ok(());
-        }
-
         // Ensure the proposed batch has not expired, and clear the proposed batch if it has expired.
         self.check_proposed_batch_for_expiration();
+        // Ensure the batch signature from the peer is valid.
+        self.check_batch_signature_from_peer(peer_ip, batch_signature)?;
 
-        // Add the signature to the batch, and attempt to certify the batch if enough signatures have been received.
+        // Retrieve the signature and timestamp.
+        let BatchSignature { signature, timestamp, .. } = batch_signature;
+
+        // Store the signature in the proposed batch.
         if let Some((_, signatures)) = self.proposed_batch.write().as_mut() {
             // Add the signature to the batch.
             signatures.insert(signature, timestamp);
@@ -424,43 +400,29 @@ impl<N: Network> Primary<N> {
                 is_ready = true;
             }
         }
-
         // If the batch is not ready to be certified, return early.
-        match is_ready {
-            true => info!("Quorum threshold reached - Preparing to certify our batch..."),
-            false => return Ok(()),
+        if !is_ready {
+            return Ok(());
         }
 
         /* Proceeding to certify the batch. */
 
         // Retrieve the batch and signatures, clearing the proposed batch.
-        let (batch, signatures) = self.proposed_batch.write().take().unwrap();
+        let proposed_batch = self.proposed_batch.write().take();
+        if let Some((batch, signatures)) = proposed_batch {
+            info!("Quorum threshold reached - Preparing to certify our batch...");
 
-        // Compute the batch header.
-        let Ok(header) = batch.to_header() else {
-            // TODO (howardwu): Figure out how to handle a failed header.
-            error!("Failed to create a batch header");
-            return Ok(());
-        };
+            // Create the batch certificate.
+            let certificate = BatchCertificate::new(batch.to_header()?, signatures)?;
+            // Store the certified batch.
+            self.storage.insert_certificate(certificate.clone())?;
+            // Broadcast the certified batch to all validators.
+            self.gateway.broadcast(Event::BatchCertified(certificate.into()));
 
-        // Create the batch certificate.
-        let Ok(certificate) = BatchCertificate::new(header, signatures) else {
-            // TODO (howardwu): Figure out how to handle a failed certificate.
-            error!("Failed to create a batch certificate");
-            return Ok(());
-        };
-
-        // Store the certified batch.
-        self.storage.insert_certificate(certificate.clone())?;
-
-        // Create a batch certified event.
-        let event = BatchCertified::new(Data::Object(certificate));
-        // Broadcast the certified batch to all validators.
-        self.gateway.broadcast(Event::BatchCertified(event));
-
-        info!("\n\n\nOur batch for round {} has been certified!\n\n", self.committee.read().round());
-        // Update the committee to the next round.
-        self.update_committee_to_next_round();
+            info!("\n\n\nOur batch for round {} has been certified!\n\n", self.committee.read().round());
+            // Update the committee to the next round.
+            self.update_committee_to_next_round();
+        }
         Ok(())
     }
 
@@ -587,7 +549,7 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
                 if let Err(e) = self_clone.process_batch_signature_from_peer(peer_ip, batch_signature).await {
-                    warn!("Cannot include the signature from peer '{peer_ip}' - {e}");
+                    warn!("Cannot include a signature from peer '{peer_ip}' - {e}");
                 }
             }
         });
@@ -692,6 +654,54 @@ impl<N: Network> Primary<N> {
         if is_expired {
             *self.proposed_batch.write() = None;
         }
+    }
+
+    /// Sanity checks the batch signature from a peer.
+    fn check_batch_signature_from_peer(&self, peer_ip: SocketAddr, batch_signature: BatchSignature<N>) -> Result<()> {
+        // Retrieve the batch ID and signature.
+        let BatchSignature { batch_id, signature, timestamp } = batch_signature;
+
+        /* Check the batch ID. */
+
+        match self.proposed_batch.read().as_ref() {
+            Some((batch, _)) => {
+                // Ensure the batch ID matches the currently proposed batch ID.
+                if batch.batch_id() != batch_id {
+                    // Log the batch mismatch.
+                    match self.storage.contains_batch(batch_id) {
+                        true => bail!("This batch was already certified"),
+                        false => bail!("Unknown batch ID '{batch_id}'"),
+                    }
+                }
+            }
+            // Ignore the signature if there is no proposed batch currently.
+            None => return Ok(()),
+        };
+
+        /* Check the signature. */
+
+        // Retrieve the address of the peer.
+        let Some(address) = self.gateway.resolver().get_address(peer_ip) else {
+            bail!("Signature is from a disconnected peer")
+        };
+        // Ensure the address is in the committee.
+        if !self.committee.read().is_committee_member(address) {
+            bail!("Signature is from a non-committee peer '{address}'")
+        }
+        // Verify the signature.
+        // Note: This check ensures the peer's address matches the signer's address.
+        if !signature.verify(&address, &[batch_id, Field::from_u64(timestamp as u64)]) {
+            bail!("Signature verification failed")
+        }
+
+        /* Check the timestamp. */
+
+        if timestamp > (now() + MAX_TIMESTAMP_DELTA_IN_SECS) {
+            bail!("Timestamp {timestamp} is too far in the future")
+        }
+        // TODO (howardwu): Add a check against the past too (against prev round timestamp).
+
+        Ok(())
     }
 
     /// Fetches any missing transmissions for the specified batch header from the specified peer.
