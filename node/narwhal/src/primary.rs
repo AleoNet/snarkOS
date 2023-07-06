@@ -781,6 +781,11 @@ impl<N: Network> Primary<N> {
 
         // Iterate through the previous certificate IDs.
         for certificate_id in header.previous_certificate_ids() {
+            // Ensure that we have not requested this certificate from this peer before.
+            if self.pending.get(*certificate_id).unwrap_or_default().contains(&peer_ip) {
+                continue;
+            }
+
             // TODO (howardwu): This conditional can be simplified, however the logic here is still unstable.
             //  As such, only update this after we have finished implementing the 'syncing' logic.
             // If we do not have the previous certificate, request it.
@@ -792,7 +797,7 @@ impl<N: Network> Primary<N> {
                 // Push the callback onto the list.
                 fetch_certificates.push(callback_receiver);
             } else if !self.pending.contains(*certificate_id) && !self.storage.contains_certificate(*certificate_id) {
-                trace!("Primary - Found a new certificate ID '{}' from peer '{peer_ip}'", fmt_id(certificate_id));
+                trace!("Primary - Found a new certificate ID for round {} from peer '{peer_ip}'", header.round());
 
                 // Initialize a oneshot channel.
                 let (callback_sender, callback_receiver) = oneshot::channel();
