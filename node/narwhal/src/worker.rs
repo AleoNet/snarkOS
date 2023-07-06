@@ -269,11 +269,8 @@ impl<N: Network> Worker<N> {
 
 #[cfg(test)]
 mod worker_tests {
-    use crate::{gateway_tests::GatewayInput, helpers::storage_tests::StorageInput, Gateway, Worker, MAX_WORKERS};
-    use snarkvm::prelude::Testnet3;
+    use crate::helpers::storage_tests::StorageInput;
     use test_strategy::Arbitrary;
-
-    type N = Testnet3;
 
     #[derive(Arbitrary, Debug, Clone)]
     pub struct WorkerInput {

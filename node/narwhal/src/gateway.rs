@@ -837,10 +837,7 @@ pub mod gateway_tests {
         pub fn to_gateway(&self) -> Gateway<N> {
             let committee = self.committee_input.to_committee().unwrap();
             let account = self.node_validator.get_account();
-            let dev = match self.dev {
-                None => None,
-                Some(dev) => Some(dev as u16),
-            };
+            let dev = self.dev.map(|dev| dev as u16);
             Gateway::new(Arc::new(RwLock::new(committee)), account, dev).unwrap()
         }
 
@@ -913,7 +910,7 @@ pub mod gateway_tests {
                 assert_eq!(gateway.num_workers(), workers.len() as u8);
             }
             Err(err) => {
-                panic!("Shouldn't fail because of {err}");
+                unreachable!("Unexpected {err}");
             }
         }
     }
