@@ -72,7 +72,7 @@ async fn main() {
     // Initialize the consensus to generate transactions.
     let ledger = CurrentLedger::load(genesis, None).unwrap();
     let consensus = CurrentConsensus::new(ledger, false).unwrap();
-    let genesis_address: Address<Testnet3> = *consensus.ledger().latest_committee().first().unwrap();
+    let genesis_address: Address<Testnet3> = Address::try_from(creator_private_key).unwrap();
 
     // Create the initial block or start producing transactions.
     if arg == EXPECTED_ARGS[0] {
