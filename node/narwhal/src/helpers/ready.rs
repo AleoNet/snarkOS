@@ -101,8 +101,10 @@ impl<N: Network> Ready<N> {
             let mut transmission_ids = self.transmission_ids.write();
             // Reset the cumulative proof target.
             *cumulative_proof_target = 0;
+            // Determine the number of transmissions to drain.
+            let range = 0..transmission_ids.len().min(num_transmissions);
             // Drain the transmission IDs.
-            transmission_ids.drain(0..num_transmissions).collect::<Vec<_>>()
+            transmission_ids.drain(range).collect::<Vec<_>>()
         };
 
         // Initialize a map for the transmissions.

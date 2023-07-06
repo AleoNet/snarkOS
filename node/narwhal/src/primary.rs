@@ -255,8 +255,9 @@ impl<N: Network> Primary<N> {
 
         // Check if the primary is still signing for the round declared in the batch.
         if let Some(round) = self.proposed_batch.read().as_ref().map(|(batch, _)| batch.round()) {
-            if round != batch_round {
-                bail!("Our primary is no longer signing for round {batch_round}");
+            match round > batch_round {
+                true => bail!("Our primary is no longer signing for round {batch_round}"),
+                false => bail!("Our primary is not ready to sign for round {batch_round}"),
             }
         }
 
@@ -376,15 +377,8 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
+        self.fetch_and_check_batch_from_peer(peer_ip, certificate.batch_header()).await?;
         // TODO (howardwu): Ensure the certificate is well-formed. If not, do not store.
-        // TODO (howardwu): Ensure the address is in the committee of the specified round. If not, do not store.
-        // TODO (howardwu): Ensure the previous certificates are for round-1. If not, do not store.
-        // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not store.
-
-        // Ensure the primary has all of the transmissions.
-        self.fetch_missing_transmissions(peer_ip, certificate.batch_header()).await?;
-        // Ensure the primary has all of the previous certificates.
-        self.fetch_missing_previous_certificates(peer_ip, certificate.batch_header()).await?;
 
         // Check if the certificate needs to be stored.
         if !self.storage.contains_certificate(certificate.certificate_id()) {
@@ -434,7 +428,7 @@ impl<N: Network> Primary<N> {
             let self_clone = self.clone();
             tokio::spawn(async move {
                 if let Err(e) = self_clone.process_batch_certificate_from_peer(peer_ip, certificate).await {
-                    warn!("Failed to store batch certificate from peer '{peer_ip}' - {e}");
+                    warn!("Unable to store batch certificate from peer '{peer_ip}' - {e}");
                 }
             });
         }
@@ -601,6 +595,16 @@ impl<N: Network> Primary<N> {
             }
         }
 
+        // Ensure the primary has all of the transmissions.
+        self.fetch_missing_transmissions(peer_ip, batch_header).await?;
+        // Ensure the primary has all of the previous certificates.
+        self.fetch_missing_previous_certificates(peer_ip, batch_header).await?;
+
+        // TODO (howardwu): Catch up to the latest committee (the storage needs to have this round's committee).
+
+        // Check the timestamp for liveness.
+        self.check_timestamp_for_liveness(batch_header.timestamp())?;
+
         // If the committee cannot be found, it means this round is either too old or too new (not within GC range).
         let Some(committee) = self.storage.get_committee_for_round(batch_round) else {
             bail!("Round {batch_round} is not within our GC range")
@@ -610,20 +614,12 @@ impl<N: Network> Primary<N> {
             bail!("{} is not a member of the committee", batch_header.author())
         }
 
-        // Check the timestamp for liveness.
-        self.check_timestamp_for_liveness(batch_header.timestamp())?;
-
-        // Ensure the primary has all of the transmissions.
-        self.fetch_missing_transmissions(peer_ip, batch_header).await?;
-        // Ensure the primary has all of the previous certificates.
-        self.fetch_missing_previous_certificates(peer_ip, batch_header).await?;
-
         // Retrieve the GC round.
         let gc_round = self.storage.gc_round();
         // Compute the previous round.
         let previous_round = batch_round.saturating_sub(1);
 
-        if previous_round > 0 && previous_round > gc_round {
+        if previous_round > gc_round {
             // Initialize a set of the previous authors.
             let mut previous_authors = HashSet::with_capacity(batch_header.previous_certificate_ids().len());
 
@@ -758,9 +754,13 @@ impl<N: Network> Primary<N> {
     }
 
     /// Fetches any missing previous certificates for the specified batch header from the specified peer.
-    async fn fetch_missing_previous_certificates(&self, peer_ip: SocketAddr, header: &BatchHeader<N>) -> Result<()> {
+    async fn fetch_missing_previous_certificates(
+        &self,
+        peer_ip: SocketAddr,
+        batch_header: &BatchHeader<N>,
+    ) -> Result<()> {
         // If the previous round is 0, or is <= the GC round, return early.
-        if header.round() == 1 || header.round() <= self.storage.gc_round() + 1 {
+        if batch_header.round() == 1 || batch_header.round() <= self.storage.gc_round() + 1 {
             return Ok(());
         }
 
@@ -768,7 +768,7 @@ impl<N: Network> Primary<N> {
         let mut fetch_certificates = FuturesUnordered::new();
 
         // Iterate through the previous certificate IDs.
-        for certificate_id in header.previous_certificate_ids() {
+        for certificate_id in batch_header.previous_certificate_ids() {
             // Ensure that we have not requested this certificate from this peer before.
             if self.pending.get(*certificate_id).unwrap_or_default().contains(&peer_ip) {
                 continue;
@@ -785,7 +785,7 @@ impl<N: Network> Primary<N> {
                 // Push the callback onto the list.
                 fetch_certificates.push(callback_receiver);
             } else if !self.pending.contains(*certificate_id) && !self.storage.contains_certificate(*certificate_id) {
-                trace!("Primary - Found a new certificate ID for round {} from peer '{peer_ip}'", header.round());
+                trace!("Primary - Found a new certificate ID for round {} from peer '{peer_ip}'", batch_header.round());
 
                 // Initialize a oneshot channel.
                 let (callback_sender, callback_receiver) = oneshot::channel();
