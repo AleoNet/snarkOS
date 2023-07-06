@@ -62,6 +62,9 @@ version = "0.10"
 [dependencies.multiaddr]
 version = "0.17"
 
+[dependencies.mysten-network]
+workspace = true
+
 [dependencies.narwhal-config]
 workspace = true
 

@@ -12,9 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::{env, net::IpAddr, time::Duration};
+use std::{env, time::Duration};
 
-use multiaddr::Protocol;
 use narwhal_config::{Import, WorkerCache};
 use narwhal_types::{TransactionProto, TransactionsClient};
 use rand::prelude::IteratorRandom;
@@ -161,20 +160,9 @@ fn spawn_tx_clients(worker_cache: WorkerCache) -> Vec<TransactionsClient<Channel
     let mut tx_uris = Vec::with_capacity(worker_cache.workers.values().map(|worker_index| worker_index.0.len()).sum());
     for worker_set in worker_cache.workers.values() {
         for worker_info in worker_set.0.values() {
-            // Construct an address usable by the tonic channel based on the worker's tx Multiaddr.
-            let mut tx_ip = None;
-            let mut tx_port = None;
-            for component in &worker_info.transactions {
-                match component {
-                    Protocol::Ip4(ip) => tx_ip = Some(IpAddr::V4(ip)),
-                    Protocol::Ip6(ip) => tx_ip = Some(IpAddr::V6(ip)),
-                    Protocol::Tcp(port) => tx_port = Some(port),
-                    _ => {} // TODO: do we expect other combinations?
-                }
-            }
-            // TODO: these may be known in advance, but shouldn't be trusted when we switch to a dynamic committee
-            let tx_ip = tx_ip.unwrap();
-            let tx_port = tx_port.unwrap();
+            let addr = mysten_network::multiaddr::to_socket_addr(&worker_info.transactions).unwrap();
+            let tx_ip = addr.ip();
+            let tx_port = addr.port();
 
             let tx_uri = format!("http://{tx_ip}:{tx_port}");
             tx_uris.push(tx_uri);

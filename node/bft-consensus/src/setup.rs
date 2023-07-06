@@ -197,12 +197,8 @@ impl CommitteeSetup {
             let mut primary_addr = primary.address.clone();
             let _port = primary_addr.pop().unwrap();
 
-            let primary_addr: Ipv4Addr = if let multiaddr::Protocol::Ip4(addr) = primary_addr.pop().unwrap()
-            {
-                addr
-            } else {
-                unreachable!()
-            };
+            let primary_addr: Ipv4Addr =
+                if let multiaddr::Protocol::Ip4(addr) = primary_addr.pop().unwrap() { addr } else { unreachable!() };
 
             fn dev_subpath(dev: bool, primary_addr: Ipv4Addr) -> String {
                 if dev { format!(".dev/{}/", primary_addr) } else { format!("{}/", primary_addr) }
