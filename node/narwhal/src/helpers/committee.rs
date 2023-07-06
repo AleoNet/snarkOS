@@ -38,13 +38,9 @@ impl<N: Network> Committee<N> {
 
     /// Returns a new `Committee` instance for the next round.
     /// TODO (howardwu): Add arguments for members (and stake) 1) to be added, 2) to be updated, and 3) to be removed.
-    pub fn to_next_round(&self) -> Result<Self> {
-        // Increment the round number.
-        let Some(round) = self.round.checked_add(1) else {
-            bail!("Overflow when incrementing round number in committee");
-        };
+    pub fn to_next_round(&self) -> Self {
         // Return the new committee.
-        Ok(Self { round, members: self.members.clone() })
+        Self { round: self.round.saturating_add(1), members: self.members.clone() }
     }
 }
 
