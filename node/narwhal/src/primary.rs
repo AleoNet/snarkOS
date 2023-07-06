@@ -214,6 +214,7 @@ impl<N: Network> Primary<N> {
             // TODO (howardwu): Perform one final filter against the ledger service.
             transmissions.extend(worker.drain());
         }
+        // TODO (howardwu): Put the truncated transmissions back into the workers.
         transmissions.truncate(MAX_TRANSMISSIONS_PER_BATCH);
 
         // Initialize the RNG.
