@@ -209,13 +209,12 @@ impl<N: Network> Primary<N> {
 
         // Initialize a map of the transmissions.
         let mut transmissions = IndexMap::new();
-        // Drain the workers.
+        // Drain the workers of the required number of transmissions.
+        let num_transmissions_per_worker = MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
         for worker in self.workers.read().iter() {
             // TODO (howardwu): Perform one final filter against the ledger service.
-            transmissions.extend(worker.drain());
+            transmissions.extend(worker.take(num_transmissions_per_worker));
         }
-        // TODO (howardwu): Put the truncated transmissions back into the workers.
-        transmissions.truncate(MAX_TRANSMISSIONS_PER_BATCH);
 
         // Initialize the RNG.
         let rng = &mut rand::thread_rng();

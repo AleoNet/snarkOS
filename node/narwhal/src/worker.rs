@@ -82,9 +82,9 @@ impl<N: Network> Worker<N> {
         self.id
     }
 
-    /// Drains the ready queue.
-    pub(crate) fn drain(&self) -> IndexMap<TransmissionID<N>, Transmission<N>> {
-        self.ready.drain()
+    /// Removes the specified number of transmissions from the ready queue, and returns them.
+    pub(crate) fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
+        self.ready.take(num_transmissions)
     }
 }
 

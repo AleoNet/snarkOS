@@ -92,8 +92,8 @@ impl<N: Network> Ready<N> {
         Ok(is_new)
     }
 
-    /// Removes the transmissions and returns them.
-    pub fn drain(&self) -> IndexMap<TransmissionID<N>, Transmission<N>> {
+    /// Removes the specified number of transmissions and returns them.
+    pub fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
         // Scope the locks.
         let ids = {
             // Acquire the write locks (simultaneously).
@@ -102,7 +102,7 @@ impl<N: Network> Ready<N> {
             // Reset the cumulative proof target.
             *cumulative_proof_target = 0;
             // Drain the transmission IDs.
-            transmission_ids.drain(..).collect::<Vec<_>>()
+            transmission_ids.drain(0..num_transmissions).collect::<Vec<_>>()
         };
 
         // Initialize a map for the transmissions.
@@ -182,7 +182,7 @@ mod tests {
         assert_eq!(ready.get(commitment_unknown), None);
 
         // Drain the ready queue.
-        let transmissions = ready.drain();
+        let transmissions = ready.take(3);
 
         // Check the number of transmissions.
         assert!(ready.is_empty());
