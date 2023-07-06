@@ -13,16 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{
-        assign_to_worker,
-        fmt_id,
-        init_worker_channels,
-        Committee,
-        Pending,
-        PrimaryReceiver,
-        PrimarySender,
-        Storage,
-    },
+    helpers::{assign_to_worker, init_worker_channels, Committee, Pending, PrimaryReceiver, PrimarySender, Storage},
     BatchPropose,
     BatchSignature,
     CertificateRequest,
@@ -33,6 +24,7 @@ use crate::{
     MAX_BATCH_DELAY,
     MAX_EXPIRATION_TIME_IN_SECS,
     MAX_TIMESTAMP_DELTA_IN_SECS,
+    MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
 };
 use snarkos_account::Account;
@@ -215,8 +207,6 @@ impl<N: Network> Primary<N> {
 
         /* Proceeding to sign & propose the batch. */
 
-        // TODO (howardwu): Primary is no longer signing for the previous round.
-
         // Initialize a map of the transmissions.
         let mut transmissions = IndexMap::new();
         // Drain the workers.
@@ -224,7 +214,7 @@ impl<N: Network> Primary<N> {
             // TODO (howardwu): Perform one final filter against the ledger service.
             transmissions.extend(worker.drain());
         }
-        // TODO (howardwu): Truncate to a maximum number of transmissions.
+        transmissions.truncate(MAX_TRANSMISSIONS_PER_BATCH);
 
         // Initialize the RNG.
         let rng = &mut rand::thread_rng();
