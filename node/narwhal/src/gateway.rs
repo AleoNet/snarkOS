@@ -898,7 +898,6 @@ pub mod gateway_tests {
     #[proptest(async = "tokio")]
     async fn gateway_start(#[filter(|x| x.dev.is_some())] input: GatewayInput) {
         let Some(dev) = input.dev else { unreachable!() };
-        println!("{input:?}");
         let mut gateway = input.to_gateway();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
