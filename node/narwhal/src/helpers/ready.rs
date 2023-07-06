@@ -202,10 +202,13 @@ mod tests {
 
     #[test]
     fn test_ready_duplicate() {
+        use rand::RngCore;
         let rng = &mut TestRng::default();
 
         // Sample random fake bytes.
-        let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
+        let mut vec = vec![0u8; 512];
+        rng.fill_bytes(&mut vec);
+        let data = Data::Buffer(Bytes::from(vec));
 
         // Initialize the ready queue.
         let ready = Ready::<CurrentNetwork>::new(Storage::new(1));
@@ -214,7 +217,7 @@ mod tests {
         let commitment = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
 
         // Initialize the solutions.
-        let solution = Transmission::Solution(data(rng));
+        let solution = Transmission::Solution(data);
 
         // Insert the commitments.
         assert!(ready.insert(commitment, solution.clone()).unwrap());
