@@ -124,6 +124,7 @@ impl<N: Network> Committee<N> {
 pub mod prop_tests {
     use crate::helpers::Committee;
     use snarkos_account::Account;
+    use std::collections::HashSet;
 
     use anyhow::Result;
     use indexmap::IndexMap;
@@ -167,7 +168,7 @@ pub mod prop_tests {
         }
 
         pub fn is_valid(&self) -> bool {
-            self.round > 0 && self.validators.len() >= 4
+            self.round > 0 && HashSet::<u64>::from_iter(self.validators.iter().map(|v| v.account_seed)).len() >= 4
         }
     }
 
