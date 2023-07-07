@@ -89,3 +89,41 @@ impl<N: Network> Resolver<N> {
         }
     }
 }
+
+#[cfg(test)]
+pub mod tests {
+
+    use super::*;
+    use snarkvm::utilities::TestRng;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    #[test]
+    fn test_resolver() {
+        let resolver = Resolver::<CurrentNetwork>::new();
+        let listener_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
+        let peer_addr = SocketAddr::from(([127, 0, 0, 1], 4321));
+        let mut rng = TestRng::default();
+        #[allow(deprecated)]
+        let address = Address::<CurrentNetwork>::rand(&mut rng);
+
+        assert!(resolver.get_listener(peer_addr).is_none());
+        assert!(resolver.get_address(listener_ip).is_none());
+        assert!(resolver.get_ambiguous(listener_ip).is_none());
+        assert!(resolver.get_peer_ip_for_address(address).is_none());
+
+        resolver.insert_peer(listener_ip, peer_addr, address);
+
+        assert_eq!(resolver.get_listener(peer_addr).unwrap(), listener_ip);
+        assert_eq!(resolver.get_address(listener_ip).unwrap(), address);
+        assert_eq!(resolver.get_ambiguous(listener_ip).unwrap(), peer_addr);
+        assert_eq!(resolver.get_peer_ip_for_address(address).unwrap(), listener_ip);
+
+        resolver.remove_peer(listener_ip);
+
+        assert!(resolver.get_listener(peer_addr).is_none());
+        assert!(resolver.get_address(listener_ip).is_none());
+        assert!(resolver.get_ambiguous(listener_ip).is_none());
+        assert!(resolver.get_peer_ip_for_address(address).is_none());
+    }
+}
