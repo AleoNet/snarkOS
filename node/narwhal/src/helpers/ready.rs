@@ -96,6 +96,7 @@ impl<N: Network> Ready<N> {
     pub fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
         // Scope the locks.
         let ids = {
+            // TODO (howardwu): This logic does not correctly update the cumulative proof target anymore.
             // Acquire the write locks (simultaneously).
             let mut cumulative_proof_target = self.cumulative_proof_target.write();
             let mut transmission_ids = self.transmission_ids.write();

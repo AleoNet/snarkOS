@@ -30,7 +30,7 @@ use crate::{
 use snarkos_account::Account;
 use snarkvm::{
     console::prelude::*,
-    ledger::narwhal::{Batch, BatchCertificate, BatchHeader},
+    ledger::narwhal::{Batch, BatchCertificate, BatchHeader, Transmission, TransmissionID},
     prelude::{Field, Signature},
 };
 
@@ -38,7 +38,13 @@ use async_recursion::async_recursion;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashSet, future::Future, net::SocketAddr, sync::Arc, time::Duration};
+use std::{
+    collections::{HashMap, HashSet},
+    future::Future,
+    net::SocketAddr,
+    sync::Arc,
+    time::Duration,
+};
 use time::OffsetDateTime;
 use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
 
@@ -559,8 +565,22 @@ impl<N: Network> Primary<N> {
             }
         }
 
+        // Ensure this batch does not contain already committed transmissions from past rounds or in the ledger.
+        // TODO: Check storage.
+        // TODO: Add a ledger service.
+
         // Ensure the primary has all of the transmissions.
-        self.fetch_missing_transmissions(peer_ip, batch_header).await?;
+        let transmissions = self.fetch_missing_transmissions(peer_ip, batch_header).await?;
+        // Iterate through the missing transmissions.
+        for (transmission_id, transmission) in transmissions {
+            // Determine if the transmission is new.
+            let is_new = !self.storage.contains_transmission(transmission_id);
+            // If the transmission is new, insert it.
+            if is_new {
+                // Insert the transmission.
+                self.storage.insert_transmission(transmission_id, transmission);
+            }
+        }
         // Ensure the primary has all of the previous certificates.
         let missing_certificates = self.fetch_missing_previous_certificates(peer_ip, batch_header).await?;
         // Iterate through the missing certificates.
@@ -683,11 +703,18 @@ impl<N: Network> Primary<N> {
     }
 
     /// Fetches any missing transmissions for the specified batch header from the specified peer.
-    async fn fetch_missing_transmissions(&self, peer_ip: SocketAddr, header: &BatchHeader<N>) -> Result<()> {
+    async fn fetch_missing_transmissions(
+        &self,
+        peer_ip: SocketAddr,
+        header: &BatchHeader<N>,
+    ) -> Result<HashMap<TransmissionID<N>, Transmission<N>>> {
         // If the round is <= the GC round, return early.
         if header.round() <= self.storage.gc_round() {
-            return Ok(());
+            return Ok(Default::default());
         }
+
+        // Retrieve the workers.
+        let workers = self.workers.read().clone();
 
         // Initialize a list for the missing transmissions.
         let mut fetch_transmissions = FuturesUnordered::new();
@@ -696,35 +723,30 @@ impl<N: Network> Primary<N> {
         let num_workers = self.gateway.num_workers();
         // Iterate through the transmission IDs.
         for transmission_id in header.transmission_ids() {
+            // Determine the worker ID.
+            let Ok(worker_id) = assign_to_worker(*transmission_id, num_workers) else {
+                bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
+            };
+            // Retrieve the worker.
+            let Some(worker) = workers.get(worker_id as usize) else { bail!("Unable to find worker {worker_id}") };
             // If we do not have the transmission, request it.
-            if !self.storage.contains_transmission(*transmission_id) {
-                // Determine the worker ID.
-                let Ok(worker_id) = assign_to_worker(*transmission_id, num_workers) else {
-                    bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
-                };
-                // Initialize a oneshot channel.
-                let (callback_sender, callback_receiver) = oneshot::channel();
-                // Retrieve the worker.
-                match self.workers.read().get(worker_id as usize) {
-                    Some(worker) => {
-                        // Send the transmission ID to the worker.
-                        worker.process_transmission_id(peer_ip, *transmission_id, Some(callback_sender));
-                        // Push the callback onto the list.
-                        fetch_transmissions.push(callback_receiver);
-                    }
-                    None => bail!("Unable to find worker {worker_id}"),
-                }
+            if !worker.contains_transmission(*transmission_id) {
+                // Push the callback onto the list.
+                fetch_transmissions.push(worker.send_transmission_request(peer_ip, *transmission_id));
             }
         }
 
+        // Initialize a set for the missing transmissions.
+        let mut missing_transmissions = HashMap::with_capacity(fetch_transmissions.len());
         // Wait for all of the transmissions to be fetched.
         while let Some(result) = fetch_transmissions.next().await {
-            if let Err(e) = result {
-                bail!("Unable to fetch transmission: {e}")
-            }
+            // Retrieve the transmission.
+            let (transmission_id, transmission) = result?;
+            // Insert the missing transmission into the set.
+            missing_transmissions.insert(transmission_id, transmission);
         }
-        // Return after receiving all of the transmissions.
-        Ok(())
+        // Return the missing transmissions.
+        Ok(missing_transmissions)
     }
 
     /// Fetches any missing previous certificates for the specified batch header from the specified peer.
@@ -742,6 +764,8 @@ impl<N: Network> Primary<N> {
         let mut fetch_certificates = FuturesUnordered::new();
         // Iterate through the previous certificate IDs.
         for certificate_id in batch_header.previous_certificate_ids() {
+            // Check if the certificate already exists in the ledger.
+            // TODO (howardwu): Add a ledger service.
             // If we do not have the previous certificate, request it.
             if !self.storage.contains_certificate(*certificate_id) {
                 trace!("Primary - Found a new certificate ID for round {} from peer '{peer_ip}'", batch_header.round());
@@ -787,6 +811,7 @@ impl<N: Network> Primary<N> {
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Insert the certificate ID into the pending queue.
         if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
+            // TODO (howardwu): Limit the number of open requests we send to a peer.
             // Send the certificate request to the peer.
             self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into()));
         }
@@ -800,10 +825,13 @@ impl<N: Network> Primary<N> {
     }
 
     /// Handles the incoming certificate response.
+    /// This method ensures the certificate response is well-formed and matches the certificate ID.
     fn finish_certificate_request(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) {
         let certificate = response.certificate;
         // Check if the peer IP exists in the pending queue for the given certificate ID.
-        if self.pending.get(certificate.certificate_id()).unwrap_or_default().contains(&peer_ip) {
+        let exists = self.pending.get(certificate.certificate_id()).unwrap_or_default().contains(&peer_ip);
+        // If the peer IP exists, finish the pending request.
+        if exists {
             // TODO: Validate the certificate.
             // Remove the certificate ID from the pending queue.
             self.pending.remove(certificate.certificate_id(), Some(certificate));
