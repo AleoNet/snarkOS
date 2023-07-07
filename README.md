@@ -6,6 +6,7 @@
     <a href="https://circleci.com/gh/AleoHQ/snarkOS"><img src="https://circleci.com/gh/AleoHQ/snarkOS.svg?style=svg&circle-token=6e9ad6d39d95350544f352d34e0e5c62ef54db26"></a>
     <a href="https://codecov.io/gh/AleoHQ/snarkOS"><img src="https://codecov.io/gh/AleoHQ/snarkOS/branch/master/graph/badge.svg?token=cck8tS9HpO"/></a>
     <a href="https://www.aleo.org/discord"><img src="https://img.shields.io/discord/700454073459015690?logo=discord"/></a>
+    <a href="https://allcontributors.org/"><img src="https://img.shields.io/github/all-contributors/AleoHQ/snarkOS?color=ee8449&style=flat-square"/></a>
 </p>
 
 ## <a name='TableofContents'></a>Table of Contents
@@ -16,13 +17,14 @@
   * [2.2 Installation](#22-installation)
 * [3. Run an Aleo Node](#3-run-an-aleo-node)
   * [3a. Run an Aleo Client](#3a-run-an-aleo-client)
-  * [3b. Run an Aleo Prover](#3a-run-an-aleo-prover)
+  * [3b. Run an Aleo Prover](#3b-run-an-aleo-prover)
 * [4. FAQs](#4-faqs)
-* [5. Command Line Interface](#5-configuration-file)
+* [5. Command Line Interface](#5-command-line-interface)
 * [6. Development Guide](#6-development-guide)
   * [6.1 Quick Start](#61-quick-start)
-  * [6.2 Operations](#61-operations)
-* [7. License](#7-license)
+  * [6.2 Operations](#62-operations)
+* [7. Contributors](#7-contributors)
+* [8. License](#8-license)
 
 [comment]: <> (* [4. JSON-RPC Interface]&#40;#4-json-rpc-interface&#41;)
 [comment]: <> (* [5. Additional Information]&#40;#5-additional-information&#41;)
@@ -200,7 +202,7 @@ OPTIONS:
     -h, --help                           Print help information
 ```
 
-## 6. Development
+## 6. Development Guide
 
 ### 6.1 Quick Start
 
@@ -238,7 +240,98 @@ To clean up the node storage, run:
 cargo run --release -- clean --dev <NODE_ID>
 ```
 
-## 7. License
+## 7. Contributors
+Thank you for helping make SnarkOS better!  
+[🧐 What do the emojis mean?](https://allcontributors.org/docs/en/emoji-key)
+
+<!-- ALL-CONTRIBUTORS-LIST:START - Do not remove or modify this section -->
+<!-- prettier-ignore-start -->
+<!-- markdownlint-disable -->
+<table>
+  <tbody>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/howardwu"><img src="https://avatars.githubusercontent.com/u/9260812?v=4?s=100" width="100px;" alt="Howard Wu"/><br /><sub><b>Howard Wu</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=howardwu" title="Code">💻</a> <a href="#maintenance-howardwu" title="Maintenance">🚧</a> <a href="#ideas-howardwu" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/AleoHQ/snarkOS/pulls?q=is%3Apr+reviewed-by%3Ahowardwu" title="Reviewed Pull Requests">👀</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/raychu86"><img src="https://avatars.githubusercontent.com/u/14917648?v=4?s=100" width="100px;" alt="Raymond Chu"/><br /><sub><b>Raymond Chu</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=raychu86" title="Code">💻</a> <a href="#maintenance-raychu86" title="Maintenance">🚧</a> <a href="#ideas-raychu86" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/AleoHQ/snarkOS/pulls?q=is%3Apr+reviewed-by%3Araychu86" title="Reviewed Pull Requests">👀</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ljedrz"><img src="https://avatars.githubusercontent.com/u/3750347?v=4?s=100" width="100px;" alt="ljedrz"/><br /><sub><b>ljedrz</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=ljedrz" title="Code">💻</a> <a href="#maintenance-ljedrz" title="Maintenance">🚧</a> <a href="#ideas-ljedrz" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/AleoHQ/snarkOS/pulls?q=is%3Apr+reviewed-by%3Aljedrz" title="Reviewed Pull Requests">👀</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/niklaslong"><img src="https://avatars.githubusercontent.com/u/13221615?v=4?s=100" width="100px;" alt="Niklas Long"/><br /><sub><b>Niklas Long</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=niklaslong" title="Code">💻</a> <a href="#maintenance-niklaslong" title="Maintenance">🚧</a> <a href="#ideas-niklaslong" title="Ideas, Planning, & Feedback">🤔</a> <a href="https://github.com/AleoHQ/snarkOS/pulls?q=is%3Apr+reviewed-by%3Aniklaslong" title="Reviewed Pull Requests">👀</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/collinc97"><img src="https://avatars.githubusercontent.com/u/16715212?v=4?s=100" width="100px;" alt="Collin Chin"/><br /><sub><b>Collin Chin</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=collinc97" title="Code">💻</a> <a href="https://github.com/AleoHQ/snarkOS/commits?author=collinc97" title="Documentation">📖</a> <a href="https://github.com/AleoHQ/snarkOS/pulls?q=is%3Apr+reviewed-by%3Acollinc97" title="Reviewed Pull Requests">👀</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/iamalwaysuncomfortable"><img src="https://avatars.githubusercontent.com/u/26438809?v=4?s=100" width="100px;" alt="Mike Turner"/><br /><sub><b>Mike Turner</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=iamalwaysuncomfortable" title="Code">💻</a> <a href="https://github.com/AleoHQ/snarkOS/commits?author=iamalwaysuncomfortable" title="Documentation">📖</a> <a href="https://github.com/AleoHQ/snarkOS/pulls?q=is%3Apr+reviewed-by%3Aiamalwaysuncomfortable" title="Reviewed Pull Requests">👀</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://gakonst.com/"><img src="https://avatars.githubusercontent.com/u/17802178?v=4?s=100" width="100px;" alt="Georgios Konstantopoulos"/><br /><sub><b>Georgios Konstantopoulos</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=gakonst" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/kobigurk"><img src="https://avatars.githubusercontent.com/u/3520024?v=4?s=100" width="100px;" alt="Kobi Gurkan"/><br /><sub><b>Kobi Gurkan</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=kobigurk" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/jules"><img src="https://avatars.githubusercontent.com/u/30194392?v=4?s=100" width="100px;" alt="jules"/><br /><sub><b>jules</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=jules" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Protryon"><img src="https://avatars.githubusercontent.com/u/8600837?v=4?s=100" width="100px;" alt="Max Bruce"/><br /><sub><b>Max Bruce</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=Protryon" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/daniilr"><img src="https://avatars.githubusercontent.com/u/1212355?v=4?s=100" width="100px;" alt="Daniil"/><br /><sub><b>Daniil</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=daniilr" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/akattis"><img src="https://avatars.githubusercontent.com/u/4978114?v=4?s=100" width="100px;" alt="akattis"/><br /><sub><b>akattis</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=akattis" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/wcannon"><img src="https://avatars.githubusercontent.com/u/910589?v=4?s=100" width="100px;" alt="William Cannon"/><br /><sub><b>William Cannon</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=wcannon" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/sadroeck"><img src="https://avatars.githubusercontent.com/u/31270289?v=4?s=100" width="100px;" alt="Sam De Roeck"/><br /><sub><b>Sam De Roeck</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=sadroeck" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/wcannon-aleo"><img src="https://avatars.githubusercontent.com/u/93155840?v=4?s=100" width="100px;" alt="wcannon-aleo"/><br /><sub><b>wcannon-aleo</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=wcannon-aleo" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/soft2dev"><img src="https://avatars.githubusercontent.com/u/35427355?v=4?s=100" width="100px;" alt="soft2dev"/><br /><sub><b>soft2dev</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=soft2dev" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/amousa11"><img src="https://avatars.githubusercontent.com/u/12452142?v=4?s=100" width="100px;" alt="Ali Mousa"/><br /><sub><b>Ali Mousa</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=amousa11" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://pyk.sh/"><img src="https://avatars.githubusercontent.com/u/2213646?v=4?s=100" width="100px;" alt="pyk"/><br /><sub><b>pyk</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=pyk" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/whalelephant"><img src="https://avatars.githubusercontent.com/u/18553484?v=4?s=100" width="100px;" alt="Belsy"/><br /><sub><b>Belsy</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=whalelephant" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/apruden2008"><img src="https://avatars.githubusercontent.com/u/39969542?v=4?s=100" width="100px;" alt="apruden2008"/><br /><sub><b>apruden2008</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=apruden2008" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://stackoverflow.com/story/fabianoprestes"><img src="https://avatars.githubusercontent.com/u/976612?v=4?s=100" width="100px;" alt="Fabiano Prestes"/><br /><sub><b>Fabiano Prestes</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=zosorock" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/HarukaMa"><img src="https://avatars.githubusercontent.com/u/861659?v=4?s=100" width="100px;" alt="Haruka"/><br /><sub><b>Haruka</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=HarukaMa" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/e4m7he6g"><img src="https://avatars.githubusercontent.com/u/95574065?v=4?s=100" width="100px;" alt="e4m7he6g"/><br /><sub><b>e4m7he6g</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=e4m7he6g" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/w4ll3"><img src="https://avatars.githubusercontent.com/u/8595904?v=4?s=100" width="100px;" alt="Gregório Granado Magalhães"/><br /><sub><b>Gregório Granado Magalhães</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=w4ll3" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://stake.nodes.guru/"><img src="https://avatars.githubusercontent.com/u/44749897?v=4?s=100" width="100px;" alt="Evgeny Garanin"/><br /><sub><b>Evgeny Garanin</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=evgeny-garanin" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/macro-ss"><img src="https://avatars.githubusercontent.com/u/59944291?v=4?s=100" width="100px;" alt="Macro Hoober"/><br /><sub><b>Macro Hoober</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=macro-ss" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/code-pangolin"><img src="https://avatars.githubusercontent.com/u/89436546?v=4?s=100" width="100px;" alt="code-pangolin"/><br /><sub><b>code-pangolin</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=code-pangolin" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/kaola526"><img src="https://avatars.githubusercontent.com/u/88829586?v=4?s=100" width="100px;" alt="kaola526"/><br /><sub><b>kaola526</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=kaola526" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/clarenous"><img src="https://avatars.githubusercontent.com/u/18611530?v=4?s=100" width="100px;" alt="clarenous"/><br /><sub><b>clarenous</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=clarenous" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/unordered-set"><img src="https://avatars.githubusercontent.com/u/78592281?v=4?s=100" width="100px;" alt="Kostyan"/><br /><sub><b>Kostyan</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=unordered-set" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/austinabell"><img src="https://avatars.githubusercontent.com/u/24993711?v=4?s=100" width="100px;" alt="Austin Abell"/><br /><sub><b>Austin Abell</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=austinabell" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/yelhousni"><img src="https://avatars.githubusercontent.com/u/16170090?v=4?s=100" width="100px;" alt="Youssef El Housni"/><br /><sub><b>Youssef El Housni</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=yelhousni" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ghostant-1017"><img src="https://avatars.githubusercontent.com/u/53888545?v=4?s=100" width="100px;" alt="ghostant-1017"/><br /><sub><b>ghostant-1017</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=ghostant-1017" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://pencil.li/"><img src="https://avatars.githubusercontent.com/u/5947268?v=4?s=100" width="100px;" alt="Miguel Gargallo"/><br /><sub><b>Miguel Gargallo</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=miguelgargallo" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/wang384670111"><img src="https://avatars.githubusercontent.com/u/78151109?v=4?s=100" width="100px;" alt="Chines Wang"/><br /><sub><b>Chines Wang</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=wang384670111" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/ayushgw"><img src="https://avatars.githubusercontent.com/u/14152340?v=4?s=100" width="100px;" alt="Ayush Goswami"/><br /><sub><b>Ayush Goswami</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=ayushgw" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/timsmith1337"><img src="https://avatars.githubusercontent.com/u/77958700?v=4?s=100" width="100px;" alt="Tim - o2Stake"/><br /><sub><b>Tim - o2Stake</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=timsmith1337" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/liusen-adalab"><img src="https://avatars.githubusercontent.com/u/74092505?v=4?s=100" width="100px;" alt="liu-sen"/><br /><sub><b>liu-sen</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=liusen-adalab" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Pa1amar"><img src="https://avatars.githubusercontent.com/u/20955327?v=4?s=100" width="100px;" alt="Palamar"/><br /><sub><b>Palamar</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=Pa1amar" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/swift-mx"><img src="https://avatars.githubusercontent.com/u/80231732?v=4?s=100" width="100px;" alt="swift-mx"/><br /><sub><b>swift-mx</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=swift-mx" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/dtynn"><img src="https://avatars.githubusercontent.com/u/1426666?v=4?s=100" width="100px;" alt="Caesar Wang"/><br /><sub><b>Caesar Wang</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=dtynn" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/paulip1792"><img src="https://avatars.githubusercontent.com/u/52645166?v=4?s=100" width="100px;" alt="Paul IP"/><br /><sub><b>Paul IP</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=paulip1792" title="Code">💻</a></td>
+    </tr>
+    <tr>
+      <td align="center" valign="top" width="14.28%"><a href="https://philipglazman.com/"><img src="https://avatars.githubusercontent.com/u/8378656?v=4?s=100" width="100px;" alt="Philip Glazman"/><br /><sub><b>Philip Glazman</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=philipglazman" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/Avadon"><img src="https://avatars.githubusercontent.com/u/404177?v=4?s=100" width="100px;" alt="Ruslan Nigmatulin"/><br /><sub><b>Ruslan Nigmatulin</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=Avadon" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://www.garillot.net/"><img src="https://avatars.githubusercontent.com/u/4142?v=4?s=100" width="100px;" alt="François Garillot"/><br /><sub><b>François Garillot</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=huitseeker" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/aolcr"><img src="https://avatars.githubusercontent.com/u/67066732?v=4?s=100" width="100px;" alt="aolcr"/><br /><sub><b>aolcr</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=aolcr" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/zvolin"><img src="https://avatars.githubusercontent.com/u/34972409?v=4?s=100" width="100px;" alt="Maciej Zwoliński"/><br /><sub><b>Maciej Zwoliński</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=zvolin" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://www.linkedin.com/in/ignacio-avecilla-39386a191/"><img src="https://avatars.githubusercontent.com/u/63374472?v=4?s=100" width="100px;" alt="Nacho Avecilla"/><br /><sub><b>Nacho Avecilla</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=IAvecilla" title="Code">💻</a></td>
+      <td align="center" valign="top" width="14.28%"><a href="https://github.com/features/security"><img src="https://avatars.githubusercontent.com/u/27347476?v=4?s=100" width="100px;" alt="Dependabot"/><br /><sub><b>Dependabot</b></sub></a><br /><a href="https://github.com/AleoHQ/snarkOS/commits?author=dependabot" title="Code">💻</a></td>
+    </tr>
+  </tbody>
+  <tfoot>
+    <tr>
+      <td align="center" size="13px" colspan="7">
+        <img src="https://raw.githubusercontent.com/all-contributors/all-contributors-cli/1b8533af435da9854653492b1327a23a4dbd0a10/assets/logo-small.svg">
+          <a href="https://all-contributors.js.org/docs/en/bot/usage">Add your contributions</a>
+        </img>
+      </td>
+    </tr>
+  </tfoot>
+</table>
+
+<!-- markdownlint-restore -->
+<!-- prettier-ignore-end -->
+
+<!-- ALL-CONTRIBUTORS-LIST:END -->
+
+This project follows the [all-contributors](https://github.com/all-contributors/all-contributors) specification. Contributions of any kind welcome!
+
+## 8. License
 
 We welcome all contributions to `snarkOS`. Please refer to the [license](#7-license) for the terms of contributions.
 
