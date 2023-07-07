@@ -873,6 +873,10 @@ pub mod prop_tests {
             Gateway::new(account, self.worker_storage.to_storage(), dev).unwrap()
         }
 
+        pub fn is_valid(&self) -> bool {
+            self.committee_input.is_valid() && self.workers_count < MAX_WORKERS
+        }
+
         pub async fn generate_workers(
             &self,
             gateway: &Gateway<CurrentNetwork>,
