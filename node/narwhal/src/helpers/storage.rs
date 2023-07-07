@@ -288,7 +288,7 @@ impl<N: Network> Storage<N> {
         // If the certificate's *previous* round is greater than the GC round, ensure the previous certificates exists.
         if previous_round > gc_round {
             // Retrieve the committee for the previous round.
-            let Some(previous_committee) = self.get_committee_for_round(previous_round) else {
+            if self.get_committee_for_round(previous_round).is_none() {
                 bail!("Missing committee for the previous round {previous_round} in storage (gc={gc_round})");
             };
             // Ensure storage contains all declared previous certificates (up to GC).
