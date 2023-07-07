@@ -18,11 +18,36 @@ use indexmap::IndexMap;
 use std::collections::HashSet;
 
 #[derive(Clone, Debug, PartialEq)]
+struct CommitteeMembers<N: Network> {
+    /// total stake of all `members`
+    total_stake: u64,
+    /// A map of `address` to `stake`.
+    members: IndexMap<Address<N>, u64>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub struct Committee<N: Network> {
     /// The current round number.
     round: u64,
-    /// A map of `address` to `stake`.
-    members: IndexMap<Address<N>, u64>,
+    /// The current committee members in this `round`
+    committee: CommitteeMembers<N>,
+}
+
+impl<N: Network> CommitteeMembers<N> {
+    /// Initializes a new `CommitteeMembers` instance. Precomputes `total_stake`.
+    pub fn new(members: IndexMap<Address<N>, u64>) -> Result<Self> {
+        // Compute the total power of the committee once when members are added/removed and/or their
+        // individual stakes change.
+        let mut power = 0u64;
+        for stake in members.values() {
+            // Accumulate the stake, checking for overflow.
+            power = match power.checked_add(*stake) {
+                Some(power) => power,
+                None => bail!("Failed to calculate total stake - overflow detected"),
+            };
+        }
+        Ok(Self { total_stake: power, members })
+    }
 }
 
 impl<N: Network> Committee<N> {
@@ -33,14 +58,15 @@ impl<N: Network> Committee<N> {
         // Ensure there are at least 4 members.
         ensure!(members.len() >= 4, "Committee must have at least 4 members");
         // Return the new committee.
-        Ok(Self { round, members })
+        let committee = CommitteeMembers::new(members)?;
+        Ok(Self { round, committee })
     }
 
     /// Returns a new `Committee` instance for the next round.
     /// TODO (howardwu): Add arguments for members (and stake) 1) to be added, 2) to be updated, and 3) to be removed.
     pub fn to_next_round(&self) -> Self {
         // Return the new committee.
-        Self { round: self.round.saturating_add(1), members: self.members.clone() }
+        Self { round: self.round.saturating_add(1), committee: self.committee.clone() }
     }
 }
 
@@ -52,65 +78,54 @@ impl<N: Network> Committee<N> {
 
     /// Returns the committee members alongside their stake.
     pub fn members(&self) -> &IndexMap<Address<N>, u64> {
-        &self.members
+        &self.committee.members
     }
 
     /// Returns the number of validators in the committee.
     pub fn committee_size(&self) -> usize {
-        self.members.len()
+        self.committee.members.len()
     }
 
     /// Returns `true` if the given address is in the committee.
     pub fn is_committee_member(&self, address: Address<N>) -> bool {
-        self.members.contains_key(&address)
+        self.committee.members.contains_key(&address)
     }
 
     /// Returns `true` if the combined stake for the given addresses reaches the quorum threshold.
     /// This method takes in a `HashSet` to guarantee that the given addresses are unique.
-    pub fn is_quorum_threshold_reached(&self, addresses: &HashSet<Address<N>>) -> Result<bool> {
+    pub fn is_quorum_threshold_reached(&self, addresses: &HashSet<Address<N>>) -> bool {
         // Compute the combined stake for the given addresses.
         let mut stake = 0u64;
+
         for address in addresses {
-            stake = match stake.checked_add(self.get_stake(*address)) {
-                Some(stake) => stake,
-                None => bail!("Overflow when computing combined stake to check quorum threshold"),
-            };
+            stake += self.get_stake(*address);
         }
         // Return whether the combined stake reaches the quorum threshold.
-        Ok(stake >= self.quorum_threshold()?)
+        stake >= self.quorum_threshold()
     }
 
     /// Returns the amount of stake for the given address.
     pub fn get_stake(&self, address: Address<N>) -> u64 {
-        self.members.get(&address).copied().unwrap_or_default()
+        self.committee.members.get(&address).copied().unwrap_or_default()
     }
 
     /// Returns the amount of stake required to reach the availability threshold `(f + 1)`.
-    pub fn availability_threshold(&self) -> Result<u64> {
+    pub fn availability_threshold(&self) -> u64 {
         // Assuming `N = 3f + 1 + k`, where `0 <= k < 3`,
         // then `(N + 2) / 3 = f + 1 + k/3 = f + 1`.
-        Ok(self.total_stake()?.saturating_add(2) / 3)
+        self.total_stake().saturating_add(2) / 3
     }
 
     /// Returns the amount of stake required to reach a quorum threshold `(2f + 1)`.
-    pub fn quorum_threshold(&self) -> Result<u64> {
+    pub fn quorum_threshold(&self) -> u64 {
         // Assuming `N = 3f + 1 + k`, where `0 <= k < 3`,
         // then `(2N + 3) / 3 = 2f + 1 + (2k + 2)/3 = 2f + 1 + k = N - f`.
-        Ok(self.total_stake()?.saturating_mul(2) / 3 + 1)
+        self.total_stake().saturating_mul(2) / 3 + 1
     }
 
     /// Returns the total amount of stake in the committee `(3f + 1)`.
-    pub fn total_stake(&self) -> Result<u64> {
-        // Compute the total power of the committee.
-        let mut power = 0u64;
-        for stake in self.members.values() {
-            // Accumulate the stake, checking for overflow.
-            power = match power.checked_add(*stake) {
-                Some(power) => power,
-                None => bail!("Failed to calculate total stake - overflow detected"),
-            };
-        }
-        Ok(power)
+    pub fn total_stake(&self) -> u64 {
+        self.committee.total_stake
     }
 }
 
@@ -203,14 +218,14 @@ pub mod prop_tests {
         }
 
         assert_eq!(committee.committee_size(), validators.len());
-        assert_eq!(committee.total_stake().unwrap(), total_stake);
+        assert_eq!(committee.total_stake(), total_stake);
         for v in validators.iter() {
             let address = v.get_account().address();
             assert!(committee.is_committee_member(address));
             assert_eq!(committee.get_stake(address), v.stake);
         }
-        let quorum_threshold = committee.quorum_threshold().unwrap();
-        let availability_threshold = committee.availability_threshold().unwrap();
+        let quorum_threshold = committee.quorum_threshold();
+        let availability_threshold = committee.availability_threshold();
         // (2f + 1) + (f + 1) - 1 = 3f + 1 = N
         assert_eq!(quorum_threshold + availability_threshold - 1, total_stake);
     }
