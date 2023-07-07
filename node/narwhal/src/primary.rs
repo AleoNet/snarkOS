@@ -373,8 +373,10 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
+        // Check if our primary is far behind the peer.
+        let is_out_of_range = round > gc_round + self.storage.max_gc_rounds();
         // If our primary is far behind the peer, update our committee to the peer's round.
-        if round > gc_round + self.storage.max_gc_rounds() {
+        if is_out_of_range {
             // TODO (howardwu): Guard this to increment after quorum threshold is reached.
             // TODO (howardwu): After bullshark is implemented, we must use Aleo blocks to guide us to `tip-50` to know the committee.
             // If the certificate's round is greater than the current committee round, update the committee.
