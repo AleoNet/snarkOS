@@ -76,6 +76,7 @@ impl<N: Network> Gateway<N> {
     pub fn new(committee: Arc<RwLock<Committee<N>>>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
         // Initialize the gateway IP.
         let ip = match dev {
+            // TODO change dev to Option<u8>, otherwise there is potential overflow
             Some(dev) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev)),
             None => SocketAddr::from_str(&format!("0.0.0.0:{}", MEMORY_POOL_PORT)),
         }?;
@@ -791,5 +792,126 @@ impl<N: Network> Gateway<N> {
         }
 
         None
+    }
+}
+
+#[cfg(test)]
+pub mod gateway_tests {
+    use crate::{
+        helpers::{
+            committee_tests::{CommitteeInput, Validator},
+            init_worker_channels,
+            storage_tests::StorageInput,
+            WorkerSender,
+        },
+        Gateway,
+        Worker,
+        MAX_COMMITTEE_SIZE,
+        MAX_WORKERS,
+        MEMORY_POOL_PORT,
+    };
+    use indexmap::IndexMap;
+    use parking_lot::RwLock;
+    use snarkos_node_tcp::P2P;
+    use snarkvm::prelude::Testnet3;
+    use std::{
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+        sync::Arc,
+    };
+    use test_strategy::{proptest, Arbitrary};
+
+    type N = Testnet3;
+
+    #[derive(Arbitrary, Debug, Clone)]
+    pub struct GatewayInput {
+        #[filter(CommitteeInput::is_valid)]
+        pub committee_input: CommitteeInput,
+        pub node_validator: Validator,
+        pub dev: Option<u8>,
+        #[strategy(0..MAX_WORKERS)]
+        pub workers_count: u8,
+        pub worker_storage: StorageInput,
+    }
+
+    impl GatewayInput {
+        pub fn to_gateway(&self) -> Gateway<N> {
+            let committee = self.committee_input.to_committee().unwrap();
+            let account = self.node_validator.get_account();
+            let dev = self.dev.map(|dev| dev as u16);
+            Gateway::new(Arc::new(RwLock::new(committee)), account, dev).unwrap()
+        }
+
+        pub async fn generate_workers(
+            &self,
+            gateway: &Gateway<N>,
+        ) -> (IndexMap<u8, Worker<N>>, IndexMap<u8, WorkerSender<N>>) {
+            // Construct a map of the worker senders.
+            let mut tx_workers = IndexMap::new();
+            let mut workers = IndexMap::new();
+
+            // Initialize the workers.
+            for id in 0..self.workers_count {
+                // Construct the worker channels.
+                let (tx_worker, rx_worker) = init_worker_channels();
+                // Construct the worker instance.
+                let mut worker = Worker::new(id, gateway.clone(), self.worker_storage.to_storage()).unwrap();
+                // Run the worker instance.
+                worker.run(rx_worker).await.unwrap();
+
+                // Add the worker and the worker sender to maps
+                workers.insert(id, worker);
+                tx_workers.insert(id, tx_worker);
+            }
+            (workers, tx_workers)
+        }
+    }
+
+    #[proptest]
+    fn gateway_initialization(input: GatewayInput) {
+        let account = input.node_validator.get_account();
+        let address = account.address();
+
+        let gateway = match input.dev {
+            Some(dev) => {
+                let gateway = input.to_gateway();
+                let tcp_config = gateway.tcp().config();
+                assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
+                assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + (dev as u16)));
+                gateway
+            }
+            None => {
+                let gateway = input.to_gateway();
+                let tcp_config = gateway.tcp().config();
+                assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
+                assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT));
+                gateway
+            }
+        };
+        let tcp_config = gateway.tcp().config();
+        assert_eq!(tcp_config.max_connections, MAX_COMMITTEE_SIZE);
+        assert_eq!(gateway.account().address(), address);
+    }
+
+    #[proptest(async = "tokio")]
+    async fn gateway_start(#[filter(|x| x.dev.is_some())] input: GatewayInput) {
+        let Some(dev) = input.dev else { unreachable!() };
+        let mut gateway = input.to_gateway();
+        let tcp_config = gateway.tcp().config();
+        assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
+        assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + (dev as u16)));
+
+        let (workers, worker_senders) = input.generate_workers(&gateway).await;
+        match gateway.run(worker_senders).await {
+            Ok(_) => {
+                assert_eq!(
+                    gateway.local_ip(),
+                    SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), MEMORY_POOL_PORT + (dev as u16))
+                );
+                assert_eq!(gateway.num_workers(), workers.len() as u8);
+            }
+            Err(err) => {
+                unreachable!("Unexpected {err}");
+            }
+        }
     }
 }

@@ -113,3 +113,7 @@ features = [ "fs", "trace" ]
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
 features = [ "env-filter" ]
+
+[dev-dependencies]
+test-strategy = { git = "https://github.com/frozenlib/test-strategy/", branch = "master"}
+proptest = "1.0.0"

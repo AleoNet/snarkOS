@@ -267,3 +267,15 @@ impl<N: Network> Worker<N> {
         self.handles.lock().iter().for_each(|handle| handle.abort());
     }
 }
+
+#[cfg(test)]
+mod worker_tests {
+    use crate::helpers::storage_tests::StorageInput;
+    use test_strategy::Arbitrary;
+
+    #[derive(Arbitrary, Debug, Clone)]
+    pub struct WorkerInput {
+        pub id: u8,
+        pub storage: StorageInput,
+    }
+}
