@@ -45,7 +45,7 @@ pub const MAX_BATCH_DELAY: u64 = 2500; // ms
 pub const MAX_COMMITTEE_SIZE: u16 = 4; // members
 /// The maximum number of seconds before a proposed batch is considered expired.
 pub const MAX_EXPIRATION_TIME_IN_SECS: i64 = 10; // seconds
-/// The maximum number of round to store before garbage collecting.
+/// The maximum number of rounds to store before garbage collecting.
 pub const MAX_GC_ROUNDS: u64 = 50; // rounds
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
