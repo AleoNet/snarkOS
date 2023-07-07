@@ -451,7 +451,7 @@ pub mod tests {
         rounds: Vec<(u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)>,
         certificates: Vec<(Field<N>, BatchCertificate<N>)>,
         batch_ids: Vec<(Field<N>, u64)>,
-        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+        transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) {
         // Ensure the committees are well-formed.
         assert_eq!(storage.committees_iter().collect::<Vec<_>>(), committees);
@@ -462,7 +462,7 @@ pub mod tests {
         // Ensure the batch IDs are well-formed.
         assert_eq!(storage.batch_ids_iter().collect::<Vec<_>>(), batch_ids);
         // Ensure the transmissions are well-formed.
-        assert_eq!(storage.transmissions_iter().collect::<Vec<_>>(), transmissions);
+        assert_eq!(storage.transmissions_iter().collect::<HashMap<_, _>>(), transmissions);
     }
 
     /// Samples a random transmission.
