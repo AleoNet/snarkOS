@@ -114,7 +114,6 @@ mod tests {
         ledger::{coinbase::PuzzleCommitment, narwhal::TransmissionID},
         prelude::{Rng, TestRng},
     };
-    use test_strategy::{proptest, Arbitrary};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -175,6 +174,13 @@ mod tests {
         // Check empty again.
         assert!(pending.is_empty());
     }
+}
+
+#[cfg(test)]
+mod prop_tests {
+    use super::*;
+
+    use test_strategy::{proptest, Arbitrary};
 
     #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
     pub struct Item {
@@ -188,8 +194,8 @@ mod tests {
     }
 
     impl PendingInput {
-        pub fn to_pending(&self) -> Pending<Item> {
-            let pending = Pending::<Item>::new();
+        pub fn to_pending(&self) -> Pending<Item, ()> {
+            let pending = Pending::<Item, ()>::new();
             for i in 0..self.count {
                 pending.insert(Item { id: i }, SocketAddr::from(([127, 0, 0, 1], i as u16)), None);
             }
@@ -199,19 +205,18 @@ mod tests {
 
     #[proptest]
     fn test_pending_proptest(input: PendingInput) {
-        println!("input: {:?}", input);
         let pending = input.to_pending();
         assert_eq!(pending.len(), input.count);
         assert!(!pending.is_empty());
         assert!(!pending.contains(Item { id: input.count + 1 }));
         assert_eq!(pending.get(Item { id: input.count + 1 }), None);
-        assert!(!pending.remove(Item { id: input.count + 1 }));
+        assert!(pending.remove(Item { id: input.count + 1 }, None).is_none());
         for i in 0..input.count {
             assert!(pending.contains(Item { id: i }));
             let peer_ip = SocketAddr::from(([127, 0, 0, 1], i as u16));
             assert!(pending.contains_peer(Item { id: i }, peer_ip));
             assert_eq!(pending.get(Item { id: i }), Some(HashSet::from([peer_ip])));
-            assert!(pending.remove(Item { id: i }));
+            assert!(pending.remove(Item { id: i }, None).is_some());
         }
         assert!(pending.is_empty());
     }

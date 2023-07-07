@@ -12,28 +12,28 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod channels;
+pub mod channels;
 pub use channels::*;
 
-mod codec;
+pub mod codec;
 pub use codec::*;
 
-mod committee;
+pub mod committee;
 pub use committee::*;
 
-mod partition;
+pub mod partition;
 pub use partition::*;
 
-mod pending;
+pub mod pending;
 pub use pending::*;
 
-mod ready;
+pub mod ready;
 pub use ready::*;
 
-mod resolver;
+pub mod resolver;
 pub use resolver::*;
 
-mod storage;
+pub mod storage;
 pub use storage::*;
 
 /// Formats an ID into a truncated identifier (for logging purposes).

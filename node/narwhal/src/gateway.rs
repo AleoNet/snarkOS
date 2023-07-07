@@ -796,12 +796,12 @@ impl<N: Network> Gateway<N> {
 }
 
 #[cfg(test)]
-pub mod gateway_tests {
+pub mod prop_tests {
     use crate::{
         helpers::{
-            committee_tests::{CommitteeInput, Validator},
+            committee::prop_tests::{CommitteeInput, Validator},
             init_worker_channels,
-            storage_tests::StorageInput,
+            storage::prop_tests::StorageInput,
             WorkerSender,
         },
         Gateway,

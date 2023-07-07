@@ -269,8 +269,9 @@ impl<N: Network> Worker<N> {
 }
 
 #[cfg(test)]
-mod worker_tests {
-    use crate::helpers::storage_tests::StorageInput;
+mod prop_tests {
+    use crate::helpers::storage::prop_tests::StorageInput;
+
     use test_strategy::Arbitrary;
 
     #[derive(Arbitrary, Debug, Clone)]

@@ -115,17 +115,17 @@ impl<N: Network> Committee<N> {
 }
 
 #[cfg(test)]
-pub mod committee_tests {
+pub mod prop_tests {
     use crate::helpers::Committee;
+    use snarkos_account::Account;
+
     use anyhow::Result;
     use indexmap::IndexMap;
     use proptest::sample::size_range;
     use rand::SeedableRng;
-    use snarkos_account::Account;
-    use snarkvm::prelude::Testnet3;
     use test_strategy::{proptest, Arbitrary};
 
-    type N = Testnet3;
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     #[derive(Arbitrary, Debug, Clone)]
     pub struct CommitteeInput {
@@ -143,7 +143,7 @@ pub mod committee_tests {
     }
 
     impl Validator {
-        pub fn get_account(&self) -> Account<N> {
+        pub fn get_account(&self) -> Account<CurrentNetwork> {
             match Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(self.account_seed)) {
                 Ok(account) => account,
                 Err(err) => panic!("Failed to create account {err}"),
@@ -152,7 +152,7 @@ pub mod committee_tests {
     }
 
     impl CommitteeInput {
-        pub fn to_committee(&self) -> Result<Committee<N>> {
+        pub fn to_committee(&self) -> Result<Committee<CurrentNetwork>> {
             let mut index_map = IndexMap::new();
             for validator in self.validators.iter() {
                 index_map.insert(validator.get_account().address(), validator.stake);
@@ -172,7 +172,7 @@ pub mod committee_tests {
         let current_members = committee.members();
         assert_eq!(committee.round(), current_round);
 
-        let committee = committee.to_next_round().unwrap();
+        let committee = committee.to_next_round();
         assert_eq!(committee.round(), current_round + 1);
         assert_eq!(committee.members(), current_members);
     }
