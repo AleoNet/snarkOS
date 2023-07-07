@@ -249,7 +249,7 @@ impl<N: Network> Storage<N> {
     /// This method ensures the following invariants:
     /// - The certificate ID does not already exist in storage.
     /// - The batch ID does not already exist in storage.
-    /// - All transmissions declared in the certificate exist in storage (up to GC).
+    /// - All transmissions declared in the certificate are provided or exist in storage (up to GC).
     /// - All previous certificates declared in the certificate exist in storage (up to GC).
     /// - All previous certificates are for the previous round (i.e. round - 1).
     /// - The previous certificates reached the quorum threshold (2f+1).
@@ -305,17 +305,6 @@ impl<N: Network> Storage<N> {
             // Ensure the previous round exists in storage.
             if !self.contains_round(previous_round) {
                 bail!("Missing state for the previous round {previous_round} in storage (gc={gc_round})");
-            }
-        }
-
-        // If the certificate's round is greater than the GC round, ensure the transmissions exists.
-        if round > gc_round {
-            // Ensure storage contains all declared transmissions (up to GC).
-            for transmission_id in certificate.transmission_ids() {
-                // Ensure storage contains the declared transmission ID.
-                if !self.contains_transmission(*transmission_id) {
-                    bail!("Missing transmission {transmission_id} for certificate in round {round} (gc={gc_round})");
-                }
             }
         }
 
