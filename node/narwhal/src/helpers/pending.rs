@@ -22,23 +22,23 @@ use std::{
 use tokio::sync::oneshot;
 
 #[derive(Clone, Debug)]
-pub struct Pending<T: PartialEq + Eq + Hash> {
+pub struct Pending<T: PartialEq + Eq + Hash, V: Clone> {
     /// The map of pending `items` to `peer IPs` that have the item.
     pending: Arc<RwLock<HashMap<T, HashSet<SocketAddr>>>>,
     /// The optional callback queue.
     /// TODO (howardwu): Expire callbacks that have not been called after a certain amount of time,
     ///  or clear the callbacks that are older than a certain round.
-    callbacks: Arc<Mutex<HashMap<T, Vec<oneshot::Sender<()>>>>>,
+    callbacks: Arc<Mutex<HashMap<T, Vec<oneshot::Sender<V>>>>>,
 }
 
-impl<T: Copy + Clone + PartialEq + Eq + Hash> Default for Pending<T> {
+impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Default for Pending<T, V> {
     /// Initializes a new instance of the pending queue.
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<T: Copy + Clone + PartialEq + Eq + Hash> Pending<T> {
+impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Pending<T, V> {
     /// Initializes a new instance of the pending queue.
     pub fn new() -> Self {
         Self { pending: Default::default(), callbacks: Default::default() }
@@ -69,31 +69,37 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> Pending<T> {
         self.pending.read().get(&item.into()).cloned()
     }
 
-    /// Inserts the specified `item` and `peer IP` to the pending queue.
+    /// Inserts the specified `item` and `peer IP` to the pending queue,
+    /// returning `true` if the `peer IP` was newly-inserted into the entry for the `item`.
+    ///
     /// In addition, an optional `callback` may be provided, that is triggered upon removal.
-    /// If the `item` already exists, the `peer IP` is added to the existing entry.
-    pub fn insert(&self, item: impl Into<T>, peer_ip: SocketAddr, callback: Option<oneshot::Sender<()>>) {
+    /// Note: The callback, if provided, is **always** inserted into the callback queue.
+    pub fn insert(&self, item: impl Into<T>, peer_ip: SocketAddr, callback: Option<oneshot::Sender<V>>) -> bool {
         let item = item.into();
         // Insert the peer IP into the pending queue.
-        self.pending.write().entry(item).or_default().insert(peer_ip);
+        let result = self.pending.write().entry(item).or_default().insert(peer_ip);
         // If a callback is provided, insert it into the callback queue.
         if let Some(callback) = callback {
             self.callbacks.lock().entry(item).or_default().push(callback);
         }
+        // Return the result.
+        result
     }
 
     /// Removes the specified `item` from the pending queue.
-    /// If the `item` exists and is removed, `true` is returned.
-    /// If the `item` does not exist, `false` is returned.
-    pub fn remove(&self, item: impl Into<T>) -> bool {
+    /// If the `item` exists and is removed, the peer IPs are returned.
+    /// If the `item` does not exist, `None` is returned.
+    pub fn remove(&self, item: impl Into<T>, callback_value: Option<V>) -> Option<HashSet<SocketAddr>> {
         let item = item.into();
         // Remove the item from the pending queue.
-        let result = self.pending.write().remove(&item).is_some();
+        let result = self.pending.write().remove(&item);
         // Remove the callback for the item, and process any remaining callbacks.
         if let Some(callbacks) = self.callbacks.lock().remove(&item) {
-            for callback in callbacks {
+            if let Some(callback_value) = callback_value {
                 // Send a notification to the callback.
-                callback.send(()).ok();
+                for callback in callbacks {
+                    callback.send(callback_value.clone()).ok();
+                }
             }
         }
         // Return the result.
@@ -116,7 +122,7 @@ mod tests {
         let rng = &mut TestRng::default();
 
         // Initialize the ready queue.
-        let pending = Pending::<TransmissionID<CurrentNetwork>>::new();
+        let pending = Pending::<TransmissionID<CurrentNetwork>, ()>::new();
 
         // Check initially empty.
         assert!(pending.is_empty());
@@ -133,9 +139,9 @@ mod tests {
         let addr_3 = SocketAddr::from(([127, 0, 0, 1], 3456));
 
         // Insert the commitments.
-        pending.insert(commitment_1, addr_1, None);
-        pending.insert(commitment_2, addr_2, None);
-        pending.insert(commitment_3, addr_3, None);
+        assert!(pending.insert(commitment_1, addr_1, None));
+        assert!(pending.insert(commitment_2, addr_2, None));
+        assert!(pending.insert(commitment_3, addr_3, None));
 
         // Check the number of SocketAddrs.
         assert_eq!(pending.len(), 3);
@@ -160,10 +166,10 @@ mod tests {
         assert_eq!(pending.get(unknown_id), None);
 
         // Check remove.
-        assert!(pending.remove(commitment_1));
-        assert!(pending.remove(commitment_2));
-        assert!(pending.remove(commitment_3));
-        assert!(!pending.remove(unknown_id));
+        assert!(pending.remove(commitment_1, None).is_some());
+        assert!(pending.remove(commitment_2, None).is_some());
+        assert!(pending.remove(commitment_3, None).is_some());
+        assert!(pending.remove(unknown_id, None).is_none());
 
         // Check empty again.
         assert!(pending.is_empty());

@@ -13,16 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{
-        assign_to_worker,
-        fmt_id,
-        init_worker_channels,
-        Committee,
-        Pending,
-        PrimaryReceiver,
-        PrimarySender,
-        Storage,
-    },
+    helpers::{assign_to_worker, init_worker_channels, Committee, Pending, PrimaryReceiver, PrimarySender, Storage},
     BatchPropose,
     BatchSignature,
     CertificateRequest,
@@ -33,21 +24,23 @@ use crate::{
     MAX_BATCH_DELAY,
     MAX_EXPIRATION_TIME_IN_SECS,
     MAX_TIMESTAMP_DELTA_IN_SECS,
+    MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
 };
 use snarkos_account::Account;
 use snarkvm::{
     console::prelude::*,
-    ledger::narwhal::{Batch, BatchCertificate, BatchHeader, Data},
+    ledger::narwhal::{Batch, BatchCertificate, BatchHeader},
     prelude::{Field, Signature},
 };
 
+use async_recursion::async_recursion;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
 use parking_lot::{Mutex, RwLock};
-use std::{collections::HashSet, future::Future, net::SocketAddr, sync::Arc};
+use std::{collections::HashSet, future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use time::OffsetDateTime;
-use tokio::{sync::oneshot, task::JoinHandle};
+use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
 
 /// Returns the current UTC epoch timestamp.
 fn now() -> i64 {
@@ -67,7 +60,7 @@ pub struct Primary<N: Network> {
     /// The currently-proposed batch, along with its `(signature, timestamp)` entries.
     proposed_batch: Arc<RwLock<Option<(Batch<N>, IndexMap<Signature<N>, i64>)>>>,
     /// The pending certificates queue.
-    pending: Pending<Field<N>>,
+    pending: Pending<Field<N>, BatchCertificate<N>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -160,11 +153,6 @@ impl<N: Network> Primary<N> {
     pub fn proposed_batch(&self) -> Option<Batch<N>> {
         self.proposed_batch.read().as_ref().map(|(batch, _)| batch.clone())
     }
-
-    /// Returns the pending certificates queue.
-    pub const fn pending(&self) -> &Pending<Field<N>> {
-        &self.pending
-    }
 }
 
 impl<N: Network> Primary<N> {
@@ -215,16 +203,14 @@ impl<N: Network> Primary<N> {
 
         /* Proceeding to sign & propose the batch. */
 
-        // TODO (howardwu): Primary is no longer signing for the previous round.
-
         // Initialize a map of the transmissions.
         let mut transmissions = IndexMap::new();
-        // Drain the workers.
+        // Drain the workers of the required number of transmissions.
+        let num_transmissions_per_worker = MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
         for worker in self.workers.read().iter() {
             // TODO (howardwu): Perform one final filter against the ledger service.
-            transmissions.extend(worker.drain());
+            transmissions.extend(worker.take(num_transmissions_per_worker));
         }
-        // TODO (howardwu): Truncate to a maximum number of transmissions.
 
         // Initialize the RNG.
         let rng = &mut rand::thread_rng();
@@ -233,7 +219,7 @@ impl<N: Network> Primary<N> {
         // Sign the batch.
         let batch = Batch::new(private_key, round, transmissions, previous_certificates, rng)?;
         // Broadcast the batch to all validators for signing.
-        self.gateway.broadcast(Event::BatchPropose(BatchPropose::new(Data::Object(batch.to_header()?))));
+        self.gateway.broadcast(Event::BatchPropose(batch.to_header()?.into()));
         // Set the proposed batch.
         *self.proposed_batch.write() = Some((batch, Default::default()));
         Ok(())
@@ -245,16 +231,48 @@ impl<N: Network> Primary<N> {
     /// 1. Verify the batch.
     /// 2. Sign the batch.
     /// 3. Broadcast the signature back to the validator.
+    ///
+    /// If our primary is ahead of the peer, we will not sign the batch.
+    /// If our primary is behind the peer, but within GC range, we will sync up to the peer's round, and then sign the batch.
     async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
+        let BatchPropose { round: batch_round, batch_header } = batch_propose;
+
+        // Retrieve the committee round.
+        let committee_round = self.committee.read().round();
+        // TODO (howardwu): Narwhal paper implies `round`, Bullshark paper implies `round + 1`.
+        // Ensure the round in the proposed batch matches the committee round.
+        if committee_round > batch_round + 1 {
+            bail!("Primary is on round {committee_round}, and no longer signing for round {batch_round}")
+        }
+        // Ensure the round declared in the batch is within GC range of the committee round.
+        if committee_round + self.storage.max_gc_rounds() <= batch_round {
+            bail!("Round {batch_round} is too far in the future")
+        }
+
+        // Check if the primary is still signing for the round declared in the batch.
+        if let Some(round) = self.proposed_batch.read().as_ref().map(|(batch, _)| batch.round()) {
+            if round > batch_round {
+                bail!("Our primary is no longer signing for round {batch_round}")
+            }
+        }
+
+        // TODO (howardwu): Ensure I have not signed this round for this author before. If so, do not sign.
+
         // Deserialize the batch header.
-        let batch_header = batch_propose.batch_header.deserialize().await?;
+        let batch_header = batch_header.deserialize().await?;
+        // Ensure the round matches in the batch header.
+        if batch_round != batch_header.round() {
+            bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
+        }
         // Ensure the batch header from the peer is valid.
-        let batch_id = self.fetch_and_check_batch_from_peer(peer_ip, &batch_header).await?;
+        self.fetch_and_check_batch_from_peer(peer_ip, &batch_header).await?;
 
         /* Proceeding to sign the batch. */
 
         // Initialize an RNG.
         let rng = &mut rand::thread_rng();
+        // Retrieve the batch ID.
+        let batch_id = batch_header.batch_id();
         // Generate a timestamp.
         let timestamp = now();
         // Sign the batch ID.
@@ -340,6 +358,7 @@ impl<N: Network> Primary<N> {
     ///   - The previous certificates are valid.
     ///   - The previous certificates have reached quorum threshold.
     /// 2. Attempt to propose a batch, if there are enough certificates to reach quorum threshold for the current round.
+    #[async_recursion]
     async fn process_batch_certificate_from_peer(
         &self,
         peer_ip: SocketAddr,
@@ -354,67 +373,29 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
-        // TODO (howardwu): Ensure the certificate is well-formed. If not, do not store.
-        // TODO (howardwu): Ensure the address is in the committee of the specified round. If not, do not store.
-        // TODO (howardwu): Ensure the previous certificates are for round-1. If not, do not store.
-        // TODO (howardwu): Ensure the previous certificates have reached 2f+1. If not, do not store.
-
-        // Ensure the primary has all of the transmissions.
-        self.fetch_missing_transmissions(peer_ip, certificate.batch_header()).await?;
-        // Ensure the primary has all of the previous certificates.
-        self.fetch_missing_certificates(peer_ip, certificate.batch_header()).await?;
-
-        // Check if the certificate needs to be stored.
-        if !self.storage.contains_certificate(certificate.certificate_id()) {
-            // Store the batch certificate.
-            self.storage.insert_certificate(certificate)?;
-            debug!("Primary - Stored certificate for round {round} from peer '{peer_ip}'");
-
+        // Check if our primary is far behind the peer.
+        let is_out_of_range = round > gc_round + self.storage.max_gc_rounds();
+        // If our primary is far behind the peer, update our committee to the peer's round.
+        if is_out_of_range {
             // TODO (howardwu): Guard this to increment after quorum threshold is reached.
+            // TODO (howardwu): After bullshark is implemented, we must use Aleo blocks to guide us to `tip-50` to know the committee.
             // If the certificate's round is greater than the current committee round, update the committee.
             while self.committee.read().round() < round {
                 self.update_committee_to_next_round();
             }
         }
 
-        // // Retrieve the committee round.
-        // let committee_round = self.committee.read().round();
-        // // Ensure the certificate round is one less than the committee round.
-        // if round + 1 != committee_round {
-        //     bail!("Primary is on round {committee_round}, and received a certificate for round {round}")
-        // }
-        // // If there is no proposed batch, attempt to propose a batch.
-        // if let Err(e) = self.propose_batch() {
-        //     error!("Failed to propose a batch - {e}");
-        // }
-        Ok(())
-    }
+        // Fetch the batch and ensure it is well-formed.
+        self.fetch_and_check_batch_from_peer(peer_ip, certificate.batch_header()).await?;
 
-    /// Handles the incoming certificate request.
-    fn process_certificate_request(&self, peer_ip: SocketAddr, request: CertificateRequest<N>) {
-        // Attempt to retrieve the certificate.
-        if let Some(certificate) = self.storage.get_certificate(request.certificate_id) {
-            // Send the certificate to the peer.
-            self.send_certificate_response(peer_ip, certificate);
-        }
-    }
+        // TODO (howardwu): Ensure the certificate is well-formed. If not, do not store.
+        //  - Check the signatures reach quorum threshold.
 
-    /// Handles the incoming certificate response.
-    /// This method will recursively fetch any missing certificates (down to the GC round).
-    async fn process_certificate_response(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) -> Result<()> {
-        let certificate = response.certificate;
-        // Check if the peer IP exists in the pending queue for the given certificate ID.
-        if self.pending.get(certificate.certificate_id()).unwrap_or_default().contains(&peer_ip) {
-            // TODO: Validate the certificate.
-            // Remove the certificate ID from the pending queue.
-            self.pending.remove(certificate.certificate_id());
-            // Store the batch certificate (recursively fetching any missing previous certificates).
-            let self_clone = self.clone();
-            tokio::spawn(async move {
-                if let Err(e) = self_clone.process_batch_certificate_from_peer(peer_ip, certificate).await {
-                    warn!("Failed to store batch certificate from peer '{peer_ip}' - {e}");
-                }
-            });
+        // Check if the certificate needs to be stored.
+        if !self.storage.contains_certificate(certificate.certificate_id()) {
+            // Store the batch certificate.
+            self.storage.insert_certificate(certificate)?;
+            debug!("Primary - Stored certificate for round {round} from peer '{peer_ip}'");
         }
         Ok(())
     }
@@ -475,7 +456,7 @@ impl<N: Network> Primary<N> {
         let self_clone = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, certificate_request)) = rx_certificate_request.recv().await {
-                self_clone.process_certificate_request(peer_ip, certificate_request);
+                self_clone.send_certificate_response(peer_ip, certificate_request);
             }
         });
 
@@ -483,9 +464,7 @@ impl<N: Network> Primary<N> {
         let self_clone = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, certificate_response)) = rx_certificate_response.recv().await {
-                if let Err(e) = self_clone.process_certificate_response(peer_ip, certificate_response).await {
-                    warn!("Cannot process a certificate response from peer '{peer_ip}' - {e}");
-                }
+                self_clone.finish_certificate_request(peer_ip, certificate_response)
             }
         });
 
@@ -567,78 +546,66 @@ impl<N: Network> Primary<N> {
     ///   - Ensure the previous certificates are for the previous round (i.e. round - 1).
     ///   - Ensure the previous certificates have reached the quorum threshold.
     ///   - Ensure we have not already signed the batch ID.
-    async fn fetch_and_check_batch_from_peer(&self, peer_ip: SocketAddr, header: &BatchHeader<N>) -> Result<Field<N>> {
-        // Retrieve the batch ID.
-        let batch_id = header.batch_id();
+    #[async_recursion]
+    async fn fetch_and_check_batch_from_peer(&self, peer_ip: SocketAddr, batch_header: &BatchHeader<N>) -> Result<()> {
         // Retrieve the round.
-        let round = header.round();
-        // Retrieve the author.
-        let author = header.author();
-        // Retrieve the timestamp.
-        let timestamp = header.timestamp();
-
-        // TODO (howardwu): Ensure I have not signed this round for this author before. If so, do not sign.
+        let batch_round = batch_header.round();
 
         // Ensure this batch ID is new.
-        if self.storage.contains_batch(batch_id) {
-            match ((self.committee.read().round() as i64) - round as i64).abs() > 2 {
-                true => bail!("Batch ID has already been processed for round {round}"),
-                false => bail!("Recently stored this batch ID for round {round}"),
+        if self.storage.contains_batch(batch_header.batch_id()) {
+            match ((self.committee.read().round() as i64) - batch_round as i64).abs() > 2 {
+                true => bail!("Batch ID has already been processed for round {batch_round}"),
+                false => return Ok(()),
             }
         }
-        // Ensure the round in the proposed batch is within GC range of the committee round.
-        if self.committee.read().round() + self.storage.max_gc_rounds() <= round {
-            bail!("Round {round} is too far in the future")
+
+        // Ensure the primary has all of the transmissions.
+        self.fetch_missing_transmissions(peer_ip, batch_header).await?;
+        // Ensure the primary has all of the previous certificates.
+        let missing_certificates = self.fetch_missing_previous_certificates(peer_ip, batch_header).await?;
+        // Iterate through the missing certificates.
+        for batch_certificate in missing_certificates {
+            // Store the batch certificate (recursively fetching any missing previous certificates).
+            self.process_batch_certificate_from_peer(peer_ip, batch_certificate).await?;
         }
 
-        // TODO (howardwu): Refactor this.
-        if self.committee.read().round() < round {
-            // Ensure the primary has all of the certificates.
-            self.fetch_missing_certificates(peer_ip, &header).await?;
-        }
-        // Ensure the round in the proposed batch matches the committee round.
-        // TODO (howardwu): Narwhal paper implies `round`, Bullshark paper implies `round + 1`.
-        if self.committee.read().round() > round + 1 {
-            // The primary is no longer signing past rounds.
-            bail!("Primary is on round {}, and no longer signing for round {round}", self.committee.read().round())
-        }
-
-        // Retrieve the committee for the specified round.
-        // If the committee cannot be found, it means this round has exceed GC depth and we should not sign it.
-        let committee = self.committee.read().clone();
-        // TODO (howardwu): Enable this code to turn on dynamic committees.
-        // let Some(committee) = self.storage.get_committee_for_round(round) else {
-        //     bail!("Round {round} has exceeded the maximum GC depth")
-        // };
-        // Ensure the author is a member of the committee.
-        if !committee.is_committee_member(author) {
-            bail!("{author} is not a member of the committee")
+        // TODO (howardwu): Guard this to increment after quorum threshold is reached.
+        // TODO (howardwu): After bullshark is implemented, we must use Aleo blocks to guide us to `tip-50` to know the committee.
+        // If the certificate's round is greater than the current committee round, update the committee.
+        while self.committee.read().round() < batch_header.round() {
+            self.update_committee_to_next_round();
         }
 
         // Check the timestamp for liveness.
-        self.check_timestamp_for_liveness(timestamp)?;
+        self.check_timestamp_for_liveness(batch_header.timestamp())?;
 
-        // Ensure the primary has all of the transmissions.
-        self.fetch_missing_transmissions(peer_ip, &header).await?;
-        // Ensure the primary has all of the previous certificates.
-        self.fetch_missing_certificates(peer_ip, &header).await?;
+        // If the committee cannot be found, it means this round is either too old or too new (not within GC range).
+        let Some(committee) = self.storage.get_committee_for_round(batch_round) else {
+            bail!("Round {batch_round} is not within our GC range")
+        };
+        // Ensure the author is a member of the committee.
+        if !committee.is_committee_member(batch_header.author()) {
+            bail!("{} is not a member of the committee", batch_header.author())
+        }
 
+        // Retrieve the GC round.
+        let gc_round = self.storage.gc_round();
         // Compute the previous round.
-        let previous_round = round.saturating_sub(1);
+        let previous_round = batch_round.saturating_sub(1);
 
-        if previous_round > 0 {
+        if previous_round > gc_round {
             // Initialize a set of the previous authors.
-            let mut previous_authors = HashSet::with_capacity(header.previous_certificate_ids().len());
+            let mut previous_authors = HashSet::with_capacity(batch_header.previous_certificate_ids().len());
 
             // Retrieve the previous certificates.
-            for previous_certificate_id in header.previous_certificate_ids() {
+            for previous_certificate_id in batch_header.previous_certificate_ids() {
                 // Retrieve the previous certificate.
                 let Some(previous_certificate) = self.storage.get_certificate(*previous_certificate_id) else {
-                    bail!("Missing previous certificate for a proposed batch from peer {peer_ip} in round {round}");
+                    bail!("Missing previous certificate for a batch in round {batch_round}");
                 };
                 // Ensure the previous certificate is for the previous round.
                 if previous_certificate.round() != previous_round {
-                    bail!("Previous certificate for a proposed batch from peer {peer_ip} is for the wrong round");
+                    bail!("Previous certificate in a batch from round {batch_round} is for the wrong round");
                 }
                 // Insert the author of the previous certificate.
                 previous_authors.insert(previous_certificate.author());
@@ -650,11 +617,10 @@ impl<N: Network> Primary<N> {
             };
             // Ensure the previous certificates have reached the quorum threshold.
             if !previous_committee.is_quorum_threshold_reached(&previous_authors)? {
-                bail!("Previous certificates for a proposed batch from peer {peer_ip} did not reach quorum threshold");
+                bail!("Previous certificates for the proposed batch did not reach quorum threshold");
             }
         }
-
-        Ok(batch_id)
+        Ok(())
     }
 
     /// Sanity checks the batch signature from a peer.
@@ -762,53 +728,95 @@ impl<N: Network> Primary<N> {
     }
 
     /// Fetches any missing previous certificates for the specified batch header from the specified peer.
-    async fn fetch_missing_certificates(&self, peer_ip: SocketAddr, header: &BatchHeader<N>) -> Result<()> {
+    async fn fetch_missing_previous_certificates(
+        &self,
+        peer_ip: SocketAddr,
+        batch_header: &BatchHeader<N>,
+    ) -> Result<HashSet<BatchCertificate<N>>> {
         // If the previous round is 0, or is <= the GC round, return early.
-        if header.round() == 1 || header.round() <= self.storage.gc_round() + 1 {
-            return Ok(());
+        if batch_header.round() == 1 || batch_header.round() <= self.storage.gc_round() + 1 {
+            return Ok(Default::default());
         }
 
         // Initialize a list for the missing previous certificates.
         let mut fetch_certificates = FuturesUnordered::new();
-
         // Iterate through the previous certificate IDs.
-        for certificate_id in header.previous_certificate_ids() {
+        for certificate_id in batch_header.previous_certificate_ids() {
             // If we do not have the previous certificate, request it.
-            if !self.pending.contains(*certificate_id) && !self.storage.contains_certificate(*certificate_id) {
-                trace!("Primary - Found a new certificate ID '{}' from peer '{peer_ip}'", fmt_id(certificate_id));
-
-                // Initialize a oneshot channel.
-                let (callback_sender, callback_receiver) = oneshot::channel();
-                // Insert the certificate ID into the pending queue.
-                self.pending.insert(*certificate_id, peer_ip, Some(callback_sender));
+            if !self.storage.contains_certificate(*certificate_id) {
+                trace!("Primary - Found a new certificate ID for round {} from peer '{peer_ip}'", batch_header.round());
                 // TODO (howardwu): Limit the number of open requests we send to a peer.
                 // Send an certificate request to the peer.
-                self.send_certificate_request(peer_ip, *certificate_id);
-                // Push the callback onto the list.
-                fetch_certificates.push(callback_receiver);
+                fetch_certificates.push(self.send_certificate_request(peer_ip, *certificate_id));
             }
         }
 
-        // Wait for all of the certificates to be fetched.
-        while let Some(result) = fetch_certificates.next().await {
-            if let Err(e) = result {
-                bail!("Unable to fetch certificate: {e}")
-            }
+        // If there are no missing previous certificates, return early.
+        match fetch_certificates.is_empty() {
+            true => return Ok(Default::default()),
+            false => trace!(
+                "Fetching {} missing previous certificates for round {} from peer '{peer_ip}'...",
+                fetch_certificates.len(),
+                batch_header.round()
+            ),
         }
-        // Return after receiving all of the certificates.
-        Ok(())
+
+        // Initialize a set for the missing previous certificates.
+        let mut missing_previous_certificates = HashSet::with_capacity(fetch_certificates.len());
+        // Wait for all of the missing previous certificates to be fetched.
+        while let Some(result) = fetch_certificates.next().await {
+            // Insert the missing previous certificate into the set.
+            missing_previous_certificates.insert(result?);
+        }
+        debug!(
+            "Fetched {} missing previous certificates for round {} from peer '{peer_ip}'",
+            missing_previous_certificates.len(),
+            batch_header.round()
+        );
+        // Return the missing previous certificates.
+        Ok(missing_previous_certificates)
     }
 
     /// Sends an certificate request to the specified peer.
-    fn send_certificate_request(&self, peer_ip: SocketAddr, certificate_id: Field<N>) {
-        // Send the certificate request to the peer.
-        self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into()));
+    async fn send_certificate_request(
+        &self,
+        peer_ip: SocketAddr,
+        certificate_id: Field<N>,
+    ) -> Result<BatchCertificate<N>> {
+        // Initialize a oneshot channel.
+        let (callback_sender, callback_receiver) = oneshot::channel();
+        // Insert the certificate ID into the pending queue.
+        if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
+            // Send the certificate request to the peer.
+            self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into()));
+        }
+        // Wait for the certificate to be fetched.
+        match timeout(Duration::from_secs(10), callback_receiver).await {
+            // If the certificate was fetched, return it.
+            Ok(result) => Ok(result?),
+            // If the certificate was not fetched, return an error.
+            Err(e) => bail!("Unable to fetch batch certificate - (timeout) {e}"),
+        }
     }
 
-    /// Sends an certificate response to the specified peer.
-    fn send_certificate_response(&self, peer_ip: SocketAddr, certificate: BatchCertificate<N>) {
-        // Send the certificate response to the peer.
-        self.gateway.send(peer_ip, Event::CertificateResponse(certificate.into()));
+    /// Handles the incoming certificate response.
+    fn finish_certificate_request(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) {
+        let certificate = response.certificate;
+        // Check if the peer IP exists in the pending queue for the given certificate ID.
+        if self.pending.get(certificate.certificate_id()).unwrap_or_default().contains(&peer_ip) {
+            // TODO: Validate the certificate.
+            // Remove the certificate ID from the pending queue.
+            self.pending.remove(certificate.certificate_id(), Some(certificate));
+        }
+    }
+
+    /// Handles the incoming certificate request.
+    fn send_certificate_response(&self, peer_ip: SocketAddr, request: CertificateRequest<N>) {
+        // Attempt to retrieve the certificate.
+        if let Some(certificate) = self.storage.get_certificate(request.certificate_id) {
+            // Send the certificate response to the peer.
+            self.gateway.send(peer_ip, Event::CertificateResponse(certificate.into()));
+        }
     }
 
     /// Updates the committee to the next round, returning the next round number.
