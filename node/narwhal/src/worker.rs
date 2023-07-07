@@ -105,8 +105,13 @@ impl<N: Network> Worker<N> {
 
     /// Removes the specified number of transmissions from the ready queue, and returns them.
     pub(crate) fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
-        // TODO (howardwu): Ensure these transmissions do not 1) exist in past rounds, and 2) are not already in the ledger.
-        self.ready.take(num_transmissions)
+        // TODO (howardwu): Ensure these transmissions are not already in the ledger.
+        self.ready
+            .take(num_transmissions)
+            .into_iter()
+            // Filter out any transmissions from past rounds.
+            .filter(|(id, _)| !self.storage.contains_transmission(*id))
+            .collect()
     }
 }
 

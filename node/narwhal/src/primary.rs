@@ -340,8 +340,10 @@ impl<N: Network> Primary<N> {
 
             // Create the batch certificate.
             let certificate = BatchCertificate::new(batch.to_header()?, signatures)?;
+            // Create the transmissions map.
+            let transmissions = batch.transmissions().clone().into_iter().collect();
             // Store the certified batch.
-            self.storage.insert_certificate(certificate.clone())?;
+            self.storage.insert_certificate(certificate.clone(), transmissions)?;
             // Broadcast the certified batch to all validators.
             self.gateway.broadcast(Event::BatchCertified(certificate.into()));
 
@@ -392,7 +394,7 @@ impl<N: Network> Primary<N> {
         }
 
         // Fetch the batch and ensure it is well-formed.
-        self.fetch_and_check_batch_from_peer(peer_ip, certificate.batch_header()).await?;
+        let missing_transmissions = self.fetch_and_check_batch_from_peer(peer_ip, certificate.batch_header()).await?;
 
         // TODO (howardwu): Ensure the certificate is well-formed. If not, do not store.
         //  - Check the signatures reach quorum threshold.
@@ -400,7 +402,7 @@ impl<N: Network> Primary<N> {
         // Check if the certificate needs to be stored.
         if !self.storage.contains_certificate(certificate.certificate_id()) {
             // Store the batch certificate.
-            self.storage.insert_certificate(certificate)?;
+            self.storage.insert_certificate(certificate, missing_transmissions)?;
             debug!("Primary - Stored certificate for round {round} from peer '{peer_ip}'");
         }
         Ok(())
@@ -553,40 +555,49 @@ impl<N: Network> Primary<N> {
     ///   - Ensure the previous certificates have reached the quorum threshold.
     ///   - Ensure we have not already signed the batch ID.
     #[async_recursion]
-    async fn fetch_and_check_batch_from_peer(&self, peer_ip: SocketAddr, batch_header: &BatchHeader<N>) -> Result<()> {
+    async fn fetch_and_check_batch_from_peer(
+        &self,
+        peer_ip: SocketAddr,
+        batch_header: &BatchHeader<N>,
+    ) -> Result<HashMap<TransmissionID<N>, Transmission<N>>> {
         // Retrieve the round.
         let batch_round = batch_header.round();
 
         // Ensure this batch ID is new.
         if self.storage.contains_batch(batch_header.batch_id()) {
-            match ((self.committee.read().round() as i64) - batch_round as i64).abs() > 2 {
-                true => bail!("Batch ID has already been processed for round {batch_round}"),
-                false => return Ok(()),
-            }
+            bail!("Batch ID has already been processed for round {batch_round}")
+            // match ((self.committee.read().round() as i64) - batch_round as i64).abs() > 2 {
+            //     true => bail!("Batch ID has already been processed for round {batch_round}"),
+            //     false => return Ok(Default::default()),
+            // }
         }
 
-        // Ensure this batch does not contain already committed transmissions from past rounds or in the ledger.
-        // TODO: Check storage.
+        // Ensure this batch does not contain already committed transmissions from past rounds.
+        if batch_header.transmission_ids().iter().any(|id| self.storage.contains_transmission(*id)) {
+            bail!("Batch contains already transmissions from past rounds");
+        }
+        // Ensure this batch does not contain already committed transmissions in the ledger.
         // TODO: Add a ledger service.
 
         // Ensure the primary has all of the transmissions.
-        let transmissions = self.fetch_missing_transmissions(peer_ip, batch_header).await?;
-        // Iterate through the missing transmissions.
-        for (transmission_id, transmission) in transmissions {
-            // Determine if the transmission is new.
-            let is_new = !self.storage.contains_transmission(transmission_id);
-            // If the transmission is new, insert it.
-            if is_new {
-                // Insert the transmission.
-                self.storage.insert_transmission(transmission_id, transmission);
-            }
-        }
+        let missing_transmissions = self.fetch_missing_transmissions(peer_ip, batch_header).await?;
         // Ensure the primary has all of the previous certificates.
         let missing_certificates = self.fetch_missing_previous_certificates(peer_ip, batch_header).await?;
         // Iterate through the missing certificates.
         for batch_certificate in missing_certificates {
-            // Store the batch certificate (recursively fetching any missing previous certificates).
-            self.process_batch_certificate_from_peer(peer_ip, batch_certificate).await?;
+            // // Store the batch certificate (recursively fetching any missing previous certificates).
+            // self.process_batch_certificate_from_peer(peer_ip, batch_certificate).await?;
+
+            // Check if the certificate needs to be stored.
+            if !self.storage.contains_certificate(batch_certificate.certificate_id()) {
+                let round = batch_certificate.round();
+                // TODO (howardwu): Check/untangle this.
+                let missing_transmissions =
+                    self.fetch_and_check_batch_from_peer(peer_ip, batch_certificate.batch_header()).await?;
+                // Store the batch certificate.
+                self.storage.insert_certificate(batch_certificate, missing_transmissions)?;
+                debug!("Primary - Stored certificate for round {round} from peer '{peer_ip}'");
+            }
         }
 
         // TODO (howardwu): Guard this to increment after quorum threshold is reached.
@@ -640,7 +651,8 @@ impl<N: Network> Primary<N> {
                 bail!("Previous certificates for the proposed batch did not reach quorum threshold");
             }
         }
-        Ok(())
+
+        Ok(missing_transmissions)
     }
 
     /// Sanity checks the batch signature from a peer.
