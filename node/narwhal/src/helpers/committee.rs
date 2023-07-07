@@ -18,36 +18,13 @@ use indexmap::IndexMap;
 use std::collections::HashSet;
 
 #[derive(Clone, Debug, PartialEq)]
-struct CommitteeMembers<N: Network> {
+pub struct Committee<N: Network> {
+    /// The current round number.
+    round: u64,
     /// total stake of all `members`
     total_stake: u64,
     /// A map of `address` to `stake`.
     members: IndexMap<Address<N>, u64>,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Committee<N: Network> {
-    /// The current round number.
-    round: u64,
-    /// The current committee members in this `round`
-    committee: CommitteeMembers<N>,
-}
-
-impl<N: Network> CommitteeMembers<N> {
-    /// Initializes a new `CommitteeMembers` instance. Precomputes `total_stake`.
-    pub fn new(members: IndexMap<Address<N>, u64>) -> Result<Self> {
-        // Compute the total power of the committee once when members are added/removed and/or their
-        // individual stakes change.
-        let mut power = 0u64;
-        for stake in members.values() {
-            // Accumulate the stake, checking for overflow.
-            power = match power.checked_add(*stake) {
-                Some(power) => power,
-                None => bail!("Failed to calculate total stake - overflow detected"),
-            };
-        }
-        Ok(Self { total_stake: power, members })
-    }
 }
 
 impl<N: Network> Committee<N> {
@@ -57,16 +34,30 @@ impl<N: Network> Committee<N> {
         ensure!(round > 0, "Round must be nonzero");
         // Ensure there are at least 4 members.
         ensure!(members.len() >= 4, "Committee must have at least 4 members");
+        // Compute the total stake of the committee only when members are added/removed and/or their
+        // individual stakes change.
+        let total_stake = Self::compute_total_stake(&members)?;
         // Return the new committee.
-        let committee = CommitteeMembers::new(members)?;
-        Ok(Self { round, committee })
+        Ok(Self { round, total_stake, members })
+    }
+
+    fn compute_total_stake(members: &IndexMap<Address<N>, u64>) -> Result<u64> {
+        let mut power = 0u64;
+        for stake in members.values() {
+            // Accumulate the stake, checking for overflow.
+            power = match power.checked_add(*stake) {
+                Some(power) => power,
+                None => bail!("Failed to calculate total stake - overflow detected"),
+            };
+        }
+        Ok(power)
     }
 
     /// Returns a new `Committee` instance for the next round.
     /// TODO (howardwu): Add arguments for members (and stake) 1) to be added, 2) to be updated, and 3) to be removed.
     pub fn to_next_round(&self) -> Self {
         // Return the new committee.
-        Self { round: self.round.saturating_add(1), committee: self.committee.clone() }
+        Self { round: self.round.saturating_add(1), total_stake: self.total_stake, members: self.members.clone() }
     }
 }
 
@@ -78,17 +69,17 @@ impl<N: Network> Committee<N> {
 
     /// Returns the committee members alongside their stake.
     pub fn members(&self) -> &IndexMap<Address<N>, u64> {
-        &self.committee.members
+        &self.members
     }
 
     /// Returns the number of validators in the committee.
     pub fn committee_size(&self) -> usize {
-        self.committee.members.len()
+        self.members.len()
     }
 
     /// Returns `true` if the given address is in the committee.
     pub fn is_committee_member(&self, address: Address<N>) -> bool {
-        self.committee.members.contains_key(&address)
+        self.members.contains_key(&address)
     }
 
     /// Returns `true` if the combined stake for the given addresses reaches the quorum threshold.
@@ -106,7 +97,7 @@ impl<N: Network> Committee<N> {
 
     /// Returns the amount of stake for the given address.
     pub fn get_stake(&self, address: Address<N>) -> u64 {
-        self.committee.members.get(&address).copied().unwrap_or_default()
+        self.members.get(&address).copied().unwrap_or_default()
     }
 
     /// Returns the amount of stake required to reach the availability threshold `(f + 1)`.
@@ -125,7 +116,7 @@ impl<N: Network> Committee<N> {
 
     /// Returns the total amount of stake in the committee `(3f + 1)`.
     pub fn total_stake(&self) -> u64 {
-        self.committee.total_stake
+        self.total_stake
     }
 }
 
