@@ -373,6 +373,16 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
+        // If our primary is far behind the peer, update our committee to the peer's round.
+        if round > gc_round + self.storage.max_gc_rounds() {
+            // TODO (howardwu): Guard this to increment after quorum threshold is reached.
+            // TODO (howardwu): After bullshark is implemented, we must use Aleo blocks to guide us to `tip-50` to know the committee.
+            // If the certificate's round is greater than the current committee round, update the committee.
+            while self.committee.read().round() < round {
+                self.update_committee_to_next_round();
+            }
+        }
+
         // Fetch the batch and ensure it is well-formed.
         self.fetch_and_check_batch_from_peer(peer_ip, certificate.batch_header()).await?;
 
@@ -385,17 +395,6 @@ impl<N: Network> Primary<N> {
             self.storage.insert_certificate(certificate)?;
             debug!("Primary - Stored certificate for round {round} from peer '{peer_ip}'");
         }
-
-        // // Retrieve the committee round.
-        // let committee_round = self.committee.read().round();
-        // // Ensure the certificate round is one less than the committee round.
-        // if round + 1 != committee_round {
-        //     bail!("Primary is on round {committee_round}, and received a certificate for round {round}")
-        // }
-        // // If there is no proposed batch, attempt to propose a batch.
-        // if let Err(e) = self.propose_batch() {
-        //     error!("Failed to propose a batch - {e}");
-        // }
         Ok(())
     }
 }
@@ -569,6 +568,7 @@ impl<N: Network> Primary<N> {
         }
 
         // TODO (howardwu): Guard this to increment after quorum threshold is reached.
+        // TODO (howardwu): After bullshark is implemented, we must use Aleo blocks to guide us to `tip-50` to know the committee.
         // If the certificate's round is greater than the current committee round, update the committee.
         while self.committee.read().round() < batch_header.round() {
             self.update_committee_to_next_round();
