@@ -26,6 +26,13 @@ impl<N: Network> CertificateResponse<N> {
     }
 }
 
+impl<N: Network> From<BatchCertificate<N>> for CertificateResponse<N> {
+    /// Initializes a new certificate response event.
+    fn from(certificate: BatchCertificate<N>) -> Self {
+        Self::new(certificate)
+    }
+}
+
 impl<N: Network> EventTrait for CertificateResponse<N> {
     /// Returns the event name.
     #[inline]

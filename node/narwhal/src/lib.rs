@@ -48,6 +48,8 @@ pub const MAX_GC_ROUNDS: u64 = 50; // rounds
 pub const MAX_REQUESTS_PER_TRANSMISSION: usize = 5; // requests
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
+/// The maximum number of transmissions allowed in a batch.
+pub const MAX_TRANSMISSIONS_PER_BATCH: usize = 1000; // transmissions
 /// The maximum number of workers that can be spawned.
 pub const MAX_WORKERS: u8 = 3; // workers
 /// The port on which the memory pool listens for incoming connections.

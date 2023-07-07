@@ -48,7 +48,7 @@ pub struct Worker<N: Network> {
     /// The ready queue.
     ready: Ready<N>,
     /// The pending transmissions queue.
-    pending: Pending<TransmissionID<N>>,
+    pending: Pending<TransmissionID<N>, ()>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -82,9 +82,9 @@ impl<N: Network> Worker<N> {
         self.id
     }
 
-    /// Drains the ready queue.
-    pub(crate) fn drain(&self) -> IndexMap<TransmissionID<N>, Transmission<N>> {
-        self.ready.drain()
+    /// Removes the specified number of transmissions from the ready queue, and returns them.
+    pub(crate) fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
+        self.ready.take(num_transmissions)
     }
 }
 
@@ -115,10 +115,11 @@ impl<N: Network> Worker<N> {
                 fmt_id(transmission_id)
             );
             // Insert the transmission ID into the pending queue.
-            self.pending.insert(transmission_id, peer_ip, callback);
-            // TODO (howardwu): Limit the number of open requests we send to a peer.
-            // Send an transmission request to the peer.
-            self.send_transmission_request(peer_ip, transmission_id);
+            if self.pending.insert(transmission_id, peer_ip, callback) {
+                // TODO (howardwu): Limit the number of open requests we send to a peer.
+                // Send an transmission request to the peer.
+                self.send_transmission_request(peer_ip, transmission_id);
+            }
         }
     }
 
@@ -139,7 +140,7 @@ impl<N: Network> Worker<N> {
             // Insert the transmission into the ready queue.
             self.ready.insert(response.transmission_id, response.transmission)?;
             // Remove the transmission ID from the pending queue.
-            self.pending.remove(response.transmission_id);
+            self.pending.remove(response.transmission_id, Some(()));
             trace!(
                 "Worker {} - Added transmission '{}' from peer '{peer_ip}'",
                 self.id,
@@ -157,7 +158,7 @@ impl<N: Network> Worker<N> {
         prover_solution: Data<ProverSolution<N>>,
     ) -> Result<()> {
         // Remove the puzzle commitment from the pending queue.
-        self.pending.remove(puzzle_commitment);
+        self.pending.remove(puzzle_commitment, Some(()));
         // Adds the prover solution to the ready queue.
         self.ready.insert(puzzle_commitment, Transmission::Solution(prover_solution))?;
         trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment));
@@ -172,7 +173,7 @@ impl<N: Network> Worker<N> {
         transaction: Data<Transaction<N>>,
     ) -> Result<()> {
         // Remove the transaction from the pending queue.
-        self.pending.remove(&transaction_id);
+        self.pending.remove(&transaction_id, Some(()));
         // Adds the transaction to the ready queue.
         self.ready.insert(&transaction_id, Transmission::Transaction(transaction))?;
         trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));

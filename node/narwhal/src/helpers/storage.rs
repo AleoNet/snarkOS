@@ -42,8 +42,8 @@ use std::sync::{
 /// 3. After a `batch` is ready to be stored:
 ///   - The `certificate` is inserted, triggering updates to the
 ///     `rounds`, `certificates`, `batch_ids`, and `transmission_ids` maps.
-/// 4. After a `round` is certified:
-///  - The `committee` is inserted into the `committees` map.
+/// 4. After a `round` reaches quorum threshold:
+///  - The `committee` for the next round is inserted into the `committees` map.
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network> {
     /* Once per round */
@@ -250,11 +250,11 @@ impl<N: Network> Storage<N> {
 
         // Ensure the certificate ID does not already exist in storage.
         if self.contains_certificate(certificate_id) {
-            bail!("Certificate {certificate_id} already exists in storage");
+            bail!("Certificate for round {round} already exists in storage");
         }
         // Ensure the batch ID does not already exist in storage.
         if self.contains_batch(batch_id) {
-            bail!("Batch {batch_id} already exists in storage");
+            bail!("Batch for round {round} already exists in storage");
         }
 
         // TODO (howardwu): Ensure the certificate is well-formed. If not, do not store.
