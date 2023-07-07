@@ -463,9 +463,7 @@ impl<N: Network> Primary<N> {
         let self_clone = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, certificate_response)) = rx_certificate_response.recv().await {
-                if let Err(e) = self_clone.finish_certificate_request(peer_ip, certificate_response).await {
-                    warn!("Cannot process a certificate response from peer '{peer_ip}' - {e}");
-                }
+                self_clone.finish_certificate_request(peer_ip, certificate_response)
             }
         });
 
@@ -800,15 +798,14 @@ impl<N: Network> Primary<N> {
     }
 
     /// Handles the incoming certificate response.
-    async fn finish_certificate_request(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) -> Result<()> {
+    fn finish_certificate_request(&self, peer_ip: SocketAddr, response: CertificateResponse<N>) {
         let certificate = response.certificate;
         // Check if the peer IP exists in the pending queue for the given certificate ID.
         if self.pending.get(certificate.certificate_id()).unwrap_or_default().contains(&peer_ip) {
             // TODO: Validate the certificate.
             // Remove the certificate ID from the pending queue.
-            self.pending.remove(certificate.certificate_id(), Some(certificate.clone()));
+            self.pending.remove(certificate.certificate_id(), Some(certificate));
         }
-        Ok(())
     }
 
     /// Handles the incoming certificate request.
