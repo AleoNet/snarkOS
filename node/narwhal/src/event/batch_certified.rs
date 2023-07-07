@@ -26,6 +26,13 @@ impl<N: Network> BatchCertified<N> {
     }
 }
 
+impl<N: Network> From<BatchCertificate<N>> for BatchCertified<N> {
+    /// Initializes a new batch certified event.
+    fn from(certificate: BatchCertificate<N>) -> Self {
+        Self::new(Data::Object(certificate))
+    }
+}
+
 impl<N: Network> EventTrait for BatchCertified<N> {
     /// Returns the event name.
     #[inline]

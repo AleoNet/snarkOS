@@ -16,13 +16,21 @@ use super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BatchPropose<N: Network> {
+    pub round: u64,
     pub batch_header: Data<BatchHeader<N>>,
 }
 
 impl<N: Network> BatchPropose<N> {
     /// Initializes a new batch propose event.
-    pub fn new(batch_header: Data<BatchHeader<N>>) -> Self {
-        Self { batch_header }
+    pub fn new(round: u64, batch_header: Data<BatchHeader<N>>) -> Self {
+        Self { round, batch_header }
+    }
+}
+
+impl<N: Network> From<BatchHeader<N>> for BatchPropose<N> {
+    /// Initializes a new batch propose event.
+    fn from(batch_header: BatchHeader<N>) -> Self {
+        Self::new(batch_header.round(), Data::Object(batch_header))
     }
 }
 
@@ -36,16 +44,18 @@ impl<N: Network> EventTrait for BatchPropose<N> {
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+        writer.write_all(&self.round.to_le_bytes())?;
         self.batch_header.serialize_blocking_into(writer)
     }
 
     /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let reader = bytes.reader();
+        let mut reader = bytes.reader();
 
+        let round = u64::read_le(&mut reader)?;
         let batch_header = Data::Buffer(reader.into_inner().freeze());
 
-        Ok(Self { batch_header })
+        Ok(Self { round, batch_header })
     }
 }

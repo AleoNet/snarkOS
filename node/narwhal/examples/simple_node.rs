@@ -164,7 +164,7 @@ fn log_connections(primary: &Primary<CurrentNetwork>) {
             for connection in connections {
                 debug!("  {}", connection);
             }
-            tokio::time::sleep(std::time::Duration::from_secs(10)).await;
+            tokio::time::sleep(std::time::Duration::from_secs(15)).await;
         }
     });
 }
