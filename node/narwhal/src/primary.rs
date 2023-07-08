@@ -203,14 +203,10 @@ impl<N: Network> Primary<N> {
                 is_ready = true;
             }
         }
-
         // If the batch is not ready to be proposed, return early.
-        match is_ready {
-            true => debug!("Proposing a batch for round {round}..."),
-            false => return Ok(()),
+        if !is_ready {
+            return Ok(());
         }
-
-        /* Proceeding to sign & propose the batch. */
 
         // Initialize a map of the transmissions.
         let mut transmissions = IndexMap::new();
@@ -218,8 +214,18 @@ impl<N: Network> Primary<N> {
         let num_transmissions_per_worker = MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
         for worker in self.workers.read().iter() {
             // TODO (howardwu): Perform one final filter against the ledger service.
-            transmissions.extend(worker.take(num_transmissions_per_worker));
+            transmissions.extend(worker.take(num_transmissions_per_worker)?);
         }
+        // Determine if there are transmissions to propose.
+        let has_transmissions = !transmissions.is_empty();
+
+        // If the batch is not ready to be proposed, return early.
+        match has_transmissions {
+            true => info!("Proposing a batch with {} transmissions for round {round}...", transmissions.len()),
+            false => return Ok(()),
+        }
+
+        /* Proceeding to sign & propose the batch. */
 
         // Initialize the RNG.
         let rng = &mut rand::thread_rng();
@@ -246,7 +252,6 @@ impl<N: Network> Primary<N> {
     async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
         let BatchPropose { round: batch_round, batch_header } = batch_propose;
 
-        info!("RECEIVED A BATCH PROPOSAL!!!");
         // Retrieve the committee round.
         let committee_round = self.committee.read().round();
         // Ensure the batch round is within GC range of the committee round.
@@ -276,11 +281,9 @@ impl<N: Network> Primary<N> {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
         }
 
-        // // Get or fetch all of the transmissions declared in the batch header.
-        // let transmissions = self.sync_with_peer(peer_ip, &batch_header).await?;
-
+        // TODO (howardwu): Include fetching from the peer's proposed batch, to fix this fetch that times out.
         // // Ensure the primary has all of the transmissions.
-        // let transmissions = self.get_or_fetch_transmissions(peer_ip, &batch_header).await?;
+        // let transmissions = self.fetch_missing_transmissions(peer_ip, &batch_header).await?;
         // // TODO (howardwu): Add the missing transmissions into the workers.
         // // Ensure the batch header from the peer is valid.
         // let missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
@@ -297,6 +300,7 @@ impl<N: Network> Primary<N> {
         let signature = self.gateway.account().sign(&[batch_id, Field::from_u64(timestamp as u64)], rng)?;
         // Broadcast the signature back to the validator.
         self.gateway.send(peer_ip, Event::BatchSignature(BatchSignature::new(batch_id, signature, timestamp)));
+        debug!("Signed a batch for round {batch_round} from peer '{peer_ip}'");
         Ok(())
     }
 
@@ -314,7 +318,7 @@ impl<N: Network> Primary<N> {
         batch_signature: BatchSignature<N>,
     ) -> Result<()> {
         // Ensure the proposed batch has not expired, and clear the proposed batch if it has expired.
-        self.check_proposed_batch_for_expiration();
+        self.check_proposed_batch_for_expiration()?;
         // Ensure the batch signature from the peer is valid.
         self.check_batch_signature_from_peer(peer_ip, batch_signature)?;
 
@@ -325,7 +329,7 @@ impl<N: Network> Primary<N> {
         if let Some((_, signatures)) = self.proposed_batch.write().as_mut() {
             // Add the signature to the batch.
             signatures.insert(signature, timestamp);
-            debug!("Added a batch signature from peer '{peer_ip}'");
+            info!("Added a batch signature from peer '{peer_ip}'");
         }
 
         // Check if the batch is ready to be certified.
@@ -500,7 +504,9 @@ impl<N: Network> Primary<N> {
                 // Sleep briefly, but longer than if there were no batch.
                 tokio::time::sleep(std::time::Duration::from_millis(MAX_BATCH_DELAY)).await;
                 // Check if the proposed batch has expired, and clear it if it has expired.
-                self_clone.check_proposed_batch_for_expiration();
+                if let Err(e) = self_clone.check_proposed_batch_for_expiration() {
+                    error!("Failed to check the proposed batch for expiration - {e}");
+                };
                 // If there is no proposed batch, attempt to propose a batch.
                 if let Err(e) = self_clone.propose_batch() {
                     error!("Failed to propose a batch - {e}");
@@ -510,7 +516,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Checks if the proposed batch is expired, and clears the proposed batch if it has expired.
-    fn check_proposed_batch_for_expiration(&self) {
+    fn check_proposed_batch_for_expiration(&self) -> Result<()> {
         // Check if the proposed batch is expired.
         let mut is_expired = false;
         if let Some((batch, _)) = self.proposed_batch.read().as_ref() {
@@ -519,8 +525,38 @@ impl<N: Network> Primary<N> {
         }
         // If the batch is expired, clear it.
         if is_expired {
-            *self.proposed_batch.write() = None;
+            // Reset the proposed batch.
+            if let Some((batch, _)) = self.proposed_batch.write().take() {
+                // Retrieve the number of workers.
+                let num_workers = self.gateway.num_workers();
+                // Re-insert the transmissions into the workers.
+                for (transmission_id, transmission) in batch.transmissions() {
+                    // Determine the worker ID.
+                    let Ok(worker_id) = assign_to_worker(*transmission_id, num_workers) else {
+                        bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
+                    };
+                    // Retrieve the worker.
+                    match self.workers.read().get(worker_id as usize) {
+                        // Re-insert the transmission into the worker.
+                        Some(worker) => worker.reinsert(*transmission_id, transmission.clone())?,
+                        None => bail!("Unable to find worker {worker_id}"),
+                    };
+                }
+            }
+
+            // TODO (howardwu): Guard this to increment after quorum threshold is reached.
+            // TODO (howardwu): After bullshark is implemented, we must use Aleo blocks to guide us to `tip-50` to know the committee.
+            // Initialize a tracker to increment the round.
+            let mut current_round = self.committee.read().round();
+            // Check if there are certificates for the next round.
+            while !self.storage.get_certificates_for_round(current_round + 1).is_empty() {
+                // If there are certificates for the next round, increment the round.
+                self.update_committee_to_next_round();
+                // Increment the current round.
+                current_round += 1;
+            }
         }
+        Ok(())
     }
 
     /// Sanity checks the batch header from a peer.
@@ -574,28 +610,21 @@ impl<N: Network> Primary<N> {
         // Ensure this batch does not contain already committed transmissions in the ledger.
         // TODO: Add a ledger service.
 
-        info!("PREPARING TO STORE CERTIFICATE FOR ROUND {}", batch_round);
-
-        // Ensure the primary has all of the transmissions.
-        let transmissions = self.get_or_fetch_transmissions(peer_ip, batch_header).await?;
-        info!("RETRIEVED TRANSMISSIONS FOR ROUND {}", batch_round);
         // Ensure the primary has all of the previous certificates.
         let missing_certificates = self.fetch_missing_previous_certificates(peer_ip, batch_header).await?;
-        info!("RETRIEVED PREVIOUS CERTIFICATES FOR ROUND {}", batch_round);
         // Iterate through the missing certificates.
         for batch_certificate in missing_certificates {
             // Store the batch certificate (recursively fetching any missing previous certificates).
             self.sync_with_peer(peer_ip, batch_certificate).await?;
         }
-        // Ensure the batch header is well-formed.
-        let missing_transmissions = self.storage.check_batch_header(batch_header, transmissions)?;
-        info!("CHECKED BATCH HEADER FOR ROUND {}", batch_round);
 
+        // Ensure the primary has all of the transmissions.
+        let missing_transmissions = self.fetch_missing_transmissions(peer_ip, batch_header).await?;
         // Check if the certificate needs to be stored.
         if !self.storage.contains_certificate(certificate.certificate_id()) {
             // Store the batch certificate.
             self.storage.insert_certificate(certificate, missing_transmissions)?;
-            debug!("Primary - Stored certificate for round {batch_round} from peer '{peer_ip}'");
+            debug!("Stored certificate for round {batch_round} from peer '{peer_ip}'");
         }
         Ok(())
     }
@@ -645,9 +674,9 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
-    /// Fetches all of the transmissions for the specified batch header.
+    /// Fetches any missing transmissions for the specified batch header.
     /// If a transmission does not exist, it will be fetched from the specified peer IP.
-    async fn get_or_fetch_transmissions(
+    async fn fetch_missing_transmissions(
         &self,
         peer_ip: SocketAddr,
         batch_header: &BatchHeader<N>,
@@ -672,24 +701,18 @@ impl<N: Network> Primary<N> {
         let num_workers = self.gateway.num_workers();
         // Iterate through the transmission IDs.
         for transmission_id in batch_header.transmission_ids() {
-            // Determine the worker ID.
-            let Ok(worker_id) = assign_to_worker(*transmission_id, num_workers) else {
-                bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
-            };
-            // Retrieve the worker.
-            let Some(worker) = workers.get(worker_id as usize) else { bail!("Unable to find worker {worker_id}") };
-            // Push the callback onto the list.
-            fetch_transmissions.push(worker.get_or_fetch_transmission(peer_ip, *transmission_id));
+            // If the transmission does not exist in storage, proceed to fetch the transmission.
+            if !self.storage.contains_transmission(*transmission_id) {
+                // Determine the worker ID.
+                let Ok(worker_id) = assign_to_worker(*transmission_id, num_workers) else {
+                    bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
+                };
+                // Retrieve the worker.
+                let Some(worker) = workers.get(worker_id as usize) else { bail!("Unable to find worker {worker_id}") };
+                // Push the callback onto the list.
+                fetch_transmissions.push(worker.get_or_fetch_transmission(peer_ip, *transmission_id));
+            }
         }
-
-        // use futures::stream::TryStreamExt; // Import TryStreamExt
-        //
-        // let missing_transmissions: HashMap<_, _> = fetch_transmissions
-        //     .map_ok(|(id, transmission)| (id, transmission)) // transform to stream of Result
-        //     .try_collect()
-        //     .await?;
-        //
-        // Ok(missing_transmissions)
 
         // Initialize a set for the transmissions.
         let mut transmissions = HashMap::with_capacity(fetch_transmissions.len());
@@ -700,8 +723,6 @@ impl<N: Network> Primary<N> {
             // Insert the transmission into the set.
             transmissions.insert(transmission_id, transmission);
         }
-        info!("FINISHED TRANSMISSIONS");
-        ensure!(transmissions.len() == batch_header.transmission_ids().len(), "MISSING TRANSMISSIONS!!");
         // Return the transmissions.
         Ok(transmissions)
     }

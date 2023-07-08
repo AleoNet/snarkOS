@@ -91,17 +91,24 @@ impl<N: Network> Ready<N> {
     }
 
     /// Removes the specified number of transmissions and returns them.
-    pub fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
+    pub fn take(&self, num_transmissions: usize) -> Result<IndexMap<TransmissionID<N>, Transmission<N>>> {
         // TODO (howardwu): This logic does not correctly update the cumulative proof target anymore.
         // Acquire the write locks (simultaneously).
         let mut cumulative_proof_target = self.cumulative_proof_target.write();
         let mut transmissions = self.transmissions.write();
-        // Reset the cumulative proof target.
-        *cumulative_proof_target = 0;
+
         // Determine the number of transmissions to drain.
         let range = 0..transmissions.len().min(num_transmissions);
         // Drain the transmission IDs.
-        transmissions.drain(range).collect()
+        let result = transmissions.drain(range).collect::<IndexMap<_, _>>();
+
+        // Update the cumulative proof target.
+        for (transmission_id, _) in result.iter() {
+            if let TransmissionID::Solution(commitment) = transmission_id {
+                *cumulative_proof_target = cumulative_proof_target.saturating_sub(commitment.to_target()? as u128);
+            }
+        }
+        Ok(result)
     }
 }
 
@@ -167,7 +174,7 @@ mod tests {
         assert_eq!(ready.get(commitment_unknown), None);
 
         // Drain the ready queue.
-        let transmissions = ready.take(3);
+        let transmissions = ready.take(3).unwrap();
 
         // Check the number of transmissions.
         assert!(ready.is_empty());

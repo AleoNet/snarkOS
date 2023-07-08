@@ -84,14 +84,7 @@ impl<N: Network> Worker<N> {
     /// Returns `true` if the transmission ID exists in the ready queue, storage, or ledger.
     pub fn contains_transmission(&self, transmission_id: TransmissionID<N>) -> bool {
         // Check if the transmission ID exists in the ready queue, storage, or ledger.
-        self.ready.contains(transmission_id) || self.contains_transmission_from_past_rounds(transmission_id)
-    }
-
-    /// Returns `true` if the transmission ID exists in the storage or ledger.
-    pub fn contains_transmission_from_past_rounds(&self, transmission_id: TransmissionID<N>) -> bool {
-        // TODO (howardwu): Add a ledger service.
-        // Check if the transmission ID exists in storage or ledger.
-        self.storage.contains_transmission(transmission_id)
+        self.ready.contains(transmission_id) || self.storage.contains_transmission(transmission_id)
     }
 
     /// Returns the transmission if it exists in the ready queue, storage, or ledger.
@@ -119,55 +112,51 @@ impl<N: Network> Worker<N> {
         if let Some(transmission) = self.get_transmission(transmission_id) {
             return Ok((transmission_id, transmission));
         }
-        // Initialize a oneshot channel.
-        let (callback_sender, callback_receiver) = oneshot::channel();
         // Send a transmission request to the peer.
-        self.send_transmission_request(peer_ip, transmission_id, Some(callback_sender));
-        // Wait for the transmission to be fetched.
-        let transmission = match timeout(Duration::from_secs(10), callback_receiver).await {
-            // If the transmission was fetched, return it.
-            Ok(result) => result?,
-            // If the transmission was not fetched, return an error.
-            Err(e) => bail!("Unable to fetch transmission - (timeout) {e}"),
-        };
-        // let (candidate_id, transmission) = self.send_transmission_request(peer_ip, transmission_id).await?;
-        // // Ensure the transmission ID matches.
-        // ensure!(candidate_id == transmission_id, "Invalid transmission ID");
+        let (candidate_id, transmission) = self.send_transmission_request(peer_ip, transmission_id).await?;
+        // Ensure the transmission ID matches.
+        ensure!(candidate_id == transmission_id, "Invalid transmission ID");
         // Return the transmission.
         Ok((transmission_id, transmission))
     }
 
     /// Removes the specified number of transmissions from the ready queue, and returns them.
-    pub(crate) fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
+    pub(crate) fn take(&self, num_transmissions: usize) -> Result<IndexMap<TransmissionID<N>, Transmission<N>>> {
         // TODO (howardwu): Ensure these transmissions are not already in the ledger.
-        self.ready
-            .take(num_transmissions)
+        Ok(self.ready
+            .take(num_transmissions)?
             .into_iter()
             // Filter out any transmissions from past rounds.
             .filter(|(id, _)| !self.storage.contains_transmission(*id))
-            .collect()
+            .collect())
+    }
+
+    /// Reinserts the specified transmission into the ready queue.
+    pub(crate) fn reinsert(&self, transmission_id: TransmissionID<N>, transmission: Transmission<N>) -> Result<bool> {
+        self.ready.insert(transmission_id, transmission)
     }
 }
 
 impl<N: Network> Worker<N> {
     /// Handles the incoming transmission ID from a worker ping event.
-    pub(crate) fn process_transmission_id_from_ping(
+    async fn process_transmission_id_from_ping(
         &self,
         peer_ip: SocketAddr,
         transmission_id: TransmissionID<N>,
-        callback: Option<oneshot::Sender<Transmission<N>>>,
-    ) {
+    ) -> Result<()> {
         // Check if the transmission ID exists.
         if self.contains_transmission(transmission_id) {
-            if let Some(callback) = callback {
-                // Send the transmission to the callback.
-                callback.send(self.get_transmission(transmission_id).unwrap()).ok();
-            }
-            return;
+            return Ok(());
         }
         trace!("Worker {} - Found a new transmission ID '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
-        // Send a transmission request to the peer.
-        self.send_transmission_request(peer_ip, transmission_id, callback);
+        // Send an transmission request to the peer.
+        let (candidate_id, transmission) = self.send_transmission_request(peer_ip, transmission_id).await?;
+        // Ensure the transmission ID matches.
+        ensure!(candidate_id == transmission_id, "Invalid transmission ID");
+        // Insert the transmission into the ready queue.
+        self.ready.insert(transmission_id, transmission)?;
+        trace!("Worker {} - Added transmission '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
+        Ok(())
     }
 
     /// Handles the incoming unconfirmed solution.
@@ -225,14 +214,13 @@ impl<N: Network> Worker<N> {
         let self_clone = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, transmission_id)) = rx_worker_ping.recv().await {
-                self_clone.process_transmission_id_from_ping(peer_ip, transmission_id, None);
-                // {
-                //     warn!(
-                //         "Worker {} failed to fetch missing transmission '{}' from peer '{peer_ip}': {e}",
-                //         self_clone.id,
-                //         fmt_id(transmission_id)
-                //     );
-                // }
+                if let Err(e) = self_clone.process_transmission_id_from_ping(peer_ip, transmission_id).await {
+                    warn!(
+                        "Worker {} failed to fetch missing transmission '{}' from peer '{peer_ip}': {e}",
+                        self_clone.id,
+                        fmt_id(transmission_id)
+                    );
+                }
             }
         });
 
@@ -268,19 +256,25 @@ impl<N: Network> Worker<N> {
     }
 
     /// Sends an transmission request to the specified peer.
-    fn send_transmission_request(
+    async fn send_transmission_request(
         &self,
         peer_ip: SocketAddr,
         transmission_id: TransmissionID<N>,
-        callback: Option<oneshot::Sender<Transmission<N>>>,
-    ) {
+    ) -> Result<(TransmissionID<N>, Transmission<N>)> {
+        // Initialize a oneshot channel.
+        let (callback_sender, callback_receiver) = oneshot::channel();
         // Insert the transmission ID into the pending queue.
-        if self.pending.insert(transmission_id, peer_ip, callback) {
-
-        }
+        self.pending.insert(transmission_id, peer_ip, Some(callback_sender));
         // TODO (howardwu): Limit the number of open requests we send to a peer.
         // Send the transmission request to the peer.
         self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into()));
+        // Wait for the transmission to be fetched.
+        match timeout(Duration::from_secs(10), callback_receiver).await {
+            // If the transmission was fetched, return it.
+            Ok(result) => Ok((transmission_id, result?)),
+            // If the transmission was not fetched, return an error.
+            Err(e) => bail!("Unable to fetch transmission - (timeout) {e}"),
+        }
     }
 
     /// Handles the incoming transmission response.
@@ -294,13 +288,8 @@ impl<N: Network> Worker<N> {
             // TODO: Validate the transmission.
             // TODO (howardwu): Deserialize the transmission, and ensure it matches the transmission ID.
             //  Note: This is difficult for testing and example purposes, since those transmissions are fake.
-            // Insert the transmission into the ready queue.
-            self.ready.insert(transmission_id, transmission.clone())?;
             // Remove the transmission ID from the pending queue.
             self.pending.remove(transmission_id, Some(transmission));
-
-
-            trace!("Worker {} - Added transmission '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
         }
         Ok(())
     }
