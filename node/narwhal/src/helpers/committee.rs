@@ -41,18 +41,6 @@ impl<N: Network> Committee<N> {
         Ok(Self { round, total_stake, members })
     }
 
-    fn compute_total_stake(members: &IndexMap<Address<N>, u64>) -> Result<u64> {
-        let mut power = 0u64;
-        for stake in members.values() {
-            // Accumulate the stake, checking for overflow.
-            power = match power.checked_add(*stake) {
-                Some(power) => power,
-                None => bail!("Failed to calculate total stake - overflow detected"),
-            };
-        }
-        Ok(power)
-    }
-
     /// Returns a new `Committee` instance for the next round.
     /// TODO (howardwu): Add arguments for members (and stake) 1) to be added, 2) to be updated, and 3) to be removed.
     pub fn to_next_round(&self) -> Self {
@@ -117,6 +105,21 @@ impl<N: Network> Committee<N> {
     /// Returns the total amount of stake in the committee `(3f + 1)`.
     pub fn total_stake(&self) -> u64 {
         self.total_stake
+    }
+}
+
+impl<N: Network> Committee<N> {
+    /// Compute the total stake of the given members.
+    fn compute_total_stake(members: &IndexMap<Address<N>, u64>) -> Result<u64> {
+        let mut power = 0u64;
+        for stake in members.values() {
+            // Accumulate the stake, checking for overflow.
+            power = match power.checked_add(*stake) {
+                Some(power) => power,
+                None => bail!("Failed to calculate total stake - overflow detected"),
+            };
+        }
+        Ok(power)
     }
 }
 
