@@ -83,9 +83,15 @@ impl<N: Network> Worker<N> {
 
     /// Returns `true` if the transmission ID exists in the ready queue, storage, or ledger.
     pub fn contains_transmission(&self, transmission_id: TransmissionID<N>) -> bool {
-        // TODO (howardwu): Add a ledger service.
         // Check if the transmission ID exists in the ready queue, storage, or ledger.
-        self.ready.contains(transmission_id) || self.storage.contains_transmission(transmission_id)
+        self.ready.contains(transmission_id) || self.contains_transmission_from_past_rounds(transmission_id)
+    }
+
+    /// Returns `true` if the transmission ID exists in the storage or ledger.
+    pub fn contains_transmission_from_past_rounds(&self, transmission_id: TransmissionID<N>) -> bool {
+        // TODO (howardwu): Add a ledger service.
+        // Check if the transmission ID exists in storage or ledger.
+        self.storage.contains_transmission(transmission_id)
     }
 
     /// Returns the transmission if it exists in the ready queue, storage, or ledger.
@@ -101,6 +107,24 @@ impl<N: Network> Worker<N> {
         // Check if the transmission ID already exists in the ledger.
         // TODO (howardwu): Add a ledger service.
         None
+    }
+
+    /// Returns the transmissions if it exists in the worker, or requests it from the specified peer.
+    pub async fn get_or_fetch_transmission(
+        &self,
+        peer_ip: SocketAddr,
+        transmission_id: TransmissionID<N>,
+    ) -> Result<(TransmissionID<N>, Transmission<N>)> {
+        // Attempt to get the transmission from the worker.
+        if let Some(transmission) = self.get_transmission(transmission_id) {
+            return Ok((transmission_id, transmission));
+        }
+        // Send a transmission request to the peer.
+        let (candidate_id, transmission) = self.send_transmission_request(peer_ip, transmission_id).await?;
+        // Ensure the transmission ID matches.
+        ensure!(candidate_id == transmission_id, "Invalid transmission ID");
+        // Return the transmission.
+        Ok((transmission_id, transmission))
     }
 
     /// Removes the specified number of transmissions from the ready queue, and returns them.
@@ -234,7 +258,7 @@ impl<N: Network> Worker<N> {
     }
 
     /// Sends an transmission request to the specified peer.
-    pub(crate) async fn send_transmission_request(
+    async fn send_transmission_request(
         &self,
         peer_ip: SocketAddr,
         transmission_id: TransmissionID<N>,

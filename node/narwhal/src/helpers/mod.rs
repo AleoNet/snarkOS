@@ -36,6 +36,9 @@ pub use resolver::*;
 pub mod storage;
 pub use storage::*;
 
+pub mod timestamp;
+pub use timestamp::*;
+
 /// Formats an ID into a truncated identifier (for logging purposes).
 pub fn fmt_id(id: impl ToString) -> String {
     let id = id.to_string();
