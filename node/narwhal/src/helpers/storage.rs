@@ -326,7 +326,7 @@ impl<N: Network> Storage<N> {
                 previous_authors.insert(previous_certificate.author());
             }
             // Ensure the previous certificates have reached the quorum threshold.
-            if !previous_committee.is_quorum_threshold_reached(&previous_authors)? {
+            if !previous_committee.is_quorum_threshold_reached(&previous_authors) {
                 bail!("Previous certificates for a batch in round {round} did not reach quorum threshold {gc_log}")
             }
         }
@@ -395,7 +395,7 @@ impl<N: Network> Storage<N> {
         }
 
         // Ensure the signatures have reached the quorum threshold.
-        if !committee.is_quorum_threshold_reached(&signers)? {
+        if !committee.is_quorum_threshold_reached(&signers) {
             bail!("Signatures for a batch in round {round} did not reach quorum threshold {gc_log}")
         }
         Ok(missing_transmissions)

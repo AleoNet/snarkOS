@@ -199,7 +199,7 @@ impl<N: Network> Primary<N> {
             // Construct a set over the authors.
             let authors = previous_certificates.iter().map(BatchCertificate::author).collect();
             // Check if the previous certificates have reached the quorum threshold.
-            if committee.is_quorum_threshold_reached(&authors)? {
+            if committee.is_quorum_threshold_reached(&authors) {
                 is_ready = true;
             }
         }
@@ -338,7 +338,7 @@ impl<N: Network> Primary<N> {
             // Construct an iterator over the addresses.
             let addresses = signatures.keys().chain([batch.signature()].into_iter()).map(Signature::to_address);
             // Check if the batch has reached the quorum threshold.
-            if self.committee.read().is_quorum_threshold_reached(&addresses.collect())? {
+            if self.committee.read().is_quorum_threshold_reached(&addresses.collect()) {
                 is_ready = true;
             }
         }

@@ -21,6 +21,8 @@ use std::collections::HashSet;
 pub struct Committee<N: Network> {
     /// The current round number.
     round: u64,
+    /// total stake of all `members`
+    total_stake: u64,
     /// A map of `address` to `stake`.
     members: IndexMap<Address<N>, u64>,
 }
@@ -32,15 +34,30 @@ impl<N: Network> Committee<N> {
         ensure!(round > 0, "Round must be nonzero");
         // Ensure there are at least 4 members.
         ensure!(members.len() >= 4, "Committee must have at least 4 members");
+        // Compute the total stake of the committee only when members are added/removed and/or their
+        // individual stakes change.
+        let total_stake = Self::compute_total_stake(&members)?;
         // Return the new committee.
-        Ok(Self { round, members })
+        Ok(Self { round, total_stake, members })
+    }
+
+    fn compute_total_stake(members: &IndexMap<Address<N>, u64>) -> Result<u64> {
+        let mut power = 0u64;
+        for stake in members.values() {
+            // Accumulate the stake, checking for overflow.
+            power = match power.checked_add(*stake) {
+                Some(power) => power,
+                None => bail!("Failed to calculate total stake - overflow detected"),
+            };
+        }
+        Ok(power)
     }
 
     /// Returns a new `Committee` instance for the next round.
     /// TODO (howardwu): Add arguments for members (and stake) 1) to be added, 2) to be updated, and 3) to be removed.
     pub fn to_next_round(&self) -> Self {
         // Return the new committee.
-        Self { round: self.round.saturating_add(1), members: self.members.clone() }
+        Self { round: self.round.saturating_add(1), total_stake: self.total_stake, members: self.members.clone() }
     }
 }
 
@@ -67,17 +84,15 @@ impl<N: Network> Committee<N> {
 
     /// Returns `true` if the combined stake for the given addresses reaches the quorum threshold.
     /// This method takes in a `HashSet` to guarantee that the given addresses are unique.
-    pub fn is_quorum_threshold_reached(&self, addresses: &HashSet<Address<N>>) -> Result<bool> {
+    pub fn is_quorum_threshold_reached(&self, addresses: &HashSet<Address<N>>) -> bool {
         // Compute the combined stake for the given addresses.
         let mut stake = 0u64;
+
         for address in addresses {
-            stake = match stake.checked_add(self.get_stake(*address)) {
-                Some(stake) => stake,
-                None => bail!("Overflow when computing combined stake to check quorum threshold"),
-            };
+            stake += self.get_stake(*address);
         }
         // Return whether the combined stake reaches the quorum threshold.
-        Ok(stake >= self.quorum_threshold()?)
+        stake >= self.quorum_threshold()
     }
 
     /// Returns the amount of stake for the given address.
@@ -86,31 +101,22 @@ impl<N: Network> Committee<N> {
     }
 
     /// Returns the amount of stake required to reach the availability threshold `(f + 1)`.
-    pub fn availability_threshold(&self) -> Result<u64> {
+    pub fn availability_threshold(&self) -> u64 {
         // Assuming `N = 3f + 1 + k`, where `0 <= k < 3`,
         // then `(N + 2) / 3 = f + 1 + k/3 = f + 1`.
-        Ok(self.total_stake()?.saturating_add(2) / 3)
+        self.total_stake().saturating_add(2) / 3
     }
 
     /// Returns the amount of stake required to reach a quorum threshold `(2f + 1)`.
-    pub fn quorum_threshold(&self) -> Result<u64> {
+    pub fn quorum_threshold(&self) -> u64 {
         // Assuming `N = 3f + 1 + k`, where `0 <= k < 3`,
         // then `(2N + 3) / 3 = 2f + 1 + (2k + 2)/3 = 2f + 1 + k = N - f`.
-        Ok(self.total_stake()?.saturating_mul(2) / 3 + 1)
+        self.total_stake().saturating_mul(2) / 3 + 1
     }
 
     /// Returns the total amount of stake in the committee `(3f + 1)`.
-    pub fn total_stake(&self) -> Result<u64> {
-        // Compute the total power of the committee.
-        let mut power = 0u64;
-        for stake in self.members.values() {
-            // Accumulate the stake, checking for overflow.
-            power = match power.checked_add(*stake) {
-                Some(power) => power,
-                None => bail!("Failed to calculate total stake - overflow detected"),
-            };
-        }
-        Ok(power)
+    pub fn total_stake(&self) -> u64 {
+        self.total_stake
     }
 }
 
@@ -118,6 +124,7 @@ impl<N: Network> Committee<N> {
 pub mod prop_tests {
     use crate::helpers::Committee;
     use snarkos_account::Account;
+    use std::collections::HashSet;
 
     use anyhow::Result;
     use indexmap::IndexMap;
@@ -161,7 +168,7 @@ pub mod prop_tests {
         }
 
         pub fn is_valid(&self) -> bool {
-            self.round > 0 && self.validators.len() >= 4
+            self.round > 0 && HashSet::<u64>::from_iter(self.validators.iter().map(|v| v.account_seed)).len() >= 4
         }
     }
 
@@ -203,14 +210,14 @@ pub mod prop_tests {
         }
 
         assert_eq!(committee.committee_size(), validators.len());
-        assert_eq!(committee.total_stake().unwrap(), total_stake);
+        assert_eq!(committee.total_stake(), total_stake);
         for v in validators.iter() {
             let address = v.get_account().address();
             assert!(committee.is_committee_member(address));
             assert_eq!(committee.get_stake(address), v.stake);
         }
-        let quorum_threshold = committee.quorum_threshold().unwrap();
-        let availability_threshold = committee.availability_threshold().unwrap();
+        let quorum_threshold = committee.quorum_threshold();
+        let availability_threshold = committee.availability_threshold();
         // (2f + 1) + (f + 1) - 1 = 3f + 1 = N
         assert_eq!(quorum_threshold + availability_threshold - 1, total_stake);
     }
