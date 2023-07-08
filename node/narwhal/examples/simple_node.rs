@@ -34,7 +34,7 @@ use snarkvm::{
 };
 
 use ::bytes::Bytes;
-use anyhow::{bail, Result};
+use anyhow::{bail, ensure, Result};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -73,6 +73,7 @@ pub fn initialize_logger(verbosity: u8) {
             .add_directive("hyper=off".parse().unwrap())
             .add_directive("reqwest=off".parse().unwrap())
             .add_directive("want=off".parse().unwrap())
+            .add_directive("snarkos_node_narwhal::gateway=off".parse().unwrap())
             .add_directive("warp=off".parse().unwrap());
 
         if verbosity > 3 {
@@ -95,6 +96,9 @@ pub async fn start_primary(
     node_id: u16,
     num_nodes: u16,
 ) -> Result<(Primary<CurrentNetwork>, PrimarySender<CurrentNetwork>)> {
+    // Ensure that the node ID is valid.
+    ensure!(node_id < num_nodes, "Node ID {node_id} must be less than {num_nodes}");
+
     // Sample a account.
     let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(node_id as u64))?;
     println!("\n{account}\n");

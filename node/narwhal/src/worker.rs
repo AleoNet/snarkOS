@@ -19,7 +19,6 @@ use crate::{
     TransmissionRequest,
     TransmissionResponse,
     WorkerPing,
-    MAX_REQUESTS_PER_TRANSMISSION,
     MAX_WORKERS,
     WORKER_PING_INTERVAL,
 };
@@ -34,8 +33,8 @@ use snarkvm::{
 
 use indexmap::IndexMap;
 use parking_lot::Mutex;
-use std::{future::Future, net::SocketAddr, sync::Arc};
-use tokio::{sync::oneshot, task::JoinHandle};
+use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
+use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
 
 #[derive(Clone)]
 pub struct Worker<N: Network> {
@@ -48,7 +47,7 @@ pub struct Worker<N: Network> {
     /// The ready queue.
     ready: Ready<N>,
     /// The pending transmissions queue.
-    pending: Pending<TransmissionID<N>, ()>,
+    pending: Pending<TransmissionID<N>, Transmission<N>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -82,71 +81,81 @@ impl<N: Network> Worker<N> {
         self.id
     }
 
+    /// Returns `true` if the transmission ID exists in the ready queue, storage, or ledger.
+    pub fn contains_transmission(&self, transmission_id: TransmissionID<N>) -> bool {
+        // Check if the transmission ID exists in the ready queue, storage, or ledger.
+        self.ready.contains(transmission_id) || self.storage.contains_transmission(transmission_id)
+    }
+
+    /// Returns the transmission if it exists in the ready queue, storage, or ledger.
+    pub fn get_transmission(&self, transmission_id: TransmissionID<N>) -> Option<Transmission<N>> {
+        // Check if the transmission ID exists in the ready queue.
+        if let Some(transmission) = self.ready.get(transmission_id) {
+            return Some(transmission);
+        }
+        // Check if the transmission ID exists in storage.
+        if let Some(transmission) = self.storage.get_transmission(transmission_id) {
+            return Some(transmission);
+        }
+        // Check if the transmission ID already exists in the ledger.
+        // TODO (howardwu): Add a ledger service.
+        None
+    }
+
+    /// Returns the transmissions if it exists in the worker, or requests it from the specified peer.
+    pub async fn get_or_fetch_transmission(
+        &self,
+        peer_ip: SocketAddr,
+        transmission_id: TransmissionID<N>,
+    ) -> Result<(TransmissionID<N>, Transmission<N>)> {
+        // Attempt to get the transmission from the worker.
+        if let Some(transmission) = self.get_transmission(transmission_id) {
+            return Ok((transmission_id, transmission));
+        }
+        // Send a transmission request to the peer.
+        let (candidate_id, transmission) = self.send_transmission_request(peer_ip, transmission_id).await?;
+        // Ensure the transmission ID matches.
+        ensure!(candidate_id == transmission_id, "Invalid transmission ID");
+        // Return the transmission.
+        Ok((transmission_id, transmission))
+    }
+
     /// Removes the specified number of transmissions from the ready queue, and returns them.
-    pub(crate) fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
-        self.ready.take(num_transmissions)
+    pub(crate) fn take(&self, num_transmissions: usize) -> Result<IndexMap<TransmissionID<N>, Transmission<N>>> {
+        // TODO (howardwu): Ensure these transmissions are not already in the ledger.
+        Ok(self.ready
+            .take(num_transmissions)?
+            .into_iter()
+            // Filter out any transmissions from past rounds.
+            .filter(|(id, _)| !self.storage.contains_transmission(*id))
+            .collect())
+    }
+
+    /// Reinserts the specified transmission into the ready queue.
+    pub(crate) fn reinsert(&self, transmission_id: TransmissionID<N>, transmission: Transmission<N>) -> Result<bool> {
+        self.ready.insert(transmission_id, transmission)
     }
 }
 
 impl<N: Network> Worker<N> {
-    /// Handles the incoming transmission ID.
-    /// This method includes an optional callback handled during `Worker::process_transmission_response`.
-    pub(crate) fn process_transmission_id(
+    /// Handles the incoming transmission ID from a worker ping event.
+    async fn process_transmission_id_from_ping(
         &self,
         peer_ip: SocketAddr,
         transmission_id: TransmissionID<N>,
-        callback: Option<oneshot::Sender<()>>,
-    ) {
-        // Check if the transmission ID exists in the ready queue or in storage.
-        if self.ready.contains(transmission_id) || self.storage.contains_transmission(transmission_id) {
-            return;
+    ) -> Result<()> {
+        // Check if the transmission ID exists.
+        if self.contains_transmission(transmission_id) {
+            return Ok(());
         }
-        // Check if the transmission ID already exists in the ledger.
-        // TODO (howardwu): Add a ledger service.
-
-        // Retrieve the peer IPs that we have requested this transmission ID from.
-        let peer_ips = self.pending.get(transmission_id).unwrap_or_default();
-
-        // Check if the number of requests is within the limit, and we have not requested from this peer IP.
-        if peer_ips.len() < MAX_REQUESTS_PER_TRANSMISSION && !peer_ips.contains(&peer_ip) {
-            trace!(
-                "Worker {} - Found a new transmission ID '{}' from peer '{peer_ip}'",
-                self.id,
-                fmt_id(transmission_id)
-            );
-            // Insert the transmission ID into the pending queue.
-            if self.pending.insert(transmission_id, peer_ip, callback) {
-                // TODO (howardwu): Limit the number of open requests we send to a peer.
-                // Send an transmission request to the peer.
-                self.send_transmission_request(peer_ip, transmission_id);
-            }
-        }
-    }
-
-    /// Handles the incoming transmission request.
-    fn process_transmission_request(&self, peer_ip: SocketAddr, request: TransmissionRequest<N>) {
-        // Attempt to retrieve the transmission.
-        if let Some(transmission) = self.storage.get_transmission(request.transmission_id) {
-            // Send the transmission to the peer.
-            self.send_transmission_response(peer_ip, request.transmission_id, transmission);
-        }
-    }
-
-    /// Handles the incoming transmission response.
-    fn process_transmission_response(&self, peer_ip: SocketAddr, response: TransmissionResponse<N>) -> Result<()> {
-        // Check if the peer IP exists in the pending queue for the given transmission ID.
-        if self.pending.get(response.transmission_id).unwrap_or_default().contains(&peer_ip) {
-            // TODO: Validate the transmission.
-            // Insert the transmission into the ready queue.
-            self.ready.insert(response.transmission_id, response.transmission)?;
-            // Remove the transmission ID from the pending queue.
-            self.pending.remove(response.transmission_id, Some(()));
-            trace!(
-                "Worker {} - Added transmission '{}' from peer '{peer_ip}'",
-                self.id,
-                fmt_id(response.transmission_id)
-            );
-        }
+        trace!("Worker {} - Found a new transmission ID '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
+        // Send an transmission request to the peer.
+        let (candidate_id, transmission) = self.send_transmission_request(peer_ip, transmission_id).await?;
+        // Ensure the transmission ID matches.
+        ensure!(candidate_id == transmission_id, "Invalid transmission ID");
+        // Insert the transmission into the ready queue.
+        self.ready.insert(transmission_id, transmission)?;
+        trace!("Worker {} - Added transmission '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
         Ok(())
     }
 
@@ -157,10 +166,12 @@ impl<N: Network> Worker<N> {
         puzzle_commitment: PuzzleCommitment<N>,
         prover_solution: Data<ProverSolution<N>>,
     ) -> Result<()> {
+        // Construct the transmission.
+        let transmission = Transmission::Solution(prover_solution);
         // Remove the puzzle commitment from the pending queue.
-        self.pending.remove(puzzle_commitment, Some(()));
+        self.pending.remove(puzzle_commitment, Some(transmission.clone()));
         // Adds the prover solution to the ready queue.
-        self.ready.insert(puzzle_commitment, Transmission::Solution(prover_solution))?;
+        self.ready.insert(puzzle_commitment, transmission)?;
         trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment));
         Ok(())
     }
@@ -172,10 +183,12 @@ impl<N: Network> Worker<N> {
         transaction_id: N::TransactionID,
         transaction: Data<Transaction<N>>,
     ) -> Result<()> {
+        // Construct the transmission.
+        let transmission = Transmission::Transaction(transaction);
         // Remove the transaction from the pending queue.
-        self.pending.remove(&transaction_id, Some(()));
+        self.pending.remove(&transaction_id, Some(transmission.clone()));
         // Adds the transaction to the ready queue.
-        self.ready.insert(&transaction_id, Transmission::Transaction(transaction))?;
+        self.ready.insert(&transaction_id, transmission)?;
         trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));
         Ok(())
     }
@@ -201,7 +214,13 @@ impl<N: Network> Worker<N> {
         let self_clone = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, transmission_id)) = rx_worker_ping.recv().await {
-                self_clone.process_transmission_id(peer_ip, transmission_id, None);
+                if let Err(e) = self_clone.process_transmission_id_from_ping(peer_ip, transmission_id).await {
+                    warn!(
+                        "Worker {} failed to fetch missing transmission '{}' from peer '{peer_ip}': {e}",
+                        self_clone.id,
+                        fmt_id(transmission_id)
+                    );
+                }
             }
         });
 
@@ -209,7 +228,7 @@ impl<N: Network> Worker<N> {
         let self_clone = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, transmission_request)) = rx_transmission_request.recv().await {
-                self_clone.process_transmission_request(peer_ip, transmission_request);
+                self_clone.send_transmission_response(peer_ip, transmission_request);
             }
         });
 
@@ -218,7 +237,7 @@ impl<N: Network> Worker<N> {
         self.spawn(async move {
             while let Some((peer_ip, transmission_response)) = rx_transmission_response.recv().await {
                 // Process the transmission response.
-                if let Err(e) = self_clone.process_transmission_response(peer_ip, transmission_response) {
+                if let Err(e) = self_clone.finish_transmission_request(peer_ip, transmission_response) {
                     error!(
                         "Worker {} failed to process transmission response from peer '{peer_ip}': {e}",
                         self_clone.id
@@ -237,22 +256,52 @@ impl<N: Network> Worker<N> {
     }
 
     /// Sends an transmission request to the specified peer.
-    fn send_transmission_request(&self, peer_ip: SocketAddr, transmission_id: TransmissionID<N>) {
-        // Send the transmission request to the peer.
-        self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into()));
-    }
-
-    /// Sends an transmission response to the specified peer.
-    fn send_transmission_response(
+    async fn send_transmission_request(
         &self,
         peer_ip: SocketAddr,
         transmission_id: TransmissionID<N>,
-        transmission: Transmission<N>,
-    ) {
-        // Construct the transmission response.
-        let transmission_response = TransmissionResponse::new(transmission_id, transmission);
-        // Send the transmission response to the peer.
-        self.gateway.send(peer_ip, Event::TransmissionResponse(transmission_response));
+    ) -> Result<(TransmissionID<N>, Transmission<N>)> {
+        // Initialize a oneshot channel.
+        let (callback_sender, callback_receiver) = oneshot::channel();
+        // Insert the transmission ID into the pending queue.
+        self.pending.insert(transmission_id, peer_ip, Some(callback_sender));
+        // TODO (howardwu): Limit the number of open requests we send to a peer.
+        // Send the transmission request to the peer.
+        self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into()));
+        // Wait for the transmission to be fetched.
+        match timeout(Duration::from_secs(10), callback_receiver).await {
+            // If the transmission was fetched, return it.
+            Ok(result) => Ok((transmission_id, result?)),
+            // If the transmission was not fetched, return an error.
+            Err(e) => bail!("Unable to fetch transmission - (timeout) {e}"),
+        }
+    }
+
+    /// Handles the incoming transmission response.
+    /// This method ensures the transmission response is well-formed and matches the transmission ID.
+    fn finish_transmission_request(&self, peer_ip: SocketAddr, response: TransmissionResponse<N>) -> Result<()> {
+        let TransmissionResponse { transmission_id, transmission } = response;
+        // Check if the peer IP exists in the pending queue for the given transmission ID.
+        let exists = self.pending.get(transmission_id).unwrap_or_default().contains(&peer_ip);
+        // If the peer IP exists, finish the pending request.
+        if exists {
+            // TODO: Validate the transmission.
+            // TODO (howardwu): Deserialize the transmission, and ensure it matches the transmission ID.
+            //  Note: This is difficult for testing and example purposes, since those transmissions are fake.
+            // Remove the transmission ID from the pending queue.
+            self.pending.remove(transmission_id, Some(transmission));
+        }
+        Ok(())
+    }
+
+    /// Sends the requested transmission to the specified peer.
+    fn send_transmission_response(&self, peer_ip: SocketAddr, request: TransmissionRequest<N>) {
+        let TransmissionRequest { transmission_id } = request;
+        // Attempt to retrieve the transmission.
+        if let Some(transmission) = self.get_transmission(transmission_id) {
+            // Send the transmission response to the peer.
+            self.gateway.send(peer_ip, Event::TransmissionResponse((transmission_id, transmission).into()));
+        }
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.

@@ -26,8 +26,8 @@ use std::sync::Arc;
 pub struct Ready<N: Network> {
     /// The storage.
     storage: Storage<N>,
-    /// The current set of `transmission IDs`.
-    transmission_ids: Arc<RwLock<IndexSet<TransmissionID<N>>>>,
+    /// The current map of `(transmission ID, transmission)` entries.
+    transmissions: Arc<RwLock<IndexMap<TransmissionID<N>, Transmission<N>>>>,
     /// The cumulative proof target in the ready queue.
     cumulative_proof_target: Arc<RwLock<u128>>,
 }
@@ -35,17 +35,17 @@ pub struct Ready<N: Network> {
 impl<N: Network> Ready<N> {
     /// Initializes a new instance of the ready queue.
     pub fn new(storage: Storage<N>) -> Self {
-        Self { storage, transmission_ids: Default::default(), cumulative_proof_target: Default::default() }
+        Self { storage, transmissions: Default::default(), cumulative_proof_target: Default::default() }
     }
 
     /// Returns `true` if the ready queue is empty.
     pub fn is_empty(&self) -> bool {
-        self.transmission_ids.read().is_empty()
+        self.transmissions.read().is_empty()
     }
 
     /// Returns the number of transmissions in the ready queue.
     pub fn len(&self) -> usize {
-        self.transmission_ids.read().len()
+        self.transmissions.read().len()
     }
 
     /// Returns the cumulative proof target.
@@ -55,17 +55,17 @@ impl<N: Network> Ready<N> {
 
     /// Returns the transmission IDs.
     pub fn transmission_ids(&self) -> IndexSet<TransmissionID<N>> {
-        self.transmission_ids.read().clone()
+        self.transmissions.read().keys().copied().collect()
     }
 
     /// Returns `true` if the ready queue contains the specified `transmission ID`.
     pub fn contains(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
-        self.transmission_ids.read().contains(&transmission_id.into())
+        self.transmissions.read().contains_key(&transmission_id.into())
     }
 
     /// Returns the transmission, given the specified `transmission ID`.
     pub fn get(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<Transmission<N>> {
-        self.storage.get_transmission(transmission_id)
+        self.transmissions.read().get(&transmission_id.into()).cloned()
     }
 
     /// Inserts the specified (`transmission ID`, `transmission`) to the ready queue.
@@ -78,9 +78,7 @@ impl<N: Network> Ready<N> {
         // If the transmission is new, insert it.
         if is_new {
             // Insert the transmission ID.
-            self.transmission_ids.write().insert(transmission_id);
-            // Insert the transmission.
-            self.storage.insert_transmission(transmission_id, transmission);
+            self.transmissions.write().insert(transmission_id, transmission);
             // Check if the transmission ID is for a prover solution.
             if let TransmissionID::Solution(commitment) = &transmission_id {
                 // Increment the cumulative proof target.
@@ -93,32 +91,24 @@ impl<N: Network> Ready<N> {
     }
 
     /// Removes the specified number of transmissions and returns them.
-    pub fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
-        // Scope the locks.
-        let ids = {
-            // Acquire the write locks (simultaneously).
-            let mut cumulative_proof_target = self.cumulative_proof_target.write();
-            let mut transmission_ids = self.transmission_ids.write();
-            // Reset the cumulative proof target.
-            *cumulative_proof_target = 0;
-            // Determine the number of transmissions to drain.
-            let range = 0..transmission_ids.len().min(num_transmissions);
-            // Drain the transmission IDs.
-            transmission_ids.drain(range).collect::<Vec<_>>()
-        };
+    pub fn take(&self, num_transmissions: usize) -> Result<IndexMap<TransmissionID<N>, Transmission<N>>> {
+        // TODO (howardwu): This logic does not correctly update the cumulative proof target anymore.
+        // Acquire the write locks (simultaneously).
+        let mut cumulative_proof_target = self.cumulative_proof_target.write();
+        let mut transmissions = self.transmissions.write();
 
-        // Initialize a map for the transmissions.
-        let mut transmissions = IndexMap::with_capacity(ids.len());
-        // Iterate through the transmission IDs.
-        for transmission_id in ids.iter() {
-            // Retrieve the transmission.
-            if let Some(transmission) = self.storage.get_transmission(*transmission_id) {
-                // Insert the transmission.
-                transmissions.insert(*transmission_id, transmission);
+        // Determine the number of transmissions to drain.
+        let range = 0..transmissions.len().min(num_transmissions);
+        // Drain the transmission IDs.
+        let result = transmissions.drain(range).collect::<IndexMap<_, _>>();
+
+        // Update the cumulative proof target.
+        for (transmission_id, _) in result.iter() {
+            if let TransmissionID::Solution(commitment) = transmission_id {
+                *cumulative_proof_target = cumulative_proof_target.saturating_sub(commitment.to_target()? as u128);
             }
         }
-        // Return the transmissions.
-        transmissions
+        Ok(result)
     }
 }
 
@@ -184,7 +174,7 @@ mod tests {
         assert_eq!(ready.get(commitment_unknown), None);
 
         // Drain the ready queue.
-        let transmissions = ready.take(3);
+        let transmissions = ready.take(3).unwrap();
 
         // Check the number of transmissions.
         assert!(ready.is_empty());

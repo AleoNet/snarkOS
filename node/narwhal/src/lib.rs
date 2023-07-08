@@ -44,8 +44,6 @@ pub const MAX_COMMITTEE_SIZE: u16 = 128; // members
 pub const MAX_EXPIRATION_TIME_IN_SECS: i64 = 10; // seconds
 /// The maximum number of round to store before garbage collecting.
 pub const MAX_GC_ROUNDS: u64 = 50; // rounds
-/// The maximum number of requests that can be made to retrieve a transmission.
-pub const MAX_REQUESTS_PER_TRANSMISSION: usize = 5; // requests
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of transmissions allowed in a batch.

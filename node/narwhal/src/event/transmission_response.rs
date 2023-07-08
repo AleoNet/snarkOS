@@ -27,6 +27,13 @@ impl<N: Network> TransmissionResponse<N> {
     }
 }
 
+impl<N: Network> From<(TransmissionID<N>, Transmission<N>)> for TransmissionResponse<N> {
+    /// Initializes a new transmission response event.
+    fn from((transmission_id, transmission): (TransmissionID<N>, Transmission<N>)) -> Self {
+        Self::new(transmission_id, transmission)
+    }
+}
+
 impl<N: Network> EventTrait for TransmissionResponse<N> {
     /// Returns the event name.
     #[inline]

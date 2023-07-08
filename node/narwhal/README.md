@@ -41,7 +41,10 @@ on the entries they receive from other validators' workers.
 - Two validators, one with X workers, another with Y workers. Check that they are compatible.
 - If a primary sees that f+1 other primaries have certified this round, it should skip to the next round if it has not been certified yet.
 - Ensure taking a set number of transmissions from workers leaves the remaining transmissions in place for the next round.
+- Send back a mismatching transmission for a transmission ID, ensure it catches it.
+- Send back a mismatching certificate for a certificate ID, ensure it catches it.
 
 ## Open Questions
 
 1. How does one guarantee the number of accepted transactions and solutions does not exceed the block limits?
+   - We need to set limits on number of transmissions for the workers, but also the primary.
