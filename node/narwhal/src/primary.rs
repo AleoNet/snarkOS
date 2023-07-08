@@ -246,6 +246,7 @@ impl<N: Network> Primary<N> {
     async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
         let BatchPropose { round: batch_round, batch_header } = batch_propose;
 
+        info!("RECEIVED A BATCH PROPOSAL!!!");
         // Retrieve the committee round.
         let committee_round = self.committee.read().round();
         // Ensure the batch round is within GC range of the committee round.
@@ -278,11 +279,11 @@ impl<N: Network> Primary<N> {
         // // Get or fetch all of the transmissions declared in the batch header.
         // let transmissions = self.sync_with_peer(peer_ip, &batch_header).await?;
 
-        // Ensure the primary has all of the transmissions.
-        let transmissions = self.get_or_fetch_transmissions(peer_ip, &batch_header).await?;
-        // TODO (howardwu): Add the missing transmissions into the workers.
-        // Ensure the batch header from the peer is valid.
-        let missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
+        // // Ensure the primary has all of the transmissions.
+        // let transmissions = self.get_or_fetch_transmissions(peer_ip, &batch_header).await?;
+        // // TODO (howardwu): Add the missing transmissions into the workers.
+        // // Ensure the batch header from the peer is valid.
+        // let missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
 
         /* Proceeding to sign the batch. */
 
@@ -573,18 +574,22 @@ impl<N: Network> Primary<N> {
         // Ensure this batch does not contain already committed transmissions in the ledger.
         // TODO: Add a ledger service.
 
+        info!("PREPARING TO STORE CERTIFICATE FOR ROUND {}", batch_round);
+
         // Ensure the primary has all of the transmissions.
         let transmissions = self.get_or_fetch_transmissions(peer_ip, batch_header).await?;
-        // Ensure the batch header is well-formed.
-        let missing_transmissions = self.storage.check_batch_header(batch_header, transmissions)?;
-
+        info!("RETRIEVED TRANSMISSIONS FOR ROUND {}", batch_round);
         // Ensure the primary has all of the previous certificates.
         let missing_certificates = self.fetch_missing_previous_certificates(peer_ip, batch_header).await?;
+        info!("RETRIEVED PREVIOUS CERTIFICATES FOR ROUND {}", batch_round);
         // Iterate through the missing certificates.
         for batch_certificate in missing_certificates {
             // Store the batch certificate (recursively fetching any missing previous certificates).
             self.sync_with_peer(peer_ip, batch_certificate).await?;
         }
+        // Ensure the batch header is well-formed.
+        let missing_transmissions = self.storage.check_batch_header(batch_header, transmissions)?;
+        info!("CHECKED BATCH HEADER FOR ROUND {}", batch_round);
 
         // Check if the certificate needs to be stored.
         if !self.storage.contains_certificate(certificate.certificate_id()) {
@@ -695,6 +700,8 @@ impl<N: Network> Primary<N> {
             // Insert the transmission into the set.
             transmissions.insert(transmission_id, transmission);
         }
+        info!("FINISHED TRANSMISSIONS");
+        ensure!(transmissions.len() == batch_header.transmission_ids().len(), "MISSING TRANSMISSIONS!!");
         // Return the transmissions.
         Ok(transmissions)
     }

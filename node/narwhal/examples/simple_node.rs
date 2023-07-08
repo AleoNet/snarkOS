@@ -73,6 +73,7 @@ pub fn initialize_logger(verbosity: u8) {
             .add_directive("hyper=off".parse().unwrap())
             .add_directive("reqwest=off".parse().unwrap())
             .add_directive("want=off".parse().unwrap())
+            .add_directive("snarkos_node_narwhal::gateway=off".parse().unwrap())
             .add_directive("warp=off".parse().unwrap());
 
         if verbosity > 3 {
