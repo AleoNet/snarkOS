@@ -16,6 +16,7 @@ use crate::{
     helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
     Event,
     Gateway,
+    ProposedBatch,
     TransmissionRequest,
     TransmissionResponse,
     MAX_WORKERS,
@@ -43,6 +44,8 @@ pub struct Worker<N: Network> {
     gateway: Gateway<N>,
     /// The storage.
     storage: Storage<N>,
+    /// The proposed batch.
+    proposed_batch: ProposedBatch<N>,
     /// The ready queue.
     ready: Ready<N>,
     /// The pending transmissions queue.
@@ -53,7 +56,7 @@ pub struct Worker<N: Network> {
 
 impl<N: Network> Worker<N> {
     /// Initializes a new worker instance.
-    pub fn new(id: u8, gateway: Gateway<N>, storage: Storage<N>) -> Result<Self> {
+    pub fn new(id: u8, gateway: Gateway<N>, storage: Storage<N>, proposed_batch: ProposedBatch<N>) -> Result<Self> {
         // Ensure the worker ID is valid.
         ensure!(id < MAX_WORKERS, "Invalid worker ID '{id}'");
         // Return the worker.
@@ -61,6 +64,7 @@ impl<N: Network> Worker<N> {
             id,
             gateway,
             storage: storage.clone(),
+            proposed_batch,
             ready: Ready::new(storage),
             pending: Default::default(),
             handles: Default::default(),
@@ -79,17 +83,30 @@ impl<N: Network> Worker<N> {
         self.id
     }
 
-    /// Returns `true` if the transmission ID exists in the ready queue, storage, or ledger.
+    /// Returns `true` if the transmission ID exists in the ready queue, proposed batch, storage, or ledger.
     pub fn contains_transmission(&self, transmission_id: TransmissionID<N>) -> bool {
-        // Check if the transmission ID exists in the ready queue, storage, or ledger.
-        self.ready.contains(transmission_id) || self.storage.contains_transmission(transmission_id)
+        // TODO (howardwu): Add a ledger service.
+        // Check if the transmission ID exists in the ready queue, proposed batch, storage, or ledger.
+        self.ready.contains(transmission_id)
+            || self
+                .proposed_batch
+                .read()
+                .as_ref()
+                .map_or(false, |proposal| proposal.contains_transmission(transmission_id))
+            || self.storage.contains_transmission(transmission_id)
     }
 
-    /// Returns the transmission if it exists in the ready queue, storage, or ledger.
+    /// Returns the transmission if it exists in the ready queue, proposed batch, storage, or ledger.
     pub fn get_transmission(&self, transmission_id: TransmissionID<N>) -> Option<Transmission<N>> {
         // Check if the transmission ID exists in the ready queue.
         if let Some(transmission) = self.ready.get(transmission_id) {
             return Some(transmission);
+        }
+        // Check if the transmission ID exists in the proposed batch.
+        if let Some(transmission) =
+            self.proposed_batch.read().as_ref().map_or(None, |proposal| proposal.get_transmission(transmission_id))
+        {
+            return Some(transmission.clone());
         }
         // Check if the transmission ID exists in storage.
         if let Some(transmission) = self.storage.get_transmission(transmission_id) {

@@ -848,7 +848,8 @@ pub mod prop_tests {
                 // Construct the worker channels.
                 let (tx_worker, rx_worker) = init_worker_channels();
                 // Construct the worker instance.
-                let worker = Worker::new(id, gateway.clone(), self.worker_storage.to_storage()).unwrap();
+                let worker =
+                    Worker::new(id, gateway.clone(), self.worker_storage.to_storage(), Default::default()).unwrap();
                 // Run the worker instance.
                 worker.run(rx_worker);
 

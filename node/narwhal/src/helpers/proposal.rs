@@ -97,6 +97,16 @@ impl<N: Network> Proposal<N> {
         self.committee.is_quorum_threshold_reached(&signers.collect())
     }
 
+    /// Returns `true` if the proposal contains the given transmission ID.
+    pub fn contains_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
+        self.batch.contains(transmission_id)
+    }
+
+    /// Returns the `transmission` for the given `transmission ID`.
+    pub fn get_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<&Transmission<N>> {
+        self.batch.get(transmission_id)
+    }
+
     /// Adds a signature to the proposal, if the signature is valid.
     pub fn add_signature(&mut self, signer: Address<N>, signature: Signature<N>, timestamp: i64) -> Result<()> {
         // Ensure the signer is in the committee.

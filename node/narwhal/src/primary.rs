@@ -55,6 +55,9 @@ use std::{
 };
 use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
 
+/// A type helper for an optional proposed batch.
+pub type ProposedBatch<N> = Arc<RwLock<Option<Proposal<N>>>>;
+
 #[derive(Clone)]
 pub struct Primary<N: Network> {
     /// The gateway.
@@ -64,7 +67,7 @@ pub struct Primary<N: Network> {
     /// The workers.
     workers: Arc<Vec<Worker<N>>>,
     /// The batch proposal, if the primary is currently proposing a batch.
-    proposed_batch: Arc<RwLock<Option<Proposal<N>>>>,
+    proposed_batch: ProposedBatch<N>,
     /// The pending certificates queue.
     pending: Pending<Field<N>, BatchCertificate<N>>,
     /// The spawned handles.
@@ -103,7 +106,7 @@ impl<N: Network> Primary<N> {
             // Construct the worker channels.
             let (tx_worker, rx_worker) = init_worker_channels();
             // Construct the worker instance.
-            let worker = Worker::new(id, self.gateway.clone(), self.storage.clone())?;
+            let worker = Worker::new(id, self.gateway.clone(), self.storage.clone(), self.proposed_batch.clone())?;
             // Run the worker instance.
             worker.run(rx_worker);
             // Add the worker to the list of workers.
