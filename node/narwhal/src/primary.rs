@@ -255,9 +255,6 @@ impl<N: Network> Primary<N> {
     async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
         let BatchPropose { round: batch_round, batch_header } = batch_propose;
 
-        // Ensure the batch is for the current round.
-        self.ensure_is_signing_round(batch_round)?;
-
         // TODO (howardwu): Ensure I have not signed this round for this author before. If so, do not sign.
 
         // Deserialize the batch header.
@@ -267,12 +264,27 @@ impl<N: Network> Primary<N> {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
         }
 
+        // Retrieve the committee round.
+        let committee_round = self.current_round();
+        // Ensure the batch round is within GC range of the committee round.
+        if committee_round + self.storage.max_gc_rounds() <= batch_round {
+            // Fetch the missing previous certificates.
+            let previous_certificates = self.fetch_missing_previous_certificates(peer_ip, &batch_header).await?;
+            // Process the previous certificates.
+            for previous_certificate in previous_certificates {
+                self.process_batch_certificate_from_peer(peer_ip, previous_certificate).await?;
+            }
+        }
+
+        // Ensure the batch is for the current round.
+        self.ensure_is_signing_round(batch_round)?;
+
         // TODO (howardwu): Include fetching from the peer's proposed batch, to fix this fetch that times out.
-        // // Ensure the primary has all of the transmissions.
-        // let transmissions = self.fetch_missing_transmissions(peer_ip, &batch_header).await?;
+        // Ensure the primary has all of the transmissions.
+        let transmissions = self.fetch_missing_transmissions(peer_ip, &batch_header).await?;
         // // TODO (howardwu): Add the missing transmissions into the workers.
-        // // Ensure the batch header from the peer is valid.
-        // let missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
+        // Ensure the batch header from the peer is valid.
+        let missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
 
         /* Proceeding to sign the batch. */
 
@@ -353,7 +365,7 @@ impl<N: Network> Primary<N> {
                 let round = certificate.round();
                 info!("\n\nOur batch with {num_transmissions} transmissions for round {round} was certified!\n");
                 // Update the committee to the next round.
-                self.update_committee_to_next_round()
+                self.update_committee_to_round(round + 1)
             }
             // If this fails, return the transmissions back into the ready queue for the next proposal.
             Err(_) => self.reinsert_transmissions_into_workers(proposal),
@@ -372,7 +384,29 @@ impl<N: Network> Primary<N> {
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
         // Store the certificate, after ensuring it is valid.
-        self.sync_with_certificate_from_peer(peer_ip, certificate).await
+        self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
+
+        // Retrieve the current committee.
+        let current_committee = self.current_committee();
+        // Retrieve the current round.
+        let current_round = current_committee.round();
+        // Retrieve the certificates.
+        let certificates = self.storage.get_certificates_for_round(current_round);
+        // Construct a set over the authors.
+        let authors = certificates.iter().map(BatchCertificate::author).collect();
+        // Check if the certificates have reached the quorum threshold.
+        let is_quorum = current_committee.is_quorum_threshold_reached(&authors);
+
+        // TODO (howardwu): Contemplate removing this check.
+        // Determine if we are currently proposing a round.
+        let is_proposing = self.proposed_batch.read().is_some();
+
+        if is_quorum && !is_proposing {
+            // TODO (howardwu): After bullshark is implemented, we need to check the leader case.
+            // If we have reached the quorum threshold, then proceed to the next round.
+            self.update_committee_to_round(current_round + 1)?;
+        }
+        Ok(())
     }
 }
 
@@ -501,7 +535,7 @@ impl<N: Network> Primary<N> {
             // Check if there are certificates for the next round.
             while !self.storage.get_certificates_for_round(current_round + 1).is_empty() {
                 // If there are certificates for the next round, increment the round.
-                self.update_committee_to_next_round()?;
+                self.update_committee_to_round(current_round + 1)?;
                 // Increment the current round.
                 current_round += 1;
             }
@@ -566,14 +600,17 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
-    /// Updates the committee to the next round, returning the next round number.
-    fn update_committee_to_next_round(&self) -> Result<()> {
-        // Update to the next committee in storage.
-        self.storage.increment_committee_to_next_round()?;
-        // Clear the proposed batch.
-        *self.proposed_batch.write() = None;
-        // Log the updated round.
-        info!("Starting round {}...", self.current_round());
+    /// Updates the committee to the specified round.
+    fn update_committee_to_round(&self, next_round: u64) -> Result<()> {
+        // Iterate until the desired round is reached.
+        while self.current_round() < next_round {
+            // Update to the next committee in storage.
+            self.storage.increment_committee_to_next_round()?;
+            // Clear the proposed batch.
+            *self.proposed_batch.write() = None;
+            // Log the updated round.
+            info!("Starting round {}...", self.current_round());
+        }
         Ok(())
     }
 
@@ -620,9 +657,7 @@ impl<N: Network> Primary<N> {
             // TODO (howardwu): Guard this to increment after quorum threshold is reached.
             // TODO (howardwu): After bullshark is implemented, we must use Aleo blocks to guide us to `tip-50` to know the committee.
             // If the batch round is greater than the current committee round, update the committee.
-            while self.current_round() < batch_round {
-                self.update_committee_to_next_round()?;
-            }
+            self.update_committee_to_round(batch_round)?;
         }
 
         // // Ensure this batch does not contain already committed transmissions from past rounds.
@@ -771,7 +806,7 @@ impl<N: Network> Primary<N> {
             self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into()));
         }
         // Wait for the certificate to be fetched.
-        match timeout(Duration::from_secs(10), callback_receiver).await {
+        match timeout(Duration::from_secs(5), callback_receiver).await {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
