@@ -104,7 +104,7 @@ impl<N: Network> Worker<N> {
         }
         // Check if the transmission ID exists in the proposed batch.
         if let Some(transmission) =
-            self.proposed_batch.read().as_ref().map_or(None, |proposal| proposal.get_transmission(transmission_id))
+            self.proposed_batch.read().as_ref().and_then(|proposal| proposal.get_transmission(transmission_id))
         {
             return Some(transmission.clone());
         }
