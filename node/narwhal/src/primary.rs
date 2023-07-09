@@ -284,7 +284,7 @@ impl<N: Network> Primary<N> {
         let transmissions = self.fetch_missing_transmissions(peer_ip, &batch_header).await?;
         // // TODO (howardwu): Add the missing transmissions into the workers.
         // Ensure the batch header from the peer is valid.
-        let missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
+        let _missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
 
         /* Proceeding to sign the batch. */
 
