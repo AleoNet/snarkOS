@@ -195,7 +195,7 @@ impl<N: Network> Primary<N> {
         // If the previous round is not 0, check if the previous certificates have reached the quorum threshold.
         if previous_round > 0 {
             // Retrieve the committee for the round.
-            let Some(committee) = self.storage.get_committee_for_round(previous_round) else {
+            let Some(committee) = self.storage.get_committee(previous_round) else {
                 bail!("Cannot propose a batch for round {round}: the previous committee is not known yet")
             };
             // Construct a set over the authors.
@@ -258,25 +258,8 @@ impl<N: Network> Primary<N> {
     async fn process_batch_propose_from_peer(&self, peer_ip: SocketAddr, batch_propose: BatchPropose<N>) -> Result<()> {
         let BatchPropose { round: batch_round, batch_header } = batch_propose;
 
-        // Retrieve the committee round.
-        let committee_round = self.committee.read().round();
-        // Ensure the batch round is within GC range of the committee round.
-        if committee_round + self.storage.max_gc_rounds() <= batch_round {
-            bail!("Round {batch_round} is too far in the future")
-        }
-
-        // Ensure the batch round is at or one before the committee round.
-        // Intuition: Our primary has moved on to the next round, but has not necessarily started proposing,
-        // so we can still sign for the previous round. If we have started proposing, the next check will fail.
-        if committee_round > batch_round + 1 {
-            bail!("Primary is on round {committee_round}, and no longer signing for round {batch_round}")
-        }
-        // Check if the primary is still signing for the batch round.
-        if let Some(signing_round) = self.proposed_batch.read().as_ref().map(|proposal| proposal.round()) {
-            if signing_round > batch_round {
-                bail!("Our primary at round {signing_round} is no longer signing for round {batch_round}")
-            }
-        }
+        // Ensure the batch is for the current round.
+        self.ensure_is_signing_round(batch_round)?;
 
         // TODO (howardwu): Ensure I have not signed this round for this author before. If so, do not sign.
 
@@ -330,10 +313,10 @@ impl<N: Network> Primary<N> {
         let BatchSignature { batch_id, signature, timestamp } = batch_signature;
 
         // Acquire the write lock.
-        let mut proposal = self.proposed_batch.write();
+        let mut proposed_batch = self.proposed_batch.write();
 
         // Add the signature to the batch, and determine if the batch is ready to be certified.
-        let is_ready = match proposal.as_mut() {
+        let is_ready = match proposed_batch.as_mut() {
             Some(proposal) => {
                 // Ensure the batch ID matches the currently proposed batch ID.
                 if proposal.batch_id() != batch_id {
@@ -362,12 +345,15 @@ impl<N: Network> Primary<N> {
 
         /* Proceeding to certify the batch. */
 
-        // TODO (howardwu): If any method below fails, we need to return the transmissions back to the ready queue.
         // Retrieve the batch proposal, clearing the proposed batch.
-        let proposal = proposal.take();
+        let proposal = proposed_batch.take();
+        drop(proposed_batch);
+
+        // Certify the batch.
         if let Some(proposal) = proposal {
             info!("Quorum threshold reached - Preparing to certify our batch...");
 
+            // TODO (howardwu): If any method below fails, we need to return the transmissions back to the ready queue.
             // Create the batch certificate and transmissions.
             let (certificate, transmissions) = proposal.into_certificate()?;
             // Store the certified batch.
@@ -548,6 +534,29 @@ impl<N: Network> Primary<N> {
                 self.update_committee_to_next_round();
                 // Increment the current round.
                 current_round += 1;
+            }
+        }
+        Ok(())
+    }
+
+    /// Ensures the primary is signing for the specified batch round.
+    fn ensure_is_signing_round(&self, batch_round: u64) -> Result<()> {
+        // Retrieve the committee round.
+        let committee_round = self.committee.read().round();
+        // Ensure the batch round is within GC range of the committee round.
+        if committee_round + self.storage.max_gc_rounds() <= batch_round {
+            bail!("Round {batch_round} is too far in the future")
+        }
+        // Ensure the batch round is at or one before the committee round.
+        // Intuition: Our primary has moved on to the next round, but has not necessarily started proposing,
+        // so we can still sign for the previous round. If we have started proposing, the next check will fail.
+        if committee_round > batch_round + 1 {
+            bail!("Primary is on round {committee_round}, and no longer signing for round {batch_round}")
+        }
+        // Check if the primary is still signing for the batch round.
+        if let Some(signing_round) = self.proposed_batch.read().as_ref().map(|proposal| proposal.round()) {
+            if signing_round > batch_round {
+                bail!("Our primary at round {signing_round} is no longer signing for round {batch_round}")
             }
         }
         Ok(())

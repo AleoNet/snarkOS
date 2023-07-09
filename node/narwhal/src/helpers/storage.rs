@@ -132,7 +132,7 @@ impl<N: Network> Storage<N> {
 
     /// Returns the `committee` for the given `round`.
     /// If the round does not exist in storage, `None` is returned.
-    pub fn get_committee_for_round(&self, round: u64) -> Option<Committee<N>> {
+    pub fn get_committee(&self, round: u64) -> Option<Committee<N>> {
         // Get the committee from storage.
         self.committees.read().get(&round).cloned()
     }
@@ -272,7 +272,7 @@ impl<N: Network> Storage<N> {
         }
 
         // Retrieve the committee for the batch round.
-        let Some(committee) = self.get_committee_for_round(round) else {
+        let Some(committee) = self.get_committee(round) else {
             bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
         };
         // Ensure the author is in the committee.
@@ -303,7 +303,7 @@ impl<N: Network> Storage<N> {
         // Check if the previous round is within range of the GC round.
         if previous_round > gc_round {
             // Retrieve the committee for the previous round.
-            let Some(previous_committee) = self.get_committee_for_round(previous_round) else {
+            let Some(previous_committee) = self.get_committee(previous_round) else {
                 bail!("Missing committee for the previous round {previous_round} in storage {gc_log}")
             };
             // Ensure the previous round exists in storage.
@@ -373,7 +373,7 @@ impl<N: Network> Storage<N> {
         }
 
         // Retrieve the committee for the batch round.
-        let Some(committee) = self.get_committee_for_round(round) else {
+        let Some(committee) = self.get_committee(round) else {
             bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
         };
 
