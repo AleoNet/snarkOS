@@ -97,7 +97,7 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Run the gateway.
-    pub async fn run(&mut self, worker_senders: IndexMap<u8, WorkerSender<N>>) -> Result<()> {
+    pub async fn run(&self, worker_senders: IndexMap<u8, WorkerSender<N>>) -> Result<()> {
         debug!("Starting the gateway for the memory pool...");
 
         // Set the worker senders.
@@ -854,7 +854,7 @@ pub mod prop_tests {
                 // Construct the worker channels.
                 let (tx_worker, rx_worker) = init_worker_channels();
                 // Construct the worker instance.
-                let mut worker = Worker::new(id, gateway.clone(), self.worker_storage.to_storage()).unwrap();
+                let worker = Worker::new(id, gateway.clone(), self.worker_storage.to_storage()).unwrap();
                 // Run the worker instance.
                 worker.run(rx_worker).await.unwrap();
 
@@ -895,7 +895,7 @@ pub mod prop_tests {
     #[proptest(async = "tokio")]
     async fn gateway_start(#[filter(|x| x.dev.is_some())] input: GatewayInput) {
         let Some(dev) = input.dev else { unreachable!() };
-        let mut gateway = input.to_gateway();
+        let gateway = input.to_gateway();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
         assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + (dev as u16)));

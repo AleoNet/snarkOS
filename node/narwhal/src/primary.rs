@@ -64,7 +64,7 @@ pub struct Primary<N: Network> {
     /// The storage.
     storage: Storage<N>,
     /// The workers.
-    workers: Arc<RwLock<Vec<Worker<N>>>>,
+    workers: Arc<Vec<Worker<N>>>,
     /// The batch proposal, if the primary is currently proposing a batch.
     proposed_batch: Arc<RwLock<Option<Proposal<N>>>>,
     /// The pending certificates queue.
@@ -106,22 +106,23 @@ impl<N: Network> Primary<N> {
 
         // Construct a map of the worker senders.
         let mut tx_workers = IndexMap::new();
-
+        // Construct a map for the workers.
+        let mut workers = Vec::new();
         // Initialize the workers.
-        for _ in 0..MAX_WORKERS {
-            // Construct the worker ID.
-            let id = u8::try_from(self.workers.read().len())?;
+        for id in 0..MAX_WORKERS {
             // Construct the worker channels.
             let (tx_worker, rx_worker) = init_worker_channels();
             // Construct the worker instance.
-            let mut worker = Worker::new(id, self.gateway.clone(), self.storage.clone())?;
+            let worker = Worker::new(id, self.gateway.clone(), self.storage.clone())?;
             // Run the worker instance.
             worker.run(rx_worker).await?;
             // Add the worker to the list of workers.
-            self.workers.write().push(worker);
+            workers.push(worker);
             // Add the worker sender to the map.
             tx_workers.insert(id, tx_worker);
         }
+        // Set the workers.
+        self.workers = Arc::new(workers);
 
         // Initialize the gateway.
         self.gateway.run(tx_workers).await?;
@@ -149,11 +150,11 @@ impl<N: Network> Primary<N> {
 
     /// Returns the number of workers.
     pub fn num_workers(&self) -> u8 {
-        u8::try_from(self.workers.read().len()).expect("Too many workers")
+        u8::try_from(self.workers.len()).expect("Too many workers")
     }
 
     /// Returns the workers.
-    pub const fn workers(&self) -> &Arc<RwLock<Vec<Worker<N>>>> {
+    pub const fn workers(&self) -> &Arc<Vec<Worker<N>>> {
         &self.workers
     }
 
@@ -211,7 +212,7 @@ impl<N: Network> Primary<N> {
         let mut transmissions = IndexMap::new();
         // Drain the workers of the required number of transmissions.
         let num_transmissions_per_worker = MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
-        for worker in self.workers.read().iter() {
+        for worker in self.workers.iter() {
             // TODO (howardwu): Perform one final filter against the ledger service.
             transmissions.extend(worker.take(num_transmissions_per_worker)?);
         }
@@ -485,7 +486,7 @@ impl<N: Network> Primary<N> {
                     continue;
                 };
                 // Retrieve the worker.
-                let worker = self_clone.workers.read()[worker_id as usize].clone();
+                let worker = self_clone.workers[worker_id as usize].clone();
                 // Process the unconfirmed solution.
                 if let Err(e) = worker.process_unconfirmed_solution(puzzle_commitment, prover_solution).await {
                     error!("Worker {} failed process a message - {e}", worker.id());
@@ -503,7 +504,7 @@ impl<N: Network> Primary<N> {
                     continue;
                 };
                 // Retrieve the worker.
-                let worker = self_clone.workers.read()[worker_id as usize].clone();
+                let worker = self_clone.workers[worker_id as usize].clone();
                 // Process the unconfirmed transaction.
                 if let Err(e) = worker.process_unconfirmed_transaction(transaction_id, transaction).await {
                     error!("Worker {} failed process a message - {e}", worker.id());
@@ -549,7 +550,7 @@ impl<N: Network> Primary<N> {
                         bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
                     };
                     // Retrieve the worker.
-                    match self.workers.read().get(worker_id as usize) {
+                    match self.workers.get(worker_id as usize) {
                         // Re-insert the transmission into the worker.
                         Some(worker) => worker.reinsert(*transmission_id, transmission.clone())?,
                         None => bail!("Unable to find worker {worker_id}"),
@@ -660,7 +661,7 @@ impl<N: Network> Primary<N> {
         }
 
         // Retrieve the workers.
-        let workers = self.workers.read().clone();
+        let workers = self.workers.clone();
 
         // Initialize a list for the transmissions.
         let mut fetch_transmissions = FuturesUnordered::new();
@@ -822,7 +823,7 @@ impl<N: Network> Primary<N> {
     pub async fn shut_down(&self) {
         trace!("Shutting down the primary...");
         // Iterate through the workers.
-        self.workers.read().iter().for_each(|worker| {
+        self.workers.iter().for_each(|worker| {
             // Shut down the worker.
             worker.shut_down();
         });
