@@ -277,6 +277,7 @@ impl<N: Network> Storage<N> {
     /// - The batch ID does not already exist in storage.
     /// - The author is a member of the committee for the batch round.
     /// - The timestamp is within the allowed time range.
+    /// - None of the transmissions are from any past rounds (up to GC).
     /// - All transmissions declared in the batch header are provided or exist in storage (up to GC).
     /// - All previous certificates declared in the certificate exist in storage (up to GC).
     /// - All previous certificates are for the previous round (i.e. round - 1).
@@ -383,6 +384,7 @@ impl<N: Network> Storage<N> {
     /// - The batch ID does not already exist in storage.
     /// - The author is a member of the committee for the batch round.
     /// - The timestamp is within the allowed time range.
+    /// - None of the transmissions are from any past rounds (up to GC).
     /// - All transmissions declared in the batch header are provided or exist in storage (up to GC).
     /// - All previous certificates declared in the certificate exist in storage (up to GC).
     /// - All previous certificates are for the previous round (i.e. round - 1).
