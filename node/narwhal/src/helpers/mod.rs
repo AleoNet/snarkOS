@@ -27,6 +27,9 @@ pub use partition::*;
 pub mod pending;
 pub use pending::*;
 
+pub mod proposal;
+pub use proposal::*;
+
 pub mod ready;
 pub use ready::*;
 

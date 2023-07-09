@@ -15,13 +15,13 @@
 use crate::{
     helpers::{
         assign_to_worker,
-        check_timestamp_for_liveness,
         init_worker_channels,
         now,
         Committee,
         Pending,
         PrimaryReceiver,
         PrimarySender,
+        Proposal,
         Storage,
     },
     BatchPropose,
@@ -32,7 +32,6 @@ use crate::{
     Gateway,
     Worker,
     MAX_BATCH_DELAY,
-    MAX_EXPIRATION_TIME_IN_SECS,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
 };
@@ -40,7 +39,7 @@ use snarkos_account::Account;
 use snarkvm::{
     console::prelude::*,
     ledger::narwhal::{Batch, BatchCertificate, BatchHeader, Transmission, TransmissionID},
-    prelude::{Field, Signature},
+    prelude::Field,
 };
 
 use async_recursion::async_recursion;
@@ -66,8 +65,8 @@ pub struct Primary<N: Network> {
     storage: Storage<N>,
     /// The workers.
     workers: Arc<RwLock<Vec<Worker<N>>>>,
-    /// The currently-proposed batch, along with its `(signature, timestamp)` entries.
-    proposed_batch: Arc<RwLock<Option<(Batch<N>, IndexMap<Signature<N>, i64>)>>>,
+    /// The batch proposal, if the primary is currently proposing a batch.
+    proposed_batch: Arc<RwLock<Option<Proposal<N>>>>,
     /// The pending certificates queue.
     pending: Pending<Field<N>, BatchCertificate<N>>,
     /// The spawned handles.
@@ -158,9 +157,9 @@ impl<N: Network> Primary<N> {
         &self.workers
     }
 
-    /// Returns the proposed batch.
-    pub fn proposed_batch(&self) -> Option<Batch<N>> {
-        self.proposed_batch.read().as_ref().map(|(batch, _)| batch.clone())
+    /// Returns the batch proposal of our primary, if one currently exists.
+    pub fn batch_proposal(&self) -> Option<Proposal<N>> {
+        self.proposed_batch.read().clone()
     }
 }
 
@@ -233,10 +232,14 @@ impl<N: Network> Primary<N> {
         let private_key = self.gateway.account().private_key();
         // Sign the batch.
         let batch = Batch::new(private_key, round, transmissions, previous_certificates, rng)?;
+        // Construct the batch header.
+        let batch_header = batch.to_header()?;
+        // Construct the proposal.
+        let proposal = Proposal::new(self.committee.read().clone(), batch)?;
         // Broadcast the batch to all validators for signing.
-        self.gateway.broadcast(Event::BatchPropose(batch.to_header()?.into()));
+        self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
         // Set the proposed batch.
-        *self.proposed_batch.write() = Some((batch, Default::default()));
+        *self.proposed_batch.write() = Some(proposal);
         Ok(())
     }
 
@@ -266,7 +269,7 @@ impl<N: Network> Primary<N> {
             bail!("Primary is on round {committee_round}, and no longer signing for round {batch_round}")
         }
         // Check if the primary is still signing for the batch round.
-        if let Some(signing_round) = self.proposed_batch.read().as_ref().map(|(batch, _)| batch.round()) {
+        if let Some(signing_round) = self.proposed_batch.read().as_ref().map(|proposal| proposal.round()) {
             if signing_round > batch_round {
                 bail!("Our primary at round {signing_round} is no longer signing for round {batch_round}")
             }
@@ -319,29 +322,44 @@ impl<N: Network> Primary<N> {
     ) -> Result<()> {
         // Ensure the proposed batch has not expired, and clear the proposed batch if it has expired.
         self.check_proposed_batch_for_expiration()?;
-        // Ensure the batch signature from the peer is valid.
-        self.check_batch_signature_from_peer(peer_ip, batch_signature)?;
 
         // Retrieve the signature and timestamp.
-        let BatchSignature { signature, timestamp, .. } = batch_signature;
+        let BatchSignature { batch_id, signature, timestamp } = batch_signature;
+
+        // Ensure the batch ID matches the currently proposed batch ID.
+        match self.proposed_batch.read().as_ref() {
+            Some(proposal) => {
+                // Ensure the batch ID matches the currently proposed batch ID.
+                if proposal.batch_id() != batch_id {
+                    // Log the batch mismatch.
+                    match self.storage.contains_batch(batch_id) {
+                        true => bail!("This batch was already certified"),
+                        false => bail!("Unknown batch ID '{batch_id}'"),
+                    }
+                }
+            }
+            // Ignore the signature if there is no proposed batch currently.
+            None => return Ok(()),
+        };
+
+        // Initialize a boolean to track whether the batch is ready to be certified.
+        let mut is_ready = false;
 
         // Store the signature in the proposed batch.
-        if let Some((_, signatures)) = self.proposed_batch.write().as_mut() {
+        if let Some(proposal) = self.proposed_batch.write().as_mut() {
+            // Retrieve the address of the peer.
+            let Some(signer) = self.gateway.resolver().get_address(peer_ip) else {
+                bail!("Signature is from a disconnected peer")
+            };
             // Add the signature to the batch.
-            signatures.insert(signature, timestamp);
+            proposal.add_signature(signer, signature, timestamp)?;
             info!("Added a batch signature from peer '{peer_ip}'");
-        }
-
-        // Check if the batch is ready to be certified.
-        let mut is_ready = false;
-        if let Some((batch, signatures)) = self.proposed_batch.read().as_ref() {
-            // Construct an iterator over the addresses.
-            let addresses = signatures.keys().chain([batch.signature()].into_iter()).map(Signature::to_address);
-            // Check if the batch has reached the quorum threshold.
-            if self.committee.read().is_quorum_threshold_reached(&addresses.collect()) {
+            // Check if the batch is ready to be certified.
+            if proposal.is_quorum_threshold_reached() {
                 is_ready = true;
             }
         }
+
         // If the batch is not ready to be certified, return early.
         if !is_ready {
             return Ok(());
@@ -349,21 +367,20 @@ impl<N: Network> Primary<N> {
 
         /* Proceeding to certify the batch. */
 
-        // Retrieve the batch and signatures, clearing the proposed batch.
-        let proposed_batch = self.proposed_batch.write().take();
-        if let Some((batch, signatures)) = proposed_batch {
+        // TODO (howardwu): If any method below fails, we need to return the transmissions back to the ready queue.
+        // Retrieve the batch proposal, clearing the proposed batch.
+        let proposal = self.proposed_batch.write().take();
+        if let Some(proposal) = proposal {
             info!("Quorum threshold reached - Preparing to certify our batch...");
 
-            // Create the batch certificate.
-            let certificate = BatchCertificate::new(batch.to_header()?, signatures)?;
-            // Create the transmissions map.
-            let transmissions = batch.transmissions().clone().into_iter().collect();
+            // Create the batch certificate and transmissions.
+            let (certificate, transmissions) = proposal.into_certificate()?;
             // Store the certified batch.
             self.storage.insert_certificate(certificate.clone(), transmissions)?;
             // Broadcast the certified batch to all validators.
             self.gateway.broadcast(Event::BatchCertified(certificate.into()));
 
-            info!("\n\n\nOur batch for round {} has been certified!\n\n", self.committee.read().round());
+            info!("\n\nOur batch for round {} has been certified!\n", self.committee.read().round());
             // Update the committee to the next round.
             self.update_committee_to_next_round();
         }
@@ -518,19 +535,15 @@ impl<N: Network> Primary<N> {
     /// Checks if the proposed batch is expired, and clears the proposed batch if it has expired.
     fn check_proposed_batch_for_expiration(&self) -> Result<()> {
         // Check if the proposed batch is expired.
-        let mut is_expired = false;
-        if let Some((batch, _)) = self.proposed_batch.read().as_ref() {
-            // If the batch is expired, clear it.
-            is_expired = now().saturating_sub(batch.timestamp()) > MAX_EXPIRATION_TIME_IN_SECS;
-        }
+        let is_expired = self.proposed_batch.read().as_ref().map_or(false, Proposal::is_expired);
         // If the batch is expired, clear it.
         if is_expired {
             // Reset the proposed batch.
-            if let Some((batch, _)) = self.proposed_batch.write().take() {
+            if let Some(proposal) = self.proposed_batch.write().take() {
                 // Retrieve the number of workers.
                 let num_workers = self.gateway.num_workers();
                 // Re-insert the transmissions into the workers.
-                for (transmission_id, transmission) in batch.transmissions() {
+                for (transmission_id, transmission) in proposal.transmissions() {
                     // Determine the worker ID.
                     let Ok(worker_id) = assign_to_worker(*transmission_id, num_workers) else {
                         bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
@@ -626,51 +639,6 @@ impl<N: Network> Primary<N> {
             self.storage.insert_certificate(certificate, missing_transmissions)?;
             debug!("Stored certificate for round {batch_round} from peer '{peer_ip}'");
         }
-        Ok(())
-    }
-
-    /// Sanity checks the batch signature from a peer.
-    fn check_batch_signature_from_peer(&self, peer_ip: SocketAddr, batch_signature: BatchSignature<N>) -> Result<()> {
-        // Retrieve the batch ID and signature.
-        let BatchSignature { batch_id, signature, timestamp } = batch_signature;
-
-        /* Check the batch ID. */
-
-        match self.proposed_batch.read().as_ref() {
-            Some((batch, _)) => {
-                // Ensure the batch ID matches the currently proposed batch ID.
-                if batch.batch_id() != batch_id {
-                    // Log the batch mismatch.
-                    match self.storage.contains_batch(batch_id) {
-                        true => bail!("This batch was already certified"),
-                        false => bail!("Unknown batch ID '{batch_id}'"),
-                    }
-                }
-            }
-            // Ignore the signature if there is no proposed batch currently.
-            None => return Ok(()),
-        };
-
-        /* Check the signature. */
-
-        // Retrieve the address of the peer.
-        let Some(address) = self.gateway.resolver().get_address(peer_ip) else {
-            bail!("Signature is from a disconnected peer")
-        };
-        // Ensure the address is in the committee.
-        if !self.committee.read().is_committee_member(address) {
-            bail!("Signature is from a non-committee peer '{address}'")
-        }
-        // Verify the signature.
-        // Note: This check ensures the peer's address matches the signer's address.
-        if !signature.verify(&address, &[batch_id, Field::from_u64(timestamp as u64)]) {
-            bail!("Signature verification failed")
-        }
-
-        /* Check the timestamp. */
-
-        check_timestamp_for_liveness(timestamp)?;
-
         Ok(())
     }
 
