@@ -283,6 +283,11 @@ impl<N: Network> Primary<N> {
         // Inserts the missing transmissions into the workers.
         self.insert_transmissions_into_workers(peer_ip, missing_transmissions.into_iter())?;
 
+        // Now that the primary is synced, check if the batch already exists, and return early if so.
+        if self.storage.contains_batch(batch_header.batch_id()) {
+            return Ok(());
+        }
+
         /* Proceeding to sign the batch. */
 
         // Initialize an RNG.
