@@ -832,7 +832,6 @@ impl<N: Network> Primary<N> {
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Insert the certificate ID into the pending queue.
         if self.pending.insert(certificate_id, peer_ip, Some(callback_sender)) {
-            // TODO (howardwu): Limit the number of open requests we send to a peer.
             // Send the certificate request to the peer.
             self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into()));
         }

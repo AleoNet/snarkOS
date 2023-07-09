@@ -294,7 +294,6 @@ impl<N: Network> Worker<N> {
         let (callback_sender, callback_receiver) = oneshot::channel();
         // Insert the transmission ID into the pending queue.
         self.pending.insert(transmission_id, peer_ip, Some(callback_sender));
-        // TODO (howardwu): Limit the number of open requests we send to a peer.
         // Send the transmission request to the peer.
         self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into()));
         // Wait for the transmission to be fetched.

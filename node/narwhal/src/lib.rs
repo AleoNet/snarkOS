@@ -39,7 +39,7 @@ pub const CONTEXT: &str = "[MemoryPool]";
 /// The maximum number of milliseconds to wait before proposing a batch.
 pub const MAX_BATCH_DELAY: u64 = 2500; // ms
 /// The maximum number of nodes that can be in a committee.
-pub const MAX_COMMITTEE_SIZE: u16 = 128; // members
+pub const MAX_COMMITTEE_SIZE: u16 = 4; // members
 /// The maximum number of seconds before a proposed batch is considered expired.
 pub const MAX_EXPIRATION_TIME_IN_SECS: i64 = 10; // seconds
 /// The maximum number of round to store before garbage collecting.

@@ -13,14 +13,21 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{assign_to_worker, EventCodec, PrimarySender, Resolver, Storage, WorkerSender},
+    helpers::{assign_to_worker, Cache, EventCodec, PrimarySender, Resolver, Storage, WorkerSender},
+    CertificateRequest,
+    CertificateResponse,
     ChallengeRequest,
     ChallengeResponse,
     DisconnectReason,
     Event,
     EventTrait,
+    TransmissionRequest,
+    TransmissionResponse,
     CONTEXT,
+    MAX_BATCH_DELAY,
     MAX_COMMITTEE_SIZE,
+    MAX_GC_ROUNDS,
+    MAX_TRANSMISSIONS_PER_BATCH,
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
@@ -37,7 +44,7 @@ use snarkvm::{console::prelude::*, ledger::narwhal::Data, prelude::Address};
 use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
-use std::{future::Future, io, net::SocketAddr, sync::Arc};
+use std::{future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpStream,
     sync::{oneshot, OnceCell},
@@ -45,6 +52,25 @@ use tokio::{
 };
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
+
+/// The maximum interval of events to cache.
+const CACHE_EVENTS_INTERVAL: i64 = (MAX_BATCH_DELAY / 1000) as i64; // seconds
+/// The maximum interval of requests to cache.
+const CACHE_REQUESTS_INTERVAL: i64 = (MAX_BATCH_DELAY / 1000) as i64; // seconds
+
+/// The maximum number of events to cache.
+const CACHE_EVENTS: usize = CACHE_TRANSMISSIONS;
+/// The maximum number of certificate requests to cache.
+const CACHE_CERTIFICATES: usize = 2 * MAX_GC_ROUNDS as usize * MAX_COMMITTEE_SIZE as usize;
+/// The maximum number of transmission requests to cache.
+const CACHE_TRANSMISSIONS: usize = CACHE_CERTIFICATES * MAX_TRANSMISSIONS_PER_BATCH;
+/// The maximum number of duplicates for any particular request.
+const CACHE_MAX_DUPLICATES: usize = MAX_COMMITTEE_SIZE as usize * MAX_COMMITTEE_SIZE as usize;
+
+/// The maximum number of connection attempts in an interval.
+const MAX_CONNECTION_ATTEMPTS: usize = 10;
+/// The maximum interval to restrict a peer.
+const RESTRICTED_INTERVAL: i64 = (MAX_CONNECTION_ATTEMPTS as u64 * MAX_BATCH_DELAY / 1000) as i64; // seconds
 
 #[derive(Clone)]
 pub struct Gateway<N: Network> {
@@ -54,6 +80,8 @@ pub struct Gateway<N: Network> {
     account: Account<N>,
     /// The TCP stack.
     tcp: Tcp,
+    /// The cache.
+    cache: Arc<Cache<N>>,
     /// The resolver.
     resolver: Arc<Resolver<N>>,
     /// The map of connected peer IPs to their peer handlers.
@@ -87,6 +115,7 @@ impl<N: Network> Gateway<N> {
             storage,
             account,
             tcp,
+            cache: Default::default(),
             resolver: Default::default(),
             connected_peers: Default::default(),
             connecting_peers: Default::default(),
@@ -157,16 +186,6 @@ impl<N: Network> Gateway<N> {
         self.worker_senders.get().and_then(|senders| senders.get(&worker_id))
     }
 
-    /// Returns the listener IP address from the (ambiguous) peer address.
-    pub fn resolve_to_listener(&self, peer_addr: SocketAddr) -> Option<SocketAddr> {
-        self.resolver.get_listener(peer_addr)
-    }
-
-    /// Returns the (ambiguous) peer address from the listener IP address.
-    pub fn resolve_to_ambiguous(&self, peer_ip: SocketAddr) -> Option<SocketAddr> {
-        self.resolver.get_ambiguous(peer_ip)
-    }
-
     /// Returns `true` if the node is connected to the given peer IP.
     pub fn is_connected(&self, ip: SocketAddr) -> bool {
         self.connected_peers.read().contains(&ip)
@@ -219,10 +238,6 @@ impl<N: Network> Gateway<N> {
         if self.is_connected(peer_ip) {
             bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (already connected)")
         }
-        // // Ensure the peer is not restricted.
-        // if self.is_restricted(&peer_ip) {
-        //     bail!("Dropping connection attempt to '{peer_ip}' (restricted)")
-        // }
         // Ensure the node is not already connecting to this peer.
         if !self.connecting_peers.lock().insert(peer_ip) {
             bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (already shaking hands as the initiator)")
@@ -244,21 +259,15 @@ impl<N: Network> Gateway<N> {
         if self.is_connected(peer_ip) {
             bail!("{CONTEXT} Dropping connection request from '{peer_ip}' (already connected)")
         }
-        // // Ensure the peer is not restricted.
-        // if self.is_restricted(&peer_ip) {
-        //     bail!("Dropping connection request from '{peer_ip}' (restricted)")
-        // }
-        // // Ensure the peer is not spamming connection attempts.
-        // if !peer_ip.ip().is_loopback() {
-        //     // Add this connection attempt and retrieve the number of attempts.
-        //     let num_attempts = self.cache.insert_inbound_connection(peer_ip.ip(), Self::RADIO_SILENCE_IN_SECS as i64);
-        //     // Ensure the connecting peer has not surpassed the connection attempt limit.
-        //     if num_attempts > Self::MAXIMUM_CONNECTION_FAILURES {
-        //         // Restrict the peer.
-        //         self.insert_restricted_peer(peer_ip);
-        //         bail!("Dropping connection request from '{peer_ip}' (tried {num_attempts} times)")
-        //     }
-        // }
+        // Ensure the peer is not spamming connection attempts.
+        if !peer_ip.ip().is_loopback() {
+            // Add this connection attempt and retrieve the number of attempts.
+            let num_attempts = self.cache.insert_inbound_connection(peer_ip.ip(), RESTRICTED_INTERVAL);
+            // Ensure the connecting peer has not surpassed the connection attempt limit.
+            if num_attempts > MAX_CONNECTION_ATTEMPTS {
+                bail!("Dropping connection request from '{peer_ip}' (tried {num_attempts} times)")
+            }
+        }
         Ok(())
     }
 
@@ -268,18 +277,54 @@ impl<N: Network> Gateway<N> {
         self.resolver.insert_peer(peer_ip, peer_addr, address);
         // Add an transmission for this peer in the connected peers.
         self.connected_peers.write().insert(peer_ip);
-        // // Remove this peer from the restricted peers, if it exists.
-        // self.restricted_peers.write().remove(&peer_ip);
     }
 
     /// Removes the connected peer and adds them to the candidate peers.
     fn remove_connected_peer(&self, peer_ip: SocketAddr) {
         // Removes the bidirectional map between the listener address and (ambiguous) peer address.
         self.resolver.remove_peer(peer_ip);
-        // // Removes the peer from the sync pool.
-        // self.sync.remove_peer(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().shift_remove(&peer_ip);
+    }
+
+    /// Sends the given event to specified peer.
+    ///
+    /// This method is rate limited to prevent spamming the peer.
+    pub(crate) fn send(&self, peer_ip: SocketAddr, event: Event<N>) {
+        macro_rules! send {
+            ($self:ident, $cache_map:ident, $interval:expr, $freq:expr) => {
+                let self_ = $self.clone();
+                tokio::spawn(async move {
+                    // Rate limit the number of certificate requests sent to the peer.
+                    while self_.cache.$cache_map(peer_ip, $interval) > $freq {
+                        // Sleep for a short period of time to allow the cache to clear.
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                    // Send the event to the peer.
+                    self_.send_inner(peer_ip, event);
+                });
+            };
+        }
+
+        // If the event type is a certificate request, increment the cache.
+        if matches!(event, Event::CertificateRequest(_)) | matches!(event, Event::CertificateResponse(_)) {
+            // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
+            self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
+            // Send the event to the peer.
+            send!(self, insert_outbound_certificate, CACHE_REQUESTS_INTERVAL, CACHE_CERTIFICATES);
+        }
+        // If the event type is a transmission request, increment the cache.
+        else if matches!(event, Event::TransmissionRequest(_)) | matches!(event, Event::TransmissionResponse(_)) {
+            // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
+            self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
+            // Send the event to the peer.
+            send!(self, insert_outbound_transmission, CACHE_REQUESTS_INTERVAL, CACHE_TRANSMISSIONS);
+        }
+        // Otherwise, employ a general rate limit.
+        else {
+            // Send the event to the peer.
+            send!(self, insert_outbound_event, CACHE_EVENTS_INTERVAL, CACHE_EVENTS);
+        }
     }
 
     /// Sends the given event to specified peer.
@@ -287,27 +332,12 @@ impl<N: Network> Gateway<N> {
     /// This function returns as soon as the event is queued to be sent,
     /// without waiting for the actual delivery; instead, the caller is provided with a [`oneshot::Receiver`]
     /// which can be used to determine when and whether the event has been delivered.
-    pub(crate) fn send(&self, peer_ip: SocketAddr, event: Event<N>) -> Option<oneshot::Receiver<io::Result<()>>> {
-        // TODO (howardwu): Add a way to delay (likely with spawn) the sending of an event,
-        //  if you've requested from this peer IP too many times already.
-
-        // // Determine whether to send the event.
-        // if !self.can_send(peer_ip, &event) {
-        //     return None;
-        // }
+    fn send_inner(&self, peer_ip: SocketAddr, event: Event<N>) -> Option<oneshot::Receiver<io::Result<()>>> {
         // Resolve the listener IP to the (ambiguous) peer address.
-        let Some(peer_addr) = self.resolve_to_ambiguous(peer_ip) else {
+        let Some(peer_addr) = self.resolver.get_ambiguous(peer_ip) else {
             warn!("Unable to resolve the listener IP address '{peer_ip}'");
             return None;
         };
-        // // If the event type is a block request, add it to the cache.
-        // if let Event::BlockRequest(request) = event {
-        //     self.router().cache.insert_outbound_block_request(peer_ip, request);
-        // }
-        // // If the event type is a puzzle request, increment the cache.
-        // if matches!(event, Event::PuzzleRequest(_)) {
-        //     self.router().cache.increment_outbound_puzzle_requests(peer_ip);
-        // }
         // Retrieve the event name.
         let name = event.name();
         // Send the event to the peer.
@@ -336,18 +366,42 @@ impl<N: Network> Gateway<N> {
 
     /// Handles the inbound event from the peer.
     async fn inbound(&self, peer_addr: SocketAddr, event: Event<N>) -> Result<()> {
+        // Rate limit for duplicate requests.
+        if matches!(&event, &Event::CertificateRequest(_) | &Event::CertificateResponse(_)) {
+            // Retrieve the certificate ID.
+            let certificate_id = match &event {
+                Event::CertificateRequest(CertificateRequest { certificate_id }) => *certificate_id,
+                Event::CertificateResponse(CertificateResponse { certificate }) => certificate.certificate_id(),
+                _ => unreachable!(),
+            };
+            // Skip processing this certificate if the rate limit was exceed (i.e. someone is spamming a specific certificate).
+            let num_events = self.cache.insert_inbound_certificate(certificate_id, CACHE_REQUESTS_INTERVAL);
+            if num_events >= CACHE_MAX_DUPLICATES {
+                return Ok(());
+            }
+        } else if matches!(&event, &Event::TransmissionRequest(_) | Event::TransmissionResponse(_)) {
+            // Retrieve the transmission ID.
+            let transmission_id = match &event {
+                Event::TransmissionRequest(TransmissionRequest { transmission_id }) => *transmission_id,
+                Event::TransmissionResponse(TransmissionResponse { transmission_id, .. }) => *transmission_id,
+                _ => unreachable!(),
+            };
+            // Skip processing this certificate if the rate limit was exceed (i.e. someone is spamming a specific certificate).
+            let num_events = self.cache.insert_inbound_transmission(transmission_id, CACHE_REQUESTS_INTERVAL);
+            if num_events >= CACHE_MAX_DUPLICATES {
+                return Ok(());
+            }
+        }
+
         // Retrieve the listener IP for the peer.
-        let peer_ip = match self.resolve_to_listener(peer_addr) {
-            Some(peer_ip) => peer_ip,
-            None => bail!("{CONTEXT} Unable to resolve the (ambiguous) peer address '{peer_addr}'"),
+        let Some(peer_ip) = self.resolver.get_listener(peer_addr) else {
+            bail!("{CONTEXT} Unable to resolve the (ambiguous) peer address '{peer_addr}'")
         };
-
-        // // Drop the peer, if they have sent more than 1000 messages in the last 5 seconds.
-        // let num_messages = self.router().cache.insert_inbound_message(peer_ip, 5);
-        // if num_messages >= 1000 {
-        //     bail!("Dropping '{peer_ip}' for spamming messages (num_messages = {num_messages})")
-        // }
-
+        // Drop the peer, if they have exceeded the rate limit (i.e. they are requesting too much from us).
+        let num_events = self.cache.insert_inbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
+        if num_events >= CACHE_EVENTS {
+            bail!("Dropping '{peer_ip}' for spamming events (num_events = {num_events})")
+        }
         trace!("{CONTEXT} Received '{}' from '{peer_ip}'", event.name());
 
         // This match statement handles the inbound event by deserializing the event,
@@ -435,7 +489,7 @@ impl<N: Network> Gateway<N> {
     pub fn disconnect(&self, peer_ip: SocketAddr) -> JoinHandle<()> {
         let gateway = self.clone();
         tokio::spawn(async move {
-            if let Some(peer_addr) = gateway.resolve_to_ambiguous(peer_ip) {
+            if let Some(peer_addr) = gateway.resolver.get_ambiguous(peer_ip) {
                 // Disconnect from this peer.
                 let _disconnected = gateway.tcp.disconnect(peer_addr).await;
                 debug_assert!(_disconnected);
@@ -471,6 +525,9 @@ impl<N: Network> Reading for Gateway<N> {
     type Codec = EventCodec<N>;
     type Message = Event<N>;
 
+    /// The maximum queue depth of incoming messages for a single peer.
+    const MESSAGE_QUEUE_DEPTH: usize = CACHE_TRANSMISSIONS;
+
     /// Creates a [`Decoder`] used to interpret messages from the network.
     /// The `side` param indicates the connection side **from the node's perspective**.
     fn codec(&self, _peer_addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
@@ -481,8 +538,8 @@ impl<N: Network> Reading for Gateway<N> {
     async fn process_message(&self, peer_addr: SocketAddr, message: Self::Message) -> io::Result<()> {
         // Process the message. Disconnect if the peer violated the protocol.
         if let Err(error) = self.inbound(peer_addr, message).await {
-            if let Some(peer_ip) = self.resolve_to_listener(peer_addr) {
-                warn!("Disconnecting from '{peer_ip}' - {error}");
+            if let Some(peer_ip) = self.resolver.get_listener(peer_addr) {
+                warn!("{CONTEXT} Disconnecting from '{peer_ip}' - {error}");
                 self.send(peer_ip, Event::Disconnect(DisconnectReason::ProtocolViolation.into()));
                 // Disconnect from this peer.
                 self.disconnect(peer_ip);
@@ -497,6 +554,9 @@ impl<N: Network> Writing for Gateway<N> {
     type Codec = EventCodec<N>;
     type Message = Event<N>;
 
+    /// The maximum queue depth of outgoing messages for a single peer.
+    const MESSAGE_QUEUE_DEPTH: usize = CACHE_TRANSMISSIONS;
+
     /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
     /// The `side` parameter indicates the connection side **from the node's perspective**.
     fn codec(&self, _addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
@@ -508,7 +568,7 @@ impl<N: Network> Writing for Gateway<N> {
 impl<N: Network> Disconnect for Gateway<N> {
     /// Any extra operations to be performed during a disconnect.
     async fn handle_disconnect(&self, peer_addr: SocketAddr) {
-        if let Some(peer_ip) = self.resolve_to_listener(peer_addr) {
+        if let Some(peer_ip) = self.resolver.get_listener(peer_addr) {
             self.remove_connected_peer(peer_ip);
         }
     }
