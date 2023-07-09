@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{assign_to_worker, Committee, EventCodec, PrimarySender, Resolver, WorkerSender},
+    helpers::{assign_to_worker, EventCodec, PrimarySender, Resolver, Storage, WorkerSender},
     ChallengeRequest,
     ChallengeResponse,
     Event,
@@ -48,8 +48,8 @@ use tokio_util::codec::Framed;
 
 #[derive(Clone)]
 pub struct Gateway<N: Network> {
-    /// The committee.
-    committee: Arc<RwLock<Committee<N>>>,
+    /// The storage.
+    storage: Storage<N>,
     /// The account of the node.
     account: Account<N>,
     /// The TCP stack.
@@ -73,7 +73,7 @@ pub struct Gateway<N: Network> {
 
 impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
-    pub fn new(committee: Arc<RwLock<Committee<N>>>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(storage: Storage<N>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
         // Initialize the gateway IP.
         let ip = match dev {
             // TODO change dev to Option<u8>, otherwise there is potential overflow
@@ -84,7 +84,7 @@ impl<N: Network> Gateway<N> {
         let tcp = Tcp::new(Config::new(ip, MAX_COMMITTEE_SIZE));
         // Return the gateway.
         Ok(Self {
-            committee,
+            storage,
             account,
             tcp,
             resolver: Default::default(),
@@ -757,7 +757,7 @@ impl<N: Network> Gateway<N> {
         }
 
         // Ensure the address is in the committee.
-        if !self.committee.read().is_committee_member(address) {
+        if !self.storage.current_committee().is_committee_member(address) {
             warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
             return Some(DisconnectReason::ProtocolViolation);
         }
@@ -811,16 +811,12 @@ pub mod prop_tests {
         MEMORY_POOL_PORT,
     };
     use indexmap::IndexMap;
-    use parking_lot::RwLock;
     use snarkos_node_tcp::P2P;
     use snarkvm::prelude::Testnet3;
-    use std::{
-        net::{IpAddr, Ipv4Addr, SocketAddr},
-        sync::Arc,
-    };
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use test_strategy::{proptest, Arbitrary};
 
-    type N = Testnet3;
+    type CurrentNetwork = Testnet3;
 
     #[derive(Arbitrary, Debug, Clone)]
     pub struct GatewayInput {
@@ -834,17 +830,16 @@ pub mod prop_tests {
     }
 
     impl GatewayInput {
-        pub fn to_gateway(&self) -> Gateway<N> {
-            let committee = self.committee_input.to_committee().unwrap();
+        pub fn to_gateway(&self) -> Gateway<CurrentNetwork> {
             let account = self.node_validator.get_account();
             let dev = self.dev.map(|dev| dev as u16);
-            Gateway::new(Arc::new(RwLock::new(committee)), account, dev).unwrap()
+            Gateway::new(self.worker_storage.to_storage(), account, dev).unwrap()
         }
 
         pub async fn generate_workers(
             &self,
-            gateway: &Gateway<N>,
-        ) -> (IndexMap<u8, Worker<N>>, IndexMap<u8, WorkerSender<N>>) {
+            gateway: &Gateway<CurrentNetwork>,
+        ) -> (IndexMap<u8, Worker<CurrentNetwork>>, IndexMap<u8, WorkerSender<CurrentNetwork>>) {
             // Construct a map of the worker senders.
             let mut tx_workers = IndexMap::new();
             let mut workers = IndexMap::new();

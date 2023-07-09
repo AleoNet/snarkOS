@@ -23,9 +23,8 @@ use snarkos_node_narwhal::{
 use tracing::*;
 
 use indexmap::IndexMap;
-use parking_lot::RwLock;
 use rand::SeedableRng;
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 use crate::common::CurrentNetwork;
 
@@ -56,11 +55,9 @@ pub async fn start_n_primaries(n: u16) -> HashMap<u16, (Primary<CurrentNetwork>,
     let (accounts, committee) = new_test_committee(n);
 
     for (id, account) in accounts.into_iter().enumerate() {
-        let storage = Storage::new(MAX_GC_ROUNDS);
+        let storage = Storage::new(committee.clone(), MAX_GC_ROUNDS);
         let (sender, receiver) = init_primary_channels();
-        let mut primary =
-            Primary::<CurrentNetwork>::new(Arc::new(RwLock::new(committee.clone())), storage, account, Some(id as u16))
-                .unwrap();
+        let mut primary = Primary::<CurrentNetwork>::new(storage, account, Some(id as u16)).unwrap();
 
         primary.run(sender.clone(), receiver).await.unwrap();
         primaries.insert(id as u16, (primary, sender));

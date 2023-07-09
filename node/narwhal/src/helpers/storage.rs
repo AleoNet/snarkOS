@@ -14,14 +14,12 @@
 
 use crate::helpers::{check_timestamp_for_liveness, Committee};
 use snarkvm::{
-    ledger::narwhal::{BatchCertificate, Transmission, TransmissionID},
-    prelude::{Address, Field, Network},
+    ledger::narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
+    prelude::{bail, ensure, Address, Field, Network, Result},
 };
 
-use anyhow::{bail, Result};
-use indexmap::{IndexMap, IndexSet};
+use indexmap::{indexmap, IndexMap, IndexSet};
 use parking_lot::RwLock;
-use snarkvm::ledger::narwhal::BatchHeader;
 use std::{
     collections::{HashMap, HashSet},
     sync::{
@@ -51,6 +49,8 @@ use std::{
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network> {
     /* Once per round */
+    /// The current round.
+    current_round: Arc<AtomicU64>,
     /// The map of `round` to `committee`.
     committees: Arc<RwLock<IndexMap<u64, Committee<N>>>>,
     /// The `round` for which garbage collection has occurred **up to** (inclusive).
@@ -72,9 +72,13 @@ pub struct Storage<N: Network> {
 
 impl<N: Network> Storage<N> {
     /// Initializes a new instance of storage.
-    pub fn new(max_gc_rounds: u64) -> Self {
+    pub fn new(committee: Committee<N>, max_gc_rounds: u64) -> Self {
+        // Retrieve the current round.
+        let current_round = committee.round();
+        // Return the storage.
         Self {
-            committees: Default::default(),
+            current_round: Arc::new(AtomicU64::new(current_round)),
+            committees: Arc::new(RwLock::new(indexmap! { current_round => committee })),
             gc_round: Arc::new(AtomicU64::new(0)),
             max_gc_rounds,
             rounds: Default::default(),
@@ -119,6 +123,12 @@ impl<N: Network> Storage<N> {
 }
 
 impl<N: Network> Storage<N> {
+    /// Returns the current round.
+    pub fn current_round(&self) -> u64 {
+        // Get the current round.
+        self.current_round.load(Ordering::Relaxed)
+    }
+
     /// Returns the `round` that garbage collection has occurred **up to** (inclusive).
     pub fn gc_round(&self) -> u64 {
         // Get the GC round.
@@ -130,6 +140,14 @@ impl<N: Network> Storage<N> {
         self.max_gc_rounds
     }
 
+    /// Returns the current committee.
+    pub fn current_committee(&self) -> Committee<N> {
+        // Get the current round.
+        let round = self.current_round();
+        // Get the committee for the current round.
+        self.get_committee(round).expect("The committee for current round should exist")
+    }
+
     /// Returns the `committee` for the given `round`.
     /// If the round does not exist in storage, `None` is returned.
     pub fn get_committee(&self, round: u64) -> Option<Committee<N>> {
@@ -137,23 +155,30 @@ impl<N: Network> Storage<N> {
         self.committees.read().get(&round).cloned()
     }
 
-    /// Insert the given `committee` into storage.
+    // TODO (howardwu): We need to know which members (and stake) to add, update, and remove.
+    /// Increments the committee to the next round, updating the current round.
     /// Note: This method is only called once per round, upon certification of the primary's batch.
-    pub fn insert_committee(&self, committee: Committee<N>) {
-        // Retrieve the round.
-        let round = committee.round();
+    pub fn increment_committee_to_next_round(&self) -> Result<()> {
+        // Construct the next committee.
+        let next_committee = self.current_committee().to_next_round();
+        // Retrieve the next round.
+        let next_round = next_committee.round();
+        // Ensure there are no certificates for the next round yet.
+        ensure!(!self.contains_certificates_for_round(next_round), "Certificates for the next round cannot exist yet");
+
+        // Update the current round.
+        self.current_round.store(next_round, Ordering::Relaxed);
         // Insert the committee into storage.
-        self.committees.write().insert(round, committee);
+        self.committees.write().insert(next_round, next_committee);
 
         // Fetch the current GC round.
         let current_gc_round = self.gc_round();
         // Compute the next GC round.
-        let next_gc_round = round.saturating_sub(self.max_gc_rounds);
+        let next_gc_round = next_round.saturating_sub(self.max_gc_rounds);
         // Check if storage needs to be garbage collected.
         if next_gc_round > current_gc_round {
             // Remove the GC round(s) from storage.
             for gc_round in current_gc_round..next_gc_round {
-                // TODO (howardwu): Handle removal of transmissions.
                 // Iterate over the certificates for the GC round.
                 for certificate in self.get_certificates_for_round(gc_round).iter() {
                     // Remove the certificate from storage.
@@ -165,6 +190,7 @@ impl<N: Network> Storage<N> {
             // Update the GC round.
             self.gc_round.store(next_gc_round, Ordering::Relaxed);
         }
+        Ok(())
     }
 
     /// Removes the committee for the given `round` from storage.
@@ -177,7 +203,7 @@ impl<N: Network> Storage<N> {
 
 impl<N: Network> Storage<N> {
     /// Returns `true` if the storage contains the specified `round`.
-    pub fn contains_round(&self, round: u64) -> bool {
+    pub fn contains_certificates_for_round(&self, round: u64) -> bool {
         // Check if the round exists in storage.
         self.rounds.read().contains_key(&round)
     }
@@ -306,9 +332,9 @@ impl<N: Network> Storage<N> {
             let Some(previous_committee) = self.get_committee(previous_round) else {
                 bail!("Missing committee for the previous round {previous_round} in storage {gc_log}")
             };
-            // Ensure the previous round exists in storage.
-            if !self.contains_round(previous_round) {
-                bail!("Missing state for the previous round {previous_round} in storage {gc_log}")
+            // Ensure the previous round certificates exists in storage.
+            if !self.contains_certificates_for_round(previous_round) {
+                bail!("Missing certificates for the previous round {previous_round} in storage {gc_log}")
             }
             // Initialize a set of the previous authors.
             let mut previous_authors = HashSet::with_capacity(batch_header.previous_certificate_ids().len());
@@ -418,6 +444,8 @@ impl<N: Network> Storage<N> {
         certificate: BatchCertificate<N>,
         transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<()> {
+        // Ensure the certificate round is above the GC round.
+        ensure!(certificate.round() > self.gc_round(), "Certificate round is at or below the GC round");
         // Ensure the certificate and its transmissions are valid.
         let missing_transmissions = self.check_certificate(&certificate, transmissions)?;
         // Insert the certificate into storage.
@@ -449,16 +477,18 @@ impl<N: Network> Storage<N> {
         self.certificates.write().insert(certificate_id, certificate.clone());
         // Insert the batch ID.
         self.batch_ids.write().insert(batch_id, round);
-        // Scope and acquire the write lock.
+        // Insert the transmission IDs.
         {
+            // Acquire the write lock.
             let mut transmission_ids = self.transmission_ids.write();
             // Insert **all** of the transmission IDs.
             for transmission_id in certificate.transmission_ids() {
                 transmission_ids.entry(*transmission_id).or_default().insert(certificate_id);
             }
         }
-        // Scope and acquire the write lock.
+        // Insert the missing transmissions.
         {
+            // Acquire the write lock.
             let mut transmissions = self.transmissions.write();
             // Insert **only the missing** transmissions from storage.
             for (transmission_id, transmission) in missing_transmissions {
@@ -487,8 +517,9 @@ impl<N: Network> Storage<N> {
         // Compute the author of the batch.
         let author = certificate.author();
 
-        // Scope and acquire the write lock.
+        // Insert the round.
         {
+            // Acquire the write lock.
             let mut rounds = self.rounds.write();
             // Remove the round to certificate ID entry.
             rounds.entry(round).or_default().remove(&(certificate_id, batch_id, author));
@@ -501,9 +532,9 @@ impl<N: Network> Storage<N> {
         self.certificates.write().remove(&certificate_id);
         // Remove the batch ID.
         self.batch_ids.write().remove(&batch_id);
-
-        // Scope and acquire the write lock.
+        // Remove the transmission IDs and transmissions.
         {
+            // Acquire the write locks.
             let mut transmission_ids = self.transmission_ids.write();
             let mut transmissions = self.transmissions.write();
             // Iterate over the transmission IDs.
@@ -586,8 +617,8 @@ pub mod tests {
     // fn test_certificate_duplicate() {
     //     let rng = &mut TestRng::default();
     //
-    //     // Create a new storage.
-    //     let storage = Storage::<CurrentNetwork>::new(1);
+    //     // Initialize the storage.
+    //     let storage = Storage::<CurrentNetwork>::new(Committee::new(1, Default::default()).unwrap(), 1);
     //     // Ensure the storage is empty.
     //     assert!(is_empty(&storage));
     //
@@ -616,8 +647,8 @@ pub mod tests {
     fn test_certificate_insert_remove() {
         let rng = &mut TestRng::default();
 
-        // Create a new storage.
-        let storage = Storage::<CurrentNetwork>::new(1);
+        // Initialize the storage.
+        let storage = Storage::<CurrentNetwork>::new(Committee::new(1, Default::default()).unwrap(), 1);
         // Ensure the storage is empty.
         assert!(is_empty(&storage));
 
@@ -681,6 +712,7 @@ pub mod tests {
 #[cfg(test)]
 pub mod prop_tests {
     use super::*;
+    use crate::helpers::committee::prop_tests::CommitteeInput;
 
     use test_strategy::Arbitrary;
 
@@ -688,12 +720,13 @@ pub mod prop_tests {
 
     #[derive(Arbitrary, Debug, Clone)]
     pub struct StorageInput {
+        pub committee: CommitteeInput,
         pub gc_rounds: u64,
     }
 
     impl StorageInput {
         pub fn to_storage(&self) -> Storage<CurrentNetwork> {
-            Storage::new(self.gc_rounds)
+            Storage::<CurrentNetwork>::new(self.committee.to_committee().unwrap(), self.gc_rounds)
         }
     }
 }

@@ -57,8 +57,6 @@ use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
 
 #[derive(Clone)]
 pub struct Primary<N: Network> {
-    /// The committee.
-    committee: Arc<RwLock<Committee<N>>>,
     /// The gateway.
     gateway: Gateway<N>,
     /// The storage.
@@ -75,19 +73,11 @@ pub struct Primary<N: Network> {
 
 impl<N: Network> Primary<N> {
     /// Initializes a new primary instance.
-    pub fn new(
-        committee: Arc<RwLock<Committee<N>>>,
-        storage: Storage<N>,
-        account: Account<N>,
-        dev: Option<u16>,
-    ) -> Result<Self> {
+    pub fn new(storage: Storage<N>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
         // Construct the gateway instance.
-        let gateway = Gateway::new(committee.clone(), account, dev)?;
-        // Insert the initial committee.
-        storage.insert_committee(committee.read().clone());
+        let gateway = Gateway::new(storage.clone(), account, dev)?;
         // Return the primary instance.
         Ok(Self {
-            committee,
             gateway,
             storage,
             workers: Default::default(),
@@ -133,9 +123,14 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
-    /// Returns the committee.
-    pub const fn committee(&self) -> &Arc<RwLock<Committee<N>>> {
-        &self.committee
+    /// Returns the current round.
+    pub fn current_round(&self) -> u64 {
+        self.storage.current_round()
+    }
+
+    /// Returns the current committee.
+    pub fn current_committee(&self) -> Committee<N> {
+        self.storage.current_committee()
     }
 
     /// Returns the gateway.
@@ -183,7 +178,7 @@ impl<N: Network> Primary<N> {
         }
 
         // Retrieve the current round.
-        let round = self.committee.read().round();
+        let round = self.current_round();
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
         // Retrieve the previous certificates.
@@ -238,7 +233,7 @@ impl<N: Network> Primary<N> {
         // Construct the batch header.
         let batch_header = batch.to_header()?;
         // Construct the proposal.
-        let proposal = Proposal::new(self.committee.read().clone(), batch)?;
+        let proposal = Proposal::new(self.current_committee(), batch)?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
         // Set the proposed batch.
@@ -367,7 +362,7 @@ impl<N: Network> Primary<N> {
                 certificate.round()
             );
             // Update the committee to the next round.
-            self.update_committee_to_next_round();
+            self.update_committee_to_next_round()?;
         }
         Ok(())
     }
@@ -527,11 +522,11 @@ impl<N: Network> Primary<N> {
             // TODO (howardwu): Guard this to increment after quorum threshold is reached.
             // TODO (howardwu): After bullshark is implemented, we must use Aleo blocks to guide us to `tip-50` to know the committee.
             // Initialize a tracker to increment the round.
-            let mut current_round = self.committee.read().round();
+            let mut current_round = self.current_round();
             // Check if there are certificates for the next round.
             while !self.storage.get_certificates_for_round(current_round + 1).is_empty() {
                 // If there are certificates for the next round, increment the round.
-                self.update_committee_to_next_round();
+                self.update_committee_to_next_round()?;
                 // Increment the current round.
                 current_round += 1;
             }
@@ -542,7 +537,7 @@ impl<N: Network> Primary<N> {
     /// Ensures the primary is signing for the specified batch round.
     fn ensure_is_signing_round(&self, batch_round: u64) -> Result<()> {
         // Retrieve the committee round.
-        let committee_round = self.committee.read().round();
+        let committee_round = self.current_round();
         // Ensure the batch round is within GC range of the committee round.
         if committee_round + self.storage.max_gc_rounds() <= batch_round {
             bail!("Round {batch_round} is too far in the future")
@@ -593,7 +588,7 @@ impl<N: Network> Primary<N> {
         // self.storage.get_certificates_for_round(round).into_iter().chain([certificate.clone()].into_iter());
 
         // Check if our primary should move to the next round.
-        let is_behind_schedule = batch_round > self.committee.read().round(); // TODO: Check if threshold is reached.
+        let is_behind_schedule = batch_round > self.current_round(); // TODO: Check if threshold is reached.
         // Check if our primary is far behind the peer.
         let is_out_of_range = batch_round > gc_round + self.storage.max_gc_rounds();
         // If our primary is far behind the peer, update our committee to the batch round.
@@ -601,8 +596,8 @@ impl<N: Network> Primary<N> {
             // TODO (howardwu): Guard this to increment after quorum threshold is reached.
             // TODO (howardwu): After bullshark is implemented, we must use Aleo blocks to guide us to `tip-50` to know the committee.
             // If the batch round is greater than the current committee round, update the committee.
-            while self.committee.read().round() < batch_round {
-                self.update_committee_to_next_round();
+            while self.current_round() < batch_round {
+                self.update_committee_to_next_round()?;
             }
         }
 
@@ -784,21 +779,14 @@ impl<N: Network> Primary<N> {
     }
 
     /// Updates the committee to the next round, returning the next round number.
-    fn update_committee_to_next_round(&self) {
-        // TODO (howardwu): Move this logic to Bullshark, as:
-        //  - We need to know which members (and stake) to add, update, and remove.
-        // Acquire the write lock for the committee.
-        let mut committee = self.committee.write();
-        // Construct the committee for the next round.
-        let next_committee = (*committee).to_next_round();
-        // Store the next committee into storage.
-        self.storage.insert_committee(next_committee.clone());
-        // Update the committee.
-        *committee = next_committee;
+    fn update_committee_to_next_round(&self) -> Result<()> {
+        // Update to the next committee in storage.
+        self.storage.increment_committee_to_next_round()?;
         // Clear the proposed batch.
         *self.proposed_batch.write() = None;
         // Log the updated round.
-        info!("Starting round {}...", committee.round());
+        info!("Starting round {}...", self.current_round());
+        Ok(())
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
@@ -809,11 +797,8 @@ impl<N: Network> Primary<N> {
     /// Shuts down the primary.
     pub async fn shut_down(&self) {
         trace!("Shutting down the primary...");
-        // Iterate through the workers.
-        self.workers.iter().for_each(|worker| {
-            // Shut down the worker.
-            worker.shut_down();
-        });
+        // Shut down the workers.
+        self.workers.iter().for_each(|worker| worker.shut_down());
         // Abort the tasks.
         self.handles.lock().iter().for_each(|handle| handle.abort());
         // Close the gateway.

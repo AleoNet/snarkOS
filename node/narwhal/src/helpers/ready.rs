@@ -92,7 +92,7 @@ impl<N: Network> Ready<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::helpers::Storage;
+    use crate::helpers::{Committee, Storage};
     use snarkvm::ledger::{coinbase::PuzzleCommitment, narwhal::Data};
 
     use ::bytes::Bytes;
@@ -106,8 +106,10 @@ mod tests {
         // Sample random fake bytes.
         let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
 
+        // Initialize the storage.
+        let storage = Storage::<CurrentNetwork>::new(Committee::new(1, Default::default()).unwrap(), 1);
         // Initialize the ready queue.
-        let ready = Ready::<CurrentNetwork>::new(Storage::new(1));
+        let ready = Ready::<CurrentNetwork>::new(storage);
 
         // Initialize the commitments.
         let commitment_1 = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
@@ -169,8 +171,10 @@ mod tests {
         rng.fill_bytes(&mut vec);
         let data = Data::Buffer(Bytes::from(vec));
 
+        // Initialize the storage.
+        let storage = Storage::<CurrentNetwork>::new(Committee::new(1, Default::default()).unwrap(), 1);
         // Initialize the ready queue.
-        let ready = Ready::<CurrentNetwork>::new(Storage::new(1));
+        let ready = Ready::<CurrentNetwork>::new(storage);
 
         // Initialize the commitments.
         let commitment = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));

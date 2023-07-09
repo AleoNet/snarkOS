@@ -118,12 +118,12 @@ pub async fn start_primary(
     // Initialize the committee.
     let committee = Arc::new(RwLock::new(Committee::<CurrentNetwork>::new(1u64, members)?));
     // Initialize the storage.
-    let storage = Storage::new(MAX_GC_ROUNDS);
+    let storage = Storage::new(committee.read().clone(), MAX_GC_ROUNDS);
 
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the primary instance.
-    let mut primary = Primary::<CurrentNetwork>::new(committee.clone(), storage, account, Some(node_id))?;
+    let mut primary = Primary::<CurrentNetwork>::new(storage, account, Some(node_id))?;
     // Run the primary instance.
     primary.run(sender.clone(), receiver).await?;
     // Keep the node's connections.
@@ -287,7 +287,7 @@ impl From<anyhow::Error> for RestError {
 
 /// Returns the current round.
 async fn get_current_round(State(primary): State<Primary<CurrentNetwork>>) -> Result<ErasedJson, RestError> {
-    Ok(ErasedJson::pretty(primary.committee().read().round()))
+    Ok(ErasedJson::pretty(primary.current_round()))
 }
 
 /// Returns the certificates for the given round.
