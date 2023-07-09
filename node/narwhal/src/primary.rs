@@ -542,6 +542,8 @@ impl<N: Network> Primary<N> {
     }
 
     /// Ensures the primary is signing for the specified batch round.
+    /// This method is used to ensure: for a given round, as soon as the primary starts proposing,
+    /// it will no longer sign for the previous round (as it has enough previous certificates to proceed).
     fn ensure_is_signing_round(&self, batch_round: u64) -> Result<()> {
         // Retrieve the committee round.
         let committee_round = self.current_round();
