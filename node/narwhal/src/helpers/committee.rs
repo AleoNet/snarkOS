@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::MIN_STAKE;
 use snarkvm::console::{prelude::*, types::Address};
 
 use indexmap::IndexMap;
@@ -34,8 +35,9 @@ impl<N: Network> Committee<N> {
         ensure!(round > 0, "Round must be nonzero");
         // Ensure there are at least 4 members.
         ensure!(members.len() >= 4, "Committee must have at least 4 members");
-        // Compute the total stake of the committee only when members are added/removed and/or their
-        // individual stakes change.
+        // Ensure all members have the minimum required stake.
+        ensure!(members.values().all(|stake| *stake >= MIN_STAKE), "All members must have sufficient stake");
+        // Compute the total stake of the committee for this round.
         let total_stake = Self::compute_total_stake(&members)?;
         // Return the new committee.
         Ok(Self { round, total_stake, members })
@@ -73,11 +75,12 @@ impl<N: Network> Committee<N> {
     /// Returns `true` if the combined stake for the given addresses reaches the quorum threshold.
     /// This method takes in a `HashSet` to guarantee that the given addresses are unique.
     pub fn is_quorum_threshold_reached(&self, addresses: &HashSet<Address<N>>) -> bool {
-        // Compute the combined stake for the given addresses.
         let mut stake = 0u64;
 
+        // Compute the combined stake for the given addresses.
         for address in addresses {
-            stake += self.get_stake(*address);
+            // Accumulate the stake, checking for overflow.
+            stake = stake.saturating_sub(self.get_stake(*address));
         }
         // Return whether the combined stake reaches the quorum threshold.
         stake >= self.quorum_threshold()
