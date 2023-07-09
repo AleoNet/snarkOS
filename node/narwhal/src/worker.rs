@@ -244,10 +244,8 @@ impl<N: Network> Worker<N> {
 
     /// Broadcasts a ping event.
     fn broadcast_ping(&self) {
-        // Construct the ping event.
-        let ping = WorkerPing::new(self.ready.transmission_ids());
         // Broadcast the ping event.
-        self.gateway.broadcast(Event::WorkerPing(ping));
+        self.gateway.broadcast(Event::WorkerPing(self.ready.transmission_ids().into()));
     }
 
     /// Sends an transmission request to the specified peer.

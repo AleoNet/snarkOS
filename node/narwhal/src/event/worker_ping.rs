@@ -26,6 +26,13 @@ impl<N: Network> WorkerPing<N> {
     }
 }
 
+impl<N: Network> From<IndexSet<TransmissionID<N>>> for WorkerPing<N> {
+    /// Initializes a new ping event.
+    fn from(transmission_ids: IndexSet<TransmissionID<N>>) -> Self {
+        Self::new(transmission_ids)
+    }
+}
+
 impl<N: Network> EventTrait for WorkerPing<N> {
     /// Returns the event name.
     #[inline]
