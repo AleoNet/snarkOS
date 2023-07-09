@@ -614,7 +614,7 @@ pub mod tests {
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
 
         // Initialize the committees.
-        let committees = vec![(1, committee.clone())];
+        let committees = vec![(1, committee)];
         // Ensure the storage is empty.
         assert_storage(
             &storage,
@@ -696,7 +696,7 @@ pub mod tests {
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
 
         // Initialize the committees.
-        let committees = vec![(1, committee.clone())];
+        let committees = vec![(1, committee)];
         // Ensure the storage is empty.
         assert_storage(
             &storage,
@@ -752,7 +752,7 @@ pub mod tests {
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation remains unchanged.
-        assert_storage(&storage, committees.clone(), rounds, certificates, batch_ids, transmissions);
+        assert_storage(&storage, committees, rounds, certificates, batch_ids, transmissions);
     }
 }
 
