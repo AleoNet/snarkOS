@@ -74,6 +74,11 @@ impl<N: Network> Proposal<N> {
         self.batch.transmissions()
     }
 
+    /// Returns the transmissions.
+    pub fn into_transmissions(self) -> IndexMap<TransmissionID<N>, Transmission<N>> {
+        self.batch.into_transmissions()
+    }
+
     /// Returns the map of `(signature, timestamp)` entries.
     pub const fn signatures(&self) -> &IndexMap<Signature<N>, i64> {
         &self.signatures

@@ -501,22 +501,9 @@ impl<N: Network> Primary<N> {
         // If the batch is expired, clear it.
         if is_expired {
             // Reset the proposed batch.
-            if let Some(proposal) = self.proposed_batch.write().take() {
-                // Retrieve the number of workers.
-                let num_workers = self.num_workers();
-                // Re-insert the transmissions into the workers.
-                for (transmission_id, transmission) in proposal.transmissions() {
-                    // Determine the worker ID.
-                    let Ok(worker_id) = assign_to_worker(*transmission_id, num_workers) else {
-                        bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
-                    };
-                    // Retrieve the worker.
-                    match self.workers.get(worker_id as usize) {
-                        // Re-insert the transmission into the worker.
-                        Some(worker) => worker.reinsert(*transmission_id, transmission.clone()),
-                        None => bail!("Unable to find worker {worker_id}"),
-                    };
-                }
+            let proposal = self.proposed_batch.write().take();
+            if let Some(proposal) = proposal {
+                self.reinsert_transmissions_into_workers(proposal)?;
             }
 
             // TODO (howardwu): Guard this to increment after quorum threshold is reached.
@@ -530,6 +517,26 @@ impl<N: Network> Primary<N> {
                 // Increment the current round.
                 current_round += 1;
             }
+        }
+        Ok(())
+    }
+
+    /// Re-inserts the transmissions from the proposal into the workers.
+    fn reinsert_transmissions_into_workers(&self, proposal: Proposal<N>) -> Result<()> {
+        // Retrieve the number of workers.
+        let num_workers = self.num_workers();
+        // Re-insert the transmissions into the workers.
+        for (transmission_id, transmission) in proposal.into_transmissions().into_iter() {
+            // Determine the worker ID.
+            let Ok(worker_id) = assign_to_worker(transmission_id, num_workers) else {
+                bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
+            };
+            // Retrieve the worker.
+            match self.workers.get(worker_id as usize) {
+                // Re-insert the transmission into the worker.
+                Some(worker) => worker.reinsert(transmission_id, transmission),
+                None => bail!("Unable to find worker {worker_id}"),
+            };
         }
         Ok(())
     }

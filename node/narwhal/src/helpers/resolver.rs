@@ -92,9 +92,8 @@ impl<N: Network> Resolver<N> {
 
 #[cfg(test)]
 pub mod tests {
-
     use super::*;
-    use snarkvm::utilities::TestRng;
+    use snarkvm::{prelude::Rng, utilities::TestRng};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -104,8 +103,7 @@ pub mod tests {
         let listener_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
         let peer_addr = SocketAddr::from(([127, 0, 0, 1], 4321));
         let mut rng = TestRng::default();
-        #[allow(deprecated)]
-        let address = Address::<CurrentNetwork>::rand(&mut rng);
+        let address = Address::<CurrentNetwork>::new(rng.gen());
 
         assert!(resolver.get_listener(peer_addr).is_none());
         assert!(resolver.get_address(listener_ip).is_none());

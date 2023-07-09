@@ -124,6 +124,28 @@ impl<N: Network> Committee<N> {
 }
 
 #[cfg(test)]
+pub mod test_helpers {
+    use super::*;
+    use snarkvm::prelude::{Address, TestRng};
+
+    use indexmap::IndexMap;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    /// Samples a random committee.
+    pub fn sample_committee(rng: &mut TestRng) -> Committee<CurrentNetwork> {
+        // Sample the members.
+        let mut members = IndexMap::new();
+        members.insert(Address::<CurrentNetwork>::new(rng.gen()), 1000);
+        members.insert(Address::<CurrentNetwork>::new(rng.gen()), 1000);
+        members.insert(Address::<CurrentNetwork>::new(rng.gen()), 1000);
+        members.insert(Address::<CurrentNetwork>::new(rng.gen()), 1000);
+        // Return the committee.
+        Committee::<CurrentNetwork>::new(1, members).unwrap()
+    }
+}
+
+#[cfg(test)]
 pub mod prop_tests {
     use crate::helpers::Committee;
     use snarkos_account::Account;

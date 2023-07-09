@@ -92,7 +92,7 @@ impl<N: Network> Ready<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::helpers::{Committee, Storage};
+    use crate::helpers::Storage;
     use snarkvm::ledger::{coinbase::PuzzleCommitment, narwhal::Data};
 
     use ::bytes::Bytes;
@@ -106,8 +106,10 @@ mod tests {
         // Sample random fake bytes.
         let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
 
+        // Sample a committee.
+        let committee = crate::helpers::committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(Committee::new(1, Default::default()).unwrap(), 1);
+        let storage = Storage::<CurrentNetwork>::new(committee, 1);
         // Initialize the ready queue.
         let ready = Ready::<CurrentNetwork>::new(storage);
 
@@ -171,8 +173,10 @@ mod tests {
         rng.fill_bytes(&mut vec);
         let data = Data::Buffer(Bytes::from(vec));
 
+        // Sample a committee.
+        let committee = crate::helpers::committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(Committee::new(1, Default::default()).unwrap(), 1);
+        let storage = Storage::<CurrentNetwork>::new(committee, 1);
         // Initialize the ready queue.
         let ready = Ready::<CurrentNetwork>::new(storage);
 
