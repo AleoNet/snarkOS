@@ -158,8 +158,8 @@ impl<N: Network> Primary<N> {
     }
 
     /// Returns the batch proposal of our primary, if one currently exists.
-    pub fn batch_proposal(&self) -> Option<Proposal<N>> {
-        self.proposed_batch.read().clone()
+    pub fn batch_proposal(&self) -> &Arc<RwLock<Option<Proposal<N>>>> {
+        &self.proposed_batch
     }
 }
 

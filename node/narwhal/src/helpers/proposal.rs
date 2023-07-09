@@ -29,7 +29,6 @@ use snarkvm::{
 use indexmap::IndexMap;
 use std::collections::HashMap;
 
-#[derive(Clone, Debug)]
 pub struct Proposal<N: Network> {
     /// The committee for the round.
     committee: Committee<N>,

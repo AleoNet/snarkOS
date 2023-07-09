@@ -7,3 +7,4 @@ wasm/Cargo.lock
 **.ledger-*
 validator-*
 **.bft-storage-*/
+**proptest-regressions/
