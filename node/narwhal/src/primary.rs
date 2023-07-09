@@ -837,7 +837,7 @@ impl<N: Network> Primary<N> {
             self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into()));
         }
         // Wait for the certificate to be fetched.
-        match timeout(Duration::from_secs(2 * MAX_BATCH_DELAY), callback_receiver).await {
+        match timeout(Duration::from_millis(2 * MAX_BATCH_DELAY), callback_receiver).await {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
