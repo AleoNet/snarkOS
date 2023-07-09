@@ -121,18 +121,18 @@ impl<N: Network> Worker<N> {
     }
 
     /// Removes the specified number of transmissions from the ready queue, and returns them.
-    pub(crate) fn take(&self, num_transmissions: usize) -> Result<IndexMap<TransmissionID<N>, Transmission<N>>> {
+    pub(crate) fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
         // TODO (howardwu): Ensure these transmissions are not already in the ledger.
-        Ok(self.ready
-            .take(num_transmissions)?
+        self.ready
+            .take(num_transmissions)
             .into_iter()
             // Filter out any transmissions from past rounds.
             .filter(|(id, _)| !self.storage.contains_transmission(*id))
-            .collect())
+            .collect()
     }
 
     /// Reinserts the specified transmission into the ready queue.
-    pub(crate) fn reinsert(&self, transmission_id: TransmissionID<N>, transmission: Transmission<N>) -> Result<bool> {
+    pub(crate) fn reinsert(&self, transmission_id: TransmissionID<N>, transmission: Transmission<N>) -> bool {
         self.ready.insert(transmission_id, transmission)
     }
 }
@@ -154,43 +154,41 @@ impl<N: Network> Worker<N> {
         // Ensure the transmission ID matches.
         ensure!(candidate_id == transmission_id, "Invalid transmission ID");
         // Insert the transmission into the ready queue.
-        self.ready.insert(transmission_id, transmission)?;
+        self.ready.insert(transmission_id, transmission);
         trace!("Worker {} - Added transmission '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
         Ok(())
     }
 
     /// Handles the incoming unconfirmed solution.
     /// Note: This method assumes the incoming solution is valid and does not exist in the ledger.
-    pub(crate) async fn process_unconfirmed_solution(
+    pub(crate) fn process_unconfirmed_solution(
         &self,
         puzzle_commitment: PuzzleCommitment<N>,
         prover_solution: Data<ProverSolution<N>>,
-    ) -> Result<()> {
+    ) {
         // Construct the transmission.
         let transmission = Transmission::Solution(prover_solution);
         // Remove the puzzle commitment from the pending queue.
         self.pending.remove(puzzle_commitment, Some(transmission.clone()));
         // Adds the prover solution to the ready queue.
-        self.ready.insert(puzzle_commitment, transmission)?;
+        self.ready.insert(puzzle_commitment, transmission);
         trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment));
-        Ok(())
     }
 
     /// Handles the incoming unconfirmed transaction.
     /// Note: This method assumes the incoming transaction is valid and does not exist in the ledger.
-    pub(crate) async fn process_unconfirmed_transaction(
+    pub(crate) fn process_unconfirmed_transaction(
         &self,
         transaction_id: N::TransactionID,
         transaction: Data<Transaction<N>>,
-    ) -> Result<()> {
+    ) {
         // Construct the transmission.
         let transmission = Transmission::Transaction(transaction);
         // Remove the transaction from the pending queue.
         self.pending.remove(&transaction_id, Some(transmission.clone()));
         // Adds the transaction to the ready queue.
-        self.ready.insert(&transaction_id, transmission)?;
+        self.ready.insert(&transaction_id, transmission);
         trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));
-        Ok(())
     }
 }
 
@@ -200,24 +198,24 @@ impl<N: Network> Worker<N> {
         let WorkerReceiver { mut rx_worker_ping, mut rx_transmission_request, mut rx_transmission_response } = receiver;
 
         // Broadcast a ping event periodically.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         self.spawn(async move {
             loop {
                 // Broadcast the ping event.
-                self_clone.broadcast_ping();
+                self_.broadcast_ping();
                 // Wait for the next interval.
                 tokio::time::sleep(std::time::Duration::from_millis(WORKER_PING_INTERVAL)).await;
             }
         });
 
         // Process the ping events.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, transmission_id)) = rx_worker_ping.recv().await {
-                if let Err(e) = self_clone.process_transmission_id_from_ping(peer_ip, transmission_id).await {
+                if let Err(e) = self_.process_transmission_id_from_ping(peer_ip, transmission_id).await {
                     warn!(
                         "Worker {} failed to fetch missing transmission '{}' from peer '{peer_ip}': {e}",
-                        self_clone.id,
+                        self_.id,
                         fmt_id(transmission_id)
                     );
                 }
@@ -225,23 +223,20 @@ impl<N: Network> Worker<N> {
         });
 
         // Process the transmission requests.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, transmission_request)) = rx_transmission_request.recv().await {
-                self_clone.send_transmission_response(peer_ip, transmission_request);
+                self_.send_transmission_response(peer_ip, transmission_request);
             }
         });
 
         // Process the transmission responses.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, transmission_response)) = rx_transmission_response.recv().await {
                 // Process the transmission response.
-                if let Err(e) = self_clone.finish_transmission_request(peer_ip, transmission_response) {
-                    error!(
-                        "Worker {} failed to process transmission response from peer '{peer_ip}': {e}",
-                        self_clone.id
-                    );
+                if let Err(e) = self_.finish_transmission_request(peer_ip, transmission_response) {
+                    error!("Worker {} failed to process transmission response from peer '{peer_ip}': {e}", self_.id);
                 }
             }
         });

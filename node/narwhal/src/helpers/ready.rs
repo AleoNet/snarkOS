@@ -28,14 +28,12 @@ pub struct Ready<N: Network> {
     storage: Storage<N>,
     /// The current map of `(transmission ID, transmission)` entries.
     transmissions: Arc<RwLock<IndexMap<TransmissionID<N>, Transmission<N>>>>,
-    /// The cumulative proof target in the ready queue.
-    cumulative_proof_target: Arc<RwLock<u128>>,
 }
 
 impl<N: Network> Ready<N> {
     /// Initializes a new instance of the ready queue.
     pub fn new(storage: Storage<N>) -> Self {
-        Self { storage, transmissions: Default::default(), cumulative_proof_target: Default::default() }
+        Self { storage, transmissions: Default::default() }
     }
 
     /// Returns `true` if the ready queue is empty.
@@ -46,11 +44,6 @@ impl<N: Network> Ready<N> {
     /// Returns the number of transmissions in the ready queue.
     pub fn len(&self) -> usize {
         self.transmissions.read().len()
-    }
-
-    /// Returns the cumulative proof target.
-    pub fn cumulative_proof_target(&self) -> u128 {
-        *self.cumulative_proof_target.read()
     }
 
     /// Returns the transmission IDs.
@@ -70,45 +63,29 @@ impl<N: Network> Ready<N> {
 
     /// Inserts the specified (`transmission ID`, `transmission`) to the ready queue.
     /// Returns `true` if the transmission is new, and was added to the ready queue.
-    pub fn insert(&self, transmission_id: impl Into<TransmissionID<N>>, transmission: Transmission<N>) -> Result<bool> {
+    pub fn insert(&self, transmission_id: impl Into<TransmissionID<N>>, transmission: Transmission<N>) -> bool {
         let transmission_id = transmission_id.into();
 
+        // TODO (howardwu): Ensure it does not exist in the ledger. Add a ledger service.
         // Determine if the transmission is new.
         let is_new = !self.contains(transmission_id) && !self.storage.contains_transmission(transmission_id);
         // If the transmission is new, insert it.
         if is_new {
             // Insert the transmission ID.
             self.transmissions.write().insert(transmission_id, transmission);
-            // Check if the transmission ID is for a prover solution.
-            if let TransmissionID::Solution(commitment) = &transmission_id {
-                // Increment the cumulative proof target.
-                let mut cumulative_proof_target = self.cumulative_proof_target.write();
-                *cumulative_proof_target = cumulative_proof_target.saturating_add(commitment.to_target()? as u128);
-            }
         }
         // Return whether the transmission is new.
-        Ok(is_new)
+        is_new
     }
 
     /// Removes the specified number of transmissions and returns them.
-    pub fn take(&self, num_transmissions: usize) -> Result<IndexMap<TransmissionID<N>, Transmission<N>>> {
-        // TODO (howardwu): This logic does not correctly update the cumulative proof target anymore.
-        // Acquire the write locks (simultaneously).
-        let mut cumulative_proof_target = self.cumulative_proof_target.write();
+    pub fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
+        // Acquire the write lock.
         let mut transmissions = self.transmissions.write();
-
         // Determine the number of transmissions to drain.
         let range = 0..transmissions.len().min(num_transmissions);
         // Drain the transmission IDs.
-        let result = transmissions.drain(range).collect::<IndexMap<_, _>>();
-
-        // Update the cumulative proof target.
-        for (transmission_id, _) in result.iter() {
-            if let TransmissionID::Solution(commitment) = transmission_id {
-                *cumulative_proof_target = cumulative_proof_target.saturating_sub(commitment.to_target()? as u128);
-            }
-        }
-        Ok(result)
+        transmissions.drain(range).collect::<IndexMap<_, _>>()
     }
 }
 
@@ -143,20 +120,12 @@ mod tests {
         let solution_3 = Transmission::Solution(data(rng));
 
         // Insert the commitments.
-        assert!(ready.insert(commitment_1, solution_1.clone()).unwrap());
-        assert!(ready.insert(commitment_2, solution_2.clone()).unwrap());
-        assert!(ready.insert(commitment_3, solution_3.clone()).unwrap());
+        assert!(ready.insert(commitment_1, solution_1.clone()));
+        assert!(ready.insert(commitment_2, solution_2.clone()));
+        assert!(ready.insert(commitment_3, solution_3.clone()));
 
         // Check the number of transmissions.
         assert_eq!(ready.len(), 3);
-
-        // Compute the expected cumulative proof target.
-        let expected_cumulative_proof_target = commitment_1.solution().unwrap().to_target().unwrap() as u128
-            + commitment_2.solution().unwrap().to_target().unwrap() as u128
-            + commitment_3.solution().unwrap().to_target().unwrap() as u128;
-
-        // Check the cumulative proof target.
-        assert_eq!(ready.cumulative_proof_target(), expected_cumulative_proof_target);
 
         // Check the transmission IDs.
         let transmission_ids = vec![commitment_1, commitment_2, commitment_3].into_iter().collect::<IndexSet<_>>();
@@ -174,12 +143,10 @@ mod tests {
         assert_eq!(ready.get(commitment_unknown), None);
 
         // Drain the ready queue.
-        let transmissions = ready.take(3).unwrap();
+        let transmissions = ready.take(3);
 
         // Check the number of transmissions.
         assert!(ready.is_empty());
-        // Check the cumulative proof target.
-        assert_eq!(ready.cumulative_proof_target(), 0);
         // Check the transmission IDs.
         assert_eq!(ready.transmission_ids(), IndexSet::new());
 
@@ -212,8 +179,8 @@ mod tests {
         let solution = Transmission::Solution(data);
 
         // Insert the commitments.
-        assert!(ready.insert(commitment, solution.clone()).unwrap());
-        assert!(!ready.insert(commitment, solution).unwrap());
+        assert!(ready.insert(commitment, solution.clone()));
+        assert!(!ready.insert(commitment, solution));
 
         // Check the number of transmissions.
         assert_eq!(ready.len(), 1);

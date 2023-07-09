@@ -170,9 +170,11 @@ impl<N: Network> Primary<N> {
     /// This method performs the following steps:
     /// 1. Drain the workers.
     /// 2. Sign the batch.
-    /// 3. Set the batch in the primary.
-    /// 4. Broadcast the batch to all validators for signing.
+    /// 3. Set the batch proposal in the primary.
+    /// 4. Broadcast the batch header to all validators for signing.
     pub fn propose_batch(&self) -> Result<()> {
+        // Check if the proposed batch has expired, and clear it if it has expired.
+        self.check_proposed_batch_for_expiration()?;
         // If there is a batch being proposed already, return early.
         if self.proposed_batch.read().is_some() {
             // TODO (howardwu): If a proposed batch already exists:
@@ -214,7 +216,7 @@ impl<N: Network> Primary<N> {
         let num_transmissions_per_worker = MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
         for worker in self.workers.iter() {
             // TODO (howardwu): Perform one final filter against the ledger service.
-            transmissions.extend(worker.take(num_transmissions_per_worker)?);
+            transmissions.extend(worker.take(num_transmissions_per_worker));
         }
         // Determine if there are transmissions to propose.
         let has_transmissions = !transmissions.is_empty();
@@ -423,30 +425,40 @@ impl<N: Network> Primary<N> {
         } = receiver;
 
         // Start the batch proposer.
-        self.start_batch_proposer();
+        let self_ = self.clone();
+        self.spawn(async move {
+            loop {
+                // Sleep briefly, but longer than if there were no batch.
+                tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY)).await;
+                // If there is no proposed batch, attempt to propose a batch.
+                if let Err(e) = self_.propose_batch() {
+                    error!("Failed to propose a batch - {e}");
+                }
+            }
+        });
 
         // Process the proposed batch.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_propose)) = rx_batch_propose.recv().await {
-                if let Err(e) = self_clone.process_batch_propose_from_peer(peer_ip, batch_propose).await {
+                if let Err(e) = self_.process_batch_propose_from_peer(peer_ip, batch_propose).await {
                     warn!("Cannot sign proposed batch from peer '{peer_ip}' - {e}");
                 }
             }
         });
 
         // Process the batch signature.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
-                if let Err(e) = self_clone.process_batch_signature_from_peer(peer_ip, batch_signature).await {
+                if let Err(e) = self_.process_batch_signature_from_peer(peer_ip, batch_signature).await {
                     warn!("Cannot include a signature from peer '{peer_ip}' - {e}");
                 }
             }
         });
 
         // Process the certified batch.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_certificate)) = rx_batch_certified.recv().await {
                 // Deserialize the batch certificate.
@@ -454,81 +466,53 @@ impl<N: Network> Primary<N> {
                     warn!("Failed to deserialize the batch certificate from peer '{peer_ip}'");
                     continue;
                 };
-                if let Err(e) = self_clone.process_batch_certificate_from_peer(peer_ip, batch_certificate).await {
+                if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, batch_certificate).await {
                     warn!("Cannot store a batch certificate from peer '{peer_ip}' - {e}");
                 }
             }
         });
 
         // Process the certificate request.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, certificate_request)) = rx_certificate_request.recv().await {
-                self_clone.send_certificate_response(peer_ip, certificate_request);
+                self_.send_certificate_response(peer_ip, certificate_request);
             }
         });
 
         // Process the certificate response.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, certificate_response)) = rx_certificate_response.recv().await {
-                self_clone.finish_certificate_request(peer_ip, certificate_response)
+                self_.finish_certificate_request(peer_ip, certificate_response)
             }
         });
 
         // Process the unconfirmed solutions.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         self.spawn(async move {
             while let Some((puzzle_commitment, prover_solution)) = rx_unconfirmed_solution.recv().await {
                 // Compute the worker ID.
-                let Ok(worker_id) = assign_to_worker(puzzle_commitment, self_clone.num_workers()) else {
+                let Ok(worker_id) = assign_to_worker(puzzle_commitment, self_.num_workers()) else {
                     error!("Unable to determine the worker ID for the unconfirmed solution");
                     continue;
                 };
-                // Retrieve the worker.
-                let worker = self_clone.workers[worker_id as usize].clone();
                 // Process the unconfirmed solution.
-                if let Err(e) = worker.process_unconfirmed_solution(puzzle_commitment, prover_solution).await {
-                    error!("Worker {} failed process a message - {e}", worker.id());
-                }
+                self_.workers[worker_id as usize].process_unconfirmed_solution(puzzle_commitment, prover_solution)
             }
         });
 
         // Process the unconfirmed transactions.
-        let self_clone = self.clone();
+        let self_ = self.clone();
         self.spawn(async move {
             while let Some((transaction_id, transaction)) = rx_unconfirmed_transaction.recv().await {
                 // Compute the worker ID.
-                let Ok(worker_id) = assign_to_worker::<N>(&transaction_id, self_clone.num_workers()) else {
+                let Ok(worker_id) = assign_to_worker::<N>(&transaction_id, self_.num_workers()) else {
                     error!("Unable to determine the worker ID for the unconfirmed transaction");
                     continue;
                 };
-                // Retrieve the worker.
-                let worker = self_clone.workers[worker_id as usize].clone();
                 // Process the unconfirmed transaction.
-                if let Err(e) = worker.process_unconfirmed_transaction(transaction_id, transaction).await {
-                    error!("Worker {} failed process a message - {e}", worker.id());
-                }
-            }
-        });
-    }
-
-    /// Starts the batch proposer.
-    fn start_batch_proposer(&self) {
-        // Initialize the batch proposer.
-        let self_clone = self.clone();
-        self.spawn(async move {
-            loop {
-                // Sleep briefly, but longer than if there were no batch.
-                tokio::time::sleep(std::time::Duration::from_millis(MAX_BATCH_DELAY)).await;
-                // Check if the proposed batch has expired, and clear it if it has expired.
-                if let Err(e) = self_clone.check_proposed_batch_for_expiration() {
-                    error!("Failed to check the proposed batch for expiration - {e}");
-                };
-                // If there is no proposed batch, attempt to propose a batch.
-                if let Err(e) = self_clone.propose_batch() {
-                    error!("Failed to propose a batch - {e}");
-                }
+                self_.workers[worker_id as usize].process_unconfirmed_transaction(transaction_id, transaction)
             }
         });
     }
@@ -542,7 +526,7 @@ impl<N: Network> Primary<N> {
             // Reset the proposed batch.
             if let Some(proposal) = self.proposed_batch.write().take() {
                 // Retrieve the number of workers.
-                let num_workers = self.gateway.num_workers();
+                let num_workers = self.num_workers();
                 // Re-insert the transmissions into the workers.
                 for (transmission_id, transmission) in proposal.transmissions() {
                     // Determine the worker ID.
@@ -552,7 +536,7 @@ impl<N: Network> Primary<N> {
                     // Retrieve the worker.
                     match self.workers.get(worker_id as usize) {
                         // Re-insert the transmission into the worker.
-                        Some(worker) => worker.reinsert(*transmission_id, transmission.clone())?,
+                        Some(worker) => worker.reinsert(*transmission_id, transmission.clone()),
                         None => bail!("Unable to find worker {worker_id}"),
                     };
                 }
@@ -667,7 +651,7 @@ impl<N: Network> Primary<N> {
         let mut fetch_transmissions = FuturesUnordered::new();
 
         // Retrieve the number of workers.
-        let num_workers = self.gateway.num_workers();
+        let num_workers = self.num_workers();
         // Iterate through the transmission IDs.
         for transmission_id in batch_header.transmission_ids() {
             // If the transmission does not exist in storage, proceed to fetch the transmission.
