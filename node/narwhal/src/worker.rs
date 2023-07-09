@@ -19,6 +19,7 @@ use crate::{
     ProposedBatch,
     TransmissionRequest,
     TransmissionResponse,
+    MAX_BATCH_DELAY,
     MAX_WORKERS,
     WORKER_PING_INTERVAL,
 };
@@ -297,7 +298,7 @@ impl<N: Network> Worker<N> {
         // Send the transmission request to the peer.
         self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into()));
         // Wait for the transmission to be fetched.
-        match timeout(Duration::from_secs(5), callback_receiver).await {
+        match timeout(Duration::from_secs(2 * MAX_BATCH_DELAY), callback_receiver).await {
             // If the transmission was fetched, return it.
             Ok(result) => Ok((transmission_id, result?)),
             // If the transmission was not fetched, return an error.

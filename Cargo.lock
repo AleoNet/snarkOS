@@ -3091,7 +3091,6 @@ dependencies = [
  "serde",
  "sha2",
  "snarkos-account",
- "snarkos-node-messages",
  "snarkos-node-tcp",
  "snarkvm",
  "test-strategy",

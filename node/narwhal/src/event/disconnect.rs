@@ -14,6 +14,41 @@
 
 use super::*;
 
+/// The reason behind the node disconnecting from a peer.
+#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+pub enum DisconnectReason {
+    /// The fork length limit was exceeded.
+    ExceededForkRange,
+    /// The peer's challenge response is invalid.
+    InvalidChallengeResponse,
+    /// The peer's client uses an invalid fork depth.
+    InvalidForkDepth,
+    /// The node is a sync node and the peer is ahead.
+    INeedToSyncFirst,
+    /// No reason given.
+    NoReasonGiven,
+    /// The peer is not following the protocol.
+    ProtocolViolation,
+    /// The peer's client is outdated, judging by its version.
+    OutdatedClientVersion,
+    /// Dropping a dead connection.
+    PeerHasDisconnected,
+    /// Dropping a connection for a periodic refresh.
+    PeerRefresh,
+    /// The node is shutting down.
+    ShuttingDown,
+    /// The sync node has served its purpose.
+    SyncComplete,
+    /// The peer has caused too many failures.
+    TooManyFailures,
+    /// The node has too many connections already.
+    TooManyPeers,
+    /// The peer is a sync node that's behind our node, and it needs to sync itself first.
+    YouNeedToSyncFirst,
+    /// The peer's listening port is closed.
+    YourPortIsClosed(u16),
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Disconnect {
     pub reason: DisconnectReason,

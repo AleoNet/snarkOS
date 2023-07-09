@@ -16,6 +16,7 @@ use crate::{
     helpers::{assign_to_worker, EventCodec, PrimarySender, Resolver, Storage, WorkerSender},
     ChallengeRequest,
     ChallengeResponse,
+    DisconnectReason,
     Event,
     EventTrait,
     CONTEXT,
@@ -23,7 +24,6 @@ use crate::{
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
-use snarkos_node_messages::DisconnectReason;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,

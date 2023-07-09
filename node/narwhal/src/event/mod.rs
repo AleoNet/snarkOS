@@ -34,7 +34,7 @@ mod challenge_response;
 pub use challenge_response::ChallengeResponse;
 
 mod disconnect;
-pub use disconnect::Disconnect;
+pub use disconnect::{Disconnect, DisconnectReason};
 
 mod transmission_request;
 pub use transmission_request::TransmissionRequest;
@@ -45,7 +45,6 @@ pub use transmission_response::TransmissionResponse;
 mod worker_ping;
 pub use worker_ping::WorkerPing;
 
-use snarkos_node_messages::DisconnectReason;
 use snarkvm::{
     console::prelude::{FromBytes, Network, ToBytes, Write},
     ledger::narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
@@ -55,6 +54,7 @@ use snarkvm::{
 use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
 use indexmap::IndexSet;
+use serde::{Deserialize, Serialize};
 
 pub trait EventTrait {
     /// Returns the event name.

@@ -56,10 +56,6 @@ default-features = false
 path = "../../account"
 version = "=2.1.4"
 
-[dependencies.snarkos-node-messages]
-path = "../messages"
-version = "=2.1.4"
-
 [dependencies.snarkos-node-tcp]
 path = "../tcp"
 version = "=2.1.4"
@@ -73,7 +69,7 @@ version = "0.3"
 
 [dependencies.tokio]
 version = "1.28"
-features = [ "rt" ]
+features = [ "macros", "rt-multi-thread", "signal" ]
 
 [dependencies.tokio-stream]
 version = "=0.1"

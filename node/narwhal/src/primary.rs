@@ -686,6 +686,11 @@ impl<N: Network> Primary<N> {
             self.update_committee_to_round(batch_round)?;
         }
 
+        // // TODO: Check if the previous certificates have reached the quorum threshold.
+        // // TODO: If so, then advance to next round.
+        // // Check if we need to advance to the future round.
+        // self.try_advance_to_next_round()?;
+
         // // Ensure this batch does not contain already committed transmissions from past rounds.
         // if batch_header.transmission_ids().iter().any(|id| self.storage.contains_transmission(*id)) {
         //     bail!("Batch contains already transmissions from past rounds");
@@ -832,7 +837,7 @@ impl<N: Network> Primary<N> {
             self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into()));
         }
         // Wait for the certificate to be fetched.
-        match timeout(Duration::from_secs(5), callback_receiver).await {
+        match timeout(Duration::from_secs(2 * MAX_BATCH_DELAY), callback_receiver).await {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.
