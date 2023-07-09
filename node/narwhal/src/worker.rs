@@ -18,7 +18,6 @@ use crate::{
     Gateway,
     TransmissionRequest,
     TransmissionResponse,
-    WorkerPing,
     MAX_WORKERS,
     WORKER_PING_INTERVAL,
 };
@@ -204,7 +203,7 @@ impl<N: Network> Worker<N> {
                 // Broadcast the ping event.
                 self_.broadcast_ping();
                 // Wait for the next interval.
-                tokio::time::sleep(std::time::Duration::from_millis(WORKER_PING_INTERVAL)).await;
+                tokio::time::sleep(Duration::from_millis(WORKER_PING_INTERVAL)).await;
             }
         });
 

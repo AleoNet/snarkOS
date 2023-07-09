@@ -329,39 +329,31 @@ impl<N: Network> Primary<N> {
         // Retrieve the signature and timestamp.
         let BatchSignature { batch_id, signature, timestamp } = batch_signature;
 
-        // Ensure the batch ID matches the currently proposed batch ID.
-        match self.proposed_batch.read().as_ref() {
+        // Acquire the write lock.
+        let mut proposal = self.proposed_batch.write();
+
+        // Add the signature to the batch, and determine if the batch is ready to be certified.
+        let is_ready = match proposal.as_mut() {
             Some(proposal) => {
                 // Ensure the batch ID matches the currently proposed batch ID.
                 if proposal.batch_id() != batch_id {
-                    // Log the batch mismatch.
                     match self.storage.contains_batch(batch_id) {
                         true => bail!("This batch was already certified"),
                         false => bail!("Unknown batch ID '{batch_id}'"),
                     }
                 }
+                // Retrieve the address of the peer.
+                let Some(signer) = self.gateway.resolver().get_address(peer_ip) else {
+                    bail!("Signature is from a disconnected peer")
+                };
+                // Add the signature to the batch.
+                proposal.add_signature(signer, signature, timestamp)?;
+                info!("Added a batch signature from peer '{peer_ip}'");
+                // Check if the batch is ready to be certified.
+                proposal.is_quorum_threshold_reached()
             }
-            // Ignore the signature if there is no proposed batch currently.
-            None => return Ok(()),
+            None => false,
         };
-
-        // Initialize a boolean to track whether the batch is ready to be certified.
-        let mut is_ready = false;
-
-        // Store the signature in the proposed batch.
-        if let Some(proposal) = self.proposed_batch.write().as_mut() {
-            // Retrieve the address of the peer.
-            let Some(signer) = self.gateway.resolver().get_address(peer_ip) else {
-                bail!("Signature is from a disconnected peer")
-            };
-            // Add the signature to the batch.
-            proposal.add_signature(signer, signature, timestamp)?;
-            info!("Added a batch signature from peer '{peer_ip}'");
-            // Check if the batch is ready to be certified.
-            if proposal.is_quorum_threshold_reached() {
-                is_ready = true;
-            }
-        }
 
         // If the batch is not ready to be certified, return early.
         if !is_ready {
@@ -372,7 +364,7 @@ impl<N: Network> Primary<N> {
 
         // TODO (howardwu): If any method below fails, we need to return the transmissions back to the ready queue.
         // Retrieve the batch proposal, clearing the proposed batch.
-        let proposal = self.proposed_batch.write().take();
+        let proposal = proposal.take();
         if let Some(proposal) = proposal {
             info!("Quorum threshold reached - Preparing to certify our batch...");
 
@@ -381,9 +373,13 @@ impl<N: Network> Primary<N> {
             // Store the certified batch.
             self.storage.insert_certificate(certificate.clone(), transmissions)?;
             // Broadcast the certified batch to all validators.
-            self.gateway.broadcast(Event::BatchCertified(certificate.into()));
+            self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
 
-            info!("\n\nOur batch for round {} has been certified!\n", self.committee.read().round());
+            info!(
+                "\n\nOur batch with {} transmissions for round {} was certified!\n",
+                certificate.transmission_ids().len(),
+                certificate.round()
+            );
             // Update the committee to the next round.
             self.update_committee_to_next_round();
         }
@@ -779,7 +775,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Updates the committee to the next round, returning the next round number.
-    fn update_committee_to_next_round(&self) -> u64 {
+    fn update_committee_to_next_round(&self) {
         // TODO (howardwu): Move this logic to Bullshark, as:
         //  - We need to know which members (and stake) to add, update, and remove.
         // Acquire the write lock for the committee.
@@ -794,8 +790,6 @@ impl<N: Network> Primary<N> {
         *self.proposed_batch.write() = None;
         // Log the updated round.
         info!("Starting round {}...", committee.round());
-        // Return the next round number.
-        committee.round()
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
