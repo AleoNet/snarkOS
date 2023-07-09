@@ -157,7 +157,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Returns the batch proposal of our primary, if one currently exists.
-    pub fn batch_proposal(&self) -> &Arc<RwLock<Option<Proposal<N>>>> {
+    pub fn proposed_batch(&self) -> &Arc<RwLock<Option<Proposal<N>>>> {
         &self.proposed_batch
     }
 }
@@ -264,27 +264,25 @@ impl<N: Network> Primary<N> {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
         }
 
-        // Retrieve the committee round.
-        let committee_round = self.current_round();
-        // Ensure the batch round is within GC range of the committee round.
-        if committee_round + self.storage.max_gc_rounds() <= batch_round {
-            // Fetch the missing previous certificates.
-            let previous_certificates = self.fetch_missing_previous_certificates(peer_ip, &batch_header).await?;
-            // Process the previous certificates.
-            for previous_certificate in previous_certificates {
-                self.process_batch_certificate_from_peer(peer_ip, previous_certificate).await?;
-            }
+        // Fetch the missing previous certificates.
+        let previous_certificates = self.fetch_missing_previous_certificates(peer_ip, &batch_header).await?;
+        // Process the previous certificates.
+        for previous_certificate in previous_certificates {
+            self.process_batch_certificate_from_peer(peer_ip, previous_certificate).await?;
         }
 
         // Ensure the batch is for the current round.
+        // This method must be called after fetching previous certificates (above),
+        // and prior to checking the batch header (below).
         self.ensure_is_signing_round(batch_round)?;
 
         // TODO (howardwu): Include fetching from the peer's proposed batch, to fix this fetch that times out.
         // Ensure the primary has all of the transmissions.
         let transmissions = self.fetch_missing_transmissions(peer_ip, &batch_header).await?;
-        // // TODO (howardwu): Add the missing transmissions into the workers.
         // Ensure the batch header from the peer is valid.
-        let _missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
+        let missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
+        // Inserts the missing transmissions into the workers.
+        self.insert_transmissions_into_workers(peer_ip, missing_transmissions.into_iter())?;
 
         /* Proceeding to sign the batch. */
 
@@ -578,6 +576,30 @@ impl<N: Network> Primary<N> {
         self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
         // Return the certificate.
         Ok(certificate)
+    }
+
+    /// Inserts the transmissions from the proposal into the workers.
+    fn insert_transmissions_into_workers(
+        &self,
+        peer_ip: SocketAddr,
+        transmissions: impl Iterator<Item = (TransmissionID<N>, Transmission<N>)>,
+    ) -> Result<()> {
+        // Retrieve the number of workers.
+        let num_workers = self.num_workers();
+        // Re-insert the transmissions into the workers.
+        for (transmission_id, transmission) in transmissions {
+            // Determine the worker ID.
+            let Ok(worker_id) = assign_to_worker(transmission_id, num_workers) else {
+                bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
+            };
+            // Retrieve the worker.
+            match self.workers.get(worker_id as usize) {
+                // Re-insert the transmission into the worker.
+                Some(worker) => worker.process_transmission_from_peer(peer_ip, transmission_id, transmission),
+                None => bail!("Unable to find worker {worker_id}"),
+            };
+        }
+        Ok(())
     }
 
     /// Re-inserts the transmissions from the proposal into the workers.

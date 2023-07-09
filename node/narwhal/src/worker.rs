@@ -148,6 +148,11 @@ impl<N: Network> Worker<N> {
 
     /// Reinserts the specified transmission into the ready queue.
     pub(crate) fn reinsert(&self, transmission_id: TransmissionID<N>, transmission: Transmission<N>) -> bool {
+        // Check if the transmission ID exists.
+        if self.contains_transmission(transmission_id) {
+            return false;
+        }
+        // Insert the transmission into the ready queue.
         self.ready.insert(transmission_id, transmission)
     }
 }
@@ -169,9 +174,24 @@ impl<N: Network> Worker<N> {
         // Ensure the transmission ID matches.
         ensure!(candidate_id == transmission_id, "Invalid transmission ID");
         // Insert the transmission into the ready queue.
+        self.process_transmission_from_peer(peer_ip, transmission_id, transmission);
+        Ok(())
+    }
+
+    /// Handles the incoming transmission from a peer.
+    pub(crate) fn process_transmission_from_peer(
+        &self,
+        peer_ip: SocketAddr,
+        transmission_id: TransmissionID<N>,
+        transmission: Transmission<N>,
+    ) {
+        // Check if the transmission ID exists.
+        if self.contains_transmission(transmission_id) {
+            return;
+        }
+        // Insert the transmission into the ready queue.
         self.ready.insert(transmission_id, transmission);
         trace!("Worker {} - Added transmission '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
-        Ok(())
     }
 
     /// Handles the incoming unconfirmed solution.
