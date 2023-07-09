@@ -15,7 +15,7 @@
 use serde::{Deserialize, Serialize};
 
 /// The reason behind the node disconnecting from a peer.
-#[derive(Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 pub enum DisconnectReason {
     /// The fork length limit was exceeded.
     ExceededForkRange,

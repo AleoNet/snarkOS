@@ -111,8 +111,6 @@ impl<N: Network> Gateway<N> {
         self.enable_on_connect().await;
         // Enable the TCP listener. Note: This must be called after the above protocols.
         let _listening_addr = self.tcp.enable_listener().await.expect("Failed to enable the TCP listener");
-        // // Initialize the heartbeat.
-        // self.initialize_heartbeat();
 
         info!("Started the gateway for the memory pool at '{}'", self.local_ip());
     }
@@ -197,18 +195,12 @@ impl<N: Network> Gateway<N> {
             return None;
         }
 
-        let gateway = self.clone();
+        let self_ = self.clone();
         Some(tokio::spawn(async move {
-            // Attempt to connect to the candidate peer.
-            match gateway.tcp.connect(peer_ip).await {
-                // // Remove the peer from the candidate peers.
-                // Ok(()) => gateway.remove_candidate_peer(peer_ip),
-                Ok(()) => (),
-                // If the connection was not allowed, log the error.
-                Err(error) => {
-                    gateway.connecting_peers.lock().shift_remove(&peer_ip);
-                    warn!("Unable to connect to '{peer_ip}' - {error}")
-                }
+            // Attempt to connect to the peer.
+            if let Err(error) = self_.tcp.connect(peer_ip).await {
+                self_.connecting_peers.lock().shift_remove(&peer_ip);
+                warn!("Unable to connect to '{peer_ip}' - {error}");
             }
         }))
     }
@@ -276,8 +268,6 @@ impl<N: Network> Gateway<N> {
         self.resolver.insert_peer(peer_ip, peer_addr, address);
         // Add an transmission for this peer in the connected peers.
         self.connected_peers.write().insert(peer_ip);
-        // // Remove this peer from the candidate peers, if it exists.
-        // self.candidate_peers.write().remove(&peer_ip);
         // // Remove this peer from the restricted peers, if it exists.
         // self.restricted_peers.write().remove(&peer_ip);
     }
@@ -290,8 +280,6 @@ impl<N: Network> Gateway<N> {
         // self.sync.remove_peer(&peer_ip);
         // Remove this peer from the connected peers, if it exists.
         self.connected_peers.write().shift_remove(&peer_ip);
-        // // Add the peer to the candidate peers.
-        // self.candidate_peers.write().insert(peer_ip);
     }
 
     /// Sends the given event to specified peer.
@@ -601,17 +589,6 @@ macro_rules! expect_event {
     };
 }
 
-/// A macro for cutting a handshake short if event verification fails.
-macro_rules! handle_verification {
-    ($result:expr, $framed:expr, $peer_addr:expr) => {
-        if let Some(reason) = $result {
-            trace!("{CONTEXT} Gateway is sending 'Disconnect' to '{}'", $peer_addr);
-            $framed.send(Event::Disconnect(reason.clone().into())).await?;
-            return Err(error(format!("Dropped '{}' for reason: {reason:?}", $peer_addr)));
-        }
-    };
-}
-
 impl<N: Network> Gateway<N> {
     /// The connection initiator side of the handshake.
     async fn handshake_inner_initiator<'a>(
@@ -647,14 +624,20 @@ impl<N: Network> Gateway<N> {
         let peer_request = expect_event!(Event::ChallengeRequest, framed, peer_addr);
 
         // Verify the challenge response. If a disconnect reason was returned, send the disconnect message and abort.
-        handle_verification!(
-            self.verify_challenge_response(peer_addr, peer_request.address, peer_response, our_nonce).await,
-            framed,
-            peer_addr
-        );
+        if let Some(reason) =
+            self.verify_challenge_response(peer_addr, peer_request.address, peer_response, our_nonce).await
+        {
+            trace!("{CONTEXT} Gateway is sending 'Disconnect' to '{peer_addr}'");
+            framed.send(Event::Disconnect(reason.into())).await?;
+            return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
+        }
 
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
-        handle_verification!(self.verify_challenge_request(peer_addr, &peer_request), framed, peer_addr);
+        if let Some(reason) = self.verify_challenge_request(peer_addr, &peer_request) {
+            trace!("{CONTEXT} Gateway is sending 'Disconnect' to '{peer_addr}'");
+            framed.send(Event::Disconnect(reason.into())).await?;
+            return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
+        }
 
         /* Step 3: Send the challenge response. */
 
@@ -700,7 +683,11 @@ impl<N: Network> Gateway<N> {
         }
 
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
-        handle_verification!(self.verify_challenge_request(peer_addr, &peer_request), framed, peer_addr);
+        if let Some(reason) = self.verify_challenge_request(peer_addr, &peer_request) {
+            trace!("{CONTEXT} Gateway is sending 'Disconnect' to '{peer_addr}'");
+            framed.send(Event::Disconnect(reason.into())).await?;
+            return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
+        }
 
         /* Step 2: Send the challenge response followed by own challenge request. */
 
@@ -732,11 +719,13 @@ impl<N: Network> Gateway<N> {
         let peer_response = expect_event!(Event::ChallengeResponse, framed, peer_addr);
 
         // Verify the challenge response. If a disconnect reason was returned, send the disconnect message and abort.
-        handle_verification!(
-            self.verify_challenge_response(peer_addr, peer_request.address, peer_response, our_nonce).await,
-            framed,
-            peer_addr
-        );
+        if let Some(reason) =
+            self.verify_challenge_response(peer_addr, peer_request.address, peer_response, our_nonce).await
+        {
+            trace!("{CONTEXT} Gateway is sending 'Disconnect' to '{peer_addr}'");
+            framed.send(Event::Disconnect(reason.into())).await?;
+            return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
+        }
 
         // Add the peer to the gateway.
         self.insert_connected_peer(peer_ip, peer_addr, peer_request.address);
@@ -748,19 +737,16 @@ impl<N: Network> Gateway<N> {
     fn verify_challenge_request(&self, peer_addr: SocketAddr, event: &ChallengeRequest<N>) -> Option<DisconnectReason> {
         // Retrieve the components of the challenge request.
         let &ChallengeRequest { version, listener_port: _, address, nonce: _ } = event;
-
         // Ensure the event protocol version is not outdated.
         if version < Event::<N>::VERSION {
             warn!("{CONTEXT} Gateway is dropping '{peer_addr}' on version {version} (outdated)");
             return Some(DisconnectReason::OutdatedClientVersion);
         }
-
         // Ensure the address is in the committee.
         if !self.storage.current_committee().is_committee_member(address) {
             warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
             return Some(DisconnectReason::ProtocolViolation);
         }
-
         None
     }
 
@@ -774,22 +760,16 @@ impl<N: Network> Gateway<N> {
     ) -> Option<DisconnectReason> {
         // Retrieve the components of the challenge response.
         let ChallengeResponse { signature } = response;
-
         // Perform the deferred non-blocking deserialization of the signature.
-        let signature = match signature.deserialize().await {
-            Ok(signature) => signature,
-            Err(_) => {
-                warn!("{CONTEXT} Gateway handshake with '{peer_addr}' failed (cannot deserialize the signature)");
-                return Some(DisconnectReason::InvalidChallengeResponse);
-            }
+        let Ok(signature) = signature.deserialize().await else {
+            warn!("{CONTEXT} Gateway handshake with '{peer_addr}' failed (cannot deserialize the signature)");
+            return Some(DisconnectReason::InvalidChallengeResponse);
         };
-
         // Verify the signature.
         if !signature.verify_bytes(&peer_address, &expected_nonce.to_le_bytes()) {
             warn!("{CONTEXT} Gateway handshake with '{peer_addr}' failed (invalid signature)");
             return Some(DisconnectReason::InvalidChallengeResponse);
         }
-
         None
     }
 }

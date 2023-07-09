@@ -17,7 +17,6 @@ use snarkos_node_messages::{
     ChallengeRequest,
     ChallengeResponse,
     Data,
-    Disconnect,
     DisconnectReason,
     Message,
     MessageCodec,
@@ -68,18 +67,6 @@ macro_rules! expect_message {
             None => {
                 return Err(error(format!("'{}' disconnected before sending {:?}", $peer_addr, stringify!($msg_ty),)))
             }
-        }
-    };
-}
-
-/// A macro for cutting a handshake short if message verification fails.
-#[macro_export]
-macro_rules! handle_verification {
-    ($result:expr, $framed:expr, $peer_addr:expr) => {
-        if let Some(reason) = $result {
-            trace!("Sending 'Disconnect' to '{}'", $peer_addr);
-            $framed.send(Message::Disconnect(Disconnect { reason: reason.clone() })).await?;
-            return Err(error(format!("Dropped '{}' for reason: {reason:?}", $peer_addr)));
         }
     };
 }
@@ -158,16 +145,20 @@ impl<N: Network> Router<N> {
         let peer_request = expect_message!(Message::ChallengeRequest, framed, peer_addr);
 
         // Verify the challenge response. If a disconnect reason was returned, send the disconnect message and abort.
-        handle_verification!(
-            self.verify_challenge_response(peer_addr, peer_request.address, peer_response, genesis_header, our_nonce)
-                .await,
-            framed,
-            peer_addr
-        );
-
+        if let Some(reason) = self
+            .verify_challenge_response(peer_addr, peer_request.address, peer_response, genesis_header, our_nonce)
+            .await
+        {
+            trace!("Sending 'Disconnect' to '{peer_addr}'");
+            framed.send(Message::Disconnect(reason.into())).await?;
+            return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
+        }
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
-        handle_verification!(self.verify_challenge_request(peer_addr, &peer_request), framed, peer_addr);
-
+        if let Some(reason) = self.verify_challenge_request(peer_addr, &peer_request) {
+            trace!("Sending 'Disconnect' to '{peer_addr}'");
+            framed.send(Message::Disconnect(reason.into())).await?;
+            return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
+        }
         /* Step 3: Send the challenge response. */
 
         // Sign the counterparty nonce.
@@ -213,8 +204,11 @@ impl<N: Network> Router<N> {
         }
 
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
-        handle_verification!(self.verify_challenge_request(peer_addr, &peer_request), framed, peer_addr);
-
+        if let Some(reason) = self.verify_challenge_request(peer_addr, &peer_request) {
+            trace!("Sending 'Disconnect' to '{peer_addr}'");
+            framed.send(Message::Disconnect(reason.into())).await?;
+            return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
+        }
         /* Step 2: Send the challenge response followed by own challenge request. */
 
         // Initialize an RNG.
@@ -245,13 +239,14 @@ impl<N: Network> Router<N> {
         let peer_response = expect_message!(Message::ChallengeResponse, framed, peer_addr);
 
         // Verify the challenge response. If a disconnect reason was returned, send the disconnect message and abort.
-        handle_verification!(
-            self.verify_challenge_response(peer_addr, peer_request.address, peer_response, genesis_header, our_nonce)
-                .await,
-            framed,
-            peer_addr
-        );
-
+        if let Some(reason) = self
+            .verify_challenge_response(peer_addr, peer_request.address, peer_response, genesis_header, our_nonce)
+            .await
+        {
+            trace!("Sending 'Disconnect' to '{peer_addr}'");
+            framed.send(Message::Disconnect(reason.into())).await?;
+            return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
+        }
         // Add the peer to the router.
         self.insert_connected_peer(Peer::new(peer_ip, &peer_request), peer_addr);
 

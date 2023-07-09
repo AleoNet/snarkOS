@@ -14,9 +14,15 @@
 
 use super::*;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Disconnect {
     pub reason: DisconnectReason,
+}
+
+impl From<DisconnectReason> for Disconnect {
+    fn from(reason: DisconnectReason) -> Self {
+        Self { reason }
+    }
 }
 
 impl MessageTrait for Disconnect {
@@ -42,11 +48,5 @@ impl MessageTrait for Disconnect {
         } else {
             bail!("Invalid 'Disconnect' message");
         }
-    }
-}
-
-impl From<DisconnectReason> for Disconnect {
-    fn from(reason: DisconnectReason) -> Self {
-        Self { reason }
     }
 }
