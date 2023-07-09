@@ -35,15 +35,15 @@ use std::{
 /// - `round` to `(certificate ID, batch ID, author)` entries.
 /// - `certificate ID` to `certificate` entries.
 /// - `batch ID` to `round` entries.
-/// - `transmission ID` to `certificate IDs` entries.
-/// - `transmission ID` to `transmission` entries.
+/// - `transmission ID` to `(transmission, certificate IDs)` entries.
 ///
 /// The chain of events is as follows:
 /// 1. A `transmission` is received.
 /// 2. After a `batch` is ready to be stored:
 ///   - The `certificate` is inserted, triggering updates to the
-///     `rounds`, `certificates`, `batch_ids`, and `transmission_ids` maps.
+///     `rounds`, `certificates`, `batch_ids`, and `transmissions` maps.
 ///   - The missing `transmissions` from storage are inserted into the `transmissions` map.
+///   - The certificate ID is inserted into the `transmissions` map.
 /// 3. After a `round` reaches quorum threshold:
 ///  - The `committee` for the next round is inserted into the `committees` map.
 #[derive(Clone, Debug)]
@@ -64,10 +64,8 @@ pub struct Storage<N: Network> {
     certificates: Arc<RwLock<IndexMap<Field<N>, BatchCertificate<N>>>>,
     /// The map of `batch ID` to `round`.
     batch_ids: Arc<RwLock<IndexMap<Field<N>, u64>>>,
-    /// The map of `transmission ID` to `certificate IDs`.
-    transmission_ids: Arc<RwLock<IndexMap<TransmissionID<N>, IndexSet<Field<N>>>>>,
-    /// The map of `transmission ID` to `transmission`.
-    transmissions: Arc<RwLock<IndexMap<TransmissionID<N>, Transmission<N>>>>,
+    /// The map of `transmission ID` to `(transmission, certificate IDs)` entries.
+    transmissions: Arc<RwLock<IndexMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>>>,
 }
 
 impl<N: Network> Storage<N> {
@@ -84,7 +82,6 @@ impl<N: Network> Storage<N> {
             rounds: Default::default(),
             certificates: Default::default(),
             batch_ids: Default::default(),
-            transmission_ids: Default::default(),
             transmissions: Default::default(),
         }
     }
@@ -111,13 +108,10 @@ impl<N: Network> Storage<N> {
         self.batch_ids.read().clone().into_iter()
     }
 
-    /// Returns an iterator over the `(transmission ID, certificate IDs)` entries.
-    pub fn transmission_ids_iter(&self) -> impl Iterator<Item = (TransmissionID<N>, IndexSet<Field<N>>)> {
-        self.transmission_ids.read().clone().into_iter()
-    }
-
-    /// Returns an iterator over the `(transmission ID, transmission)` entries.
-    pub fn transmissions_iter(&self) -> impl Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+    /// Returns an iterator over the `(transmission ID, (transmission, certificate IDs))` entries.
+    pub fn transmissions_iter(
+        &self,
+    ) -> impl Iterator<Item = (TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>))> {
         self.transmissions.read().clone().into_iter()
     }
 }
@@ -230,7 +224,7 @@ impl<N: Network> Storage<N> {
     /// If the transmission ID does not exist in storage, `None` is returned.
     pub fn get_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<Transmission<N>> {
         // Get the transmission.
-        self.transmissions.read().get(&transmission_id.into()).cloned()
+        self.transmissions.read().get(&transmission_id.into()).map(|(transmission, _)| transmission).cloned()
     }
 
     /// Returns the round for the given `certificate ID`.
@@ -430,8 +424,7 @@ impl<N: Network> Storage<N> {
 
     /// Inserts the given `certificate` into storage.
     ///
-    /// This method triggers updates to the `rounds`, `certificates`, `batch_ids`,
-    /// `transmission_ids`, and `transmissions` maps.
+    /// This method triggers updates to the `rounds`, `certificates`, `batch_ids`, and `transmissions` maps.
     ///
     /// This method ensures the following invariants:
     /// - The certificate ID does not already exist in storage.
@@ -456,12 +449,13 @@ impl<N: Network> Storage<N> {
 
     /// Inserts the given `certificate` into storage.
     ///
-    /// This method triggers updates to the `rounds`, `certificates`, `batch_ids`,
-    /// `transmission_ids`, and `transmissions` maps.
+    /// This method assumes **all missing** transmissions are provided in the `missing_transmissions` map.
+    ///
+    /// This method triggers updates to the `rounds`, `certificates`, `batch_ids`, and `transmissions` maps.
     fn insert_certificate_atomic(
         &self,
         certificate: BatchCertificate<N>,
-        missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+        mut missing_transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
     ) {
         // Retrieve the round.
         let round = certificate.round();
@@ -478,30 +472,29 @@ impl<N: Network> Storage<N> {
         self.certificates.write().insert(certificate_id, certificate.clone());
         // Insert the batch ID.
         self.batch_ids.write().insert(batch_id, round);
-        // Insert the transmission IDs.
-        {
-            // Acquire the write lock.
-            let mut transmission_ids = self.transmission_ids.write();
-            // Insert **all** of the transmission IDs.
-            for transmission_id in certificate.transmission_ids() {
-                transmission_ids.entry(*transmission_id).or_default().insert(certificate_id);
-            }
-        }
-        // Insert the missing transmissions.
-        {
-            // Acquire the write lock.
-            let mut transmissions = self.transmissions.write();
-            // Insert **only the missing** transmissions from storage.
-            for (transmission_id, transmission) in missing_transmissions {
-                transmissions.insert(transmission_id, transmission);
-            }
+        // Acquire the transmissions write lock.
+        let mut transmissions = self.transmissions.write();
+        // Inserts the following:
+        //   - Inserts **only the missing** transmissions from storage.
+        //   - Inserts the certificate ID into the corresponding set for **all** transmissions.
+        for transmission_id in certificate.transmission_ids() {
+            // Retrieve the transmission entry.
+            transmissions.entry(*transmission_id)
+                // Insert **only the missing** transmissions from storage.
+                .or_insert_with( || {
+                    // Retrieve the missing transmission.
+                    let transmission = missing_transmissions.remove(transmission_id).expect("Missing transmission not found");
+                    // Return the transmission and an empty set of certificate IDs.
+                    (transmission, Default::default())
+                })
+                // Insert the certificate ID into the corresponding set for **all** transmissions.
+                .1.insert(certificate_id);
         }
     }
 
     /// Removes the given `certificate ID` from storage.
     ///
-    /// This method triggers updates to the `rounds`, `certificates`, `batch_ids`,
-    /// `transmission_ids`, and `transmissions` maps.
+    /// This method triggers updates to the `rounds`, `certificates`, `batch_ids`, and `transmissions` maps.
     ///
     /// If the certificate was successfully removed, `true` is returned.
     /// If the certificate did not exist in storage, `false` is returned.
@@ -533,22 +526,21 @@ impl<N: Network> Storage<N> {
         self.certificates.write().remove(&certificate_id);
         // Remove the batch ID.
         self.batch_ids.write().remove(&batch_id);
-        // Remove the transmission IDs and transmissions.
-        {
-            // Acquire the write locks.
-            let mut transmission_ids = self.transmission_ids.write();
-            let mut transmissions = self.transmissions.write();
-            // Iterate over the transmission IDs.
-            for transmission_id in certificate.transmission_ids() {
+        // Acquire the transmissions write lock.
+        let mut transmissions = self.transmissions.write();
+        // If this is the last certificate ID for the transmission ID, remove the transmission.
+        for transmission_id in certificate.transmission_ids() {
+            // Remove the certificate ID for the transmission ID, and determine if there are any more certificate IDs.
+            let is_empty = transmissions.get_mut(transmission_id).map_or(false, |(_, certificate_ids)| {
                 // Remove the certificate ID for the transmission ID.
-                transmission_ids.entry(*transmission_id).or_default().remove(&certificate_id);
-                // If this is the last certificate ID for the transmission ID, remove the transmission.
-                if transmission_ids.get(transmission_id).map_or(true, |certificate_ids| certificate_ids.is_empty()) {
-                    // Remove the entry for the transmission ID.
-                    transmission_ids.remove(transmission_id);
-                    // Remove the transmission.
-                    transmissions.remove(transmission_id);
-                }
+                certificate_ids.remove(&certificate_id);
+                // Determine if there are any more certificate IDs for the transmission ID.
+                certificate_ids.is_empty()
+            });
+            // If there are no more certificate IDs for the transmission ID, remove the transmission.
+            if is_empty {
+                // Remove the entry for the transmission ID.
+                transmissions.remove(transmission_id);
             }
         }
         // Return successfully.
@@ -576,7 +568,7 @@ pub mod tests {
         rounds: Vec<(u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)>,
         certificates: Vec<(Field<N>, BatchCertificate<N>)>,
         batch_ids: Vec<(Field<N>, u64)>,
-        transmissions: HashMap<TransmissionID<N>, Transmission<N>>,
+        transmissions: HashMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>,
     ) {
         // Ensure the committees are well-formed.
         assert_eq!(storage.committees_iter().collect::<Vec<_>>(), committees);
@@ -601,6 +593,34 @@ pub mod tests {
             true => Transmission::Solution(s(rng)),
             false => Transmission::Transaction(t(rng)),
         }
+    }
+
+    /// Samples the random transmissions, returning the missing transmissions and the transmissions.
+    fn sample_transmissions(
+        certificate: &BatchCertificate<CurrentNetwork>,
+        rng: &mut TestRng,
+    ) -> (
+        HashMap<TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>>,
+        HashMap<TransmissionID<CurrentNetwork>, (Transmission<CurrentNetwork>, IndexSet<Field<CurrentNetwork>>)>,
+    ) {
+        // Retrieve the certificate ID.
+        let certificate_id = certificate.certificate_id();
+
+        let mut missing_transmissions = HashMap::new();
+        let mut transmissions = HashMap::<_, (_, IndexSet<Field<CurrentNetwork>>)>::new();
+        for transmission_id in certificate.transmission_ids() {
+            // Initialize the transmission.
+            let transmission = sample_transmission(rng);
+            // Update the missing transmissions.
+            missing_transmissions.insert(*transmission_id, transmission.clone());
+            // Update the transmissions map.
+            transmissions
+                .entry(*transmission_id)
+                .or_insert((transmission, Default::default()))
+                .1
+                .insert(certificate_id);
+        }
+        (missing_transmissions, transmissions)
     }
 
     // TODO (howardwu): Testing with 'max_gc_rounds' set to '0' should ensure everything is cleared after insertion.
@@ -638,16 +658,10 @@ pub mod tests {
         let author = certificate.author();
 
         // Construct the sample 'transmissions'.
-        let mut transmissions = HashMap::new();
-        for transmission_id in certificate.transmission_ids() {
-            // Initialize the transmission.
-            let transmission = sample_transmission(rng);
-            // Save the transmission.
-            transmissions.insert(*transmission_id, transmission);
-        }
+        let (missing_transmissions, transmissions) = sample_transmissions(&certificate, rng);
 
         // Insert the certificate.
-        storage.insert_certificate_atomic(certificate.clone(), transmissions.clone());
+        storage.insert_certificate_atomic(certificate.clone(), missing_transmissions);
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Ensure the certificate is stored in the correct round.
@@ -726,16 +740,10 @@ pub mod tests {
         // Construct the expected layout for 'batch_ids'.
         let batch_ids = vec![(batch_id, round)];
         // Construct the sample 'transmissions'.
-        let mut transmissions = HashMap::new();
-        for transmission_id in certificate.transmission_ids() {
-            // Initialize the transmission.
-            let transmission = sample_transmission(rng);
-            // Save the transmission.
-            transmissions.insert(*transmission_id, transmission);
-        }
+        let (missing_transmissions, transmissions) = sample_transmissions(&certificate, rng);
 
         // Insert the certificate.
-        storage.insert_certificate_atomic(certificate.clone(), transmissions.clone());
+        storage.insert_certificate_atomic(certificate.clone(), missing_transmissions.clone());
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation is correct.
@@ -748,8 +756,22 @@ pub mod tests {
             transmissions.clone(),
         );
 
-        // Insert the certificate again.
-        storage.insert_certificate_atomic(certificate, transmissions.clone());
+        // Insert the certificate again - without any missing transmissions.
+        storage.insert_certificate_atomic(certificate.clone(), Default::default());
+        // Ensure the certificate exists in storage.
+        assert!(storage.contains_certificate(certificate_id));
+        // Check that the underlying storage representation remains unchanged.
+        assert_storage(
+            &storage,
+            committees.clone(),
+            rounds.clone(),
+            certificates.clone(),
+            batch_ids.clone(),
+            transmissions.clone(),
+        );
+
+        // Insert the certificate again - with all of the original missing transmissions.
+        storage.insert_certificate_atomic(certificate, missing_transmissions);
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation remains unchanged.
