@@ -115,8 +115,8 @@ impl<N: Network> Proposal<N> {
         Ok(())
     }
 
-    /// Returns the batch certificate and transmissions, consuming the batch proposal.
-    pub fn into_certificate(self) -> Result<(BatchCertificate<N>, HashMap<TransmissionID<N>, Transmission<N>>)> {
+    /// Returns the batch certificate and transmissions.
+    pub fn to_certificate(&self) -> Result<(BatchCertificate<N>, HashMap<TransmissionID<N>, Transmission<N>>)> {
         // Ensure the quorum threshold has been reached.
         ensure!(self.is_quorum_threshold_reached(), "The quorum threshold has not been reached");
         // Create the batch certificate.

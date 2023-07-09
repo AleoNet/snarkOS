@@ -215,7 +215,6 @@ impl<N: Network> Primary<N> {
         }
         // Determine if there are transmissions to propose.
         let has_transmissions = !transmissions.is_empty();
-
         // If the batch is not ready to be proposed, return early.
         match has_transmissions {
             true => info!("Proposing a batch with {} transmissions for round {round}...", transmissions.len()),
@@ -321,18 +320,17 @@ impl<N: Network> Primary<N> {
                     }
                 }
                 // Retrieve the address of the peer.
-                let Some(signer) = self.gateway.resolver().get_address(peer_ip) else {
-                    bail!("Signature is from a disconnected peer")
+                match self.gateway.resolver().get_address(peer_ip) {
+                    // Add the signature to the batch.
+                    Some(signer) => proposal.add_signature(signer, signature, timestamp)?,
+                    None => bail!("Signature is from a disconnected peer"),
                 };
-                // Add the signature to the batch.
-                proposal.add_signature(signer, signature, timestamp)?;
                 info!("Added a batch signature from peer '{peer_ip}'");
                 // Check if the batch is ready to be certified.
                 proposal.is_quorum_threshold_reached()
             }
             None => false,
         };
-
         // If the batch is not ready to be certified, return early.
         if !is_ready {
             return Ok(());
@@ -341,30 +339,26 @@ impl<N: Network> Primary<N> {
         /* Proceeding to certify the batch. */
 
         // Retrieve the batch proposal, clearing the proposed batch.
-        let proposal = proposed_batch.take();
+        let proposal = match proposed_batch.take() {
+            Some(proposal) => proposal,
+            None => return Ok(()),
+        };
         drop(proposed_batch);
 
-        // Certify the batch.
-        if let Some(proposal) = proposal {
-            info!("Quorum threshold reached - Preparing to certify our batch...");
-
-            // TODO (howardwu): If any method below fails, we need to return the transmissions back to the ready queue.
-            // Create the batch certificate and transmissions.
-            let (certificate, transmissions) = proposal.into_certificate()?;
-            // Store the certified batch.
-            self.storage.insert_certificate(certificate.clone(), transmissions)?;
-            // Broadcast the certified batch to all validators.
-            self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
-
-            info!(
-                "\n\nOur batch with {} transmissions for round {} was certified!\n",
-                certificate.transmission_ids().len(),
-                certificate.round()
-            );
-            // Update the committee to the next round.
-            self.update_committee_to_next_round()?;
+        info!("Quorum threshold reached - Preparing to certify our batch...");
+        // Store the certified batch and broadcast it to all validators.
+        match self.store_and_broadcast_certificate(&proposal) {
+            Ok(certificate) => {
+                // Log the certified batch.
+                let num_transmissions = certificate.transmission_ids().len();
+                let round = certificate.round();
+                info!("\n\nOur batch with {num_transmissions} transmissions for round {round} was certified!\n");
+                // Update the committee to the next round.
+                self.update_committee_to_next_round()
+            }
+            // If this fails, return the transmissions back into the ready queue for the next proposal.
+            Err(_) => self.reinsert_transmissions_into_workers(proposal),
         }
-        Ok(())
     }
 
     /// Processes a batch certificate from a peer.
@@ -521,26 +515,6 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
-    /// Re-inserts the transmissions from the proposal into the workers.
-    fn reinsert_transmissions_into_workers(&self, proposal: Proposal<N>) -> Result<()> {
-        // Retrieve the number of workers.
-        let num_workers = self.num_workers();
-        // Re-insert the transmissions into the workers.
-        for (transmission_id, transmission) in proposal.into_transmissions().into_iter() {
-            // Determine the worker ID.
-            let Ok(worker_id) = assign_to_worker(transmission_id, num_workers) else {
-                bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
-            };
-            // Retrieve the worker.
-            match self.workers.get(worker_id as usize) {
-                // Re-insert the transmission into the worker.
-                Some(worker) => worker.reinsert(transmission_id, transmission),
-                None => bail!("Unable to find worker {worker_id}"),
-            };
-        }
-        Ok(())
-    }
-
     /// Ensures the primary is signing for the specified batch round.
     /// This method is used to ensure: for a given round, as soon as the primary starts proposing,
     /// it will no longer sign for the previous round (as it has enough previous certificates to proceed).
@@ -563,6 +537,49 @@ impl<N: Network> Primary<N> {
                 bail!("Our primary at round {signing_round} is no longer signing for round {batch_round}")
             }
         }
+        Ok(())
+    }
+
+    /// Stores the certified batch and broadcasts it to all validators, returning the certificate.
+    fn store_and_broadcast_certificate(&self, proposal: &Proposal<N>) -> Result<BatchCertificate<N>> {
+        // Create the batch certificate and transmissions.
+        let (certificate, transmissions) = proposal.to_certificate()?;
+        // Store the certified batch.
+        self.storage.insert_certificate(certificate.clone(), transmissions)?;
+        // Broadcast the certified batch to all validators.
+        self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
+        // Return the certificate.
+        Ok(certificate)
+    }
+
+    /// Re-inserts the transmissions from the proposal into the workers.
+    fn reinsert_transmissions_into_workers(&self, proposal: Proposal<N>) -> Result<()> {
+        // Retrieve the number of workers.
+        let num_workers = self.num_workers();
+        // Re-insert the transmissions into the workers.
+        for (transmission_id, transmission) in proposal.into_transmissions().into_iter() {
+            // Determine the worker ID.
+            let Ok(worker_id) = assign_to_worker(transmission_id, num_workers) else {
+                bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
+            };
+            // Retrieve the worker.
+            match self.workers.get(worker_id as usize) {
+                // Re-insert the transmission into the worker.
+                Some(worker) => worker.reinsert(transmission_id, transmission),
+                None => bail!("Unable to find worker {worker_id}"),
+            };
+        }
+        Ok(())
+    }
+
+    /// Updates the committee to the next round, returning the next round number.
+    fn update_committee_to_next_round(&self) -> Result<()> {
+        // Update to the next committee in storage.
+        self.storage.increment_committee_to_next_round()?;
+        // Clear the proposed batch.
+        *self.proposed_batch.write() = None;
+        // Log the updated round.
+        info!("Starting round {}...", self.current_round());
         Ok(())
     }
 
@@ -785,17 +802,6 @@ impl<N: Network> Primary<N> {
             // Send the certificate response to the peer.
             self.gateway.send(peer_ip, Event::CertificateResponse(certificate.into()));
         }
-    }
-
-    /// Updates the committee to the next round, returning the next round number.
-    fn update_committee_to_next_round(&self) -> Result<()> {
-        // Update to the next committee in storage.
-        self.storage.increment_committee_to_next_round()?;
-        // Clear the proposed batch.
-        *self.proposed_batch.write() = None;
-        // Log the updated round.
-        info!("Starting round {}...", self.current_round());
-        Ok(())
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.

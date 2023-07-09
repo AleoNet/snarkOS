@@ -313,6 +313,7 @@ impl<N: Network> Storage<N> {
         let mut missing_transmissions = HashMap::new();
         // Ensure the declared transmission IDs are all present in storage or the given transmissions map.
         for transmission_id in batch_header.transmission_ids() {
+            // TODO (howardwu): If transmission ID exists, check it is in right round.
             // Check if the transmission ID already exists in storage.
             if !self.contains_transmission(*transmission_id) {
                 // Retrieve the transmission.
