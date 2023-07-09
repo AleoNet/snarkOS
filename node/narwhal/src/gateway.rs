@@ -571,11 +571,13 @@ macro_rules! expect_event {
                 data
             }
             // Received a disconnect event, abort.
-            Some(Event::Disconnect(reason)) => return Err(error(format!("'{}' disconnected: {reason:?}", $peer_addr))),
+            Some(Event::Disconnect(reason)) => {
+                return Err(error(format!("{CONTEXT} '{}' disconnected: {reason:?}", $peer_addr)))
+            }
             // Received an unexpected event, abort.
             Some(ty) => {
                 return Err(error(format!(
-                    "'{}' did not follow the handshake protocol: received {:?} instead of {}",
+                    "{CONTEXT} '{}' did not follow the handshake protocol: received {:?} instead of {}",
                     $peer_addr,
                     ty.name(),
                     stringify!($event_ty),
@@ -583,10 +585,24 @@ macro_rules! expect_event {
             }
             // Received nothing.
             None => {
-                return Err(error(format!("'{}' disconnected before sending {:?}", $peer_addr, stringify!($event_ty),)))
+                return Err(error(format!(
+                    "{CONTEXT} '{}' disconnected before sending {:?}",
+                    $peer_addr,
+                    stringify!($event_ty)
+                )))
             }
         }
     };
+}
+
+/// Send the given message to the peer.
+async fn send<N: Network>(
+    framed: &mut Framed<&mut TcpStream, EventCodec<N>>,
+    peer_addr: SocketAddr,
+    event: Event<N>,
+) -> io::Result<()> {
+    trace!("{CONTEXT} Gateway is sending '{}' to '{peer_addr}'", event.name());
+    framed.send(event).await
 }
 
 impl<N: Network> Gateway<N> {
@@ -597,29 +613,26 @@ impl<N: Network> Gateway<N> {
         peer_ip: &mut Option<SocketAddr>,
         stream: &'a mut TcpStream,
     ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, EventCodec<N>>)> {
+        // This value is immediately guaranteed to be present, so it can be unwrapped.
+        let peer_ip = peer_ip.unwrap();
         // Construct the stream.
         let mut framed = Framed::new(stream, EventCodec::<N>::handshake());
 
-        // This value is immediately guaranteed to be present, so it can be unwrapped.
-        let peer_ip = peer_ip.unwrap();
+        // Initialize an RNG.
+        let rng = &mut rand::rngs::OsRng;
 
         /* Step 1: Send the challenge request. */
 
-        // Initialize an RNG.
-        let rng = &mut rand::rngs::OsRng;
         // Sample a random nonce.
         let our_nonce = rng.gen();
-
         // Send a challenge request to the peer.
         let our_request = ChallengeRequest::new(self.local_ip().port(), self.account.address(), our_nonce);
-        trace!("Sending '{}' to '{peer_addr}'", our_request.name());
-        framed.send(Event::ChallengeRequest(our_request)).await?;
+        send(&mut framed, peer_addr, Event::ChallengeRequest(our_request)).await?;
 
         /* Step 2: Receive the peer's challenge response followed by the challenge request. */
 
         // Listen for the challenge response message.
         let peer_response = expect_event!(Event::ChallengeResponse, framed, peer_addr);
-
         // Listen for the challenge request message.
         let peer_request = expect_event!(Event::ChallengeRequest, framed, peer_addr);
 
@@ -627,30 +640,24 @@ impl<N: Network> Gateway<N> {
         if let Some(reason) =
             self.verify_challenge_response(peer_addr, peer_request.address, peer_response, our_nonce).await
         {
-            trace!("{CONTEXT} Gateway is sending 'Disconnect' to '{peer_addr}'");
-            framed.send(Event::Disconnect(reason.into())).await?;
+            send(&mut framed, peer_addr, reason.into()).await?;
             return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
         }
-
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
         if let Some(reason) = self.verify_challenge_request(peer_addr, &peer_request) {
-            trace!("{CONTEXT} Gateway is sending 'Disconnect' to '{peer_addr}'");
-            framed.send(Event::Disconnect(reason.into())).await?;
+            send(&mut framed, peer_addr, reason.into()).await?;
             return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
         }
 
         /* Step 3: Send the challenge response. */
 
         // Sign the counterparty nonce.
-        let our_signature = self
-            .account
-            .sign_bytes(&peer_request.nonce.to_le_bytes(), rng)
-            .map_err(|_| error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")))?;
-
+        let Ok(our_signature) = self.account.sign_bytes(&peer_request.nonce.to_le_bytes(), rng) else {
+            return Err(error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")))
+        };
         // Send the challenge response.
         let our_response = ChallengeResponse { signature: Data::Object(our_signature) };
-        trace!("{CONTEXT} Gateway is sending '{}' to '{peer_addr}'", our_response.name());
-        framed.send(Event::ChallengeResponse(our_response)).await?;
+        send(&mut framed, peer_addr, Event::ChallengeResponse(our_response)).await?;
 
         // Add the peer to the gateway.
         self.insert_connected_peer(peer_ip, peer_addr, peer_request.address);
@@ -681,11 +688,9 @@ impl<N: Network> Gateway<N> {
         if let Err(forbidden_message) = self.ensure_peer_is_allowed(peer_ip) {
             return Err(error(format!("{forbidden_message}")));
         }
-
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
         if let Some(reason) = self.verify_challenge_request(peer_addr, &peer_request) {
-            trace!("{CONTEXT} Gateway is sending 'Disconnect' to '{peer_addr}'");
-            framed.send(Event::Disconnect(reason.into())).await?;
+            send(&mut framed, peer_addr, reason.into()).await?;
             return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
         }
 
@@ -695,38 +700,30 @@ impl<N: Network> Gateway<N> {
         let rng = &mut rand::rngs::OsRng;
 
         // Sign the counterparty nonce.
-        let our_signature = self
-            .account
-            .sign_bytes(&peer_request.nonce.to_le_bytes(), rng)
-            .map_err(|_| error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")))?;
+        let Ok(our_signature) = self.account.sign_bytes(&peer_request.nonce.to_le_bytes(), rng) else {
+            return Err(error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")));
+        };
+        // Send the challenge response.
+        let our_response = ChallengeResponse { signature: Data::Object(our_signature) };
+        send(&mut framed, peer_addr, Event::ChallengeResponse(our_response)).await?;
 
         // Sample a random nonce.
         let our_nonce = rng.gen();
-
-        // Send the challenge response.
-        let our_response = ChallengeResponse { signature: Data::Object(our_signature) };
-        trace!("{CONTEXT} Gateway is sending '{}' to '{peer_addr}'", our_response.name());
-        framed.send(Event::ChallengeResponse(our_response)).await?;
-
         // Send the challenge request.
         let our_request = ChallengeRequest::new(self.local_ip().port(), self.account.address(), our_nonce);
-        trace!("{CONTEXT} Gateway is sending '{}' to '{peer_addr}'", our_request.name());
-        framed.send(Event::ChallengeRequest(our_request)).await?;
+        send(&mut framed, peer_addr, Event::ChallengeRequest(our_request)).await?;
 
         /* Step 3: Receive the challenge response. */
 
         // Listen for the challenge response message.
         let peer_response = expect_event!(Event::ChallengeResponse, framed, peer_addr);
-
         // Verify the challenge response. If a disconnect reason was returned, send the disconnect message and abort.
         if let Some(reason) =
             self.verify_challenge_response(peer_addr, peer_request.address, peer_response, our_nonce).await
         {
-            trace!("{CONTEXT} Gateway is sending 'Disconnect' to '{peer_addr}'");
-            framed.send(Event::Disconnect(reason.into())).await?;
+            send(&mut framed, peer_addr, reason.into()).await?;
             return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
         }
-
         // Add the peer to the gateway.
         self.insert_connected_peer(peer_ip, peer_addr, peer_request.address);
 

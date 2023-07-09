@@ -120,6 +120,12 @@ pub enum Message<N: Network> {
     UnconfirmedTransaction(UnconfirmedTransaction<N>),
 }
 
+impl<N: Network> From<DisconnectReason> for Message<N> {
+    fn from(reason: DisconnectReason) -> Self {
+        Self::Disconnect(Disconnect { reason })
+    }
+}
+
 impl<N: Network> Message<N> {
     /// The version of the network protocol; it can be incremented in order to force users to update.
     pub const VERSION: u32 = 7;

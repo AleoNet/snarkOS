@@ -82,6 +82,12 @@ pub enum Event<N: Network> {
     WorkerPing(WorkerPing<N>),
 }
 
+impl<N: Network> From<DisconnectReason> for Event<N> {
+    fn from(reason: DisconnectReason) -> Self {
+        Self::Disconnect(Disconnect { reason })
+    }
+}
+
 impl<N: Network> Event<N> {
     /// The version of the event protocol; it can be incremented in order to force users to update.
     pub const VERSION: u32 = 1;
