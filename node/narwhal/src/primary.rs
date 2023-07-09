@@ -105,7 +105,7 @@ impl<N: Network> Primary<N> {
             // Construct the worker instance.
             let worker = Worker::new(id, self.gateway.clone(), self.storage.clone())?;
             // Run the worker instance.
-            worker.run(rx_worker).await?;
+            worker.run(rx_worker);
             // Add the worker to the list of workers.
             workers.push(worker);
             // Add the worker sender to the map.
@@ -115,7 +115,7 @@ impl<N: Network> Primary<N> {
         self.workers = Arc::new(workers);
 
         // Initialize the gateway.
-        self.gateway.run(tx_workers).await?;
+        self.gateway.run(tx_workers).await;
 
         // Start the primary handlers.
         self.start_handlers(receiver);
@@ -295,11 +295,7 @@ impl<N: Network> Primary<N> {
     /// 3. Store the signature.
     /// 4. Certify the batch if enough signatures have been received.
     /// 5. Broadcast the batch certificate to all validators.
-    async fn process_batch_signature_from_peer(
-        &self,
-        peer_ip: SocketAddr,
-        batch_signature: BatchSignature<N>,
-    ) -> Result<()> {
+    fn process_batch_signature_from_peer(&self, peer_ip: SocketAddr, batch_signature: BatchSignature<N>) -> Result<()> {
         // Ensure the proposed batch has not expired, and clear the proposed batch if it has expired.
         self.check_proposed_batch_for_expiration()?;
 
@@ -364,21 +360,16 @@ impl<N: Network> Primary<N> {
     /// Processes a batch certificate from a peer.
     ///
     /// This method performs the following steps:
-    /// 1. Stores the given batch certificate, after ensuring:
-    ///   - The certificate is well-formed.
-    ///   - The round is within range.
-    ///   - The address is in the committee of the specified round.
-    ///   - We have all of the transmissions.
-    ///   - We have all of the previous certificates.
-    ///   - The previous certificates are valid.
-    ///   - The previous certificates have reached quorum threshold.
-    /// 2. Attempt to propose a batch, if there are enough certificates to reach quorum threshold for the current round.
+    /// 1. Stores the given batch certificate, after ensuring it is valid.
+    /// 2. If there are enough certificates to reach quorum threshold for the current round,
+    ///  then proceed to advance to the next round.
     async fn process_batch_certificate_from_peer(
         &self,
         peer_ip: SocketAddr,
         certificate: BatchCertificate<N>,
     ) -> Result<()> {
-        self.sync_with_peer(peer_ip, certificate).await
+        // Store the certificate, after ensuring it is valid.
+        self.sync_with_certificate_from_peer(peer_ip, certificate).await
     }
 }
 
@@ -422,7 +413,7 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
-                if let Err(e) = self_.process_batch_signature_from_peer(peer_ip, batch_signature).await {
+                if let Err(e) = self_.process_batch_signature_from_peer(peer_ip, batch_signature) {
                     warn!("Cannot include a signature from peer '{peer_ip}' - {e}");
                 }
             }
@@ -583,7 +574,7 @@ impl<N: Network> Primary<N> {
         Ok(())
     }
 
-    /// Sanity checks the batch header from a peer.
+    /// Recursively stores a given batch certificate, after ensuring:
     ///   - Ensure the round matches the committee round.
     ///   - Ensure the address is a member of the committee.
     ///   - Ensure the timestamp is within range.
@@ -593,7 +584,11 @@ impl<N: Network> Primary<N> {
     ///   - Ensure the previous certificates have reached the quorum threshold.
     ///   - Ensure we have not already signed the batch ID.
     #[async_recursion]
-    async fn sync_with_peer(&self, peer_ip: SocketAddr, certificate: BatchCertificate<N>) -> Result<()> {
+    async fn sync_with_certificate_from_peer(
+        &self,
+        peer_ip: SocketAddr,
+        certificate: BatchCertificate<N>,
+    ) -> Result<()> {
         // Retrieve the batch header.
         let batch_header = certificate.batch_header();
         // Retrieve the batch round.
@@ -639,7 +634,7 @@ impl<N: Network> Primary<N> {
         // Iterate through the missing certificates.
         for batch_certificate in missing_certificates {
             // Store the batch certificate (recursively fetching any missing previous certificates).
-            self.sync_with_peer(peer_ip, batch_certificate).await?;
+            self.sync_with_certificate_from_peer(peer_ip, batch_certificate).await?;
         }
 
         // Ensure the primary has all of the transmissions.

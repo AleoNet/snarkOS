@@ -68,11 +68,10 @@ impl<N: Network> Worker<N> {
     }
 
     /// Run the worker instance.
-    pub async fn run(&self, receiver: WorkerReceiver<N>) -> Result<(), Error> {
+    pub fn run(&self, receiver: WorkerReceiver<N>) {
         info!("Starting worker instance {} of the memory pool...", self.id);
         // Start the worker handlers.
         self.start_handlers(receiver);
-        Ok(())
     }
 
     /// Returns the worker ID.

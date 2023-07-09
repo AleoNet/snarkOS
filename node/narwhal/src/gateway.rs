@@ -97,7 +97,7 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Run the gateway.
-    pub async fn run(&self, worker_senders: IndexMap<u8, WorkerSender<N>>) -> Result<()> {
+    pub async fn run(&self, worker_senders: IndexMap<u8, WorkerSender<N>>) {
         debug!("Starting the gateway for the memory pool...");
 
         // Set the worker senders.
@@ -115,7 +115,6 @@ impl<N: Network> Gateway<N> {
         // self.initialize_heartbeat();
 
         info!("Started the gateway for the memory pool at '{}'", self.local_ip());
-        Ok(())
     }
 
     /// Returns the account of the node.
@@ -851,7 +850,7 @@ pub mod prop_tests {
                 // Construct the worker instance.
                 let worker = Worker::new(id, gateway.clone(), self.worker_storage.to_storage()).unwrap();
                 // Run the worker instance.
-                worker.run(rx_worker).await.unwrap();
+                worker.run(rx_worker);
 
                 // Add the worker and the worker sender to maps
                 workers.insert(id, worker);
@@ -896,17 +895,11 @@ pub mod prop_tests {
         assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + (dev as u16)));
 
         let (workers, worker_senders) = input.generate_workers(&gateway).await;
-        match gateway.run(worker_senders).await {
-            Ok(_) => {
-                assert_eq!(
-                    gateway.local_ip(),
-                    SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), MEMORY_POOL_PORT + (dev as u16))
-                );
-                assert_eq!(gateway.num_workers(), workers.len() as u8);
-            }
-            Err(err) => {
-                unreachable!("Unexpected {err}");
-            }
-        }
+        gateway.run(worker_senders).await;
+        assert_eq!(
+            gateway.local_ip(),
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), MEMORY_POOL_PORT + (dev as u16))
+        );
+        assert_eq!(gateway.num_workers(), workers.len() as u8);
     }
 }
