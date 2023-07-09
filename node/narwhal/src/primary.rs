@@ -276,7 +276,6 @@ impl<N: Network> Primary<N> {
         // and prior to checking the batch header (below).
         self.ensure_is_signing_round(batch_round)?;
 
-        // TODO (howardwu): Include fetching from the peer's proposed batch, to fix this fetch that times out.
         // Ensure the primary has all of the transmissions.
         let transmissions = self.fetch_missing_transmissions(peer_ip, &batch_header).await?;
         // Ensure the batch header from the peer is valid.
