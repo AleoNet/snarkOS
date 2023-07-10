@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# The mode - bullshark or narwhal
+mode=$1
+
 # Default number of nodes to spin up
 default_num_nodes=4
 
@@ -37,6 +40,6 @@ for ((i = 0; i < num_nodes; i++)); do
 			echo "xterm could not be found, please install it"
 			exit
 		fi
-		xterm -e "cd $path; $command $i $num_nodes" &
+		xterm -e "cd $path; $command $mode $i $num_nodes" &
 	fi
 done

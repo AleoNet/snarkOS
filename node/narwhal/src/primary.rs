@@ -555,6 +555,8 @@ impl<N: Network> Primary<N> {
             *self.proposed_batch.write() = None;
             // Log the updated round.
             info!("Starting round {}...", self.current_round());
+
+            // TODO (howardwu): If round % 2 == 0, update the leader.
         }
         Ok(())
     }

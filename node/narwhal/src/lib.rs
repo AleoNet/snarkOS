@@ -22,6 +22,9 @@ extern crate tracing;
 
 pub mod helpers;
 
+mod bullshark;
+pub use bullshark::*;
+
 mod event;
 pub use event::*;
 

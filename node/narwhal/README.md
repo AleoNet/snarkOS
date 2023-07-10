@@ -48,3 +48,4 @@ on the entries they receive from other validators' workers.
 
 1. How does one guarantee the number of accepted transactions and solutions does not exceed the block limits?
    - We need to set limits on number of transmissions for the workers, but also the primary.
+2. What should happen if another node comes online with the same address?
