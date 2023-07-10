@@ -366,6 +366,15 @@ impl<N: Network> Gateway<N> {
 
     /// Handles the inbound event from the peer.
     async fn inbound(&self, peer_addr: SocketAddr, event: Event<N>) -> Result<()> {
+        // Retrieve the listener IP for the peer.
+        let Some(peer_ip) = self.resolver.get_listener(peer_addr) else {
+            bail!("{CONTEXT} Unable to resolve the (ambiguous) peer address '{peer_addr}'")
+        };
+        // Drop the peer, if they have exceeded the rate limit (i.e. they are requesting too much from us).
+        let num_events = self.cache.insert_inbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
+        if num_events >= CACHE_EVENTS {
+            bail!("Dropping '{peer_ip}' for spamming events (num_events = {num_events})")
+        }
         // Rate limit for duplicate requests.
         if matches!(&event, &Event::CertificateRequest(_) | &Event::CertificateResponse(_)) {
             // Retrieve the certificate ID.
@@ -391,16 +400,6 @@ impl<N: Network> Gateway<N> {
             if num_events >= CACHE_MAX_DUPLICATES {
                 return Ok(());
             }
-        }
-
-        // Retrieve the listener IP for the peer.
-        let Some(peer_ip) = self.resolver.get_listener(peer_addr) else {
-            bail!("{CONTEXT} Unable to resolve the (ambiguous) peer address '{peer_addr}'")
-        };
-        // Drop the peer, if they have exceeded the rate limit (i.e. they are requesting too much from us).
-        let num_events = self.cache.insert_inbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
-        if num_events >= CACHE_EVENTS {
-            bail!("Dropping '{peer_ip}' for spamming events (num_events = {num_events})")
         }
         trace!("{CONTEXT} Received '{}' from '{peer_ip}'", event.name());
 
