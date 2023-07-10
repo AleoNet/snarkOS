@@ -136,7 +136,7 @@ impl<N: Network> BFT<N> {
         // Retrieve the leader certificate.
         let Some(leader_certificate) = self.leader_certificate.read().clone() else {
             // If there is no leader certificate for the previous round, return 'true'.
-            return Ok(true)
+            return Ok(true);
         };
         // Retrieve the leader certificate ID.
         let leader_certificate_id = leader_certificate.certificate_id();

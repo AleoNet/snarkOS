@@ -12,13 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::Worker;
 use snarkvm::{
     ledger::narwhal::TransmissionID,
     prelude::{Network, ToBytes},
 };
 
-use anyhow::Result;
+use anyhow::{bail, Result};
 use sha2::{Digest, Sha256};
+use snarkvm::ledger::narwhal::Transmission;
 
 fn double_sha256(data: &[u8]) -> [u8; 32] {
     let digest = Sha256::digest(Sha256::digest(data));
@@ -42,4 +44,28 @@ pub fn assign_to_worker<N: Network>(transmission_id: impl Into<TransmissionID<N>
     let worker_id = (hash % num_workers as u128) as u8;
     // Return the worker ID.
     Ok(worker_id)
+}
+
+/// Assigns the given `(transmission ID, transmission)` entries into the `workers` using the given `op`.
+pub fn assign_to_workers<N: Network>(
+    workers: &[Worker<N>],
+    transmissions: impl Iterator<Item = (TransmissionID<N>, Transmission<N>)>,
+    op: impl Fn(&Worker<N>, TransmissionID<N>, Transmission<N>),
+) -> Result<()> {
+    // Set the number of workers.
+    let num_workers = u8::try_from(workers.len()).expect("Too many workers");
+    // Re-insert the transmissions into the workers.
+    for (transmission_id, transmission) in transmissions.into_iter() {
+        // Determine the worker ID.
+        let Ok(worker_id) = assign_to_worker(transmission_id, num_workers) else {
+            bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
+        };
+        // Retrieve the worker.
+        match workers.get(worker_id as usize) {
+            // Use the provided closure to operate on the worker.
+            Some(worker) => op(worker, transmission_id, transmission),
+            None => bail!("Unable to find worker {worker_id}"),
+        };
+    }
+    Ok(())
 }

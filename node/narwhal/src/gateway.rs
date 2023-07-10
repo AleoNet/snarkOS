@@ -713,7 +713,7 @@ impl<N: Network> Gateway<N> {
 
         // Sign the counterparty nonce.
         let Ok(our_signature) = self.account.sign_bytes(&peer_request.nonce.to_le_bytes(), rng) else {
-            return Err(error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")))
+            return Err(error(format!("Failed to sign the challenge request nonce from '{peer_addr}'")));
         };
         // Send the challenge response.
         let our_response = ChallengeResponse { signature: Data::Object(our_signature) };

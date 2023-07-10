@@ -42,7 +42,7 @@ use snarkvm::{
     prelude::Field,
 };
 
-use crate::helpers::BFTSender;
+use crate::helpers::{assign_to_workers, BFTSender};
 use async_recursion::async_recursion;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
@@ -303,7 +303,7 @@ impl<N: Network> Primary<N> {
         // Ensure the batch header from the peer is valid.
         let missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
         // Inserts the missing transmissions into the workers.
-        self.insert_transmissions_into_workers(peer_ip, missing_transmissions.into_iter())?;
+        self.insert_missing_transmissions_into_workers(peer_ip, missing_transmissions.into_iter())?;
 
         // Now that the primary is synced, check if the batch already exists, and return early if so.
         if self.storage.contains_batch(batch_header.batch_id()) {
@@ -623,48 +623,28 @@ impl<N: Network> Primary<N> {
         Ok(certificate)
     }
 
-    /// Inserts the transmissions from the proposal into the workers.
-    fn insert_transmissions_into_workers(
+    /// Inserts the missing transmissions from the proposal into the workers.
+    fn insert_missing_transmissions_into_workers(
         &self,
         peer_ip: SocketAddr,
         transmissions: impl Iterator<Item = (TransmissionID<N>, Transmission<N>)>,
     ) -> Result<()> {
-        // Retrieve the number of workers.
-        let num_workers = self.num_workers();
-        // Re-insert the transmissions into the workers.
-        for (transmission_id, transmission) in transmissions {
-            // Determine the worker ID.
-            let Ok(worker_id) = assign_to_worker(transmission_id, num_workers) else {
-                bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
-            };
-            // Retrieve the worker.
-            match self.workers.get(worker_id as usize) {
-                // Re-insert the transmission into the worker.
-                Some(worker) => worker.process_transmission_from_peer(peer_ip, transmission_id, transmission),
-                None => bail!("Unable to find worker {worker_id}"),
-            };
-        }
-        Ok(())
+        // Insert the transmissions into the workers.
+        assign_to_workers(&self.workers, transmissions, |worker, transmission_id, transmission| {
+            worker.process_transmission_from_peer(peer_ip, transmission_id, transmission);
+        })
     }
 
     /// Re-inserts the transmissions from the proposal into the workers.
     fn reinsert_transmissions_into_workers(&self, proposal: Proposal<N>) -> Result<()> {
-        // Retrieve the number of workers.
-        let num_workers = self.num_workers();
         // Re-insert the transmissions into the workers.
-        for (transmission_id, transmission) in proposal.into_transmissions().into_iter() {
-            // Determine the worker ID.
-            let Ok(worker_id) = assign_to_worker(transmission_id, num_workers) else {
-                bail!("Unable to assign transmission ID '{transmission_id}' to a worker")
-            };
-            // Retrieve the worker.
-            match self.workers.get(worker_id as usize) {
-                // Re-insert the transmission into the worker.
-                Some(worker) => worker.reinsert(transmission_id, transmission),
-                None => bail!("Unable to find worker {worker_id}"),
-            };
-        }
-        Ok(())
+        assign_to_workers(
+            &self.workers,
+            proposal.into_transmissions().into_iter(),
+            |worker, transmission_id, transmission| {
+                worker.reinsert(transmission_id, transmission);
+            },
+        )
     }
 
     /// Recursively stores a given batch certificate, after ensuring:
