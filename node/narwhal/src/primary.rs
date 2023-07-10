@@ -348,9 +348,8 @@ impl<N: Network> Primary<N> {
         let proposal = {
             // Acquire the write lock.
             let mut proposed_batch = self.proposed_batch.write();
-
             // Add the signature to the batch, and determine if the batch is ready to be certified.
-            let is_ready = match proposed_batch.as_mut() {
+            match proposed_batch.as_mut() {
                 Some(proposal) => {
                     // Ensure the batch ID matches the currently proposed batch ID.
                     if proposal.batch_id() != batch_id {
@@ -367,14 +366,14 @@ impl<N: Network> Primary<N> {
                     };
                     info!("Added a batch signature from peer '{peer_ip}'");
                     // Check if the batch is ready to be certified.
-                    proposal.is_quorum_threshold_reached()
+                    if !proposal.is_quorum_threshold_reached() {
+                        // If the batch is not ready to be certified, return early.
+                        return Ok(());
+                    }
                 }
-                None => false,
+                // There is no proposed batch, so return early.
+                None => return Ok(()),
             };
-            // If the batch is not ready to be certified, return early.
-            if !is_ready {
-                return Ok(());
-            }
             // Retrieve the batch proposal, clearing the proposed batch.
             match proposed_batch.take() {
                 Some(proposal) => proposal,
