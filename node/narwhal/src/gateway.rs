@@ -631,7 +631,7 @@ macro_rules! expect_event {
             }
             // Received a disconnect event, abort.
             Some(Event::Disconnect(reason)) => {
-                return Err(error(format!("{CONTEXT} '{}' disconnected: {reason:?}", $peer_addr)))
+                return Err(error(format!("{CONTEXT} '{}' disconnected: {reason:?}", $peer_addr)));
             }
             // Received an unexpected event, abort.
             Some(ty) => {
