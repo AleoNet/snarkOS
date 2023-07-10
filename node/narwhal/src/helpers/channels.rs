@@ -26,23 +26,24 @@ use snarkvm::{
     prelude::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
+        Result,
     },
 };
 
 use std::{net::SocketAddr, sync::Arc};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, oneshot};
 
 const MAX_CHANNEL_SIZE: usize = 8192;
 
 #[derive(Debug)]
 pub struct BFTSender<N: Network> {
-    pub tx_primary_round: Arc<mpsc::Sender<u64>>,
+    pub tx_primary_round: Arc<mpsc::Sender<(u64, oneshot::Sender<Result<()>>)>>,
     _phantom: std::marker::PhantomData<N>,
 }
 
 #[derive(Debug)]
 pub struct BFTReceiver<N: Network> {
-    pub rx_primary_round: mpsc::Receiver<u64>,
+    pub rx_primary_round: mpsc::Receiver<(u64, oneshot::Sender<Result<()>>)>,
     _phantom: std::marker::PhantomData<N>,
 }
 

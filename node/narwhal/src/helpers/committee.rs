@@ -67,7 +67,7 @@ impl<N: Network> Committee<N> {
     }
 
     /// Returns the number of validators in the committee.
-    pub fn committee_size(&self) -> usize {
+    pub fn num_members(&self) -> usize {
         self.members.len()
     }
 
@@ -298,7 +298,7 @@ pub mod prop_tests {
             total_stake += v.stake;
         }
 
-        assert_eq!(committee.committee_size(), validators.len());
+        assert_eq!(committee.num_members(), validators.len());
         assert_eq!(committee.total_stake(), total_stake);
         for v in validators.iter() {
             let address = v.get_account().address();

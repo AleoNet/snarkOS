@@ -184,6 +184,11 @@ impl<N: Network> Storage<N> {
             // Update the GC round.
             self.gc_round.store(next_gc_round, Ordering::Relaxed);
         }
+
+        // Ensure the next round matches in storage.
+        ensure!(next_round == self.current_round(), "The next round {next_round} does not match in storage");
+        // Log the updated round.
+        info!("Starting round {next_round}...");
         Ok(())
     }
 
@@ -281,6 +286,7 @@ impl<N: Network> Storage<N> {
     /// - All transmissions declared in the batch header are provided or exist in storage (up to GC).
     /// - All previous certificates declared in the certificate exist in storage (up to GC).
     /// - All previous certificates are for the previous round (i.e. round - 1).
+    /// - All previous certificates contain a unique author.
     /// - The previous certificates reached the quorum threshold (2f+1).
     pub fn check_batch_header(
         &self,
@@ -354,6 +360,10 @@ impl<N: Network> Storage<N> {
             if !self.contains_certificates_for_round(previous_round) {
                 bail!("Missing certificates for the previous round {previous_round} in storage {gc_log}")
             }
+            // Ensure the number of previous certificate IDs is at or below the number of committee members.
+            if batch_header.previous_certificate_ids().len() > previous_committee.num_members() {
+                bail!("Too many previous certificates for round {round} {gc_log}")
+            }
             // Initialize a set of the previous authors.
             let mut previous_authors = HashSet::with_capacity(batch_header.previous_certificate_ids().len());
             // Ensure storage contains all declared previous certificates (up to GC).
@@ -365,6 +375,10 @@ impl<N: Network> Storage<N> {
                 // Ensure the previous certificate is for the previous round.
                 if previous_certificate.round() != previous_round {
                     bail!("Round {round} certificate contains a round {previous_round} certificate {gc_log}")
+                }
+                // Ensure the previous author is new.
+                if previous_authors.contains(&previous_certificate.author()) {
+                    bail!("Round {round} certificate contains a duplicate author {gc_log}")
                 }
                 // Insert the author of the previous certificate.
                 previous_authors.insert(previous_certificate.author());

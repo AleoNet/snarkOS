@@ -20,6 +20,7 @@ use crate::{
     TransmissionRequest,
     TransmissionResponse,
     MAX_BATCH_DELAY,
+    MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
     WORKER_PING_INTERVAL,
 };
@@ -167,6 +168,11 @@ impl<N: Network> Worker<N> {
     ) -> Result<()> {
         // Check if the transmission ID exists.
         if self.contains_transmission(transmission_id) {
+            return Ok(());
+        }
+        // If the ready queue is full, then skip this transmission.
+        // Note: We must prioritize the unconfirmed solutions and unconfirmed transactions, not transmissions.
+        if self.ready.len() > MAX_TRANSMISSIONS_PER_BATCH {
             return Ok(());
         }
         trace!("Worker {} - Found a new transmission ID '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));

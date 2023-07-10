@@ -412,7 +412,8 @@ impl<N: Network> Primary<N> {
     ) -> Result<()> {
         // Store the certificate, after ensuring it is valid.
         self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
-        // Check if we need to advance to the next round.
+        // If there are enough certificates to reach quorum threshold for the current round,
+        // then proceed to advance to the next round.
         self.try_advance_to_next_round().await
     }
 }
@@ -534,8 +535,8 @@ impl<N: Network> Primary<N> {
             if let Some(proposal) = proposal {
                 self.reinsert_transmissions_into_workers(proposal)?;
             }
-            // Check if we need to advance to the next round.
-            self.try_advance_to_next_round().await?;
+            // If we have reached the quorum threshold, then proceed to the next round.
+            self.update_committee_to_round(self.current_round() + 1).await?;
         }
         Ok(())
     }
@@ -553,34 +554,53 @@ impl<N: Network> Primary<N> {
         // Check if the certificates have reached the quorum threshold.
         let is_quorum = current_committee.is_quorum_threshold_reached(&authors);
 
-        // TODO (howardwu): Contemplate removing this check.
         // Determine if we are currently proposing a round.
+        // Note: This is important, because while our peers have advanced,
+        // they may not be proposing yet, and thus still able to sign our proposed batch.
         let is_proposing = self.proposed_batch.read().is_some();
 
+        // Determine whether to advance to the next round.
         if is_quorum && !is_proposing {
-            // TODO (howardwu): After bullshark is implemented, we need to check the leader case.
+            // Update to the next committee in storage.
+            // self.storage.increment_committee_to_next_round()?;
+            // // If we have reached the quorum threshold, then proceed to the next round.
+            // self.try_advance_to_next_round_in_narwhal().await?;
             // If we have reached the quorum threshold, then proceed to the next round.
             self.update_committee_to_round(current_round + 1).await?;
+            // // Start proposing a batch for the next round.
+            // self.propose_batch().await?;
         }
         Ok(())
     }
 
     /// Updates the committee to the specified round.
+    ///
+    /// This method should only be called after processing a proposed batch, or in catching up,
+    /// and thus enforces that the proposed batch is cleared.
     async fn update_committee_to_round(&self, next_round: u64) -> Result<()> {
-        // Iterate until the desired round is reached.
-        while self.current_round() < next_round {
+        // Iterate until the penultimate round is reached.
+        while self.current_round() < next_round.saturating_sub(1) {
             // Update to the next committee in storage.
             self.storage.increment_committee_to_next_round()?;
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;
-            // Log the updated round.
-            info!("Starting round {}...", self.current_round());
-
-            // TODO (howardwu): If round % 2 == 0, update the leader.
-            // If a BFT sender was provided, send the certificate to the BFT sender.
+        }
+        // Attempt to advance to the next round.
+        if self.current_round() < next_round {
+            // If a BFT sender was provided, send the certificate to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
-                bft_sender.tx_primary_round.send(self.current_round()).await?;
+                // Initialize a callback sender and receiver.
+                let (callback_sender, callback_receiver) = oneshot::channel();
+                // Send the current round to the BFT.
+                bft_sender.tx_primary_round.send((self.current_round(), callback_sender)).await?;
+                // Await the callback to continue.
+                callback_receiver.await??; // Double ?s unwraps the result from the BFT method.
+            } else {
+                // Update to the next committee in storage.
+                self.storage.increment_committee_to_next_round()?;
             }
+            // Clear the proposed batch.
+            *self.proposed_batch.write() = None;
         }
         Ok(())
     }
@@ -683,9 +703,9 @@ impl<N: Network> Primary<N> {
         // Check if our primary should move to the next round.
         let is_behind_schedule = batch_round > self.current_round(); // TODO: Check if threshold is reached.
         // Check if our primary is far behind the peer.
-        let is_out_of_range = batch_round > gc_round + self.storage.max_gc_rounds();
+        let is_peer_far_in_future = batch_round > self.current_round() + self.storage.max_gc_rounds();
         // If our primary is far behind the peer, update our committee to the batch round.
-        if is_behind_schedule || is_out_of_range {
+        if is_behind_schedule || is_peer_far_in_future {
             // TODO (howardwu): Guard this to increment after quorum threshold is reached.
             // TODO (howardwu): After bullshark is implemented, we must use Aleo blocks to guide us to `tip-50` to know the committee.
             // If the batch round is greater than the current committee round, update the committee.
