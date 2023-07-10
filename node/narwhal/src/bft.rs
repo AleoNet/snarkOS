@@ -110,7 +110,7 @@ impl<N: Network> BFT<N> {
         // TODO (howardwu): Determine whether to use the current round or the previous round committee.
         // Determine the leader of the previous round, using the committee of the current round.
         let leader = match self.storage().get_committee(current_round) {
-            Some(committee) => committee.leader_for(current_round)?,
+            Some(committee) => committee.get_leader()?,
             None => bail!("BFT failed to retrieve the committee for the current round"),
         };
         // Find and set the leader certificate to the leader of the previous round, if they were present.

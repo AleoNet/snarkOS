@@ -116,11 +116,14 @@ impl<N: Network> Committee<N> {
 }
 
 impl<N: Network> Committee<N> {
-    /// Returns the leader address for the given round.
+    /// Returns the leader address for the current round.
     /// Note: This method returns a deterministic result that is SNARK-friendly.
-    pub fn leader_for(&self, current_round: u64) -> Result<Address<N>> {
-        // Compute the previous round.
+    pub fn get_leader(&self) -> Result<Address<N>> {
+        // Set the current round.
+        let current_round = self.round;
+        // Set the previous round.
         let previous_round = current_round.saturating_sub(1);
+
         // Retrieve the total stake of the committee.
         let total_stake = self.total_stake();
         // Construct the round seed.
