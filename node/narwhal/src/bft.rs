@@ -13,16 +13,17 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{init_bft_channels, BFTReceiver, PrimaryReceiver, PrimarySender, Storage},
+    helpers::{init_bft_channels, BFTReceiver, Committee, PrimaryReceiver, PrimarySender, Storage},
     Primary,
 };
 use snarkos_account::Account;
 use snarkvm::{
     console::account::Address,
     ledger::narwhal::BatchCertificate,
-    prelude::{bail, Network, Result},
+    prelude::{bail, ensure, Field, Network, Result},
 };
 
+use indexmap::IndexSet;
 use parking_lot::{Mutex, RwLock};
 use std::{future::Future, sync::Arc};
 use tokio::task::JoinHandle;
@@ -85,12 +86,14 @@ impl<N: Network> BFT<N> {
     ///
     /// This method runs on every even round, by determining the leader of the previous round,
     /// and setting the leader certificate to their certificate in the previous round, if they were present.
-    pub fn update_leader_certificate(&self) -> Result<()> {
+    pub fn update_leader_certificate(&self, round: u64) -> Result<()> {
         // Retrieve the current round.
         let current_round = self.storage().current_round();
-        // If the current round is odd, return early.
+        // Ensure the current round matches the given round.
+        ensure!(current_round == round, "BFT storage reference is out of sync with the current round");
+        // If the current round is odd, throw an error.
         if current_round % 2 != 0 {
-            return Ok(());
+            bail!("BFT cannot update the leader certificate on an odd round")
         }
 
         // Retrieve the previous round.
@@ -115,11 +118,88 @@ impl<N: Network> BFT<N> {
             previous_certificates.into_iter().find(|certificate| certificate.author() == leader);
         Ok(())
     }
+
+    /// Returns 'true' if any of the following conditions hold:
+    ///  - The leader certificate reached quorum threshold `(2f + 1)` (in the previous certificates in the current round),
+    ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round),
+    ///  - The leader certificate is 'None'.
+    pub fn process_odd_round(&self, round: u64) -> Result<bool> {
+        // Retrieve the current round.
+        let current_round = self.storage().current_round();
+        // Ensure the current round matches the given round.
+        ensure!(current_round == round, "BFT storage reference is out of sync with the current round");
+        // If the current round is even, throw an error.
+        if current_round % 2 != 1 {
+            bail!("BFT cannot compute the stake for the leader certificate in an even round")
+        }
+
+        // Retrieve the leader certificate.
+        let Some(leader_certificate) = self.leader_certificate.read().clone() else {
+            // If there is no leader certificate for the previous round, return 'true'.
+            return Ok(true)
+        };
+        // Retrieve the leader certificate ID.
+        let leader_certificate_id = leader_certificate.certificate_id();
+        // Retrieve the certificates for the current round.
+        let current_certificates = self.storage().get_certificates_for_round(current_round);
+        // Retrieve the committee of the current round.
+        let Some(current_committee) = self.storage().get_committee(current_round) else {
+            bail!("BFT failed to retrieve the committee for the current round")
+        };
+
+        // Compute the stake for the leader certificate.
+        let (stake_with_leader, stake_without_leader) =
+            self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &current_committee)?;
+        // Return 'true' if any of the following conditions hold:
+        Ok(stake_with_leader >= current_committee.quorum_threshold()
+            || stake_without_leader >= current_committee.availability_threshold())
+    }
+
+    /// Computes the amount of stake that has & has not signed for the leader certificate.
+    fn compute_stake_for_leader_certificate(
+        &self,
+        leader_certificate_id: Field<N>,
+        current_certificates: IndexSet<BatchCertificate<N>>,
+        current_committee: &Committee<N>,
+    ) -> Result<(u64, u64)> {
+        // If there are no current certificates, return early.
+        if current_certificates.is_empty() {
+            return Ok((0, 0));
+        }
+
+        // Initialize a tracker for the stake with the leader.
+        let mut stake_with_leader = 0u64;
+        // Initialize a tracker for the stake without the leader.
+        let mut stake_without_leader = 0u64;
+        // Iterate over the current certificates.
+        for certificate in current_certificates {
+            // Retrieve the stake for the author of the certificate.
+            let stake = current_committee.get_stake(certificate.author());
+            // Determine if the certificate includes the leader.
+            match certificate.previous_certificate_ids().iter().any(|id| *id == leader_certificate_id) {
+                // If the certificate includes the leader, add the stake to the stake with the leader.
+                true => stake_with_leader = stake_with_leader.saturating_add(stake),
+                // If the certificate does not include the leader, add the stake to the stake without the leader.
+                false => stake_without_leader = stake_without_leader.saturating_add(stake),
+            }
+        }
+        // Return the stake with the leader, and the stake without the leader.
+        Ok((stake_with_leader, stake_without_leader))
+    }
 }
 
 impl<N: Network> BFT<N> {
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
-    fn process_certificate_from_primary(&self, _certificate: BatchCertificate<N>) -> Result<()> {
+    fn update_to_next_round(&self, round: u64) -> Result<()> {
+        let _is_ready = match round % 2 == 0 {
+            true => {
+                // Update the leader certificate to the previous round.
+                self.update_leader_certificate(round)?;
+                // Return 'true' if there is a leader certificate set for the previous round.
+                self.leader_certificate.read().is_some()
+            }
+            false => self.process_odd_round(round)?,
+        };
         Ok(())
     }
 }
@@ -127,13 +207,13 @@ impl<N: Network> BFT<N> {
 impl<N: Network> BFT<N> {
     /// Starts the BFT handlers.
     fn start_handlers(&self, bft_receiver: BFTReceiver<N>) {
-        let BFTReceiver { mut rx_primary_certificate } = bft_receiver;
+        let BFTReceiver { mut rx_primary_round, .. } = bft_receiver;
 
         // Process the certificate from the primary.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some(certificate) = rx_primary_certificate.recv().await {
-                if let Err(e) = self_.process_certificate_from_primary(certificate) {
+            while let Some(round) = rx_primary_round.recv().await {
+                if let Err(e) = self_.update_to_next_round(round) {
                     warn!("Cannot process certificate from primary - {e}");
                 }
             }

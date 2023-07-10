@@ -187,9 +187,9 @@ impl<N: Network> Primary<N> {
     /// 2. Sign the batch.
     /// 3. Set the batch proposal in the primary.
     /// 4. Broadcast the batch header to all validators for signing.
-    pub fn propose_batch(&self) -> Result<()> {
+    pub async fn propose_batch(&self) -> Result<()> {
         // Check if the proposed batch has expired, and clear it if it has expired.
-        self.check_proposed_batch_for_expiration()?;
+        self.check_proposed_batch_for_expiration().await?;
         // If there is a batch being proposed already, return early.
         if self.proposed_batch.read().is_some() {
             // TODO (howardwu): If a proposed batch already exists:
@@ -340,7 +340,7 @@ impl<N: Network> Primary<N> {
         batch_signature: BatchSignature<N>,
     ) -> Result<()> {
         // Ensure the proposed batch has not expired, and clear the proposed batch if it has expired.
-        self.check_proposed_batch_for_expiration()?;
+        self.check_proposed_batch_for_expiration().await?;
 
         // Retrieve the signature and timestamp.
         let BatchSignature { batch_id, signature, timestamp } = batch_signature;
@@ -391,13 +391,9 @@ impl<N: Network> Primary<N> {
                 // Log the certified batch.
                 let num_transmissions = certificate.transmission_ids().len();
                 let round = certificate.round();
-                // If a BFT sender was provided, send the certificate to the BFT sender.
-                if let Some(bft_sender) = self.bft_sender.get() {
-                    bft_sender.tx_primary_certificate.send(certificate).await?;
-                }
                 info!("\n\nOur batch with {num_transmissions} transmissions for round {round} was certified!\n");
                 // Update the committee to the next round.
-                self.update_committee_to_round(round + 1)
+                self.update_committee_to_round(round + 1).await
             }
             // If this fails, return the transmissions back into the ready queue for the next proposal.
             Err(_) => self.reinsert_transmissions_into_workers(proposal),
@@ -418,7 +414,7 @@ impl<N: Network> Primary<N> {
         // Store the certificate, after ensuring it is valid.
         self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
         // Check if we need to advance to the next round.
-        self.try_advance_to_next_round()
+        self.try_advance_to_next_round().await
     }
 }
 
@@ -442,7 +438,7 @@ impl<N: Network> Primary<N> {
                 // Sleep briefly, but longer than if there were no batch.
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY)).await;
                 // If there is no proposed batch, attempt to propose a batch.
-                if let Err(e) = self_.propose_batch() {
+                if let Err(e) = self_.propose_batch().await {
                     error!("Failed to propose a batch - {e}");
                 }
             }
@@ -529,7 +525,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Checks if the proposed batch is expired, and clears the proposed batch if it has expired.
-    fn check_proposed_batch_for_expiration(&self) -> Result<()> {
+    async fn check_proposed_batch_for_expiration(&self) -> Result<()> {
         // Check if the proposed batch is expired.
         let is_expired = self.proposed_batch.read().as_ref().map_or(false, Proposal::is_expired);
         // If the batch is expired, clear it.
@@ -540,13 +536,13 @@ impl<N: Network> Primary<N> {
                 self.reinsert_transmissions_into_workers(proposal)?;
             }
             // Check if we need to advance to the next round.
-            self.try_advance_to_next_round()?;
+            self.try_advance_to_next_round().await?;
         }
         Ok(())
     }
 
     /// If the current round has reached quorum threshold, then advance to the next round.
-    fn try_advance_to_next_round(&self) -> Result<()> {
+    async fn try_advance_to_next_round(&self) -> Result<()> {
         // Retrieve the current committee.
         let current_committee = self.current_committee();
         // Retrieve the current round.
@@ -565,13 +561,13 @@ impl<N: Network> Primary<N> {
         if is_quorum && !is_proposing {
             // TODO (howardwu): After bullshark is implemented, we need to check the leader case.
             // If we have reached the quorum threshold, then proceed to the next round.
-            self.update_committee_to_round(current_round + 1)?;
+            self.update_committee_to_round(current_round + 1).await?;
         }
         Ok(())
     }
 
     /// Updates the committee to the specified round.
-    fn update_committee_to_round(&self, next_round: u64) -> Result<()> {
+    async fn update_committee_to_round(&self, next_round: u64) -> Result<()> {
         // Iterate until the desired round is reached.
         while self.current_round() < next_round {
             // Update to the next committee in storage.
@@ -582,6 +578,10 @@ impl<N: Network> Primary<N> {
             info!("Starting round {}...", self.current_round());
 
             // TODO (howardwu): If round % 2 == 0, update the leader.
+            // If a BFT sender was provided, send the certificate to the BFT sender.
+            if let Some(bft_sender) = self.bft_sender.get() {
+                bft_sender.tx_primary_round.send(self.current_round()).await?;
+            }
         }
         Ok(())
     }
@@ -710,7 +710,7 @@ impl<N: Network> Primary<N> {
             // TODO (howardwu): Guard this to increment after quorum threshold is reached.
             // TODO (howardwu): After bullshark is implemented, we must use Aleo blocks to guide us to `tip-50` to know the committee.
             // If the batch round is greater than the current committee round, update the committee.
-            self.update_committee_to_round(batch_round)?;
+            self.update_committee_to_round(batch_round).await?;
         }
 
         // // TODO: Check if the previous certificates have reached the quorum threshold.

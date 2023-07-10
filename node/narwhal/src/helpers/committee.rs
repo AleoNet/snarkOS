@@ -84,7 +84,7 @@ impl<N: Network> Committee<N> {
         // Compute the combined stake for the given addresses.
         for address in addresses {
             // Accumulate the stake, checking for overflow.
-            stake = stake.saturating_sub(self.get_stake(*address));
+            stake = stake.saturating_add(self.get_stake(*address));
         }
         // Return whether the combined stake reaches the quorum threshold.
         stake >= self.quorum_threshold()
