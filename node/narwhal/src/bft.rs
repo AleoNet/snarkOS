@@ -45,6 +45,7 @@ impl<N: Network> BFT<N> {
 
     /// Run the BFT instance.
     pub async fn run(&mut self, primary_sender: PrimarySender<N>, primary_receiver: PrimaryReceiver<N>) -> Result<()> {
+        info!("Starting the BFT instance...");
         // Initialize the BFT channels.
         let (bft_sender, bft_receiver) = init_bft_channels::<N>();
         // Run the primary instance.
@@ -66,7 +67,7 @@ impl<N: Network> BFT<N> {
 }
 
 impl<N: Network> BFT<N> {
-    /// Stores the certificate in the DAG, and attempts to commit an anchor.
+    /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
     fn process_certificate_from_primary(&self, _certificate: BatchCertificate<N>) -> Result<()> {
         Ok(())
     }
