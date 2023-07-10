@@ -18,7 +18,10 @@ use crate::common::{
     primary::{initiate_connections, log_connections, start_n_primaries},
     utils::{fire_unconfirmed_solutions, fire_unconfirmed_transactions},
 };
+use deadline::deadline;
 use snarkos_node_narwhal::MAX_BATCH_DELAY;
+use std::time::Duration;
+use tokio::time::sleep;
 
 #[tokio::test]
 #[ignore = "Long-running e2e test"]
@@ -68,7 +71,7 @@ async fn test_quorum_threshold() {
         fire_unconfirmed_transactions(sender_0, 0);
     }
 
-    tokio::time::sleep(std::time::Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
+    sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
 
     // Check each node is still at round 1.
     for (primary, _sender) in primaries.values() {
@@ -84,7 +87,7 @@ async fn test_quorum_threshold() {
         let ip = primary_1.gateway().local_ip();
         primary_0.gateway().connect(ip);
         // Give the connection time to be established.
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(100)).await;
 
         // Fire unconfirmed solutions.
         fire_unconfirmed_solutions(_sender_1, 1);
@@ -92,7 +95,7 @@ async fn test_quorum_threshold() {
         fire_unconfirmed_transactions(_sender_1, 1);
     }
 
-    tokio::time::sleep(std::time::Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
+    sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
 
     // Check each node is still at round 1.
     for (primary, _sender) in primaries.values() {
@@ -110,7 +113,7 @@ async fn test_quorum_threshold() {
         primary_0.gateway().connect(ip);
         primary_1.gateway().connect(ip);
         // Give the connection time to be established.
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(100)).await;
 
         // Fire unconfirmed solutions.
         fire_unconfirmed_solutions(_sender_2, 2);
@@ -119,7 +122,7 @@ async fn test_quorum_threshold() {
     }
 
     // Check the nodes reach quorum and advance through the rounds.
-    deadline::deadline!(std::time::Duration::from_secs(20), move || {
+    deadline!(std::time::Duration::from_secs(20), move || {
         let (primary_0, _sender_0) = &primaries.get(&0).unwrap();
         let (primary_1, _sender_1) = &primaries.get(&1).unwrap();
         let (primary_2, _sender_2) = &primaries.get(&2).unwrap();
@@ -151,7 +154,7 @@ async fn test_quorum_break() {
 
     // Wait until the nodes have advanced through the rounds a bit.
     let primaries_clone = primaries.clone();
-    deadline::deadline!(std::time::Duration::from_secs(20), move || {
+    deadline!(std::time::Duration::from_secs(20), move || {
         let (primary_0, _sender_0) = &primaries_clone.get(&0).unwrap();
         let (primary_1, _sender_1) = &primaries_clone.get(&1).unwrap();
         let (primary_2, _sender_2) = &primaries_clone.get(&2).unwrap();
@@ -171,7 +174,7 @@ async fn test_quorum_break() {
     primary_3.shut_down().await;
 
     // Give the network time to settle.
-    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+    sleep(Duration::from_millis(100)).await;
 
     // Check the nodes stop advancing through the rounds.
     let (primary_0, _sender_0) = &primaries.get(&0).unwrap();
@@ -180,7 +183,7 @@ async fn test_quorum_break() {
     assert_eq!(primary_0.current_round(), primary_1.current_round());
     let break_round = primary_0.current_round();
 
-    tokio::time::sleep(std::time::Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
+    sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
 
     assert_eq!(primary_0.current_round(), break_round);
     assert_eq!(primary_1.current_round(), break_round);
