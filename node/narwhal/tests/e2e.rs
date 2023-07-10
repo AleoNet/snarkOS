@@ -130,3 +130,58 @@ async fn test_quorum_threshold() {
             && primary_2.current_round() > NUM_ROUNDS
     });
 }
+
+#[tokio::test]
+async fn test_quorum_break() {
+    // crate::common::utils::initialize_logger(0);
+
+    const N: u16 = 4;
+    let primaries = start_n_primaries(N).await;
+    initiate_connections(&primaries).await;
+    log_connections(&primaries);
+
+    // Start the tx cannons for each primary.
+    for (id, primary) in &primaries {
+        let sender = &primary.1;
+        // Fire unconfirmed solutions.
+        fire_unconfirmed_solutions(sender, *id);
+        // Fire unconfirmed transactions.
+        fire_unconfirmed_transactions(sender, *id);
+    }
+
+    // Wait until the nodes have advanced through the rounds a bit.
+    let primaries_clone = primaries.clone();
+    deadline::deadline!(std::time::Duration::from_secs(20), move || {
+        let (primary_0, _sender_0) = &primaries_clone.get(&0).unwrap();
+        let (primary_1, _sender_1) = &primaries_clone.get(&1).unwrap();
+        let (primary_2, _sender_2) = &primaries_clone.get(&2).unwrap();
+        let (primary_3, _sender_3) = &primaries_clone.get(&3).unwrap();
+
+        const NUM_ROUNDS: u64 = 4;
+        primary_0.current_round() > NUM_ROUNDS
+            && primary_1.current_round() > NUM_ROUNDS
+            && primary_2.current_round() > NUM_ROUNDS
+            && primary_3.current_round() > NUM_ROUNDS
+    });
+
+    // Break quorum by disconnecting two nodes.
+    let (primary_2, _sender_2) = &primaries.get(&2).unwrap();
+    primary_2.shut_down().await;
+    let (primary_3, _sender_3) = &primaries.get(&3).unwrap();
+    primary_3.shut_down().await;
+
+    // Give the network time to settle.
+    tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+    // Check the nodes stop advancing through the rounds.
+    let (primary_0, _sender_0) = &primaries.get(&0).unwrap();
+    let (primary_1, _sender_1) = &primaries.get(&1).unwrap();
+
+    assert_eq!(primary_0.current_round(), primary_1.current_round());
+    let break_round = primary_0.current_round();
+
+    tokio::time::sleep(std::time::Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
+
+    assert_eq!(primary_0.current_round(), break_round);
+    assert_eq!(primary_1.current_round(), break_round);
+}
