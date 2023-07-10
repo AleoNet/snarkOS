@@ -63,15 +63,12 @@ pub async fn start_n_primaries(n: u16) -> HashMap<u16, (Primary<CurrentNetwork>,
         primaries.insert(id as u16, (primary, sender));
     }
 
-    initiate_connections(&primaries).await;
-    log_connections(&primaries);
-
     primaries
 }
 
 // TODO(nkls): should be handled by the gateway or on the snarkOS level.
 /// Actively try to keep the node's connections to all nodes.
-async fn initiate_connections(primaries: &HashMap<u16, (Primary<CurrentNetwork>, PrimarySender<CurrentNetwork>)>) {
+pub async fn initiate_connections(primaries: &HashMap<u16, (Primary<CurrentNetwork>, PrimarySender<CurrentNetwork>)>) {
     for (primary, other_primary) in primaries.values().map(|(p, _)| p).tuple_combinations() {
         // Connect to the node.
         let ip = other_primary.gateway().local_ip();
@@ -82,7 +79,7 @@ async fn initiate_connections(primaries: &HashMap<u16, (Primary<CurrentNetwork>,
 }
 
 /// Logs the node's connections.
-fn log_connections(primaries: &HashMap<u16, (Primary<CurrentNetwork>, PrimarySender<CurrentNetwork>)>) {
+pub fn log_connections(primaries: &HashMap<u16, (Primary<CurrentNetwork>, PrimarySender<CurrentNetwork>)>) {
     for (primary, _) in primaries.values() {
         let node = primary.clone();
         tokio::task::spawn(async move {
