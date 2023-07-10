@@ -321,10 +321,10 @@ struct NodeState {
     primary: Primary<CurrentNetwork>,
 }
 
-/// Returns the leader of the previous round.
-async fn get_previous_leader(State(node): State<NodeState>) -> Result<ErasedJson, RestError> {
+/// Returns the leader of the previous round, if one was present.
+async fn get_leader(State(node): State<NodeState>) -> Result<ErasedJson, RestError> {
     match &node.bft {
-        Some(bft) => Ok(ErasedJson::pretty(bft.previous_leader())),
+        Some(bft) => Ok(ErasedJson::pretty(bft.leader())),
         None => Err(RestError::from(anyhow!("BFT is not enabled"))),
     }
 }
@@ -347,7 +347,7 @@ async fn start_server(bft: Option<BFT<CurrentNetwork>>, primary: Primary<Current
     // Initialize the routes.
     let router = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
-        .route("/leader/previous", get(get_previous_leader))
+        .route("/leader", get(get_leader))
         .route("/round/current", get(get_current_round))
         .route("/certificates/:round", get(get_certificates_for_round))
         // Pass in the `NodeState` to access state.

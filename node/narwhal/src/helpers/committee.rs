@@ -13,7 +13,11 @@
 // limitations under the License.
 
 use crate::MIN_STAKE;
-use snarkvm::console::{prelude::*, types::Address};
+use snarkvm::console::{
+    prelude::*,
+    program::{Literal, LiteralType},
+    types::{Address, Field},
+};
 
 use indexmap::IndexMap;
 use std::collections::HashSet;
@@ -108,6 +112,60 @@ impl<N: Network> Committee<N> {
     /// Returns the total amount of stake in the committee `(3f + 1)`.
     pub fn total_stake(&self) -> u64 {
         self.total_stake
+    }
+}
+
+impl<N: Network> Committee<N> {
+    /// Returns the leader address for the given round.
+    /// Note: This method returns a deterministic result that is SNARK-friendly.
+    pub fn leader_for(&self, current_round: u64) -> Result<Address<N>> {
+        // Compute the previous round.
+        let previous_round = current_round.saturating_sub(1);
+        // Retrieve the total stake of the committee.
+        let total_stake = self.total_stake();
+        // Construct the round seed.
+        let seed = [previous_round, current_round, total_stake].map(Field::from_u64);
+        // Hash the round seed.
+        let hash = Literal::Group(N::hash_to_group_psd4(&seed)?);
+        // Compute the stake index from the hash output.
+        let stake_index = match hash.downcast_lossy(LiteralType::U64)? {
+            Literal::U64(output) => (*output) % total_stake,
+            _ => bail!("BFT failed to downcast the hash output to a U64 literal"),
+        };
+
+        // Initialize a tracker for the leader.
+        let mut leader = None;
+        // Initialize a tracker for the current stake index.
+        let mut current_stake_index = 0u64;
+        // Sort the committee members in decreasing order of their stake, tie-breaking with addresses.
+        let candidates = self.sorted_members();
+        // Determine the leader of the previous round.
+        for (candidate, stake) in candidates {
+            // Increment the current stake index by the candidate's stake.
+            current_stake_index = current_stake_index.saturating_add(stake);
+            // If the current stake index is greater than or equal to the stake index,
+            // set the leader to the candidate, and break.
+            if current_stake_index >= stake_index {
+                leader = Some(candidate);
+                break;
+            }
+        }
+        // Note: This is guaranteed to be safe.
+        Ok(leader.unwrap())
+    }
+
+    /// Returns the committee members sorted by stake in decreasing order.
+    /// For members with matching stakes, we further sort by their address' x-coordinate in decreasing order.
+    /// Note: This ensures the method returns a deterministic result that is SNARK-friendly.
+    fn sorted_members(&self) -> Vec<(Address<N>, u64)> {
+        let mut members = self.members.iter().map(|(address, stake)| (*address, *stake)).collect::<Vec<_>>();
+        members.sort_by(|(address1, stake1), (address2, stake2)| {
+            // Sort by stake in decreasing order.
+            let cmp = stake2.cmp(stake1);
+            // If the stakes are equal, sort by x-coordinate in decreasing order.
+            if cmp == Ordering::Equal { address2.to_x_coordinate().cmp(&address1.to_x_coordinate()) } else { cmp }
+        });
+        members
     }
 }
 

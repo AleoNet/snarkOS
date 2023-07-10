@@ -20,10 +20,10 @@ use snarkos_account::Account;
 use snarkvm::{
     console::account::Address,
     ledger::narwhal::BatchCertificate,
-    prelude::{Network, Result},
+    prelude::{bail, Network, Result},
 };
 
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 use std::{future::Future, sync::Arc};
 use tokio::task::JoinHandle;
 
@@ -31,8 +31,8 @@ use tokio::task::JoinHandle;
 pub struct BFT<N: Network> {
     /// The primary.
     primary: Primary<N>,
-    /// The leader of the previous round, if one was present.
-    previous_leader: Option<Address<N>>,
+    /// The batch certificate of the leader from the previous round, if one was present.
+    leader_certificate: Arc<RwLock<Option<BatchCertificate<N>>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -40,7 +40,11 @@ pub struct BFT<N: Network> {
 impl<N: Network> BFT<N> {
     /// Initializes a new instance of the BFT.
     pub fn new(storage: Storage<N>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
-        Ok(Self { primary: Primary::new(storage, account, dev)?, previous_leader: None, handles: Default::default() })
+        Ok(Self {
+            primary: Primary::new(storage, account, dev)?,
+            leader_certificate: Default::default(),
+            handles: Default::default(),
+        })
     }
 
     /// Run the BFT instance.
@@ -60,9 +64,56 @@ impl<N: Network> BFT<N> {
         &self.primary
     }
 
-    /// Returns the previous round leader, if one was present.
-    pub const fn previous_leader(&self) -> Option<Address<N>> {
-        self.previous_leader
+    /// Returns the storage.
+    pub const fn storage(&self) -> &Storage<N> {
+        self.primary.storage()
+    }
+}
+
+impl<N: Network> BFT<N> {
+    /// Returns the leader of the previous round, if one was present.
+    pub fn leader(&self) -> Option<Address<N>> {
+        self.leader_certificate.read().as_ref().map(|certificate| certificate.author())
+    }
+
+    /// Returns the certificate of the leader from the previous round, if one was present.
+    pub const fn leader_certificate(&self) -> &Arc<RwLock<Option<BatchCertificate<N>>>> {
+        &self.leader_certificate
+    }
+
+    /// Updates the leader certificate to the previous round.
+    ///
+    /// This method runs on every even round, by determining the leader of the previous round,
+    /// and setting the leader certificate to their certificate in the previous round, if they were present.
+    pub fn update_leader_certificate(&self) -> Result<()> {
+        // Retrieve the current round.
+        let current_round = self.storage().current_round();
+        // If the current round is odd, return early.
+        if current_round % 2 != 0 {
+            return Ok(());
+        }
+
+        // Retrieve the previous round.
+        let previous_round = current_round.saturating_sub(1);
+        // Retrieve the certificates for the previous round.
+        let previous_certificates = self.storage().get_certificates_for_round(previous_round);
+        // If there are no previous certificates, set the previous leader certificate to 'None', and return early.
+        if previous_certificates.is_empty() {
+            // Set the previous leader certificate to 'None'.
+            *self.leader_certificate.write() = None;
+            return Ok(());
+        }
+
+        // TODO (howardwu): Determine whether to use the current round or the previous round committee.
+        // Determine the leader of the previous round, using the committee of the current round.
+        let leader = match self.storage().get_committee(current_round) {
+            Some(committee) => committee.leader_for(current_round)?,
+            None => bail!("BFT failed to retrieve the committee for the current round"),
+        };
+        // Find and set the leader certificate to the leader of the previous round, if they were present.
+        *self.leader_certificate.write() =
+            previous_certificates.into_iter().find(|certificate| certificate.author() == leader);
+        Ok(())
     }
 }
 
