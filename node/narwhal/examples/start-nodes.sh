@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# The mode - bullshark or narwhal
+# The mode - bft or narwhal
 mode=$1
 
 # Default number of nodes to spin up

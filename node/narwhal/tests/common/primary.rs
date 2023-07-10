@@ -59,7 +59,7 @@ pub async fn start_n_primaries(n: u16) -> HashMap<u16, (Primary<CurrentNetwork>,
         let (sender, receiver) = init_primary_channels();
         let mut primary = Primary::<CurrentNetwork>::new(storage, account, Some(id as u16)).unwrap();
 
-        primary.run(sender.clone(), receiver).await.unwrap();
+        primary.run(sender.clone(), receiver, None).await.unwrap();
         primaries.insert(id as u16, (primary, sender));
     }
 

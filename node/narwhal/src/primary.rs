@@ -42,6 +42,7 @@ use snarkvm::{
     prelude::Field,
 };
 
+use crate::helpers::BFTSender;
 use async_recursion::async_recursion;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
@@ -53,7 +54,11 @@ use std::{
     sync::Arc,
     time::Duration,
 };
-use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
+use tokio::{
+    sync::{oneshot, OnceCell},
+    task::JoinHandle,
+    time::timeout,
+};
 
 /// A type helper for an optional proposed batch.
 pub type ProposedBatch<N> = Arc<RwLock<Option<Proposal<N>>>>;
@@ -66,6 +71,8 @@ pub struct Primary<N: Network> {
     storage: Storage<N>,
     /// The workers.
     workers: Arc<Vec<Worker<N>>>,
+    /// The BFT sender.
+    bft_sender: Arc<OnceCell<BFTSender<N>>>,
     /// The batch proposal, if the primary is currently proposing a batch.
     proposed_batch: ProposedBatch<N>,
     /// The pending certificates queue.
@@ -84,6 +91,7 @@ impl<N: Network> Primary<N> {
             gateway,
             storage,
             workers: Default::default(),
+            bft_sender: Default::default(),
             proposed_batch: Default::default(),
             pending: Default::default(),
             handles: Default::default(),
@@ -91,11 +99,20 @@ impl<N: Network> Primary<N> {
     }
 
     /// Run the primary instance.
-    pub async fn run(&mut self, sender: PrimarySender<N>, receiver: PrimaryReceiver<N>) -> Result<()> {
+    pub async fn run(
+        &mut self,
+        primary_sender: PrimarySender<N>,
+        primary_receiver: PrimaryReceiver<N>,
+        bft_sender: Option<BFTSender<N>>,
+    ) -> Result<()> {
         info!("Starting the primary instance of the memory pool...");
 
         // Set the primary sender.
-        self.gateway.set_primary_sender(sender);
+        self.gateway.set_primary_sender(primary_sender);
+        // Set the BFT sender.
+        if let Some(bft_sender) = bft_sender {
+            self.bft_sender.set(bft_sender).expect("BFT sender already set");
+        }
 
         // Construct a map of the worker senders.
         let mut tx_workers = IndexMap::new();
@@ -121,7 +138,7 @@ impl<N: Network> Primary<N> {
         self.gateway.run(tx_workers).await;
 
         // Start the primary handlers.
-        self.start_handlers(receiver);
+        self.start_handlers(primary_receiver);
 
         Ok(())
     }
@@ -317,51 +334,55 @@ impl<N: Network> Primary<N> {
     /// 3. Store the signature.
     /// 4. Certify the batch if enough signatures have been received.
     /// 5. Broadcast the batch certificate to all validators.
-    fn process_batch_signature_from_peer(&self, peer_ip: SocketAddr, batch_signature: BatchSignature<N>) -> Result<()> {
+    async fn process_batch_signature_from_peer(
+        &self,
+        peer_ip: SocketAddr,
+        batch_signature: BatchSignature<N>,
+    ) -> Result<()> {
         // Ensure the proposed batch has not expired, and clear the proposed batch if it has expired.
         self.check_proposed_batch_for_expiration()?;
 
         // Retrieve the signature and timestamp.
         let BatchSignature { batch_id, signature, timestamp } = batch_signature;
 
-        // Acquire the write lock.
-        let mut proposed_batch = self.proposed_batch.write();
+        let proposal = {
+            // Acquire the write lock.
+            let mut proposed_batch = self.proposed_batch.write();
 
-        // Add the signature to the batch, and determine if the batch is ready to be certified.
-        let is_ready = match proposed_batch.as_mut() {
-            Some(proposal) => {
-                // Ensure the batch ID matches the currently proposed batch ID.
-                if proposal.batch_id() != batch_id {
-                    match self.storage.contains_batch(batch_id) {
-                        true => bail!("This batch was already certified"),
-                        false => bail!("Unknown batch ID '{batch_id}'"),
+            // Add the signature to the batch, and determine if the batch is ready to be certified.
+            let is_ready = match proposed_batch.as_mut() {
+                Some(proposal) => {
+                    // Ensure the batch ID matches the currently proposed batch ID.
+                    if proposal.batch_id() != batch_id {
+                        match self.storage.contains_batch(batch_id) {
+                            true => bail!("This batch was already certified"),
+                            false => bail!("Unknown batch ID '{batch_id}'"),
+                        }
                     }
+                    // Retrieve the address of the peer.
+                    match self.gateway.resolver().get_address(peer_ip) {
+                        // Add the signature to the batch.
+                        Some(signer) => proposal.add_signature(signer, signature, timestamp)?,
+                        None => bail!("Signature is from a disconnected peer"),
+                    };
+                    info!("Added a batch signature from peer '{peer_ip}'");
+                    // Check if the batch is ready to be certified.
+                    proposal.is_quorum_threshold_reached()
                 }
-                // Retrieve the address of the peer.
-                match self.gateway.resolver().get_address(peer_ip) {
-                    // Add the signature to the batch.
-                    Some(signer) => proposal.add_signature(signer, signature, timestamp)?,
-                    None => bail!("Signature is from a disconnected peer"),
-                };
-                info!("Added a batch signature from peer '{peer_ip}'");
-                // Check if the batch is ready to be certified.
-                proposal.is_quorum_threshold_reached()
+                None => false,
+            };
+            // If the batch is not ready to be certified, return early.
+            if !is_ready {
+                return Ok(());
             }
-            None => false,
+            // Retrieve the batch proposal, clearing the proposed batch.
+            match proposed_batch.take() {
+                Some(proposal) => proposal,
+                None => return Ok(()),
+            }
         };
-        // If the batch is not ready to be certified, return early.
-        if !is_ready {
-            return Ok(());
-        }
 
         /* Proceeding to certify the batch. */
-
-        // Retrieve the batch proposal, clearing the proposed batch.
-        let proposal = match proposed_batch.take() {
-            Some(proposal) => proposal,
-            None => return Ok(()),
-        };
-        drop(proposed_batch);
 
         info!("Quorum threshold reached - Preparing to certify our batch...");
         // Store the certified batch and broadcast it to all validators.
@@ -370,6 +391,10 @@ impl<N: Network> Primary<N> {
                 // Log the certified batch.
                 let num_transmissions = certificate.transmission_ids().len();
                 let round = certificate.round();
+                // If a BFT sender was provided, send the certificate to the BFT sender.
+                if let Some(bft_sender) = self.bft_sender.get() {
+                    bft_sender.tx_primary_certificate.send(certificate).await?;
+                }
                 info!("\n\nOur batch with {num_transmissions} transmissions for round {round} was certified!\n");
                 // Update the committee to the next round.
                 self.update_committee_to_round(round + 1)
@@ -399,7 +424,7 @@ impl<N: Network> Primary<N> {
 
 impl<N: Network> Primary<N> {
     /// Starts the primary handlers.
-    fn start_handlers(&self, receiver: PrimaryReceiver<N>) {
+    fn start_handlers(&self, primary_receiver: PrimaryReceiver<N>) {
         let PrimaryReceiver {
             mut rx_batch_propose,
             mut rx_batch_signature,
@@ -408,7 +433,7 @@ impl<N: Network> Primary<N> {
             mut rx_certificate_response,
             mut rx_unconfirmed_solution,
             mut rx_unconfirmed_transaction,
-        } = receiver;
+        } = primary_receiver;
 
         // Start the batch proposer.
         let self_ = self.clone();
@@ -437,7 +462,7 @@ impl<N: Network> Primary<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
-                if let Err(e) = self_.process_batch_signature_from_peer(peer_ip, batch_signature) {
+                if let Err(e) = self_.process_batch_signature_from_peer(peer_ip, batch_signature).await {
                     warn!("Cannot include a signature from peer '{peer_ip}' - {e}");
                 }
             }

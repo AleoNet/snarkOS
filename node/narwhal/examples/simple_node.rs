@@ -18,8 +18,8 @@ extern crate tracing;
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
     helpers::{init_primary_channels, Committee, PrimarySender, Storage},
-    Bullshark,
     Primary,
+    BFT,
     MAX_GC_ROUNDS,
     MEMORY_POOL_PORT,
 };
@@ -92,29 +92,26 @@ pub fn initialize_logger(verbosity: u8) {
 
 /**************************************************************************************************/
 
-/// Starts the Bullshark instance.
-pub async fn start_bullshark(
-    node_id: u16,
-    num_nodes: u16,
-) -> Result<(Bullshark<CurrentNetwork>, PrimarySender<CurrentNetwork>)> {
+/// Starts the BFT instance.
+pub async fn start_bft(node_id: u16, num_nodes: u16) -> Result<(BFT<CurrentNetwork>, PrimarySender<CurrentNetwork>)> {
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
     let (storage, account) = initialize_components(node_id, num_nodes)?;
-    // Initialize the Bullshark instance.
-    let mut bullshark = Bullshark::<CurrentNetwork>::new(storage, account, Some(node_id))?;
-    // Run the Bullshark instance.
-    bullshark.run(sender.clone(), receiver).await?;
-    // Retrieve the Bullshark primary.
-    let primary = bullshark.primary();
+    // Initialize the BFT instance.
+    let mut bft = BFT::<CurrentNetwork>::new(storage, account, Some(node_id))?;
+    // Run the BFT instance.
+    bft.run(sender.clone(), receiver).await?;
+    // Retrieve the BFT's primary.
+    let primary = bft.primary();
     // Keep the node's connections.
     keep_connections(primary, node_id, num_nodes);
     // Handle the log connections.
     log_connections(primary);
     // Handle OS signals.
     handle_signals(primary);
-    // Return the Bullshark instance.
-    Ok((bullshark, sender))
+    // Return the BFT instance.
+    Ok((bft, sender))
 }
 
 /// Starts the primary instance.
@@ -129,7 +126,7 @@ pub async fn start_primary(
     // Initialize the primary instance.
     let mut primary = Primary::<CurrentNetwork>::new(storage, account, Some(node_id))?;
     // Run the primary instance.
-    primary.run(sender.clone(), receiver).await?;
+    primary.run(sender.clone(), receiver, None).await?;
     // Keep the node's connections.
     keep_connections(&primary, node_id, num_nodes);
     // Handle the log connections.
@@ -320,15 +317,15 @@ impl From<anyhow::Error> for RestError {
 
 #[derive(Clone)]
 struct NodeState {
-    bullshark: Option<Bullshark<CurrentNetwork>>,
+    bft: Option<BFT<CurrentNetwork>>,
     primary: Primary<CurrentNetwork>,
 }
 
 /// Returns the leader of the previous round.
 async fn get_previous_leader(State(node): State<NodeState>) -> Result<ErasedJson, RestError> {
-    match &node.bullshark {
-        Some(bullshark) => Ok(ErasedJson::pretty(bullshark.previous_leader())),
-        None => Err(RestError::from(anyhow!("Bullshark is not enabled"))),
+    match &node.bft {
+        Some(bft) => Ok(ErasedJson::pretty(bft.previous_leader())),
+        None => Err(RestError::from(anyhow!("BFT is not enabled"))),
     }
 }
 
@@ -346,7 +343,7 @@ async fn get_certificates_for_round(
 }
 
 /// Starts up a local server for monitoring the node.
-async fn start_server(bullshark: Option<Bullshark<CurrentNetwork>>, primary: Primary<CurrentNetwork>, node_id: u16) {
+async fn start_server(bft: Option<BFT<CurrentNetwork>>, primary: Primary<CurrentNetwork>, node_id: u16) {
     // Initialize the routes.
     let router = Router::new()
         .route("/", get(|| async { "Hello, World!" }))
@@ -354,7 +351,7 @@ async fn start_server(bullshark: Option<Bullshark<CurrentNetwork>>, primary: Pri
         .route("/round/current", get(get_current_round))
         .route("/certificates/:round", get(get_certificates_for_round))
         // Pass in the `NodeState` to access state.
-        .with_state(NodeState { bullshark, primary });
+        .with_state(NodeState { bft, primary });
 
     // Construct the IP address and port.
     let addr = format!("127.0.0.1:{}", 3000 + node_id);
@@ -381,26 +378,26 @@ async fn main() -> Result<()> {
 
     // Parse the mode.
     let mode = args[1].as_str();
-    if mode != "bullshark" && mode != "narwhal" {
-        bail!("Please provide a valid mode - 'bullshark' or 'narwhal'.")
+    if mode != "bft" && mode != "narwhal" {
+        bail!("Please provide a valid mode - 'bft' or 'narwhal'.")
     }
     // Parse the node ID.
     let node_id = u16::from_str(&args[2])?;
     // Parse the number of nodes.
     let num_nodes = u16::from_str(&args[3])?;
 
-    // Initialize an optional Bullshark holder.
-    let mut bullshark_holder = None;
+    // Initialize an optional BFT holder.
+    let mut bft_holder = None;
 
     // Start the node.
     let (primary, sender) = match mode {
-        "bullshark" => {
-            // Start Bullshark.
-            let (bullshark, sender) = start_bullshark(node_id, num_nodes).await?;
-            // Set the Bullshark holder.
-            bullshark_holder = Some(bullshark.clone());
+        "bft" => {
+            // Start the BFT.
+            let (bft, sender) = start_bft(node_id, num_nodes).await?;
+            // Set the BFT holder.
+            bft_holder = Some(bft.clone());
             // Return the primary and sender.
-            (bullshark.primary().clone(), sender)
+            (bft.primary().clone(), sender)
         }
         "narwhal" => start_primary(node_id, num_nodes).await?,
         _ => unreachable!(),
@@ -412,7 +409,7 @@ async fn main() -> Result<()> {
     fire_unconfirmed_transactions(&sender, node_id);
 
     // Start the monitoring server.
-    start_server(bullshark_holder, primary, node_id).await;
+    start_server(bft_holder, primary, node_id).await;
     // // Note: Do not move this.
     // std::future::pending::<()>().await;
     Ok(())
