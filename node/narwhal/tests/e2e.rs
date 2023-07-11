@@ -20,6 +20,7 @@ use crate::common::{
 };
 
 #[tokio::test]
+#[ignore = "Long-running e2e test"]
 async fn test_state_coherence() {
     crate::common::utils::initialize_logger(0);
 
