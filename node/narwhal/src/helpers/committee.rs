@@ -299,8 +299,7 @@ mod tests {
         // Set the number of rounds.
         const NUM_ROUNDS: u64 = 256 * 1_000;
         // Sample the number of members.
-        // let num_members = rng.gen_range(4..50);
-        let num_members = 50;
+        let num_members = rng.gen_range(4..50);
         // Sample a committee.
         let committee = crate::helpers::committee::test_helpers::sample_committee_custom(num_members, rng);
         // Check the leader distribution.
