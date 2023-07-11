@@ -18,6 +18,7 @@ use snarkos_node_narwhal::{
     helpers::{init_primary_channels, Committee, PrimarySender, Storage},
     Primary,
     MAX_GC_ROUNDS,
+    MIN_STAKE,
 };
 
 use indexmap::IndexMap;
@@ -28,7 +29,7 @@ use tracing::*;
 
 // Initializes a new test committee.
 pub fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<CurrentNetwork>) {
-    const INITIAL_STAKE: u64 = 1000;
+    const INITIAL_STAKE: u64 = MIN_STAKE;
 
     let mut accounts = Vec::with_capacity(n as usize);
     let mut members = IndexMap::with_capacity(n as usize);
