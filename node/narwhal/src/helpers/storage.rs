@@ -77,7 +77,7 @@ impl<N: Network> Storage<N> {
         Self {
             current_round: Arc::new(AtomicU64::new(current_round)),
             committees: Arc::new(RwLock::new(indexmap! { current_round => committee })),
-            gc_round: Arc::new(AtomicU64::new(0)),
+            gc_round: Default::default(),
             max_gc_rounds,
             rounds: Default::default(),
             certificates: Default::default(),
