@@ -597,7 +597,7 @@ pub mod tests {
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     /// Asserts that the storage matches the expected layout.
-    fn assert_storage<N: Network>(
+    pub fn assert_storage<N: Network>(
         storage: &Storage<N>,
         committees: Vec<(u64, Committee<N>)>,
         rounds: Vec<(u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)>,
@@ -817,7 +817,15 @@ pub mod tests {
 #[cfg(test)]
 pub mod prop_tests {
     use super::*;
-    use proptest::prelude::{BoxedStrategy, Just, Strategy};
+    use indexmap::indexset;
+    use proptest::{
+        collection,
+        prelude::{any, BoxedStrategy, Just, Strategy},
+        prop_oneof,
+    };
+    use snarkvm::{ledger::coinbase::PuzzleCommitment, prelude::Uniform};
+    use std::fmt::Debug;
+    use test_strategy::proptest;
 
     use crate::{helpers::committee::prop_tests::any_valid_committee, MAX_GC_ROUNDS};
 
@@ -825,7 +833,7 @@ pub mod prop_tests {
 
     pub fn any_valid_storage() -> BoxedStrategy<Storage<CurrentNetwork>> {
         (any_valid_committee(), 0..MAX_GC_ROUNDS)
-            .prop_map(|((committee, _), gc_rounds)| Storage::<CurrentNetwork>::new(committee.unwrap(), gc_rounds))
+            .prop_map(|((committee, _), gc_rounds)| Storage::<CurrentNetwork>::new(committee, gc_rounds))
             .boxed()
     }
 
@@ -833,5 +841,241 @@ pub mod prop_tests {
         (0..MAX_GC_ROUNDS, Just(committee))
             .prop_map(|(gc_rounds, committee)| Storage::<CurrentNetwork>::new(committee, gc_rounds))
             .boxed()
+    }
+
+    use crate::helpers::{committee::prop_tests::Validator, now, storage::tests::assert_storage};
+
+    use ::bytes::Bytes;
+    use proptest::{prelude::Arbitrary, test_runner::TestRng};
+    use rand::{CryptoRng, Error, Rng, RngCore};
+
+    use snarkvm::{
+        ledger::narwhal::{Batch, Data},
+        prelude::Signature,
+    };
+
+    // The `proptest::TestRng` doesn't implement `rand_core::CryptoRng` trait which is required in snarkVM, so we use a wrapper
+    #[derive(Debug)]
+    struct CryptoTestRng(TestRng);
+
+    impl Arbitrary for CryptoTestRng {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<CryptoTestRng>;
+
+        fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+            Just(0).prop_perturb(|_, rng| CryptoTestRng(rng)).boxed()
+        }
+    }
+    impl RngCore for CryptoTestRng {
+        fn next_u32(&mut self) -> u32 {
+            self.0.next_u32()
+        }
+
+        fn next_u64(&mut self) -> u64 {
+            self.0.next_u64()
+        }
+
+        fn fill_bytes(&mut self, dest: &mut [u8]) {
+            self.0.fill_bytes(dest);
+        }
+
+        fn try_fill_bytes(&mut self, dest: &mut [u8]) -> std::result::Result<(), Error> {
+            self.0.try_fill_bytes(dest)
+        }
+    }
+
+    impl CryptoRng for CryptoTestRng {}
+
+    /// Samples a random transmission.
+    // fn sample_transmission(rng: &mut TestRng) -> Transmission<CurrentNetwork> {
+    //     // Sample random fake solution bytes.
+    //     let s = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
+    //     // Sample random fake transaction bytes.
+    //     let t = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..2048).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
+    //     // Sample a random transmission.
+    //     match rng.gen::<bool>() {
+    //         true => Transmission::Solution(s(rng)),
+    //         false => Transmission::Transaction(t(rng)),
+    //     }
+    // }
+
+    #[derive(Debug, Clone)]
+    struct AnyTransmission(Transmission<CurrentNetwork>);
+
+    impl Arbitrary for AnyTransmission {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<AnyTransmission>;
+
+        fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+            any_transmission().prop_map(AnyTransmission).boxed()
+        }
+    }
+
+    #[derive(Debug, Clone)]
+    struct AnyTransmissionID(TransmissionID<CurrentNetwork>);
+
+    impl Arbitrary for AnyTransmissionID {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<AnyTransmissionID>;
+
+        fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+            any_transmission_id().prop_map(AnyTransmissionID).boxed()
+        }
+    }
+
+    fn any_transmission() -> BoxedStrategy<Transmission<CurrentNetwork>> {
+        prop_oneof![
+            (collection::vec(any::<u8>(), 512..=512))
+                .prop_map(|bytes| Transmission::Solution(Data::Buffer(Bytes::from(bytes)))),
+            (collection::vec(any::<u8>(), 2048..=2048))
+                .prop_map(|bytes| Transmission::Transaction(Data::Buffer(Bytes::from(bytes)))),
+        ]
+        .boxed()
+    }
+
+    fn any_puzzle_commitment() -> BoxedStrategy<PuzzleCommitment<CurrentNetwork>> {
+        Just(0).prop_perturb(|_, rng| PuzzleCommitment::from_g1_affine(CryptoTestRng(rng).gen())).boxed()
+    }
+
+    fn any_transaction_id() -> BoxedStrategy<<CurrentNetwork as Network>::TransactionID> {
+        Just(0)
+            .prop_perturb(|_, rng| {
+                <CurrentNetwork as Network>::TransactionID::from(Field::rand(&mut CryptoTestRng(rng)))
+            })
+            .boxed()
+    }
+
+    fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
+        prop_oneof![
+            any_transaction_id().prop_map(|tid| TransmissionID::Transaction(tid)),
+            any_puzzle_commitment().prop_map(|pc| TransmissionID::Solution(pc)),
+        ]
+        .boxed()
+    }
+
+    struct ValidatorSet(HashSet<Validator>);
+
+    impl ValidatorSet {
+        fn sign_batch_header<R: Rng + CryptoRng>(
+            &self,
+            batch_header: &BatchHeader<CurrentNetwork>,
+            rng: &mut R,
+        ) -> IndexMap<Signature<CurrentNetwork>, i64> {
+            let mut signatures = IndexMap::with_capacity(self.0.len());
+            for validator in self.0.iter() {
+                let private_key = validator.account.private_key();
+                let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
+                let timestamp_field = Field::from_u64(timestamp as u64);
+                signatures
+                    .insert(private_key.sign(&[batch_header.batch_id(), timestamp_field], rng).unwrap(), timestamp);
+            }
+            signatures
+        }
+    }
+    use proptest::sample::size_range;
+
+    #[proptest]
+    // #[proptest_dump]
+    fn test_certificate_duplicate(
+        #[strategy(any_valid_committee())] committee_input: (Committee<CurrentNetwork>, HashSet<Validator>),
+        #[any(size_range(1..16).lift())] transmissions: Vec<(AnyTransmissionID, AnyTransmission)>,
+        mut rng: CryptoTestRng,
+    ) {
+        let (committee, validators) = committee_input;
+
+        // Sample a committee.
+        // Initialize the storage.
+        let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
+
+        // Initialize the committees.
+        let committees = vec![(committee.round(), committee)];
+        // Ensure the storage is empty.
+        assert_storage(
+            &storage,
+            committees.clone(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+            Default::default(),
+        );
+
+        // Create a new certificate.
+        let signer = validators.iter().next().cloned().unwrap();
+
+        let mut transmission_map = IndexMap::new();
+
+        for (AnyTransmissionID(id), AnyTransmission(t)) in transmissions.iter() {
+            transmission_map.insert(*id, t.clone());
+        }
+
+        let result =
+            Batch::new(signer.account.private_key(), 0, now(), transmission_map.clone(), Default::default(), &mut rng)
+                .unwrap();
+        let batch_header = result.to_header().unwrap();
+        let certificate = BatchCertificate::new(
+            batch_header.clone(),
+            ValidatorSet(validators).sign_batch_header(&batch_header, &mut rng),
+        )
+        .unwrap();
+
+        // Retrieve the certificate ID.
+        let certificate_id = certificate.certificate_id();
+        let mut internal_transmissions = HashMap::<_, (_, IndexSet<Field<CurrentNetwork>>)>::new();
+        for (AnyTransmissionID(id), AnyTransmission(t)) in transmissions.iter().cloned() {
+            internal_transmissions.entry(id).or_insert((t, Default::default())).1.insert(certificate_id);
+        }
+
+        // Retrieve the round.
+        let round = certificate.round();
+        // Retrieve the batch ID.
+        let batch_id = certificate.batch_id();
+        // Retrieve the author of the batch.
+        let author = certificate.author();
+
+        // Construct the expected layout for 'rounds'.
+        let rounds = vec![(round, indexset! { (certificate_id, batch_id, author) })];
+        // Construct the expected layout for 'certificates'.
+        let certificates = vec![(certificate_id, certificate.clone())];
+        // Construct the expected layout for 'batch_ids'.
+        let batch_ids = vec![(batch_id, round)];
+        // // Construct the sample 'transmissions'.
+        // let (missing_transmissions, transmissions) = sample_transmissions(&certificate, rng);
+        //
+        // Insert the certificate.
+        let missing_transmissions: HashMap<TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>> =
+            transmission_map.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+        storage.insert_certificate_atomic(certificate.clone(), missing_transmissions.clone());
+        // Ensure the certificate exists in storage.
+        assert!(storage.contains_certificate(certificate_id));
+        // Check that the underlying storage representation is correct.
+        assert_storage(
+            &storage,
+            committees.clone(),
+            rounds.clone(),
+            certificates.clone(),
+            batch_ids.clone(),
+            internal_transmissions.clone(),
+        );
+
+        // Insert the certificate again - without any missing transmissions.
+        storage.insert_certificate_atomic(certificate.clone(), Default::default());
+        // Ensure the certificate exists in storage.
+        assert!(storage.contains_certificate(certificate_id));
+        // Check that the underlying storage representation remains unchanged.
+        assert_storage(
+            &storage,
+            committees.clone(),
+            rounds.clone(),
+            certificates.clone(),
+            batch_ids.clone(),
+            internal_transmissions.clone(),
+        );
+
+        // Insert the certificate again - with all of the original missing transmissions.
+        storage.insert_certificate_atomic(certificate, missing_transmissions);
+        // Ensure the certificate exists in storage.
+        assert!(storage.contains_certificate(certificate_id));
+        // Check that the underlying storage representation remains unchanged.
+        assert_storage(&storage, committees, rounds, certificates, batch_ids, internal_transmissions);
     }
 }

@@ -376,9 +376,9 @@ pub mod prop_tests {
         (1u64.., hash_set(invalid_stake_validator(), 4..=4)).prop_map(to_committee).boxed()
     }
 
-    pub fn any_valid_committee() -> BoxedStrategy<(Result<Committee<CurrentNetwork>>, HashSet<Validator>)> {
+    pub fn any_valid_committee() -> BoxedStrategy<(Committee<CurrentNetwork>, HashSet<Validator>)> {
         (1u64.., hash_set(any_valid_validator(), 4..=MAX_COMMITTEE_SIZE as usize))
-            .prop_map(|(round, validators)| (to_committee((round, validators.clone())), validators.clone()))
+            .prop_map(|(round, validators)| (to_committee((round, validators.clone())).unwrap(), validators.clone()))
             .boxed()
     }
 
@@ -423,12 +423,8 @@ pub mod prop_tests {
     }
 
     #[proptest]
-    fn committee_advance(
-        #[strategy(any_valid_committee())] input: (Result<Committee<CurrentNetwork>>, HashSet<Validator>),
-    ) {
+    fn committee_advance(#[strategy(any_valid_committee())] input: (Committee<CurrentNetwork>, HashSet<Validator>)) {
         let (committee, _) = input;
-        assert_eq!(committee.is_ok(), true);
-        let committee = committee.unwrap();
 
         let current_round = committee.round();
         let current_members = committee.members();

@@ -875,13 +875,11 @@ pub mod prop_tests {
     pub fn any_valid_dev_gateway() -> BoxedStrategy<(Storage<CurrentNetwork>, Account<CurrentNetwork>, Option<u16>)> {
         any_valid_committee()
             .prop_flat_map(|(committee, validators)| {
-                (any_valid_storage_with(committee.unwrap()), Just(validators), 0u8..).prop_map(
-                    |(storage, validators, dev)| {
-                        let account = validators.iter().next().cloned().unwrap().account;
-                        let dev_option = Some(dev as u16);
-                        (storage, account, dev_option)
-                    },
-                )
+                (any_valid_storage_with(committee), Just(validators), 0u8..).prop_map(|(storage, validators, dev)| {
+                    let account = validators.iter().next().cloned().unwrap().account;
+                    let dev_option = Some(dev as u16);
+                    (storage, account, dev_option)
+                })
             })
             .boxed()
     }
@@ -889,7 +887,7 @@ pub mod prop_tests {
     pub fn any_valid_prod_gateway() -> BoxedStrategy<(Storage<CurrentNetwork>, Account<CurrentNetwork>, Option<u16>)> {
         any_valid_committee()
             .prop_flat_map(|(committee, validators)| {
-                (any_valid_storage_with(committee.unwrap()), Just(validators)).prop_map(|(storage, validators)| {
+                (any_valid_storage_with(committee), Just(validators)).prop_map(|(storage, validators)| {
                     let account = validators.iter().next().cloned().unwrap().account;
                     let dev_option = None;
                     (storage, account, dev_option)
