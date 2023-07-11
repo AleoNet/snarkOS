@@ -50,7 +50,7 @@ use std::{future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpStream,
     sync::{oneshot, OnceCell},
-    task::JoinHandle,
+    task::{self, JoinHandle},
 };
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
@@ -819,7 +819,7 @@ impl<N: Network> Gateway<N> {
         // Retrieve the components of the challenge response.
         let ChallengeResponse { signature } = response;
         // Perform the deferred non-blocking deserialization of the signature.
-        let Ok(signature) = signature.deserialize().await else {
+        let Ok(Ok(signature)) = task::spawn_blocking(move || signature.deserialize_blocking()).await else {
             warn!("{CONTEXT} Gateway handshake with '{peer_addr}' failed (cannot deserialize the signature)");
             return Some(DisconnectReason::InvalidChallengeResponse);
         };

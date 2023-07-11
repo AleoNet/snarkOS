@@ -53,7 +53,7 @@ use std::{
 };
 use tokio::{
     sync::{oneshot, OnceCell},
-    task::JoinHandle,
+    task::{self, JoinHandle},
     time::timeout,
 };
 
@@ -293,7 +293,7 @@ impl<N: Network> Primary<N> {
         // TODO (howardwu): Ensure I have not signed this round for this author before. If so, do not sign.
 
         // Deserialize the batch header.
-        let batch_header = batch_header.deserialize().await?;
+        let batch_header = task::spawn_blocking(move || batch_header.deserialize_blocking()).await??;
         // Ensure the round matches in the batch header.
         if batch_round != batch_header.round() {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
@@ -473,7 +473,9 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((peer_ip, batch_certificate)) = rx_batch_certified.recv().await {
                 // Deserialize the batch certificate.
-                let Ok(batch_certificate) = batch_certificate.deserialize().await else {
+                let Ok(Ok(batch_certificate)) =
+                    task::spawn_blocking(move || batch_certificate.deserialize_blocking()).await
+                else {
                     warn!("Failed to deserialize the batch certificate from peer '{peer_ip}'");
                     continue;
                 };
