@@ -13,6 +13,7 @@
 // limitations under the License.
 
 use crate::{
+    event::{BatchPropose, BatchSignature, CertificateRequest, CertificateResponse, Event},
     helpers::{
         assign_to_worker,
         init_worker_channels,
@@ -24,13 +25,8 @@ use crate::{
         Proposal,
         Storage,
     },
-    BatchPropose,
-    BatchSignature,
-    CertificateRequest,
-    CertificateResponse,
-    Event,
+    traits::LedgerService,
     Gateway,
-    LedgerService,
     Worker,
     MAX_BATCH_DELAY,
     MAX_TRANSMISSIONS_PER_BATCH,

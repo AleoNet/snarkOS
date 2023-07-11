@@ -14,7 +14,7 @@
 
 use crate::{
     helpers::{init_bft_channels, BFTReceiver, Committee, PrimaryReceiver, PrimarySender, Storage},
-    LedgerService,
+    traits::LedgerService,
     Primary,
 };
 use snarkos_account::Account;

@@ -13,12 +13,10 @@
 // limitations under the License.
 
 use crate::{
+    event::{Event, TransmissionRequest, TransmissionResponse},
     helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
-    Event,
     Gateway,
     ProposedBatch,
-    TransmissionRequest,
-    TransmissionResponse,
     MAX_BATCH_DELAY,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,

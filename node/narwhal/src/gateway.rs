@@ -13,16 +13,18 @@
 // limitations under the License.
 
 use crate::{
+    event::{
+        CertificateRequest,
+        CertificateResponse,
+        ChallengeRequest,
+        ChallengeResponse,
+        DisconnectReason,
+        Event,
+        EventTrait,
+        TransmissionRequest,
+        TransmissionResponse,
+    },
     helpers::{assign_to_worker, Cache, EventCodec, PrimarySender, Resolver, Storage, WorkerSender},
-    CertificateRequest,
-    CertificateResponse,
-    ChallengeRequest,
-    ChallengeResponse,
-    DisconnectReason,
-    Event,
-    EventTrait,
-    TransmissionRequest,
-    TransmissionResponse,
     CONTEXT,
     MAX_BATCH_DELAY,
     MAX_COMMITTEE_SIZE,
