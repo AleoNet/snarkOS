@@ -45,7 +45,7 @@ pub struct Worker<N: Network> {
     /// The storage.
     storage: Storage<N>,
     /// The proposed batch.
-    proposed_batch: ProposedBatch<N>,
+    proposed_batch: Arc<ProposedBatch<N>>,
     /// The ready queue.
     ready: Ready<N>,
     /// The pending transmissions queue.
@@ -56,7 +56,12 @@ pub struct Worker<N: Network> {
 
 impl<N: Network> Worker<N> {
     /// Initializes a new worker instance.
-    pub fn new(id: u8, gateway: Gateway<N>, storage: Storage<N>, proposed_batch: ProposedBatch<N>) -> Result<Self> {
+    pub fn new(
+        id: u8,
+        gateway: Gateway<N>,
+        storage: Storage<N>,
+        proposed_batch: Arc<ProposedBatch<N>>,
+    ) -> Result<Self> {
         // Ensure the worker ID is valid.
         ensure!(id < MAX_WORKERS, "Invalid worker ID '{id}'");
         // Return the worker.
