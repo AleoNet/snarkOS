@@ -30,6 +30,7 @@ use crate::{
     CertificateResponse,
     Event,
     Gateway,
+    LedgerService,
     Worker,
     MAX_BATCH_DELAY,
     MAX_TRANSMISSIONS_PER_BATCH,
@@ -79,11 +80,18 @@ pub struct Primary<N: Network> {
     pending: Pending<Field<N>, BatchCertificate<N>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
+    /// The ledger service.
+    ledger_service: Arc<Box<dyn LedgerService<N>>>,
 }
 
 impl<N: Network> Primary<N> {
     /// Initializes a new primary instance.
-    pub fn new(storage: Storage<N>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(
+        storage: Storage<N>,
+        account: Account<N>,
+        ledger_service: Box<dyn LedgerService<N>>,
+        dev: Option<u16>,
+    ) -> Result<Self> {
         // Construct the gateway instance.
         let gateway = Gateway::new(storage.clone(), account, dev)?;
         // Return the primary instance.
@@ -95,6 +103,7 @@ impl<N: Network> Primary<N> {
             proposed_batch: Default::default(),
             pending: Default::default(),
             handles: Default::default(),
+            ledger_service: Arc::from(ledger_service),
         })
     }
 
@@ -835,7 +844,10 @@ impl<N: Network> Primary<N> {
         // Iterate through the previous certificate IDs.
         for certificate_id in batch_header.previous_certificate_ids() {
             // Check if the certificate already exists in the ledger.
-            // TODO (howardwu): Add a ledger service.
+            if self.ledger_service.contains_certificate_id(certificate_id)? {
+                // TODO: Is this correct?
+                continue;
+            }
             // If we do not have the previous certificate, request it.
             if !self.storage.contains_certificate(*certificate_id) {
                 trace!("Primary - Found a new certificate ID for round {round} from peer '{peer_ip}'");

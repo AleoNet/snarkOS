@@ -37,6 +37,9 @@ pub use primary::*;
 mod worker;
 pub use worker::*;
 
+mod ledgerservice;
+pub use ledgerservice::*;
+
 pub const CONTEXT: &str = "[MemoryPool]";
 
 /// The maximum number of milliseconds to wait before proposing a batch.

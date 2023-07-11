@@ -16,10 +16,12 @@ use itertools::Itertools;
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
     helpers::{init_primary_channels, Committee, PrimarySender, Storage},
+    LedgerService,
     Primary,
     MAX_GC_ROUNDS,
 };
 
+use snarkvm::prelude::Network;
 use tracing::*;
 
 use indexmap::IndexMap;
@@ -57,7 +59,8 @@ pub async fn start_n_primaries(n: u16) -> HashMap<u16, (Primary<CurrentNetwork>,
     for (id, account) in accounts.into_iter().enumerate() {
         let storage = Storage::new(committee.clone(), MAX_GC_ROUNDS);
         let (sender, receiver) = init_primary_channels();
-        let mut primary = Primary::<CurrentNetwork>::new(storage, account, Some(id as u16)).unwrap();
+        let ledger_service = Box::new(MockLedgerService::new());
+        let mut primary = Primary::<CurrentNetwork>::new(storage, account, ledger_service, Some(id as u16)).unwrap();
 
         primary.run(sender.clone(), receiver, None).await.unwrap();
         primaries.insert(id as u16, (primary, sender));
@@ -95,5 +98,26 @@ fn log_connections(primaries: &HashMap<u16, (Primary<CurrentNetwork>, PrimarySen
                 tokio::time::sleep(std::time::Duration::from_secs(10)).await;
             }
         });
+    }
+}
+
+struct MockLedgerService {}
+
+impl MockLedgerService {
+    fn new() -> MockLedgerService {
+        MockLedgerService {}
+    }
+}
+
+impl<N: Network> LedgerService<N> for MockLedgerService {
+    fn contains_certificate_id(&self, _certificate: &snarkvm::prelude::Field<N>) -> anyhow::Result<bool> {
+        Ok(false)
+    }
+
+    fn contains_transmission_id(
+        &self,
+        _transmission_id: &snarkvm::prelude::narwhal::TransmissionID<N>,
+    ) -> anyhow::Result<bool> {
+        Ok(false)
     }
 }

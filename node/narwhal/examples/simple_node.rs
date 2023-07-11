@@ -18,6 +18,7 @@ extern crate tracing;
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
     helpers::{init_primary_channels, Committee, PrimarySender, Storage},
+    LedgerService,
     Primary,
     BFT,
     MAX_GC_ROUNDS,
@@ -98,8 +99,10 @@ pub async fn start_bft(node_id: u16, num_nodes: u16) -> Result<(BFT<CurrentNetwo
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
     let (storage, account) = initialize_components(node_id, num_nodes)?;
+    // Create a fake LedgerService.
+    let ledger_service = Box::new(MockLedgerService::new());
     // Initialize the BFT instance.
-    let mut bft = BFT::<CurrentNetwork>::new(storage, account, Some(node_id))?;
+    let mut bft = BFT::<CurrentNetwork>::new(storage, account, ledger_service, Some(node_id))?;
     // Run the BFT instance.
     bft.run(sender.clone(), receiver).await?;
     // Retrieve the BFT's primary.
@@ -123,8 +126,10 @@ pub async fn start_primary(
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
     let (storage, account) = initialize_components(node_id, num_nodes)?;
+    // Create a fake LedgerService.
+    let ledger_service = Box::new(MockLedgerService::new());
     // Initialize the primary instance.
-    let mut primary = Primary::<CurrentNetwork>::new(storage, account, Some(node_id))?;
+    let mut primary = Primary::<CurrentNetwork>::new(storage, account, ledger_service, Some(node_id))?;
     // Run the primary instance.
     primary.run(sender.clone(), receiver, None).await?;
     // Keep the node's connections.
@@ -413,4 +418,24 @@ async fn main() -> Result<()> {
     // // Note: Do not move this.
     // std::future::pending::<()>().await;
     Ok(())
+}
+
+struct MockLedgerService {}
+
+impl MockLedgerService {
+    fn new() -> MockLedgerService {
+        MockLedgerService {}
+    }
+}
+
+impl<N: Network> LedgerService<N> for MockLedgerService {
+    fn contains_certificate_id(&self, certificate: &snarkvm::prelude::Field<N>) -> Result<bool> {
+        trace!("contains_certificate {:#?}", certificate);
+        Ok(false)
+    }
+
+    fn contains_transmission_id(&self, transmission_id: &snarkvm::prelude::narwhal::TransmissionID<N>) -> Result<bool> {
+        trace!("contains_transmission_id {:#?}", transmission_id);
+        Ok(false)
+    }
 }
