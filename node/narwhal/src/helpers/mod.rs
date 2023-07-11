@@ -24,6 +24,9 @@ pub use codec::*;
 pub mod committee;
 pub use committee::*;
 
+pub mod dag;
+pub use dag::*;
+
 pub mod partition;
 pub use partition::*;
 

@@ -38,23 +38,25 @@ const MAX_CHANNEL_SIZE: usize = 8192;
 #[derive(Debug)]
 pub struct BFTSender<N: Network> {
     pub tx_primary_round: Arc<mpsc::Sender<(u64, oneshot::Sender<Result<()>>)>>,
-    _phantom: std::marker::PhantomData<N>,
+    pub tx_primary_certificate: Arc<mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>>,
 }
 
 #[derive(Debug)]
 pub struct BFTReceiver<N: Network> {
     pub rx_primary_round: mpsc::Receiver<(u64, oneshot::Sender<Result<()>>)>,
-    _phantom: std::marker::PhantomData<N>,
+    pub rx_primary_certificate: mpsc::Receiver<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
 }
 
 /// Initializes the BFT channels.
 pub fn init_bft_channels<N: Network>() -> (BFTSender<N>, BFTReceiver<N>) {
     let (tx_primary_round, rx_primary_round) = mpsc::channel(MAX_CHANNEL_SIZE);
+    let (tx_primary_certificate, rx_primary_certificate) = mpsc::channel(MAX_CHANNEL_SIZE);
 
     let tx_primary_round = Arc::new(tx_primary_round);
+    let tx_primary_certificate = Arc::new(tx_primary_certificate);
 
-    let sender = BFTSender { tx_primary_round, _phantom: std::marker::PhantomData };
-    let receiver = BFTReceiver { rx_primary_round, _phantom: std::marker::PhantomData };
+    let sender = BFTSender { tx_primary_round, tx_primary_certificate };
+    let receiver = BFTReceiver { rx_primary_round, rx_primary_certificate };
 
     (sender, receiver)
 }

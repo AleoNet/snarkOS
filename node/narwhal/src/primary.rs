@@ -387,7 +387,7 @@ impl<N: Network> Primary<N> {
 
         info!("Quorum threshold reached - Preparing to certify our batch...");
         // Store the certified batch and broadcast it to all validators.
-        match self.store_and_broadcast_certificate(&proposal) {
+        match self.store_and_broadcast_certificate(&proposal).await {
             Ok(certificate) => {
                 // Log the certified batch.
                 let num_transmissions = certificate.transmission_ids().len();
@@ -593,7 +593,7 @@ impl<N: Network> Primary<N> {
         }
         // Attempt to advance to the next round.
         if self.current_round() < next_round {
-            // If a BFT sender was provided, send the certificate to the BFT.
+            // If a BFT sender was provided, send the current round to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
                 // Initialize a callback sender and receiver.
                 let (callback_sender, callback_receiver) = oneshot::channel();
@@ -637,13 +637,22 @@ impl<N: Network> Primary<N> {
     }
 
     /// Stores the certified batch and broadcasts it to all validators, returning the certificate.
-    fn store_and_broadcast_certificate(&self, proposal: &Proposal<N>) -> Result<BatchCertificate<N>> {
+    async fn store_and_broadcast_certificate(&self, proposal: &Proposal<N>) -> Result<BatchCertificate<N>> {
         // Create the batch certificate and transmissions.
         let (certificate, transmissions) = proposal.to_certificate()?;
         // Store the certified batch.
         self.storage.insert_certificate(certificate.clone(), transmissions)?;
         // Broadcast the certified batch to all validators.
         self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
+        // If a BFT sender was provided, send the certificate to the BFT.
+        if let Some(bft_sender) = self.bft_sender.get() {
+            // Initialize a callback sender and receiver.
+            let (callback_sender, callback_receiver) = oneshot::channel();
+            // Send the certificate to the BFT.
+            bft_sender.tx_primary_certificate.send((certificate.clone(), callback_sender)).await?;
+            // Await the callback to continue.
+            callback_receiver.await??; // Double ?s unwraps the result from the BFT method.
+        }
         // Return the certificate.
         Ok(certificate)
     }
@@ -710,6 +719,15 @@ impl<N: Network> Primary<N> {
         if !self.storage.contains_certificate(certificate.certificate_id()) {
             // Store the batch certificate.
             self.storage.insert_certificate(certificate, missing_transmissions)?;
+            // // If a BFT sender was provided, send the certificate to the BFT.
+            // if let Some(bft_sender) = self.bft_sender.get() {
+            //     // Initialize a callback sender and receiver.
+            //     let (callback_sender, callback_receiver) = oneshot::channel();
+            //     // Send the certificate to the BFT.
+            //     bft_sender.tx_primary_certificate.send((certificate.clone(), callback_sender))?;
+            //     // Await the callback to continue.
+            //     callback_receiver.recv()?;
+            // }
             debug!("Stored certificate for round {batch_round} from peer '{peer_ip}'");
         }
         Ok(())

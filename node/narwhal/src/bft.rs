@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{init_bft_channels, BFTReceiver, Committee, PrimaryReceiver, PrimarySender, Storage},
+    helpers::{init_bft_channels, BFTReceiver, Committee, PrimaryReceiver, PrimarySender, Storage, DAG},
     Ledger,
     Primary,
 };
@@ -26,13 +26,19 @@ use snarkvm::{
 
 use indexmap::IndexSet;
 use parking_lot::{Mutex, RwLock};
-use std::{future::Future, sync::Arc};
+use std::{
+    collections::{BTreeMap, HashSet},
+    future::Future,
+    sync::Arc,
+};
 use tokio::task::JoinHandle;
 
 #[derive(Clone)]
 pub struct BFT<N: Network> {
     /// The primary.
     primary: Primary<N>,
+    /// The DAG.
+    dag: Arc<RwLock<DAG<N>>>,
     /// The batch certificate of the leader from the current even round, if one was present.
     leader_certificate: Arc<RwLock<Option<BatchCertificate<N>>>>,
     /// The spawned handles.
@@ -44,6 +50,7 @@ impl<N: Network> BFT<N> {
     pub fn new(account: Account<N>, storage: Storage<N>, ledger: Ledger<N>, dev: Option<u16>) -> Result<Self> {
         Ok(Self {
             primary: Primary::new(account, storage, ledger, dev)?,
+            dag: Default::default(),
             leader_certificate: Default::default(),
             handles: Default::default(),
         })
@@ -212,18 +219,187 @@ impl<N: Network> BFT<N> {
         }
         Ok(())
     }
+
+    /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
+    fn update_dag(&self, certificate: BatchCertificate<N>) -> Result<()> {
+        // Retrieve the certificate round.
+        let certificate_round = certificate.round();
+        // Insert the certificate into the DAG.
+        self.dag.write().insert(certificate);
+
+        // Construct the commit round.
+        let commit_round = certificate_round.saturating_sub(1);
+        // If the commit round is odd, throw an error.
+        if commit_round % 2 != 1 {
+            bail!("BFT cannot commit anchors in an odd round")
+        }
+        // If the commit round is at or below the last committed round, return early.
+        if commit_round <= self.dag.read().last_committed_round() {
+            return Ok(());
+        }
+
+        // Retrieve the committee for the commit round.
+        let Some(committee) = self.storage().get_committee(commit_round) else {
+            bail!("BFT failed to retrieve the committee for commit round {commit_round}");
+        };
+        // Compute the leader for the commit round.
+        let Ok(leader) = committee.get_leader() else {
+            bail!("BFT failed to compute the leader for commit round {commit_round}");
+        };
+        // Retrieve the leader certificate for the commit round.
+        let Some(leader_certificate) = self.dag.read().get_certificate_for_round_with_author(commit_round, leader)
+        else {
+            return Ok(());
+        };
+        // Retrieve all of the certificates for the **certificate** round.
+        let Some(certificates) = self.dag.read().get_certificates_for_round(certificate_round) else {
+            // TODO (howardwu): Investigate how many certificates we should have at this point.
+            bail!("BFT failed to retrieve the certificates for certificate round {certificate_round}");
+        };
+        // Construct a set over the authors who included the leader's certificate in the certificate round.
+        let authors = certificates
+            .values()
+            .filter_map(|c| match c.previous_certificate_ids().contains(&leader_certificate.certificate_id()) {
+                true => Some(c.author()),
+                false => None,
+            })
+            .collect();
+        // Check if the leader is ready to be committed.
+        if !committee.is_availability_threshold_reached(&authors) {
+            // If the leader is not ready to be committed, return early.
+            return Ok(());
+        }
+
+        /* Proceeding to commit the leader. */
+
+        // Order all previous leader certificates since the last committed round.
+        let mut leader_certificates = vec![leader_certificate.clone()];
+        let mut current_certificate = leader_certificate;
+        for round in (self.dag.read().last_committed_round() + 2..=commit_round.saturating_sub(2)).rev().step_by(2) {
+            // Retrieve the previous leader certificate.
+            let Some(previous_certificate) = self.dag.read().get_certificate_for_round_with_author(round, leader)
+            else {
+                continue;
+            };
+            // Determine if there is a path between the previous certificate and the current certificate.
+            if self.is_linked(previous_certificate.clone(), current_certificate.clone())? {
+                // Add the previous leader certificate to the list of certificates to commit.
+                leader_certificates.push(previous_certificate.clone());
+                // Update the current certificate to the previous leader certificate.
+                current_certificate = previous_certificate;
+            }
+        }
+
+        // Iterate over the leader certificates to commit.
+        for leader_certificate in leader_certificates.into_iter().rev() {
+            // Initialize a map for the subdag to commit.
+            let mut commit_subdag = BTreeMap::new();
+            // Start from the oldest leader certificate.
+            for (round, certificate) in self.order_dag_with_dfs(leader_certificate) {
+                // Update the DAG.
+                self.dag.write().commit(certificate.clone(), self.storage().max_gc_rounds());
+                // Insert the certificate into the map.
+                commit_subdag.insert(round, certificate);
+            }
+            // Trigger the commit.
+            // TODO (howardwu): Trigger the commit.
+        }
+        Ok(())
+    }
+
+    /// Returns the certificates to commit.
+    fn order_dag_with_dfs(&self, leader_certificate: BatchCertificate<N>) -> BTreeMap<u64, BatchCertificate<N>> {
+        // Initialize a map for the certificates to commit.
+        let mut commit = BTreeMap::new();
+        // Initialize a set for the already ordered certificates.
+        let mut already_ordered = HashSet::new();
+        // Initialize a buffer for the certificates to order.
+        let mut buffer = vec![leader_certificate];
+        // Iterate over the certificates to order.
+        while let Some(certificate) = buffer.pop() {
+            // Insert the certificate into the map.
+            commit.insert(certificate.round(), certificate.clone());
+            // Iterate over the previous certificate IDs.
+            for previous_certificate_id in certificate.previous_certificate_ids() {
+                let Some(previous_certificate) = self
+                    .dag
+                    .read()
+                    .get_certificate_for_round_with_id(certificate.round() - 1, *previous_certificate_id)
+                else {
+                    // It is either ordered or below the GC round.
+                    continue;
+                };
+                // If the previous certificate is already ordered, continue.
+                if already_ordered.contains(&previous_certificate.certificate_id()) {
+                    continue;
+                }
+                // If the last committed round is the same as the previous certificate round for this author, continue.
+                if self
+                    .dag
+                    .read()
+                    .last_committed_authors()
+                    .get(&previous_certificate.author())
+                    .map_or(false, |round| *round == previous_certificate.round())
+                {
+                    // If the previous certificate is already ordered, continue.
+                    continue;
+                }
+                // Insert the previous certificate into the set of already ordered certificates.
+                already_ordered.insert(previous_certificate.certificate_id());
+                // Insert the previous certificate into the buffer.
+                buffer.push(previous_certificate);
+            }
+        }
+        // Ensure we only retain certificates that are above the GC round.
+        commit.retain(|round, _| round + self.storage().max_gc_rounds() > self.dag.read().last_committed_round());
+        // Return the certificates to commit.
+        commit
+    }
+
+    /// Returns `true` if there is a path from the previous certificate to the current certificate.
+    fn is_linked(
+        &self,
+        previous_certificate: BatchCertificate<N>,
+        current_certificate: BatchCertificate<N>,
+    ) -> Result<bool> {
+        // Initialize the list containing the traversal.
+        let mut traversal = vec![current_certificate.clone()];
+        // Iterate over the rounds from the current certificate to the previous certificate.
+        for round in (previous_certificate.round()..current_certificate.round()).rev() {
+            // Retrieve all of the certificates for this past round.
+            let Some(certificates) = self.dag.read().get_certificates_for_round(round) else {
+                // This is a critical error, as the traversal should have these certificates.
+                // If this error is hit, it is likely that the maximum GC rounds should be increased.
+                bail!("BFT failed to retrieve the certificates for past round {round}");
+            };
+            // Filter the certificates to only include those that are in the traversal.
+            traversal = certificates
+                .into_values()
+                .filter(|c| traversal.iter().any(|p| c.previous_certificate_ids().contains(&p.certificate_id())))
+                .collect();
+        }
+        Ok(traversal.contains(&previous_certificate))
+    }
 }
 
 impl<N: Network> BFT<N> {
     /// Starts the BFT handlers.
     fn start_handlers(&self, bft_receiver: BFTReceiver<N>) {
-        let BFTReceiver { mut rx_primary_round, .. } = bft_receiver;
+        let BFTReceiver { mut rx_primary_round, mut rx_primary_certificate } = bft_receiver;
 
-        // Process the certificate from the primary.
+        // Process the current round from the primary.
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((current_round, callback_sender)) = rx_primary_round.recv().await {
                 callback_sender.send(self_.update_to_next_round(current_round)).ok();
+            }
+        });
+
+        // Process the certificate from the primary.
+        let self_ = self.clone();
+        self.spawn(async move {
+            while let Some((certificate, callback_sender)) = rx_primary_certificate.recv().await {
+                callback_sender.send(self_.update_dag(certificate)).ok();
             }
         });
     }
