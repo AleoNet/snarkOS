@@ -298,34 +298,18 @@ impl<N: Network> Primary<N> {
             bail!("Malicious peer - proposed round {batch_round}, but sent batch for round {}", batch_header.round());
         }
 
-        // Fetch the missing previous certificates.
-        let previous_certificates = self.fetch_missing_previous_certificates(peer_ip, &batch_header).await?;
-        // Process the previous certificates.
-        for previous_certificate in previous_certificates {
-            self.process_batch_certificate_from_peer(peer_ip, previous_certificate).await?;
-        }
-
-        // Now that the primary synced previous certificates, check if the batch already exists, and return early if so.
-        if self.storage.contains_batch(batch_header.batch_id()) {
-            return Ok(());
-        }
+        // If the peer is ahead, use the batch header to sync up to the peer.
+        let transmissions = self.sync_with_header_from_peer(peer_ip, &batch_header).await?;
 
         // Ensure the batch is for the current round.
         // This method must be called after fetching previous certificates (above),
         // and prior to checking the batch header (below).
         self.ensure_is_signing_round(batch_round)?;
 
-        // Ensure the primary has all of the transmissions.
-        let transmissions = self.fetch_missing_transmissions(peer_ip, &batch_header).await?;
         // Ensure the batch header from the peer is valid.
         let missing_transmissions = self.storage.check_batch_header(&batch_header, transmissions)?;
         // Inserts the missing transmissions into the workers.
         self.insert_missing_transmissions_into_workers(peer_ip, missing_transmissions.into_iter())?;
-
-        // Now that the primary is synced, check if the batch already exists, and return early if so.
-        if self.storage.contains_batch(batch_header.batch_id()) {
-            return Ok(());
-        }
 
         /* Proceeding to sign the batch. */
 
@@ -718,6 +702,33 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
+        // If the peer is ahead, use the batch header to sync up to the peer.
+        let missing_transmissions = self.sync_with_header_from_peer(peer_ip, batch_header).await?;
+
+        // Check if the certificate needs to be stored.
+        if !self.storage.contains_certificate(certificate.certificate_id()) {
+            // Store the batch certificate.
+            self.storage.insert_certificate(certificate, missing_transmissions)?;
+            debug!("Stored certificate for round {batch_round} from peer '{peer_ip}'");
+        }
+        Ok(())
+    }
+
+    // TODO (howardwu): This method is a mess. There are many redundant checks and logic. Ignore these until design is stable.
+    /// Recursively syncs using the given batch header.
+    async fn sync_with_header_from_peer(
+        &self,
+        peer_ip: SocketAddr,
+        batch_header: &BatchHeader<N>,
+    ) -> Result<HashMap<TransmissionID<N>, Transmission<N>>> {
+        // Retrieve the batch round.
+        let batch_round = batch_header.round();
+
+        // If the certificate round is outdated, do not store it.
+        if batch_round <= self.storage.gc_round() {
+            bail!("Round {batch_round} is too far in the past")
+        }
+
         // Check if our primary should move to the next round.
         let is_behind_schedule = batch_round > self.current_round(); // TODO: Check if threshold is reached.
         // Check if our primary is far behind the peer.
@@ -748,14 +759,7 @@ impl<N: Network> Primary<N> {
             // Store the batch certificate (recursively fetching any missing previous certificates).
             self.sync_with_certificate_from_peer(peer_ip, batch_certificate).await?;
         }
-
-        // Check if the certificate needs to be stored.
-        if !self.storage.contains_certificate(certificate.certificate_id()) {
-            // Store the batch certificate.
-            self.storage.insert_certificate(certificate, missing_transmissions)?;
-            debug!("Stored certificate for round {batch_round} from peer '{peer_ip}'");
-        }
-        Ok(())
+        Ok(missing_transmissions)
     }
 
     /// Fetches any missing transmissions for the specified batch header.
