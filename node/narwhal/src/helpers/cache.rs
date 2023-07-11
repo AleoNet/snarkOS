@@ -131,7 +131,51 @@ mod tests {
     use super::*;
     use snarkvm::prelude::Testnet3;
 
+    use std::net::Ipv4Addr;
+
     type CurrentNetwork = Testnet3;
+
+    #[test]
+    fn test_inbound_connection() {
+        let cache = Cache::<CurrentNetwork>::default();
+        let peer_ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
+
+        // Check that the cache is empty.
+        assert_eq!(cache.seen_inbound_connections.read().len(), 0);
+
+        // Insert a connection.
+        assert_eq!(cache.insert_inbound_connection(peer_ip, 5), 1);
+
+        // Check that the cache contains the connection.
+        assert_eq!(cache.seen_inbound_connections.read().len(), 1);
+
+        // Insert the same connection again.
+        assert_eq!(cache.insert_inbound_connection(peer_ip, 5), 2);
+
+        // Check that the cache still contains the connection.
+        assert_eq!(cache.seen_inbound_connections.read().len(), 1);
+    }
+
+    #[test]
+    fn test_inbound_event() {
+        let cache = Cache::<CurrentNetwork>::default();
+        let peer_ip = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234);
+
+        // Check that the cache is empty.
+        assert_eq!(cache.seen_inbound_events.read().len(), 0);
+
+        // Insert an event.
+        assert_eq!(cache.insert_inbound_event(peer_ip, 5), 1);
+
+        // Check that the cache contains the event.
+        assert_eq!(cache.seen_inbound_events.read().len(), 1);
+
+        // Insert the same event again.
+        assert_eq!(cache.insert_inbound_event(peer_ip, 5), 2);
+
+        // Check that the cache still contains the event.
+        assert_eq!(cache.seen_inbound_events.read().len(), 1);
+    }
 
     #[test]
     fn test_inbound_certificate() {
@@ -173,5 +217,68 @@ mod tests {
 
         // Check that the cache still contains the transmission.
         assert_eq!(cache.seen_inbound_transmissions.read().len(), 1);
+    }
+
+    #[test]
+    fn test_outbound_event() {
+        let cache = Cache::<CurrentNetwork>::default();
+        let peer_ip = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234);
+
+        // Check that the cache is empty.
+        assert_eq!(cache.seen_outbound_events.read().len(), 0);
+
+        // Insert an event.
+        assert_eq!(cache.insert_outbound_event(peer_ip, 5), 1);
+
+        // Check that the cache contains the event.
+        assert_eq!(cache.seen_outbound_events.read().len(), 1);
+
+        // Insert the same event again.
+        assert_eq!(cache.insert_outbound_event(peer_ip, 5), 2);
+
+        // Check that the cache still contains the event.
+        assert_eq!(cache.seen_outbound_events.read().len(), 1);
+    }
+
+    #[test]
+    fn test_outbound_certificate() {
+        let cache = Cache::<CurrentNetwork>::default();
+        let peer_ip = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234);
+
+        // Check that the cache is empty.
+        assert_eq!(cache.seen_outbound_certificates.read().len(), 0);
+
+        // Insert a solution.
+        assert_eq!(cache.insert_outbound_certificate(peer_ip, 5), 1);
+
+        // Check that the cache contains the solution.
+        assert_eq!(cache.seen_outbound_certificates.read().len(), 1);
+
+        // Insert the same solution again.
+        assert_eq!(cache.insert_outbound_certificate(peer_ip, 5), 2);
+
+        // Check that the cache still contains the solution.
+        assert_eq!(cache.seen_outbound_certificates.read().len(), 1);
+    }
+
+    #[test]
+    fn test_outbound_transmission() {
+        let cache = Cache::<CurrentNetwork>::default();
+        let peer_ip = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234);
+
+        // Check that the cache is empty.
+        assert_eq!(cache.seen_outbound_transmissions.read().len(), 0);
+
+        // Insert a transmission.
+        assert_eq!(cache.insert_outbound_transmission(peer_ip, 5), 1);
+
+        // Check that the cache contains the transmission.
+        assert_eq!(cache.seen_outbound_transmissions.read().len(), 1);
+
+        // Insert the same transmission again.
+        assert_eq!(cache.insert_outbound_transmission(peer_ip, 5), 2);
+
+        // Check that the cache still contains the transmission.
+        assert_eq!(cache.seen_outbound_transmissions.read().len(), 1);
     }
 }
