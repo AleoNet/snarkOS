@@ -395,7 +395,7 @@ pub mod prop_tests {
             .boxed()
     }
 
-    pub fn invalid_stake_validator() -> BoxedStrategy<Validator> {
+    fn invalid_stake_validator() -> BoxedStrategy<Validator> {
         (0..MIN_STAKE, any_valid_account()).prop_map(|(stake, account)| Validator { stake, account }).boxed()
     }
 
