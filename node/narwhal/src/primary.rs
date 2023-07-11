@@ -85,11 +85,8 @@ pub struct Primary<N: Network> {
 impl<N: Network> Primary<N> {
     /// Initializes a new primary instance.
     pub fn new(account: Account<N>, storage: Storage<N>, ledger: Ledger<N>, dev: Option<u16>) -> Result<Self> {
-        // Construct the gateway instance.
-        let gateway = Gateway::new(storage.clone(), account, dev)?;
-        // Return the primary instance.
         Ok(Self {
-            gateway,
+            gateway: Gateway::new(account, storage.clone(), dev)?,
             storage,
             ledger: Arc::from(ledger),
             workers: Default::default(),

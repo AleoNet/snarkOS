@@ -76,10 +76,10 @@ const RESTRICTED_INTERVAL: i64 = (MAX_CONNECTION_ATTEMPTS as u64 * MAX_BATCH_DEL
 
 #[derive(Clone)]
 pub struct Gateway<N: Network> {
-    /// The storage.
-    storage: Storage<N>,
     /// The account of the node.
     account: Account<N>,
+    /// The storage.
+    storage: Storage<N>,
     /// The TCP stack.
     tcp: Tcp,
     /// The cache.
@@ -103,7 +103,7 @@ pub struct Gateway<N: Network> {
 
 impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
-    pub fn new(storage: Storage<N>, account: Account<N>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(account: Account<N>, storage: Storage<N>, dev: Option<u16>) -> Result<Self> {
         // Initialize the gateway IP.
         let ip = match dev {
             // TODO change dev to Option<u8>, otherwise there is potential overflow
@@ -114,8 +114,8 @@ impl<N: Network> Gateway<N> {
         let tcp = Tcp::new(Config::new(ip, MAX_COMMITTEE_SIZE));
         // Return the gateway.
         Ok(Self {
-            storage,
             account,
+            storage,
             tcp,
             cache: Default::default(),
             resolver: Default::default(),
@@ -870,7 +870,7 @@ pub mod prop_tests {
         pub fn to_gateway(&self) -> Gateway<CurrentNetwork> {
             let account = self.node_validator.get_account();
             let dev = self.dev.map(|dev| dev as u16);
-            Gateway::new(self.worker_storage.to_storage(), account, dev).unwrap()
+            Gateway::new(account, self.worker_storage.to_storage(), dev).unwrap()
         }
 
         pub async fn generate_workers(
