@@ -78,7 +78,7 @@ mod tests {
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     #[test]
-    fn test_worker_assignment() {
+    fn test_assign_to_worker() {
         let data = "Hello Aleo".as_bytes();
         let sha = double_sha256(data);
         assert_eq!(sha, [
@@ -92,4 +92,3 @@ mod tests {
         assert_eq!(worker_id, 4);
     }
 }
-
