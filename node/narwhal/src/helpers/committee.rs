@@ -169,7 +169,7 @@ impl<N: Network> Committee<N> {
     /// Note: This ensures the method returns a deterministic result that is SNARK-friendly.
     fn sorted_members(&self) -> indexmap::map::IntoIter<Address<N>, u64> {
         let members = self.members.clone();
-        members.sorted_by(|address1, stake1, address2, stake2| {
+        members.sorted_unstable_by(|address1, stake1, address2, stake2| {
             // Sort by stake in decreasing order.
             let cmp = stake2.cmp(stake1);
             // If the stakes are equal, sort by x-coordinate in decreasing order.
