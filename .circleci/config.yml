@@ -235,6 +235,15 @@ jobs:
           workspace_member: node/messages
           cache_key: snarkos-node-messages-cache
 
+  node-narwhal:
+    docker:
+      - image: cimg/rust:1.68
+    resource_class: 2xlarge
+    steps:
+      - run_serial:
+          workspace_member: node/narwhal
+          cache_key: snarkos-node-narwhal-cache
+
   node-rest:
     docker:
       - image: cimg/rust:1.68
@@ -321,6 +330,7 @@ workflows:
       - node-cdn
       - node-consensus
       - node-messages
+      - node-narwhal
       - node-rest
       - node-router
       - node-tcp
