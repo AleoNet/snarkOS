@@ -309,15 +309,16 @@ mod tests {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::helpers::Committee;
+    use super::*;
+
     use snarkos_account::Account;
-    use std::collections::HashSet;
+
+    use std::{collections::HashSet, hash::Hash};
 
     use anyhow::Result;
     use indexmap::IndexMap;
     use proptest::sample::size_range;
     use rand::SeedableRng;
-    use std::{collections::HashSet, hash::Hash};
     use test_strategy::{proptest, Arbitrary};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -326,7 +327,7 @@ pub mod prop_tests {
     pub struct CommitteeInput {
         #[strategy(0u64..)]
         pub round: u64,
-        // Using a HashSet here garanties we'll check the PartialEq implementation on the
+        // Using a HashSet here guarantees we'll check the PartialEq implementation on the
         // `account_seed` and generate unique validators.
         #[any(size_range(0..32).lift())]
         pub validators: HashSet<Validator>,
@@ -360,6 +361,10 @@ pub mod prop_tests {
                 Err(err) => panic!("Failed to create account {err}"),
             }
         }
+
+        pub fn is_valid(&self) -> bool {
+            self.stake >= MIN_STAKE
+        }
     }
 
     impl CommitteeInput {
@@ -372,7 +377,9 @@ pub mod prop_tests {
         }
 
         pub fn is_valid(&self) -> bool {
-            self.round > 0 && HashSet::<u64>::from_iter(self.validators.iter().map(|v| v.account_seed)).len() >= 4
+            self.round > 0
+                && HashSet::<u64>::from_iter(self.validators.iter().map(|v| v.account_seed)).len() >= 4
+                && self.validators.iter().all(|v| v.stake >= MIN_STAKE)
         }
     }
 

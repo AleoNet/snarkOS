@@ -381,7 +381,7 @@ mod prop_tests {
 
     impl WorkerInput {
         fn to_worker(&self) -> Result<Worker<CurrentNetwork>> {
-            Worker::new(self.id, self.gateway.to_gateway(), self.storage.to_storage())
+            Worker::new(self.id, self.gateway.to_gateway(), self.storage.to_storage(), Default::default())
         }
 
         fn is_valid(&self) -> bool {

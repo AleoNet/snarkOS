@@ -859,6 +859,7 @@ pub mod prop_tests {
     pub struct GatewayInput {
         #[filter(CommitteeInput::is_valid)]
         pub committee_input: CommitteeInput,
+        #[filter(Validator::is_valid)]
         pub node_validator: Validator,
         pub dev: Option<u8>,
         #[strategy(0..MAX_WORKERS)]

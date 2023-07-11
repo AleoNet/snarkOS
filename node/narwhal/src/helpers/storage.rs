@@ -839,6 +839,7 @@ pub mod prop_tests {
 
     #[derive(Arbitrary, Debug, Clone)]
     pub struct StorageInput {
+        #[filter(CommitteeInput::is_valid)]
         pub committee: CommitteeInput,
         pub gc_rounds: u64,
     }
