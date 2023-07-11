@@ -77,7 +77,7 @@ pub struct Primary<N: Network> {
     /// The batch proposal, if the primary is currently proposing a batch.
     proposed_batch: Arc<ProposedBatch<N>>,
     /// The pending certificates queue.
-    pending: Pending<Field<N>, BatchCertificate<N>>,
+    pending: Arc<Pending<Field<N>, BatchCertificate<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }

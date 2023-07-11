@@ -49,7 +49,7 @@ pub struct Worker<N: Network> {
     /// The ready queue.
     ready: Ready<N>,
     /// The pending transmissions queue.
-    pending: Pending<TransmissionID<N>, Transmission<N>>,
+    pending: Arc<Pending<TransmissionID<N>, Transmission<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }

@@ -17,18 +17,17 @@ use std::{
     collections::{HashMap, HashSet},
     hash::Hash,
     net::SocketAddr,
-    sync::Arc,
 };
 use tokio::sync::oneshot;
 
-#[derive(Clone, Debug)]
+#[derive(Debug)]
 pub struct Pending<T: PartialEq + Eq + Hash, V: Clone> {
     /// The map of pending `items` to `peer IPs` that have the item.
-    pending: Arc<RwLock<HashMap<T, HashSet<SocketAddr>>>>,
-    /// The optional callback queue.
+    pending: RwLock<HashMap<T, HashSet<SocketAddr>>>,
     /// TODO (howardwu): Expire callbacks that have not been called after a certain amount of time,
     ///  or clear the callbacks that are older than a certain round.
-    callbacks: Arc<Mutex<HashMap<T, Vec<oneshot::Sender<V>>>>>,
+    /// The optional callback queue.
+    callbacks: Mutex<HashMap<T, Vec<oneshot::Sender<V>>>>,
 }
 
 impl<T: Copy + Clone + PartialEq + Eq + Hash, V: Clone> Default for Pending<T, V> {
