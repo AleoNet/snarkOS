@@ -264,8 +264,10 @@ impl<N: Network> Primary<N> {
         let rng = &mut rand::thread_rng();
         // Retrieve the private key.
         let private_key = self.gateway.account().private_key();
+        // Generate the local timestamp for batch
+        let timestamp = now();
         // Sign the batch.
-        let batch = Batch::new(private_key, round, transmissions, previous_certificates, rng)?;
+        let batch = Batch::new(private_key, round, timestamp, transmissions, previous_certificates, rng)?;
         // Construct the batch header.
         let batch_header = batch.to_header()?;
         // Construct the proposal.
