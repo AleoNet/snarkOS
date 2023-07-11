@@ -35,3 +35,32 @@ pub fn check_timestamp_for_liveness(timestamp: i64) -> Result<()> {
     // }
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::{check_timestamp_for_liveness, now};
+    use crate::MAX_TIMESTAMP_DELTA_IN_SECS;
+
+    use proptest::prelude::*;
+    use test_strategy::proptest;
+
+    fn any_valid_timestamp() -> BoxedStrategy<i64> {
+        (Just(now()), 0..MAX_TIMESTAMP_DELTA_IN_SECS).prop_map(|(now, delta)| now + delta).boxed()
+    }
+
+    fn any_invalid_timestamp() -> BoxedStrategy<i64> {
+        (Just(now()), MAX_TIMESTAMP_DELTA_IN_SECS..).prop_map(|(now, delta)| now + delta).boxed()
+    }
+
+    #[proptest]
+    fn test_check_timestamp_for_liveness(#[strategy(any_valid_timestamp())] timestamp: i64) {
+        let result = check_timestamp_for_liveness(timestamp);
+        assert!(result.is_ok());
+    }
+
+    #[proptest]
+    fn test_check_timestamp_for_liveness_too_far_in_future(#[strategy(any_invalid_timestamp())] timestamp: i64) {
+        let result = check_timestamp_for_liveness(timestamp);
+        assert!(result.is_err());
+    }
+}
