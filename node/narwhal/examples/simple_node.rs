@@ -125,10 +125,10 @@ pub async fn start_bft(node_id: u16, num_nodes: u16) -> Result<(BFT<CurrentNetwo
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
     let (storage, account) = initialize_components(node_id, num_nodes)?;
-    // Create a fake LedgerService.
-    let ledger_service = Box::new(MockLedgerService::new());
+    // Initialize the mock ledger service.
+    let ledger = Box::new(MockLedgerService::new());
     // Initialize the BFT instance.
-    let mut bft = BFT::<CurrentNetwork>::new(storage, account, ledger_service, Some(node_id))?;
+    let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, Some(node_id))?;
     // Run the BFT instance.
     bft.run(sender.clone(), receiver).await?;
     // Retrieve the BFT's primary.
@@ -152,10 +152,10 @@ pub async fn start_primary(
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
     let (storage, account) = initialize_components(node_id, num_nodes)?;
-    // Create a fake LedgerService.
-    let ledger_service = Box::new(MockLedgerService::new());
+    // Initialize the mock ledger service.
+    let ledger = Box::new(MockLedgerService::new());
     // Initialize the primary instance.
-    let mut primary = Primary::<CurrentNetwork>::new(storage, account, ledger_service, Some(node_id))?;
+    let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, Some(node_id))?;
     // Run the primary instance.
     primary.run(sender.clone(), receiver, None).await?;
     // Keep the node's connections.

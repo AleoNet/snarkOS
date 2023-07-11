@@ -57,8 +57,10 @@ use tokio::{
     time::timeout,
 };
 
-/// A type helper for an optional proposed batch.
+/// A helper type for an optional proposed batch.
 pub type ProposedBatch<N> = Arc<RwLock<Option<Proposal<N>>>>;
+/// A helper type for the ledger service.
+pub type Ledger<N> = Box<dyn LedgerService<N>>;
 
 #[derive(Clone)]
 pub struct Primary<N: Network> {
@@ -66,6 +68,8 @@ pub struct Primary<N: Network> {
     gateway: Gateway<N>,
     /// The storage.
     storage: Storage<N>,
+    /// The ledger service.
+    ledger: Arc<Ledger<N>>,
     /// The workers.
     workers: Arc<Vec<Worker<N>>>,
     /// The BFT sender.
@@ -76,30 +80,23 @@ pub struct Primary<N: Network> {
     pending: Pending<Field<N>, BatchCertificate<N>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
-    /// The ledger service.
-    ledger_service: Arc<Box<dyn LedgerService<N>>>,
 }
 
 impl<N: Network> Primary<N> {
     /// Initializes a new primary instance.
-    pub fn new(
-        storage: Storage<N>,
-        account: Account<N>,
-        ledger_service: Box<dyn LedgerService<N>>,
-        dev: Option<u16>,
-    ) -> Result<Self> {
+    pub fn new(account: Account<N>, storage: Storage<N>, ledger: Ledger<N>, dev: Option<u16>) -> Result<Self> {
         // Construct the gateway instance.
         let gateway = Gateway::new(storage.clone(), account, dev)?;
         // Return the primary instance.
         Ok(Self {
             gateway,
             storage,
+            ledger: Arc::from(ledger),
             workers: Default::default(),
             bft_sender: Default::default(),
             proposed_batch: Default::default(),
             pending: Default::default(),
             handles: Default::default(),
-            ledger_service: Arc::from(ledger_service),
         })
     }
 
@@ -840,8 +837,7 @@ impl<N: Network> Primary<N> {
         // Iterate through the previous certificate IDs.
         for certificate_id in batch_header.previous_certificate_ids() {
             // Check if the certificate already exists in the ledger.
-            if self.ledger_service.contains_certificate_id(certificate_id)? {
-                // TODO: Is this correct?
+            if self.ledger.contains_certificate_id(certificate_id)? {
                 continue;
             }
             // If we do not have the previous certificate, request it.

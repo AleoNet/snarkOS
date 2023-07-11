@@ -14,7 +14,7 @@
 
 use crate::{
     helpers::{init_bft_channels, BFTReceiver, Committee, PrimaryReceiver, PrimarySender, Storage},
-    traits::LedgerService,
+    Ledger,
     Primary,
 };
 use snarkos_account::Account;
@@ -41,14 +41,9 @@ pub struct BFT<N: Network> {
 
 impl<N: Network> BFT<N> {
     /// Initializes a new instance of the BFT.
-    pub fn new(
-        storage: Storage<N>,
-        account: Account<N>,
-        ledger_service: Box<dyn LedgerService<N>>,
-        dev: Option<u16>,
-    ) -> Result<Self> {
+    pub fn new(account: Account<N>, storage: Storage<N>, ledger: Ledger<N>, dev: Option<u16>) -> Result<Self> {
         Ok(Self {
-            primary: Primary::new(storage, account, ledger_service, dev)?,
+            primary: Primary::new(account, storage, ledger, dev)?,
             leader_certificate: Default::default(),
             handles: Default::default(),
         })
