@@ -190,10 +190,27 @@ impl<N: Network> Primary<N> {
     pub async fn propose_batch(&self) -> Result<()> {
         // Check if the proposed batch has expired, and clear it if it has expired.
         self.check_proposed_batch_for_expiration().await?;
-        // If there is a batch being proposed already, return early.
-        if self.proposed_batch.read().is_some() {
-            // TODO (howardwu): If a proposed batch already exists:
-            //  - Rebroadcast the propose batch only to nodes that have not signed.
+        // If there is a batch being proposed already,
+        // rebroadcast the batch header to the non-signers, and return early.
+        if let Some(proposal) = self.proposed_batch.read().as_ref() {
+            // Retrieve the batch header.
+            let batch_header = proposal.batch().to_header()?;
+            // Construct the event.
+            let event = Event::BatchPropose(batch_header.into());
+            // Iterate through the non-signers.
+            for address in proposal.nonsigners() {
+                // Resolve the address to the peer IP.
+                match self.gateway.resolver().get_peer_ip_for_address(address) {
+                    // Broadcast the batch to all validators for signing.
+                    Some(peer_ip) => {
+                        debug!("Resending batch proposal for round {} to peer '{peer_ip}'", proposal.round());
+                        // Broadcast the event.
+                        self.gateway.send(peer_ip, event.clone());
+                    }
+                    None => continue,
+                }
+            }
+            // Return early.
             return Ok(());
         }
 
@@ -392,6 +409,7 @@ impl<N: Network> Primary<N> {
                 let round = certificate.round();
                 info!("\n\nOur batch with {num_transmissions} transmissions for round {round} was certified!\n");
                 // Update the committee to the next round.
+                // self.update_committee_to_next_round().await
                 self.update_committee_to_round(round + 1).await
             }
             // If this fails, return the transmissions back into the ready queue for the next proposal.
@@ -414,6 +432,7 @@ impl<N: Network> Primary<N> {
         self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
         // If there are enough certificates to reach quorum threshold for the current round,
         // then proceed to advance to the next round.
+        // self.update_committee_to_next_round_with_thresholding().await
         self.try_advance_to_next_round().await
     }
 }
@@ -535,8 +554,10 @@ impl<N: Network> Primary<N> {
             if let Some(proposal) = proposal {
                 self.reinsert_transmissions_into_workers(proposal)?;
             }
-            // If we have reached the quorum threshold, then proceed to the next round.
-            self.update_committee_to_round(self.current_round() + 1).await?;
+            // Proceed to the next round.
+            self.try_advance_to_next_round().await?;
+            // // If we have reached the quorum threshold, then proceed to the next round.
+            // self.update_committee_to_next_round_with_thresholding().await?;
         }
         Ok(())
     }
@@ -697,9 +718,6 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
-        // // Check if
-        // self.storage.get_certificates_for_round(round).into_iter().chain([certificate.clone()].into_iter());
-
         // Check if our primary should move to the next round.
         let is_behind_schedule = batch_round > self.current_round(); // TODO: Check if threshold is reached.
         // Check if our primary is far behind the peer.
@@ -709,13 +727,9 @@ impl<N: Network> Primary<N> {
             // TODO (howardwu): Guard this to increment after quorum threshold is reached.
             // TODO (howardwu): After bullshark is implemented, we must use Aleo blocks to guide us to `tip-50` to know the committee.
             // If the batch round is greater than the current committee round, update the committee.
+            // self.update_committee_to_round_catch_up(batch_round).await?;
             self.update_committee_to_round(batch_round).await?;
         }
-
-        // // TODO: Check if the previous certificates have reached the quorum threshold.
-        // // TODO: If so, then advance to next round.
-        // // Check if we need to advance to the future round.
-        // self.try_advance_to_next_round()?;
 
         // // Ensure this batch does not contain already committed transmissions from past rounds.
         // if batch_header.transmission_ids().iter().any(|id| self.storage.contains_transmission(*id)) {
@@ -726,14 +740,15 @@ impl<N: Network> Primary<N> {
 
         // Ensure the primary has all of the previous certificates.
         let missing_certificates = self.fetch_missing_previous_certificates(peer_ip, batch_header).await?;
+        // Ensure the primary has all of the transmissions.
+        let missing_transmissions = self.fetch_missing_transmissions(peer_ip, batch_header).await?;
+
         // Iterate through the missing certificates.
         for batch_certificate in missing_certificates {
             // Store the batch certificate (recursively fetching any missing previous certificates).
             self.sync_with_certificate_from_peer(peer_ip, batch_certificate).await?;
         }
 
-        // Ensure the primary has all of the transmissions.
-        let missing_transmissions = self.fetch_missing_transmissions(peer_ip, batch_header).await?;
         // Check if the certificate needs to be stored.
         if !self.storage.contains_certificate(certificate.certificate_id()) {
             // Store the batch certificate.
@@ -862,7 +877,7 @@ impl<N: Network> Primary<N> {
             self.gateway.send(peer_ip, Event::CertificateRequest(certificate_id.into()));
         }
         // Wait for the certificate to be fetched.
-        match timeout(Duration::from_millis(2 * MAX_BATCH_DELAY), callback_receiver).await {
+        match timeout(Duration::from_millis(MAX_BATCH_DELAY), callback_receiver).await {
             // If the certificate was fetched, return it.
             Ok(result) => Ok(result?),
             // If the certificate was not fetched, return an error.

@@ -26,7 +26,7 @@ use snarkvm::{
     prelude::{bail, ensure, Result},
 };
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use std::collections::HashMap;
 
 pub struct Proposal<N: Network> {
@@ -84,6 +84,28 @@ impl<N: Network> Proposal<N> {
         &self.signatures
     }
 
+    /// Returns the signers.
+    pub fn signers(&self) -> IndexSet<Address<N>> {
+        self.signatures.keys().map(Signature::to_address).collect()
+    }
+
+    /// Returns the nonsigners.
+    pub fn nonsigners(&self) -> IndexSet<Address<N>> {
+        // Retrieve the current signers.
+        let signers = self.signers();
+        // Initialize a set for the non-signers.
+        let mut nonsigners = IndexSet::new();
+        // Iterate through the committee members.
+        for address in self.committee.members().keys() {
+            // Insert the address if it is not a signer.
+            if !signers.contains(address) {
+                nonsigners.insert(*address);
+            }
+        }
+        // Return the non-signers.
+        nonsigners
+    }
+
     /// Returns `true` if the proposal has expired.
     pub fn is_expired(&self) -> bool {
         now().saturating_sub(self.timestamp()) > MAX_EXPIRATION_TIME_IN_SECS
@@ -112,6 +134,10 @@ impl<N: Network> Proposal<N> {
         // Ensure the signer is in the committee.
         if !self.committee.is_committee_member(signer) {
             bail!("Signature is from a non-committee peer '{signer}'")
+        }
+        // Ensure the signer is new.
+        if self.signers().contains(&signer) {
+            bail!("Signature is from a duplicate peer '{signer}'")
         }
         // Verify the signature.
         // Note: This check ensures the peer's address matches the address of the signature.

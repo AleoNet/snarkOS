@@ -33,7 +33,7 @@ use snarkvm::{
     },
 };
 
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
@@ -86,7 +86,8 @@ impl<N: Network> Worker<N> {
     }
 
     /// Returns `true` if the transmission ID exists in the ready queue, proposed batch, storage, or ledger.
-    pub fn contains_transmission(&self, transmission_id: TransmissionID<N>) -> bool {
+    pub fn contains_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
+        let transmission_id = transmission_id.into();
         // TODO (howardwu): Add a ledger service.
         // Check if the transmission ID exists in the ready queue, proposed batch, storage, or ledger.
         self.ready.contains(transmission_id)
@@ -151,11 +152,11 @@ impl<N: Network> Worker<N> {
     /// Reinserts the specified transmission into the ready queue.
     pub(crate) fn reinsert(&self, transmission_id: TransmissionID<N>, transmission: Transmission<N>) -> bool {
         // Check if the transmission ID exists.
-        if self.contains_transmission(transmission_id) {
-            return false;
+        if !self.contains_transmission(transmission_id) {
+            // Insert the transmission into the ready queue.
+            return self.ready.insert(transmission_id, transmission);
         }
-        // Insert the transmission into the ready queue.
-        self.ready.insert(transmission_id, transmission)
+        false
     }
 }
 
@@ -193,12 +194,11 @@ impl<N: Network> Worker<N> {
         transmission: Transmission<N>,
     ) {
         // Check if the transmission ID exists.
-        if self.contains_transmission(transmission_id) {
-            return;
+        if !self.contains_transmission(transmission_id) {
+            // Insert the transmission into the ready queue.
+            self.ready.insert(transmission_id, transmission);
+            trace!("Worker {} - Added transmission '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
         }
-        // Insert the transmission into the ready queue.
-        self.ready.insert(transmission_id, transmission);
-        trace!("Worker {} - Added transmission '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
     }
 
     /// Handles the incoming unconfirmed solution.
@@ -212,9 +212,12 @@ impl<N: Network> Worker<N> {
         let transmission = Transmission::Solution(prover_solution);
         // Remove the puzzle commitment from the pending queue.
         self.pending.remove(puzzle_commitment, Some(transmission.clone()));
-        // Adds the prover solution to the ready queue.
-        self.ready.insert(puzzle_commitment, transmission);
-        trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment));
+        // Check if the solution exists.
+        if !self.contains_transmission(puzzle_commitment) {
+            // Adds the prover solution to the ready queue.
+            self.ready.insert(puzzle_commitment, transmission);
+            trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment));
+        }
     }
 
     /// Handles the incoming unconfirmed transaction.
@@ -228,9 +231,12 @@ impl<N: Network> Worker<N> {
         let transmission = Transmission::Transaction(transaction);
         // Remove the transaction from the pending queue.
         self.pending.remove(&transaction_id, Some(transmission.clone()));
-        // Adds the transaction to the ready queue.
-        self.ready.insert(&transaction_id, transmission);
-        trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));
+        // Check if the transaction ID exists.
+        if !self.contains_transmission(&transaction_id) {
+            // Adds the transaction to the ready queue.
+            self.ready.insert(&transaction_id, transmission);
+            trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));
+        }
     }
 }
 
@@ -287,7 +293,9 @@ impl<N: Network> Worker<N> {
     /// Broadcasts a ping event.
     fn broadcast_ping(&self) {
         // Broadcast the ping event.
-        self.gateway.broadcast(Event::WorkerPing(self.ready.transmission_ids().into()));
+        self.gateway.broadcast(Event::WorkerPing(
+            self.ready.transmission_ids().into_iter().take(MAX_TRANSMISSIONS_PER_BATCH).collect::<IndexSet<_>>().into(),
+        ));
     }
 
     /// Sends an transmission request to the specified peer.
@@ -303,7 +311,7 @@ impl<N: Network> Worker<N> {
         // Send the transmission request to the peer.
         self.gateway.send(peer_ip, Event::TransmissionRequest(transmission_id.into()));
         // Wait for the transmission to be fetched.
-        match timeout(Duration::from_millis(2 * MAX_BATCH_DELAY), callback_receiver).await {
+        match timeout(Duration::from_millis(MAX_BATCH_DELAY), callback_receiver).await {
             // If the transmission was fetched, return it.
             Ok(result) => Ok((transmission_id, result?)),
             // If the transmission was not fetched, return an error.

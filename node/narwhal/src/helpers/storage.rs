@@ -213,6 +213,11 @@ impl<N: Network> Storage<N> {
         self.certificates.read().contains_key(&certificate_id)
     }
 
+    /// Returns `true` if the storage contains a certificate from the specified `author` in the given `round`.
+    pub fn contains_certificate_in_round_from(&self, round: u64, author: Address<N>) -> bool {
+        self.rounds.read().get(&round).map_or(false, |set| set.iter().any(|(_, _, a)| a == &author))
+    }
+
     /// Returns `true` if the storage contains the specified `batch ID`.
     pub fn contains_batch(&self, batch_id: Field<N>) -> bool {
         // Check if the batch ID exists in storage.
@@ -397,6 +402,7 @@ impl<N: Network> Storage<N> {
     /// - The certificate ID does not already exist in storage.
     /// - The batch ID does not already exist in storage.
     /// - The author is a member of the committee for the batch round.
+    /// - The author has not already created a certificate for the batch round.
     /// - The timestamp is within the allowed time range.
     /// - None of the transmissions are from any past rounds (up to GC).
     /// - All transmissions declared in the batch header are provided or exist in storage (up to GC).
@@ -420,6 +426,11 @@ impl<N: Network> Storage<N> {
         // Ensure the certificate ID does not already exist in storage.
         if self.contains_certificate(certificate.certificate_id()) {
             bail!("Certificate for round {round} already exists in storage {gc_log}")
+        }
+
+        // Ensure the storage does not already contain a certificate for this author in this round.
+        if self.contains_certificate_in_round_from(round, certificate.author()) {
+            bail!("Certificate with this author for round {round} already exists in storage {gc_log}")
         }
 
         // Ensure the batch header is well-formed.
