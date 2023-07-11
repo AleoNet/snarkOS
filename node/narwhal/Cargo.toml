@@ -98,6 +98,12 @@ version = "4"
 [dev-dependencies.rand_chacha]
 version = "0.3"
 
+[dev-dependencies.rand_distr]
+version = "0.4"
+
+[dev-dependencies.rayon]
+version = "1"
+
 [dev-dependencies.snarkvm]
 workspace = true
 features = [ "test-helpers" ]
