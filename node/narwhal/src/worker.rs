@@ -31,7 +31,7 @@ use snarkvm::{
     },
 };
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexSet;
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
@@ -142,14 +142,16 @@ impl<N: Network> Worker<N> {
     }
 
     /// Removes the specified number of transmissions from the ready queue, and returns them.
-    pub(crate) fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
+    pub(crate) fn take(
+        &self,
+        num_transmissions: usize,
+    ) -> impl Iterator<Item = (TransmissionID<N>, Transmission<N>)> + '_ {
         // TODO (howardwu): Ensure these transmissions are not already in the ledger.
         self.ready
             .take(num_transmissions)
             .into_iter()
             // Filter out any transmissions from past rounds.
             .filter(|(id, _)| !self.storage.contains_transmission(*id))
-            .collect()
     }
 
     /// Reinserts the specified transmission into the ready queue.
