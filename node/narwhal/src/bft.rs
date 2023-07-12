@@ -229,9 +229,9 @@ impl<N: Network> BFT<N> {
 
         // Construct the commit round.
         let commit_round = certificate_round.saturating_sub(1);
-        // If the commit round is odd, throw an error.
+        // If the commit round is odd, return early.
         if commit_round % 2 != 1 {
-            bail!("BFT cannot commit anchors in an odd round")
+            return Ok(());
         }
         // If the commit round is at or below the last committed round, return early.
         if commit_round <= self.dag.read().last_committed_round() {
@@ -249,6 +249,7 @@ impl<N: Network> BFT<N> {
         // Retrieve the leader certificate for the commit round.
         let Some(leader_certificate) = self.dag.read().get_certificate_for_round_with_author(commit_round, leader)
         else {
+            trace!("BFT did not find the leader certificate for commit round {commit_round} yet");
             return Ok(());
         };
         // Retrieve all of the certificates for the **certificate** round.
@@ -267,6 +268,7 @@ impl<N: Network> BFT<N> {
         // Check if the leader is ready to be committed.
         if !committee.is_availability_threshold_reached(&authors) {
             // If the leader is not ready to be committed, return early.
+            trace!("BFT is not ready to commit {commit_round}");
             return Ok(());
         }
 
@@ -303,6 +305,7 @@ impl<N: Network> BFT<N> {
             }
             // Trigger the commit.
             // TODO (howardwu): Trigger the commit.
+            info!("\n\nCommitting subdag: {:?}\n", commit_subdag.keys().collect::<Vec<_>>());
         }
         Ok(())
     }
@@ -399,7 +402,10 @@ impl<N: Network> BFT<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((certificate, callback_sender)) = rx_primary_certificate.recv().await {
-                callback_sender.send(self_.update_dag(certificate)).ok();
+                callback_sender.send(Ok(())).ok();
+                if let Err(e) = self_.update_dag(certificate) {
+                    warn!("BFT failed to update the DAG: {e}");
+                }
             }
         });
     }

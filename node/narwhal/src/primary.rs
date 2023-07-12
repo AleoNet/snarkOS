@@ -600,7 +600,10 @@ impl<N: Network> Primary<N> {
                 // Send the current round to the BFT.
                 bft_sender.tx_primary_round.send((self.current_round(), callback_sender)).await?;
                 // Await the callback to continue.
-                callback_receiver.await??; // Double ?s unwraps the result from the BFT method.
+                if let Err(e) = callback_receiver.await? {
+                    warn!("Failed to update the BFT to the next round: {e}");
+                    return Err(e);
+                };
             } else {
                 // Update to the next committee in storage.
                 self.storage.increment_committee_to_next_round()?;
@@ -718,16 +721,16 @@ impl<N: Network> Primary<N> {
         // Check if the certificate needs to be stored.
         if !self.storage.contains_certificate(certificate.certificate_id()) {
             // Store the batch certificate.
-            self.storage.insert_certificate(certificate, missing_transmissions)?;
-            // // If a BFT sender was provided, send the certificate to the BFT.
-            // if let Some(bft_sender) = self.bft_sender.get() {
-            //     // Initialize a callback sender and receiver.
-            //     let (callback_sender, callback_receiver) = oneshot::channel();
-            //     // Send the certificate to the BFT.
-            //     bft_sender.tx_primary_certificate.send((certificate.clone(), callback_sender))?;
-            //     // Await the callback to continue.
-            //     callback_receiver.recv()?;
-            // }
+            self.storage.insert_certificate(certificate.clone(), missing_transmissions)?;
+            // If a BFT sender was provided, send the certificate to the BFT.
+            if let Some(bft_sender) = self.bft_sender.get() {
+                // Initialize a callback sender and receiver.
+                let (callback_sender, callback_receiver) = oneshot::channel();
+                // Send the certificate to the BFT.
+                bft_sender.tx_primary_certificate.send((certificate, callback_sender)).await?;
+                // Await the callback to continue.
+                callback_receiver.await??; // Double ?s unwraps the result from the BFT method.
+            }
             debug!("Stored certificate for round {batch_round} from peer '{peer_ip}'");
         }
         Ok(())
