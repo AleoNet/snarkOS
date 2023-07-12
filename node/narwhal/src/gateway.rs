@@ -859,6 +859,7 @@ pub mod prop_tests {
     pub struct GatewayInput {
         #[filter(CommitteeInput::is_valid)]
         pub committee_input: CommitteeInput,
+        #[filter(Validator::is_valid)]
         pub node_validator: Validator,
         pub dev: Option<u8>,
         #[strategy(0..MAX_WORKERS)]
@@ -871,6 +872,10 @@ pub mod prop_tests {
             let account = self.node_validator.get_account();
             let dev = self.dev.map(|dev| dev as u16);
             Gateway::new(account, self.worker_storage.to_storage(), dev).unwrap()
+        }
+
+        pub fn is_valid(&self) -> bool {
+            self.committee_input.is_valid() && self.workers_count < MAX_WORKERS
         }
 
         pub async fn generate_workers(

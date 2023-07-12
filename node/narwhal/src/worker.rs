@@ -364,13 +364,42 @@ impl<N: Network> Worker<N> {
 
 #[cfg(test)]
 mod prop_tests {
-    use crate::helpers::storage::prop_tests::StorageInput;
+    use super::*;
 
-    use test_strategy::Arbitrary;
+    use crate::{helpers::storage::prop_tests::StorageInput, prop_tests::GatewayInput};
+    use test_strategy::{proptest, Arbitrary};
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     #[derive(Arbitrary, Debug, Clone)]
     pub struct WorkerInput {
         pub id: u8,
+        #[filter(GatewayInput::is_valid)]
+        pub gateway: GatewayInput,
         pub storage: StorageInput,
+    }
+
+    impl WorkerInput {
+        fn to_worker(&self) -> Result<Worker<CurrentNetwork>> {
+            Worker::new(self.id, self.gateway.to_gateway(), self.storage.to_storage(), Default::default())
+        }
+
+        fn is_valid(&self) -> bool {
+            self.id < MAX_WORKERS
+        }
+    }
+
+    #[proptest]
+    fn worker_initialization(input: WorkerInput) {
+        match input.to_worker() {
+            Ok(worker) => {
+                assert!(input.is_valid());
+                assert_eq!(worker.id(), input.id);
+            }
+            Err(e) => {
+                assert!(!input.is_valid());
+                assert_eq!(e.to_string().as_str(), format!("Invalid worker ID '{}'", input.id));
+            }
+        }
     }
 }

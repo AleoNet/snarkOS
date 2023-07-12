@@ -321,9 +321,11 @@ mod tests {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::helpers::Committee;
+    use super::*;
+
     use snarkos_account::Account;
-    use std::collections::HashSet;
+
+    use std::{collections::HashSet, hash::Hash};
 
     use anyhow::Result;
     use indexmap::IndexMap;
@@ -337,15 +339,31 @@ pub mod prop_tests {
     pub struct CommitteeInput {
         #[strategy(0u64..)]
         pub round: u64,
+        // Using a HashSet here guarantees we'll check the PartialEq implementation on the
+        // `account_seed` and generate unique validators.
         #[any(size_range(0..32).lift())]
-        pub validators: Vec<Validator>,
+        pub validators: HashSet<Validator>,
     }
 
-    #[derive(Arbitrary, Debug, Clone)]
+    #[derive(Arbitrary, Debug, Clone, Eq)]
     pub struct Validator {
         #[strategy(..5_000_000_000u64)]
         pub stake: u64,
         account_seed: u64,
+    }
+
+    // Validators can have the same stake but shouldn't have the same account seed.
+    impl PartialEq for Validator {
+        fn eq(&self, other: &Self) -> bool {
+            self.account_seed == other.account_seed
+        }
+    }
+
+    // Make sure the Hash matches PartialEq.
+    impl Hash for Validator {
+        fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+            self.account_seed.hash(state);
+        }
     }
 
     impl Validator {
@@ -354,6 +372,10 @@ pub mod prop_tests {
                 Ok(account) => account,
                 Err(err) => panic!("Failed to create account {err}"),
             }
+        }
+
+        pub fn is_valid(&self) -> bool {
+            self.stake >= MIN_STAKE
         }
     }
 
@@ -367,7 +389,9 @@ pub mod prop_tests {
         }
 
         pub fn is_valid(&self) -> bool {
-            self.round > 0 && HashSet::<u64>::from_iter(self.validators.iter().map(|v| v.account_seed)).len() >= 4
+            self.round > 0
+                && HashSet::<u64>::from_iter(self.validators.iter().map(|v| v.account_seed)).len() >= 4
+                && self.validators.iter().all(|v| v.stake >= MIN_STAKE)
         }
     }
 
