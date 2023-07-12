@@ -37,10 +37,8 @@ const MAX_CHANNEL_SIZE: usize = 8192;
 
 #[derive(Debug)]
 pub struct BFTSender<N: Network> {
-==== BASE ====
-    pub tx_primary_round: Arc<mpsc::Sender<(u64, oneshot::Sender<Result<()>>)>>,
-    _phantom: std::marker::PhantomData<N>,
-==== BASE ====
+    pub tx_primary_round: mpsc::Sender<(u64, oneshot::Sender<Result<()>>)>,
+    pub tx_primary_certificate: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
 }
 
 #[derive(Debug)]

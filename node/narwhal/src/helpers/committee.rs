@@ -20,6 +20,7 @@ use snarkvm::console::{
 };
 
 use indexmap::IndexMap;
+use std::collections::HashSet;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Committee<N: Network> {
