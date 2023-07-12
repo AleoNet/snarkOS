@@ -1043,7 +1043,7 @@ pub mod prop_tests {
         //
         // Insert the certificate.
         let missing_transmissions: HashMap<TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>> =
-            transmission_map.iter().map(|(k, v)| (k.clone(), v.clone())).collect();
+            transmission_map.into_iter().collect();
         storage.insert_certificate_atomic(certificate.clone(), missing_transmissions.clone());
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
