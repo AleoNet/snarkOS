@@ -18,13 +18,14 @@ use snarkos_node_narwhal::{
     helpers::{init_primary_channels, Committee, PrimarySender, Storage},
     Primary,
     MAX_GC_ROUNDS,
+    MEMORY_POOL_PORT,
     MIN_STAKE,
 };
 
 use indexmap::IndexMap;
 use itertools::Itertools;
 use rand::SeedableRng;
-use std::collections::HashMap;
+use std::{collections::HashMap, net::SocketAddr, str::FromStr};
 use tracing::*;
 
 // Initializes a new test committee.
@@ -57,7 +58,8 @@ pub async fn start_n_primaries(n: u16) -> HashMap<u16, (Primary<CurrentNetwork>,
         let storage = Storage::new(committee.clone(), MAX_GC_ROUNDS);
         let (sender, receiver) = init_primary_channels();
         let ledger = Box::new(MockLedgerService::new());
-        let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, Some(id as u16)).unwrap();
+        let ip = SocketAddr::from_str(format!("127.0.0.1:{}", MEMORY_POOL_PORT + id as u16).as_str()).unwrap();
+        let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, Some(id as u16), ip).unwrap();
 
         primary.run(sender.clone(), receiver, None).await.unwrap();
         primaries.insert(id as u16, (primary, sender));
