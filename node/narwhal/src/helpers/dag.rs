@@ -20,7 +20,6 @@ use snarkvm::{
 
 use std::collections::{BTreeMap, HashMap};
 
-// TODO (howardwu): Map this over to methods in `Storage`.
 pub struct DAG<N: Network> {
     /// The in-memory collection of certificates that comprise the DAG.
     graph: BTreeMap<u64, HashMap<Address<N>, BatchCertificate<N>>>,
@@ -95,7 +94,7 @@ impl<N: Network> DAG<N> {
         self.graph.entry(round).or_default().insert(author, certificate);
     }
 
-    /// Commits a certificate to the DAG.
+    /// Commits a certificate, removing all certificates for this author at or before this round from the DAG.
     pub fn commit(&mut self, certificate: BatchCertificate<N>, max_gc_rounds: u64) {
         let certificate_round = certificate.round();
         let author = certificate.author();
@@ -116,7 +115,7 @@ impl<N: Network> DAG<N> {
 
         // Remove certificates that are below the GC round.
         self.graph.retain(|round, _| round + max_gc_rounds > self.last_committed_round);
-        // Remove any authors that are below the certificate round.
+        // Remove any certificates for this author that are at or below the certificate round.
         self.graph.retain(|round, map| match *round > certificate_round {
             true => true,
             false => {
