@@ -307,7 +307,7 @@ mod tests {
     #[test]
     fn test_get_leader_distribution() {
         // Initialize the RNG.
-        let rng = &mut TestRng::fixed(13186328061192972098);
+        let rng = &mut TestRng::default();
         // Set the number of rounds.
         const NUM_ROUNDS: u64 = 256 * 1_500;
         // Sample the number of members.
