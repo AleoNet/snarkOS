@@ -135,150 +135,72 @@ mod tests {
 
     type CurrentNetwork = Testnet3;
 
-    #[test]
-    fn test_inbound_connection() {
-        let cache = Cache::<CurrentNetwork>::default();
-        let peer_ip = IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1));
-
-        // Check that the cache is empty.
-        assert_eq!(cache.seen_inbound_connections.read().len(), 0);
-
-        // Insert a connection.
-        assert_eq!(cache.insert_inbound_connection(peer_ip, 5), 1);
-
-        // Check that the cache contains the connection.
-        assert_eq!(cache.seen_inbound_connections.read().len(), 1);
-
-        // Insert the same connection again.
-        assert_eq!(cache.insert_inbound_connection(peer_ip, 5), 2);
-
-        // Check that the cache still contains the connection.
-        assert_eq!(cache.seen_inbound_connections.read().len(), 1);
+    trait Input {
+        fn input() -> Self;
     }
 
-    #[test]
-    fn test_inbound_event() {
-        let cache = Cache::<CurrentNetwork>::default();
-        let peer_ip = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234);
-
-        // Check that the cache is empty.
-        assert_eq!(cache.seen_inbound_events.read().len(), 0);
-
-        // Insert an event.
-        assert_eq!(cache.insert_inbound_event(peer_ip, 5), 1);
-
-        // Check that the cache contains the event.
-        assert_eq!(cache.seen_inbound_events.read().len(), 1);
-
-        // Insert the same event again.
-        assert_eq!(cache.insert_inbound_event(peer_ip, 5), 2);
-
-        // Check that the cache still contains the event.
-        assert_eq!(cache.seen_inbound_events.read().len(), 1);
+    impl Input for IpAddr {
+        fn input() -> Self {
+            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))
+        }
     }
 
-    #[test]
-    fn test_inbound_certificate() {
-        let cache = Cache::<CurrentNetwork>::default();
-        let certificate_id = Field::<CurrentNetwork>::from_u8(1);
-
-        // Check that the cache is empty.
-        assert_eq!(cache.seen_inbound_certificates.read().len(), 0);
-
-        // Insert a solution.
-        assert_eq!(cache.insert_inbound_certificate(certificate_id, 5), 1);
-
-        // Check that the cache contains the solution.
-        assert_eq!(cache.seen_inbound_certificates.read().len(), 1);
-
-        // Insert the same solution again.
-        assert_eq!(cache.insert_inbound_certificate(certificate_id, 5), 2);
-
-        // Check that the cache still contains the solution.
-        assert_eq!(cache.seen_inbound_certificates.read().len(), 1);
+    impl Input for SocketAddr {
+        fn input() -> Self {
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234)
+        }
     }
 
-    #[test]
-    fn test_inbound_transmission() {
-        let cache = Cache::<CurrentNetwork>::default();
-        let transmission = TransmissionID::Transaction(Default::default());
-
-        // Check that the cache is empty.
-        assert_eq!(cache.seen_inbound_transmissions.read().len(), 0);
-
-        // Insert a transmission.
-        assert_eq!(cache.insert_inbound_transmission(transmission, 5), 1);
-
-        // Check that the cache contains the transmission.
-        assert_eq!(cache.seen_inbound_transmissions.read().len(), 1);
-
-        // Insert the same transmission again.
-        assert_eq!(cache.insert_inbound_transmission(transmission, 5), 2);
-
-        // Check that the cache still contains the transmission.
-        assert_eq!(cache.seen_inbound_transmissions.read().len(), 1);
+    impl Input for Field<CurrentNetwork> {
+        fn input() -> Self {
+            Field::from_u8(1)
+        }
     }
 
-    #[test]
-    fn test_outbound_event() {
-        let cache = Cache::<CurrentNetwork>::default();
-        let peer_ip = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234);
-
-        // Check that the cache is empty.
-        assert_eq!(cache.seen_outbound_events.read().len(), 0);
-
-        // Insert an event.
-        assert_eq!(cache.insert_outbound_event(peer_ip, 5), 1);
-
-        // Check that the cache contains the event.
-        assert_eq!(cache.seen_outbound_events.read().len(), 1);
-
-        // Insert the same event again.
-        assert_eq!(cache.insert_outbound_event(peer_ip, 5), 2);
-
-        // Check that the cache still contains the event.
-        assert_eq!(cache.seen_outbound_events.read().len(), 1);
+    impl Input for TransmissionID<CurrentNetwork> {
+        fn input() -> Self {
+            TransmissionID::Transaction(Default::default())
+        }
     }
 
-    #[test]
-    fn test_outbound_certificate() {
-        let cache = Cache::<CurrentNetwork>::default();
-        let peer_ip = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234);
+    const INTERVAL_IN_SECS: i64 = 5;
 
-        // Check that the cache is empty.
-        assert_eq!(cache.seen_outbound_certificates.read().len(), 0);
+    macro_rules! test_cache_fields {
+        ($($name:ident),*) => {
+            $(
+                paste::paste! {
+                    #[test]
+                    fn [<test_seen_ $name s>]() {
+                        let cache = Cache::<CurrentNetwork>::default();
+                        let input = Input::input();
 
-        // Insert a solution.
-        assert_eq!(cache.insert_outbound_certificate(peer_ip, 5), 1);
+                        // Check that the cache is empty.
+                        assert!(cache.[<seen_ $name s>].read().is_empty());
 
-        // Check that the cache contains the solution.
-        assert_eq!(cache.seen_outbound_certificates.read().len(), 1);
+                        // Insert an input, recent events should be 1.
+                        assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 1);
 
-        // Insert the same solution again.
-        assert_eq!(cache.insert_outbound_certificate(peer_ip, 5), 2);
+                        // Check that the cache contains the input.
+                        assert_eq!(cache.[<seen_ $name s>].read().len(), 1);
 
-        // Check that the cache still contains the solution.
-        assert_eq!(cache.seen_outbound_certificates.read().len(), 1);
+                        // Insert the same input again, recent events should be 2.
+                        assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 2);
+
+                        // Check that the cache still contains the input.
+                        assert_eq!(cache.[<seen_ $name s>].read().len(), 1);
+                    }
+                }
+            )*
+        }
     }
 
-    #[test]
-    fn test_outbound_transmission() {
-        let cache = Cache::<CurrentNetwork>::default();
-        let peer_ip = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 1234);
-
-        // Check that the cache is empty.
-        assert_eq!(cache.seen_outbound_transmissions.read().len(), 0);
-
-        // Insert a transmission.
-        assert_eq!(cache.insert_outbound_transmission(peer_ip, 5), 1);
-
-        // Check that the cache contains the transmission.
-        assert_eq!(cache.seen_outbound_transmissions.read().len(), 1);
-
-        // Insert the same transmission again.
-        assert_eq!(cache.insert_outbound_transmission(peer_ip, 5), 2);
-
-        // Check that the cache still contains the transmission.
-        assert_eq!(cache.seen_outbound_transmissions.read().len(), 1);
+    test_cache_fields! {
+       inbound_connection,
+       inbound_event,
+       inbound_certificate,
+       inbound_transmission,
+       outbound_event,
+       outbound_certificate,
+       outbound_transmission
     }
 }
