@@ -326,24 +326,8 @@ impl<N: Network> Storage<N> {
         let mut missing_transmissions = HashMap::new();
         // Ensure the declared transmission IDs are all present in storage or the given transmissions map.
         for transmission_id in batch_header.transmission_ids() {
-            // Retrieve the transmission entry.
-            let transmission_entry = self.transmissions.read().get(transmission_id).cloned();
-            // If transmission ID exists, ensure it is in the right round.
-            if let Some((_, certificate_ids)) = transmission_entry {
-                // Ensure the certificate IDs correspond to the same round as the batch header.
-                for certificate_id in certificate_ids {
-                    // Retrieve the certificate round.
-                    let Some(certificate_round) = self.get_certificate_round(certificate_id) else {
-                        bail!("Failed to find a certificate for round {round} in storage {gc_log}");
-                    };
-                    // Ensure the certificate is for the same round.
-                    if certificate_round != round {
-                        bail!("A transmission for round {round} was stored in round {certificate_round} {gc_log}");
-                    }
-                }
-            }
-            // If the transmission does not exist, ensure it was provided by the caller.
-            else {
+            // If the transmission ID does not exist, ensure it was provided by the caller.
+            if self.transmissions.read().contains_key(transmission_id) {
                 // Retrieve the transmission.
                 let Some(transmission) = transmissions.remove(transmission_id) else {
                     bail!("Failed to provide a transmission for round {round} {gc_log}");
