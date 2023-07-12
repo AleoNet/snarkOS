@@ -327,7 +327,7 @@ impl<N: Network> Storage<N> {
         // Ensure the declared transmission IDs are all present in storage or the given transmissions map.
         for transmission_id in batch_header.transmission_ids() {
             // If the transmission ID does not exist, ensure it was provided by the caller.
-            if self.transmissions.read().contains_key(transmission_id) {
+            if !self.transmissions.read().contains_key(transmission_id) {
                 // Retrieve the transmission.
                 let Some(transmission) = transmissions.remove(transmission_id) else {
                     bail!("Failed to provide a transmission for round {round} {gc_log}");
