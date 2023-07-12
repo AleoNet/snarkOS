@@ -230,9 +230,9 @@ impl<N: Network> Primary<N> {
                 bail!("Cannot propose a batch for round {round}: the previous committee is not known yet")
             };
             // Construct a set over the authors.
-            let authors = previous_certificates.iter().map(BatchCertificate::author);
+            let authors = previous_certificates.iter().map(BatchCertificate::author).collect();
             // Check if the previous certificates have reached the quorum threshold.
-            if committee.is_quorum_threshold_reached(authors) {
+            if committee.is_quorum_threshold_reached(&authors) {
                 is_ready = true;
             }
         }
@@ -558,9 +558,9 @@ impl<N: Network> Primary<N> {
         // Retrieve the certificates.
         let certificates = self.storage.get_certificates_for_round(current_round);
         // Construct a set over the authors.
-        let authors = certificates.iter().map(BatchCertificate::author);
+        let authors = certificates.iter().map(BatchCertificate::author).collect();
         // Check if the certificates have reached the quorum threshold.
-        let is_quorum = current_committee.is_quorum_threshold_reached(authors);
+        let is_quorum = current_committee.is_quorum_threshold_reached(&authors);
 
         // Determine if we are currently proposing a round.
         // Note: This is important, because while our peers have advanced,

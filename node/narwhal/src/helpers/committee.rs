@@ -91,12 +91,12 @@ impl<N: Network> Committee<N> {
 
     /// Returns `true` if the combined stake for the given addresses reaches the quorum threshold.
     /// This method takes in a `HashSet` to guarantee that the given addresses are unique.
-    pub fn is_quorum_threshold_reached(&self, addresses: impl IntoIterator<Item = Address<N>>) -> bool {
+    pub fn is_quorum_threshold_reached(&self, addresses: &HashSet<Address<N>>) -> bool {
         let mut stake = 0u64;
         // Compute the combined stake for the given addresses.
-        for address in addresses.into_iter() {
+        for address in addresses {
             // Accumulate the stake, checking for overflow.
-            stake = stake.saturating_add(self.get_stake(address));
+            stake = stake.saturating_add(self.get_stake(*address));
         }
         // Return whether the combined stake reaches the quorum threshold.
         stake >= self.quorum_threshold()

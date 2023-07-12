@@ -116,7 +116,7 @@ impl<N: Network> Proposal<N> {
         // Construct an iterator over the signers.
         let signers = self.signatures.keys().chain(Some(self.batch.signature())).map(Signature::to_address);
         // Check if the batch has reached the quorum threshold.
-        self.committee.is_quorum_threshold_reached(signers)
+        self.committee.is_quorum_threshold_reached(&signers.collect())
     }
 
     /// Returns `true` if the proposal contains the given transmission ID.
