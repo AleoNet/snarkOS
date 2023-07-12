@@ -3095,6 +3095,7 @@ dependencies = [
  "itertools",
  "open",
  "parking_lot",
+ "paste",
  "proptest",
  "rand",
  "rand_chacha",
