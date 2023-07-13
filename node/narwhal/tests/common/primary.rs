@@ -20,10 +20,10 @@ use snarkos_node_narwhal::{
     MAX_GC_ROUNDS,
     MIN_STAKE,
 };
+use snarkvm::prelude::TestRng;
 
 use indexmap::IndexMap;
 use itertools::Itertools;
-use rand::SeedableRng;
 use std::collections::HashMap;
 use tracing::*;
 
@@ -35,7 +35,7 @@ pub fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<Cu
     let mut members = IndexMap::with_capacity(n as usize);
     for i in 0..n {
         // Sample the account.
-        let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64)).unwrap();
+        let account = Account::new(&mut TestRng::fixed(i as u64)).unwrap();
 
         // TODO(nkls): use tracing instead.
         info!("Validator {}: {}", i, account.address());
