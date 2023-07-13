@@ -331,9 +331,8 @@ pub mod prop_tests {
 
     use crate::{MAX_COMMITTEE_SIZE, MIN_STAKE};
     use anyhow::Result;
-    use indexmap::IndexMap;
     use proptest::{
-        collection::{hash_set, HashSetStrategy, SizeRange},
+        collection::{hash_set, SizeRange},
         prelude::{any, Arbitrary, BoxedStrategy, Just, Strategy},
         sample::size_range,
     };
@@ -405,7 +404,7 @@ pub mod prop_tests {
         type Parameters = ();
         type Strategy = BoxedStrategy<ValidatorSet>;
 
-        fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
+        fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
             validator_set(any_valid_validator(), size_range(4..=MAX_COMMITTEE_SIZE as usize)).boxed()
         }
     }

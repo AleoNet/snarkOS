@@ -867,9 +867,9 @@ pub mod prop_tests {
         type Parameters = ();
         type Strategy = BoxedStrategy<Gateway<CurrentNetwork>>;
 
-        fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
+        fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
             any_valid_dev_gateway()
-                .prop_map(|(storage, committee, account, dev)| Gateway::new(account, storage, dev).unwrap())
+                .prop_map(|(storage, _, account, dev)| Gateway::new(account, storage, dev).unwrap())
                 .boxed()
         }
     }

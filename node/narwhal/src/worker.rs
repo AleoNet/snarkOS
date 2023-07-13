@@ -364,9 +364,8 @@ impl<N: Network> Worker<N> {
 #[cfg(test)]
 mod prop_tests {
     use super::*;
-    use proptest::prelude::{any, Arbitrary, BoxedStrategy, Strategy};
 
-    use test_strategy::{proptest, Arbitrary};
+    use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 

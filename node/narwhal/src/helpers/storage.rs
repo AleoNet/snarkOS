@@ -852,7 +852,7 @@ pub mod prop_tests {
         }
     }
 
-    use crate::helpers::{committee::prop_tests::Validator, now, storage::tests::assert_storage};
+    use crate::helpers::{now, storage::tests::assert_storage};
 
     use ::bytes::Bytes;
     use proptest::{prelude::Arbitrary, test_runner::TestRng};
