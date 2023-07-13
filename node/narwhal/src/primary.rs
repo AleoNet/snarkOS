@@ -667,7 +667,10 @@ impl<N: Network> Primary<N> {
             // Send the certificate to the BFT.
             bft_sender.tx_primary_certificate.send((certificate.clone(), callback_sender)).await?;
             // Await the callback to continue.
-            callback_receiver.await??; // Double ?s unwraps the result from the BFT method.
+            if let Err(e) = callback_receiver.await? {
+                warn!("Failed to update the BFT DAG from primary: {e}");
+                return Err(e);
+            };
         }
         // Return the certificate.
         Ok(certificate)
@@ -742,7 +745,10 @@ impl<N: Network> Primary<N> {
                 // Send the certificate to the BFT.
                 bft_sender.tx_primary_certificate.send((certificate, callback_sender)).await?;
                 // Await the callback to continue.
-                callback_receiver.await??; // Double ?s unwraps the result from the BFT method.
+                if let Err(e) = callback_receiver.await? {
+                    warn!("Failed to update the BFT DAG from sync: {e}");
+                    return Err(e);
+                };
             }
             debug!("Stored certificate for round {batch_round} from peer '{peer_ip}'");
         }
