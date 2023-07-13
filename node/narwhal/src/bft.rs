@@ -24,7 +24,8 @@ use snarkvm::{
     prelude::{bail, ensure, Field, Network, Result},
 };
 
-use indexmap::IndexSet;
+use crate::helpers::fmt_id;
+use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{BTreeMap, HashSet},
@@ -294,26 +295,45 @@ impl<N: Network> BFT<N> {
 
         // Iterate over the leader certificates to commit.
         for leader_certificate in leader_certificates.into_iter().rev() {
-            // Initialize a map for the subdag to commit.
-            let mut commit_subdag = BTreeMap::new();
+            // Compute the commit subdag.
+            let commit_subdag = self.order_dag_with_dfs(leader_certificate);
+            // Initialize a map for the deduped transmissions.
+            let mut transmissions = IndexMap::new();
             // Start from the oldest leader certificate.
-            for (round, certificate) in self.order_dag_with_dfs(leader_certificate) {
+            for certificate in commit_subdag.values().flatten() {
                 // Update the DAG.
                 self.dag.write().commit(certificate.clone(), self.storage().max_gc_rounds());
-                // Insert the certificate into the map.
-                commit_subdag.insert(round, certificate);
+                // Retrieve the transmissions.
+                for transmission_id in certificate.transmission_ids() {
+                    // If the transmission already exists in the map, skip it.
+                    if transmissions.contains_key(transmission_id) {
+                        continue;
+                    }
+                    // If the transmission already exists in the ledger, skip it.
+                    // TODO (howardwu): Check if the transmission exists in the ledger.
+                    // Retrieve the transmission.
+                    let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
+                        bail!("BFT failed to retrieve transmission {}", fmt_id(transmission_id));
+                    };
+                    // Add the transmission to the set.
+                    transmissions.insert(*transmission_id, transmission);
+                }
             }
-            // Trigger the commit.
-            // TODO (howardwu): Trigger the commit.
-            info!("\n\nCommitting subdag: {:?}\n", commit_subdag.keys().collect::<Vec<_>>());
+            // Trigger consensus.
+            // TODO (howardwu): Trigger consensus.
+            info!(
+                "\n\nCommitting subdag with {} transmissions: {:?}\n",
+                transmissions.len(),
+                commit_subdag.iter().map(|(round, certificates)| (round, certificates.len())).collect::<Vec<_>>()
+            );
         }
         Ok(())
     }
 
     /// Returns the certificates to commit.
-    fn order_dag_with_dfs(&self, leader_certificate: BatchCertificate<N>) -> BTreeMap<u64, BatchCertificate<N>> {
+    fn order_dag_with_dfs(&self, leader_certificate: BatchCertificate<N>) -> BTreeMap<u64, Vec<BatchCertificate<N>>> {
         // Initialize a map for the certificates to commit.
-        let mut commit = BTreeMap::new();
+        let mut commit = BTreeMap::<u64, Vec<_>>::new();
         // Initialize a set for the already ordered certificates.
         let mut already_ordered = HashSet::new();
         // Initialize a buffer for the certificates to order.
@@ -321,7 +341,7 @@ impl<N: Network> BFT<N> {
         // Iterate over the certificates to order.
         while let Some(certificate) = buffer.pop() {
             // Insert the certificate into the map.
-            commit.insert(certificate.round(), certificate.clone());
+            commit.entry(certificate.round()).or_default().push(certificate.clone());
             // Iterate over the previous certificate IDs.
             for previous_certificate_id in certificate.previous_certificate_ids() {
                 let Some(previous_certificate) = self
