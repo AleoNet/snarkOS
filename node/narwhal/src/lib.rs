@@ -34,9 +34,6 @@ pub use gateway::*;
 mod primary;
 pub use primary::*;
 
-pub mod traits;
-pub use traits::*;
-
 mod worker;
 pub use worker::*;
 

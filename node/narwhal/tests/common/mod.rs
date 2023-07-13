@@ -12,8 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod ledger_service;
 pub mod primary;
 pub mod utils;
 
 pub type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+pub type MockLedgerService = snarkos_node_narwhal_ledger_service::MockLedgerService<CurrentNetwork>;

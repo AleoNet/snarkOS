@@ -16,6 +16,7 @@ use crate::{
     event::{Event, TransmissionRequest, TransmissionResponse},
     helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
     Gateway,
+    Ledger,
     ProposedBatch,
     MAX_BATCH_DELAY,
     MAX_TRANSMISSIONS_PER_BATCH,
@@ -44,6 +45,8 @@ pub struct Worker<N: Network> {
     gateway: Gateway<N>,
     /// The storage.
     storage: Storage<N>,
+    /// The ledger service.
+    ledger: Arc<Ledger<N>>,
     /// The proposed batch.
     proposed_batch: Arc<ProposedBatch<N>>,
     /// The ready queue.
@@ -60,6 +63,7 @@ impl<N: Network> Worker<N> {
         id: u8,
         gateway: Gateway<N>,
         storage: Storage<N>,
+        ledger: Arc<Ledger<N>>,
         proposed_batch: Arc<ProposedBatch<N>>,
     ) -> Result<Self> {
         // Ensure the worker ID is valid.
@@ -69,6 +73,7 @@ impl<N: Network> Worker<N> {
             id,
             gateway,
             storage: storage.clone(),
+            ledger,
             proposed_batch,
             ready: Ready::new(storage),
             pending: Default::default(),
@@ -91,15 +96,11 @@ impl<N: Network> Worker<N> {
     /// Returns `true` if the transmission ID exists in the ready queue, proposed batch, storage, or ledger.
     pub fn contains_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
         let transmission_id = transmission_id.into();
-        // TODO (howardwu): Add a ledger service.
         // Check if the transmission ID exists in the ready queue, proposed batch, storage, or ledger.
         self.ready.contains(transmission_id)
-            || self
-                .proposed_batch
-                .read()
-                .as_ref()
-                .map_or(false, |proposal| proposal.contains_transmission(transmission_id))
+            || self.proposed_batch.read().as_ref().map_or(false, |p| p.contains_transmission(transmission_id))
             || self.storage.contains_transmission(transmission_id)
+            || self.ledger.contains_transmission(&transmission_id).unwrap_or(false)
     }
 
     /// Returns the transmission if it exists in the ready queue, proposed batch, storage, or ledger.
@@ -108,18 +109,20 @@ impl<N: Network> Worker<N> {
         if let Some(transmission) = self.ready.get(transmission_id) {
             return Some(transmission);
         }
-        // Check if the transmission ID exists in the proposed batch.
-        if let Some(transmission) =
-            self.proposed_batch.read().as_ref().and_then(|proposal| proposal.get_transmission(transmission_id))
-        {
-            return Some(transmission.clone());
-        }
         // Check if the transmission ID exists in storage.
         if let Some(transmission) = self.storage.get_transmission(transmission_id) {
             return Some(transmission);
         }
+        // Check if the transmission ID exists in the proposed batch.
+        if let Some(transmission) =
+            self.proposed_batch.read().as_ref().and_then(|p| p.get_transmission(transmission_id))
+        {
+            return Some(transmission.clone());
+        }
         // Check if the transmission ID already exists in the ledger.
-        // TODO (howardwu): Add a ledger service.
+        if let Some(transmission) = self.ledger.get_transmission(&transmission_id).unwrap_or(None) {
+            return Some(transmission);
+        }
         None
     }
 
@@ -142,16 +145,20 @@ impl<N: Network> Worker<N> {
     }
 
     /// Removes the specified number of transmissions from the ready queue, and returns them.
-    pub(crate) fn take(
+    pub(crate) fn take_candidates(
         &self,
         num_transmissions: usize,
-    ) -> impl Iterator<Item = (TransmissionID<N>, Transmission<N>)> + '_ {
-        // TODO (howardwu): Ensure these transmissions are not already in the ledger.
-        self.ready
-            .take(num_transmissions)
-            .into_iter()
-            // Filter out any transmissions from past rounds.
-            .filter(|(id, _)| !self.storage.contains_transmission(*id))
+    ) -> impl Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        // Acquire the proposed batch read lock.
+        let proposed_batch = self.proposed_batch.read();
+        // Retain the transmissions that are not in the storage or ledger.
+        self.ready.retain(|id, _| {
+            !self.storage.contains_transmission(*id)
+                && !proposed_batch.as_ref().map_or(false, |p| p.contains_transmission(*id))
+                && !self.ledger.contains_transmission(id).unwrap_or(false)
+        });
+        // Remove the specified number of transmissions from the ready queue.
+        self.ready.take(num_transmissions).into_iter()
     }
 
     /// Reinserts the specified transmission into the ready queue.
@@ -364,8 +371,9 @@ impl<N: Network> Worker<N> {
 #[cfg(test)]
 mod prop_tests {
     use super::*;
-
     use crate::{helpers::storage::prop_tests::StorageInput, prop_tests::GatewayInput};
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+
     use test_strategy::{proptest, Arbitrary};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -380,7 +388,13 @@ mod prop_tests {
 
     impl WorkerInput {
         fn to_worker(&self) -> Result<Worker<CurrentNetwork>> {
-            Worker::new(self.id, self.gateway.to_gateway(), self.storage.to_storage(), Default::default())
+            Worker::new(
+                self.id,
+                self.gateway.to_gateway(),
+                self.storage.to_storage(),
+                Arc::new(Box::new(MockLedgerService::new())),
+                Default::default(),
+            )
         }
 
         fn is_valid(&self) -> bool {

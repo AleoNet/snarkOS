@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::{ledger_service::MockLedgerService, CurrentNetwork};
+use crate::common::{CurrentNetwork, MockLedgerService};
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
     helpers::{init_primary_channels, Committee, PrimarySender, Storage},

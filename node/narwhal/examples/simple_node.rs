@@ -17,15 +17,15 @@ extern crate tracing;
 
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
-    helpers::{fmt_id, init_primary_channels, Committee, PrimarySender, Storage},
-    LedgerService,
+    helpers::{init_primary_channels, Committee, PrimarySender, Storage},
     Primary,
     BFT,
     MAX_GC_ROUNDS,
     MEMORY_POOL_PORT,
 };
+use snarkos_node_narwhal_ledger_service::MockLedgerService;
 use snarkvm::{
-    ledger::narwhal::{Data, TransmissionID},
+    ledger::narwhal::Data,
     prelude::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
@@ -89,32 +89,6 @@ pub fn initialize_logger(verbosity: u8) {
     let _ = tracing_subscriber::registry()
         .with(tracing_subscriber::fmt::Layer::default().with_target(verbosity > 2).with_filter(filter))
         .try_init();
-}
-
-/**************************************************************************************************/
-
-/// A mock ledger service that always returns `false`.
-struct MockLedgerService {}
-
-impl MockLedgerService {
-    /// Initializes a new mock ledger service.
-    fn new() -> MockLedgerService {
-        MockLedgerService {}
-    }
-}
-
-impl<N: Network> LedgerService<N> for MockLedgerService {
-    /// Returns `false` for all queries.
-    fn contains_certificate_id(&self, certificate_id: &Field<N>) -> Result<bool> {
-        trace!("[MockLedgerService] Contains certificate ID {} - false", fmt_id(certificate_id));
-        Ok(false)
-    }
-
-    /// Returns `false` for all queries.
-    fn contains_transmission_id(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
-        trace!("[MockLedgerService] Contains transmission ID {} - false", fmt_id(transmission_id));
-        Ok(false)
-    }
 }
 
 /**************************************************************************************************/

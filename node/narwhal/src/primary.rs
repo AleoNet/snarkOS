@@ -25,7 +25,6 @@ use crate::{
         Proposal,
         Storage,
     },
-    traits::LedgerService,
     Gateway,
     Worker,
     MAX_BATCH_DELAY,
@@ -33,9 +32,10 @@ use crate::{
     MAX_WORKERS,
 };
 use snarkos_account::Account;
+use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
-    ledger::narwhal::{Batch, BatchCertificate, BatchHeader, Transmission, TransmissionID},
+    ledger::narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     prelude::Field,
 };
 
@@ -122,7 +122,13 @@ impl<N: Network> Primary<N> {
             // Construct the worker channels.
             let (tx_worker, rx_worker) = init_worker_channels();
             // Construct the worker instance.
-            let worker = Worker::new(id, self.gateway.clone(), self.storage.clone(), self.proposed_batch.clone())?;
+            let worker = Worker::new(
+                id,
+                self.gateway.clone(),
+                self.storage.clone(),
+                self.ledger.clone(),
+                self.proposed_batch.clone(),
+            )?;
             // Run the worker instance.
             worker.run(rx_worker);
             // Add the worker to the list of workers.
@@ -162,6 +168,11 @@ impl<N: Network> Primary<N> {
         &self.storage
     }
 
+    /// Returns the ledger.
+    pub fn ledger(&self) -> &Ledger<N> {
+        &self.ledger
+    }
+
     /// Returns the number of workers.
     pub fn num_workers(&self) -> u8 {
         u8::try_from(self.workers.len()).expect("Too many workers")
@@ -192,10 +203,8 @@ impl<N: Network> Primary<N> {
         // If there is a batch being proposed already,
         // rebroadcast the batch header to the non-signers, and return early.
         if let Some(proposal) = self.proposed_batch.read().as_ref() {
-            // Retrieve the batch header.
-            let batch_header = proposal.batch().to_header()?;
             // Construct the event.
-            let event = Event::BatchPropose(batch_header.into());
+            let event = Event::BatchPropose(proposal.batch_header().clone().into());
             // Iterate through the non-signers.
             for address in proposal.nonsigners() {
                 // Resolve the address to the peer IP.
@@ -241,14 +250,11 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
-        // Initialize a map of the transmissions.
-        let mut transmissions = IndexMap::new();
-        // Drain the workers of the required number of transmissions.
+        // Determined the required number of transmissions per worker.
         let num_transmissions_per_worker = MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
-        for worker in self.workers.iter() {
-            // TODO (howardwu): Perform one final filter against the ledger service.
-            transmissions.extend(worker.take(num_transmissions_per_worker));
-        }
+        // Take the transmissions from the workers.
+        let transmissions: IndexMap<_, _> =
+            self.workers.iter().map(|worker| worker.take_candidates(num_transmissions_per_worker)).flatten().collect();
         // Determine if there are transmissions to propose.
         let has_transmissions = !transmissions.is_empty();
         // If the batch is not ready to be proposed, return early.
@@ -265,12 +271,14 @@ impl<N: Network> Primary<N> {
         let private_key = self.gateway.account().private_key();
         // Generate the local timestamp for batch
         let timestamp = now();
-        // Sign the batch.
-        let batch = Batch::new(private_key, round, timestamp, transmissions, previous_certificates, rng)?;
-        // Construct the batch header.
-        let batch_header = batch.to_header()?;
+        // Prepare the transmission IDs.
+        let transmission_ids = transmissions.keys().copied().collect();
+        // Prepare the certificate IDs.
+        let certificate_ids = previous_certificates.into_iter().map(|c| c.certificate_id()).collect();
+        // Sign the batch header.
+        let batch_header = BatchHeader::new(private_key, round, timestamp, transmission_ids, certificate_ids, rng)?;
         // Construct the proposal.
-        let proposal = Proposal::new(self.current_committee(), batch)?;
+        let proposal = Proposal::new(self.current_committee(), batch_header.clone(), transmissions)?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
         // Set the proposed batch.
@@ -645,6 +653,9 @@ impl<N: Network> Primary<N> {
     async fn store_and_broadcast_certificate(&self, proposal: &Proposal<N>) -> Result<BatchCertificate<N>> {
         // Create the batch certificate and transmissions.
         let (certificate, transmissions) = proposal.to_certificate()?;
+        // Convert the transmissions into a HashMap.
+        // Note: Do not change the `Proposal` to use a HashMap. The ordering there is necessary for safety.
+        let transmissions = transmissions.into_iter().collect::<HashMap<_, _>>();
         // Store the certified batch.
         self.storage.insert_certificate(certificate.clone(), transmissions)?;
         // Broadcast the certified batch to all validators.
@@ -857,7 +868,7 @@ impl<N: Network> Primary<N> {
         // Iterate through the previous certificate IDs.
         for certificate_id in batch_header.previous_certificate_ids() {
             // Check if the certificate already exists in the ledger.
-            if self.ledger.contains_certificate_id(certificate_id)? {
+            if self.ledger.contains_certificate(certificate_id)? {
                 continue;
             }
             // If we do not have the previous certificate, request it.

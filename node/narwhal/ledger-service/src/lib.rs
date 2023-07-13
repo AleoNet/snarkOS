@@ -12,5 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-pub mod ledger_service;
-pub use ledger_service::*;
+#[cfg(feature = "mock")]
+pub mod mock;
+#[cfg(feature = "mock")]
+pub use mock::*;
+
+pub mod traits;
+pub use traits::*;
+
+/// Formats an ID into a truncated identifier (for logging purposes).
+pub fn fmt_id(id: impl ToString) -> String {
+    let id = id.to_string();
+    let mut formatted_id = id.chars().take(16).collect::<String>();
+    if id.chars().count() > 16 {
+        formatted_id.push_str("..");
+    }
+    formatted_id
+}

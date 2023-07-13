@@ -29,6 +29,7 @@ members = [
   "node/messages",
   "node/metrics",
   "node/narwhal",
+  "node/narwhal/ledger-service",
   "node/rest",
   "node/router",
   "node/tcp",

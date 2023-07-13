@@ -847,10 +847,15 @@ pub mod prop_tests {
         MAX_WORKERS,
         MEMORY_POOL_PORT,
     };
-    use indexmap::IndexMap;
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
     use snarkos_node_tcp::P2P;
     use snarkvm::prelude::Testnet3;
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    use indexmap::IndexMap;
+    use std::{
+        net::{IpAddr, Ipv4Addr, SocketAddr},
+        sync::Arc,
+    };
     use test_strategy::{proptest, Arbitrary};
 
     type CurrentNetwork = Testnet3;
@@ -891,8 +896,14 @@ pub mod prop_tests {
                 // Construct the worker channels.
                 let (tx_worker, rx_worker) = init_worker_channels();
                 // Construct the worker instance.
-                let worker =
-                    Worker::new(id, gateway.clone(), self.worker_storage.to_storage(), Default::default()).unwrap();
+                let worker = Worker::new(
+                    id,
+                    gateway.clone(),
+                    self.worker_storage.to_storage(),
+                    Arc::new(Box::new(MockLedgerService::new())),
+                    Default::default(),
+                )
+                .unwrap();
                 // Run the worker instance.
                 worker.run(rx_worker);
 

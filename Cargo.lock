@@ -3105,6 +3105,7 @@ dependencies = [
  "serde",
  "sha2",
  "snarkos-account",
+ "snarkos-node-narwhal-ledger-service",
  "snarkos-node-tcp",
  "snarkvm",
  "test-strategy",
@@ -3115,6 +3116,14 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber 0.3.17",
+]
+
+[[package]]
+name = "snarkos-node-narwhal-ledger-service"
+version = "2.1.4"
+dependencies = [
+ "snarkvm",
+ "tracing",
 ]
 
 [[package]]

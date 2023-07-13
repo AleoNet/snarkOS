@@ -22,79 +22,95 @@ use snarkvm::{
         network::Network,
         types::Field,
     },
-    ledger::narwhal::{Batch, BatchCertificate, Transmission, TransmissionID},
-    prelude::{bail, ensure, Result},
+    ledger::narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
+    prelude::{bail, ensure, Itertools, Result},
 };
 
-use indexmap::{IndexMap, IndexSet};
-use std::collections::HashMap;
+use indexmap::IndexMap;
+use std::collections::HashSet;
 
 pub struct Proposal<N: Network> {
     /// The committee for the round.
     committee: Committee<N>,
-    /// The proposed batch.
-    batch: Batch<N>,
+    /// The proposed batch header.
+    batch_header: BatchHeader<N>,
+    /// The proposed transmissions.
+    transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     /// The map of `(signature, timestamp)` entries.
     signatures: IndexMap<Signature<N>, i64>,
 }
 
 impl<N: Network> Proposal<N> {
     /// Initializes a new instance of the proposal.
-    pub fn new(committee: Committee<N>, batch: Batch<N>) -> Result<Self> {
+    pub fn new(
+        committee: Committee<N>,
+        batch_header: BatchHeader<N>,
+        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<Self> {
         // Ensure the committee round batches the proposed batch round.
-        ensure!(committee.round() == batch.round(), "The committee round does not match the batch round");
+        ensure!(committee.round() == batch_header.round(), "The committee round does not match the batch round");
         // Ensure the batch author is a member of the committee.
-        ensure!(committee.is_committee_member(batch.author()), "The batch author is not a committee member");
+        ensure!(committee.is_committee_member(batch_header.author()), "The batch author is not a committee member");
+        // Ensure the transmissions are not empty.
+        ensure!(!transmissions.is_empty(), "The transmissions are empty");
+        // Ensure the transmission IDs match in the batch header and transmissions.
+        ensure!(
+            batch_header.transmission_ids().len() == transmissions.len(),
+            "The transmission IDs do not match in the batch header and transmissions"
+        );
+        for (a, b) in batch_header.transmission_ids().iter().zip_eq(transmissions.keys()) {
+            ensure!(a == b, "The transmission IDs do not match in the batch header and transmissions");
+        }
         // Return the proposal.
-        Ok(Self { committee, batch, signatures: Default::default() })
+        Ok(Self { committee, batch_header, transmissions, signatures: Default::default() })
     }
 
-    /// Returns the proposed batch.
-    pub const fn batch(&self) -> &Batch<N> {
-        &self.batch
+    /// Returns the proposed batch header.
+    pub const fn batch_header(&self) -> &BatchHeader<N> {
+        &self.batch_header
     }
 
     /// Returns the proposed batch ID.
     pub const fn batch_id(&self) -> Field<N> {
-        self.batch.batch_id()
+        self.batch_header.batch_id()
     }
 
     /// Returns the round.
     pub const fn round(&self) -> u64 {
-        self.batch.round()
+        self.batch_header.round()
     }
 
     /// Returns the timestamp.
     pub const fn timestamp(&self) -> i64 {
-        self.batch.timestamp()
+        self.batch_header.timestamp()
     }
 
     /// Returns the transmissions.
     pub const fn transmissions(&self) -> &IndexMap<TransmissionID<N>, Transmission<N>> {
-        self.batch.transmissions()
+        &self.transmissions
     }
 
     /// Returns the transmissions.
     pub fn into_transmissions(self) -> IndexMap<TransmissionID<N>, Transmission<N>> {
-        self.batch.into_transmissions()
+        self.transmissions
     }
 
-    /// Returns the map of `(signature, timestamp)` entries.
-    pub const fn signatures(&self) -> &IndexMap<Signature<N>, i64> {
-        &self.signatures
-    }
+    // /// Returns the map of `(signature, timestamp)` entries.
+    // pub const fn signatures(&self) -> &IndexMap<Signature<N>, i64> {
+    //     &self.signatures
+    // }
 
     /// Returns the signers.
-    pub fn signers(&self) -> IndexSet<Address<N>> {
-        self.signatures.keys().map(Signature::to_address).collect()
+    pub fn signers(&self) -> HashSet<Address<N>> {
+        self.signatures.keys().chain(Some(self.batch_header.signature())).map(Signature::to_address).collect()
     }
 
     /// Returns the nonsigners.
-    pub fn nonsigners(&self) -> IndexSet<Address<N>> {
+    pub fn nonsigners(&self) -> HashSet<Address<N>> {
         // Retrieve the current signers.
         let signers = self.signers();
         // Initialize a set for the non-signers.
-        let mut nonsigners = IndexSet::new();
+        let mut nonsigners = HashSet::new();
         // Iterate through the committee members.
         for address in self.committee.members().keys() {
             // Insert the address if it is not a signer.
@@ -113,20 +129,18 @@ impl<N: Network> Proposal<N> {
 
     /// Returns `true` if the quorum threshold has been reached for the proposed batch.
     pub fn is_quorum_threshold_reached(&self) -> bool {
-        // Construct an iterator over the signers.
-        let signers = self.signatures.keys().chain(Some(self.batch.signature())).map(Signature::to_address);
         // Check if the batch has reached the quorum threshold.
-        self.committee.is_quorum_threshold_reached(&signers.collect())
+        self.committee.is_quorum_threshold_reached(&self.signers())
     }
 
     /// Returns `true` if the proposal contains the given transmission ID.
     pub fn contains_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
-        self.batch.contains(transmission_id)
+        self.transmissions.contains_key(&transmission_id.into())
     }
 
     /// Returns the `transmission` for the given `transmission ID`.
     pub fn get_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> Option<&Transmission<N>> {
-        self.batch.get(transmission_id)
+        self.transmissions.get(&transmission_id.into())
     }
 
     /// Adds a signature to the proposal, if the signature is valid.
@@ -152,14 +166,12 @@ impl<N: Network> Proposal<N> {
     }
 
     /// Returns the batch certificate and transmissions.
-    pub fn to_certificate(&self) -> Result<(BatchCertificate<N>, HashMap<TransmissionID<N>, Transmission<N>>)> {
+    pub fn to_certificate(&self) -> Result<(BatchCertificate<N>, IndexMap<TransmissionID<N>, Transmission<N>>)> {
         // Ensure the quorum threshold has been reached.
         ensure!(self.is_quorum_threshold_reached(), "The quorum threshold has not been reached");
         // Create the batch certificate.
-        let certificate = BatchCertificate::new(self.batch.to_header()?, self.signatures.clone())?;
-        // Create the transmissions map.
-        let transmissions = self.batch.transmissions().clone().into_iter().collect();
+        let certificate = BatchCertificate::new(self.batch_header.clone(), self.signatures.clone())?;
         // Return the certificate and transmissions.
-        Ok((certificate, transmissions))
+        Ok((certificate, self.transmissions.clone()))
     }
 }

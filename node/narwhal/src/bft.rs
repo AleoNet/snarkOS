@@ -78,6 +78,11 @@ impl<N: Network> BFT<N> {
     pub const fn storage(&self) -> &Storage<N> {
         self.primary.storage()
     }
+
+    /// Returns the ledger.
+    pub fn ledger(&self) -> &Ledger<N> {
+        self.primary.ledger()
+    }
 }
 
 impl<N: Network> BFT<N> {
@@ -312,7 +317,10 @@ impl<N: Network> BFT<N> {
                         continue;
                     }
                     // If the transmission already exists in the ledger, skip it.
-                    // TODO (howardwu): Check if the transmission exists in the ledger.
+                    // Note: On failure to read from the ledger, we skip including this transmission, out of safety.
+                    if self.ledger().contains_transmission(transmission_id).unwrap_or(true) {
+                        continue;
+                    }
                     // Retrieve the transmission.
                     let Some(transmission) = self.storage().get_transmission(*transmission_id) else {
                         bail!("BFT failed to retrieve transmission {}", fmt_id(transmission_id));
