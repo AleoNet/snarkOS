@@ -114,7 +114,7 @@ impl<N: Network> Proposal<N> {
     /// Returns `true` if the quorum threshold has been reached for the proposed batch.
     pub fn is_quorum_threshold_reached(&self) -> bool {
         // Construct an iterator over the signers.
-        let signers = self.signatures.keys().chain([self.batch.signature()].into_iter()).map(Signature::to_address);
+        let signers = self.signatures.keys().chain(Some(self.batch.signature())).map(Signature::to_address);
         // Check if the batch has reached the quorum threshold.
         self.committee.is_quorum_threshold_reached(&signers.collect())
     }

@@ -30,15 +30,15 @@ use snarkvm::{
     },
 };
 
-use std::{net::SocketAddr, sync::Arc};
+use std::net::SocketAddr;
 use tokio::sync::{mpsc, oneshot};
 
 const MAX_CHANNEL_SIZE: usize = 8192;
 
 #[derive(Debug)]
 pub struct BFTSender<N: Network> {
-    pub tx_primary_round: Arc<mpsc::Sender<(u64, oneshot::Sender<Result<()>>)>>,
-    pub tx_primary_certificate: Arc<mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>>,
+    pub tx_primary_round: mpsc::Sender<(u64, oneshot::Sender<Result<()>>)>,
+    pub tx_primary_certificate: mpsc::Sender<(BatchCertificate<N>, oneshot::Sender<Result<()>>)>,
 }
 
 #[derive(Debug)]
@@ -52,9 +52,6 @@ pub fn init_bft_channels<N: Network>() -> (BFTSender<N>, BFTReceiver<N>) {
     let (tx_primary_round, rx_primary_round) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_primary_certificate, rx_primary_certificate) = mpsc::channel(MAX_CHANNEL_SIZE);
 
-    let tx_primary_round = Arc::new(tx_primary_round);
-    let tx_primary_certificate = Arc::new(tx_primary_certificate);
-
     let sender = BFTSender { tx_primary_round, tx_primary_certificate };
     let receiver = BFTReceiver { rx_primary_round, rx_primary_certificate };
 
@@ -63,13 +60,13 @@ pub fn init_bft_channels<N: Network>() -> (BFTSender<N>, BFTReceiver<N>) {
 
 #[derive(Clone, Debug)]
 pub struct PrimarySender<N: Network> {
-    pub tx_batch_propose: Arc<mpsc::Sender<(SocketAddr, BatchPropose<N>)>>,
-    pub tx_batch_signature: Arc<mpsc::Sender<(SocketAddr, BatchSignature<N>)>>,
-    pub tx_batch_certified: Arc<mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>)>>,
-    pub tx_certificate_request: Arc<mpsc::Sender<(SocketAddr, CertificateRequest<N>)>>,
-    pub tx_certificate_response: Arc<mpsc::Sender<(SocketAddr, CertificateResponse<N>)>>,
-    pub tx_unconfirmed_solution: Arc<mpsc::Sender<(PuzzleCommitment<N>, Data<ProverSolution<N>>)>>,
-    pub tx_unconfirmed_transaction: Arc<mpsc::Sender<(N::TransactionID, Data<Transaction<N>>)>>,
+    pub tx_batch_propose: mpsc::Sender<(SocketAddr, BatchPropose<N>)>,
+    pub tx_batch_signature: mpsc::Sender<(SocketAddr, BatchSignature<N>)>,
+    pub tx_batch_certified: mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>)>,
+    pub tx_certificate_request: mpsc::Sender<(SocketAddr, CertificateRequest<N>)>,
+    pub tx_certificate_response: mpsc::Sender<(SocketAddr, CertificateResponse<N>)>,
+    pub tx_unconfirmed_solution: mpsc::Sender<(PuzzleCommitment<N>, Data<ProverSolution<N>>)>,
+    pub tx_unconfirmed_transaction: mpsc::Sender<(N::TransactionID, Data<Transaction<N>>)>,
 }
 
 #[derive(Debug)]
@@ -92,14 +89,6 @@ pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver
     let (tx_certificate_response, rx_certificate_response) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_unconfirmed_solution, rx_unconfirmed_solution) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_unconfirmed_transaction, rx_unconfirmed_transaction) = mpsc::channel(MAX_CHANNEL_SIZE);
-
-    let tx_batch_propose = Arc::new(tx_batch_propose);
-    let tx_batch_signature = Arc::new(tx_batch_signature);
-    let tx_batch_certified = Arc::new(tx_batch_certified);
-    let tx_certificate_request = Arc::new(tx_certificate_request);
-    let tx_certificate_response = Arc::new(tx_certificate_response);
-    let tx_unconfirmed_solution = Arc::new(tx_unconfirmed_solution);
-    let tx_unconfirmed_transaction = Arc::new(tx_unconfirmed_transaction);
 
     let sender = PrimarySender {
         tx_batch_propose,
@@ -125,9 +114,9 @@ pub fn init_primary_channels<N: Network>() -> (PrimarySender<N>, PrimaryReceiver
 
 #[derive(Debug)]
 pub struct WorkerSender<N: Network> {
-    pub tx_worker_ping: Arc<mpsc::Sender<(SocketAddr, TransmissionID<N>)>>,
-    pub tx_transmission_request: Arc<mpsc::Sender<(SocketAddr, TransmissionRequest<N>)>>,
-    pub tx_transmission_response: Arc<mpsc::Sender<(SocketAddr, TransmissionResponse<N>)>>,
+    pub tx_worker_ping: mpsc::Sender<(SocketAddr, TransmissionID<N>)>,
+    pub tx_transmission_request: mpsc::Sender<(SocketAddr, TransmissionRequest<N>)>,
+    pub tx_transmission_response: mpsc::Sender<(SocketAddr, TransmissionResponse<N>)>,
 }
 
 #[derive(Debug)]
@@ -142,10 +131,6 @@ pub fn init_worker_channels<N: Network>() -> (WorkerSender<N>, WorkerReceiver<N>
     let (tx_worker_ping, rx_worker_ping) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_transmission_request, rx_transmission_request) = mpsc::channel(MAX_CHANNEL_SIZE);
     let (tx_transmission_response, rx_transmission_response) = mpsc::channel(MAX_CHANNEL_SIZE);
-
-    let tx_worker_ping = Arc::new(tx_worker_ping);
-    let tx_transmission_request = Arc::new(tx_transmission_request);
-    let tx_transmission_response = Arc::new(tx_transmission_response);
 
     let sender = WorkerSender { tx_worker_ping, tx_transmission_request, tx_transmission_response };
     let receiver = WorkerReceiver { rx_worker_ping, rx_transmission_request, rx_transmission_response };
