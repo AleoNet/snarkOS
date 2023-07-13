@@ -970,7 +970,6 @@ pub mod prop_tests {
     use proptest::sample::{size_range, Selector};
 
     #[proptest]
-    // #[proptest_dump]
     fn test_certificate_duplicate(
         context: CommitteeContext,
         #[any(size_range(1..16).lift())] transmissions: Vec<(AnyTransmissionID, AnyTransmission)>,
@@ -1034,9 +1033,7 @@ pub mod prop_tests {
         let certificates = vec![(certificate_id, certificate.clone())];
         // Construct the expected layout for 'batch_ids'.
         let batch_ids = vec![(batch_id, round)];
-        // // Construct the sample 'transmissions'.
-        // let (missing_transmissions, transmissions) = sample_transmissions(&certificate, rng);
-        //
+
         // Insert the certificate.
         let missing_transmissions: HashMap<TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>> =
             transmission_map.into_iter().collect();

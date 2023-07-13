@@ -325,7 +325,7 @@ pub mod prop_tests {
 
     use snarkos_account::Account;
     use std::{
-        collections::{HashMap, HashSet},
+        collections::HashSet,
         hash::{Hash, Hasher},
     };
 
@@ -337,7 +337,7 @@ pub mod prop_tests {
         sample::size_range,
     };
     use rand::SeedableRng;
-    use test_strategy::{proptest, Arbitrary};
+    use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -351,7 +351,7 @@ pub mod prop_tests {
         type Parameters = ();
         type Strategy = BoxedStrategy<Validator>;
 
-        fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
+        fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
             any_valid_validator()
         }
     }
@@ -421,6 +421,14 @@ pub mod prop_tests {
     impl Arbitrary for CommitteeContext {
         type Parameters = ValidatorSet;
         type Strategy = BoxedStrategy<CommitteeContext>;
+
+        fn arbitrary() -> Self::Strategy {
+            any::<ValidatorSet>()
+                .prop_map(|validators| {
+                    CommitteeContext(to_committee((1, validators.clone())).unwrap(), validators.clone())
+                })
+                .boxed()
+        }
 
         fn arbitrary_with(validator_set: Self::Parameters) -> Self::Strategy {
             Just(validator_set)

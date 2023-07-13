@@ -874,56 +874,39 @@ pub mod prop_tests {
         }
     }
 
-    pub struct GatewayContext(pub Gateway<CurrentNetwork>, pub Storage<CurrentNetwork>, pub ValidatorSet);
+    type GatewayInput = (Storage<CurrentNetwork>, CommitteeContext, Account<CurrentNetwork>, Option<u16>);
 
-    fn any_valid_dev_gateway()
-    -> BoxedStrategy<(Storage<CurrentNetwork>, CommitteeContext, Account<CurrentNetwork>, Option<u16>)> {
-        any::<ValidatorSet>()
-            .prop_flat_map(|validators| {
-                (any_with::<CommitteeContext>(validators), any::<Selector>()).prop_flat_map(
-                    |(context, account_selector)| {
-                        let CommitteeContext(_, ValidatorSet(validators)) = context.clone();
-                        (
-                            any_with::<Storage<CurrentNetwork>>(context.clone()),
-                            Just(context.clone()),
-                            Just(account_selector.select(validators)),
-                            0u8..,
-                        )
-                            .prop_map(|(a, b, c, d)| (a, b, c.clone().account, Some(d as u16)))
-                    },
+    fn any_valid_dev_gateway() -> BoxedStrategy<GatewayInput> {
+        (any::<CommitteeContext>(), any::<Selector>())
+            .prop_flat_map(|(context, account_selector)| {
+                let CommitteeContext(_, ValidatorSet(validators)) = context.clone();
+                (
+                    any_with::<Storage<CurrentNetwork>>(context.clone()),
+                    Just(context.clone()),
+                    Just(account_selector.select(validators)),
+                    0u8..,
                 )
+                    .prop_map(|(a, b, c, d)| (a, b, c.clone().account, Some(d as u16)))
             })
             .boxed()
     }
 
-    fn any_valid_prod_gateway()
-    -> BoxedStrategy<(Storage<CurrentNetwork>, CommitteeContext, Account<CurrentNetwork>, Option<u16>)> {
-        any::<ValidatorSet>()
-            .prop_flat_map(|validators| {
-                (any_with::<CommitteeContext>(validators), any::<Selector>()).prop_flat_map(
-                    |(context, account_selector)| {
-                        let CommitteeContext(_, ValidatorSet(validators)) = context.clone();
-                        (
-                            any_with::<Storage<CurrentNetwork>>(context.clone()),
-                            Just(context.clone()),
-                            Just(account_selector.select(validators)),
-                        )
-                            .prop_map(|(a, b, c)| (a, b, c.clone().account, None))
-                    },
+    fn any_valid_prod_gateway() -> BoxedStrategy<GatewayInput> {
+        (any::<CommitteeContext>(), any::<Selector>())
+            .prop_flat_map(|(context, account_selector)| {
+                let CommitteeContext(_, ValidatorSet(validators)) = context.clone();
+                (
+                    any_with::<Storage<CurrentNetwork>>(context.clone()),
+                    Just(context.clone()),
+                    Just(account_selector.select(validators)),
                 )
+                    .prop_map(|(a, b, c)| (a, b, c.clone().account, None))
             })
             .boxed()
     }
 
     #[proptest]
-    fn gateway_dev_initialization(
-        #[strategy(any_valid_dev_gateway())] input: (
-            Storage<CurrentNetwork>,
-            CommitteeContext,
-            Account<CurrentNetwork>,
-            Option<u16>,
-        ),
-    ) {
+    fn gateway_dev_initialization(#[strategy(any_valid_dev_gateway())] input: GatewayInput) {
         let (storage, _, account, dev) = input;
         let address = account.address();
         let gateway = Gateway::new(account, storage, dev);
@@ -939,14 +922,7 @@ pub mod prop_tests {
     }
 
     #[proptest]
-    fn gateway_prod_initialization(
-        #[strategy(any_valid_prod_gateway())] input: (
-            Storage<CurrentNetwork>,
-            CommitteeContext,
-            Account<CurrentNetwork>,
-            Option<u16>,
-        ),
-    ) {
+    fn gateway_prod_initialization(#[strategy(any_valid_prod_gateway())] input: GatewayInput) {
         let (storage, _, account, dev) = input;
         let address = account.address();
         let gateway = Gateway::new(account, storage, dev);
@@ -964,12 +940,7 @@ pub mod prop_tests {
 
     #[proptest(async = "tokio")]
     async fn gateway_start(
-        #[strategy(any_valid_dev_gateway())] input: (
-            Storage<CurrentNetwork>,
-            CommitteeContext,
-            Account<CurrentNetwork>,
-            Option<u16>,
-        ),
+        #[strategy(any_valid_dev_gateway())] input: GatewayInput,
         #[strategy(0..MAX_WORKERS)] workers_count: u8,
     ) {
         let (storage, _, account, dev) = input;
