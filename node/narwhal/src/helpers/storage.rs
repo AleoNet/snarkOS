@@ -817,22 +817,21 @@ pub mod tests {
 #[cfg(test)]
 pub mod prop_tests {
     use super::*;
-    use crate::helpers::committee::prop_tests::CommitteeInput;
+    use proptest::prelude::{BoxedStrategy, Just, Strategy};
 
-    use test_strategy::Arbitrary;
+    use crate::{helpers::committee::prop_tests::any_valid_committee, MAX_GC_ROUNDS};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    #[derive(Arbitrary, Debug, Clone)]
-    pub struct StorageInput {
-        #[filter(CommitteeInput::is_valid)]
-        pub committee: CommitteeInput,
-        pub gc_rounds: u64,
+    pub fn any_valid_storage() -> BoxedStrategy<Storage<CurrentNetwork>> {
+        (any_valid_committee(), 0..MAX_GC_ROUNDS)
+            .prop_map(|((committee, _), gc_rounds)| Storage::<CurrentNetwork>::new(committee.unwrap(), gc_rounds))
+            .boxed()
     }
 
-    impl StorageInput {
-        pub fn to_storage(&self) -> Storage<CurrentNetwork> {
-            Storage::<CurrentNetwork>::new(self.committee.to_committee().unwrap(), self.gc_rounds)
-        }
+    pub fn any_valid_storage_with(committee: Committee<CurrentNetwork>) -> BoxedStrategy<Storage<CurrentNetwork>> {
+        (0..MAX_GC_ROUNDS, Just(committee))
+            .prop_map(|(gc_rounds, committee)| Storage::<CurrentNetwork>::new(committee, gc_rounds))
+            .boxed()
     }
 }

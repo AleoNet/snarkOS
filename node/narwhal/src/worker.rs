@@ -364,41 +364,38 @@ impl<N: Network> Worker<N> {
 #[cfg(test)]
 mod prop_tests {
     use super::*;
+    use proptest::prelude::{any, Arbitrary, BoxedStrategy, Strategy};
 
-    use crate::{helpers::storage::prop_tests::StorageInput, prop_tests::GatewayInput};
+    use crate::{
+        helpers::{committee::prop_tests::any_valid_committee, storage::prop_tests::any_valid_storage},
+        prop_tests::{any_valid_dev_gateway, any_valid_gateway},
+    };
     use test_strategy::{proptest, Arbitrary};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    #[derive(Arbitrary, Debug, Clone)]
-    pub struct WorkerInput {
-        pub id: u8,
-        #[filter(GatewayInput::is_valid)]
-        pub gateway: GatewayInput,
-        pub storage: StorageInput,
-    }
-
-    impl WorkerInput {
-        fn to_worker(&self) -> Result<Worker<CurrentNetwork>> {
-            Worker::new(self.id, self.gateway.to_gateway(), self.storage.to_storage(), Default::default())
-        }
-
-        fn is_valid(&self) -> bool {
-            self.id < MAX_WORKERS
-        }
+    #[proptest]
+    fn worker_initialization(
+        #[strategy(0..MAX_WORKERS)] id: u8,
+        #[strategy(any_valid_gateway())] gateway: Gateway<CurrentNetwork>,
+        #[strategy(any_valid_storage())] storage: Storage<CurrentNetwork>,
+    ) {
+        let worker = Worker::new(id, gateway, storage, Default::default());
+        assert_eq!(worker.is_ok(), true);
+        let worker = worker.unwrap();
+        assert_eq!(worker.id(), id);
     }
 
     #[proptest]
-    fn worker_initialization(input: WorkerInput) {
-        match input.to_worker() {
-            Ok(worker) => {
-                assert!(input.is_valid());
-                assert_eq!(worker.id(), input.id);
-            }
-            Err(e) => {
-                assert!(!input.is_valid());
-                assert_eq!(e.to_string().as_str(), format!("Invalid worker ID '{}'", input.id));
-            }
+    fn invalid_worker_id(
+        #[strategy(MAX_WORKERS..)] id: u8,
+        #[strategy(any_valid_gateway())] gateway: Gateway<CurrentNetwork>,
+        #[strategy(any_valid_storage())] storage: Storage<CurrentNetwork>,
+    ) {
+        let worker = Worker::new(id, gateway, storage, Default::default());
+        assert_eq!(worker.is_ok(), false);
+        if let Err(error) = worker {
+            assert_eq!(error.to_string().as_str(), format!("Invalid worker ID '{}'", id));
         }
     }
 }
