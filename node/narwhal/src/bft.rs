@@ -295,6 +295,8 @@ impl<N: Network> BFT<N> {
 
         // Iterate over the leader certificates to commit.
         for leader_certificate in leader_certificates.into_iter().rev() {
+            // Retrieve the leader certificate round.
+            let leader_round = leader_certificate.round();
             // Compute the commit subdag.
             let commit_subdag = self.order_dag_with_dfs(leader_certificate);
             // Initialize a map for the deduped transmissions.
@@ -322,7 +324,7 @@ impl<N: Network> BFT<N> {
             // Trigger consensus.
             // TODO (howardwu): Trigger consensus.
             info!(
-                "\n\nCommitting subdag with {} transmissions: {:?}\n",
+                "\n\nCommitting a subdag from round {leader_round} with {} transmissions: {:?}\n",
                 transmissions.len(),
                 commit_subdag.iter().map(|(round, certificates)| (round, certificates.len())).collect::<Vec<_>>()
             );
