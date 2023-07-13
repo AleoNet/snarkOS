@@ -95,11 +95,6 @@ impl<N: Network> Proposal<N> {
         self.transmissions
     }
 
-    // /// Returns the map of `(signature, timestamp)` entries.
-    // pub const fn signatures(&self) -> &IndexMap<Signature<N>, i64> {
-    //     &self.signatures
-    // }
-
     /// Returns the signers.
     pub fn signers(&self) -> HashSet<Address<N>> {
         self.signatures.keys().chain(Some(self.batch_header.signature())).map(Signature::to_address).collect()
