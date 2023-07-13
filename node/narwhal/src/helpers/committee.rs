@@ -364,7 +364,7 @@ pub mod prop_tests {
         element: T,
         size: impl Into<SizeRange>,
     ) -> impl Strategy<Value = ValidatorSet> {
-        hash_set(element, size).prop_map(|set| ValidatorSet(set))
+        hash_set(element, size).prop_map(ValidatorSet)
     }
 
     fn invalid_round_committee() -> BoxedStrategy<Result<Committee<CurrentNetwork>>> {
@@ -403,7 +403,6 @@ pub mod prop_tests {
                         account: Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i)).unwrap(),
                         stake: MIN_STAKE,
                     })
-                    .into_iter()
                     .collect(),
             )
         }
@@ -425,7 +424,7 @@ pub mod prop_tests {
         fn arbitrary() -> Self::Strategy {
             any::<ValidatorSet>()
                 .prop_map(|validators| {
-                    CommitteeContext(to_committee((1, validators.clone())).unwrap(), validators.clone())
+                    CommitteeContext(to_committee((1, validators.clone())).unwrap(), validators)
                 })
                 .boxed()
         }
@@ -433,7 +432,7 @@ pub mod prop_tests {
         fn arbitrary_with(validator_set: Self::Parameters) -> Self::Strategy {
             Just(validator_set)
                 .prop_map(|validators| {
-                    CommitteeContext(to_committee((1, validators.clone())).unwrap(), validators.clone())
+                    CommitteeContext(to_committee((1, validators.clone())).unwrap(), validators)
                 })
                 .boxed()
         }
@@ -508,7 +507,7 @@ pub mod prop_tests {
 
     #[proptest]
     fn invalid_stakes(#[strategy(too_low_stake_committee())] committee: Result<Committee<CurrentNetwork>>) {
-        assert_eq!(committee.is_ok(), false);
+        assert!(!committee.is_ok());
         if let Err(err) = committee {
             assert_eq!(err.to_string().as_str(), "All members must have sufficient stake");
         }
@@ -516,7 +515,7 @@ pub mod prop_tests {
 
     #[proptest]
     fn invalid_member_count(#[strategy(too_small_committee())] committee: Result<Committee<CurrentNetwork>>) {
-        assert_eq!(committee.is_ok(), false);
+        assert!(!committee.is_ok());
         if let Err(err) = committee {
             assert_eq!(err.to_string().as_str(), "Committee must have at least 4 members");
         }
@@ -524,7 +523,7 @@ pub mod prop_tests {
 
     #[proptest]
     fn invalid_round(#[strategy(invalid_round_committee())] committee: Result<Committee<CurrentNetwork>>) {
-        assert_eq!(committee.is_ok(), false);
+        assert!(!committee.is_ok());
         if let Err(err) = committee {
             assert_eq!(err.to_string().as_str(), "Round must be nonzero");
         }

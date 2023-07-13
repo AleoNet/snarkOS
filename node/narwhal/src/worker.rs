@@ -376,7 +376,7 @@ mod prop_tests {
         storage: Storage<CurrentNetwork>,
     ) {
         let worker = Worker::new(id, gateway, storage, Default::default());
-        assert_eq!(worker.is_ok(), true);
+        assert!(worker.is_ok());
         let worker = worker.unwrap();
         assert_eq!(worker.id(), id);
     }
@@ -388,7 +388,7 @@ mod prop_tests {
         storage: Storage<CurrentNetwork>,
     ) {
         let worker = Worker::new(id, gateway, storage, Default::default());
-        assert_eq!(worker.is_ok(), false);
+        assert!(!worker.is_ok());
         if let Err(error) = worker {
             assert_eq!(error.to_string().as_str(), format!("Invalid worker ID '{}'", id));
         }

@@ -943,8 +943,8 @@ pub mod prop_tests {
 
     fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
         prop_oneof![
-            any_transaction_id().prop_map(|tid| TransmissionID::Transaction(tid)),
-            any_puzzle_commitment().prop_map(|pc| TransmissionID::Solution(pc)),
+            any_transaction_id().prop_map(TransmissionID::Transaction),
+            any_puzzle_commitment().prop_map(TransmissionID::Solution),
         ]
         .boxed()
     }

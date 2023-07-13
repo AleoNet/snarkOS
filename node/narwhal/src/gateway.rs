@@ -882,11 +882,11 @@ pub mod prop_tests {
                 let CommitteeContext(_, ValidatorSet(validators)) = context.clone();
                 (
                     any_with::<Storage<CurrentNetwork>>(context.clone()),
-                    Just(context.clone()),
+                    Just(context),
                     Just(account_selector.select(validators)),
                     0u8..,
                 )
-                    .prop_map(|(a, b, c, d)| (a, b, c.clone().account, Some(d as u16)))
+                    .prop_map(|(a, b, c, d)| (a, b, c.account, Some(d as u16)))
             })
             .boxed()
     }
@@ -897,10 +897,10 @@ pub mod prop_tests {
                 let CommitteeContext(_, ValidatorSet(validators)) = context.clone();
                 (
                     any_with::<Storage<CurrentNetwork>>(context.clone()),
-                    Just(context.clone()),
+                    Just(context),
                     Just(account_selector.select(validators)),
                 )
-                    .prop_map(|(a, b, c)| (a, b, c.clone().account, None))
+                    .prop_map(|(a, b, c)| (a, b, c.account, None))
             })
             .boxed()
     }
@@ -910,7 +910,7 @@ pub mod prop_tests {
         let (storage, _, account, dev) = input;
         let address = account.address();
         let gateway = Gateway::new(account, storage, dev);
-        assert_eq!(gateway.is_ok(), true);
+        assert!(gateway.is_ok());
         let gateway = gateway.unwrap();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
@@ -926,8 +926,8 @@ pub mod prop_tests {
         let (storage, _, account, dev) = input;
         let address = account.address();
         let gateway = Gateway::new(account, storage, dev);
-        assert_eq!(gateway.is_ok(), true);
-        assert_eq!(dev.is_none(), true);
+        assert!(gateway.is_ok());
+        assert!(dev.is_none());
         let gateway = gateway.unwrap();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
@@ -946,7 +946,7 @@ pub mod prop_tests {
         let (storage, _, account, dev) = input;
         let worker_storage = storage.clone();
         let gateway = Gateway::new(account, storage, dev);
-        assert_eq!(gateway.is_ok(), true);
+        assert!(gateway.is_ok());
         let gateway = gateway.unwrap();
 
         let (workers, worker_senders) = {
