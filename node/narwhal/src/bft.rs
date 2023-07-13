@@ -178,7 +178,7 @@ impl<N: Network> BFT<N> {
             return true;
         }
         // If the timer has expired, and we can achieve quorum threshold (2f + 1) without the leader, return 'true'.
-        if self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY > now() {
+        if self.is_timer_expired() {
             // Retrieve the certificate authors.
             let authors = certificates.into_iter().map(|c| c.author()).collect();
             // Determine if the quorum threshold is reached.
@@ -188,10 +188,16 @@ impl<N: Network> BFT<N> {
         false
     }
 
+    /// Returns `true` if the timer for the leader certificate has expired.
+    fn is_timer_expired(&self) -> bool {
+        self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY <= now()
+    }
+
     /// Returns 'true' if any of the following conditions hold:
-    ///  - The leader certificate reached quorum threshold `(2f + 1)` (in the previous certificates in the current round),
-    ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round),
     ///  - The leader certificate is 'None'.
+    ///  - The leader certificate reached quorum threshold `(2f + 1)` (in the previous certificates in the current round).
+    ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round).
+    ///  - The leader certificate timer has expired.
     fn is_leader_quorum_or_nonleaders_available(&self, round: u64) -> Result<bool> {
         // Retrieve the current round.
         let current_round = self.storage().current_round();
@@ -221,7 +227,8 @@ impl<N: Network> BFT<N> {
             self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &current_committee)?;
         // Return 'true' if any of the following conditions hold:
         Ok(stake_with_leader >= current_committee.availability_threshold()
-            || stake_without_leader >= current_committee.quorum_threshold())
+            || stake_without_leader >= current_committee.quorum_threshold()
+            || self.is_timer_expired())
     }
 
     /// Computes the amount of stake that has & has not signed for the leader certificate.
