@@ -827,20 +827,29 @@ pub mod prop_tests {
     use std::fmt::Debug;
     use test_strategy::proptest;
 
-    use crate::{helpers::committee::prop_tests::any_valid_committee, MAX_GC_ROUNDS};
+    use crate::MAX_GC_ROUNDS;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    pub fn any_valid_storage() -> BoxedStrategy<Storage<CurrentNetwork>> {
-        (any_valid_committee(), 0..MAX_GC_ROUNDS)
-            .prop_map(|((committee, _), gc_rounds)| Storage::<CurrentNetwork>::new(committee, gc_rounds))
-            .boxed()
-    }
+    impl Arbitrary for Storage<CurrentNetwork> {
+        type Parameters = CommitteeContext;
+        type Strategy = BoxedStrategy<Storage<CurrentNetwork>>;
 
-    pub fn any_valid_storage_with(committee: Committee<CurrentNetwork>) -> BoxedStrategy<Storage<CurrentNetwork>> {
-        (0..MAX_GC_ROUNDS, Just(committee))
-            .prop_map(|(gc_rounds, committee)| Storage::<CurrentNetwork>::new(committee, gc_rounds))
-            .boxed()
+        fn arbitrary() -> Self::Strategy {
+            (any::<CommitteeContext>(), 0..MAX_GC_ROUNDS)
+                .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
+                    Storage::<CurrentNetwork>::new(committee, gc_rounds)
+                })
+                .boxed()
+        }
+
+        fn arbitrary_with(context: Self::Parameters) -> Self::Strategy {
+            (Just(context), 0..MAX_GC_ROUNDS)
+                .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
+                    Storage::<CurrentNetwork>::new(committee, gc_rounds)
+                })
+                .boxed()
+        }
     }
 
     use crate::helpers::{committee::prop_tests::Validator, now, storage::tests::assert_storage};
@@ -885,19 +894,6 @@ pub mod prop_tests {
     }
 
     impl CryptoRng for CryptoTestRng {}
-
-    /// Samples a random transmission.
-    // fn sample_transmission(rng: &mut TestRng) -> Transmission<CurrentNetwork> {
-    //     // Sample random fake solution bytes.
-    //     let s = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
-    //     // Sample random fake transaction bytes.
-    //     let t = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..2048).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
-    //     // Sample a random transmission.
-    //     match rng.gen::<bool>() {
-    //         true => Transmission::Solution(s(rng)),
-    //         false => Transmission::Transaction(t(rng)),
-    //     }
-    // }
 
     #[derive(Debug, Clone)]
     struct AnyTransmission(Transmission<CurrentNetwork>);
@@ -953,8 +949,6 @@ pub mod prop_tests {
         .boxed()
     }
 
-    struct ValidatorSet(HashSet<Validator>);
-
     impl ValidatorSet {
         fn sign_batch_header<R: Rng + CryptoRng>(
             &self,
@@ -972,16 +966,18 @@ pub mod prop_tests {
             signatures
         }
     }
-    use proptest::sample::size_range;
+    use crate::helpers::committee::prop_tests::{CommitteeContext, ValidatorSet};
+    use proptest::sample::{size_range, Selector};
 
     #[proptest]
     // #[proptest_dump]
     fn test_certificate_duplicate(
-        #[strategy(any_valid_committee())] committee_input: (Committee<CurrentNetwork>, HashSet<Validator>),
+        context: CommitteeContext,
         #[any(size_range(1..16).lift())] transmissions: Vec<(AnyTransmissionID, AnyTransmission)>,
         mut rng: CryptoTestRng,
+        selector: Selector,
     ) {
-        let (committee, validators) = committee_input;
+        let CommitteeContext(committee, ValidatorSet(validators)) = context;
 
         // Sample a committee.
         // Initialize the storage.
@@ -1000,7 +996,7 @@ pub mod prop_tests {
         );
 
         // Create a new certificate.
-        let signer = validators.iter().next().cloned().unwrap();
+        let signer = selector.select(&validators);
 
         let mut transmission_map = IndexMap::new();
 

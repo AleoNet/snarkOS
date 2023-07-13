@@ -333,8 +333,8 @@ pub mod prop_tests {
     use anyhow::Result;
     use indexmap::IndexMap;
     use proptest::{
-        collection::hash_set,
-        prelude::{any, BoxedStrategy, Just, Strategy},
+        collection::{hash_set, HashSetStrategy, SizeRange},
+        prelude::{any, Arbitrary, BoxedStrategy, Just, Strategy},
         sample::size_range,
     };
     use rand::SeedableRng;
@@ -348,45 +348,79 @@ pub mod prop_tests {
         pub account: Account<CurrentNetwork>,
     }
 
-    fn to_committee_and_input(
-        (round, validators): (u64, HashSet<Validator>),
-    ) -> (Result<Committee<CurrentNetwork>>, (u64, HashSet<Validator>)) {
-        (to_committee((round, validators.clone())), (round, validators.clone()))
+    fn to_committee((round, ValidatorSet(validators)): (u64, ValidatorSet)) -> Result<Committee<CurrentNetwork>> {
+        Committee::new(round, validators.iter().map(|v| (v.account.address(), v.stake)).collect())
     }
 
-    fn to_committee((round, validators): (u64, HashSet<Validator>)) -> Result<Committee<CurrentNetwork>> {
-        let mut index_map = IndexMap::new();
-        for validator in validators.iter() {
-            index_map.insert(validator.account.address(), validator.stake);
-        }
-        Committee::new(round, index_map)
+    fn validator_set<T: Strategy<Value = Validator>>(
+        element: T,
+        size: impl Into<SizeRange>,
+    ) -> impl Strategy<Value = ValidatorSet> {
+        hash_set(element, size).prop_map(|set| ValidatorSet(set))
     }
 
     fn invalid_round_committee() -> BoxedStrategy<Result<Committee<CurrentNetwork>>> {
-        (Just(0), hash_set(any_valid_validator(), size_range(4..=MAX_COMMITTEE_SIZE as usize)))
+        (Just(0), validator_set(any_valid_validator(), size_range(4..=MAX_COMMITTEE_SIZE as usize)))
             .prop_map(to_committee)
             .boxed()
     }
 
     fn too_small_committee() -> BoxedStrategy<Result<Committee<CurrentNetwork>>> {
-        (1u64.., hash_set(any_valid_validator(), 0..4)).prop_map(to_committee).boxed()
+        (1u64.., validator_set(any_valid_validator(), 0..4)).prop_map(to_committee).boxed()
     }
 
     fn too_low_stake_committee() -> BoxedStrategy<Result<Committee<CurrentNetwork>>> {
-        (1u64.., hash_set(invalid_stake_validator(), 4..=4)).prop_map(to_committee).boxed()
+        (1u64.., validator_set(invalid_stake_validator(), 4..=4)).prop_map(to_committee).boxed()
     }
 
-    pub fn any_valid_committee() -> BoxedStrategy<(Committee<CurrentNetwork>, HashSet<Validator>)> {
-        (1u64.., hash_set(any_valid_validator(), 4..=MAX_COMMITTEE_SIZE as usize))
-            .prop_map(|(round, validators)| (to_committee((round, validators.clone())).unwrap(), validators.clone()))
-            .boxed()
+    #[derive(Debug, Clone)]
+    pub struct CommitteeContext(pub Committee<CurrentNetwork>, pub ValidatorSet);
+
+    impl Default for CommitteeContext {
+        fn default() -> Self {
+            let validators = ValidatorSet::default();
+            let committee = to_committee((u64::default(), validators.clone())).unwrap();
+            Self(committee, validators)
+        }
     }
 
-    fn any_valid_committee_and_input() -> BoxedStrategy<(Result<Committee<CurrentNetwork>>, (u64, HashSet<Validator>))>
-    {
-        (1u64.., hash_set(any_valid_validator(), 4..=MAX_COMMITTEE_SIZE as usize))
-            .prop_map(to_committee_and_input)
-            .boxed()
+    #[derive(Debug, Clone)]
+    pub struct ValidatorSet(pub HashSet<Validator>);
+
+    impl Default for ValidatorSet {
+        fn default() -> Self {
+            ValidatorSet(
+                (0..=4u64)
+                    .map(|i| Validator {
+                        account: Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i)).unwrap(),
+                        stake: MIN_STAKE,
+                    })
+                    .into_iter()
+                    .collect(),
+            )
+        }
+    }
+
+    impl Arbitrary for ValidatorSet {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<ValidatorSet>;
+
+        fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
+            validator_set(any_valid_validator(), size_range(4..=MAX_COMMITTEE_SIZE as usize)).boxed()
+        }
+    }
+
+    impl Arbitrary for CommitteeContext {
+        type Parameters = ValidatorSet;
+        type Strategy = BoxedStrategy<CommitteeContext>;
+
+        fn arbitrary_with(validator_set: Self::Parameters) -> Self::Strategy {
+            (1u64.., Just(validator_set))
+                .prop_map(|(round, validators)| {
+                    CommitteeContext(to_committee((round, validators.clone())).unwrap(), validators.clone())
+                })
+                .boxed()
+        }
     }
 
     pub fn any_valid_validator() -> BoxedStrategy<Validator> {
@@ -423,8 +457,8 @@ pub mod prop_tests {
     }
 
     #[proptest]
-    fn committee_advance(#[strategy(any_valid_committee())] input: (Committee<CurrentNetwork>, HashSet<Validator>)) {
-        let (committee, _) = input;
+    fn committee_advance(input: CommitteeContext) {
+        let CommitteeContext(committee, _) = input;
 
         let current_round = committee.round();
         let current_members = committee.members();
@@ -435,15 +469,8 @@ pub mod prop_tests {
     }
 
     #[proptest]
-    fn committee_members(
-        #[strategy(any_valid_committee_and_input())] input: (
-            Result<Committee<CurrentNetwork>>,
-            (u64, HashSet<Validator>),
-        ),
-    ) {
-        let (committee, (_, validators)) = input;
-        assert_eq!(committee.is_ok(), true);
-        let committee = committee.unwrap();
+    fn committee_members(input: CommitteeContext) {
+        let CommitteeContext(committee, ValidatorSet(validators)) = input;
 
         let mut total_stake = 0u64;
         for v in validators.iter() {

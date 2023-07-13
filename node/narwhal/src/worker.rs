@@ -366,10 +366,6 @@ mod prop_tests {
     use super::*;
     use proptest::prelude::{any, Arbitrary, BoxedStrategy, Strategy};
 
-    use crate::{
-        helpers::{committee::prop_tests::any_valid_committee, storage::prop_tests::any_valid_storage},
-        prop_tests::{any_valid_dev_gateway, any_valid_gateway},
-    };
     use test_strategy::{proptest, Arbitrary};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -377,8 +373,8 @@ mod prop_tests {
     #[proptest]
     fn worker_initialization(
         #[strategy(0..MAX_WORKERS)] id: u8,
-        #[strategy(any_valid_gateway())] gateway: Gateway<CurrentNetwork>,
-        #[strategy(any_valid_storage())] storage: Storage<CurrentNetwork>,
+        gateway: Gateway<CurrentNetwork>,
+        storage: Storage<CurrentNetwork>,
     ) {
         let worker = Worker::new(id, gateway, storage, Default::default());
         assert_eq!(worker.is_ok(), true);
@@ -389,8 +385,8 @@ mod prop_tests {
     #[proptest]
     fn invalid_worker_id(
         #[strategy(MAX_WORKERS..)] id: u8,
-        #[strategy(any_valid_gateway())] gateway: Gateway<CurrentNetwork>,
-        #[strategy(any_valid_storage())] storage: Storage<CurrentNetwork>,
+        gateway: Gateway<CurrentNetwork>,
+        storage: Storage<CurrentNetwork>,
     ) {
         let worker = Worker::new(id, gateway, storage, Default::default());
         assert_eq!(worker.is_ok(), false);
