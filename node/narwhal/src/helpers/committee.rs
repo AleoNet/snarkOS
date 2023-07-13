@@ -423,9 +423,9 @@ pub mod prop_tests {
         type Strategy = BoxedStrategy<CommitteeContext>;
 
         fn arbitrary_with(validator_set: Self::Parameters) -> Self::Strategy {
-            (1u64.., Just(validator_set))
-                .prop_map(|(round, validators)| {
-                    CommitteeContext(to_committee((round, validators.clone())).unwrap(), validators.clone())
+            Just(validator_set)
+                .prop_map(|validators| {
+                    CommitteeContext(to_committee((1, validators.clone())).unwrap(), validators.clone())
                 })
                 .boxed()
         }

@@ -163,3 +163,49 @@ impl<N: Network> Proposal<N> {
         Ok((certificate, transmissions))
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::helpers::{
+        committee::prop_tests::{CommitteeContext, ValidatorSet},
+        now,
+        storage::prop_tests::{AnyTransmission, AnyTransmissionID, CryptoTestRng},
+        Proposal,
+    };
+    use indexmap::IndexMap;
+    use proptest::sample::{size_range, Selector};
+    use snarkvm::ledger::narwhal::Batch;
+    use test_strategy::proptest;
+
+    #[proptest]
+    fn initialize_proposal(
+        context: CommitteeContext,
+        #[any(size_range(1..16).lift())] transmissions: Vec<(AnyTransmissionID, AnyTransmission)>,
+        selector: Selector,
+        mut rng: CryptoTestRng,
+    ) {
+        let CommitteeContext(committee, ValidatorSet(validators)) = context;
+
+        let signer = selector.select(&validators);
+        let mut transmission_map = IndexMap::new();
+
+        for (AnyTransmissionID(id), AnyTransmission(t)) in transmissions.iter() {
+            transmission_map.insert(*id, t.clone());
+        }
+
+        let batch = Batch::new(
+            signer.account.private_key(),
+            committee.round(),
+            now(),
+            transmission_map.clone(),
+            Default::default(),
+            &mut rng,
+        )
+        .unwrap();
+
+        let proposal = Proposal::new(committee, batch.clone());
+        assert!(proposal.is_ok());
+        let proposal = proposal.unwrap();
+        assert_eq!(proposal.batch_id(), batch.batch_id());
+    }
+}

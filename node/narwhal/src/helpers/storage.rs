@@ -865,7 +865,7 @@ pub mod prop_tests {
 
     // The `proptest::TestRng` doesn't implement `rand_core::CryptoRng` trait which is required in snarkVM, so we use a wrapper
     #[derive(Debug)]
-    struct CryptoTestRng(TestRng);
+    pub struct CryptoTestRng(TestRng);
 
     impl Arbitrary for CryptoTestRng {
         type Parameters = ();
@@ -896,7 +896,7 @@ pub mod prop_tests {
     impl CryptoRng for CryptoTestRng {}
 
     #[derive(Debug, Clone)]
-    struct AnyTransmission(Transmission<CurrentNetwork>);
+    pub struct AnyTransmission(pub Transmission<CurrentNetwork>);
 
     impl Arbitrary for AnyTransmission {
         type Parameters = ();
@@ -908,7 +908,7 @@ pub mod prop_tests {
     }
 
     #[derive(Debug, Clone)]
-    struct AnyTransmissionID(TransmissionID<CurrentNetwork>);
+    pub struct AnyTransmissionID(pub TransmissionID<CurrentNetwork>);
 
     impl Arbitrary for AnyTransmissionID {
         type Parameters = ();
