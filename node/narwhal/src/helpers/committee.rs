@@ -423,17 +423,13 @@ pub mod prop_tests {
 
         fn arbitrary() -> Self::Strategy {
             any::<ValidatorSet>()
-                .prop_map(|validators| {
-                    CommitteeContext(to_committee((1, validators.clone())).unwrap(), validators)
-                })
+                .prop_map(|validators| CommitteeContext(to_committee((1, validators.clone())).unwrap(), validators))
                 .boxed()
         }
 
         fn arbitrary_with(validator_set: Self::Parameters) -> Self::Strategy {
             Just(validator_set)
-                .prop_map(|validators| {
-                    CommitteeContext(to_committee((1, validators.clone())).unwrap(), validators)
-                })
+                .prop_map(|validators| CommitteeContext(to_committee((1, validators.clone())).unwrap(), validators))
                 .boxed()
         }
     }
@@ -507,7 +503,7 @@ pub mod prop_tests {
 
     #[proptest]
     fn invalid_stakes(#[strategy(too_low_stake_committee())] committee: Result<Committee<CurrentNetwork>>) {
-        assert!(!committee.is_ok());
+        assert!(committee.is_err());
         if let Err(err) = committee {
             assert_eq!(err.to_string().as_str(), "All members must have sufficient stake");
         }
@@ -515,7 +511,7 @@ pub mod prop_tests {
 
     #[proptest]
     fn invalid_member_count(#[strategy(too_small_committee())] committee: Result<Committee<CurrentNetwork>>) {
-        assert!(!committee.is_ok());
+        assert!(committee.is_err());
         if let Err(err) = committee {
             assert_eq!(err.to_string().as_str(), "Committee must have at least 4 members");
         }
@@ -523,7 +519,7 @@ pub mod prop_tests {
 
     #[proptest]
     fn invalid_round(#[strategy(invalid_round_committee())] committee: Result<Committee<CurrentNetwork>>) {
-        assert!(!committee.is_ok());
+        assert!(committee.is_err());
         if let Err(err) = committee {
             assert_eq!(err.to_string().as_str(), "Round must be nonzero");
         }
