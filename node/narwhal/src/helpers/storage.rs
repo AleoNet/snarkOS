@@ -77,7 +77,7 @@ impl<N: Network> Storage<N> {
         Self {
             current_round: Arc::new(AtomicU64::new(current_round)),
             committees: Arc::new(RwLock::new(indexmap! { current_round => committee })),
-            gc_round: Arc::new(AtomicU64::new(0)),
+            gc_round: Default::default(),
             max_gc_rounds,
             rounds: Default::default(),
             certificates: Default::default(),
@@ -501,8 +501,10 @@ impl<N: Network> Storage<N> {
 
         // Insert the round to certificate ID entry.
         self.rounds.write().entry(round).or_default().insert((certificate_id, batch_id, author));
+        // Obtain the certificate's transmission ids.
+        let transmission_ids = certificate.transmission_ids().clone();
         // Insert the certificate.
-        self.certificates.write().insert(certificate_id, certificate.clone());
+        self.certificates.write().insert(certificate_id, certificate);
         // Insert the batch ID.
         self.batch_ids.write().insert(batch_id, round);
         // Acquire the transmissions write lock.
@@ -510,13 +512,13 @@ impl<N: Network> Storage<N> {
         // Inserts the following:
         //   - Inserts **only the missing** transmissions from storage.
         //   - Inserts the certificate ID into the corresponding set for **all** transmissions.
-        for transmission_id in certificate.transmission_ids() {
+        for transmission_id in transmission_ids {
             // Retrieve the transmission entry.
-            transmissions.entry(*transmission_id)
+            transmissions.entry(transmission_id)
                 // Insert **only the missing** transmissions from storage.
                 .or_insert_with( || {
                     // Retrieve the missing transmission.
-                    let transmission = missing_transmissions.remove(transmission_id).expect("Missing transmission not found");
+                    let transmission = missing_transmissions.remove(&transmission_id).expect("Missing transmission not found");
                     // Return the transmission and an empty set of certificate IDs.
                     (transmission, Default::default())
                 })

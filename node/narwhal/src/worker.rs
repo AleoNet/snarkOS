@@ -31,7 +31,7 @@ use snarkvm::{
     },
 };
 
-use indexmap::{IndexMap, IndexSet};
+use indexmap::IndexSet;
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
@@ -142,14 +142,16 @@ impl<N: Network> Worker<N> {
     }
 
     /// Removes the specified number of transmissions from the ready queue, and returns them.
-    pub(crate) fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
+    pub(crate) fn take(
+        &self,
+        num_transmissions: usize,
+    ) -> impl Iterator<Item = (TransmissionID<N>, Transmission<N>)> + '_ {
         // TODO (howardwu): Ensure these transmissions are not already in the ledger.
         self.ready
             .take(num_transmissions)
             .into_iter()
             // Filter out any transmissions from past rounds.
             .filter(|(id, _)| !self.storage.contains_transmission(*id))
-            .collect()
     }
 
     /// Reinserts the specified transmission into the ready queue.
@@ -286,9 +288,7 @@ impl<N: Network> Worker<N> {
         self.spawn(async move {
             while let Some((peer_ip, transmission_response)) = rx_transmission_response.recv().await {
                 // Process the transmission response.
-                if let Err(e) = self_.finish_transmission_request(peer_ip, transmission_response) {
-                    error!("Worker {} failed to process transmission response from peer '{peer_ip}': {e}", self_.id);
-                }
+                self_.finish_transmission_request(peer_ip, transmission_response);
             }
         });
     }
@@ -324,7 +324,7 @@ impl<N: Network> Worker<N> {
 
     /// Handles the incoming transmission response.
     /// This method ensures the transmission response is well-formed and matches the transmission ID.
-    fn finish_transmission_request(&self, peer_ip: SocketAddr, response: TransmissionResponse<N>) -> Result<()> {
+    fn finish_transmission_request(&self, peer_ip: SocketAddr, response: TransmissionResponse<N>) {
         let TransmissionResponse { transmission_id, transmission } = response;
         // Check if the peer IP exists in the pending queue for the given transmission ID.
         let exists = self.pending.get(transmission_id).unwrap_or_default().contains(&peer_ip);
@@ -336,7 +336,6 @@ impl<N: Network> Worker<N> {
             // Remove the transmission ID from the pending queue.
             self.pending.remove(transmission_id, Some(transmission));
         }
-        Ok(())
     }
 
     /// Sends the requested transmission to the specified peer.
