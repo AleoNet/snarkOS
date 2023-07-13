@@ -104,7 +104,7 @@ pub async fn start_bft(node_id: u16, num_nodes: u16) -> Result<(BFT<CurrentNetwo
     // Initialize the BFT instance.
     let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, Some(node_id))?;
     // Run the BFT instance.
-    bft.run(sender.clone(), receiver).await?;
+    bft.run(sender.clone(), receiver, None).await?;
     // Retrieve the BFT's primary.
     let primary = bft.primary();
     // Keep the node's connections.

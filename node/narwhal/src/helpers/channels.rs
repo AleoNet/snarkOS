@@ -22,7 +22,7 @@ use crate::{
 };
 use snarkvm::{
     console::network::*,
-    ledger::narwhal::{BatchCertificate, Data, TransmissionID},
+    ledger::narwhal::{BatchCertificate, Data, Transmission, TransmissionID},
     prelude::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
@@ -30,10 +30,33 @@ use snarkvm::{
     },
 };
 
-use std::net::SocketAddr;
+use indexmap::IndexMap;
+use std::{collections::BTreeMap, net::SocketAddr};
 use tokio::sync::{mpsc, oneshot};
 
 const MAX_CHANNEL_SIZE: usize = 8192;
+
+#[derive(Debug)]
+pub struct ConsensusSender<N: Network> {
+    pub tx_consensus_subdag:
+        mpsc::Sender<(BTreeMap<u64, Vec<BatchCertificate<N>>>, IndexMap<TransmissionID<N>, Transmission<N>>)>,
+}
+
+#[derive(Debug)]
+pub struct ConsensusReceiver<N: Network> {
+    pub rx_consensus_subdag:
+        mpsc::Receiver<(BTreeMap<u64, Vec<BatchCertificate<N>>>, IndexMap<TransmissionID<N>, Transmission<N>>)>,
+}
+
+/// Initializes the consensus channels.
+pub fn init_consensus_channels<N: Network>() -> (ConsensusSender<N>, ConsensusReceiver<N>) {
+    let (tx_consensus_subdag, rx_consensus_subdag) = mpsc::channel(MAX_CHANNEL_SIZE);
+
+    let sender = ConsensusSender { tx_consensus_subdag };
+    let receiver = ConsensusReceiver { rx_consensus_subdag };
+
+    (sender, receiver)
+}
 
 #[derive(Debug)]
 pub struct BFTSender<N: Network> {

@@ -13,7 +13,18 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{fmt_id, init_bft_channels, now, BFTReceiver, Committee, PrimaryReceiver, PrimarySender, Storage, DAG},
+    helpers::{
+        fmt_id,
+        init_bft_channels,
+        now,
+        BFTReceiver,
+        Committee,
+        ConsensusSender,
+        PrimaryReceiver,
+        PrimarySender,
+        Storage,
+        DAG,
+    },
     Ledger,
     Primary,
     MAX_LEADER_CERTIFICATE_DELAY,
@@ -35,7 +46,7 @@ use std::{
         Arc,
     },
 };
-use tokio::task::JoinHandle;
+use tokio::{sync::OnceCell, task::JoinHandle};
 
 #[derive(Clone)]
 pub struct BFT<N: Network> {
@@ -47,6 +58,8 @@ pub struct BFT<N: Network> {
     leader_certificate: Arc<RwLock<Option<BatchCertificate<N>>>>,
     /// The timer for the leader certificate to be received.
     leader_certificate_timer: Arc<AtomicI64>,
+    /// The consensus sender.
+    consensus_sender: Arc<OnceCell<ConsensusSender<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -59,13 +72,23 @@ impl<N: Network> BFT<N> {
             dag: Default::default(),
             leader_certificate: Default::default(),
             leader_certificate_timer: Default::default(),
+            consensus_sender: Default::default(),
             handles: Default::default(),
         })
     }
 
     /// Run the BFT instance.
-    pub async fn run(&mut self, primary_sender: PrimarySender<N>, primary_receiver: PrimaryReceiver<N>) -> Result<()> {
+    pub async fn run(
+        &mut self,
+        primary_sender: PrimarySender<N>,
+        primary_receiver: PrimaryReceiver<N>,
+        consensus_sender: Option<ConsensusSender<N>>,
+    ) -> Result<()> {
         info!("Starting the BFT instance...");
+        // Set the consensus sender.
+        if let Some(consensus_sender) = consensus_sender {
+            self.consensus_sender.set(consensus_sender).expect("Consensus sender already set");
+        }
         // Initialize the BFT channels.
         let (bft_sender, bft_receiver) = init_bft_channels::<N>();
         // Run the primary instance.
@@ -266,7 +289,7 @@ impl<N: Network> BFT<N> {
 
 impl<N: Network> BFT<N> {
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
-    fn update_dag(&self, certificate: BatchCertificate<N>) -> Result<()> {
+    async fn update_dag(&self, certificate: BatchCertificate<N>) -> Result<()> {
         // Retrieve the certificate round.
         let certificate_round = certificate.round();
         // Insert the certificate into the DAG.
@@ -368,13 +391,15 @@ impl<N: Network> BFT<N> {
                     transmissions.insert(*transmission_id, transmission);
                 }
             }
-            // Trigger consensus.
-            // TODO (howardwu): Trigger consensus.
             info!(
                 "\n\nCommitting a subdag from round {leader_round} with {} transmissions: {:?}\n",
                 transmissions.len(),
                 commit_subdag.iter().map(|(round, certificates)| (round, certificates.len())).collect::<Vec<_>>()
             );
+            // Trigger consensus.
+            if let Some(consensus_sender) = self.consensus_sender.get() {
+                consensus_sender.tx_consensus_subdag.send((commit_subdag, transmissions)).await?;
+            }
         }
         Ok(())
     }
@@ -472,7 +497,7 @@ impl<N: Network> BFT<N> {
         self.spawn(async move {
             while let Some((certificate, callback_sender)) = rx_primary_certificate.recv().await {
                 callback_sender.send(Ok(())).ok();
-                if let Err(e) = self_.update_dag(certificate) {
+                if let Err(e) = self_.update_dag(certificate).await {
                     warn!("BFT failed to update the DAG: {e}");
                 }
             }
