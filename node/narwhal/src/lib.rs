@@ -47,6 +47,8 @@ pub const MAX_COMMITTEE_SIZE: u16 = 4; // members
 pub const MAX_EXPIRATION_TIME_IN_SECS: i64 = 10; // seconds
 /// The maximum number of rounds to store before garbage collecting.
 pub const MAX_GC_ROUNDS: u64 = 50; // rounds
+/// The maximum number of seconds allowed for the leader to send their certificate.
+pub const MAX_LEADER_CERTIFICATE_DELAY: i64 = 2 * MAX_BATCH_DELAY as i64 / 1000; // seconds
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of transmissions allowed in a batch.

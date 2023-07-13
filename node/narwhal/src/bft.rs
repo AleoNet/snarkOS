@@ -13,9 +13,10 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{init_bft_channels, BFTReceiver, Committee, PrimaryReceiver, PrimarySender, Storage, DAG},
+    helpers::{fmt_id, init_bft_channels, now, BFTReceiver, Committee, PrimaryReceiver, PrimarySender, Storage, DAG},
     Ledger,
     Primary,
+    MAX_LEADER_CERTIFICATE_DELAY,
 };
 use snarkos_account::Account;
 use snarkvm::{
@@ -24,13 +25,15 @@ use snarkvm::{
     prelude::{bail, ensure, Field, Network, Result},
 };
 
-use crate::helpers::fmt_id;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{BTreeMap, HashSet},
     future::Future,
-    sync::Arc,
+    sync::{
+        atomic::{AtomicI64, Ordering},
+        Arc,
+    },
 };
 use tokio::task::JoinHandle;
 
@@ -42,6 +45,8 @@ pub struct BFT<N: Network> {
     dag: Arc<RwLock<DAG<N>>>,
     /// The batch certificate of the leader from the current even round, if one was present.
     leader_certificate: Arc<RwLock<Option<BatchCertificate<N>>>>,
+    /// The timer for the leader certificate to be received.
+    leader_certificate_timer: Arc<AtomicI64>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -53,6 +58,7 @@ impl<N: Network> BFT<N> {
             primary: Primary::new(account, storage, ledger, dev)?,
             dag: Default::default(),
             leader_certificate: Default::default(),
+            leader_certificate_timer: Default::default(),
             handles: Default::default(),
         })
     }
@@ -83,9 +89,7 @@ impl<N: Network> BFT<N> {
     pub fn ledger(&self) -> &Ledger<N> {
         self.primary.ledger()
     }
-}
 
-impl<N: Network> BFT<N> {
     /// Returns the leader of the current even round, if one was present.
     pub fn leader(&self) -> Option<Address<N>> {
         self.leader_certificate.read().as_ref().map(|certificate| certificate.author())
@@ -95,12 +99,40 @@ impl<N: Network> BFT<N> {
     pub const fn leader_certificate(&self) -> &Arc<RwLock<Option<BatchCertificate<N>>>> {
         &self.leader_certificate
     }
+}
 
-    /// Updates the leader certificate to the current even round.
+impl<N: Network> BFT<N> {
+    /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
+    fn update_to_next_round(&self, current_round: u64) -> Result<()> {
+        // Determine if the BFT is ready to update to the next round.
+        let is_ready = match current_round % 2 == 0 {
+            true => self.update_leader_certificate(current_round)?,
+            false => self.is_leader_quorum_or_nonleaders_available(current_round)?,
+        };
+
+        // Log the leader election.
+        if current_round % 2 == 0 {
+            if let Some(leader_certificate) = self.leader_certificate.read().as_ref() {
+                info!("\n\nRound {current_round} elected a leader - {}\n", leader_certificate.author());
+            }
+        }
+
+        // If the BFT is ready to update to the next round, update to the next committee.
+        if is_ready {
+            // Update to the next committee in storage.
+            self.storage().increment_committee_to_next_round()?;
+            // Update the timer for the leader certificate.
+            self.leader_certificate_timer.store(now(), Ordering::SeqCst);
+        }
+        Ok(())
+    }
+
+    /// Updates the leader certificate to the current even round,
+    /// returning `true` if the BFT is ready to update to the next round.
     ///
     /// This method runs on every even round, by determining the leader of the current even round,
     /// and setting the leader certificate to their certificate in the round, if they were present.
-    pub fn update_leader_certificate(&self, round: u64) -> Result<()> {
+    fn update_leader_certificate(&self, round: u64) -> Result<bool> {
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
@@ -116,25 +148,51 @@ impl<N: Network> BFT<N> {
         if current_certificates.is_empty() {
             // Set the leader certificate to 'None'.
             *self.leader_certificate.write() = None;
-            return Ok(());
+            return Ok(false);
         }
 
-        // Determine the leader of the current even round, using the committee of the current round.
-        let leader = match self.storage().get_committee(current_round) {
-            Some(committee) => committee.get_leader()?,
-            None => bail!("BFT failed to retrieve the committee for the current round"),
+        // Retrieve the committee for the current round.
+        let Some(committee) = self.storage().get_committee(current_round) else {
+            bail!("BFT failed to retrieve the committee for the even round")
         };
+        // Determine the leader of the current round.
+        let leader = committee.get_leader()?;
         // Find and set the leader certificate, if the leader was present in the current even round.
-        *self.leader_certificate.write() =
-            current_certificates.into_iter().find(|certificate| certificate.author() == leader);
-        Ok(())
+        let leader_certificate = current_certificates.iter().find(|certificate| certificate.author() == leader);
+        *self.leader_certificate.write() = leader_certificate.cloned();
+
+        Ok(self.is_even_round_ready_for_next_round(current_certificates, committee))
+    }
+
+    /// Returns 'true' under one of the following conditions:
+    ///  - If the leader certificate is set for the current even round,
+    ///  - The timer for the leader certificate has expired, and we can
+    ///    achieve quorum threshold (2f + 1) without the leader.
+    fn is_even_round_ready_for_next_round(
+        &self,
+        certificates: IndexSet<BatchCertificate<N>>,
+        committee: Committee<N>,
+    ) -> bool {
+        // If the leader certificate is set for the current even round, return 'true'.
+        if self.leader_certificate.read().is_some() {
+            return true;
+        }
+        // If the timer has expired, and we can achieve quorum threshold (2f + 1) without the leader, return 'true'.
+        if self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY > now() {
+            // Retrieve the certificate authors.
+            let authors = certificates.into_iter().map(|c| c.author()).collect();
+            // Determine if the quorum threshold is reached.
+            return committee.is_quorum_threshold_reached(&authors);
+        }
+        // Otherwise, return 'false'.
+        false
     }
 
     /// Returns 'true' if any of the following conditions hold:
     ///  - The leader certificate reached quorum threshold `(2f + 1)` (in the previous certificates in the current round),
     ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round),
     ///  - The leader certificate is 'None'.
-    pub fn is_leader_quorum_or_nonleaders_available(&self, round: u64) -> Result<bool> {
+    fn is_leader_quorum_or_nonleaders_available(&self, round: u64) -> Result<bool> {
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
@@ -162,8 +220,8 @@ impl<N: Network> BFT<N> {
         let (stake_with_leader, stake_without_leader) =
             self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &current_committee)?;
         // Return 'true' if any of the following conditions hold:
-        Ok(stake_with_leader >= current_committee.quorum_threshold()
-            || stake_without_leader >= current_committee.availability_threshold())
+        Ok(stake_with_leader >= current_committee.availability_threshold()
+            || stake_without_leader >= current_committee.quorum_threshold())
     }
 
     /// Computes the amount of stake that has & has not signed for the leader certificate.
@@ -200,32 +258,6 @@ impl<N: Network> BFT<N> {
 }
 
 impl<N: Network> BFT<N> {
-    /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
-    fn update_to_next_round(&self, current_round: u64) -> Result<()> {
-        // Determine if the BFT is ready to update to the next round.
-        let is_ready = match current_round % 2 == 0 {
-            true => {
-                // Update the leader certificate for the current even round.
-                self.update_leader_certificate(current_round)?;
-                // Return 'true' if there is a leader certificate set for the current even round.
-                self.leader_certificate.read().is_some()
-            }
-            false => self.is_leader_quorum_or_nonleaders_available(current_round)?,
-        };
-
-        if current_round % 2 == 0 {
-            if let Some(leader_certificate) = self.leader_certificate.read().as_ref() {
-                info!("\n\nRound {current_round} elected a leader - {}\n", leader_certificate.author());
-            }
-        }
-
-        if is_ready {
-            // Update to the next committee in storage.
-            self.storage().increment_committee_to_next_round()?;
-        }
-        Ok(())
-    }
-
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
     fn update_dag(&self, certificate: BatchCertificate<N>) -> Result<()> {
         // Retrieve the certificate round.
