@@ -103,7 +103,10 @@ impl<N: Network> Worker<N> {
             || self.ledger.contains_transmission(&transmission_id).unwrap_or(false)
     }
 
-    /// Returns the transmission if it exists in the ready queue, proposed batch, storage, or ledger.
+    /// Returns the transmission if it exists in the ready queue, proposed batch, storage.
+    ///
+    /// Note: We explicitly forbid retrieving a transmission from the ledger, as transmissions
+    /// in the ledger are not guaranteed to be invalid for the current batch.
     pub fn get_transmission(&self, transmission_id: TransmissionID<N>) -> Option<Transmission<N>> {
         // Check if the transmission ID exists in the ready queue.
         if let Some(transmission) = self.ready.get(transmission_id) {
@@ -118,10 +121,6 @@ impl<N: Network> Worker<N> {
             self.proposed_batch.read().as_ref().and_then(|p| p.get_transmission(transmission_id))
         {
             return Some(transmission.clone());
-        }
-        // Check if the transmission ID already exists in the ledger.
-        if let Some(transmission) = self.ledger.get_transmission(&transmission_id).unwrap_or(None) {
-            return Some(transmission);
         }
         None
     }

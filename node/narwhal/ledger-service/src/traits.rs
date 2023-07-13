@@ -12,12 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkvm::prelude::{
-    narwhal::{Transmission, TransmissionID},
-    Field,
-    Network,
-    Result,
-};
+use snarkvm::prelude::{narwhal::TransmissionID, Field, Network, Result};
 
 pub trait LedgerService<N: Network>: Send + Sync {
     /// Returns `true` if the ledger contains the given certificate ID.
@@ -25,7 +20,4 @@ pub trait LedgerService<N: Network>: Send + Sync {
 
     /// Returns `true` if the ledger contains the given transmission ID.
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
-
-    /// Returns the transmission for the given transmission ID, if it exists.
-    fn get_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<Option<Transmission<N>>>;
 }

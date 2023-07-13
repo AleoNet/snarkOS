@@ -18,6 +18,7 @@ edition = "2021"
 
 [features]
 default = [ ]
+ledger = [ "tracing" ]
 mock = [ "tracing" ]
 
 [dependencies.snarkvm]
