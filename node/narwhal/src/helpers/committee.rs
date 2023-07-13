@@ -325,7 +325,7 @@ pub mod prop_tests {
 
     use snarkos_account::Account;
     use std::{
-        collections::HashSet,
+        collections::{HashMap, HashSet},
         hash::{Hash, Hasher},
     };
 
@@ -337,7 +337,7 @@ pub mod prop_tests {
         sample::size_range,
     };
     use rand::SeedableRng;
-    use test_strategy::proptest;
+    use test_strategy::{proptest, Arbitrary};
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -345,6 +345,15 @@ pub mod prop_tests {
     pub struct Validator {
         pub stake: u64,
         pub account: Account<CurrentNetwork>,
+    }
+
+    impl Arbitrary for Validator {
+        type Parameters = ();
+        type Strategy = BoxedStrategy<Validator>;
+
+        fn arbitrary_with(args: Self::Parameters) -> Self::Strategy {
+            any_valid_validator()
+        }
     }
 
     fn to_committee((round, ValidatorSet(validators)): (u64, ValidatorSet)) -> Result<Committee<CurrentNetwork>> {
