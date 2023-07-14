@@ -27,7 +27,7 @@ use snarkvm::{
 };
 
 use ::bytes::Bytes;
-use rand::{Rng, SeedableRng};
+use rand::Rng;
 use tokio::{sync::oneshot, task};
 use tracing::*;
 use tracing_subscriber::{
