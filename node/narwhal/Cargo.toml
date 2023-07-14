@@ -130,7 +130,7 @@ features = [ "test-helpers" ]
 [dev-dependencies.snarkos-node-narwhal-committee]
 path = "./committee"
 default-features = false
-features = [ "test-helpers" ]
+features = [ "prop-tests", "test-helpers" ]
 
 [dev-dependencies.snarkos-node-narwhal-ledger-service]
 path = "./ledger-service"
