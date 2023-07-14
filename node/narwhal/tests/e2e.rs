@@ -64,7 +64,7 @@ async fn test_quorum_threshold() {
     }
 
     // Start the cannons for node 0.
-    network.fire_cannons(0);
+    network.fire_cannons_at(0);
 
     sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
 
@@ -74,8 +74,8 @@ async fn test_quorum_threshold() {
     }
 
     // Connect the first two nodes and start the cannons for node 1.
-    network.connect(0, 1).await;
-    network.fire_cannons(1);
+    network.connect_primaries(0, 1).await;
+    network.fire_cannons_at(1);
 
     sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
 
@@ -85,9 +85,9 @@ async fn test_quorum_threshold() {
     }
 
     // Connect the third node and start the cannons for it.
-    network.connect(0, 2).await;
-    network.connect(1, 2).await;
-    network.fire_cannons(2);
+    network.connect_primaries(0, 2).await;
+    network.connect_primaries(1, 2).await;
+    network.fire_cannons_at(2);
 
     // Check the nodes reach quorum and advance through the rounds.
     const TARGET_ROUND: u64 = 4;

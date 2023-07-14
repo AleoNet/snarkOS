@@ -36,11 +36,11 @@ use std::{
 
 use indexmap::IndexMap;
 use itertools::Itertools;
-use parking_lot::RwLock;
+use parking_lot::Mutex;
 use tokio::{task::JoinHandle, time::sleep};
 use tracing::*;
 
-#[derive(Clone)]
+#[derive(Clone, Copy, Debug)]
 pub struct TestNetworkConfig {
     pub num_nodes: u16,
     pub connect_all: bool,
@@ -60,7 +60,7 @@ pub struct TestPrimary {
     pub id: u16,
     pub primary: Primary<CurrentNetwork>,
     pub sender: Option<PrimarySender<CurrentNetwork>>,
-    pub handles: Arc<RwLock<Vec<JoinHandle<()>>>>,
+    pub handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 impl Deref for TestPrimary {
@@ -82,13 +82,13 @@ impl TestPrimary {
         let solution_handle = fire_unconfirmed_solutions(self.sender.as_mut().unwrap(), self.id);
         let transaction_handle = fire_unconfirmed_transactions(self.sender.as_mut().unwrap(), self.id);
 
-        self.handles.write().push(solution_handle);
-        self.handles.write().push(transaction_handle);
+        self.handles.lock().push(solution_handle);
+        self.handles.lock().push(transaction_handle);
     }
 
     pub fn log_connections(&mut self) {
         let self_clone = self.clone();
-        self.handles.write().push(tokio::task::spawn(async move {
+        self.handles.lock().push(tokio::task::spawn(async move {
             loop {
                 let connections = self_clone.gateway().connected_peers().read().clone();
                 info!("{} connections", connections.len());
@@ -146,15 +146,15 @@ impl TestNetwork {
     }
 
     // Starts the solution and trasnaction cannons for node.
-    pub fn fire_cannons(&mut self, id: u16) {
+    pub fn fire_cannons_at(&mut self, id: u16) {
         self.primaries.get_mut(&id).unwrap().fire_cannons();
     }
 
     // Connects a node to another node.
-    pub async fn connect(&self, id: u16, peer_id: u16) {
-        let primary = self.primaries.get(&id).unwrap();
-        let peer_ip = self.primaries.get(&peer_id).unwrap().gateway().local_ip();
-        primary.gateway().connect(peer_ip);
+    pub async fn connect_primaries(&self, first_id: u16, second_id: u16) {
+        let first_primary = self.primaries.get(&first_id).unwrap();
+        let second_primary_ip = self.primaries.get(&second_id).unwrap().gateway().local_ip();
+        first_primary.gateway().connect(second_primary_ip);
         // Give the connection time to be established.
         sleep(Duration::from_millis(100)).await;
     }
@@ -170,10 +170,9 @@ impl TestNetwork {
         }
     }
 
-    // Disconnects a node from all other nodes.
+    // Disconnects N nodes from all other nodes.
     pub async fn disconnect(&self, num_nodes: u16) {
-        for id in 0..num_nodes {
-            let primary = self.primaries.get(&id).unwrap();
+        for primary in self.primaries.values().take(num_nodes as usize) {
             for peer_ip in primary.gateway().connected_peers().read().iter() {
                 primary.gateway().disconnect(*peer_ip);
             }
@@ -183,13 +182,13 @@ impl TestNetwork {
         sleep(Duration::from_millis(100)).await;
     }
 
-    // Checks a quorum of nodes have reached the given round.
+    // Checks if at least 2f + 1 nodes have reached the given round.
     pub fn is_round_reached(&self, round: u64) -> bool {
         let quorum_threshold = self.primaries.len() / 2 + 1;
         self.primaries.values().filter(|p| p.current_round() >= round).count() >= quorum_threshold
     }
 
-    // Checks all nodes have stopped progressing.
+    // Checks if all the nodes have stopped progressing.
     pub async fn is_halted(&self) -> bool {
         let halt_round = self.primaries.values().map(|p| p.current_round()).max().unwrap();
         sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
