@@ -131,7 +131,7 @@ impl<N: Network> DAG<N> {
 mod tests {
     use super::*;
     use snarkvm::{
-        prelude::{narwhal::batch_certificate::test_helpers::sample_batch_certificate, Testnet3},
+        prelude::{narwhal::batch_certificate::test_helpers::sample_batch_certificate_for_round, Testnet3},
         utilities::TestRng,
     };
 
@@ -149,9 +149,10 @@ mod tests {
         let mut rng = TestRng::default();
         let mut dag = DAG::<Testnet3>::new();
 
-        let certificate = sample_batch_certificate(&mut rng);
+        let certificate = sample_batch_certificate_for_round(2, &mut rng);
         dag.insert(certificate.clone());
         let round = certificate.round();
+        assert_eq!(round, 2);
         assert!(dag.contains_certificate_in_round(round, certificate.certificate_id()));
         assert_eq!(dag.get_certificate_for_round_with_author(round, certificate.author()), Some(certificate.clone()));
         assert_eq!(
@@ -171,26 +172,30 @@ mod tests {
         let mut rng = TestRng::default();
         let mut dag = DAG::<Testnet3>::new();
 
-        let certificate = sample_batch_certificate(&mut rng);
+        let certificate = sample_batch_certificate_for_round(3, &mut rng);
         dag.insert(certificate.clone());
-        let round = certificate.round();
-        assert!(dag.contains_certificate_in_round(round, certificate.certificate_id()));
-        assert_eq!(dag.get_certificate_for_round_with_author(round, certificate.author()), Some(certificate.clone()));
+        assert!(dag.contains_certificate_in_round(3, certificate.certificate_id()));
+        assert_eq!(dag.get_certificate_for_round_with_author(3, certificate.author()), Some(certificate.clone()));
+        assert_eq!(dag.get_certificate_for_round_with_id(3, certificate.certificate_id()), Some(certificate.clone()));
         assert_eq!(
-            dag.get_certificate_for_round_with_id(round, certificate.certificate_id()),
-            Some(certificate.clone())
-        );
-        assert_eq!(
-            dag.get_certificates_for_round(round),
+            dag.get_certificates_for_round(3),
             Some(vec![(certificate.author(), certificate.clone())].into_iter().collect())
         );
         assert_eq!(dag.last_committed_round(), 0);
         assert_eq!(dag.last_committed_authors().len(), 0);
 
+        // Add a lower certificate. As the author is random, it's probably going to be different.
+        let lower = sample_batch_certificate_for_round(2, &mut rng);
+        dag.insert(lower.clone());
+        // Add a higher certificate. As the author is random, it's probably going to be different.
+        let higher = sample_batch_certificate_for_round(4, &mut rng);
+        dag.insert(higher.clone());
         // now commit the certificate, this will trigger GC
         dag.commit(certificate.clone(), 10);
-        assert!(!dag.contains_certificate_in_round(round, certificate.certificate_id()));
-        assert_eq!(dag.last_committed_round(), round);
+        assert!(!dag.contains_certificate_in_round(3, certificate.certificate_id()));
+        assert!(dag.contains_certificate_in_round(2, lower.certificate_id()));
+        assert!(dag.contains_certificate_in_round(4, higher.certificate_id()));
+        assert_eq!(dag.last_committed_round(), 3);
         assert_eq!(dag.last_committed_authors().len(), 1);
     }
 }
