@@ -31,14 +31,13 @@ use snarkvm::prelude::{
     store::ConsensusStorage,
     Ledger,
     Network,
-    RecordMap,
     Value,
 };
 
 use aleo_std::prelude::{finish, lap, timer};
 use anyhow::{bail, Result};
 use core::{str::FromStr, time::Duration};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::Mutex;
 use std::{
     net::SocketAddr,
     sync::{
@@ -475,11 +474,11 @@ mod tests {
         .await
         .unwrap();
 
-        // println!(
-        //     "Loaded beacon node with {} blocks and {} records",
-        //     beacon.ledger.latest_height(),
-        //     beacon.unspent_records.read().len()
-        // );
+        println!(
+            "Loaded beacon node with {} blocks",
+            beacon.ledger.latest_height(),
+            //     beacon.unspent_records.read().len()
+        );
 
         bail!("\n\nRemember to #[ignore] this test!\n\n")
     }
