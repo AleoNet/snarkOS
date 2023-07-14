@@ -12,17 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::collections::HashSet;
-
 use crate::{Committee, MIN_STAKE};
-use anyhow::Result;
+use snarkos_account::Account;
+use snarkvm::prelude::Result;
+
 use indexmap::IndexMap;
 use proptest::sample::size_range;
-use rand::{Rng, SeedableRng};
-use rand_distr::Distribution;
-use snarkos_account::Account;
-use std::hash::Hash;
-use test_strategy::Arbitrary;
+use rand::SeedableRng;
+use std::{collections::HashSet, hash::Hash};
+use test_strategy::{proptest, Arbitrary};
 
 type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -84,4 +82,54 @@ impl CommitteeInput {
             && HashSet::<u64>::from_iter(self.validators.iter().map(|v| v.account_seed)).len() >= 4
             && self.validators.iter().all(|v| v.stake >= MIN_STAKE)
     }
+}
+
+#[proptest]
+fn committee_advance(#[filter(CommitteeInput::is_valid)] input: CommitteeInput) {
+    let committee = input.to_committee().unwrap();
+    let current_round = input.round;
+    let current_members = committee.members();
+    assert_eq!(committee.round(), current_round);
+
+    let committee = committee.to_next_round();
+    assert_eq!(committee.round(), current_round + 1);
+    assert_eq!(committee.members(), current_members);
+}
+
+#[proptest]
+fn committee_members(input: CommitteeInput) {
+    let committee = match input.to_committee() {
+        Ok(committee) => {
+            assert!(input.is_valid());
+            committee
+        }
+        Err(err) => {
+            assert!(!input.is_valid());
+            match err.to_string().as_str() {
+                "Round must be nonzero" => assert_eq!(input.round, 0),
+                "Committee must have at least 4 members" => assert!(input.validators.len() < 4),
+                _ => panic!("Unexpected error: {err}"),
+            }
+            return Ok(());
+        }
+    };
+
+    let validators = input.validators;
+
+    let mut total_stake = 0;
+    for v in validators.iter() {
+        total_stake += v.stake;
+    }
+
+    assert_eq!(committee.num_members(), validators.len());
+    assert_eq!(committee.total_stake(), total_stake);
+    for v in validators.iter() {
+        let address = v.get_account().address();
+        assert!(committee.is_committee_member(address));
+        assert_eq!(committee.get_stake(address), v.stake);
+    }
+    let quorum_threshold = committee.quorum_threshold();
+    let availability_threshold = committee.availability_threshold();
+    // (2f + 1) + (f + 1) - 1 = 3f + 1 = N
+    assert_eq!(quorum_threshold + availability_threshold - 1, total_stake);
 }

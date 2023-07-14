@@ -3129,8 +3129,6 @@ dependencies = [
 name = "snarkos-node-narwhal-committee"
 version = "2.1.4"
 dependencies = [
- "anyhow",
- "async-trait",
  "indexmap 2.0.0",
  "parking_lot",
  "proptest",
@@ -3142,8 +3140,6 @@ dependencies = [
  "snarkos-node-narwhal-committee",
  "snarkvm",
  "test-strategy",
- "tokio",
- "tracing",
 ]
 
 [[package]]

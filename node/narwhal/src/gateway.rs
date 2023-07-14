@@ -842,7 +842,7 @@ pub mod prop_tests {
         MAX_WORKERS,
         MEMORY_POOL_PORT,
     };
-    use snarkos_node_narwhal_committee::test_helpers::{CommitteeInput, Validator};
+    use snarkos_node_narwhal_committee::prop_tests::{CommitteeInput, Validator};
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
     use snarkos_node_tcp::P2P;
     use snarkvm::prelude::Testnet3;
