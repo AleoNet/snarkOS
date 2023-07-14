@@ -22,7 +22,7 @@ use crate::{
 };
 use snarkvm::{
     console::network::*,
-    ledger::narwhal::{BatchCertificate, Data, TransmissionID},
+    ledger::narwhal::{BatchCertificate, Data, Transmission, TransmissionID},
     prelude::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
@@ -30,10 +30,33 @@ use snarkvm::{
     },
 };
 
-use std::net::SocketAddr;
+use indexmap::IndexMap;
+use std::{collections::BTreeMap, net::SocketAddr};
 use tokio::sync::{mpsc, oneshot};
 
 const MAX_CHANNEL_SIZE: usize = 8192;
+
+#[derive(Debug)]
+pub struct ConsensusSender<N: Network> {
+    pub tx_consensus_subdag:
+        mpsc::Sender<(BTreeMap<u64, Vec<BatchCertificate<N>>>, IndexMap<TransmissionID<N>, Transmission<N>>)>,
+}
+
+#[derive(Debug)]
+pub struct ConsensusReceiver<N: Network> {
+    pub rx_consensus_subdag:
+        mpsc::Receiver<(BTreeMap<u64, Vec<BatchCertificate<N>>>, IndexMap<TransmissionID<N>, Transmission<N>>)>,
+}
+
+/// Initializes the consensus channels.
+pub fn init_consensus_channels<N: Network>() -> (ConsensusSender<N>, ConsensusReceiver<N>) {
+    let (tx_consensus_subdag, rx_consensus_subdag) = mpsc::channel(MAX_CHANNEL_SIZE);
+
+    let sender = ConsensusSender { tx_consensus_subdag };
+    let receiver = ConsensusReceiver { rx_consensus_subdag };
+
+    (sender, receiver)
+}
 
 #[derive(Debug)]
 pub struct BFTSender<N: Network> {
@@ -65,8 +88,9 @@ pub struct PrimarySender<N: Network> {
     pub tx_batch_certified: mpsc::Sender<(SocketAddr, Data<BatchCertificate<N>>)>,
     pub tx_certificate_request: mpsc::Sender<(SocketAddr, CertificateRequest<N>)>,
     pub tx_certificate_response: mpsc::Sender<(SocketAddr, CertificateResponse<N>)>,
-    pub tx_unconfirmed_solution: mpsc::Sender<(PuzzleCommitment<N>, Data<ProverSolution<N>>)>,
-    pub tx_unconfirmed_transaction: mpsc::Sender<(N::TransactionID, Data<Transaction<N>>)>,
+    pub tx_unconfirmed_solution:
+        mpsc::Sender<(PuzzleCommitment<N>, Data<ProverSolution<N>>, oneshot::Sender<Result<()>>)>,
+    pub tx_unconfirmed_transaction: mpsc::Sender<(N::TransactionID, Data<Transaction<N>>, oneshot::Sender<Result<()>>)>,
 }
 
 #[derive(Debug)]
@@ -76,8 +100,10 @@ pub struct PrimaryReceiver<N: Network> {
     pub rx_batch_certified: mpsc::Receiver<(SocketAddr, Data<BatchCertificate<N>>)>,
     pub rx_certificate_request: mpsc::Receiver<(SocketAddr, CertificateRequest<N>)>,
     pub rx_certificate_response: mpsc::Receiver<(SocketAddr, CertificateResponse<N>)>,
-    pub rx_unconfirmed_solution: mpsc::Receiver<(PuzzleCommitment<N>, Data<ProverSolution<N>>)>,
-    pub rx_unconfirmed_transaction: mpsc::Receiver<(N::TransactionID, Data<Transaction<N>>)>,
+    pub rx_unconfirmed_solution:
+        mpsc::Receiver<(PuzzleCommitment<N>, Data<ProverSolution<N>>, oneshot::Sender<Result<()>>)>,
+    pub rx_unconfirmed_transaction:
+        mpsc::Receiver<(N::TransactionID, Data<Transaction<N>>, oneshot::Sender<Result<()>>)>,
 }
 
 /// Initializes the primary channels.

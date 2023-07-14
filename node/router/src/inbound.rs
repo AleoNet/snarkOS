@@ -262,7 +262,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
                     bail!("Peer '{peer_ip}' is not following the 'UnconfirmedTransaction' protocol")
                 }
                 // Handle the unconfirmed transaction.
-                match self.unconfirmed_transaction(peer_ip, serialized, transaction) {
+                match self.unconfirmed_transaction(peer_ip, serialized, transaction).await {
                     true => Ok(()),
                     false => bail!("Peer '{peer_ip}' sent an invalid unconfirmed transaction"),
                 }
@@ -400,7 +400,7 @@ pub trait Inbound<N: Network>: Reading + Outbound<N> {
     ) -> bool;
 
     /// Handles an `UnconfirmedTransaction` message.
-    fn unconfirmed_transaction(
+    async fn unconfirmed_transaction(
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedTransaction<N>,

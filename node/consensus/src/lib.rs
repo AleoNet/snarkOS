@@ -23,30 +23,98 @@ pub use memory_pool::*;
 #[cfg(test)]
 mod tests;
 
-use snarkvm::prelude::{
-    block::{Block, Transaction},
-    coinbase::{CoinbasePuzzle, ProverSolution},
-    store::ConsensusStorage,
-    *,
+use snarkos_account::Account;
+use snarkos_node_narwhal::{
+    helpers::{
+        init_consensus_channels,
+        Committee,
+        ConsensusReceiver,
+        PrimaryReceiver,
+        PrimarySender,
+        Storage as NarwhalStorage,
+    },
+    BFT,
+    MAX_GC_ROUNDS,
+    MIN_STAKE,
+};
+use snarkos_node_narwhal_ledger_service::CoreLedgerService;
+use snarkvm::{
+    ledger::narwhal::Data,
+    prelude::{
+        block::{Block, Transaction},
+        coinbase::{CoinbasePuzzle, ProverSolution},
+        store::ConsensusStorage,
+        *,
+    },
 };
 
+use ::rand::thread_rng;
 use anyhow::Result;
+use indexmap::IndexMap;
+use parking_lot::Mutex;
+use std::{future::Future, sync::Arc};
+use tokio::{
+    sync::{oneshot, OnceCell},
+    task::JoinHandle,
+};
 
 #[derive(Clone)]
 pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     /// The ledger.
     ledger: Ledger<N, C>,
+    /// The BFT.
+    bft: BFT<N>,
+    /// The primary sender.
+    primary_sender: Arc<OnceCell<PrimarySender<N>>>,
     /// The memory pool.
     memory_pool: MemoryPool<N>,
-    /// The boolean flag for the development mode.
-    #[allow(dead_code)]
-    is_dev: bool,
+    /// The spawned handles.
+    handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Initializes a new instance of consensus.
-    pub fn new(ledger: Ledger<N, C>, is_dev: bool) -> Result<Self> {
-        Ok(Self { ledger, memory_pool: Default::default(), is_dev })
+    pub fn new(account: Account<N>, ledger: Ledger<N, C>, dev: Option<u16>) -> Result<Self> {
+        // Initialize the committee.
+        let committee = {
+            // TODO (howardwu): Refactor committee out for narwhal.
+            // TODO (howardwu): Fix the ledger round number.
+            // TODO (howardwu): Retrieve the real committee members.
+            // Sample the members.
+            let mut members = IndexMap::new();
+            for _ in 0..4 {
+                members.insert(Address::<N>::new(thread_rng().gen()), MIN_STAKE);
+            }
+            Committee::new(ledger.latest_round(), members)?
+        };
+        // Initialize the Narwhal storage.
+        let storage = NarwhalStorage::new(committee, MAX_GC_ROUNDS);
+        // Initialize the ledger service.
+        let ledger_service = Box::new(CoreLedgerService::<N, C>::new(ledger.clone()));
+        // Initialize the BFT.
+        let bft = BFT::new(account, storage, ledger_service, None, dev)?;
+        // Return the consensus.
+        Ok(Self {
+            ledger,
+            bft,
+            primary_sender: Default::default(),
+            memory_pool: Default::default(),
+            handles: Default::default(),
+        })
+    }
+
+    /// Run the consensus instance.
+    pub async fn run(&mut self, primary_sender: PrimarySender<N>, primary_receiver: PrimaryReceiver<N>) -> Result<()> {
+        info!("Starting the consensus instance...");
+        // Sets the primary sender.
+        self.primary_sender.set(primary_sender.clone()).expect("Primary sender already set");
+        // Initialize the consensus channels.
+        let (consensus_sender, consensus_receiver) = init_consensus_channels();
+        // Start the consensus.
+        self.bft.run(primary_sender, primary_receiver, Some(consensus_sender)).await?;
+        // Start the consensus handlers.
+        self.start_handlers(consensus_receiver);
+        Ok(())
     }
 
     /// Returns the ledger.
@@ -59,6 +127,42 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         self.ledger.coinbase_puzzle()
     }
 
+    /// Returns the BFT.
+    pub const fn bft(&self) -> &BFT<N> {
+        &self.bft
+    }
+
+    /// Returns the primary sender.
+    pub fn primary_sender(&self) -> &PrimarySender<N> {
+        self.primary_sender.get().expect("Primary sender not set")
+    }
+
+    /// Adds the given unconfirmed transaction to the memory pool.
+    pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback, callback_receiver) = oneshot::channel();
+        // Send the transaction to the primary.
+        self.primary_sender()
+            .tx_unconfirmed_transaction
+            .send((transaction.id(), Data::Object(transaction), callback))
+            .await?;
+        // Return the callback.
+        callback_receiver.await?
+    }
+
+    /// Adds the given unconfirmed solution to the memory pool.
+    pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback, callback_receiver) = oneshot::channel();
+        // Send the transaction to the primary.
+        self.primary_sender()
+            .tx_unconfirmed_solution
+            .send((solution.commitment(), Data::Object(solution), callback))
+            .await?;
+        // Return the callback.
+        callback_receiver.await?
+    }
+
     /// Returns the memory pool.
     pub const fn memory_pool(&self) -> &MemoryPool<N> {
         &self.memory_pool
@@ -67,52 +171,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Checks the given transaction is well-formed and unique.
     pub fn check_transaction_basic(&self, transaction: &Transaction<N>, rejected_id: Option<Field<N>>) -> Result<()> {
         self.ledger.check_transaction_basic(transaction, rejected_id)
-    }
-
-    /// Checks the given block is valid next block.
-    pub fn check_next_block(&self, block: &Block<N>) -> Result<()> {
-        self.ledger.check_next_block(block)
-    }
-
-    /// Adds the given unconfirmed transaction to the memory pool.
-    pub fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
-        // Ensure the transaction is not already in the memory pool.
-        if self.memory_pool.contains_unconfirmed_transaction(transaction.id()) {
-            bail!("Transaction is already in the memory pool.");
-        }
-        // Check that the transaction is well-formed and unique.
-        self.check_transaction_basic(&transaction, None)?;
-        // Insert the transaction to the memory pool.
-        self.memory_pool.add_unconfirmed_transaction(&transaction);
-
-        Ok(())
-    }
-
-    /// Adds the given unconfirmed solution to the memory pool.
-    pub fn add_unconfirmed_solution(&self, solution: &ProverSolution<N>) -> Result<()> {
-        // Ensure the prover solution is not already in the memory pool.
-        if self.memory_pool.contains_unconfirmed_solution(solution.commitment()) {
-            bail!("Prover solution is already in the memory pool.");
-        }
-        // Ensure the prover solution is not already in the ledger.
-        if self.ledger.contains_puzzle_commitment(&solution.commitment())? {
-            bail!("Prover solution is already in the ledger.");
-        }
-
-        // Compute the current epoch challenge.
-        let epoch_challenge = self.ledger.latest_epoch_challenge()?;
-        // Retrieve the current proof target.
-        let proof_target = self.ledger.latest_proof_target();
-
-        // Ensure that the prover solution is valid for the given epoch.
-        if !solution.verify(self.coinbase_puzzle().coinbase_verifying_key(), &epoch_challenge, proof_target)? {
-            bail!("Invalid prover solution '{}' for the current epoch.", solution.commitment());
-        }
-
-        // Insert the solution to the memory pool.
-        self.memory_pool.add_unconfirmed_solution(solution)?;
-
-        Ok(())
     }
 
     /// Returns `true` if the coinbase target is met.
@@ -125,6 +183,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let latest_coinbase_target = self.ledger.latest_coinbase_target();
         // Check if the coinbase target is met.
         Ok(cumulative_proof_target >= latest_coinbase_target as u128)
+    }
+
+    /// Checks the given block is valid next block.
+    pub fn check_next_block(&self, block: &Block<N>) -> Result<()> {
+        self.ledger.check_next_block(block)
     }
 
     /// Returns a candidate for the next block in the ledger.
@@ -185,5 +248,34 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Clear the memory pool of unconfirmed transactions that are now invalid.
         self.memory_pool.clear_unconfirmed_transactions();
         Ok(())
+    }
+}
+
+impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
+    /// Starts the consensus handlers.
+    fn start_handlers(&self, consensus_receiver: ConsensusReceiver<N>) {
+        let ConsensusReceiver { mut rx_consensus_subdag } = consensus_receiver;
+
+        // Process the committed subdag and transmissions from the BFT.
+        let _self_ = self.clone();
+        self.spawn(async move {
+            while let Some((_committed_subdag, _transmissions)) = rx_consensus_subdag.recv().await {
+                // TODO (howardwu): Prepare to create a new block.
+            }
+        });
+    }
+
+    /// Spawns a task with the given future; it should only be used for long-running tasks.
+    fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
+        self.handles.lock().push(tokio::spawn(future));
+    }
+
+    /// Shuts down the BFT.
+    pub async fn shut_down(&self) {
+        trace!("Shutting down consensus...");
+        // Shut down the BFT.
+        self.bft.shut_down().await;
+        // Abort the tasks.
+        self.handles.lock().iter().for_each(|handle| handle.abort());
     }
 }

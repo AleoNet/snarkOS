@@ -12,34 +12,60 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkos_node_narwhal::{helpers::fmt_id, traits::LedgerService};
+use crate::{fmt_id, LedgerService};
 use snarkvm::{
-    ledger::narwhal::TransmissionID,
+    ledger::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+        narwhal::{Data, TransmissionID},
+    },
     prelude::{Field, Network, Result},
 };
 
 use tracing::*;
 
 /// A mock ledger service that always returns `false`.
+#[derive(Default)]
 pub struct MockLedgerService {}
 
 impl MockLedgerService {
     /// Initializes a new mock ledger service.
-    pub fn new() -> MockLedgerService {
-        MockLedgerService {}
+    pub fn new() -> Self {
+        Self {}
     }
 }
 
+#[async_trait]
 impl<N: Network> LedgerService<N> for MockLedgerService {
     /// Returns `false` for all queries.
-    fn contains_certificate_id(&self, certificate_id: &Field<N>) -> Result<bool> {
+    fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
         trace!("[MockLedgerService] Contains certificate ID {} - false", fmt_id(certificate_id));
         Ok(false)
     }
 
     /// Returns `false` for all queries.
-    fn contains_transmission_id(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
+    fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
         trace!("[MockLedgerService] Contains transmission ID {} - false", fmt_id(transmission_id));
         Ok(false)
+    }
+
+    /// Checks the given solution is well-formed.
+    async fn check_solution_basic(
+        &self,
+        puzzle_commitment: PuzzleCommitment<N>,
+        _solution: Data<ProverSolution<N>>,
+    ) -> Result<()> {
+        trace!("[MockLedgerService] Check solution basic {:?} - Ok", fmt_id(puzzle_commitment));
+        Ok(())
+    }
+
+    /// Checks the given transaction is well-formed and unique.
+    async fn check_transaction_basic(
+        &self,
+        transaction_id: N::TransactionID,
+        _transaction: Data<Transaction<N>>,
+    ) -> Result<()> {
+        trace!("[MockLedgerService] Check transaction basic {:?} - Ok", fmt_id(transaction_id));
+        Ok(())
     }
 }

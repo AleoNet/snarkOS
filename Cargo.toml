@@ -29,6 +29,7 @@ members = [
   "node/messages",
   "node/metrics",
   "node/narwhal",
+  "node/narwhal/ledger-service",
   "node/rest",
   "node/router",
   "node/tcp",
@@ -37,7 +38,7 @@ members = [
 
 [workspace.dependencies.snarkvm]
 git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "bb295b7cb"
+rev = "ba140c393"
 #version = "=0.14.1"
 features = [ "circuit", "console", "rocks" ]
 

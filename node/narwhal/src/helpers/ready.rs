@@ -78,6 +78,12 @@ impl<N: Network> Ready<N> {
         is_new
     }
 
+    /// Retains the transmissions that satisfy the specified predicate.
+    pub fn retain(&self, predicate: impl FnMut(&TransmissionID<N>, &mut Transmission<N>) -> bool) {
+        // Retain the transmissions.
+        self.transmissions.write().retain(predicate);
+    }
+
     /// Removes the specified number of transmissions and returns them.
     pub fn take(&self, num_transmissions: usize) -> IndexMap<TransmissionID<N>, Transmission<N>> {
         // Acquire the write lock.
