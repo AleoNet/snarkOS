@@ -16,7 +16,7 @@ use super::*;
 
 use snarkos_node_messages::{BlockRequest, DisconnectReason, Message, MessageCodec, Pong, UnconfirmedTransaction};
 use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
-use snarkvm::prelude::{Network, Transaction};
+use snarkvm::prelude::{block::Transaction, Network};
 
 use std::{io, net::SocketAddr};
 

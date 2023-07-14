@@ -14,7 +14,7 @@
 
 use super::CurrentNetwork;
 
-use snarkvm::prelude::{Block, Ciphertext, Field, Network, Plaintext, PrivateKey, Record, ViewKey};
+use snarkvm::prelude::{block::Block, Ciphertext, Field, Network, Plaintext, PrivateKey, Record, ViewKey};
 
 use anyhow::{bail, ensure, Result};
 use clap::Parser;

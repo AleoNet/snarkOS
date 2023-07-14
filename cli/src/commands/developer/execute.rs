@@ -14,9 +14,17 @@
 
 use super::{CurrentNetwork, Developer, Program};
 
-use snarkvm::{
-    prelude::{ConsensusStore, Identifier, Locator, Plaintext, PrivateKey, ProgramID, Query, Record, Value, VM},
-    synthesizer::store::helpers::memory::ConsensusMemory,
+use snarkvm::prelude::{
+    query::Query,
+    store::{helpers::memory::ConsensusMemory, ConsensusStore},
+    Identifier,
+    Locator,
+    Plaintext,
+    PrivateKey,
+    ProgramID,
+    Record,
+    Value,
+    VM,
 };
 
 use anyhow::{bail, Result};

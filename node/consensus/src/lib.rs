@@ -23,7 +23,12 @@ pub use memory_pool::*;
 #[cfg(test)]
 mod tests;
 
-use snarkvm::prelude::*;
+use snarkvm::prelude::{
+    block::{Block, Transaction},
+    coinbase::{CoinbasePuzzle, ProverSolution},
+    store::ConsensusStorage,
+    *,
+};
 
 use anyhow::Result;
 

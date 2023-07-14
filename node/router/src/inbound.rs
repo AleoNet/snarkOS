@@ -25,7 +25,11 @@ use snarkos_node_messages::{
     UnconfirmedTransaction,
 };
 use snarkos_node_tcp::{is_bogon_address, protocols::Reading};
-use snarkvm::prelude::{Block, EpochChallenge, Header, Network, ProverSolution, Transaction};
+use snarkvm::prelude::{
+    block::{Block, Header, Transaction},
+    coinbase::{EpochChallenge, ProverSolution},
+    Network,
+};
 
 use anyhow::{bail, ensure, Result};
 use std::{net::SocketAddr, time::Instant};

@@ -17,9 +17,13 @@
 #[cfg(test)]
 mod tests {
     use snarkos_node_cdn::sync_ledger_with_cdn;
-    use snarkvm::{
-        prelude::{Block, FromBytes, Ledger, Network, Testnet3},
-        synthesizer::store::helpers::memory::ConsensusMemory,
+    use snarkvm::prelude::{
+        block::Block,
+        store::helpers::memory::ConsensusMemory,
+        FromBytes,
+        Ledger,
+        Network,
+        Testnet3,
     };
 
     use tracing_test::traced_test;

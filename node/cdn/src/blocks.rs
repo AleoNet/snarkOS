@@ -13,9 +13,8 @@
 // limitations under the License.
 
 use snarkvm::prelude::{
-    cow_to_copied,
-    Block,
-    ConsensusStorage,
+    block::Block,
+    store::{cow_to_copied, ConsensusStorage},
     Deserialize,
     DeserializeOwned,
     Ledger,
@@ -384,7 +383,7 @@ mod tests {
         blocks::{cdn_get, cdn_height, handle_dispatch_error, log_progress, BLOCKS_PER_FILE},
         load_blocks,
     };
-    use snarkvm::prelude::{Block, Testnet3};
+    use snarkvm::prelude::{block::Block, Testnet3};
 
     use anyhow::{anyhow, Result};
     use parking_lot::RwLock;

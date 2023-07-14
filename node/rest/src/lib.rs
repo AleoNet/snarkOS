@@ -27,8 +27,7 @@ use snarkos_node_messages::{Data, Message, UnconfirmedTransaction};
 use snarkos_node_router::Routing;
 use snarkvm::{
     console::{program::ProgramID, types::Field},
-    prelude::{cfg_into_iter, Ledger, Network},
-    synthesizer::ConsensusStorage,
+    prelude::{cfg_into_iter, store::ConsensusStorage, Ledger, Network},
 };
 
 use anyhow::Result;

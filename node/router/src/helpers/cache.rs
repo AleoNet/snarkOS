@@ -13,7 +13,7 @@
 // limitations under the License.
 
 use snarkos_node_messages::BlockRequest;
-use snarkvm::prelude::{Network, PuzzleCommitment};
+use snarkvm::prelude::{coinbase::PuzzleCommitment, Network};
 
 use core::hash::Hash;
 use indexmap::{IndexMap, IndexSet};
