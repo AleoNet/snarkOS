@@ -179,6 +179,16 @@ impl<N: Network> Primary<N> {
         &self.ledger
     }
 
+    /// Returns the number of unconfirmed transmissions.
+    pub fn num_unconfirmed_transmissions(&self) -> usize {
+        self.workers.iter().map(|worker| worker.num_transmissions()).sum()
+    }
+
+    /// Returns the unconfirmed transmissions.
+    pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.workers.iter().flat_map(|worker| worker.transmissions())
+    }
+
     /// Returns the number of workers.
     pub fn num_workers(&self) -> u8 {
         u8::try_from(self.workers.len()).expect("Too many workers")

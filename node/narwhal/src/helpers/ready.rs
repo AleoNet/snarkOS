@@ -51,6 +51,11 @@ impl<N: Network> Ready<N> {
         self.transmissions.read().keys().copied().collect()
     }
 
+    /// Returns the transmissions.
+    pub fn transmissions(&self) -> IndexMap<TransmissionID<N>, Transmission<N>> {
+        self.transmissions.read().clone()
+    }
+
     /// Returns `true` if the ready queue contains the specified `transmission ID`.
     pub fn contains(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
         self.transmissions.read().contains_key(&transmission_id.into())

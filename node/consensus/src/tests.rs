@@ -301,7 +301,7 @@ async fn test_ledger_deploy() {
     let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
 
     // Ensure the block is a valid next block.
-    consensus.check_next_block(&next_block).unwrap();
+    consensus.ledger.check_next_block(&next_block).unwrap();
 
     // Construct a next block.
     consensus.advance_to_next_block(&next_block).unwrap();
@@ -314,7 +314,7 @@ async fn test_ledger_deploy() {
     // Ensure that the VM can't re-deploy the same program.
     assert!(consensus.ledger.vm().finalize(sample_finalize_state(1), &transactions).is_err());
     // Ensure that the ledger deems the same transaction invalid.
-    assert!(consensus.check_transaction_basic(&transaction, None).is_err());
+    assert!(consensus.ledger.check_transaction_basic(&transaction, None).is_err());
     // Ensure that the ledger cannot add the same transaction.
     assert!(consensus.add_unconfirmed_transaction(transaction).await.is_err());
 }
@@ -337,7 +337,7 @@ async fn test_ledger_execute() {
     let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
 
     // Ensure the block is a valid next block.
-    consensus.check_next_block(&next_block).unwrap();
+    consensus.ledger.check_next_block(&next_block).unwrap();
 
     // Construct a next block.
     consensus.advance_to_next_block(&next_block).unwrap();
@@ -345,7 +345,7 @@ async fn test_ledger_execute() {
     assert_eq!(consensus.ledger.latest_hash(), next_block.hash());
 
     // Ensure that the ledger deems the same transaction invalid.
-    assert!(consensus.check_transaction_basic(&transaction, None).is_err());
+    assert!(consensus.ledger.check_transaction_basic(&transaction, None).is_err());
     // Ensure that the ledger cannot add the same transaction.
     assert!(consensus.add_unconfirmed_transaction(transaction).await.is_err());
 }
@@ -399,13 +399,13 @@ async fn test_ledger_execute_many() {
             // Add the transaction to the memory pool.
             consensus.add_unconfirmed_transaction(transaction).await.unwrap();
         }
-        assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), NUM_GENESIS * (1 << (height - 1)));
+        assert_eq!(consensus.memory_pool.num_unconfirmed_transactions(), NUM_GENESIS * (1 << (height - 1)));
 
         // Propose the next block.
         let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
 
         // Ensure the block is a valid next block.
-        consensus.check_next_block(&next_block).unwrap();
+        consensus.ledger.check_next_block(&next_block).unwrap();
         // Construct a next block.
         consensus.advance_to_next_block(&next_block).unwrap();
         assert_eq!(consensus.ledger.latest_height(), height as u32);
@@ -431,7 +431,8 @@ async fn test_proof_target() {
 
     for _ in 0..100 {
         // Generate a prover solution.
-        let prover_solution = consensus.coinbase_puzzle().prove(&epoch_challenge, address, rng.gen(), None).unwrap();
+        let prover_solution =
+            consensus.ledger.coinbase_puzzle().prove(&epoch_challenge, address, rng.gen(), None).unwrap();
 
         // Check that the prover solution meets the proof target requirement.
         if prover_solution.to_target().unwrap() >= proof_target {
@@ -442,7 +443,7 @@ async fn test_proof_target() {
 
         // Generate a prover solution with a minimum proof target.
         let prover_solution =
-            consensus.coinbase_puzzle().prove(&epoch_challenge, address, rng.gen(), Some(proof_target));
+            consensus.ledger.coinbase_puzzle().prove(&epoch_challenge, address, rng.gen(), Some(proof_target));
 
         // Check that the prover solution meets the proof target requirement.
         if let Ok(prover_solution) = prover_solution {
@@ -479,7 +480,7 @@ async fn test_coinbase_target() {
 
     while cumulative_target < consensus.ledger.latest_coinbase_target() as u128 {
         // Generate a prover solution.
-        let prover_solution = match consensus.coinbase_puzzle().prove(
+        let prover_solution = match consensus.ledger.coinbase_puzzle().prove(
             &epoch_challenge,
             address,
             rng.gen(),

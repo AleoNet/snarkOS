@@ -32,7 +32,7 @@ use snarkos_account::Account;
 use snarkos_node_narwhal_committee::Committee;
 use snarkvm::{
     console::account::Address,
-    ledger::narwhal::BatchCertificate,
+    ledger::narwhal::{BatchCertificate, Transmission, TransmissionID},
     prelude::{bail, ensure, Field, Network, Result},
 };
 
@@ -128,6 +128,16 @@ impl<N: Network> BFT<N> {
     /// Returns the certificate of the leader from the current even round, if one was present.
     pub const fn leader_certificate(&self) -> &Arc<RwLock<Option<BatchCertificate<N>>>> {
         &self.leader_certificate
+    }
+
+    /// Returns the number of unconfirmed transmissions.
+    pub fn num_unconfirmed_transmissions(&self) -> usize {
+        self.primary.num_unconfirmed_transmissions()
+    }
+
+    /// Returns the unconfirmed transmissions.
+    pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.primary.unconfirmed_transmissions()
     }
 }
 

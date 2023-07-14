@@ -48,7 +48,7 @@ impl<N: Network> MemoryPool<N> {
             }
 
             // Ensure the transaction is well-formed.
-            if consensus.check_transaction_basic(transaction, None).is_err() {
+            if consensus.ledger.check_transaction_basic(transaction, None).is_err() {
                 continue;
             }
 
@@ -102,7 +102,7 @@ impl<N: Network> MemoryPool<N> {
                 return false;
             }
             // Ensure the transaction is valid.
-            match consensus.check_transaction_basic(transaction, None) {
+            match consensus.ledger.check_transaction_basic(transaction, None) {
                 Ok(_) => true,
                 Err(_) => {
                     trace!("Removed transaction '{transaction_id}' from the memory pool");

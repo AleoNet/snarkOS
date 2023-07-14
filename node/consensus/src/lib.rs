@@ -32,10 +32,10 @@ use snarkos_node_narwhal::{
 use snarkos_node_narwhal_committee::{Committee, MIN_STAKE};
 use snarkos_node_narwhal_ledger_service::CoreLedgerService;
 use snarkvm::{
-    ledger::narwhal::Data,
+    ledger::narwhal::{Data, Transmission, TransmissionID},
     prelude::{
         block::{Block, Transaction},
-        coinbase::{CoinbasePuzzle, ProverSolution},
+        coinbase::ProverSolution,
         store::ConsensusStorage,
         *,
     },
@@ -78,7 +78,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             for _ in 0..4 {
                 members.insert(Address::<N>::new(thread_rng().gen()), MIN_STAKE);
             }
-            Committee::new(ledger.latest_round(), members)?
+            Committee::new(ledger.latest_round() + 1, members)?
         };
         // Initialize the Narwhal storage.
         let storage = NarwhalStorage::new(committee, MAX_GC_ROUNDS);
@@ -115,11 +115,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         &self.ledger
     }
 
-    /// Returns the coinbase puzzle.
-    pub const fn coinbase_puzzle(&self) -> &CoinbasePuzzle<N> {
-        self.ledger.coinbase_puzzle()
-    }
-
     /// Returns the BFT.
     pub const fn bft(&self) -> &BFT<N> {
         &self.bft
@@ -128,6 +123,16 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Returns the primary sender.
     pub fn primary_sender(&self) -> &PrimarySender<N> {
         self.primary_sender.get().expect("Primary sender not set")
+    }
+
+    /// Returns the number of unconfirmed transmissions.
+    pub fn num_unconfirmed_transmissions(&self) -> usize {
+        self.bft.num_unconfirmed_transmissions()
+    }
+
+    /// Returns the unconfirmed transmissions.
+    pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.bft.unconfirmed_transmissions()
     }
 
     /// Adds the given unconfirmed transaction to the memory pool.
@@ -161,11 +166,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         &self.memory_pool
     }
 
-    /// Checks the given transaction is well-formed and unique.
-    pub fn check_transaction_basic(&self, transaction: &Transaction<N>, rejected_id: Option<Field<N>>) -> Result<()> {
-        self.ledger.check_transaction_basic(transaction, rejected_id)
-    }
-
     /// Returns `true` if the coinbase target is met.
     pub fn is_coinbase_target_met(&self) -> Result<bool> {
         // Retrieve the latest proof target.
@@ -176,11 +176,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let latest_coinbase_target = self.ledger.latest_coinbase_target();
         // Check if the coinbase target is met.
         Ok(cumulative_proof_target >= latest_coinbase_target as u128)
-    }
-
-    /// Checks the given block is valid next block.
-    pub fn check_next_block(&self, block: &Block<N>) -> Result<()> {
-        self.ledger.check_next_block(block)
     }
 
     /// Returns a candidate for the next block in the ledger.
@@ -222,24 +217,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         }
 
         info!("Advanced to block {}", block.height());
-        Ok(())
-    }
-
-    /// Clears the memory pool of invalid solutions and transactions.
-    pub fn refresh_memory_pool(&self) -> Result<()> {
-        // Clear the memory pool of unconfirmed solutions that are now invalid.
-        self.memory_pool.clear_invalid_solutions(self);
-        // Clear the memory pool of unconfirmed transactions that are now invalid.
-        self.memory_pool.clear_invalid_transactions(self);
-        Ok(())
-    }
-
-    /// Clears the memory pool of all solutions and transactions.
-    pub fn clear_memory_pool(&self) -> Result<()> {
-        // Clear the memory pool of unconfirmed solutions that are now invalid.
-        self.memory_pool.clear_all_unconfirmed_solutions();
-        // Clear the memory pool of unconfirmed transactions that are now invalid.
-        self.memory_pool.clear_unconfirmed_transactions();
         Ok(())
     }
 }

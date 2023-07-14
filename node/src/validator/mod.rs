@@ -228,7 +228,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 break;
             }
             // Check the next block.
-            if let Err(error) = self.consensus.check_next_block(&block) {
+            if let Err(error) = self.ledger.check_next_block(&block) {
                 warn!("The next block ({}) is invalid - {error}", block.height());
                 break;
             }

@@ -32,7 +32,7 @@ use snarkvm::{
     },
 };
 
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
@@ -91,6 +91,16 @@ impl<N: Network> Worker<N> {
     /// Returns the worker ID.
     pub const fn id(&self) -> u8 {
         self.id
+    }
+
+    /// Returns the number of transmissions in the ready queue.
+    pub fn num_transmissions(&self) -> usize {
+        self.ready.len()
+    }
+
+    /// Returns the transmissions in the ready queue.
+    pub fn transmissions(&self) -> IndexMap<TransmissionID<N>, Transmission<N>> {
+        self.ready.transmissions()
     }
 
     /// Returns `true` if the transmission ID exists in the ready queue, proposed batch, storage, or ledger.

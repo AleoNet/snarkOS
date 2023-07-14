@@ -13,11 +13,12 @@
 // limitations under the License.
 
 use super::*;
-
-use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
 use snarkos_node_env::ENV_INFO;
 use snarkvm::prelude::{block::Transaction, Identifier, Plaintext};
+
+use indexmap::IndexMap;
+use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
@@ -124,11 +125,13 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_transaction(tx_id)?))
     }
 
-    // GET /testnet3/memoryPool/transactions
-    pub(crate) async fn get_memory_pool_transactions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+    // GET /testnet3/memoryPool/transmissions
+    pub(crate) async fn get_memory_pool_transmissions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
-            Some(consensus) => Ok(ErasedJson::pretty(consensus.memory_pool().unconfirmed_transactions())),
-            None => Err(RestError("route isn't available for this node type".to_string())),
+            Some(consensus) => {
+                Ok(ErasedJson::pretty(consensus.unconfirmed_transmissions().collect::<IndexMap<_, _>>()))
+            }
+            None => Err(RestError("Route isn't available for this node type".to_string())),
         }
     }
 

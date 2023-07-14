@@ -166,7 +166,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
         // Try to advance the ledger with the sync pool.
         while let Some(block) = self.router().sync().remove_block_response(latest_height + 1) {
             // Check the next block.
-            if let Err(error) = self.consensus.check_next_block(&block) {
+            if let Err(error) = self.ledger.check_next_block(&block) {
                 warn!("The next block ({}) is invalid - {error}", block.height());
                 break;
             }

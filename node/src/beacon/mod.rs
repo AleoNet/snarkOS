@@ -324,10 +324,10 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
             let next_block = beacon.consensus.propose_next_block(beacon.private_key(), &mut rand::thread_rng())?;
 
             // Ensure the block is a valid next block.
-            if let Err(error) = beacon.consensus.check_next_block(&next_block) {
+            if let Err(error) = beacon.ledger.check_next_block(&next_block) {
                 // Clear the memory pool of all solutions and transactions.
                 trace!("Clearing the memory pool...");
-                beacon.consensus.clear_memory_pool()?;
+                // beacon.consensus.clear_memory_pool()?;
                 trace!("Cleared the memory pool");
                 bail!("Proposed an invalid block: {error}")
             }
@@ -367,7 +367,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 Err(error) => {
                     // Clear the memory pool of all solutions and transactions.
                     trace!("Clearing the memory pool...");
-                    beacon.consensus.clear_memory_pool()?;
+                    // beacon.consensus.clear_memory_pool()?;
                     trace!("Cleared the memory pool");
                     bail!("Failed to advance to the next block: {error}")
                 }
