@@ -151,13 +151,14 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Advances the ledger to the next block.
     pub fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
         // Adds the next block to the ledger.
+        let old_epoch = self.ledger.latest_epoch_number();
         self.ledger.advance_to_next_block(block)?;
 
         // Clear the memory pool of unconfirmed transactions that are now invalid.
         self.memory_pool.clear_invalid_transactions(self);
 
         // If this starts a new epoch, clear all unconfirmed solutions from the memory pool.
-        if block.epoch_number() > self.ledger.latest_epoch_number() {
+        if block.epoch_number() > old_epoch {
             self.memory_pool.clear_all_unconfirmed_solutions();
         }
         // Otherwise, if a new coinbase was produced, clear the memory pool of unconfirmed solutions that are now invalid.
