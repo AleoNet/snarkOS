@@ -186,7 +186,7 @@ impl TestNetwork {
     // Checks a quorum of nodes have reached the given round.
     pub fn is_round_reached(&self, round: u64) -> bool {
         let quorum_threshold = self.primaries.len() / 2 + 1;
-        self.primaries.values().filter(|p| p.current_round() >= round).count() >= quorum_threshold as usize
+        self.primaries.values().filter(|p| p.current_round() >= round).count() >= quorum_threshold
     }
 
     // Checks all nodes have stopped progressing.
