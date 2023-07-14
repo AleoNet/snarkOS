@@ -83,7 +83,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             // Sample the members.
             let mut members = IndexMap::new();
             for _ in 0..4 {
-                members.insert(Address::<N>::new((&mut thread_rng()).gen()), MIN_STAKE);
+                members.insert(Address::<N>::new(thread_rng().gen()), MIN_STAKE);
             }
             Committee::new(ledger.latest_round(), members)?
         };
