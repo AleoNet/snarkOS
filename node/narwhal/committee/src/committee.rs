@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::MIN_STAKE;
 use snarkvm::console::{
     prelude::*,
     program::{Literal, LiteralType},
@@ -20,8 +21,6 @@ use snarkvm::console::{
 
 use indexmap::IndexMap;
 use std::collections::HashSet;
-
-use crate::MIN_STAKE;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Committee<N: Network> {
@@ -197,10 +196,10 @@ impl<N: Network> Committee<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::{sample_committee, sample_committee_custom};
+    use snarkvm::prelude::TestRng;
+
     use parking_lot::RwLock;
     use rayon::prelude::*;
-    use snarkvm::prelude::TestRng;
     use std::sync::Arc;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -249,7 +248,7 @@ mod tests {
         // Set the number of rounds.
         const NUM_ROUNDS: u64 = 256 * 100;
         // Sample a committee.
-        let committee = sample_committee(rng);
+        let committee = crate::test_helpers::sample_committee(rng);
         // Check the leader distribution.
         check_leader_distribution(committee, NUM_ROUNDS, 2.0);
     }
@@ -263,16 +262,67 @@ mod tests {
         // Sample the number of members.
         let num_members = rng.gen_range(4..50);
         // Sample a committee.
-        let committee = sample_committee_custom(num_members, rng);
+        let committee = crate::test_helpers::sample_committee_custom(num_members, rng);
         // Check the leader distribution.
         check_leader_distribution(committee, NUM_ROUNDS, 5.0);
     }
 }
 
 #[cfg(test)]
-pub mod prop_tests {
+pub mod test_helpers {
+    use super::*;
+    use snarkvm::prelude::{Address, TestRng};
 
+    use indexmap::IndexMap;
+    use rand_distr::{Distribution, Exp};
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    /// Samples a random committee.
+    pub fn sample_committee(rng: &mut TestRng) -> Committee<CurrentNetwork> {
+        // Sample the members.
+        let mut members = IndexMap::new();
+        for _ in 0..4 {
+            members.insert(Address::<CurrentNetwork>::new(rng.gen()), MIN_STAKE);
+        }
+        // Return the committee.
+        Committee::<CurrentNetwork>::new(1, members).unwrap()
+    }
+
+    /// Samples a random committee.
+    pub fn sample_committee_custom(num_members: u16, rng: &mut TestRng) -> Committee<CurrentNetwork> {
+        assert!(num_members >= 4);
+        // Set the minimum amount staked in the node.
+        const MIN_STAKE: u64 = 1_000_000_000_000;
+        // Set the maximum amount staked in the node.
+        const MAX_STAKE: u64 = 100_000_000_000_000;
+        // Initialize the Exponential distribution.
+        let distribution = Exp::new(2.0).unwrap();
+        // Initialize an RNG for the stake.
+        let range = (MAX_STAKE - MIN_STAKE) as f64;
+        // Sample the members.
+        let mut members = IndexMap::new();
+        // Add in the minimum and maximum staked nodes.
+        members.insert(Address::<CurrentNetwork>::new(rng.gen()), MIN_STAKE);
+        while members.len() < num_members as usize - 1 {
+            loop {
+                let stake = MIN_STAKE as f64 + range * distribution.sample(rng);
+                if stake >= MIN_STAKE as f64 && stake <= MAX_STAKE as f64 {
+                    members.insert(Address::<CurrentNetwork>::new(rng.gen()), stake as u64);
+                    break;
+                }
+            }
+        }
+        members.insert(Address::<CurrentNetwork>::new(rng.gen()), MAX_STAKE);
+        // Return the committee.
+        Committee::<CurrentNetwork>::new(1, members).unwrap()
+    }
+}
+
+#[cfg(test)]
+pub mod prop_tests {
     use crate::test_helpers::CommitteeInput;
+
     use test_strategy::proptest;
 
     #[proptest]

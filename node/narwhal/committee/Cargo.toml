@@ -20,6 +20,9 @@ edition = "2021"
 default = [ ]
 test-utils = [ "rand_chacha", "rand_distr", "test-strategy", "proptest" ]
 
+[dependencies.anyhow]
+version = "1.0.70"
+
 [dependencies.async-trait]
 version = "0.1"
 
@@ -48,9 +51,6 @@ version = "0.12"
 
 [dependencies.rand]
 version = "0.8"
-
-[dependencies.anyhow]
-version = "1.0.70"
 
 [dependencies.rand_distr]
 version = "0.4"

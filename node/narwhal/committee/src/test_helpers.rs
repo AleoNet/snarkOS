@@ -19,9 +19,8 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use proptest::sample::size_range;
 use rand::{Rng, SeedableRng};
-use rand_distr::{Distribution, Exp};
+use rand_distr::Distribution;
 use snarkos_account::Account;
-use snarkvm::prelude::{Address, TestRng};
 use std::hash::Hash;
 use test_strategy::Arbitrary;
 
@@ -85,44 +84,4 @@ impl CommitteeInput {
             && HashSet::<u64>::from_iter(self.validators.iter().map(|v| v.account_seed)).len() >= 4
             && self.validators.iter().all(|v| v.stake >= MIN_STAKE)
     }
-}
-
-/// Samples a random committee.
-pub fn sample_committee(rng: &mut TestRng) -> Committee<CurrentNetwork> {
-    // Sample the members.
-    let mut members = IndexMap::new();
-    for _ in 0..4 {
-        members.insert(Address::<CurrentNetwork>::new(rng.gen()), MIN_STAKE);
-    }
-    // Return the committee.
-    Committee::<CurrentNetwork>::new(1, members).unwrap()
-}
-
-/// Samples a random committee.
-pub fn sample_committee_custom(num_members: u16, rng: &mut TestRng) -> Committee<CurrentNetwork> {
-    assert!(num_members >= 4);
-    // Set the minimum amount staked in the node.
-    const MIN_STAKE: u64 = 1_000_000_000_000;
-    // Set the maximum amount staked in the node.
-    const MAX_STAKE: u64 = 100_000_000_000_000;
-    // Initialize the Exponential distribution.
-    let distribution = Exp::new(2.0).unwrap();
-    // Initialize an RNG for the stake.
-    let range = (MAX_STAKE - MIN_STAKE) as f64;
-    // Sample the members.
-    let mut members = IndexMap::new();
-    // Add in the minimum and maximum staked nodes.
-    members.insert(Address::<CurrentNetwork>::new(rng.gen()), MIN_STAKE);
-    while members.len() < num_members as usize - 1 {
-        loop {
-            let stake = MIN_STAKE as f64 + range * distribution.sample(rng);
-            if stake >= MIN_STAKE as f64 && stake <= MAX_STAKE as f64 {
-                members.insert(Address::<CurrentNetwork>::new(rng.gen()), stake as u64);
-                break;
-            }
-        }
-    }
-    members.insert(Address::<CurrentNetwork>::new(rng.gen()), MAX_STAKE);
-    // Return the committee.
-    Committee::<CurrentNetwork>::new(1, members).unwrap()
 }

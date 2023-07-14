@@ -56,13 +56,13 @@ default-features = false
 path = "../../account"
 version = "=2.1.4"
 
-[dependencies.snarkos-node-narwhal-ledger-service]
-path = "./ledger-service"
+[dependencies.snarkos-node-narwhal-committee]
+path = "./committee"
 version = "=2.1.4"
 default-features = false
 
-[dependencies.snarkos-node-narwhal-committee]
-path = "./committee"
+[dependencies.snarkos-node-narwhal-ledger-service]
+path = "./ledger-service"
 version = "=2.1.4"
 default-features = false
 
@@ -124,15 +124,15 @@ version = "1"
 workspace = true
 features = [ "test-helpers" ]
 
-[dev-dependencies.snarkos-node-narwhal-ledger-service]
-path = "./ledger-service"
-default-features = false
-features = [ "mock" ]
-
 [dev-dependencies.snarkos-node-narwhal-committee]
 path = "./committee"
 default-features = false
 features = [ "test-utils" ]
+
+[dev-dependencies.snarkos-node-narwhal-ledger-service]
+path = "./ledger-service"
+default-features = false
+features = [ "mock" ]
 
 [dev-dependencies.tower-http]
 version = "0.4"
