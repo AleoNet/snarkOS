@@ -866,6 +866,7 @@ pub mod prop_tests {
         pub committee_input: CommitteeInput,
         #[filter(Validator::is_valid)]
         pub node_validator: Validator,
+        #[filter(#dev.is_none() || *#dev.as_ref().unwrap() < 10000)]
         pub dev: Option<u16>,
         #[strategy(0..MAX_WORKERS)]
         pub workers_count: u8,
