@@ -14,10 +14,7 @@
 
 mod common;
 
-use crate::common::{
-    primary::{initiate_connections, log_connections, start_n_primaries},
-    utils::{fire_unconfirmed_solutions, fire_unconfirmed_transactions},
-};
+use crate::common::primary::{TestNetwork, TestNetworkConfig};
 use deadline::deadline;
 use snarkos_node_narwhal::MAX_BATCH_DELAY;
 use std::time::Duration;
@@ -26,21 +23,18 @@ use tokio::time::sleep;
 #[tokio::test(flavor = "multi_thread")]
 #[ignore = "Long-running e2e test"]
 async fn test_state_coherence() {
-    crate::common::utils::initialize_logger(0);
-
     const N: u16 = 4;
-    let primaries = start_n_primaries(N).await;
-    initiate_connections(&primaries).await;
-    log_connections(&primaries);
+    let mut network = TestNetwork::new(TestNetworkConfig {
+        num_nodes: N,
+        initiate_connections: true,
+        fire_cannons: true,
 
-    // Start the tx cannons for each primary.
-    for (id, primary) in primaries {
-        let sender = primary.1;
-        // Fire unconfirmed solutions.
-        fire_unconfirmed_solutions(&sender, id);
-        // Fire unconfirmed transactions.
-        fire_unconfirmed_transactions(&sender, id);
-    }
+        // Set this to Some(0..=4) to see the logs.
+        log_level: None,
+        log_connections: true,
+    });
+
+    network.start().await;
 
     // TODO(nkls): the easiest would be to assert on the anchor or bullshark's output, once
     // implemented.
@@ -50,141 +44,83 @@ async fn test_state_coherence() {
 
 #[tokio::test]
 async fn test_quorum_threshold() {
-    // crate::common::utils::initialize_logger(0);
-
-    // 1. Start N nodes but don't connect them.
+    // Start N nodes but don't connect them.
     const N: u16 = 4;
-    let primaries = start_n_primaries(N).await;
-    log_connections(&primaries);
+    let mut network = TestNetwork::new(TestNetworkConfig {
+        num_nodes: N,
+        initiate_connections: false,
+        fire_cannons: false,
+
+        // Set this to Some(0..=4) to see the logs.
+        log_level: None,
+        log_connections: true,
+    });
+    network.start().await;
 
     // Check each node is at round 1 (0 is genesis).
-    for (primary, _sender) in primaries.values() {
+    for primary in network.primaries.values() {
         assert_eq!(primary.current_round(), 1);
     }
 
-    // 2. Start the cannon for node 0.
-    {
-        let (_primary_0, sender_0) = &primaries.get(&0).unwrap();
-        // Fire unconfirmed solutions.
-        fire_unconfirmed_solutions(sender_0, 0);
-        // Fire unconfirmed transactions.
-        fire_unconfirmed_transactions(sender_0, 0);
-    }
+    // Start the cannons for node 0.
+    network.fire_unconfirmed_solutions(0);
+    network.fire_unconfirmed_transactions(0);
 
     sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
 
     // Check each node is still at round 1.
-    for (primary, _sender) in primaries.values() {
+    for primary in network.primaries.values() {
         assert_eq!(primary.current_round(), 1);
     }
 
-    // 3. Connect the first two nodes and start the tx cannon for the second node.
-    {
-        let (primary_0, _sender_0) = &primaries.get(&0).unwrap();
-        let (primary_1, _sender_1) = &primaries.get(&1).unwrap();
-
-        // Connect node 0 to node 1.
-        let ip = primary_1.gateway().local_ip();
-        primary_0.gateway().connect(ip);
-        // Give the connection time to be established.
-        sleep(Duration::from_millis(100)).await;
-
-        // Fire unconfirmed solutions.
-        fire_unconfirmed_solutions(_sender_1, 1);
-        // Fire unconfirmed transactions.
-        fire_unconfirmed_transactions(_sender_1, 1);
-    }
+    // Connect the first two nodes and start the cannons for node 1.
+    network.connect(0, 1).await;
+    network.fire_unconfirmed_solutions(1);
+    network.fire_unconfirmed_transactions(1);
 
     sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
 
     // Check each node is still at round 1.
-    for (primary, _sender) in primaries.values() {
+    for primary in network.primaries.values() {
         assert_eq!(primary.current_round(), 1);
     }
 
-    // 4. Connect the third node and start the tx cannon for it.
-    {
-        let (primary_0, _sender_0) = &primaries.get(&0).unwrap();
-        let (primary_1, _sender_1) = &primaries.get(&1).unwrap();
-        let (primary_2, _sender_2) = &primaries.get(&2).unwrap();
-
-        // Connect node 0 and 1 to node 2.
-        let ip = primary_2.gateway().local_ip();
-        primary_0.gateway().connect(ip);
-        primary_1.gateway().connect(ip);
-        // Give the connection time to be established.
-        sleep(Duration::from_millis(100)).await;
-
-        // Fire unconfirmed solutions.
-        fire_unconfirmed_solutions(_sender_2, 2);
-        // Fire unconfirmed transactions.
-        fire_unconfirmed_transactions(_sender_2, 2);
-    }
+    // Connect the third node and start the cannons for it.
+    network.connect(0, 2).await;
+    network.connect(1, 2).await;
+    network.fire_unconfirmed_solutions(2);
+    network.fire_unconfirmed_transactions(2);
 
     // Check the nodes reach quorum and advance through the rounds.
-    deadline!(std::time::Duration::from_secs(20), move || {
-        let (primary_0, _sender_0) = &primaries.get(&0).unwrap();
-        let (primary_1, _sender_1) = &primaries.get(&1).unwrap();
-        let (primary_2, _sender_2) = &primaries.get(&2).unwrap();
-
-        const NUM_ROUNDS: u64 = 4;
-        primary_0.current_round() > NUM_ROUNDS
-            && primary_1.current_round() > NUM_ROUNDS
-            && primary_2.current_round() > NUM_ROUNDS
-    });
+    const TARGET_ROUND: u64 = 4;
+    deadline!(Duration::from_secs(20), move || { network.is_round_reached(TARGET_ROUND) });
 }
 
 #[tokio::test]
 async fn test_quorum_break() {
-    // crate::common::utils::initialize_logger(0);
-
+    // Start N nodes, connect them and start the cannons for each.
     const N: u16 = 4;
-    let primaries = start_n_primaries(N).await;
-    initiate_connections(&primaries).await;
-    log_connections(&primaries);
+    let mut network = TestNetwork::new(TestNetworkConfig {
+        num_nodes: N,
+        initiate_connections: true,
+        fire_cannons: true,
 
-    // Start the tx cannons for each primary.
-    for (id, primary) in &primaries {
-        let sender = &primary.1;
-        // Fire unconfirmed solutions.
-        fire_unconfirmed_solutions(sender, *id);
-        // Fire unconfirmed transactions.
-        fire_unconfirmed_transactions(sender, *id);
-    }
-
-    // Wait until the nodes have advanced through the rounds a bit.
-    let primaries_clone = primaries.clone();
-    deadline!(std::time::Duration::from_secs(20), move || {
-        let (primary_0, _sender_0) = &primaries_clone.get(&0).unwrap();
-        let (primary_1, _sender_1) = &primaries_clone.get(&1).unwrap();
-        let (primary_2, _sender_2) = &primaries_clone.get(&2).unwrap();
-        let (primary_3, _sender_3) = &primaries_clone.get(&3).unwrap();
-
-        const NUM_ROUNDS: u64 = 4;
-        primary_0.current_round() > NUM_ROUNDS
-            && primary_1.current_round() > NUM_ROUNDS
-            && primary_2.current_round() > NUM_ROUNDS
-            && primary_3.current_round() > NUM_ROUNDS
+        // Set this to Some(0..=4) to see the logs.
+        log_level: None,
+        log_connections: true,
     });
+    network.start().await;
 
-    // Break quorum by disconnecting two nodes.
-    let (primary_2, _sender_2) = &primaries.get(&2).unwrap();
-    primary_2.shut_down().await;
-    let (primary_3, _sender_3) = &primaries.get(&3).unwrap();
-    primary_3.shut_down().await;
+    // Check the nodes have started advancing through the rounds.
+    const TARGET_ROUND: u64 = 4;
+    // Note: cloning the network is fine because the primaries it wraps are `Arc`ed.
+    let network_clone = network.clone();
+    deadline!(Duration::from_secs(20), move || { network_clone.is_round_reached(TARGET_ROUND) });
 
-    // Give the network time to settle.
-    sleep(Duration::from_millis(100)).await;
+    // Break the quorum by disconnecting two nodes.
+    const NUM_NODES: u16 = 2;
+    network.disconnect(NUM_NODES).await;
 
-    // Check the nodes stop advancing through the rounds.
-    let (primary_0, _sender_0) = &primaries.get(&0).unwrap();
-    let (primary_1, _sender_1) = &primaries.get(&1).unwrap();
-
-    assert_eq!(primary_0.current_round(), primary_1.current_round());
-    let break_round = primary_0.current_round();
-
-    sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
-
-    assert_eq!(primary_0.current_round(), break_round);
-    assert_eq!(primary_1.current_round(), break_round);
+    // Check the nodes have stopped advancing through the rounds.
+    assert!(network.is_halted().await);
 }

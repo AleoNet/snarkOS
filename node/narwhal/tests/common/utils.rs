@@ -28,7 +28,7 @@ use snarkvm::{
 
 use ::bytes::Bytes;
 use rand::Rng;
-use tokio::{sync::oneshot, task};
+use tokio::{sync::oneshot, task, task::JoinHandle};
 use tracing::*;
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
@@ -69,7 +69,7 @@ pub fn initialize_logger(verbosity: u8) {
 }
 
 /// Fires *fake* unconfirmed solutions at the node.
-pub fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_id: u16) {
+pub fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_id: u16) -> JoinHandle<()> {
     let tx_unconfirmed_solution = sender.tx_unconfirmed_solution.clone();
     tokio::task::spawn(async move {
         // This RNG samples the *same* fake solutions for all nodes.
@@ -111,11 +111,11 @@ pub fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_i
             // Sleep briefly.
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
-    });
+    })
 }
 
 /// Fires *fake* unconfirmed transactions at the node.
-pub fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id: u16) {
+pub fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id: u16) -> JoinHandle<()> {
     let tx_unconfirmed_transaction = sender.tx_unconfirmed_transaction.clone();
     tokio::task::spawn(async move {
         // This RNG samples the *same* fake transactions for all nodes.
@@ -155,5 +155,5 @@ pub fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, nod
             // Sleep briefly.
             tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
-    });
+    })
 }
