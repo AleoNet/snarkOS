@@ -46,6 +46,10 @@ version = "=2.1.4"
 default-features = false
 features = [ "ledger" ]
 
+[dependencies.snarkos-node-narwhal-committee]
+path = "../narwhal/committee"
+version = "=2.1.4"
+
 [dependencies.snarkvm]
 workspace = true
 

@@ -17,12 +17,13 @@ extern crate tracing;
 
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
-    helpers::{init_primary_channels, Committee, PrimarySender, Storage},
+    helpers::{init_primary_channels, PrimarySender, Storage},
     Primary,
     BFT,
     MAX_GC_ROUNDS,
     MEMORY_POOL_PORT,
 };
+use snarkos_node_narwhal_committee::Committee;
 use snarkos_node_narwhal_ledger_service::MockLedgerService;
 use snarkvm::{
     ledger::narwhal::Data,

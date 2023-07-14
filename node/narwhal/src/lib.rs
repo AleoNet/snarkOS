@@ -55,9 +55,6 @@ pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 pub const MAX_TRANSMISSIONS_PER_BATCH: usize = 1000; // transmissions
 /// The maximum number of workers that can be spawned.
 pub const MAX_WORKERS: u8 = 3; // workers
-/// The minimum amount of stake required for a validator to bond.
-/// TODO (howardwu): Change to 1_000_000_000_000u64.
-pub const MIN_STAKE: u64 = 1_000u64; // microcredits
 /// The port on which the memory pool listens for incoming connections.
 pub const MEMORY_POOL_PORT: u16 = 5000; // port
 /// The frequency at which each worker broadcasts a ping to every other node.

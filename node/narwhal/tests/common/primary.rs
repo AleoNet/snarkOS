@@ -15,11 +15,11 @@
 use crate::common::{CurrentNetwork, MockLedgerService};
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
-    helpers::{init_primary_channels, Committee, PrimarySender, Storage},
+    helpers::{init_primary_channels, PrimarySender, Storage},
     Primary,
     MAX_GC_ROUNDS,
-    MIN_STAKE,
 };
+use snarkos_node_narwhal_committee::{Committee, MIN_STAKE};
 use snarkvm::prelude::TestRng;
 
 use indexmap::IndexMap;

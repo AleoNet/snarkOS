@@ -18,7 +18,6 @@ use crate::{
         init_bft_channels,
         now,
         BFTReceiver,
-        Committee,
         ConsensusSender,
         PrimaryReceiver,
         PrimarySender,
@@ -30,6 +29,7 @@ use crate::{
     MAX_LEADER_CERTIFICATE_DELAY,
 };
 use snarkos_account::Account;
+use snarkos_node_narwhal_committee::Committee;
 use snarkvm::{
     console::account::Address,
     ledger::narwhal::BatchCertificate,
