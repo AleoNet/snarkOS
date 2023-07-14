@@ -17,15 +17,7 @@ mod router;
 use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
-use snarkos_node_messages::{
-    BeaconPropose,
-    Data,
-    Message,
-    NodeType,
-    PuzzleResponse,
-    UnconfirmedSolution,
-    UnconfirmedTransaction,
-};
+use snarkos_node_messages::{Data, NodeType, PuzzleResponse, UnconfirmedSolution, UnconfirmedTransaction};
 use snarkos_node_narwhal::helpers::init_primary_channels;
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
@@ -37,18 +29,12 @@ use snarkvm::prelude::{
     block::{Block, Transaction},
     coinbase::ProverSolution,
     store::ConsensusStorage,
-    Entry,
-    Identifier,
     Ledger,
-    Literal,
     Network,
-    Plaintext,
     RecordMap,
     Value,
-    Zero,
 };
 
-use ::time::OffsetDateTime;
 use aleo_std::prelude::{finish, lap, timer};
 use anyhow::{bail, Result};
 use core::{str::FromStr, time::Duration};
@@ -56,11 +42,11 @@ use parking_lot::{Mutex, RwLock};
 use std::{
     net::SocketAddr,
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
+        atomic::{AtomicBool, Ordering},
         Arc,
     },
 };
-use tokio::{task::JoinHandle, time::timeout};
+use tokio::task::JoinHandle;
 
 /// A beacon is a full node, capable of producing blocks.
 #[derive(Clone)]
@@ -75,10 +61,8 @@ pub struct Beacon<N: Network, C: ConsensusStorage<N>> {
     router: Router<N>,
     /// The REST server of the node.
     rest: Option<Rest<N, C, Self>>,
-    /// The time it to generate a block.
-    block_generation_time: Arc<AtomicU64>,
-    /// The unspent records.
-    unspent_records: Arc<RwLock<RecordMap<N>>>,
+    // /// The unspent records.
+    // unspent_records: Arc<RwLock<RecordMap<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
     /// The shutdown signal.
@@ -120,11 +104,9 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         consensus.run(primary_sender, primary_receiver).await?;
         lap!(timer, "Initialize consensus");
 
-        // Initialize the block generation time.
-        let block_generation_time = Arc::new(AtomicU64::new(2));
-        // Retrieve the unspent records.
-        let unspent_records = ledger.find_unspent_credits_records(account.view_key())?;
-        lap!(timer, "Retrieve the unspent credits records");
+        // // Retrieve the unspent records.
+        // let unspent_records = ledger.find_unspent_credits_records(account.view_key())?;
+        // lap!(timer, "Retrieve the unspent credits records");
 
         // Initialize the node router.
         let router = Router::new(
@@ -145,8 +127,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
             consensus: consensus.clone(),
             router,
             rest: None,
-            block_generation_time,
-            unspent_records: Arc::new(RwLock::new(unspent_records)),
+            // unspent_records: Arc::new(RwLock::new(unspent_records)),
             handles: Default::default(),
             shutdown: Default::default(),
         };
@@ -205,56 +186,60 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Beacon<N, C> {
     }
 }
 
-/// A helper method to check if the coinbase target has been met.
-async fn check_for_coinbase<N: Network, C: ConsensusStorage<N>>(consensus: Consensus<N, C>) {
-    loop {
-        // Check if the coinbase target has been met.
-        match consensus.is_coinbase_target_met() {
-            Ok(true) => break,
-            Ok(false) => (),
-            Err(error) => error!("Failed to check if coinbase target is met: {error}"),
-        }
-        // Sleep for one second.
-        tokio::time::sleep(Duration::from_secs(1)).await
-    }
-}
+// /// A helper method to check if the coinbase target has been met.
+// async fn check_for_coinbase<N: Network, C: ConsensusStorage<N>>(consensus: Consensus<N, C>) {
+//     loop {
+//         // Check if the coinbase target has been met.
+//         match consensus.is_coinbase_target_met() {
+//             Ok(true) => break,
+//             Ok(false) => (),
+//             Err(error) => error!("Failed to check if coinbase target is met: {error}"),
+//         }
+//         // Sleep for one second.
+//         tokio::time::sleep(Duration::from_secs(1)).await
+//     }
+// }
 
 impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     /// Initialize a new instance of block production.
     async fn initialize_block_production(&self) {
         let beacon = self.clone();
         self.handles.lock().push(tokio::spawn(async move {
-            // Expected time per block.
-            const ROUND_TIME: u64 = 15; // 15 seconds per block
+            //         // Expected time per block.
+            //         const ROUND_TIME: u64 = 15; // 15 seconds per block
 
             // Produce blocks.
             loop {
-                // Fetch the current timestamp.
-                let current_timestamp = OffsetDateTime::now_utc().unix_timestamp();
-                // Compute the elapsed time.
-                let elapsed_time = current_timestamp.saturating_sub(beacon.ledger.latest_timestamp()) as u64;
+                //             // Fetch the current timestamp.
+                //             let current_timestamp = OffsetDateTime::now_utc().unix_timestamp();
+                //             // Compute the elapsed time.
+                //             let elapsed_time = current_timestamp.saturating_sub(beacon.ledger.latest_timestamp()) as u64;
+                //
+                //             // Do not produce a block if the elapsed time has not exceeded `ROUND_TIME - block_generation_time`.
+                //             // This will ensure a block is produced at intervals of approximately `ROUND_TIME`.
+                //             let time_to_wait = ROUND_TIME.saturating_sub(beacon.block_generation_time.load(Ordering::Acquire));
+                //             trace!("Waiting for {time_to_wait} seconds before producing a block...");
+                //             if elapsed_time < time_to_wait {
+                //                 if let Err(error) = timeout(
+                //                     Duration::from_secs(time_to_wait.saturating_sub(elapsed_time)),
+                //                     check_for_coinbase(beacon.consensus.clone()),
+                //                 )
+                //                 .await
+                //                 {
+                //                     trace!("Check for coinbase - {error}");
+                //                 }
+                //             }
+                //
+                //             // Start a timer.
+                //             let timer = std::time::Instant::now();
 
-                // Do not produce a block if the elapsed time has not exceeded `ROUND_TIME - block_generation_time`.
-                // This will ensure a block is produced at intervals of approximately `ROUND_TIME`.
-                let time_to_wait = ROUND_TIME.saturating_sub(beacon.block_generation_time.load(Ordering::Acquire));
-                trace!("Waiting for {time_to_wait} seconds before producing a block...");
-                if elapsed_time < time_to_wait {
-                    if let Err(error) = timeout(
-                        Duration::from_secs(time_to_wait.saturating_sub(elapsed_time)),
-                        check_for_coinbase(beacon.consensus.clone()),
-                    )
-                    .await
-                    {
-                        trace!("Check for coinbase - {error}");
-                    }
-                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
 
-                // Start a timer.
-                let timer = std::time::Instant::now();
                 // Produce the next block and propagate it to all peers.
                 match beacon.produce_next_block().await {
                     // Update the block generation time.
-                    Ok(()) => beacon.block_generation_time.store(timer.elapsed().as_secs(), Ordering::Release),
+                    // Ok(()) => beacon.block_generation_time.store(timer.elapsed().as_secs(), Ordering::Release),
+                    Ok(()) => (),
                     Err(error) => error!("{error}"),
                 }
 
@@ -269,7 +254,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
 
     /// Produces the next block and propagates it to all peers.
     async fn produce_next_block(&self) -> Result<()> {
-        let mut beacon_transaction: Option<Transaction<N>> = None;
+        // let mut beacon_transaction: Option<Transaction<N>> = None;
 
         // Produce a transaction if the mempool is empty.
         if self.consensus.num_unconfirmed_transactions() == 0 {
@@ -308,7 +293,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
                 Err(error) => bail!("Failed to create a transfer transaction for the next block: {error}"),
             };
             // Save the beacon transaction.
-            beacon_transaction = Some(transaction.clone());
+            // beacon_transaction = Some(transaction.clone());
 
             // Add the transaction to the memory pool.
             let beacon = self.clone();
@@ -318,77 +303,77 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
             }
         }
 
-        // Propose the next block.
-        let beacon = self.clone();
-        let next_block = match tokio::task::spawn_blocking(move || {
-            let next_block = beacon.consensus.propose_next_block(beacon.private_key(), &mut rand::thread_rng())?;
+        // // Propose the next block.
+        // let beacon = self.clone();
+        // let next_block = match tokio::task::spawn_blocking(move || {
+        //     let next_block = beacon.consensus.propose_next_block(beacon.private_key(), &mut rand::thread_rng())?;
+        //
+        //     // Ensure the block is a valid next block.
+        //     if let Err(error) = beacon.ledger.check_next_block(&next_block) {
+        //         // Clear the memory pool of all solutions and transactions.
+        //         trace!("Clearing the memory pool...");
+        //         // beacon.consensus.clear_memory_pool()?;
+        //         trace!("Cleared the memory pool");
+        //         bail!("Proposed an invalid block: {error}")
+        //     }
 
-            // Ensure the block is a valid next block.
-            if let Err(error) = beacon.ledger.check_next_block(&next_block) {
-                // Clear the memory pool of all solutions and transactions.
-                trace!("Clearing the memory pool...");
-                // beacon.consensus.clear_memory_pool()?;
-                trace!("Cleared the memory pool");
-                bail!("Proposed an invalid block: {error}")
-            }
-
-            // Advance to the next block.
-            match beacon.consensus.advance_to_next_block(&next_block) {
-                Ok(()) => {
-                    // If the beacon produced a transaction, save its output records.
-                    if let Some(transaction) = beacon_transaction {
-                        // Save the unspent records.
-                        if let Err(error) = transaction.into_transitions().try_for_each(|transition| {
-                            for (commitment, record) in transition.into_records() {
-                                let record = record.decrypt(beacon.account.view_key())?;
-
-                                if let Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) =
-                                    record.data().get(&Identifier::from_str("microcredits")?)
-                                {
-                                    if !amount.is_zero() {
-                                        beacon.unspent_records.write().insert(commitment, record);
-                                    }
-                                }
-                            }
-                            Ok::<_, anyhow::Error>(())
-                        }) {
-                            warn!("Unable to save the beacon unspent records, recomputing unspent records: {error}");
-                            // Recompute the unspent records.
-                            *beacon.unspent_records.write() =
-                                beacon.ledger.find_unspent_credits_records(beacon.account.view_key())?;
-                        };
-                    }
-                    // Log the next block.
-                    match serde_json::to_string_pretty(&next_block.header()) {
-                        Ok(header) => info!("Block {}: {header}", next_block.height()),
-                        Err(error) => info!("Block {}: (serde failed: {error})", next_block.height()),
-                    }
-                }
-                Err(error) => {
-                    // Clear the memory pool of all solutions and transactions.
-                    trace!("Clearing the memory pool...");
-                    // beacon.consensus.clear_memory_pool()?;
-                    trace!("Cleared the memory pool");
-                    bail!("Failed to advance to the next block: {error}")
-                }
-            }
-
-            Ok(next_block)
-        })
-        .await
-        {
-            Ok(Ok(next_block)) => next_block,
-            Ok(Err(error)) => {
-                // Sleep for one second.
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                bail!("Failed to propose the next block: {error}")
-            }
-            Err(error) => {
-                // Sleep for one second.
-                tokio::time::sleep(Duration::from_secs(1)).await;
-                bail!("Failed to propose the next block (JoinError): {error}")
-            }
-        };
+        //     // Advance to the next block.
+        //     match beacon.consensus.advance_to_next_block(&next_block) {
+        //         Ok(()) => {
+        //             // If the beacon produced a transaction, save its output records.
+        //             if let Some(transaction) = beacon_transaction {
+        //                 // Save the unspent records.
+        //                 if let Err(error) = transaction.into_transitions().try_for_each(|transition| {
+        //                     for (commitment, record) in transition.into_records() {
+        //                         let record = record.decrypt(beacon.account.view_key())?;
+        //
+        //                         if let Some(Entry::Private(Plaintext::Literal(Literal::U64(amount), _))) =
+        //                             record.data().get(&Identifier::from_str("microcredits")?)
+        //                         {
+        //                             if !amount.is_zero() {
+        //                                 beacon.unspent_records.write().insert(commitment, record);
+        //                             }
+        //                         }
+        //                     }
+        //                     Ok::<_, anyhow::Error>(())
+        //                 }) {
+        //                     warn!("Unable to save the beacon unspent records, recomputing unspent records: {error}");
+        //                     // Recompute the unspent records.
+        //                     *beacon.unspent_records.write() =
+        //                         beacon.ledger.find_unspent_credits_records(beacon.account.view_key())?;
+        //                 };
+        //             }
+        //             // Log the next block.
+        //             match serde_json::to_string_pretty(&next_block.header()) {
+        //                 Ok(header) => info!("Block {}: {header}", next_block.height()),
+        //                 Err(error) => info!("Block {}: (serde failed: {error})", next_block.height()),
+        //             }
+        //         }
+        //         Err(error) => {
+        //             // Clear the memory pool of all solutions and transactions.
+        //             trace!("Clearing the memory pool...");
+        //             // beacon.consensus.clear_memory_pool()?;
+        //             trace!("Cleared the memory pool");
+        //             bail!("Failed to advance to the next block: {error}")
+        //         }
+        //     }
+        //
+        //     Ok(next_block)
+        // })
+        // .await
+        // {
+        //     Ok(Ok(next_block)) => next_block,
+        //     Ok(Err(error)) => {
+        //         // Sleep for one second.
+        //         tokio::time::sleep(Duration::from_secs(1)).await;
+        //         bail!("Failed to propose the next block: {error}")
+        //     }
+        //     Err(error) => {
+        //         // Sleep for one second.
+        //         tokio::time::sleep(Duration::from_secs(1)).await;
+        //         bail!("Failed to propose the next block (JoinError): {error}")
+        //     }
+        // };
 
         // // Ensure the block is a valid next block.
         // if let Err(error) = self.consensus.check_next_block(&next_block) {
@@ -418,27 +403,27 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         //     }
         // }
 
-        // Prepare the message.
-        let next_block_round = next_block.round();
-        let next_block_height = next_block.height();
-        let next_block_hash = next_block.hash();
-
-        // Serialize the block ahead of time to not do it for each peer.
-        let serialized_block = match Data::Object(next_block).serialize().await {
-            Ok(serialized_block) => Data::Buffer(serialized_block),
-            Err(error) => bail!("Failed to serialize the next block for propagation: {error}"),
-        };
-
-        // Prepare the block to be sent to all peers.
-        let message = Message::<N>::BeaconPropose(BeaconPropose::new(
-            next_block_round,
-            next_block_height,
-            next_block_hash,
-            serialized_block,
-        ));
-
-        // Propagate the block to all beacons.
-        self.propagate_to_beacons(message, &[]);
+        // // Prepare the message.
+        // let next_block_round = next_block.round();
+        // let next_block_height = next_block.height();
+        // let next_block_hash = next_block.hash();
+        //
+        // // Serialize the block ahead of time to not do it for each peer.
+        // let serialized_block = match Data::Object(next_block).serialize().await {
+        //     Ok(serialized_block) => Data::Buffer(serialized_block),
+        //     Err(error) => bail!("Failed to serialize the next block for propagation: {error}"),
+        // };
+        //
+        // // Prepare the block to be sent to all peers.
+        // let message = Message::<N>::BeaconPropose(BeaconPropose::new(
+        //     next_block_round,
+        //     next_block_height,
+        //     next_block_hash,
+        //     serialized_block,
+        // ));
+        //
+        // // Propagate the block to all beacons.
+        // self.propagate_to_beacons(message, &[]);
 
         Ok(())
     }
@@ -490,11 +475,11 @@ mod tests {
         .await
         .unwrap();
 
-        println!(
-            "Loaded beacon node with {} blocks and {} records",
-            beacon.ledger.latest_height(),
-            beacon.unspent_records.read().len()
-        );
+        // println!(
+        //     "Loaded beacon node with {} blocks and {} records",
+        //     beacon.ledger.latest_height(),
+        //     beacon.unspent_records.read().len()
+        // );
 
         bail!("\n\nRemember to #[ignore] this test!\n\n")
     }

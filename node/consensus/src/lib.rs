@@ -209,48 +209,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Check if the coinbase target is met.
         Ok(cumulative_proof_target >= latest_coinbase_target as u128)
     }
-
-    /// Returns a candidate for the next block in the ledger.
-    pub fn propose_next_block<R: Rng + CryptoRng>(&self, private_key: &PrivateKey<N>, rng: &mut R) -> Result<Block<N>> {
-        // Retrieve the latest block.
-        let latest_block = self.ledger.latest_block();
-        // Retrieve the latest height.
-        let latest_height = latest_block.height();
-        // Retrieve the latest proof target.
-        let latest_proof_target = latest_block.proof_target();
-        // Retrieve the latest coinbase target.
-        let latest_coinbase_target = latest_block.coinbase_target();
-
-        // Select the transactions from the memory pool.
-        let transactions = self.memory_pool.candidate_transactions(self);
-        // Select the prover solutions from the memory pool.
-        let prover_solutions =
-            self.memory_pool.candidate_solutions(self, latest_height, latest_proof_target, latest_coinbase_target)?;
-
-        // Prepare the next block.
-        self.ledger.prepare_advance_to_next_block(private_key, transactions, prover_solutions, rng)
-    }
-
-    /// Advances the ledger to the next block.
-    pub fn advance_to_next_block(&self, block: &Block<N>) -> Result<()> {
-        // Adds the next block to the ledger.
-        self.ledger.advance_to_next_block(block)?;
-
-        // Clear the memory pool of unconfirmed transactions that are now invalid.
-        self.memory_pool.clear_invalid_transactions(self);
-
-        // If this starts a new epoch, clear all unconfirmed solutions from the memory pool.
-        if block.epoch_number() > self.ledger.latest_epoch_number() {
-            self.memory_pool.clear_all_unconfirmed_solutions();
-        }
-        // Otherwise, if a new coinbase was produced, clear the memory pool of unconfirmed solutions that are now invalid.
-        else if block.coinbase().is_some() {
-            self.memory_pool.clear_invalid_solutions(self);
-        }
-
-        info!("Advanced to block {}", block.height());
-        Ok(())
-    }
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {

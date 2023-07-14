@@ -244,6 +244,35 @@ function compute:
             })
             .clone()
     }
+
+    /// Returns a candidate for the next block in the ledger.
+    pub fn propose_next_block<R: Rng + CryptoRng>(
+        consensus: &CurrentConsensus,
+        private_key: &PrivateKey<CurrentNetwork>,
+        rng: &mut R,
+    ) -> Result<Block<CurrentNetwork>> {
+        // Retrieve the latest block.
+        let latest_block = consensus.ledger.latest_block();
+        // Retrieve the latest height.
+        let latest_height = latest_block.height();
+        // Retrieve the latest proof target.
+        let latest_proof_target = latest_block.proof_target();
+        // Retrieve the latest coinbase target.
+        let latest_coinbase_target = latest_block.coinbase_target();
+
+        // Select the transactions from the memory pool.
+        let transactions = consensus.memory_pool.candidate_transactions(consensus);
+        // Select the prover solutions from the memory pool.
+        let prover_solutions = consensus.memory_pool.candidate_solutions(
+            consensus,
+            latest_height,
+            latest_proof_target,
+            latest_coinbase_target,
+        )?;
+
+        // Prepare the next block.
+        consensus.ledger.prepare_advance_to_next_block(private_key, transactions, prover_solutions, rng)
+    }
 }
 
 #[test]
@@ -298,13 +327,13 @@ async fn test_ledger_deploy() {
     let transactions = consensus.ledger.vm().speculate(sample_finalize_state(1), [transaction.clone()].iter()).unwrap();
 
     // Propose the next block.
-    let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
+    let next_block = crate::tests::test_helpers::propose_next_block(&consensus, &private_key, rng).unwrap();
 
     // Ensure the block is a valid next block.
     consensus.ledger.check_next_block(&next_block).unwrap();
 
     // Construct a next block.
-    consensus.advance_to_next_block(&next_block).unwrap();
+    consensus.ledger.advance_to_next_block(&next_block).unwrap();
     assert_eq!(consensus.ledger.latest_height(), 1);
     assert_eq!(consensus.ledger.latest_hash(), next_block.hash());
     assert!(consensus.ledger.contains_transaction_id(&transaction.id()).unwrap());
@@ -334,13 +363,13 @@ async fn test_ledger_execute() {
     consensus.add_unconfirmed_transaction(transaction.clone()).await.unwrap();
 
     // Propose the next block.
-    let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
+    let next_block = crate::tests::test_helpers::propose_next_block(&consensus, &private_key, rng).unwrap();
 
     // Ensure the block is a valid next block.
     consensus.ledger.check_next_block(&next_block).unwrap();
 
     // Construct a next block.
-    consensus.advance_to_next_block(&next_block).unwrap();
+    consensus.ledger.advance_to_next_block(&next_block).unwrap();
     assert_eq!(consensus.ledger.latest_height(), 1);
     assert_eq!(consensus.ledger.latest_hash(), next_block.hash());
 
@@ -402,12 +431,12 @@ async fn test_ledger_execute_many() {
         assert_eq!(consensus.num_unconfirmed_transactions(), NUM_GENESIS * (1 << (height - 1)));
 
         // Propose the next block.
-        let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
+        let next_block = crate::tests::test_helpers::propose_next_block(&consensus, &private_key, rng).unwrap();
 
         // Ensure the block is a valid next block.
         consensus.ledger.check_next_block(&next_block).unwrap();
         // Construct a next block.
-        consensus.advance_to_next_block(&next_block).unwrap();
+        consensus.ledger.advance_to_next_block(&next_block).unwrap();
         assert_eq!(consensus.ledger.latest_height(), height as u32);
         assert_eq!(consensus.ledger.latest_hash(), next_block.hash());
     }
@@ -470,7 +499,7 @@ async fn test_coinbase_target() {
     consensus.add_unconfirmed_transaction(transaction).await.unwrap();
 
     // Ensure that the ledger can't create a block that satisfies the coinbase target.
-    let proposed_block = consensus.propose_next_block(&private_key, rng).unwrap();
+    let proposed_block = crate::tests::test_helpers::propose_next_block(&consensus, &private_key, rng).unwrap();
     // Ensure the block does not contain a coinbase solution.
     assert!(proposed_block.coinbase().is_none());
 
@@ -498,7 +527,7 @@ async fn test_coinbase_target() {
     }
 
     // Ensure that the ledger can create a block that satisfies the coinbase target.
-    let proposed_block = consensus.propose_next_block(&private_key, rng).unwrap();
+    let proposed_block = crate::tests::test_helpers::propose_next_block(&consensus, &private_key, rng).unwrap();
     // Ensure the block contains a coinbase solution.
     assert!(proposed_block.coinbase().is_some());
 }
