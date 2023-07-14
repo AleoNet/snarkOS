@@ -196,8 +196,8 @@ impl<N: Network> Worker<N> {
         num_transmissions: usize,
     ) -> impl Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
         // Iterate through the ready transmissions, and determine which should be retained.
-        let stream =
-            futures::stream::iter(self.ready.transmissions().into_iter().map(|(id, transmission)| async move {
+        let keep = futures::stream::iter(self.ready.transmissions())
+            .filter_map(|(id, transmission)| async move {
                 // Check if the transmission has been stored already.
                 if self.storage.contains_transmission(id) {
                     return None;
@@ -220,9 +220,9 @@ impl<N: Network> Worker<N> {
                     }
                 }
                 Some(id)
-            }));
-
-        let keep: IndexSet<_> = stream.filter_map(|x| x).collect().await;
+            })
+            .collect::<IndexSet<_>>()
+            .await;
 
         // Retain the transmissions that are not in the storage or ledger.
         self.ready.retain(|id, _| keep.contains(id));
