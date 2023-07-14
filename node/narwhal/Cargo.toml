@@ -72,7 +72,6 @@ version = "=2.1.4"
 
 [dependencies.snarkvm]
 workspace = true
-features = [ "async" ]
 
 [dependencies.time]
 version = "0.3"
