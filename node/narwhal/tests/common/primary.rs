@@ -27,12 +27,7 @@ use snarkos_node_narwhal::{
 use snarkos_node_narwhal_committee::{Committee, MIN_STAKE};
 use snarkvm::prelude::TestRng;
 
-use std::{
-    collections::HashMap,
-    ops::{Deref, DerefMut},
-    sync::Arc,
-    time::Duration,
-};
+use std::{collections::HashMap, sync::Arc, time::Duration};
 
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -52,32 +47,18 @@ pub struct TestNetworkConfig {
 #[derive(Clone)]
 pub struct TestNetwork {
     pub config: TestNetworkConfig,
-    pub primaries: HashMap<u16, TestPrimary>,
+    pub validators: HashMap<u16, TestValidator>,
 }
 
 #[derive(Clone)]
-pub struct TestPrimary {
+pub struct TestValidator {
     pub id: u16,
     pub primary: Primary<CurrentNetwork>,
     pub sender: Option<PrimarySender<CurrentNetwork>>,
     pub handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
-impl Deref for TestPrimary {
-    type Target = Primary<CurrentNetwork>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.primary
-    }
-}
-
-impl DerefMut for TestPrimary {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.primary
-    }
-}
-
-impl TestPrimary {
+impl TestValidator {
     pub fn fire_cannons(&mut self) {
         let solution_handle = fire_unconfirmed_solutions(self.sender.as_mut().unwrap(), self.id);
         let transaction_handle = fire_unconfirmed_transactions(self.sender.as_mut().unwrap(), self.id);
@@ -90,7 +71,7 @@ impl TestPrimary {
         let self_clone = self.clone();
         self.handles.lock().push(tokio::task::spawn(async move {
             loop {
-                let connections = self_clone.gateway().connected_peers().read().clone();
+                let connections = self_clone.primary.gateway().connected_peers().read().clone();
                 info!("{} connections", connections.len());
                 for connection in connections {
                     debug!("  {}", connection);
@@ -110,33 +91,33 @@ impl TestNetwork {
 
         let (accounts, committee) = new_test_committee(config.num_nodes);
 
-        let mut primaries = HashMap::with_capacity(config.num_nodes as usize);
+        let mut validators = HashMap::with_capacity(config.num_nodes as usize);
         for (id, account) in accounts.into_iter().enumerate() {
             let storage = Storage::new(committee.clone(), MAX_GC_ROUNDS);
             let ledger = Box::new(MockLedgerService::new());
             let primary = Primary::<CurrentNetwork>::new(account, storage, ledger, None, Some(id as u16)).unwrap();
 
-            let test_primary = TestPrimary { id: id as u16, primary, sender: None, handles: Default::default() };
-            primaries.insert(id as u16, test_primary);
+            let test_validator = TestValidator { id: id as u16, primary, sender: None, handles: Default::default() };
+            validators.insert(id as u16, test_validator);
         }
 
-        Self { config, primaries }
+        Self { config, validators }
     }
 
     // Starts each node in the network.
     pub async fn start(&mut self) {
-        for primary in self.primaries.values_mut() {
+        for validator in self.validators.values_mut() {
             // Setup the channels and start the primary.
             let (sender, receiver) = init_primary_channels();
-            primary.sender = Some(sender.clone());
-            primary.run(sender.clone(), receiver, None).await.unwrap();
+            validator.sender = Some(sender.clone());
+            validator.primary.run(sender.clone(), receiver, None).await.unwrap();
 
             if self.config.fire_cannons {
-                primary.fire_cannons();
+                validator.fire_cannons();
             }
 
             if self.config.log_connections {
-                primary.log_connections();
+                validator.log_connections();
             }
         }
 
@@ -147,24 +128,24 @@ impl TestNetwork {
 
     // Starts the solution and trasnaction cannons for node.
     pub fn fire_cannons_at(&mut self, id: u16) {
-        self.primaries.get_mut(&id).unwrap().fire_cannons();
+        self.validators.get_mut(&id).unwrap().fire_cannons();
     }
 
     // Connects a node to another node.
-    pub async fn connect_primaries(&self, first_id: u16, second_id: u16) {
-        let first_primary = self.primaries.get(&first_id).unwrap();
-        let second_primary_ip = self.primaries.get(&second_id).unwrap().gateway().local_ip();
-        first_primary.gateway().connect(second_primary_ip);
+    pub async fn connect_validators(&self, first_id: u16, second_id: u16) {
+        let first_validator = self.validators.get(&first_id).unwrap();
+        let second_validator_ip = self.validators.get(&second_id).unwrap().primary.gateway().local_ip();
+        first_validator.primary.gateway().connect(second_validator_ip);
         // Give the connection time to be established.
         sleep(Duration::from_millis(100)).await;
     }
 
     // Connects all nodes to each other.
     pub async fn connect_all(&self) {
-        for (primary, other_primary) in self.primaries.values().tuple_combinations() {
+        for (validator, other_validator) in self.validators.values().tuple_combinations() {
             // Connect to the node.
-            let ip = other_primary.gateway().local_ip();
-            primary.gateway().connect(ip);
+            let ip = other_validator.primary.gateway().local_ip();
+            validator.primary.gateway().connect(ip);
             // Give the connection time to be established.
             tokio::time::sleep(std::time::Duration::from_millis(100)).await;
         }
@@ -172,9 +153,9 @@ impl TestNetwork {
 
     // Disconnects N nodes from all other nodes.
     pub async fn disconnect(&self, num_nodes: u16) {
-        for primary in self.primaries.values().take(num_nodes as usize) {
-            for peer_ip in primary.gateway().connected_peers().read().iter() {
-                primary.gateway().disconnect(*peer_ip);
+        for validator in self.validators.values().take(num_nodes as usize) {
+            for peer_ip in validator.primary.gateway().connected_peers().read().iter() {
+                validator.primary.gateway().disconnect(*peer_ip);
             }
         }
 
@@ -184,15 +165,15 @@ impl TestNetwork {
 
     // Checks if at least 2f + 1 nodes have reached the given round.
     pub fn is_round_reached(&self, round: u64) -> bool {
-        let quorum_threshold = self.primaries.len() / 2 + 1;
-        self.primaries.values().filter(|p| p.current_round() >= round).count() >= quorum_threshold
+        let quorum_threshold = self.validators.len() / 2 + 1;
+        self.validators.values().filter(|v| v.primary.current_round() >= round).count() >= quorum_threshold
     }
 
     // Checks if all the nodes have stopped progressing.
     pub async fn is_halted(&self) -> bool {
-        let halt_round = self.primaries.values().map(|p| p.current_round()).max().unwrap();
+        let halt_round = self.validators.values().map(|v| v.primary.current_round()).max().unwrap();
         sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
-        self.primaries.values().all(|p| p.current_round() <= halt_round)
+        self.validators.values().all(|v| v.primary.current_round() <= halt_round)
     }
 }
 
