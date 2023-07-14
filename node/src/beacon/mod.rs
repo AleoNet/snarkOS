@@ -26,6 +26,7 @@ use snarkos_node_messages::{
     UnconfirmedSolution,
     UnconfirmedTransaction,
 };
+use snarkos_node_narwhal::helpers::init_primary_channels;
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::{
@@ -112,7 +113,11 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         }
 
         // Initialize the consensus.
-        let consensus = Consensus::new(ledger.clone(), dev.is_some())?;
+        let mut consensus = Consensus::new(account.clone(), ledger.clone(), dev)?;
+        // Initialize the primary channels.
+        let (primary_sender, primary_receiver) = init_primary_channels::<N>();
+        // Start the consensus.
+        consensus.run(primary_sender, primary_receiver).await?;
         lap!(timer, "Initialize consensus");
 
         // Initialize the block generation time.
@@ -307,9 +312,8 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
 
             // Add the transaction to the memory pool.
             let beacon = self.clone();
-            match tokio::task::spawn_blocking(move || beacon.consensus.add_unconfirmed_transaction(transaction)).await {
-                Ok(Ok(())) => (),
-                Ok(Err(error)) => bail!("Failed to add the transaction to the memory pool: {error}"),
+            match beacon.consensus.add_unconfirmed_transaction(transaction).await {
+                Ok(()) => (),
                 Err(error) => bail!("Failed to add the transaction to the memory pool: {error}"),
             }
         }

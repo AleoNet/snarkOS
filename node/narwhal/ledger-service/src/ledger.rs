@@ -14,8 +14,14 @@
 
 use crate::{fmt_id, LedgerService};
 use snarkvm::{
-    ledger::{narwhal::TransmissionID, store::ConsensusStorage, Ledger},
-    prelude::{Field, Network, Result},
+    ledger::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+        narwhal::{Data, TransmissionID},
+        store::ConsensusStorage,
+        Ledger,
+    },
+    prelude::{bail, Field, Network, Result},
 };
 
 use tracing::*;
@@ -32,6 +38,7 @@ impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
     }
 }
 
+#[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<N, C> {
     /// Returns `false` for all queries.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
@@ -47,5 +54,48 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             TransmissionID::Solution(puzzle_commitment) => self.ledger.contains_puzzle_commitment(puzzle_commitment),
             TransmissionID::Transaction(transaction_id) => self.ledger.contains_transaction_id(transaction_id),
         }
+    }
+
+    /// Checks the given solution is well-formed.
+    async fn check_solution_basic(
+        &self,
+        puzzle_commitment: PuzzleCommitment<N>,
+        solution: Data<ProverSolution<N>>,
+    ) -> Result<()> {
+        // Deserialize the solution.
+        let solution = tokio::task::spawn_blocking(move || solution.deserialize_blocking()).await??;
+        // Ensure the puzzle commitment matches in the solution.
+        if puzzle_commitment != solution.commitment() {
+            bail!("Invalid solution - expected {puzzle_commitment}, found {}", solution.commitment());
+        }
+
+        // Retrieve the coinbase verifying key.
+        let coinbase_verifying_key = self.ledger.coinbase_puzzle().coinbase_verifying_key();
+        // Compute the current epoch challenge.
+        let epoch_challenge = self.ledger.latest_epoch_challenge()?;
+        // Retrieve the current proof target.
+        let proof_target = self.ledger.latest_proof_target();
+
+        // Ensure that the prover solution is valid for the given epoch.
+        if !solution.verify(coinbase_verifying_key, &epoch_challenge, proof_target)? {
+            bail!("Invalid prover solution '{puzzle_commitment}' for the current epoch.");
+        }
+        Ok(())
+    }
+
+    /// Checks the given transaction is well-formed and unique.
+    async fn check_transaction_basic(
+        &self,
+        transaction_id: N::TransactionID,
+        transaction: Data<Transaction<N>>,
+    ) -> Result<()> {
+        // Deserialize the transaction.
+        let transaction = tokio::task::spawn_blocking(move || transaction.deserialize_blocking()).await??;
+        // Ensure the transaction ID matches in the transaction.
+        if transaction_id != transaction.id() {
+            bail!("Invalid transaction - expected {transaction_id}, found {}", transaction.id());
+        }
+        // Check the transaction is well-formed.
+        self.ledger.check_transaction_basic(&transaction, None)
     }
 }

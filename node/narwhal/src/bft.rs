@@ -487,16 +487,16 @@ impl<N: Network> BFT<N> {
         // Process the current round from the primary.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((current_round, callback_sender)) = rx_primary_round.recv().await {
-                callback_sender.send(self_.update_to_next_round(current_round)).ok();
+            while let Some((current_round, callback)) = rx_primary_round.recv().await {
+                callback.send(self_.update_to_next_round(current_round)).ok();
             }
         });
 
         // Process the certificate from the primary.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((certificate, callback_sender)) = rx_primary_certificate.recv().await {
-                callback_sender.send(Ok(())).ok();
+            while let Some((certificate, callback)) = rx_primary_certificate.recv().await {
+                callback.send(Ok(())).ok();
                 if let Err(e) = self_.update_dag(certificate).await {
                     warn!("BFT failed to update the DAG: {e}");
                 }

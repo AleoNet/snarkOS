@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use crate::common::CurrentNetwork;
 use snarkos_node_narwhal::helpers::PrimarySender;
 use snarkvm::{
     ledger::narwhal::Data,
@@ -23,18 +24,15 @@ use snarkvm::{
         Uniform,
     },
 };
-use tracing::*;
 
 use ::bytes::Bytes;
-
 use rand::{Rng, SeedableRng};
-
+use tokio::sync::oneshot;
+use tracing::*;
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
 };
-
-use crate::common::CurrentNetwork;
 
 /// Initializes the logger.
 #[allow(dead_code)]
@@ -98,10 +96,13 @@ pub fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_i
             // Sample a random fake puzzle commitment and solution.
             let (commitment, solution) =
                 if counter % 2 == 0 { sample(&mut shared_rng) } else { sample(&mut unique_rng) };
+            // Initialize a callback sender and receiver.
+            let (callback, callback_receiver) = oneshot::channel();
             // Send the fake solution.
-            if let Err(e) = tx_unconfirmed_solution.send((commitment, solution)).await {
+            if let Err(e) = tx_unconfirmed_solution.send((commitment, solution, callback)).await {
                 error!("Failed to send unconfirmed solution: {e}");
             }
+            let _ = callback_receiver.await;
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
@@ -139,10 +140,13 @@ pub fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, nod
         loop {
             // Sample a random fake transaction ID and transaction.
             let (id, transaction) = if counter % 2 == 0 { sample(&mut shared_rng) } else { sample(&mut unique_rng) };
+            // Initialize a callback sender and receiver.
+            let (callback, callback_receiver) = oneshot::channel();
             // Send the fake transaction.
-            if let Err(e) = tx_unconfirmed_transaction.send((id, transaction)).await {
+            if let Err(e) = tx_unconfirmed_transaction.send((id, transaction, callback)).await {
                 error!("Failed to send unconfirmed transaction: {e}");
             }
+            let _ = callback_receiver.await;
             // Increment the counter.
             counter += 1;
             // Sleep briefly.

@@ -14,7 +14,11 @@
 
 use crate::{fmt_id, LedgerService};
 use snarkvm::{
-    ledger::narwhal::TransmissionID,
+    ledger::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+        narwhal::{Data, TransmissionID},
+    },
     prelude::{Field, Network, Result},
 };
 
@@ -31,6 +35,7 @@ impl MockLedgerService {
     }
 }
 
+#[async_trait]
 impl<N: Network> LedgerService<N> for MockLedgerService {
     /// Returns `false` for all queries.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
@@ -42,5 +47,25 @@ impl<N: Network> LedgerService<N> for MockLedgerService {
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
         trace!("[MockLedgerService] Contains transmission ID {} - false", fmt_id(transmission_id));
         Ok(false)
+    }
+
+    /// Checks the given solution is well-formed.
+    async fn check_solution_basic(
+        &self,
+        puzzle_commitment: PuzzleCommitment<N>,
+        _solution: Data<ProverSolution<N>>,
+    ) -> Result<()> {
+        trace!("[MockLedgerService] Check solution basic {:?} - Ok", fmt_id(puzzle_commitment));
+        Ok(())
+    }
+
+    /// Checks the given transaction is well-formed and unique.
+    async fn check_transaction_basic(
+        &self,
+        transaction_id: N::TransactionID,
+        _transaction: Data<Transaction<N>>,
+    ) -> Result<()> {
+        trace!("[MockLedgerService] Check transaction basic {:?} - Ok", fmt_id(transaction_id));
+        Ok(())
     }
 }

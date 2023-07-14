@@ -20,7 +20,6 @@ use snarkos_node_tcp::{Connection, ConnectionSide, Tcp};
 use snarkvm::prelude::{block::Header, coinbase::EpochChallenge, error};
 
 use std::{io, net::SocketAddr};
-use tokio::task::spawn_blocking;
 
 impl<N: Network, C: ConsensusStorage<N>> P2P for Beacon<N, C> {
     /// Returns a reference to the TCP instance.
@@ -235,17 +234,9 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
         solution: ProverSolution<N>,
     ) -> bool {
         // Add the unconfirmed solution to the memory pool.
-        let node = self.clone();
-        match spawn_blocking(move || node.consensus.add_unconfirmed_solution(&solution)).await {
-            Ok(Err(error)) => {
-                trace!("[UnconfirmedSolution] {error}");
-                return true; // Maintain the connection.
-            }
-            Err(error) => {
-                trace!("[UnconfirmedSolution] {error}");
-                return true; // Maintain the connection.
-            }
-            _ => {}
+        if let Err(error) = self.consensus.add_unconfirmed_solution(solution).await {
+            trace!("[UnconfirmedSolution] {error}");
+            return true; // Maintain the connection.
         }
         let message = Message::UnconfirmedSolution(serialized);
         // Propagate the "UnconfirmedSolution" to the connected beacons.
@@ -254,14 +245,14 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Beacon<N, C> {
     }
 
     /// Adds the unconfirmed transaction to the memory pool, and propagates the transaction to all connected beacons.
-    fn unconfirmed_transaction(
+    async fn unconfirmed_transaction(
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedTransaction<N>,
         transaction: Transaction<N>,
     ) -> bool {
         // Add the unconfirmed transaction to the memory pool.
-        if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction) {
+        if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction).await {
             trace!("[UnconfirmedTransaction] {error}");
             return true; // Maintain the connection.
         }

@@ -3039,7 +3039,12 @@ dependencies = [
  "itertools",
  "once_cell",
  "parking_lot",
+ "rand",
+ "snarkos-account",
+ "snarkos-node-narwhal",
+ "snarkos-node-narwhal-ledger-service",
  "snarkvm",
+ "tokio",
  "tracing",
  "tracing-test 0.2.4",
 ]
@@ -3122,7 +3127,9 @@ dependencies = [
 name = "snarkos-node-narwhal-ledger-service"
 version = "2.1.4"
 dependencies = [
+ "async-trait",
  "snarkvm",
+ "tokio",
  "tracing",
 ]
 
