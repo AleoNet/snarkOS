@@ -13,7 +13,18 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{fmt_id, init_bft_channels, now, BFTReceiver, Committee, PrimaryReceiver, PrimarySender, Storage, DAG},
+    helpers::{
+        fmt_id,
+        init_bft_channels,
+        now,
+        BFTReceiver,
+        Committee,
+        ConsensusSender,
+        PrimaryReceiver,
+        PrimarySender,
+        Storage,
+        DAG,
+    },
     Ledger,
     Primary,
     MAX_LEADER_CERTIFICATE_DELAY,
@@ -36,7 +47,7 @@ use std::{
         Arc,
     },
 };
-use tokio::task::JoinHandle;
+use tokio::{sync::OnceCell, task::JoinHandle};
 
 #[derive(Clone)]
 pub struct BFT<N: Network> {
@@ -48,6 +59,8 @@ pub struct BFT<N: Network> {
     leader_certificate: Arc<RwLock<Option<BatchCertificate<N>>>>,
     /// The timer for the leader certificate to be received.
     leader_certificate_timer: Arc<AtomicI64>,
+    /// The consensus sender.
+    consensus_sender: Arc<OnceCell<ConsensusSender<N>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -58,21 +71,31 @@ impl<N: Network> BFT<N> {
         account: Account<N>,
         storage: Storage<N>,
         ledger: Ledger<N>,
+        ip: Option<SocketAddr>,
         dev: Option<u16>,
-        ip: SocketAddr,
     ) -> Result<Self> {
         Ok(Self {
-            primary: Primary::new(account, storage, ledger, dev, ip)?,
+            primary: Primary::new(account, storage, ledger, ip, dev)?,
             dag: Default::default(),
             leader_certificate: Default::default(),
             leader_certificate_timer: Default::default(),
+            consensus_sender: Default::default(),
             handles: Default::default(),
         })
     }
 
     /// Run the BFT instance.
-    pub async fn run(&mut self, primary_sender: PrimarySender<N>, primary_receiver: PrimaryReceiver<N>) -> Result<()> {
+    pub async fn run(
+        &mut self,
+        primary_sender: PrimarySender<N>,
+        primary_receiver: PrimaryReceiver<N>,
+        consensus_sender: Option<ConsensusSender<N>>,
+    ) -> Result<()> {
         info!("Starting the BFT instance...");
+        // Set the consensus sender.
+        if let Some(consensus_sender) = consensus_sender {
+            self.consensus_sender.set(consensus_sender).expect("Consensus sender already set");
+        }
         // Initialize the BFT channels.
         let (bft_sender, bft_receiver) = init_bft_channels::<N>();
         // Run the primary instance.
@@ -185,7 +208,7 @@ impl<N: Network> BFT<N> {
             return true;
         }
         // If the timer has expired, and we can achieve quorum threshold (2f + 1) without the leader, return 'true'.
-        if self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY > now() {
+        if self.is_timer_expired() {
             // Retrieve the certificate authors.
             let authors = certificates.into_iter().map(|c| c.author()).collect();
             // Determine if the quorum threshold is reached.
@@ -195,10 +218,16 @@ impl<N: Network> BFT<N> {
         false
     }
 
+    /// Returns `true` if the timer for the leader certificate has expired.
+    fn is_timer_expired(&self) -> bool {
+        self.leader_certificate_timer.load(Ordering::SeqCst) + MAX_LEADER_CERTIFICATE_DELAY <= now()
+    }
+
     /// Returns 'true' if any of the following conditions hold:
-    ///  - The leader certificate reached quorum threshold `(2f + 1)` (in the previous certificates in the current round),
-    ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round),
     ///  - The leader certificate is 'None'.
+    ///  - The leader certificate reached quorum threshold `(2f + 1)` (in the previous certificates in the current round).
+    ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round).
+    ///  - The leader certificate timer has expired.
     fn is_leader_quorum_or_nonleaders_available(&self, round: u64) -> Result<bool> {
         // Retrieve the current round.
         let current_round = self.storage().current_round();
@@ -228,7 +257,8 @@ impl<N: Network> BFT<N> {
             self.compute_stake_for_leader_certificate(leader_certificate_id, current_certificates, &current_committee)?;
         // Return 'true' if any of the following conditions hold:
         Ok(stake_with_leader >= current_committee.availability_threshold()
-            || stake_without_leader >= current_committee.quorum_threshold())
+            || stake_without_leader >= current_committee.quorum_threshold()
+            || self.is_timer_expired())
     }
 
     /// Computes the amount of stake that has & has not signed for the leader certificate.
@@ -266,7 +296,7 @@ impl<N: Network> BFT<N> {
 
 impl<N: Network> BFT<N> {
     /// Stores the certificate in the DAG, and attempts to commit one or more anchors.
-    fn update_dag(&self, certificate: BatchCertificate<N>) -> Result<()> {
+    async fn update_dag(&self, certificate: BatchCertificate<N>) -> Result<()> {
         // Retrieve the certificate round.
         let certificate_round = certificate.round();
         // Insert the certificate into the DAG.
@@ -368,13 +398,15 @@ impl<N: Network> BFT<N> {
                     transmissions.insert(*transmission_id, transmission);
                 }
             }
-            // Trigger consensus.
-            // TODO (howardwu): Trigger consensus.
             info!(
                 "\n\nCommitting a subdag from round {leader_round} with {} transmissions: {:?}\n",
                 transmissions.len(),
                 commit_subdag.iter().map(|(round, certificates)| (round, certificates.len())).collect::<Vec<_>>()
             );
+            // Trigger consensus.
+            if let Some(consensus_sender) = self.consensus_sender.get() {
+                consensus_sender.tx_consensus_subdag.send((commit_subdag, transmissions)).await?;
+            }
         }
         Ok(())
     }
@@ -462,17 +494,17 @@ impl<N: Network> BFT<N> {
         // Process the current round from the primary.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((current_round, callback_sender)) = rx_primary_round.recv().await {
-                callback_sender.send(self_.update_to_next_round(current_round)).ok();
+            while let Some((current_round, callback)) = rx_primary_round.recv().await {
+                callback.send(self_.update_to_next_round(current_round)).ok();
             }
         });
 
         // Process the certificate from the primary.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((certificate, callback_sender)) = rx_primary_certificate.recv().await {
-                callback_sender.send(Ok(())).ok();
-                if let Err(e) = self_.update_dag(certificate) {
+            while let Some((certificate, callback)) = rx_primary_certificate.recv().await {
+                callback.send(Ok(())).ok();
+                if let Err(e) = self_.update_dag(certificate).await {
                     warn!("BFT failed to update the DAG: {e}");
                 }
             }

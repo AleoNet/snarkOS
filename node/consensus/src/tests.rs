@@ -40,6 +40,7 @@ type CurrentNetwork = Testnet3;
 pub(crate) mod test_helpers {
     use super::*;
     use crate::Consensus;
+    use snarkos_account::Account;
     use snarkvm::{
         console::{account::PrivateKey, network::Testnet3, program::Value},
         prelude::{block::Block, store::helpers::memory::ConsensusMemory, FinalizeGlobalState, TestRng},
@@ -111,7 +112,7 @@ pub(crate) mod test_helpers {
         assert_eq!(genesis.round(), ledger.latest_round());
         assert_eq!(genesis, ledger.get_block(0).unwrap());
 
-        CurrentConsensus::new(ledger, true).unwrap()
+        CurrentConsensus::new(Account::try_from(private_key).unwrap(), ledger, None).unwrap()
     }
 
     pub(crate) fn sample_program() -> Program<CurrentNetwork> {
@@ -279,9 +280,9 @@ fn test_validators() {
     assert!(validators.contains_key(&signer));
 }
 
-#[test]
 #[traced_test]
-fn test_ledger_deploy() {
+#[tokio::test]
+async fn test_ledger_deploy() {
     let rng = &mut TestRng::default();
 
     // Sample the genesis private key.
@@ -291,7 +292,7 @@ fn test_ledger_deploy() {
 
     // Add a transaction to the memory pool.
     let transaction = crate::tests::test_helpers::sample_deployment_transaction(rng);
-    consensus.add_unconfirmed_transaction(transaction.clone()).unwrap();
+    consensus.add_unconfirmed_transaction(transaction.clone()).await.unwrap();
 
     // Compute a confirmed transactions to reuse later.
     let transactions = consensus.ledger.vm().speculate(sample_finalize_state(1), [transaction.clone()].iter()).unwrap();
@@ -315,12 +316,12 @@ fn test_ledger_deploy() {
     // Ensure that the ledger deems the same transaction invalid.
     assert!(consensus.check_transaction_basic(&transaction, None).is_err());
     // Ensure that the ledger cannot add the same transaction.
-    assert!(consensus.add_unconfirmed_transaction(transaction).is_err());
+    assert!(consensus.add_unconfirmed_transaction(transaction).await.is_err());
 }
 
-#[test]
 #[traced_test]
-fn test_ledger_execute() {
+#[tokio::test]
+async fn test_ledger_execute() {
     let rng = &mut TestRng::default();
 
     // Sample the genesis private key.
@@ -330,7 +331,7 @@ fn test_ledger_execute() {
 
     // Add a transaction to the memory pool.
     let transaction = crate::tests::test_helpers::sample_execution_transaction(rng);
-    consensus.add_unconfirmed_transaction(transaction.clone()).unwrap();
+    consensus.add_unconfirmed_transaction(transaction.clone()).await.unwrap();
 
     // Propose the next block.
     let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
@@ -346,12 +347,12 @@ fn test_ledger_execute() {
     // Ensure that the ledger deems the same transaction invalid.
     assert!(consensus.check_transaction_basic(&transaction, None).is_err());
     // Ensure that the ledger cannot add the same transaction.
-    assert!(consensus.add_unconfirmed_transaction(transaction).is_err());
+    assert!(consensus.add_unconfirmed_transaction(transaction).await.is_err());
 }
 
-#[test]
 #[traced_test]
-fn test_ledger_execute_many() {
+#[tokio::test]
+async fn test_ledger_execute_many() {
     let rng = &mut TestRng::default();
 
     // Sample the genesis private key, view key, and address.
@@ -396,7 +397,7 @@ fn test_ledger_execute_many() {
                 .execute(&private_key, ("credits.aleo", "split"), inputs.iter(), None, None, rng)
                 .unwrap();
             // Add the transaction to the memory pool.
-            consensus.add_unconfirmed_transaction(transaction).unwrap();
+            consensus.add_unconfirmed_transaction(transaction).await.unwrap();
         }
         assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), NUM_GENESIS * (1 << (height - 1)));
 
@@ -412,9 +413,9 @@ fn test_ledger_execute_many() {
     }
 }
 
-#[test]
 #[traced_test]
-fn test_proof_target() {
+#[tokio::test]
+async fn test_proof_target() {
     let rng = &mut TestRng::default();
 
     // Sample the genesis private key and address.
@@ -434,9 +435,9 @@ fn test_proof_target() {
 
         // Check that the prover solution meets the proof target requirement.
         if prover_solution.to_target().unwrap() >= proof_target {
-            assert!(consensus.add_unconfirmed_solution(&prover_solution).is_ok())
+            assert!(consensus.add_unconfirmed_solution(prover_solution).await.is_ok())
         } else {
-            assert!(consensus.add_unconfirmed_solution(&prover_solution).is_err())
+            assert!(consensus.add_unconfirmed_solution(prover_solution).await.is_err())
         }
 
         // Generate a prover solution with a minimum proof target.
@@ -446,14 +447,14 @@ fn test_proof_target() {
         // Check that the prover solution meets the proof target requirement.
         if let Ok(prover_solution) = prover_solution {
             assert!(prover_solution.to_target().unwrap() >= proof_target);
-            assert!(consensus.add_unconfirmed_solution(&prover_solution).is_ok())
+            assert!(consensus.add_unconfirmed_solution(prover_solution).await.is_ok())
         }
     }
 }
 
-#[test]
 #[traced_test]
-fn test_coinbase_target() {
+#[tokio::test]
+async fn test_coinbase_target() {
     let rng = &mut TestRng::default();
 
     // Sample the genesis private key and address.
@@ -465,7 +466,7 @@ fn test_coinbase_target() {
 
     // Add a transaction to the memory pool.
     let transaction = crate::tests::test_helpers::sample_execution_transaction(rng);
-    consensus.add_unconfirmed_transaction(transaction).unwrap();
+    consensus.add_unconfirmed_transaction(transaction).await.unwrap();
 
     // Ensure that the ledger can't create a block that satisfies the coinbase target.
     let proposed_block = consensus.propose_next_block(&private_key, rng).unwrap();
@@ -489,7 +490,7 @@ fn test_coinbase_target() {
         };
 
         // Try to add the prover solution to the memory pool.
-        if consensus.add_unconfirmed_solution(&prover_solution).is_ok() {
+        if consensus.add_unconfirmed_solution(prover_solution).await.is_ok() {
             // Add to the cumulative target if the prover solution is valid.
             cumulative_target += prover_solution.to_target().unwrap() as u128;
         }

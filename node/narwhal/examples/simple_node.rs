@@ -49,6 +49,7 @@ use indexmap::IndexMap;
 use parking_lot::RwLock;
 use rand::{Rng, SeedableRng};
 use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::Arc};
+use tokio::sync::oneshot;
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
@@ -105,12 +106,15 @@ pub async fn start_bft(
     let (storage, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
     let ledger = Box::new(MockLedgerService::new());
-    // Initialize the gateway IP.
-    let ip = peers.get(&node_id).ok_or(anyhow!("Invalid node ID"))?;
+    // Initialize the gateway IP and dev mode.
+    let (ip, dev) = match peers.get(&node_id) {
+        Some(ip) => (Some(*ip), None),
+        None => (None, Some(node_id)),
+    };
     // Initialize the BFT instance.
-    let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, Some(node_id), *ip)?;
+    let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, ip, dev)?;
     // Run the BFT instance.
-    bft.run(sender.clone(), receiver).await?;
+    bft.run(sender.clone(), receiver, None).await?;
     // Retrieve the BFT's primary.
     let primary = bft.primary();
     // Keep the node's connections.
@@ -135,10 +139,13 @@ pub async fn start_primary(
     let (storage, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
     let ledger = Box::new(MockLedgerService::new());
-    // Initialize the gateway IP.
-    let ip = peers.get(&node_id).ok_or(anyhow!("Invalid node ID"))?;
+    // Initialize the gateway IP and dev mode.
+    let (ip, dev) = match peers.get(&node_id) {
+        Some(ip) => (Some(*ip), None),
+        None => (None, Some(node_id)),
+    };
     // Initialize the primary instance.
-    let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, Some(node_id), *ip)?;
+    let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, ip, dev)?;
     // Run the primary instance.
     primary.run(sender.clone(), receiver, None).await?;
     // Keep the node's connections.
@@ -190,11 +197,14 @@ fn keep_connections(primary: &Primary<CurrentNetwork>, node_id: u16, num_nodes: 
         loop {
             for i in 0..num_nodes {
                 // Initialize the gateway IP.
-                let ip = *peers.get(&i).unwrap();
+                let ip = match peers.get(&i) {
+                    Some(ip) => *ip,
+                    None => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i)).unwrap(),
+                };
                 // Check if the node is connected.
                 if i != node_id && !node.gateway().is_connected(ip) {
                     // Connect to the node.
-                    debug!("Connecting to {}", ip);
+                    debug!("Connecting to {}...", ip);
                     node.gateway().connect(ip);
                 }
             }
@@ -262,10 +272,13 @@ fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_id: u
             // Sample a random fake puzzle commitment and solution.
             let (commitment, solution) =
                 if counter % 2 == 0 { sample(&mut shared_rng) } else { sample(&mut unique_rng) };
+            // Initialize a callback sender and receiver.
+            let (callback, callback_receiver) = oneshot::channel();
             // Send the fake solution.
-            if let Err(e) = tx_unconfirmed_solution.send((commitment, solution)).await {
+            if let Err(e) = tx_unconfirmed_solution.send((commitment, solution, callback)).await {
                 error!("Failed to send unconfirmed solution: {e}");
             }
+            let _ = callback_receiver.await;
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
@@ -301,10 +314,13 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
         loop {
             // Sample a random fake transaction ID and transaction.
             let (id, transaction) = if counter % 2 == 0 { sample(&mut shared_rng) } else { sample(&mut unique_rng) };
+            // Initialize a callback sender and receiver.
+            let (callback, callback_receiver) = oneshot::channel();
             // Send the fake transaction.
-            if let Err(e) = tx_unconfirmed_transaction.send((id, transaction)).await {
+            if let Err(e) = tx_unconfirmed_transaction.send((id, transaction, callback)).await {
                 error!("Failed to send unconfirmed transaction: {e}");
             }
+            let _ = callback_receiver.await;
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
@@ -379,6 +395,9 @@ async fn start_server(bft: Option<BFT<CurrentNetwork>>, primary: Primary<Current
         .unwrap();
 }
 
+/**************************************************************************************************/
+
+/// A helper method to parse the peers provided to the CLI.
 fn parse_peers(peers_string: String) -> Result<HashMap<u16, SocketAddr>, Error> {
     // Expect list of peers in the form of `node_id=ip:port`, one per line.
     let mut peers = HashMap::new();
@@ -414,18 +433,10 @@ async fn main() -> Result<()> {
     // Parse the number of nodes.
     let num_nodes = u16::from_str(&args[3])?;
 
-    let peers = if args.len() > 4 {
-        // read peers from a file
-        let peers_string = std::fs::read_to_string(&args[4])?;
-        parse_peers(peers_string)?
-    } else {
-        // All nodes running locally.
-        let mut peers = HashMap::new();
-        for i in 0..num_nodes {
-            let ip = SocketAddr::from_str(format!("127.0.0.1:{:?}", MEMORY_POOL_PORT + i).as_str())?;
-            peers.insert(i, ip);
-        }
-        peers
+    // (optional) Parse the peers from a file.
+    let peers = match args.len() > 4 {
+        true => parse_peers(std::fs::read_to_string(&args[4])?)?,
+        false => Default::default(),
     };
 
     // Initialize an optional BFT holder.

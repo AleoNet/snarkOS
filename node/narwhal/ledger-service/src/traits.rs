@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkvm::prelude::{
-    narwhal::{Transmission, TransmissionID},
-    Field,
-    Network,
-    Result,
+use snarkvm::{
+    ledger::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+        narwhal::Data,
+    },
+    prelude::{narwhal::TransmissionID, Field, Network, Result},
 };
 
+#[async_trait]
 pub trait LedgerService<N: Network>: Send + Sync {
     /// Returns `true` if the ledger contains the given certificate ID.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
@@ -26,6 +29,17 @@ pub trait LedgerService<N: Network>: Send + Sync {
     /// Returns `true` if the ledger contains the given transmission ID.
     fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
 
-    /// Returns the transmission for the given transmission ID, if it exists.
-    fn get_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<Option<Transmission<N>>>;
+    /// Checks the given solution is well-formed.
+    async fn check_solution_basic(
+        &self,
+        puzzle_commitment: PuzzleCommitment<N>,
+        solution: Data<ProverSolution<N>>,
+    ) -> Result<()>;
+
+    /// Checks the given transaction is well-formed and unique.
+    async fn check_transaction_basic(
+        &self,
+        transaction_id: N::TransactionID,
+        transaction: Data<Transaction<N>>,
+    ) -> Result<()>;
 }

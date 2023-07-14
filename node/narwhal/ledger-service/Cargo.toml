@@ -18,10 +18,19 @@ edition = "2021"
 
 [features]
 default = [ ]
+ledger = [ "tokio", "tracing" ]
 mock = [ "tracing" ]
+
+[dependencies.async-trait]
+version = "0.1"
 
 [dependencies.snarkvm]
 workspace = true
+
+[dependencies.tokio]
+version = "1.28"
+features = [ "macros", "rt-multi-thread" ]
+optional = true
 
 [dependencies.tracing]
 version = "0.1"

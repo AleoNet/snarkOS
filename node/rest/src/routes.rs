@@ -237,7 +237,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = rest.consensus {
             // Add the unconfirmed transaction to the memory pool.
-            consensus.add_unconfirmed_transaction(tx.clone())?;
+            consensus.add_unconfirmed_transaction(tx.clone()).await?;
         }
 
         // Prepare the unconfirmed transaction message.

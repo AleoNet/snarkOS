@@ -103,7 +103,10 @@ impl<N: Network> Worker<N> {
             || self.ledger.contains_transmission(&transmission_id).unwrap_or(false)
     }
 
-    /// Returns the transmission if it exists in the ready queue, proposed batch, storage, or ledger.
+    /// Returns the transmission if it exists in the ready queue, proposed batch, storage.
+    ///
+    /// Note: We explicitly forbid retrieving a transmission from the ledger, as transmissions
+    /// in the ledger are not guaranteed to be invalid for the current batch.
     pub fn get_transmission(&self, transmission_id: TransmissionID<N>) -> Option<Transmission<N>> {
         // Check if the transmission ID exists in the ready queue.
         if let Some(transmission) = self.ready.get(transmission_id) {
@@ -118,10 +121,6 @@ impl<N: Network> Worker<N> {
             self.proposed_batch.read().as_ref().and_then(|p| p.get_transmission(transmission_id))
         {
             return Some(transmission.clone());
-        }
-        // Check if the transmission ID already exists in the ledger.
-        if let Some(transmission) = self.ledger.get_transmission(&transmission_id).unwrap_or(None) {
-            return Some(transmission);
         }
         None
     }
@@ -215,40 +214,53 @@ impl<N: Network> Worker<N> {
 
     /// Handles the incoming unconfirmed solution.
     /// Note: This method assumes the incoming solution is valid and does not exist in the ledger.
-    pub(crate) fn process_unconfirmed_solution(
+    pub(crate) async fn process_unconfirmed_solution(
         &self,
         puzzle_commitment: PuzzleCommitment<N>,
         prover_solution: Data<ProverSolution<N>>,
-    ) {
+    ) -> Result<()> {
         // Construct the transmission.
-        let transmission = Transmission::Solution(prover_solution);
+        let transmission = Transmission::Solution(prover_solution.clone());
         // Remove the puzzle commitment from the pending queue.
         self.pending.remove(puzzle_commitment, Some(transmission.clone()));
+
         // Check if the solution exists.
-        if !self.contains_transmission(puzzle_commitment) {
-            // Adds the prover solution to the ready queue.
-            self.ready.insert(puzzle_commitment, transmission);
-            trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment));
+        if self.contains_transmission(puzzle_commitment) {
+            bail!("Solution '{}' already exists.", fmt_id(puzzle_commitment));
         }
+        // Check that the solution is well-formed and unique.
+        if let Err(e) = self.ledger.check_solution_basic(puzzle_commitment, prover_solution).await {
+            bail!("Invalid unconfirmed solution '{}': {e}", fmt_id(puzzle_commitment));
+        }
+        // Adds the prover solution to the ready queue.
+        self.ready.insert(puzzle_commitment, transmission);
+        trace!("Worker {} - Added unconfirmed solution '{}'", self.id, fmt_id(puzzle_commitment));
+        Ok(())
     }
 
     /// Handles the incoming unconfirmed transaction.
-    /// Note: This method assumes the incoming transaction is valid and does not exist in the ledger.
-    pub(crate) fn process_unconfirmed_transaction(
+    pub(crate) async fn process_unconfirmed_transaction(
         &self,
         transaction_id: N::TransactionID,
         transaction: Data<Transaction<N>>,
-    ) {
+    ) -> Result<()> {
         // Construct the transmission.
-        let transmission = Transmission::Transaction(transaction);
+        let transmission = Transmission::Transaction(transaction.clone());
         // Remove the transaction from the pending queue.
         self.pending.remove(&transaction_id, Some(transmission.clone()));
+
         // Check if the transaction ID exists.
-        if !self.contains_transmission(&transaction_id) {
-            // Adds the transaction to the ready queue.
-            self.ready.insert(&transaction_id, transmission);
-            trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));
+        if self.contains_transmission(&transaction_id) {
+            bail!("Transaction '{}' already exists.", fmt_id(transaction_id));
         }
+        // Check that the transaction is well-formed and unique.
+        if let Err(e) = self.ledger.check_transaction_basic(transaction_id, transaction).await {
+            bail!("Invalid unconfirmed transaction '{}': {e}", fmt_id(transaction_id));
+        }
+        // Adds the transaction to the ready queue.
+        self.ready.insert(&transaction_id, transmission);
+        trace!("Worker {} - Added unconfirmed transaction '{}'", self.id, fmt_id(transaction_id));
+        Ok(())
     }
 }
 

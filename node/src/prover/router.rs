@@ -214,7 +214,7 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Prover<N, C> {
     }
 
     /// Handles an `UnconfirmedTransaction` message.
-    fn unconfirmed_transaction(
+    async fn unconfirmed_transaction(
         &self,
         _peer_ip: SocketAddr,
         _serialized: UnconfirmedTransaction<N>,

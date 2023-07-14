@@ -30,6 +30,7 @@ use crate::{
     MAX_COMMITTEE_SIZE,
     MAX_GC_ROUNDS,
     MAX_TRANSMISSIONS_PER_BATCH,
+    MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
 use snarkos_node_tcp::{
@@ -102,8 +103,13 @@ pub struct Gateway<N: Network> {
 
 impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
-    #[allow(unused_variables)]
-    pub fn new(account: Account<N>, storage: Storage<N>, dev: Option<u16>, ip: SocketAddr) -> Result<Self> {
+    pub fn new(account: Account<N>, storage: Storage<N>, ip: Option<SocketAddr>, dev: Option<u16>) -> Result<Self> {
+        // Initialize the gateway IP.
+        let ip = match (ip, dev) {
+            (_, Some(dev)) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev))?,
+            (None, None) => SocketAddr::from_str(&format!("0.0.0.0:{}", MEMORY_POOL_PORT))?,
+            (Some(ip), None) => ip,
+        };
         // Initialize the TCP stack.
         let tcp = Tcp::new(Config::new(ip, MAX_COMMITTEE_SIZE));
         // Return the gateway.
@@ -848,7 +854,6 @@ pub mod prop_tests {
     use indexmap::IndexMap;
     use std::{
         net::{IpAddr, Ipv4Addr, SocketAddr},
-        str::FromStr,
         sync::Arc,
     };
     use test_strategy::{proptest, Arbitrary};
@@ -870,11 +875,7 @@ pub mod prop_tests {
     impl GatewayInput {
         pub fn to_gateway(&self) -> Gateway<CurrentNetwork> {
             let account = self.node_validator.get_account();
-            let ip = self
-                .dev
-                .map(|dev| SocketAddr::from_str(format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev).as_str()).unwrap())
-                .unwrap_or(SocketAddr::from_str(format!("0.0.0.0:{}", MEMORY_POOL_PORT).as_str()).unwrap());
-            Gateway::new(account, self.worker_storage.to_storage(), self.dev, ip).unwrap()
+            Gateway::new(account, self.worker_storage.to_storage(), None, self.dev).unwrap()
         }
 
         pub fn is_valid(&self) -> bool {

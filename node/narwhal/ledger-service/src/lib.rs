@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+#[macro_use]
+extern crate async_trait;
+
+#[cfg(feature = "ledger")]
+pub mod ledger;
+#[cfg(feature = "ledger")]
+pub use ledger::*;
+
 #[cfg(feature = "mock")]
 pub mod mock;
 #[cfg(feature = "mock")]

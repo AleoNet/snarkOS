@@ -17,4 +17,4 @@ pub mod utils;
 
 pub type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-pub type MockLedgerService = snarkos_node_narwhal_ledger_service::MockLedgerService<CurrentNetwork>;
+pub type MockLedgerService = snarkos_node_narwhal_ledger_service::MockLedgerService;
