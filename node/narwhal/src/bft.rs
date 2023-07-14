@@ -32,7 +32,11 @@ use snarkos_account::Account;
 use snarkos_node_narwhal_committee::Committee;
 use snarkvm::{
     console::account::Address,
-    ledger::narwhal::{BatchCertificate, Transmission, TransmissionID},
+    ledger::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+        narwhal::{BatchCertificate, Data, Transmission, TransmissionID},
+    },
     prelude::{bail, ensure, Field, Network, Result},
 };
 
@@ -129,15 +133,49 @@ impl<N: Network> BFT<N> {
     pub const fn leader_certificate(&self) -> &Arc<RwLock<Option<BatchCertificate<N>>>> {
         &self.leader_certificate
     }
+}
 
+impl<N: Network> BFT<N> {
     /// Returns the number of unconfirmed transmissions.
     pub fn num_unconfirmed_transmissions(&self) -> usize {
         self.primary.num_unconfirmed_transmissions()
     }
 
+    /// Returns the number of unconfirmed ratifications.
+    pub fn num_unconfirmed_ratifications(&self) -> usize {
+        self.primary.num_unconfirmed_ratifications()
+    }
+
+    /// Returns the number of solutions.
+    pub fn num_unconfirmed_solutions(&self) -> usize {
+        self.primary.num_unconfirmed_solutions()
+    }
+
+    /// Returns the number of unconfirmed transactions.
+    pub fn num_unconfirmed_transactions(&self) -> usize {
+        self.primary.num_unconfirmed_transactions()
+    }
+}
+
+impl<N: Network> BFT<N> {
+    /// Returns the unconfirmed transmission IDs.
+    pub fn unconfirmed_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
+        self.primary.unconfirmed_transmission_ids()
+    }
+
     /// Returns the unconfirmed transmissions.
     pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
         self.primary.unconfirmed_transmissions()
+    }
+
+    /// Returns the unconfirmed solutions.
+    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
+        self.primary.unconfirmed_solutions()
+    }
+
+    /// Returns the unconfirmed transactions.
+    pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+        self.primary.unconfirmed_transactions()
     }
 }
 

@@ -92,10 +92,34 @@ impl<N: Network> Worker<N> {
     pub const fn id(&self) -> u8 {
         self.id
     }
+}
 
+impl<N: Network> Worker<N> {
     /// Returns the number of transmissions in the ready queue.
     pub fn num_transmissions(&self) -> usize {
-        self.ready.len()
+        self.ready.num_transmissions()
+    }
+
+    /// Returns the number of ratifications in the ready queue.
+    pub fn num_ratifications(&self) -> usize {
+        self.ready.num_ratifications()
+    }
+
+    /// Returns the number of solutions in the ready queue.
+    pub fn num_solutions(&self) -> usize {
+        self.ready.num_solutions()
+    }
+
+    /// Returns the number of transactions in the ready queue.
+    pub fn num_transactions(&self) -> usize {
+        self.ready.num_transactions()
+    }
+}
+
+impl<N: Network> Worker<N> {
+    /// Returns the transmission IDs in the ready queue.
+    pub fn transmission_ids(&self) -> IndexSet<TransmissionID<N>> {
+        self.ready.transmission_ids()
     }
 
     /// Returns the transmissions in the ready queue.
@@ -103,6 +127,18 @@ impl<N: Network> Worker<N> {
         self.ready.transmissions()
     }
 
+    /// Returns the solutions in the ready queue.
+    pub fn solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
+        self.ready.solutions()
+    }
+
+    /// Returns the transactions in the ready queue.
+    pub fn transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+        self.ready.transactions()
+    }
+}
+
+impl<N: Network> Worker<N> {
     /// Returns `true` if the transmission ID exists in the ready queue, proposed batch, storage, or ledger.
     pub fn contains_transmission(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
         let transmission_id = transmission_id.into();
@@ -194,7 +230,7 @@ impl<N: Network> Worker<N> {
         }
         // If the ready queue is full, then skip this transmission.
         // Note: We must prioritize the unconfirmed solutions and unconfirmed transactions, not transmissions.
-        if self.ready.len() > MAX_TRANSMISSIONS_PER_BATCH {
+        if self.ready.num_transmissions() > MAX_TRANSMISSIONS_PER_BATCH {
             return Ok(());
         }
         trace!("Worker {} - Found a new transmission ID '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));

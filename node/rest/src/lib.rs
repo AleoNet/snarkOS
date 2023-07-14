@@ -137,6 +137,8 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
             .route("/testnet3/blocks", get(Self::get_blocks))
             .route("/testnet3/height/:hash", get(Self::get_height))
             .route("/testnet3/memoryPool/transmissions", get(Self::get_memory_pool_transmissions))
+            .route("/testnet3/memoryPool/solutions", get(Self::get_memory_pool_solutions))
+            .route("/testnet3/memoryPool/transactions", get(Self::get_memory_pool_transactions))
             .route("/testnet3/statePath/:commitment", get(Self::get_state_path_for_commitment))
             .route("/testnet3/beacons", get(Self::get_beacons))
             .route("/testnet3/node/address", get(Self::get_node_address))

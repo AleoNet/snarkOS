@@ -32,13 +32,13 @@ use snarkos_node_narwhal::{
 use snarkos_node_narwhal_committee::{Committee, MIN_STAKE};
 use snarkos_node_narwhal_ledger_service::CoreLedgerService;
 use snarkvm::{
-    ledger::narwhal::{Data, Transmission, TransmissionID},
-    prelude::{
+    ledger::{
         block::{Block, Transaction},
-        coinbase::ProverSolution,
+        coinbase::{ProverSolution, PuzzleCommitment},
+        narwhal::{Data, Transmission, TransmissionID},
         store::ConsensusStorage,
-        *,
     },
+    prelude::*,
 };
 
 use ::rand::thread_rng;
@@ -124,10 +124,34 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     pub fn primary_sender(&self) -> &PrimarySender<N> {
         self.primary_sender.get().expect("Primary sender not set")
     }
+}
 
+impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Returns the number of unconfirmed transmissions.
     pub fn num_unconfirmed_transmissions(&self) -> usize {
         self.bft.num_unconfirmed_transmissions()
+    }
+
+    /// Returns the number of unconfirmed ratifications.
+    pub fn num_unconfirmed_ratifications(&self) -> usize {
+        self.bft.num_unconfirmed_ratifications()
+    }
+
+    /// Returns the number of solutions.
+    pub fn num_unconfirmed_solutions(&self) -> usize {
+        self.bft.num_unconfirmed_solutions()
+    }
+
+    /// Returns the number of unconfirmed transactions.
+    pub fn num_unconfirmed_transactions(&self) -> usize {
+        self.bft.num_unconfirmed_transactions()
+    }
+}
+
+impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
+    /// Returns the unconfirmed transmission IDs.
+    pub fn unconfirmed_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
+        self.bft.unconfirmed_transmission_ids()
     }
 
     /// Returns the unconfirmed transmissions.
@@ -135,6 +159,18 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         self.bft.unconfirmed_transmissions()
     }
 
+    /// Returns the unconfirmed solutions.
+    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
+        self.bft.unconfirmed_solutions()
+    }
+
+    /// Returns the unconfirmed transactions.
+    pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+        self.bft.unconfirmed_transactions()
+    }
+}
+
+impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Adds the given unconfirmed transaction to the memory pool.
     pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
         // Initialize a callback sender and receiver.
@@ -160,7 +196,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Return the callback.
         callback_receiver.await?
     }
+}
 
+impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Returns the memory pool.
     pub const fn memory_pool(&self) -> &MemoryPool<N> {
         &self.memory_pool

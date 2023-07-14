@@ -135,6 +135,22 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         }
     }
 
+    // GET /testnet3/memoryPool/solutions
+    pub(crate) async fn get_memory_pool_solutions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        match rest.consensus {
+            Some(consensus) => Ok(ErasedJson::pretty(consensus.unconfirmed_solutions().collect::<IndexMap<_, _>>())),
+            None => Err(RestError("Route isn't available for this node type".to_string())),
+        }
+    }
+
+    // GET /testnet3/memoryPool/transactions
+    pub(crate) async fn get_memory_pool_transactions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        match rest.consensus {
+            Some(consensus) => Ok(ErasedJson::pretty(consensus.unconfirmed_transactions().collect::<IndexMap<_, _>>())),
+            None => Err(RestError("Route isn't available for this node type".to_string())),
+        }
+    }
+
     // GET /testnet3/program/{programID}
     pub(crate) async fn get_program(
         State(rest): State<Self>,

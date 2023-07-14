@@ -16,8 +16,10 @@ use crate::{
     event::{BatchPropose, BatchSignature, CertificateRequest, CertificateResponse, Event},
     helpers::{
         assign_to_worker,
+        assign_to_workers,
         init_worker_channels,
         now,
+        BFTSender,
         Pending,
         PrimaryReceiver,
         PrimarySender,
@@ -35,11 +37,14 @@ use snarkos_node_narwhal_committee::Committee;
 use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
-    ledger::narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
+    ledger::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+        narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
+    },
     prelude::Field,
 };
 
-use crate::helpers::{assign_to_workers, BFTSender};
 use async_recursion::async_recursion;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
@@ -179,16 +184,6 @@ impl<N: Network> Primary<N> {
         &self.ledger
     }
 
-    /// Returns the number of unconfirmed transmissions.
-    pub fn num_unconfirmed_transmissions(&self) -> usize {
-        self.workers.iter().map(|worker| worker.num_transmissions()).sum()
-    }
-
-    /// Returns the unconfirmed transmissions.
-    pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
-        self.workers.iter().flat_map(|worker| worker.transmissions())
-    }
-
     /// Returns the number of workers.
     pub fn num_workers(&self) -> u8 {
         u8::try_from(self.workers.len()).expect("Too many workers")
@@ -202,6 +197,50 @@ impl<N: Network> Primary<N> {
     /// Returns the batch proposal of our primary, if one currently exists.
     pub fn proposed_batch(&self) -> &Arc<RwLock<Option<Proposal<N>>>> {
         &self.proposed_batch
+    }
+}
+
+impl<N: Network> Primary<N> {
+    /// Returns the number of unconfirmed transmissions.
+    pub fn num_unconfirmed_transmissions(&self) -> usize {
+        self.workers.iter().map(|worker| worker.num_transmissions()).sum()
+    }
+
+    /// Returns the number of unconfirmed ratifications.
+    pub fn num_unconfirmed_ratifications(&self) -> usize {
+        self.workers.iter().map(|worker| worker.num_ratifications()).sum()
+    }
+
+    /// Returns the number of solutions.
+    pub fn num_unconfirmed_solutions(&self) -> usize {
+        self.workers.iter().map(|worker| worker.num_solutions()).sum()
+    }
+
+    /// Returns the number of unconfirmed transactions.
+    pub fn num_unconfirmed_transactions(&self) -> usize {
+        self.workers.iter().map(|worker| worker.num_transactions()).sum()
+    }
+}
+
+impl<N: Network> Primary<N> {
+    /// Returns the unconfirmed transmission IDs.
+    pub fn unconfirmed_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
+        self.workers.iter().flat_map(|worker| worker.transmission_ids())
+    }
+
+    /// Returns the unconfirmed transmissions.
+    pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.workers.iter().flat_map(|worker| worker.transmissions())
+    }
+
+    /// Returns the unconfirmed solutions.
+    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
+        self.workers.iter().flat_map(|worker| worker.solutions())
+    }
+
+    /// Returns the unconfirmed transactions.
+    pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+        self.workers.iter().flat_map(|worker| worker.transactions())
     }
 }
 
