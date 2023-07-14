@@ -21,13 +21,14 @@ use snarkvm::{
         coinbase::{ProverSolution, PuzzleCommitment},
         Field,
         Network,
+        TestRng,
         Uniform,
     },
 };
 
 use ::bytes::Bytes;
 use rand::{Rng, SeedableRng};
-use tokio::sync::oneshot;
+use tokio::{sync::oneshot, task};
 use tracing::*;
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
@@ -72,15 +73,17 @@ pub fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_i
     let tx_unconfirmed_solution = sender.tx_unconfirmed_solution.clone();
     tokio::task::spawn(async move {
         // This RNG samples the *same* fake solutions for all nodes.
-        let mut shared_rng = rand_chacha::ChaChaRng::seed_from_u64(123456789);
+        let mut shared_rng = TestRng::fixed(123456789);
         // This RNG samples *different* fake solutions for each node.
-        let mut unique_rng = rand_chacha::ChaChaRng::seed_from_u64(node_id as u64);
+        let mut unique_rng = TestRng::fixed(node_id as u64);
 
         // A closure to generate a commitment and solution.
-        fn sample(mut rng: impl Rng) -> (PuzzleCommitment<CurrentNetwork>, Data<ProverSolution<CurrentNetwork>>) {
+        async fn sample(mut rng: impl Rng) -> (PuzzleCommitment<CurrentNetwork>, Data<ProverSolution<CurrentNetwork>>) {
             // Sample a random fake puzzle commitment.
             // TODO (howardwu): Use a mutex to bring in the real 'proof target' and change this sampling to a while loop.
-            let commitment = PuzzleCommitment::<CurrentNetwork>::from_g1_affine(rng.gen());
+            let affine = rng.gen();
+            let commitment =
+                task::spawn_blocking(move || PuzzleCommitment::<CurrentNetwork>::from_g1_affine(affine)).await.unwrap();
             // Sample random fake solution bytes.
             let mut vec = vec![0u8; 1024];
             rng.fill_bytes(&mut vec);
@@ -95,7 +98,7 @@ pub fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_i
         loop {
             // Sample a random fake puzzle commitment and solution.
             let (commitment, solution) =
-                if counter % 2 == 0 { sample(&mut shared_rng) } else { sample(&mut unique_rng) };
+                if counter % 2 == 0 { sample(&mut shared_rng).await } else { sample(&mut unique_rng).await };
             // Initialize a callback sender and receiver.
             let (callback, callback_receiver) = oneshot::channel();
             // Send the fake solution.
@@ -106,7 +109,7 @@ pub fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_i
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(450)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
     });
 }
@@ -116,9 +119,9 @@ pub fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, nod
     let tx_unconfirmed_transaction = sender.tx_unconfirmed_transaction.clone();
     tokio::task::spawn(async move {
         // This RNG samples the *same* fake transactions for all nodes.
-        let mut shared_rng = rand_chacha::ChaChaRng::seed_from_u64(123456789);
+        let mut shared_rng = TestRng::fixed(123456789);
         // This RNG samples *different* fake transactions for each node.
-        let mut unique_rng = rand_chacha::ChaChaRng::seed_from_u64(node_id as u64);
+        let mut unique_rng = TestRng::fixed(node_id as u64);
 
         // A closure to generate an ID and transaction.
         fn sample(
@@ -150,7 +153,7 @@ pub fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, nod
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(450)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
     });
 }

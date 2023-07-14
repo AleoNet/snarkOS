@@ -23,10 +23,10 @@ use snarkos_node_narwhal::MAX_BATCH_DELAY;
 use std::time::Duration;
 use tokio::time::sleep;
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "Long-running e2e test"]
 async fn test_state_coherence() {
-    // crate::common::utils::initialize_logger(0);
+    crate::common::utils::initialize_logger(0);
 
     const N: u16 = 4;
     let primaries = start_n_primaries(N).await;
@@ -45,7 +45,7 @@ async fn test_state_coherence() {
     // TODO(nkls): the easiest would be to assert on the anchor or bullshark's output, once
     // implemented.
 
-    // std::future::pending::<()>().await;
+    std::future::pending::<()>().await;
 }
 
 #[tokio::test]
