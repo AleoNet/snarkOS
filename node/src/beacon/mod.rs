@@ -272,7 +272,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         let mut beacon_transaction: Option<Transaction<N>> = None;
 
         // Produce a transaction if the mempool is empty.
-        if self.consensus.memory_pool().num_unconfirmed_transactions() == 0 {
+        if self.consensus.num_unconfirmed_transactions() == 0 {
             // Create a transfer transaction.
             let beacon = self.clone();
             let transaction = match tokio::task::spawn_blocking(move || {

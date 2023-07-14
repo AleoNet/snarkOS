@@ -324,8 +324,10 @@ impl<N: Network> Primary<N> {
         // Determined the required number of transmissions per worker.
         let num_transmissions_per_worker = MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
         // Take the transmissions from the workers.
-        let transmissions: IndexMap<_, _> =
-            self.workers.iter().flat_map(|worker| worker.take_candidates(num_transmissions_per_worker)).collect();
+        let mut transmissions: IndexMap<_, _> = Default::default();
+        for worker in self.workers.iter() {
+            transmissions.extend(worker.take_candidates(num_transmissions_per_worker).await);
+        }
         // Determine if there are transmissions to propose.
         let has_transmissions = !transmissions.is_empty();
         // If the batch is not ready to be proposed, return early.

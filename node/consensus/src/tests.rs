@@ -399,7 +399,7 @@ async fn test_ledger_execute_many() {
             // Add the transaction to the memory pool.
             consensus.add_unconfirmed_transaction(transaction).await.unwrap();
         }
-        assert_eq!(consensus.memory_pool.num_unconfirmed_transactions(), NUM_GENESIS * (1 << (height - 1)));
+        assert_eq!(consensus.num_unconfirmed_transactions(), NUM_GENESIS * (1 << (height - 1)));
 
         // Propose the next block.
         let next_block = consensus.propose_next_block(&private_key, rng).unwrap();

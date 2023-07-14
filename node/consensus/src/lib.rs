@@ -70,7 +70,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     pub fn new(account: Account<N>, ledger: Ledger<N, C>, dev: Option<u16>) -> Result<Self> {
         // Initialize the committee.
         let committee = {
-            // TODO (howardwu): Refactor committee out for narwhal.
             // TODO (howardwu): Fix the ledger round number.
             // TODO (howardwu): Retrieve the real committee members.
             // Sample the members.
@@ -199,11 +198,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
-    /// Returns the memory pool.
-    pub const fn memory_pool(&self) -> &MemoryPool<N> {
-        &self.memory_pool
-    }
-
     /// Returns `true` if the coinbase target is met.
     pub fn is_coinbase_target_met(&self) -> Result<bool> {
         // Retrieve the latest proof target.

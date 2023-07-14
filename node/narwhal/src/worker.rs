@@ -32,6 +32,7 @@ use snarkvm::{
     },
 };
 
+use futures::StreamExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
@@ -190,18 +191,41 @@ impl<N: Network> Worker<N> {
     }
 
     /// Removes the specified number of transmissions from the ready queue, and returns them.
-    pub(crate) fn take_candidates(
+    pub(crate) async fn take_candidates(
         &self,
         num_transmissions: usize,
     ) -> impl Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
-        // Acquire the proposed batch read lock.
-        let proposed_batch = self.proposed_batch.read();
+        // Iterate through the ready transmissions, and determine which should be retained.
+        let stream =
+            futures::stream::iter(self.ready.transmissions().into_iter().map(|(id, transmission)| async move {
+                // Check if the transmission has been stored already.
+                if self.storage.contains_transmission(id) {
+                    return None;
+                }
+                // Check if the proposed batch already contains the transmission.
+                if let Some(proposed_batch) = self.proposed_batch.read().as_ref() {
+                    if proposed_batch.contains_transmission(id) {
+                        return None;
+                    }
+                }
+                // Check if the ledger already contains the transmission.
+                if self.ledger.contains_transmission(&id).unwrap_or(false) {
+                    return None;
+                }
+                // If the transmission is a solution, ensure the solution is still valid.
+                if let (TransmissionID::Solution(commitment), Transmission::Solution(solution)) = (id, transmission) {
+                    // Check if the solution is still valid.
+                    if self.ledger.check_solution_basic(commitment, solution).await.is_err() {
+                        return None;
+                    }
+                }
+                Some(id)
+            }));
+
+        let keep: IndexSet<_> = stream.filter_map(|x| x).collect().await;
+
         // Retain the transmissions that are not in the storage or ledger.
-        self.ready.retain(|id, _| {
-            !self.storage.contains_transmission(*id)
-                && !proposed_batch.as_ref().map_or(false, |p| p.contains_transmission(*id))
-                && !self.ledger.contains_transmission(id).unwrap_or(false)
-        });
+        self.ready.retain(|id, _| keep.contains(id));
         // Remove the specified number of transmissions from the ready queue.
         self.ready.take(num_transmissions).into_iter()
     }
