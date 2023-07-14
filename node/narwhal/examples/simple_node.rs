@@ -158,7 +158,7 @@ pub async fn start_primary(
     Ok((primary, sender))
 }
 
-/// Initializes the components of the node
+/// Initializes the components of the node.
 fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Storage<CurrentNetwork>, Account<CurrentNetwork>)> {
     // Ensure that the node ID is valid.
     ensure!(node_id < num_nodes, "Node ID {node_id} must be less than {num_nodes}");
