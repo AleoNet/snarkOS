@@ -43,7 +43,7 @@ use tracing::*;
 #[derive(Clone)]
 pub struct TestNetworkConfig {
     pub num_nodes: u16,
-    pub initiate_connections: bool,
+    pub connect_all: bool,
     pub fire_cannons: bool,
     pub log_level: Option<u8>,
     pub log_connections: bool,
@@ -87,7 +87,6 @@ impl TestPrimary {
     }
 
     pub fn log_connections(&mut self) {
-        // let node = self.clone();
         let self_clone = self.clone();
         self.handles.write().push(tokio::task::spawn(async move {
             loop {
@@ -103,6 +102,7 @@ impl TestPrimary {
 }
 
 impl TestNetwork {
+    // Creates a new test network with the given configuration.
     pub fn new(config: TestNetworkConfig) -> Self {
         if let Some(log_level) = config.log_level {
             initialize_logger(log_level);
@@ -123,6 +123,7 @@ impl TestNetwork {
         Self { config, primaries }
     }
 
+    // Starts each node in the network.
     pub async fn start(&mut self) {
         for primary in self.primaries.values_mut() {
             // Setup the channels and start the primary.
@@ -139,29 +140,37 @@ impl TestNetwork {
             }
         }
 
-        if self.config.initiate_connections {
-            initiate_connections(&self.primaries).await;
+        if self.config.connect_all {
+            self.connect_all().await;
         }
     }
 
+    // Starts the solution and trasnaction cannons for node.
     pub fn fire_cannons(&mut self, id: u16) {
         self.primaries.get_mut(&id).unwrap().fire_cannons();
     }
 
+    // Connects a node to another node.
     pub async fn connect(&self, id: u16, peer_id: u16) {
         let primary = self.primaries.get(&id).unwrap();
         let peer_ip = self.primaries.get(&peer_id).unwrap().gateway().local_ip();
         primary.gateway().connect(peer_ip);
         // Give the connection time to be established.
         sleep(Duration::from_millis(100)).await;
-
-        //  // TODO(nkls): maybe deadline could be used here instead?
-        //  let primary_clone = primary.clone();
-        //  deadline::deadline!(std::time::Duration::from_millis(100), move || {
-        //      primary_clone.gateway().is_connected(peer_ip)
-        //  });
     }
 
+    // Connects all nodes to each other.
+    pub async fn connect_all(&self) {
+        for (primary, other_primary) in self.primaries.values().tuple_combinations() {
+            // Connect to the node.
+            let ip = other_primary.gateway().local_ip();
+            primary.gateway().connect(ip);
+            // Give the connection time to be established.
+            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+        }
+    }
+
+    // Disconnects a node from all other nodes.
     pub async fn disconnect(&self, num_nodes: u16) {
         for id in 0..num_nodes {
             let primary = self.primaries.get(&id).unwrap();
@@ -174,11 +183,13 @@ impl TestNetwork {
         sleep(Duration::from_millis(100)).await;
     }
 
+    // Checks a quorum of nodes have reached the given round.
     pub fn is_round_reached(&self, round: u64) -> bool {
         let quorum_threshold = self.primaries.len() / 2 + 1;
         self.primaries.values().filter(|p| p.current_round() >= round).count() >= quorum_threshold as usize
     }
 
+    // Checks all nodes have stopped progressing.
     pub async fn is_halted(&self) -> bool {
         let halt_round = self.primaries.values().map(|p| p.current_round()).max().unwrap();
         sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
@@ -187,7 +198,7 @@ impl TestNetwork {
 }
 
 // Initializes a new test committee.
-pub fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<CurrentNetwork>) {
+fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<CurrentNetwork>) {
     const INITIAL_STAKE: u64 = MIN_STAKE;
 
     let mut accounts = Vec::with_capacity(n as usize);
@@ -207,32 +218,3 @@ pub fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<Cu
 
     (accounts, committee)
 }
-
-// TODO(nkls): should be handled by the gateway or on the snarkOS level.
-/// Actively try to keep the node's connections to all nodes.
-pub async fn initiate_connections(primaries: &HashMap<u16, TestPrimary>) {
-    for (primary, other_primary) in primaries.values().tuple_combinations() {
-        // Connect to the node.
-        let ip = other_primary.gateway().local_ip();
-        primary.gateway().connect(ip);
-        // Give the connection time to be established.
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-    }
-}
-
-///// Logs the node's connections.
-//pub fn log_connections() {
-//    for (primary, _) in primaries.values() {
-//        let node = primary.clone();
-//        tokio::task::spawn(async move {
-//            loop {
-//                let connections = node.gateway().connected_peers().read().clone();
-//                info!("{} connections", connections.len());
-//                for connection in connections {
-//                    debug!("  {}", connection);
-//                }
-//                tokio::time::sleep(std::time::Duration::from_secs(10)).await;
-//            }
-//        });
-//    }
-//}
