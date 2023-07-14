@@ -144,16 +144,8 @@ impl TestNetwork {
         }
     }
 
-    pub fn fire_unconfirmed_solutions(&mut self, id: u16) {
-        let primary = self.primaries.get_mut(&id).unwrap();
-        let handle = fire_unconfirmed_solutions(&primary.sender.as_ref().unwrap(), id);
-        primary.handles.write().push(handle);
-    }
-
-    pub fn fire_unconfirmed_transactions(&mut self, id: u16) {
-        let primary = self.primaries.get_mut(&id).unwrap();
-        let handle = fire_unconfirmed_transactions(&primary.sender.as_ref().unwrap(), id);
-        primary.handles.write().push(handle);
+    pub fn fire_cannons(&mut self, id: u16) {
+        self.primaries.get_mut(&id).unwrap().fire_cannons();
     }
 
     pub async fn connect(&self, id: u16, peer_id: u16) {
