@@ -26,9 +26,11 @@ use snarkvm::{
     },
 };
 
+use std::time::Duration;
+
 use ::bytes::Bytes;
 use rand::Rng;
-use tokio::{sync::oneshot, task, task::JoinHandle};
+use tokio::{sync::oneshot, task, task::JoinHandle, time::sleep};
 use tracing::*;
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
@@ -109,7 +111,7 @@ pub fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_i
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            sleep(Duration::from_millis(10)).await;
         }
     })
 }
@@ -153,7 +155,7 @@ pub fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, nod
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+            sleep(Duration::from_millis(10)).await;
         }
     })
 }
