@@ -13,9 +13,10 @@
 // limitations under the License.
 
 use crate::{
-    helpers::{check_timestamp_for_liveness, now, Committee},
+    helpers::{check_timestamp_for_liveness, now},
     MAX_EXPIRATION_TIME_IN_SECS,
 };
+use snarkos_node_narwhal_committee::Committee;
 use snarkvm::{
     console::{
         account::{Address, Signature},

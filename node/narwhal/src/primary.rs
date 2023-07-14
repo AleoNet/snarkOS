@@ -18,7 +18,6 @@ use crate::{
         assign_to_worker,
         init_worker_channels,
         now,
-        Committee,
         Pending,
         PrimaryReceiver,
         PrimarySender,
@@ -32,6 +31,7 @@ use crate::{
     MAX_WORKERS,
 };
 use snarkos_account::Account;
+use snarkos_node_narwhal_committee::Committee;
 use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,

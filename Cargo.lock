@@ -3042,6 +3042,7 @@ dependencies = [
  "rand",
  "snarkos-account",
  "snarkos-node-narwhal",
+ "snarkos-node-narwhal-committee",
  "snarkos-node-narwhal-ledger-service",
  "snarkvm",
  "tokio",
@@ -3110,6 +3111,7 @@ dependencies = [
  "serde",
  "sha2",
  "snarkos-account",
+ "snarkos-node-narwhal-committee",
  "snarkos-node-narwhal-ledger-service",
  "snarkos-node-tcp",
  "snarkvm",
@@ -3121,6 +3123,27 @@ dependencies = [
  "tower-http",
  "tracing",
  "tracing-subscriber 0.3.17",
+]
+
+[[package]]
+name = "snarkos-node-narwhal-committee"
+version = "2.1.4"
+dependencies = [
+ "anyhow",
+ "async-trait",
+ "indexmap 2.0.0",
+ "parking_lot",
+ "proptest",
+ "rand",
+ "rand_chacha",
+ "rand_distr",
+ "rayon",
+ "snarkos-account",
+ "snarkos-node-narwhal-committee",
+ "snarkvm",
+ "test-strategy",
+ "tokio",
+ "tracing",
 ]
 
 [[package]]

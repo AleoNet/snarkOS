@@ -835,18 +835,14 @@ impl<N: Network> Gateway<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        helpers::{
-            committee::prop_tests::{CommitteeInput, Validator},
-            init_worker_channels,
-            storage::prop_tests::StorageInput,
-            WorkerSender,
-        },
+        helpers::{init_worker_channels, storage::prop_tests::StorageInput, WorkerSender},
         Gateway,
         Worker,
         MAX_COMMITTEE_SIZE,
         MAX_WORKERS,
         MEMORY_POOL_PORT,
     };
+    use snarkos_node_narwhal_committee::test_helpers::{CommitteeInput, Validator};
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
     use snarkos_node_tcp::P2P;
     use snarkvm::prelude::Testnet3;

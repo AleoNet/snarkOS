@@ -25,18 +25,11 @@ mod tests;
 
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
-    helpers::{
-        init_consensus_channels,
-        Committee,
-        ConsensusReceiver,
-        PrimaryReceiver,
-        PrimarySender,
-        Storage as NarwhalStorage,
-    },
+    helpers::{init_consensus_channels, ConsensusReceiver, PrimaryReceiver, PrimarySender, Storage as NarwhalStorage},
     BFT,
     MAX_GC_ROUNDS,
-    MIN_STAKE,
 };
+use snarkos_node_narwhal_committee::{Committee, MIN_STAKE};
 use snarkos_node_narwhal_ledger_service::CoreLedgerService;
 use snarkvm::{
     ledger::narwhal::Data,

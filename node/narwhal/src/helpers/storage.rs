@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::{check_timestamp_for_liveness, Committee};
+use crate::helpers::check_timestamp_for_liveness;
+use snarkos_node_narwhal_committee::Committee;
 use snarkvm::{
     ledger::narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     prelude::{bail, ensure, Address, Field, Network, Result},
@@ -586,6 +587,7 @@ impl<N: Network> Storage<N> {
 #[cfg(test)]
 pub mod tests {
     use super::*;
+    use snarkos_node_narwhal_committee::test_helpers::sample_committee;
     use snarkvm::{
         ledger::narwhal::Data,
         prelude::{Rng, TestRng},
@@ -665,7 +667,7 @@ pub mod tests {
         let rng = &mut TestRng::default();
 
         // Sample a committee.
-        let committee = crate::helpers::committee::test_helpers::sample_committee(rng);
+        let committee = sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
 
@@ -741,7 +743,7 @@ pub mod tests {
         let rng = &mut TestRng::default();
 
         // Sample a committee.
-        let committee = crate::helpers::committee::test_helpers::sample_committee(rng);
+        let committee = sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
 
@@ -817,8 +819,8 @@ pub mod tests {
 #[cfg(test)]
 pub mod prop_tests {
     use super::*;
-    use crate::helpers::committee::prop_tests::CommitteeInput;
 
+    use snarkos_node_narwhal_committee::test_helpers::CommitteeInput;
     use test_strategy::Arbitrary;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;

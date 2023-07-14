@@ -61,6 +61,11 @@ path = "./ledger-service"
 version = "=2.1.4"
 default-features = false
 
+[dependencies.snarkos-node-narwhal-committee]
+path = "./committee"
+version = "=2.1.4"
+default-features = false
+
 [dependencies.snarkos-node-tcp]
 path = "../tcp"
 version = "=2.1.4"
@@ -123,6 +128,11 @@ features = [ "test-helpers" ]
 path = "./ledger-service"
 default-features = false
 features = [ "mock" ]
+
+[dev-dependencies.snarkos-node-narwhal-committee]
+path = "./committee"
+default-features = false
+features = [ "test-utils" ]
 
 [dev-dependencies.tower-http]
 version = "0.4"
