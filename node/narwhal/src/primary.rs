@@ -84,9 +84,15 @@ pub struct Primary<N: Network> {
 
 impl<N: Network> Primary<N> {
     /// Initializes a new primary instance.
-    pub fn new(account: Account<N>, storage: Storage<N>, ledger: Ledger<N>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(
+        account: Account<N>,
+        storage: Storage<N>,
+        ledger: Ledger<N>,
+        ip: Option<SocketAddr>,
+        dev: Option<u16>,
+    ) -> Result<Self> {
         Ok(Self {
-            gateway: Gateway::new(account, storage.clone(), dev)?,
+            gateway: Gateway::new(account, storage.clone(), ip, dev)?,
             storage,
             ledger: Arc::from(ledger),
             workers: Default::default(),

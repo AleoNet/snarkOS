@@ -103,13 +103,13 @@ pub struct Gateway<N: Network> {
 
 impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
-    pub fn new(account: Account<N>, storage: Storage<N>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(account: Account<N>, storage: Storage<N>, ip: Option<SocketAddr>, dev: Option<u16>) -> Result<Self> {
         // Initialize the gateway IP.
-        let ip = match dev {
-            // TODO change dev to Option<u8>, otherwise there is potential overflow
-            Some(dev) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev)),
-            None => SocketAddr::from_str(&format!("0.0.0.0:{}", MEMORY_POOL_PORT)),
-        }?;
+        let ip = match (ip, dev) {
+            (_, Some(dev)) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev))?,
+            (None, None) => SocketAddr::from_str(&format!("0.0.0.0:{}", MEMORY_POOL_PORT))?,
+            (Some(ip), None) => ip,
+        };
         // Initialize the TCP stack.
         let tcp = Tcp::new(Config::new(ip, MAX_COMMITTEE_SIZE));
         // Return the gateway.
@@ -866,7 +866,7 @@ pub mod prop_tests {
         pub committee_input: CommitteeInput,
         #[filter(Validator::is_valid)]
         pub node_validator: Validator,
-        pub dev: Option<u8>,
+        pub dev: Option<u16>,
         #[strategy(0..MAX_WORKERS)]
         pub workers_count: u8,
         pub worker_storage: StorageInput,
@@ -875,8 +875,7 @@ pub mod prop_tests {
     impl GatewayInput {
         pub fn to_gateway(&self) -> Gateway<CurrentNetwork> {
             let account = self.node_validator.get_account();
-            let dev = self.dev.map(|dev| dev as u16);
-            Gateway::new(account, self.worker_storage.to_storage(), dev).unwrap()
+            Gateway::new(account, self.worker_storage.to_storage(), None, self.dev).unwrap()
         }
 
         pub fn is_valid(&self) -> bool {
@@ -925,7 +924,7 @@ pub mod prop_tests {
                 let gateway = input.to_gateway();
                 let tcp_config = gateway.tcp().config();
                 assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
-                assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + (dev as u16)));
+                assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev));
                 gateway
             }
             None => {
@@ -947,14 +946,11 @@ pub mod prop_tests {
         let gateway = input.to_gateway();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
-        assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + (dev as u16)));
+        assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev));
 
         let (workers, worker_senders) = input.generate_workers(&gateway).await;
         gateway.run(worker_senders).await;
-        assert_eq!(
-            gateway.local_ip(),
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), MEMORY_POOL_PORT + (dev as u16))
-        );
+        assert_eq!(gateway.local_ip(), SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), MEMORY_POOL_PORT + dev));
         assert_eq!(gateway.num_workers(), workers.len() as u8);
     }
 }

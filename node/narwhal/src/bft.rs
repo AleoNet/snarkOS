@@ -41,6 +41,7 @@ use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{BTreeMap, HashSet},
     future::Future,
+    net::SocketAddr,
     sync::{
         atomic::{AtomicI64, Ordering},
         Arc,
@@ -66,9 +67,15 @@ pub struct BFT<N: Network> {
 
 impl<N: Network> BFT<N> {
     /// Initializes a new instance of the BFT.
-    pub fn new(account: Account<N>, storage: Storage<N>, ledger: Ledger<N>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(
+        account: Account<N>,
+        storage: Storage<N>,
+        ledger: Ledger<N>,
+        ip: Option<SocketAddr>,
+        dev: Option<u16>,
+    ) -> Result<Self> {
         Ok(Self {
-            primary: Primary::new(account, storage, ledger, dev)?,
+            primary: Primary::new(account, storage, ledger, ip, dev)?,
             dag: Default::default(),
             leader_certificate: Default::default(),
             leader_certificate_timer: Default::default(),
