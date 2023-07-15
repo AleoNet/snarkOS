@@ -909,9 +909,7 @@ pub mod prop_tests {
     fn gateway_dev_initialization(#[strategy(any_valid_dev_gateway())] input: GatewayInput) {
         let (storage, _, account, dev) = input;
         let address = account.address();
-        let gateway = Gateway::new(account, storage, dev);
-        assert!(gateway.is_ok());
-        let gateway = gateway.unwrap();
+        let gateway = Gateway::new(account, storage, dev).unwrap();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
         assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev.unwrap()));
@@ -925,10 +923,8 @@ pub mod prop_tests {
     fn gateway_prod_initialization(#[strategy(any_valid_prod_gateway())] input: GatewayInput) {
         let (storage, _, account, dev) = input;
         let address = account.address();
-        let gateway = Gateway::new(account, storage, dev);
-        assert!(gateway.is_ok());
+        let gateway = Gateway::new(account, storage, dev).unwrap();
         assert!(dev.is_none());
-        let gateway = gateway.unwrap();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
         assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT));
@@ -945,9 +941,7 @@ pub mod prop_tests {
     ) {
         let (storage, _, account, dev) = input;
         let worker_storage = storage.clone();
-        let gateway = Gateway::new(account, storage, dev);
-        assert!(gateway.is_ok());
-        let gateway = gateway.unwrap();
+        let gateway = Gateway::new(account, storage, dev).unwrap();
 
         let (workers, worker_senders) = {
             // Construct a map of the worker senders.

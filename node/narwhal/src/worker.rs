@@ -375,9 +375,7 @@ mod prop_tests {
         gateway: Gateway<CurrentNetwork>,
         storage: Storage<CurrentNetwork>,
     ) {
-        let worker = Worker::new(id, gateway, storage, Default::default());
-        assert!(worker.is_ok());
-        let worker = worker.unwrap();
+        let worker = Worker::new(id, gateway, storage, Default::default()).unwrap();
         assert_eq!(worker.id(), id);
     }
 
@@ -388,9 +386,9 @@ mod prop_tests {
         storage: Storage<CurrentNetwork>,
     ) {
         let worker = Worker::new(id, gateway, storage, Default::default());
-        assert!(worker.is_err());
+        // TODO once Worker implements Debug, simplify this with `unwrap_err`
         if let Err(error) = worker {
-            assert_eq!(error.to_string().as_str(), format!("Invalid worker ID '{}'", id));
+            assert_eq!(error.to_string(), format!("Invalid worker ID '{}'", id));
         }
     }
 }

@@ -203,9 +203,7 @@ pub mod prop_tests {
         )
         .unwrap();
 
-        let proposal = Proposal::new(committee, batch.clone());
-        assert!(proposal.is_ok());
-        let proposal = proposal.unwrap();
+        let proposal = Proposal::new(committee, batch.clone()).unwrap();
         assert_eq!(proposal.batch_id(), batch.batch_id());
     }
 }

@@ -816,18 +816,37 @@ pub mod tests {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use super::*;
+    use std::fmt::Debug;
+
+    use ::bytes::Bytes;
     use indexmap::indexset;
     use proptest::{
         collection,
-        prelude::{any, BoxedStrategy, Just, Strategy},
+        prelude::{any, Arbitrary, BoxedStrategy, Just, Strategy},
         prop_oneof,
+        sample::{size_range, Selector},
+        test_runner::TestRng,
     };
-    use snarkvm::{ledger::coinbase::PuzzleCommitment, prelude::Uniform};
-    use std::fmt::Debug;
+    use rand::{CryptoRng, Error, Rng, RngCore};
+    use snarkvm::{
+        ledger::{
+            coinbase::PuzzleCommitment,
+            narwhal::{Batch, Data},
+        },
+        prelude::{Signature, Uniform},
+    };
     use test_strategy::proptest;
 
-    use crate::MAX_GC_ROUNDS;
+    use crate::{
+        helpers::{
+            committee::prop_tests::{CommitteeContext, ValidatorSet},
+            now,
+            storage::tests::assert_storage,
+        },
+        MAX_GC_ROUNDS,
+    };
+
+    use super::*;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -851,17 +870,6 @@ pub mod prop_tests {
                 .boxed()
         }
     }
-
-    use crate::helpers::{now, storage::tests::assert_storage};
-
-    use ::bytes::Bytes;
-    use proptest::{prelude::Arbitrary, test_runner::TestRng};
-    use rand::{CryptoRng, Error, Rng, RngCore};
-
-    use snarkvm::{
-        ledger::narwhal::{Batch, Data},
-        prelude::Signature,
-    };
 
     // The `proptest::TestRng` doesn't implement `rand_core::CryptoRng` trait which is required in snarkVM, so we use a wrapper
     #[derive(Debug)]
@@ -966,8 +974,6 @@ pub mod prop_tests {
             signatures
         }
     }
-    use crate::helpers::committee::prop_tests::{CommitteeContext, ValidatorSet};
-    use proptest::sample::{size_range, Selector};
 
     #[proptest]
     fn test_certificate_duplicate(
