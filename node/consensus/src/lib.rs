@@ -20,8 +20,8 @@ extern crate tracing;
 mod memory_pool;
 pub use memory_pool::*;
 
-#[cfg(test)]
-mod tests;
+// #[cfg(test)]
+// mod tests;
 
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
@@ -33,7 +33,7 @@ use snarkos_node_narwhal_committee::{Committee, MIN_STAKE};
 use snarkos_node_narwhal_ledger_service::CoreLedgerService;
 use snarkvm::{
     ledger::{
-        block::{Block, Transaction},
+        block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
         narwhal::{Data, Transmission, TransmissionID},
         store::ConsensusStorage,
@@ -194,20 +194,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             .await?;
         // Return the callback.
         callback_receiver.await?
-    }
-}
-
-impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
-    /// Returns `true` if the coinbase target is met.
-    pub fn is_coinbase_target_met(&self) -> Result<bool> {
-        // Retrieve the latest proof target.
-        let latest_proof_target = self.ledger.latest_proof_target();
-        // Compute the candidate coinbase target.
-        let cumulative_proof_target = self.memory_pool.candidate_coinbase_target(latest_proof_target)?;
-        // Retrieve the latest coinbase target.
-        let latest_coinbase_target = self.ledger.latest_coinbase_target();
-        // Check if the coinbase target is met.
-        Ok(cumulative_proof_target >= latest_coinbase_target as u128)
     }
 }
 

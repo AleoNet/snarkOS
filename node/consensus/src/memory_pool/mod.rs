@@ -12,20 +12,11 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-mod solutions;
 mod transactions;
 
 use crate::Consensus;
-use snarkvm::prelude::{
-    anchor_block_height,
-    block::Transaction,
-    coinbase::{ProverSolution, PuzzleCommitment},
-    store::ConsensusStorage,
-    Itertools,
-    Network,
-};
+use snarkvm::prelude::{block::Transaction, store::ConsensusStorage, Network};
 
-use anyhow::{anyhow, Result};
 use parking_lot::RwLock;
 use std::{collections::HashMap, sync::Arc};
 
@@ -34,14 +25,12 @@ use std::{collections::HashMap, sync::Arc};
 pub struct MemoryPool<N: Network> {
     /// The pool of unconfirmed transactions.
     unconfirmed_transactions: Arc<RwLock<HashMap<N::TransactionID, Transaction<N>>>>,
-    /// The pool of unconfirmed solutions and their proof targets.
-    unconfirmed_solutions: Arc<RwLock<HashMap<PuzzleCommitment<N>, (ProverSolution<N>, u64)>>>,
 }
 
 impl<N: Network> MemoryPool<N> {
     /// Initializes a new instance of a memory pool.
     pub fn new() -> Self {
-        Self { unconfirmed_transactions: Default::default(), unconfirmed_solutions: Default::default() }
+        Self { unconfirmed_transactions: Default::default() }
     }
 }
 
