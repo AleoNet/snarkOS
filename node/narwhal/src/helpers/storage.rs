@@ -585,7 +585,7 @@ impl<N: Network> Storage<N> {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
     use snarkvm::{
         ledger::narwhal::Data,

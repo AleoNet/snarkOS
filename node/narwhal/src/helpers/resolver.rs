@@ -91,7 +91,7 @@ impl<N: Network> Resolver<N> {
 }
 
 #[cfg(test)]
-pub mod tests {
+mod tests {
     use super::*;
     use snarkvm::{prelude::Rng, utilities::TestRng};
 
