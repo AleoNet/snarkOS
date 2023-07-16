@@ -54,8 +54,7 @@ version = "=2.1.4"
 optional = true
 
 [dependencies.test-strategy]
-git = "https://github.com/frozenlib/test-strategy/"
-branch = "master"
+version = "0.3.1"
 optional = true
 
 [dev-dependencies.parking_lot]

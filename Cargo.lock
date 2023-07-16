@@ -4051,8 +4051,9 @@ dependencies = [
 
 [[package]]
 name = "test-strategy"
-version = "0.3.0"
-source = "git+https://github.com/frozenlib/test-strategy/?branch=master#885013160c1431970a80faa43a5c96a9e05385ce"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8361c808554228ad09bfed70f5c823caf8a3450b6881cc3a38eb57e8c08c1d9"
 dependencies = [
  "proc-macro2",
  "quote 1.0.29",

@@ -58,16 +58,20 @@ fn validator_set<T: Strategy<Value = Validator>>(
     hash_set(element, size).prop_map(ValidatorSet)
 }
 
+// TODO remove the allow(dead_code)s once there's a fix in test-strategy crate
+#[allow(dead_code)]
 fn invalid_round_committee() -> BoxedStrategy<Result<Committee<CurrentNetwork>>> {
     (Just(0), validator_set(any_valid_validator(), size_range(4..=MAX_COMMITTEE_SIZE as usize)))
         .prop_map(to_committee)
         .boxed()
 }
 
+#[allow(dead_code)]
 fn too_small_committee() -> BoxedStrategy<Result<Committee<CurrentNetwork>>> {
     (1u64.., validator_set(any_valid_validator(), 0..4)).prop_map(to_committee).boxed()
 }
 
+#[allow(dead_code)]
 fn too_low_stake_committee() -> BoxedStrategy<Result<Committee<CurrentNetwork>>> {
     (1u64.., validator_set(invalid_stake_validator(), 4..=4)).prop_map(to_committee).boxed()
 }
@@ -125,14 +129,17 @@ impl Arbitrary for CommitteeContext {
     }
 }
 
+#[allow(dead_code)]
 pub fn any_valid_validator() -> BoxedStrategy<Validator> {
     (MIN_STAKE..5_000_000_000, any_valid_account()).prop_map(|(stake, account)| Validator { stake, account }).boxed()
 }
 
+#[allow(dead_code)]
 fn invalid_stake_validator() -> BoxedStrategy<Validator> {
     (0..MIN_STAKE, any_valid_account()).prop_map(|(stake, account)| Validator { stake, account }).boxed()
 }
 
+#[allow(dead_code)]
 pub fn any_valid_account() -> BoxedStrategy<Account<CurrentNetwork>> {
     any::<u64>()
         .prop_map(|seed| match Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(seed)) {
