@@ -880,14 +880,14 @@ pub mod prop_tests {
             if let GatewayAddress::Prod(ip) = self {
                 return *ip;
             }
-            return None;
+            None
         }
 
         fn port(&self) -> Option<u16> {
             if let GatewayAddress::Dev(port) = self {
                 return Some(*port as u16);
             }
-            return None;
+            None
         }
     }
 
