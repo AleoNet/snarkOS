@@ -15,7 +15,11 @@
 use crate::helpers::Storage;
 use snarkvm::{
     console::prelude::*,
-    ledger::narwhal::{Transmission, TransmissionID},
+    ledger::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+        narwhal::{Data, Transmission, TransmissionID},
+    },
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -42,15 +46,53 @@ impl<N: Network> Ready<N> {
     }
 
     /// Returns the number of transmissions in the ready queue.
-    pub fn len(&self) -> usize {
+    pub fn num_transmissions(&self) -> usize {
         self.transmissions.read().len()
     }
 
-    /// Returns the transmission IDs.
+    /// Returns the number of ratifications in the ready queue.
+    pub fn num_ratifications(&self) -> usize {
+        self.transmissions.read().keys().filter(|id| matches!(id, TransmissionID::Ratification)).count()
+    }
+
+    /// Returns the number of solutions in the ready queue.
+    pub fn num_solutions(&self) -> usize {
+        self.transmissions.read().keys().filter(|id| matches!(id, TransmissionID::Solution(..))).count()
+    }
+
+    /// Returns the number of transactions in the ready queue.
+    pub fn num_transactions(&self) -> usize {
+        self.transmissions.read().keys().filter(|id| matches!(id, TransmissionID::Transaction(..))).count()
+    }
+
+    /// Returns the transmission IDs in the ready queue.
     pub fn transmission_ids(&self) -> IndexSet<TransmissionID<N>> {
         self.transmissions.read().keys().copied().collect()
     }
 
+    /// Returns the transmissions in the ready queue.
+    pub fn transmissions(&self) -> IndexMap<TransmissionID<N>, Transmission<N>> {
+        self.transmissions.read().clone()
+    }
+
+    /// Returns the solutions in the ready queue.
+    pub fn solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
+        self.transmissions.read().clone().into_iter().filter_map(|(id, transmission)| match (id, transmission) {
+            (TransmissionID::Solution(id), Transmission::Solution(solution)) => Some((id, solution)),
+            _ => None,
+        })
+    }
+
+    /// Returns the transactions in the ready queue.
+    pub fn transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+        self.transmissions.read().clone().into_iter().filter_map(|(id, transmission)| match (id, transmission) {
+            (TransmissionID::Transaction(id), Transmission::Transaction(tx)) => Some((id, tx)),
+            _ => None,
+        })
+    }
+}
+
+impl<N: Network> Ready<N> {
     /// Returns `true` if the ready queue contains the specified `transmission ID`.
     pub fn contains(&self, transmission_id: impl Into<TransmissionID<N>>) -> bool {
         self.transmissions.read().contains_key(&transmission_id.into())
@@ -76,6 +118,12 @@ impl<N: Network> Ready<N> {
         }
         // Return whether the transmission is new.
         is_new
+    }
+
+    /// Retains the transmissions that satisfy the specified predicate.
+    pub fn retain(&self, predicate: impl FnMut(&TransmissionID<N>, &mut Transmission<N>) -> bool) {
+        // Retain the transmissions.
+        self.transmissions.write().retain(predicate);
     }
 
     /// Removes the specified number of transmissions and returns them.
@@ -107,7 +155,7 @@ mod tests {
         let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
 
         // Sample a committee.
-        let committee = crate::helpers::committee::test_helpers::sample_committee(rng);
+        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee, 1);
         // Initialize the ready queue.
@@ -129,7 +177,7 @@ mod tests {
         assert!(ready.insert(commitment_3, solution_3.clone()));
 
         // Check the number of transmissions.
-        assert_eq!(ready.len(), 3);
+        assert_eq!(ready.num_transmissions(), 3);
 
         // Check the transmission IDs.
         let transmission_ids = vec![commitment_1, commitment_2, commitment_3].into_iter().collect::<IndexSet<_>>();
@@ -174,7 +222,7 @@ mod tests {
         let data = Data::Buffer(Bytes::from(vec));
 
         // Sample a committee.
-        let committee = crate::helpers::committee::test_helpers::sample_committee(rng);
+        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee, 1);
         // Initialize the ready queue.
@@ -191,6 +239,6 @@ mod tests {
         assert!(!ready.insert(commitment, solution));
 
         // Check the number of transmissions.
-        assert_eq!(ready.len(), 1);
+        assert_eq!(ready.num_transmissions(), 1);
     }
 }

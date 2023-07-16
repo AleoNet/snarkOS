@@ -12,18 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::common::{ledger_service::MockLedgerService, CurrentNetwork};
+use crate::common::{CurrentNetwork, MockLedgerService};
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
-    helpers::{init_primary_channels, Committee, PrimarySender, Storage},
+    helpers::{init_primary_channels, PrimarySender, Storage},
     Primary,
     MAX_GC_ROUNDS,
-    MIN_STAKE,
 };
+use snarkos_node_narwhal_committee::{Committee, MIN_STAKE};
+use snarkvm::prelude::TestRng;
 
 use indexmap::IndexMap;
 use itertools::Itertools;
-use rand::SeedableRng;
 use std::collections::HashMap;
 use tracing::*;
 
@@ -35,7 +35,7 @@ pub fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<Cu
     let mut members = IndexMap::with_capacity(n as usize);
     for i in 0..n {
         // Sample the account.
-        let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64)).unwrap();
+        let account = Account::new(&mut TestRng::fixed(i as u64)).unwrap();
 
         // TODO(nkls): use tracing instead.
         info!("Validator {}: {}", i, account.address());
@@ -57,7 +57,7 @@ pub async fn start_n_primaries(n: u16) -> HashMap<u16, (Primary<CurrentNetwork>,
         let storage = Storage::new(committee.clone(), MAX_GC_ROUNDS);
         let (sender, receiver) = init_primary_channels();
         let ledger = Box::new(MockLedgerService::new());
-        let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, Some(id as u16)).unwrap();
+        let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, None, Some(id as u16)).unwrap();
 
         primary.run(sender.clone(), receiver, None).await.unwrap();
         primaries.insert(id as u16, (primary, sender));

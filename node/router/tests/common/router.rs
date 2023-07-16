@@ -182,7 +182,7 @@ impl<N: Network> Inbound<N> for TestRouter<N> {
     }
 
     /// Handles an `UnconfirmedTransaction` message.
-    fn unconfirmed_transaction(
+    async fn unconfirmed_transaction(
         &self,
         _peer_ip: SocketAddr,
         _serialized: UnconfirmedTransaction<N>,

@@ -12,7 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::{check_timestamp_for_liveness, Committee};
+use crate::helpers::check_timestamp_for_liveness;
+use snarkos_node_narwhal_committee::Committee;
 use snarkvm::{
     ledger::narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     prelude::{bail, ensure, Address, Field, Network, Result},
@@ -665,7 +666,7 @@ pub mod tests {
         let rng = &mut TestRng::default();
 
         // Sample a committee.
-        let committee = crate::helpers::committee::test_helpers::sample_committee(rng);
+        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
 
@@ -741,7 +742,7 @@ pub mod tests {
         let rng = &mut TestRng::default();
 
         // Sample a committee.
-        let committee = crate::helpers::committee::test_helpers::sample_committee(rng);
+        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
 
@@ -829,22 +830,16 @@ pub mod prop_tests {
     };
     use rand::{CryptoRng, Error, Rng, RngCore};
     use snarkvm::{
-        ledger::{
-            coinbase::PuzzleCommitment,
-            narwhal::{Batch, Data},
-        },
+        ledger::{coinbase::PuzzleCommitment, narwhal::Data},
         prelude::{Signature, Uniform},
     };
     use test_strategy::proptest;
 
     use crate::{
-        helpers::{
-            committee::prop_tests::{CommitteeContext, ValidatorSet},
-            now,
-            storage::tests::assert_storage,
-        },
+        helpers::{now, storage::tests::assert_storage},
         MAX_GC_ROUNDS,
     };
+    use snarkos_node_narwhal_committee::prop_tests::{CommitteeContext, ValidatorSet};
 
     use super::*;
 
@@ -957,22 +952,19 @@ pub mod prop_tests {
         .boxed()
     }
 
-    impl ValidatorSet {
-        fn sign_batch_header<R: Rng + CryptoRng>(
-            &self,
-            batch_header: &BatchHeader<CurrentNetwork>,
-            rng: &mut R,
-        ) -> IndexMap<Signature<CurrentNetwork>, i64> {
-            let mut signatures = IndexMap::with_capacity(self.0.len());
-            for validator in self.0.iter() {
-                let private_key = validator.account.private_key();
-                let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
-                let timestamp_field = Field::from_u64(timestamp as u64);
-                signatures
-                    .insert(private_key.sign(&[batch_header.batch_id(), timestamp_field], rng).unwrap(), timestamp);
-            }
-            signatures
+    fn sign_batch_header<R: Rng + CryptoRng>(
+        validator_set: &ValidatorSet,
+        batch_header: &BatchHeader<CurrentNetwork>,
+        rng: &mut R,
+    ) -> IndexMap<Signature<CurrentNetwork>, i64> {
+        let mut signatures = IndexMap::with_capacity(validator_set.0.len());
+        for validator in validator_set.0.iter() {
+            let private_key = validator.account.private_key();
+            let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
+            let timestamp_field = Field::from_u64(timestamp as u64);
+            signatures.insert(private_key.sign(&[batch_header.batch_id(), timestamp_field], rng).unwrap(), timestamp);
         }
+        signatures
     }
 
     #[proptest]
@@ -1009,13 +1001,18 @@ pub mod prop_tests {
             transmission_map.insert(*id, t.clone());
         }
 
-        let result =
-            Batch::new(signer.account.private_key(), 0, now(), transmission_map.clone(), Default::default(), &mut rng)
-                .unwrap();
-        let batch_header = result.to_header().unwrap();
+        let batch_header = BatchHeader::new(
+            signer.account.private_key(),
+            0,
+            now(),
+            transmission_map.keys().cloned().collect(),
+            Default::default(),
+            &mut rng,
+        )
+        .unwrap();
         let certificate = BatchCertificate::new(
             batch_header.clone(),
-            ValidatorSet(validators).sign_batch_header(&batch_header, &mut rng),
+            sign_batch_header(&ValidatorSet(validators), &batch_header, &mut rng),
         )
         .unwrap();
 

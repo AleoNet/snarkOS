@@ -34,9 +34,6 @@ pub use gateway::*;
 mod primary;
 pub use primary::*;
 
-pub mod traits;
-pub use traits::*;
-
 mod worker;
 pub use worker::*;
 
@@ -44,21 +41,18 @@ pub const CONTEXT: &str = "[MemoryPool]";
 
 /// The maximum number of milliseconds to wait before proposing a batch.
 pub const MAX_BATCH_DELAY: u64 = 2500; // ms
-/// The maximum number of nodes that can be in a committee.
-pub const MAX_COMMITTEE_SIZE: u16 = 4; // members
 /// The maximum number of seconds before a proposed batch is considered expired.
 pub const MAX_EXPIRATION_TIME_IN_SECS: i64 = 10; // seconds
 /// The maximum number of rounds to store before garbage collecting.
 pub const MAX_GC_ROUNDS: u64 = 50; // rounds
+/// The maximum number of seconds allowed for the leader to send their certificate.
+pub const MAX_LEADER_CERTIFICATE_DELAY: i64 = 2 * MAX_BATCH_DELAY as i64 / 1000; // seconds
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of transmissions allowed in a batch.
 pub const MAX_TRANSMISSIONS_PER_BATCH: usize = 1000; // transmissions
 /// The maximum number of workers that can be spawned.
 pub const MAX_WORKERS: u8 = 3; // workers
-/// The minimum amount of stake required for a validator to bond.
-/// TODO (howardwu): Change to 1_000_000_000_000u64.
-pub const MIN_STAKE: u64 = 1_000u64; // microcredits
 /// The port on which the memory pool listens for incoming connections.
 pub const MEMORY_POOL_PORT: u16 = 5000; // port
 /// The frequency at which each worker broadcasts a ping to every other node.

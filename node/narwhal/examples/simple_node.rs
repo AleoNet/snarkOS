@@ -17,15 +17,16 @@ extern crate tracing;
 
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
-    helpers::{fmt_id, init_primary_channels, Committee, PrimarySender, Storage},
-    LedgerService,
+    helpers::{init_primary_channels, PrimarySender, Storage},
     Primary,
     BFT,
     MAX_GC_ROUNDS,
     MEMORY_POOL_PORT,
 };
+use snarkos_node_narwhal_committee::Committee;
+use snarkos_node_narwhal_ledger_service::MockLedgerService;
 use snarkvm::{
-    ledger::narwhal::{Data, TransmissionID},
+    ledger::narwhal::Data,
     prelude::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
@@ -36,7 +37,7 @@ use snarkvm::{
 };
 
 use ::bytes::Bytes;
-use anyhow::{anyhow, bail, ensure, Result};
+use anyhow::{anyhow, bail, ensure, Error, Result};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -48,7 +49,8 @@ use axum_extra::response::ErasedJson;
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 use rand::{Rng, SeedableRng};
-use std::{net::SocketAddr, str::FromStr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::Arc};
+use tokio::sync::oneshot;
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
     util::SubscriberInitExt,
@@ -93,48 +95,31 @@ pub fn initialize_logger(verbosity: u8) {
 
 /**************************************************************************************************/
 
-/// A mock ledger service that always returns `false`.
-struct MockLedgerService {}
-
-impl MockLedgerService {
-    /// Initializes a new mock ledger service.
-    fn new() -> MockLedgerService {
-        MockLedgerService {}
-    }
-}
-
-impl<N: Network> LedgerService<N> for MockLedgerService {
-    /// Returns `false` for all queries.
-    fn contains_certificate_id(&self, certificate_id: &Field<N>) -> Result<bool> {
-        trace!("[MockLedgerService] Contains certificate ID {} - false", fmt_id(certificate_id));
-        Ok(false)
-    }
-
-    /// Returns `false` for all queries.
-    fn contains_transmission_id(&self, transmission_id: &TransmissionID<N>) -> Result<bool> {
-        trace!("[MockLedgerService] Contains transmission ID {} - false", fmt_id(transmission_id));
-        Ok(false)
-    }
-}
-
-/**************************************************************************************************/
-
 /// Starts the BFT instance.
-pub async fn start_bft(node_id: u16, num_nodes: u16) -> Result<(BFT<CurrentNetwork>, PrimarySender<CurrentNetwork>)> {
+pub async fn start_bft(
+    node_id: u16,
+    num_nodes: u16,
+    peers: HashMap<u16, SocketAddr>,
+) -> Result<(BFT<CurrentNetwork>, PrimarySender<CurrentNetwork>)> {
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
     let (storage, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
     let ledger = Box::new(MockLedgerService::new());
+    // Initialize the gateway IP and dev mode.
+    let (ip, dev) = match peers.get(&node_id) {
+        Some(ip) => (Some(*ip), None),
+        None => (None, Some(node_id)),
+    };
     // Initialize the BFT instance.
-    let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, Some(node_id))?;
+    let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, ip, dev)?;
     // Run the BFT instance.
-    bft.run(sender.clone(), receiver).await?;
+    bft.run(sender.clone(), receiver, None).await?;
     // Retrieve the BFT's primary.
     let primary = bft.primary();
     // Keep the node's connections.
-    keep_connections(primary, node_id, num_nodes);
+    keep_connections(primary, node_id, num_nodes, peers);
     // Handle the log connections.
     log_connections(primary);
     // Handle OS signals.
@@ -147,6 +132,7 @@ pub async fn start_bft(node_id: u16, num_nodes: u16) -> Result<(BFT<CurrentNetwo
 pub async fn start_primary(
     node_id: u16,
     num_nodes: u16,
+    peers: HashMap<u16, SocketAddr>,
 ) -> Result<(Primary<CurrentNetwork>, PrimarySender<CurrentNetwork>)> {
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
@@ -154,12 +140,17 @@ pub async fn start_primary(
     let (storage, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
     let ledger = Box::new(MockLedgerService::new());
+    // Initialize the gateway IP and dev mode.
+    let (ip, dev) = match peers.get(&node_id) {
+        Some(ip) => (Some(*ip), None),
+        None => (None, Some(node_id)),
+    };
     // Initialize the primary instance.
-    let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, Some(node_id))?;
+    let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, ip, dev)?;
     // Run the primary instance.
     primary.run(sender.clone(), receiver, None).await?;
     // Keep the node's connections.
-    keep_connections(&primary, node_id, num_nodes);
+    keep_connections(&primary, node_id, num_nodes, peers);
     // Handle the log connections.
     log_connections(&primary);
     // Handle OS signals.
@@ -168,7 +159,7 @@ pub async fn start_primary(
     Ok((primary, sender))
 }
 
-/// Initializes the components of the node
+/// Initializes the components of the node.
 fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Storage<CurrentNetwork>, Account<CurrentNetwork>)> {
     // Ensure that the node ID is valid.
     ensure!(node_id < num_nodes, "Node ID {node_id} must be less than {num_nodes}");
@@ -198,7 +189,7 @@ fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Storage<Curren
 }
 
 /// Actively try to keep the node's connections to all nodes.
-fn keep_connections(primary: &Primary<CurrentNetwork>, node_id: u16, num_nodes: u16) {
+fn keep_connections(primary: &Primary<CurrentNetwork>, node_id: u16, num_nodes: u16, peers: HashMap<u16, SocketAddr>) {
     let node = primary.clone();
     tokio::task::spawn(async move {
         // Sleep briefly to ensure the other nodes are ready to connect.
@@ -207,10 +198,14 @@ fn keep_connections(primary: &Primary<CurrentNetwork>, node_id: u16, num_nodes: 
         loop {
             for i in 0..num_nodes {
                 // Initialize the gateway IP.
-                let ip = SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i)).unwrap();
+                let ip = match peers.get(&i) {
+                    Some(ip) => *ip,
+                    None => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i)).unwrap(),
+                };
                 // Check if the node is connected.
                 if i != node_id && !node.gateway().is_connected(ip) {
                     // Connect to the node.
+                    debug!("Connecting to {}...", ip);
                     node.gateway().connect(ip);
                 }
             }
@@ -278,10 +273,13 @@ fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_id: u
             // Sample a random fake puzzle commitment and solution.
             let (commitment, solution) =
                 if counter % 2 == 0 { sample(&mut shared_rng) } else { sample(&mut unique_rng) };
+            // Initialize a callback sender and receiver.
+            let (callback, callback_receiver) = oneshot::channel();
             // Send the fake solution.
-            if let Err(e) = tx_unconfirmed_solution.send((commitment, solution)).await {
+            if let Err(e) = tx_unconfirmed_solution.send((commitment, solution, callback)).await {
                 error!("Failed to send unconfirmed solution: {e}");
             }
+            let _ = callback_receiver.await;
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
@@ -317,10 +315,13 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
         loop {
             // Sample a random fake transaction ID and transaction.
             let (id, transaction) = if counter % 2 == 0 { sample(&mut shared_rng) } else { sample(&mut unique_rng) };
+            // Initialize a callback sender and receiver.
+            let (callback, callback_receiver) = oneshot::channel();
             // Send the fake transaction.
-            if let Err(e) = tx_unconfirmed_transaction.send((id, transaction)).await {
+            if let Err(e) = tx_unconfirmed_transaction.send((id, transaction, callback)).await {
                 error!("Failed to send unconfirmed transaction: {e}");
             }
+            let _ = callback_receiver.await;
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
@@ -397,6 +398,22 @@ async fn start_server(bft: Option<BFT<CurrentNetwork>>, primary: Primary<Current
 
 /**************************************************************************************************/
 
+/// A helper method to parse the peers provided to the CLI.
+fn parse_peers(peers_string: String) -> Result<HashMap<u16, SocketAddr>, Error> {
+    // Expect list of peers in the form of `node_id=ip:port`, one per line.
+    let mut peers = HashMap::new();
+    for peer in peers_string.lines() {
+        let mut split = peer.split('=');
+        let node_id = u16::from_str(split.next().ok_or_else(|| anyhow!("Bad Format"))?)?;
+        let addr: String = split.next().ok_or_else(|| anyhow!("Bad Format"))?.parse()?;
+        let ip = SocketAddr::from_str(addr.as_str())?;
+        peers.insert(node_id, ip);
+    }
+    Ok(peers)
+}
+
+/**************************************************************************************************/
+
 #[tokio::main]
 async fn main() -> Result<()> {
     initialize_logger(1);
@@ -417,6 +434,12 @@ async fn main() -> Result<()> {
     // Parse the number of nodes.
     let num_nodes = u16::from_str(&args[3])?;
 
+    // (optional) Parse the peers from a file.
+    let peers = match args.len() > 4 {
+        true => parse_peers(std::fs::read_to_string(&args[4])?)?,
+        false => Default::default(),
+    };
+
     // Initialize an optional BFT holder.
     let mut bft_holder = None;
 
@@ -424,13 +447,13 @@ async fn main() -> Result<()> {
     let (primary, sender) = match mode {
         "bft" => {
             // Start the BFT.
-            let (bft, sender) = start_bft(node_id, num_nodes).await?;
+            let (bft, sender) = start_bft(node_id, num_nodes, peers).await?;
             // Set the BFT holder.
             bft_holder = Some(bft.clone());
             // Return the primary and sender.
             (bft.primary().clone(), sender)
         }
-        "narwhal" => start_primary(node_id, num_nodes).await?,
+        "narwhal" => start_primary(node_id, num_nodes, peers).await?,
         _ => unreachable!(),
     };
 
@@ -444,4 +467,43 @@ async fn main() -> Result<()> {
     // // Note: Do not move this.
     // std::future::pending::<()>().await;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn parse_peers_empty() -> Result<(), Error> {
+        let peers = parse_peers("".to_owned())?;
+        assert_eq!(peers.len(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn parse_peers_ok() -> Result<(), Error> {
+        let s = r#"0=192.168.1.176:5000
+1=192.168.1.176:5001
+2=192.168.1.176:5002
+3=192.168.1.176:5003"#;
+        let peers = parse_peers(s.to_owned())?;
+        assert_eq!(peers.len(), 4);
+        Ok(())
+    }
+
+    #[test]
+    fn parse_peers_bad_id() -> Result<(), Error> {
+        let s = "A=192.168.1.176:5000";
+        let peers = parse_peers(s.to_owned());
+        assert!(peers.is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn parse_peers_bad_format() -> Result<(), Error> {
+        let s = "foo";
+        let peers = parse_peers(s.to_owned());
+        assert!(peers.is_err());
+        Ok(())
+    }
 }

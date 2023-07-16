@@ -56,13 +56,22 @@ default-features = false
 path = "../../account"
 version = "=2.1.4"
 
+[dependencies.snarkos-node-narwhal-committee]
+path = "./committee"
+version = "=2.1.4"
+default-features = false
+
+[dependencies.snarkos-node-narwhal-ledger-service]
+path = "./ledger-service"
+version = "=2.1.4"
+default-features = false
+
 [dependencies.snarkos-node-tcp]
 path = "../tcp"
 version = "=2.1.4"
 
 [dependencies.snarkvm]
 workspace = true
-features = [ "async" ]
 
 [dependencies.time]
 version = "0.3"
@@ -101,6 +110,9 @@ version = "4"
 [dev-dependencies.paste]
 version = "1"
 
+[dev-dependencies.proptest]
+version = "1.0.0"
+
 [dev-dependencies.rand_chacha]
 version = "0.3"
 
@@ -114,6 +126,20 @@ version = "1"
 workspace = true
 features = [ "test-helpers" ]
 
+[dev-dependencies.snarkos-node-narwhal-committee]
+path = "./committee"
+default-features = false
+features = [ "prop-tests", "test-helpers" ]
+
+[dev-dependencies.snarkos-node-narwhal-ledger-service]
+path = "./ledger-service"
+default-features = false
+features = [ "mock" ]
+
+[dev-dependencies.test-strategy]
+git = "https://github.com/frozenlib/test-strategy/"
+branch = "master"
+
 [dev-dependencies.tower-http]
 version = "0.4"
 features = [ "fs", "trace" ]
@@ -121,7 +147,3 @@ features = [ "fs", "trace" ]
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
 features = [ "env-filter" ]
-
-[dev-dependencies]
-test-strategy = { git = "https://github.com/frozenlib/test-strategy/", branch = "master"}
-proptest = "1.0.0"

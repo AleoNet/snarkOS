@@ -40,6 +40,7 @@ type CurrentNetwork = Testnet3;
 pub(crate) mod test_helpers {
     use super::*;
     use crate::Consensus;
+    use snarkos_account::Account;
     use snarkvm::{
         console::{account::PrivateKey, network::Testnet3, program::Value},
         prelude::{block::Block, store::helpers::memory::ConsensusMemory, FinalizeGlobalState, TestRng},
@@ -111,7 +112,7 @@ pub(crate) mod test_helpers {
         assert_eq!(genesis.round(), ledger.latest_round());
         assert_eq!(genesis, ledger.get_block(0).unwrap());
 
-        CurrentConsensus::new(ledger, true).unwrap()
+        CurrentConsensus::new(Account::try_from(private_key).unwrap(), ledger, None).unwrap()
     }
 
     pub(crate) fn sample_program() -> Program<CurrentNetwork> {
@@ -243,6 +244,35 @@ function compute:
             })
             .clone()
     }
+
+    /// Returns a candidate for the next block in the ledger.
+    pub fn propose_next_block<R: Rng + CryptoRng>(
+        consensus: &CurrentConsensus,
+        private_key: &PrivateKey<CurrentNetwork>,
+        rng: &mut R,
+    ) -> Result<Block<CurrentNetwork>> {
+        // Retrieve the latest block.
+        let latest_block = consensus.ledger.latest_block();
+        // Retrieve the latest height.
+        let latest_height = latest_block.height();
+        // Retrieve the latest proof target.
+        let latest_proof_target = latest_block.proof_target();
+        // Retrieve the latest coinbase target.
+        let latest_coinbase_target = latest_block.coinbase_target();
+
+        // Select the transactions from the memory pool.
+        let transactions = consensus.memory_pool.candidate_transactions(consensus);
+        // Select the prover solutions from the memory pool.
+        let prover_solutions = consensus.memory_pool.candidate_solutions(
+            consensus,
+            latest_height,
+            latest_proof_target,
+            latest_coinbase_target,
+        )?;
+
+        // Prepare the next block.
+        consensus.ledger.prepare_advance_to_next_block(private_key, transactions, prover_solutions, rng)
+    }
 }
 
 #[test]
@@ -279,9 +309,9 @@ fn test_validators() {
     assert!(validators.contains_key(&signer));
 }
 
-#[test]
 #[traced_test]
-fn test_ledger_deploy() {
+#[tokio::test]
+async fn test_ledger_deploy() {
     let rng = &mut TestRng::default();
 
     // Sample the genesis private key.
@@ -291,19 +321,19 @@ fn test_ledger_deploy() {
 
     // Add a transaction to the memory pool.
     let transaction = crate::tests::test_helpers::sample_deployment_transaction(rng);
-    consensus.add_unconfirmed_transaction(transaction.clone()).unwrap();
+    consensus.add_unconfirmed_transaction(transaction.clone()).await.unwrap();
 
     // Compute a confirmed transactions to reuse later.
     let transactions = consensus.ledger.vm().speculate(sample_finalize_state(1), [transaction.clone()].iter()).unwrap();
 
     // Propose the next block.
-    let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
+    let next_block = crate::tests::test_helpers::propose_next_block(&consensus, &private_key, rng).unwrap();
 
     // Ensure the block is a valid next block.
-    consensus.check_next_block(&next_block).unwrap();
+    consensus.ledger.check_next_block(&next_block).unwrap();
 
     // Construct a next block.
-    consensus.advance_to_next_block(&next_block).unwrap();
+    consensus.ledger.advance_to_next_block(&next_block).unwrap();
     assert_eq!(consensus.ledger.latest_height(), 1);
     assert_eq!(consensus.ledger.latest_hash(), next_block.hash());
     assert!(consensus.ledger.contains_transaction_id(&transaction.id()).unwrap());
@@ -313,14 +343,14 @@ fn test_ledger_deploy() {
     // Ensure that the VM can't re-deploy the same program.
     assert!(consensus.ledger.vm().finalize(sample_finalize_state(1), &transactions).is_err());
     // Ensure that the ledger deems the same transaction invalid.
-    assert!(consensus.check_transaction_basic(&transaction, None).is_err());
+    assert!(consensus.ledger.check_transaction_basic(&transaction, None).is_err());
     // Ensure that the ledger cannot add the same transaction.
-    assert!(consensus.add_unconfirmed_transaction(transaction).is_err());
+    assert!(consensus.add_unconfirmed_transaction(transaction).await.is_err());
 }
 
-#[test]
 #[traced_test]
-fn test_ledger_execute() {
+#[tokio::test]
+async fn test_ledger_execute() {
     let rng = &mut TestRng::default();
 
     // Sample the genesis private key.
@@ -330,28 +360,28 @@ fn test_ledger_execute() {
 
     // Add a transaction to the memory pool.
     let transaction = crate::tests::test_helpers::sample_execution_transaction(rng);
-    consensus.add_unconfirmed_transaction(transaction.clone()).unwrap();
+    consensus.add_unconfirmed_transaction(transaction.clone()).await.unwrap();
 
     // Propose the next block.
-    let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
+    let next_block = crate::tests::test_helpers::propose_next_block(&consensus, &private_key, rng).unwrap();
 
     // Ensure the block is a valid next block.
-    consensus.check_next_block(&next_block).unwrap();
+    consensus.ledger.check_next_block(&next_block).unwrap();
 
     // Construct a next block.
-    consensus.advance_to_next_block(&next_block).unwrap();
+    consensus.ledger.advance_to_next_block(&next_block).unwrap();
     assert_eq!(consensus.ledger.latest_height(), 1);
     assert_eq!(consensus.ledger.latest_hash(), next_block.hash());
 
     // Ensure that the ledger deems the same transaction invalid.
-    assert!(consensus.check_transaction_basic(&transaction, None).is_err());
+    assert!(consensus.ledger.check_transaction_basic(&transaction, None).is_err());
     // Ensure that the ledger cannot add the same transaction.
-    assert!(consensus.add_unconfirmed_transaction(transaction).is_err());
+    assert!(consensus.add_unconfirmed_transaction(transaction).await.is_err());
 }
 
-#[test]
 #[traced_test]
-fn test_ledger_execute_many() {
+#[tokio::test]
+async fn test_ledger_execute_many() {
     let rng = &mut TestRng::default();
 
     // Sample the genesis private key, view key, and address.
@@ -396,25 +426,25 @@ fn test_ledger_execute_many() {
                 .execute(&private_key, ("credits.aleo", "split"), inputs.iter(), None, None, rng)
                 .unwrap();
             // Add the transaction to the memory pool.
-            consensus.add_unconfirmed_transaction(transaction).unwrap();
+            consensus.add_unconfirmed_transaction(transaction).await.unwrap();
         }
-        assert_eq!(consensus.memory_pool().num_unconfirmed_transactions(), NUM_GENESIS * (1 << (height - 1)));
+        assert_eq!(consensus.num_unconfirmed_transactions(), NUM_GENESIS * (1 << (height - 1)));
 
         // Propose the next block.
-        let next_block = consensus.propose_next_block(&private_key, rng).unwrap();
+        let next_block = crate::tests::test_helpers::propose_next_block(&consensus, &private_key, rng).unwrap();
 
         // Ensure the block is a valid next block.
-        consensus.check_next_block(&next_block).unwrap();
+        consensus.ledger.check_next_block(&next_block).unwrap();
         // Construct a next block.
-        consensus.advance_to_next_block(&next_block).unwrap();
+        consensus.ledger.advance_to_next_block(&next_block).unwrap();
         assert_eq!(consensus.ledger.latest_height(), height as u32);
         assert_eq!(consensus.ledger.latest_hash(), next_block.hash());
     }
 }
 
-#[test]
 #[traced_test]
-fn test_proof_target() {
+#[tokio::test]
+async fn test_proof_target() {
     let rng = &mut TestRng::default();
 
     // Sample the genesis private key and address.
@@ -430,30 +460,31 @@ fn test_proof_target() {
 
     for _ in 0..100 {
         // Generate a prover solution.
-        let prover_solution = consensus.coinbase_puzzle().prove(&epoch_challenge, address, rng.gen(), None).unwrap();
+        let prover_solution =
+            consensus.ledger.coinbase_puzzle().prove(&epoch_challenge, address, rng.gen(), None).unwrap();
 
         // Check that the prover solution meets the proof target requirement.
         if prover_solution.to_target().unwrap() >= proof_target {
-            assert!(consensus.add_unconfirmed_solution(&prover_solution).is_ok())
+            assert!(consensus.add_unconfirmed_solution(prover_solution).await.is_ok())
         } else {
-            assert!(consensus.add_unconfirmed_solution(&prover_solution).is_err())
+            assert!(consensus.add_unconfirmed_solution(prover_solution).await.is_err())
         }
 
         // Generate a prover solution with a minimum proof target.
         let prover_solution =
-            consensus.coinbase_puzzle().prove(&epoch_challenge, address, rng.gen(), Some(proof_target));
+            consensus.ledger.coinbase_puzzle().prove(&epoch_challenge, address, rng.gen(), Some(proof_target));
 
         // Check that the prover solution meets the proof target requirement.
         if let Ok(prover_solution) = prover_solution {
             assert!(prover_solution.to_target().unwrap() >= proof_target);
-            assert!(consensus.add_unconfirmed_solution(&prover_solution).is_ok())
+            assert!(consensus.add_unconfirmed_solution(prover_solution).await.is_ok())
         }
     }
 }
 
-#[test]
 #[traced_test]
-fn test_coinbase_target() {
+#[tokio::test]
+async fn test_coinbase_target() {
     let rng = &mut TestRng::default();
 
     // Sample the genesis private key and address.
@@ -465,10 +496,10 @@ fn test_coinbase_target() {
 
     // Add a transaction to the memory pool.
     let transaction = crate::tests::test_helpers::sample_execution_transaction(rng);
-    consensus.add_unconfirmed_transaction(transaction).unwrap();
+    consensus.add_unconfirmed_transaction(transaction).await.unwrap();
 
     // Ensure that the ledger can't create a block that satisfies the coinbase target.
-    let proposed_block = consensus.propose_next_block(&private_key, rng).unwrap();
+    let proposed_block = crate::tests::test_helpers::propose_next_block(&consensus, &private_key, rng).unwrap();
     // Ensure the block does not contain a coinbase solution.
     assert!(proposed_block.coinbase().is_none());
 
@@ -478,7 +509,7 @@ fn test_coinbase_target() {
 
     while cumulative_target < consensus.ledger.latest_coinbase_target() as u128 {
         // Generate a prover solution.
-        let prover_solution = match consensus.coinbase_puzzle().prove(
+        let prover_solution = match consensus.ledger.coinbase_puzzle().prove(
             &epoch_challenge,
             address,
             rng.gen(),
@@ -489,14 +520,14 @@ fn test_coinbase_target() {
         };
 
         // Try to add the prover solution to the memory pool.
-        if consensus.add_unconfirmed_solution(&prover_solution).is_ok() {
+        if consensus.add_unconfirmed_solution(prover_solution).await.is_ok() {
             // Add to the cumulative target if the prover solution is valid.
             cumulative_target += prover_solution.to_target().unwrap() as u128;
         }
     }
 
     // Ensure that the ledger can create a block that satisfies the coinbase target.
-    let proposed_block = consensus.propose_next_block(&private_key, rng).unwrap();
+    let proposed_block = crate::tests::test_helpers::propose_next_block(&consensus, &private_key, rng).unwrap();
     // Ensure the block contains a coinbase solution.
     assert!(proposed_block.coinbase().is_some());
 }

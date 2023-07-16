@@ -18,6 +18,7 @@ use crate::traits::NodeInterface;
 use snarkos_account::Account;
 use snarkos_node_consensus::Consensus;
 use snarkos_node_messages::{BlockRequest, Message, NodeType, PuzzleResponse, UnconfirmedSolution};
+use snarkos_node_narwhal::helpers::init_primary_channels;
 use snarkos_node_rest::Rest;
 use snarkos_node_router::{Heartbeat, Inbound, Outbound, Router, Routing};
 use snarkos_node_tcp::{
@@ -83,7 +84,11 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             }
         }
         // Initialize the consensus.
-        let consensus = Consensus::new(ledger.clone(), dev.is_some())?;
+        let mut consensus = Consensus::new(account.clone(), ledger.clone(), dev)?;
+        // Initialize the primary channels.
+        let (primary_sender, primary_receiver) = init_primary_channels::<N>();
+        // Start the consensus.
+        consensus.run(primary_sender, primary_receiver).await?;
 
         // Initialize the node router.
         let router = Router::new(
@@ -223,12 +228,12 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                 break;
             }
             // Check the next block.
-            if let Err(error) = self.consensus.check_next_block(&block) {
+            if let Err(error) = self.ledger.check_next_block(&block) {
                 warn!("The next block ({}) is invalid - {error}", block.height());
                 break;
             }
             // Attempt to advance to the next block.
-            if let Err(error) = self.consensus.advance_to_next_block(&block) {
+            if let Err(error) = self.consensus.ledger().advance_to_next_block(&block) {
                 warn!("{error}");
                 break;
             }

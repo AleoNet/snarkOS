@@ -13,11 +13,12 @@
 // limitations under the License.
 
 use super::*;
-
-use rayon::prelude::*;
-use serde::{Deserialize, Serialize};
 use snarkos_node_env::ENV_INFO;
 use snarkvm::prelude::{block::Transaction, Identifier, Plaintext};
+
+use indexmap::IndexMap;
+use rayon::prelude::*;
+use serde::{Deserialize, Serialize};
 
 /// The `get_blocks` query object.
 #[derive(Deserialize, Serialize)]
@@ -124,11 +125,29 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         Ok(ErasedJson::pretty(rest.ledger.get_transaction(tx_id)?))
     }
 
+    // GET /testnet3/memoryPool/transmissions
+    pub(crate) async fn get_memory_pool_transmissions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        match rest.consensus {
+            Some(consensus) => {
+                Ok(ErasedJson::pretty(consensus.unconfirmed_transmissions().collect::<IndexMap<_, _>>()))
+            }
+            None => Err(RestError("Route isn't available for this node type".to_string())),
+        }
+    }
+
+    // GET /testnet3/memoryPool/solutions
+    pub(crate) async fn get_memory_pool_solutions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
+        match rest.consensus {
+            Some(consensus) => Ok(ErasedJson::pretty(consensus.unconfirmed_solutions().collect::<IndexMap<_, _>>())),
+            None => Err(RestError("Route isn't available for this node type".to_string())),
+        }
+    }
+
     // GET /testnet3/memoryPool/transactions
     pub(crate) async fn get_memory_pool_transactions(State(rest): State<Self>) -> Result<ErasedJson, RestError> {
         match rest.consensus {
-            Some(consensus) => Ok(ErasedJson::pretty(consensus.memory_pool().unconfirmed_transactions())),
-            None => Err(RestError("route isn't available for this node type".to_string())),
+            Some(consensus) => Ok(ErasedJson::pretty(consensus.unconfirmed_transactions().collect::<IndexMap<_, _>>())),
+            None => Err(RestError("Route isn't available for this node type".to_string())),
         }
     }
 
@@ -237,7 +256,7 @@ impl<N: Network, C: ConsensusStorage<N>, R: Routing<N>> Rest<N, C, R> {
         // If the consensus module is enabled, add the unconfirmed transaction to the memory pool.
         if let Some(consensus) = rest.consensus {
             // Add the unconfirmed transaction to the memory pool.
-            consensus.add_unconfirmed_transaction(tx.clone())?;
+            consensus.add_unconfirmed_transaction(tx.clone()).await?;
         }
 
         // Prepare the unconfirmed transaction message.

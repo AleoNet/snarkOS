@@ -27,12 +27,12 @@ use crate::{
     helpers::{assign_to_worker, Cache, EventCodec, PrimarySender, Resolver, Storage, WorkerSender},
     CONTEXT,
     MAX_BATCH_DELAY,
-    MAX_COMMITTEE_SIZE,
     MAX_GC_ROUNDS,
     MAX_TRANSMISSIONS_PER_BATCH,
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
+use snarkos_node_narwhal_committee::MAX_COMMITTEE_SIZE;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
@@ -103,13 +103,13 @@ pub struct Gateway<N: Network> {
 
 impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
-    pub fn new(account: Account<N>, storage: Storage<N>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(account: Account<N>, storage: Storage<N>, ip: Option<SocketAddr>, dev: Option<u16>) -> Result<Self> {
         // Initialize the gateway IP.
-        let ip = match dev {
-            // TODO change dev to Option<u8>, otherwise there is potential overflow
-            Some(dev) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev)),
-            None => SocketAddr::from_str(&format!("0.0.0.0:{}", MEMORY_POOL_PORT)),
-        }?;
+        let ip = match (ip, dev) {
+            (_, Some(dev)) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev))?,
+            (None, None) => SocketAddr::from_str(&format!("0.0.0.0:{}", MEMORY_POOL_PORT))?,
+            (Some(ip), None) => ip,
+        };
         // Initialize the TCP stack.
         let tcp = Tcp::new(Config::new(ip, MAX_COMMITTEE_SIZE));
         // Return the gateway.
@@ -834,7 +834,7 @@ impl<N: Network> Gateway<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{helpers::init_worker_channels, Gateway, Worker, MAX_COMMITTEE_SIZE, MAX_WORKERS, MEMORY_POOL_PORT};
+    use crate::{helpers::init_worker_channels, Gateway, Worker, MAX_WORKERS, MEMORY_POOL_PORT};
     use indexmap::IndexMap;
     use proptest::{
         prelude::{any, any_with, Arbitrary, BoxedStrategy, Just, Strategy},
@@ -845,21 +845,49 @@ pub mod prop_tests {
     use std::{
         fmt::{Debug, Formatter},
         net::{IpAddr, Ipv4Addr, SocketAddr},
+        sync::Arc,
     };
     use test_strategy::proptest;
 
     type CurrentNetwork = Testnet3;
 
-    use crate::helpers::{
-        committee::prop_tests::{CommitteeContext, ValidatorSet},
-        Storage,
+    use crate::{
+        helpers::Storage,
+        prop_tests::GatewayAddress::{Dev, Prod},
     };
     use snarkos_account::Account;
+    use snarkos_node_narwhal_committee::{
+        prop_tests::{CommitteeContext, ValidatorSet},
+        MAX_COMMITTEE_SIZE,
+    };
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
 
     impl Debug for Gateway<CurrentNetwork> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
             // TODO implement Debug properly and move it over to production code
             f.debug_tuple("Gateway").field(&self.account.address()).field(&self.tcp.config()).finish()
+        }
+    }
+
+    #[derive(Debug, test_strategy::Arbitrary)]
+    enum GatewayAddress {
+        Dev(u8),
+        Prod(Option<SocketAddr>),
+    }
+
+    impl GatewayAddress {
+        fn ip(&self) -> Option<SocketAddr> {
+            if let GatewayAddress::Prod(ip) = self {
+                return *ip;
+            }
+            return None;
+        }
+
+        fn port(&self) -> Option<u16> {
+            if let GatewayAddress::Dev(port) = self {
+                return Some(*port as u16);
+            }
+            return None;
         }
     }
 
@@ -869,12 +897,14 @@ pub mod prop_tests {
 
         fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
             any_valid_dev_gateway()
-                .prop_map(|(storage, _, account, dev)| Gateway::new(account, storage, dev).unwrap())
+                .prop_map(|(storage, _, account, address)| {
+                    Gateway::new(account, storage, address.ip(), address.port()).unwrap()
+                })
                 .boxed()
         }
     }
 
-    type GatewayInput = (Storage<CurrentNetwork>, CommitteeContext, Account<CurrentNetwork>, Option<u16>);
+    type GatewayInput = (Storage<CurrentNetwork>, CommitteeContext, Account<CurrentNetwork>, GatewayAddress);
 
     fn any_valid_dev_gateway() -> BoxedStrategy<GatewayInput> {
         (any::<CommitteeContext>(), any::<Selector>())
@@ -886,7 +916,7 @@ pub mod prop_tests {
                     Just(account_selector.select(validators)),
                     0u8..,
                 )
-                    .prop_map(|(a, b, c, d)| (a, b, c.account, Some(d as u16)))
+                    .prop_map(|(a, b, c, d)| (a, b, c.account, Dev(d)))
             })
             .boxed()
     }
@@ -899,8 +929,9 @@ pub mod prop_tests {
                     any_with::<Storage<CurrentNetwork>>(context.clone()),
                     Just(context),
                     Just(account_selector.select(validators)),
+                    any::<Option<SocketAddr>>(),
                 )
-                    .prop_map(|(a, b, c)| (a, b, c.account, None))
+                    .prop_map(|(a, b, c, d)| (a, b, c.account, Prod(d)))
             })
             .boxed()
     }
@@ -909,10 +940,10 @@ pub mod prop_tests {
     fn gateway_dev_initialization(#[strategy(any_valid_dev_gateway())] input: GatewayInput) {
         let (storage, _, account, dev) = input;
         let address = account.address();
-        let gateway = Gateway::new(account, storage, dev).unwrap();
+        let gateway = Gateway::new(account, storage, dev.ip(), dev.port()).unwrap();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
-        assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev.unwrap()));
+        assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev.port().unwrap()));
 
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.max_connections, MAX_COMMITTEE_SIZE);
@@ -923,11 +954,15 @@ pub mod prop_tests {
     fn gateway_prod_initialization(#[strategy(any_valid_prod_gateway())] input: GatewayInput) {
         let (storage, _, account, dev) = input;
         let address = account.address();
-        let gateway = Gateway::new(account, storage, dev).unwrap();
-        assert!(dev.is_none());
+        let gateway = Gateway::new(account, storage, dev.ip(), dev.port()).unwrap();
         let tcp_config = gateway.tcp().config();
-        assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
-        assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT));
+        if let Some(socket_addr) = dev.ip() {
+            assert_eq!(tcp_config.listener_ip, Some(socket_addr.ip()));
+            assert_eq!(tcp_config.desired_listening_port, Some(socket_addr.port()));
+        } else {
+            assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
+            assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT));
+        }
 
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.max_connections, MAX_COMMITTEE_SIZE);
@@ -941,7 +976,7 @@ pub mod prop_tests {
     ) {
         let (storage, _, account, dev) = input;
         let worker_storage = storage.clone();
-        let gateway = Gateway::new(account, storage, dev).unwrap();
+        let gateway = Gateway::new(account, storage, dev.ip(), dev.port()).unwrap();
 
         let (workers, worker_senders) = {
             // Construct a map of the worker senders.
@@ -953,7 +988,10 @@ pub mod prop_tests {
                 // Construct the worker channels.
                 let (tx_worker, rx_worker) = init_worker_channels();
                 // Construct the worker instance.
-                let worker = Worker::new(id, gateway.clone(), worker_storage.clone(), Default::default()).unwrap();
+                let ledger = Box::new(MockLedgerService::new());
+                let worker =
+                    Worker::new(id, gateway.clone(), worker_storage.clone(), Arc::new(ledger), Default::default())
+                        .unwrap();
                 // Run the worker instance.
                 worker.run(rx_worker);
 
@@ -966,7 +1004,7 @@ pub mod prop_tests {
         gateway.run(worker_senders).await;
         assert_eq!(
             gateway.local_ip(),
-            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), MEMORY_POOL_PORT + dev.unwrap())
+            SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), MEMORY_POOL_PORT + dev.port().unwrap())
         );
         assert_eq!(gateway.num_workers(), workers.len() as u8);
     }

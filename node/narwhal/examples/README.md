@@ -6,6 +6,7 @@ To start 4 **BFT** nodes, run:
 ```bash
 ./start-nodes.sh bft
 ```
+
 To start 4 **Narwhal** nodes, run:
 ```bash
 ./start-nodes.sh narwhal
@@ -43,3 +44,16 @@ cargo run --release --example simple_node narwhal 3 4
 ```
 
 These initialize 4 nodes, and tells each node that there are 4 validators in the committee.
+
+## Advanced Usage
+
+You may optionally provide a filename as last argument.
+The file must contain the peer node IDs, IP addresses and ports, in the following form `node_id=ip:port`:
+```
+0=192.168.1.1:5000
+1=192.168.1.2:5001
+2=192.168.1.3:5002
+3=192.168.1.4:5003
+```
+
+If this parameter is not present, all nodes are run on localhost.

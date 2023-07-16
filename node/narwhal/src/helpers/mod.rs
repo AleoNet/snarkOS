@@ -21,9 +21,6 @@ pub use channels::*;
 pub mod codec;
 pub use codec::*;
 
-pub mod committee;
-pub use committee::*;
-
 pub mod dag;
 pub use dag::*;
 

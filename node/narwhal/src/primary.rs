@@ -16,16 +16,16 @@ use crate::{
     event::{BatchPropose, BatchSignature, CertificateRequest, CertificateResponse, Event},
     helpers::{
         assign_to_worker,
+        assign_to_workers,
         init_worker_channels,
         now,
-        Committee,
+        BFTSender,
         Pending,
         PrimaryReceiver,
         PrimarySender,
         Proposal,
         Storage,
     },
-    traits::LedgerService,
     Gateway,
     Worker,
     MAX_BATCH_DELAY,
@@ -33,13 +33,18 @@ use crate::{
     MAX_WORKERS,
 };
 use snarkos_account::Account;
+use snarkos_node_narwhal_committee::Committee;
+use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
-    ledger::narwhal::{Batch, BatchCertificate, BatchHeader, Transmission, TransmissionID},
+    ledger::{
+        block::Transaction,
+        coinbase::{ProverSolution, PuzzleCommitment},
+        narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
+    },
     prelude::Field,
 };
 
-use crate::helpers::{assign_to_workers, BFTSender};
 use async_recursion::async_recursion;
 use futures::stream::{FuturesUnordered, StreamExt};
 use indexmap::IndexMap;
@@ -84,9 +89,15 @@ pub struct Primary<N: Network> {
 
 impl<N: Network> Primary<N> {
     /// Initializes a new primary instance.
-    pub fn new(account: Account<N>, storage: Storage<N>, ledger: Ledger<N>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(
+        account: Account<N>,
+        storage: Storage<N>,
+        ledger: Ledger<N>,
+        ip: Option<SocketAddr>,
+        dev: Option<u16>,
+    ) -> Result<Self> {
         Ok(Self {
-            gateway: Gateway::new(account, storage.clone(), dev)?,
+            gateway: Gateway::new(account, storage.clone(), ip, dev)?,
             storage,
             ledger: Arc::from(ledger),
             workers: Default::default(),
@@ -122,7 +133,13 @@ impl<N: Network> Primary<N> {
             // Construct the worker channels.
             let (tx_worker, rx_worker) = init_worker_channels();
             // Construct the worker instance.
-            let worker = Worker::new(id, self.gateway.clone(), self.storage.clone(), self.proposed_batch.clone())?;
+            let worker = Worker::new(
+                id,
+                self.gateway.clone(),
+                self.storage.clone(),
+                self.ledger.clone(),
+                self.proposed_batch.clone(),
+            )?;
             // Run the worker instance.
             worker.run(rx_worker);
             // Add the worker to the list of workers.
@@ -162,6 +179,11 @@ impl<N: Network> Primary<N> {
         &self.storage
     }
 
+    /// Returns the ledger.
+    pub fn ledger(&self) -> &Ledger<N> {
+        &self.ledger
+    }
+
     /// Returns the number of workers.
     pub fn num_workers(&self) -> u8 {
         u8::try_from(self.workers.len()).expect("Too many workers")
@@ -179,6 +201,50 @@ impl<N: Network> Primary<N> {
 }
 
 impl<N: Network> Primary<N> {
+    /// Returns the number of unconfirmed transmissions.
+    pub fn num_unconfirmed_transmissions(&self) -> usize {
+        self.workers.iter().map(|worker| worker.num_transmissions()).sum()
+    }
+
+    /// Returns the number of unconfirmed ratifications.
+    pub fn num_unconfirmed_ratifications(&self) -> usize {
+        self.workers.iter().map(|worker| worker.num_ratifications()).sum()
+    }
+
+    /// Returns the number of solutions.
+    pub fn num_unconfirmed_solutions(&self) -> usize {
+        self.workers.iter().map(|worker| worker.num_solutions()).sum()
+    }
+
+    /// Returns the number of unconfirmed transactions.
+    pub fn num_unconfirmed_transactions(&self) -> usize {
+        self.workers.iter().map(|worker| worker.num_transactions()).sum()
+    }
+}
+
+impl<N: Network> Primary<N> {
+    /// Returns the unconfirmed transmission IDs.
+    pub fn unconfirmed_transmission_ids(&self) -> impl '_ + Iterator<Item = TransmissionID<N>> {
+        self.workers.iter().flat_map(|worker| worker.transmission_ids())
+    }
+
+    /// Returns the unconfirmed transmissions.
+    pub fn unconfirmed_transmissions(&self) -> impl '_ + Iterator<Item = (TransmissionID<N>, Transmission<N>)> {
+        self.workers.iter().flat_map(|worker| worker.transmissions())
+    }
+
+    /// Returns the unconfirmed solutions.
+    pub fn unconfirmed_solutions(&self) -> impl '_ + Iterator<Item = (PuzzleCommitment<N>, Data<ProverSolution<N>>)> {
+        self.workers.iter().flat_map(|worker| worker.solutions())
+    }
+
+    /// Returns the unconfirmed transactions.
+    pub fn unconfirmed_transactions(&self) -> impl '_ + Iterator<Item = (N::TransactionID, Data<Transaction<N>>)> {
+        self.workers.iter().flat_map(|worker| worker.transactions())
+    }
+}
+
+impl<N: Network> Primary<N> {
     /// Proposes the batch for the current round.
     ///
     /// This method performs the following steps:
@@ -192,10 +258,8 @@ impl<N: Network> Primary<N> {
         // If there is a batch being proposed already,
         // rebroadcast the batch header to the non-signers, and return early.
         if let Some(proposal) = self.proposed_batch.read().as_ref() {
-            // Retrieve the batch header.
-            let batch_header = proposal.batch().to_header()?;
             // Construct the event.
-            let event = Event::BatchPropose(batch_header.into());
+            let event = Event::BatchPropose(proposal.batch_header().clone().into());
             // Iterate through the non-signers.
             for address in proposal.nonsigners() {
                 // Resolve the address to the peer IP.
@@ -217,6 +281,22 @@ impl<N: Network> Primary<N> {
         let round = self.current_round();
         // Compute the previous round.
         let previous_round = round.saturating_sub(1);
+        // Ensure the primary has not proposed a batch for this round before.
+        if self.storage.contains_certificate_in_round_from(round, self.gateway.account().address()) {
+            // If a BFT sender was provided, attempt to advance the current round.
+            if let Some(bft_sender) = self.bft_sender.get() {
+                // Initialize a callback sender and receiver.
+                let (callback_sender, callback_receiver) = oneshot::channel();
+                // Send the current round to the BFT.
+                bft_sender.tx_primary_round.send((self.current_round(), callback_sender)).await?;
+                // Await the callback to continue.
+                if let Err(e) = callback_receiver.await? {
+                    warn!("Failed to update the BFT to the next round: {e}");
+                    return Err(e);
+                };
+            }
+            bail!("Primary is safely skipping (round {round} was already certified)")
+        }
         // Retrieve the previous certificates.
         let previous_certificates = self.storage.get_certificates_for_round(previous_round);
 
@@ -241,13 +321,12 @@ impl<N: Network> Primary<N> {
             return Ok(());
         }
 
-        // Initialize a map of the transmissions.
-        let mut transmissions = IndexMap::new();
-        // Drain the workers of the required number of transmissions.
+        // Determined the required number of transmissions per worker.
         let num_transmissions_per_worker = MAX_TRANSMISSIONS_PER_BATCH / self.num_workers() as usize;
+        // Take the transmissions from the workers.
+        let mut transmissions: IndexMap<_, _> = Default::default();
         for worker in self.workers.iter() {
-            // TODO (howardwu): Perform one final filter against the ledger service.
-            transmissions.extend(worker.take(num_transmissions_per_worker));
+            transmissions.extend(worker.take_candidates(num_transmissions_per_worker).await);
         }
         // Determine if there are transmissions to propose.
         let has_transmissions = !transmissions.is_empty();
@@ -265,12 +344,14 @@ impl<N: Network> Primary<N> {
         let private_key = self.gateway.account().private_key();
         // Generate the local timestamp for batch
         let timestamp = now();
-        // Sign the batch.
-        let batch = Batch::new(private_key, round, timestamp, transmissions, previous_certificates, rng)?;
-        // Construct the batch header.
-        let batch_header = batch.to_header()?;
+        // Prepare the transmission IDs.
+        let transmission_ids = transmissions.keys().copied().collect();
+        // Prepare the certificate IDs.
+        let certificate_ids = previous_certificates.into_iter().map(|c| c.certificate_id()).collect();
+        // Sign the batch header.
+        let batch_header = BatchHeader::new(private_key, round, timestamp, transmission_ids, certificate_ids, rng)?;
         // Construct the proposal.
-        let proposal = Proposal::new(self.current_committee(), batch)?;
+        let proposal = Proposal::new(self.current_committee(), batch_header.clone(), transmissions)?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
         // Set the proposed batch.
@@ -397,8 +478,11 @@ impl<N: Network> Primary<N> {
                 // self.update_committee_to_next_round().await
                 self.update_committee_to_round(round + 1).await
             }
-            // If this fails, return the transmissions back into the ready queue for the next proposal.
-            Err(_) => self.reinsert_transmissions_into_workers(proposal),
+            Err(e) => {
+                // Reinsert the transmissions back into the ready queue for the next proposal.
+                self.reinsert_transmissions_into_workers(proposal)?;
+                Err(e)
+            }
         }
     }
 
@@ -443,7 +527,7 @@ impl<N: Network> Primary<N> {
                 tokio::time::sleep(Duration::from_millis(MAX_BATCH_DELAY)).await;
                 // If there is no proposed batch, attempt to propose a batch.
                 if let Err(e) = self_.propose_batch().await {
-                    error!("Failed to propose a batch - {e}");
+                    warn!("Cannot propose a batch - {e}");
                 }
             }
         });
@@ -453,7 +537,7 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((peer_ip, batch_propose)) = rx_batch_propose.recv().await {
                 if let Err(e) = self_.process_batch_propose_from_peer(peer_ip, batch_propose).await {
-                    warn!("Cannot sign proposed batch from peer '{peer_ip}' - {e}");
+                    warn!("Cannot sign a batch from peer '{peer_ip}' - {e}");
                 }
             }
         });
@@ -463,7 +547,7 @@ impl<N: Network> Primary<N> {
         self.spawn(async move {
             while let Some((peer_ip, batch_signature)) = rx_batch_signature.recv().await {
                 if let Err(e) = self_.process_batch_signature_from_peer(peer_ip, batch_signature).await {
-                    warn!("Cannot include a signature from peer '{peer_ip}' - {e}");
+                    warn!("Cannot store a signature from peer '{peer_ip}' - {e}");
                 }
             }
         });
@@ -480,7 +564,7 @@ impl<N: Network> Primary<N> {
                     continue;
                 };
                 if let Err(e) = self_.process_batch_certificate_from_peer(peer_ip, batch_certificate).await {
-                    warn!("Cannot store a batch certificate from peer '{peer_ip}' - {e}");
+                    warn!("Cannot store a certificate from peer '{peer_ip}' - {e}");
                 }
             }
         });
@@ -504,28 +588,36 @@ impl<N: Network> Primary<N> {
         // Process the unconfirmed solutions.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((puzzle_commitment, prover_solution)) = rx_unconfirmed_solution.recv().await {
+            while let Some((puzzle_commitment, prover_solution, callback)) = rx_unconfirmed_solution.recv().await {
                 // Compute the worker ID.
                 let Ok(worker_id) = assign_to_worker(puzzle_commitment, self_.num_workers()) else {
                     error!("Unable to determine the worker ID for the unconfirmed solution");
                     continue;
                 };
+                // Retrieve the worker.
+                let worker = &self_.workers[worker_id as usize];
                 // Process the unconfirmed solution.
-                self_.workers[worker_id as usize].process_unconfirmed_solution(puzzle_commitment, prover_solution)
+                let result = worker.process_unconfirmed_solution(puzzle_commitment, prover_solution).await;
+                // Send the result to the callback.
+                callback.send(result).ok();
             }
         });
 
         // Process the unconfirmed transactions.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((transaction_id, transaction)) = rx_unconfirmed_transaction.recv().await {
+            while let Some((transaction_id, transaction, callback)) = rx_unconfirmed_transaction.recv().await {
                 // Compute the worker ID.
                 let Ok(worker_id) = assign_to_worker::<N>(&transaction_id, self_.num_workers()) else {
                     error!("Unable to determine the worker ID for the unconfirmed transaction");
                     continue;
                 };
+                // Retrieve the worker.
+                let worker = &self_.workers[worker_id as usize];
                 // Process the unconfirmed transaction.
-                self_.workers[worker_id as usize].process_unconfirmed_transaction(transaction_id, transaction)
+                let result = worker.process_unconfirmed_transaction(transaction_id, transaction).await;
+                // Send the result to the callback.
+                callback.send(result).ok();
             }
         });
     }
@@ -606,7 +698,9 @@ impl<N: Network> Primary<N> {
                     warn!("Failed to update the BFT to the next round: {e}");
                     return Err(e);
                 };
-            } else {
+            }
+            // Otherwise, handle the Narwhal case.
+            else {
                 // Update to the next committee in storage.
                 self.storage.increment_committee_to_next_round()?;
             }
@@ -645,8 +739,12 @@ impl<N: Network> Primary<N> {
     async fn store_and_broadcast_certificate(&self, proposal: &Proposal<N>) -> Result<BatchCertificate<N>> {
         // Create the batch certificate and transmissions.
         let (certificate, transmissions) = proposal.to_certificate()?;
+        // Convert the transmissions into a HashMap.
+        // Note: Do not change the `Proposal` to use a HashMap. The ordering there is necessary for safety.
+        let transmissions = transmissions.into_iter().collect::<HashMap<_, _>>();
         // Store the certified batch.
         self.storage.insert_certificate(certificate.clone(), transmissions)?;
+        debug!("Stored certificate for round {}", certificate.round());
         // Broadcast the certified batch to all validators.
         self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
         // If a BFT sender was provided, send the certificate to the BFT.
@@ -656,7 +754,10 @@ impl<N: Network> Primary<N> {
             // Send the certificate to the BFT.
             bft_sender.tx_primary_certificate.send((certificate.clone(), callback_sender)).await?;
             // Await the callback to continue.
-            callback_receiver.await??; // Double ?s unwraps the result from the BFT method.
+            if let Err(e) = callback_receiver.await? {
+                warn!("Failed to update the BFT DAG from primary: {e}");
+                return Err(e);
+            };
         }
         // Return the certificate.
         Ok(certificate)
@@ -724,6 +825,7 @@ impl<N: Network> Primary<N> {
         if !self.storage.contains_certificate(certificate.certificate_id()) {
             // Store the batch certificate.
             self.storage.insert_certificate(certificate.clone(), missing_transmissions)?;
+            debug!("Stored certificate for round {batch_round} from peer '{peer_ip}'");
             // If a BFT sender was provided, send the certificate to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
                 // Initialize a callback sender and receiver.
@@ -731,9 +833,11 @@ impl<N: Network> Primary<N> {
                 // Send the certificate to the BFT.
                 bft_sender.tx_primary_certificate.send((certificate, callback_sender)).await?;
                 // Await the callback to continue.
-                callback_receiver.await??; // Double ?s unwraps the result from the BFT method.
+                if let Err(e) = callback_receiver.await? {
+                    warn!("Failed to update the BFT DAG from sync: {e}");
+                    return Err(e);
+                };
             }
-            debug!("Stored certificate for round {batch_round} from peer '{peer_ip}'");
         }
         Ok(())
     }
@@ -857,7 +961,7 @@ impl<N: Network> Primary<N> {
         // Iterate through the previous certificate IDs.
         for certificate_id in batch_header.previous_certificate_ids() {
             // Check if the certificate already exists in the ledger.
-            if self.ledger.contains_certificate_id(certificate_id)? {
+            if self.ledger.contains_certificate(certificate_id)? {
                 continue;
             }
             // If we do not have the previous certificate, request it.
