@@ -453,48 +453,34 @@ impl<N: Network> Worker<N> {
 #[cfg(test)]
 mod prop_tests {
     use super::*;
-    use crate::{helpers::storage::prop_tests::StorageInput, prop_tests::GatewayInput};
-    use snarkos_node_narwhal_ledger_service::MockLedgerService;
 
-    use test_strategy::{proptest, Arbitrary};
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    #[derive(Arbitrary, Debug, Clone)]
-    pub struct WorkerInput {
-        pub id: u8,
-        #[filter(GatewayInput::is_valid)]
-        pub gateway: GatewayInput,
-        pub storage: StorageInput,
-    }
-
-    impl WorkerInput {
-        fn to_worker(&self) -> Result<Worker<CurrentNetwork>> {
-            Worker::new(
-                self.id,
-                self.gateway.to_gateway(),
-                self.storage.to_storage(),
-                Arc::new(Box::new(MockLedgerService::new())),
-                Default::default(),
-            )
-        }
-
-        fn is_valid(&self) -> bool {
-            self.id < MAX_WORKERS
-        }
+    #[proptest]
+    fn worker_initialization(
+        #[strategy(0..MAX_WORKERS)] id: u8,
+        gateway: Gateway<CurrentNetwork>,
+        storage: Storage<CurrentNetwork>,
+    ) {
+        let ledger: Ledger<CurrentNetwork> = Box::new(MockLedgerService::new());
+        let worker = Worker::new(id, gateway, storage, Arc::new(ledger), Default::default()).unwrap();
+        assert_eq!(worker.id(), id);
     }
 
     #[proptest]
-    fn worker_initialization(input: WorkerInput) {
-        match input.to_worker() {
-            Ok(worker) => {
-                assert!(input.is_valid());
-                assert_eq!(worker.id(), input.id);
-            }
-            Err(e) => {
-                assert!(!input.is_valid());
-                assert_eq!(e.to_string().as_str(), format!("Invalid worker ID '{}'", input.id));
-            }
+    fn invalid_worker_id(
+        #[strategy(MAX_WORKERS..)] id: u8,
+        gateway: Gateway<CurrentNetwork>,
+        storage: Storage<CurrentNetwork>,
+    ) {
+        let ledger: Ledger<CurrentNetwork> = Box::new(MockLedgerService::new());
+        let worker = Worker::new(id, gateway, storage, Arc::new(ledger), Default::default());
+        // TODO once Worker implements Debug, simplify this with `unwrap_err`
+        if let Err(error) = worker {
+            assert_eq!(error.to_string(), format!("Invalid worker ID '{}'", id));
         }
     }
 }
