@@ -195,7 +195,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Returns the batch proposal of our primary, if one currently exists.
-    pub fn proposed_batch(&self) -> &Arc<RwLock<Option<Proposal<N>>>> {
+    pub fn proposed_batch(&self) -> &Arc<ProposedBatch<N>> {
         &self.proposed_batch
     }
 }
