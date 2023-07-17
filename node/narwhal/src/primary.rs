@@ -76,7 +76,7 @@ pub struct Primary<N: Network> {
     /// The ledger service.
     ledger: Ledger<N>,
     /// The workers.
-    workers: Arc<Vec<Worker<N>>>,
+    workers: Arc<[Worker<N>]>,
     /// The BFT sender.
     bft_sender: Arc<OnceCell<BFTSender<N>>>,
     /// The batch proposal, if the primary is currently proposing a batch.
@@ -100,7 +100,7 @@ impl<N: Network> Primary<N> {
             gateway: Gateway::new(account, storage.clone(), ip, dev)?,
             storage,
             ledger,
-            workers: Default::default(),
+            workers: Arc::from(vec![]),
             bft_sender: Default::default(),
             proposed_batch: Default::default(),
             pending: Default::default(),
@@ -148,7 +148,7 @@ impl<N: Network> Primary<N> {
             tx_workers.insert(id, tx_worker);
         }
         // Set the workers.
-        self.workers = Arc::new(workers);
+        self.workers = Arc::from(workers);
 
         // Initialize the gateway.
         self.gateway.run(tx_workers).await;
@@ -190,7 +190,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Returns the workers.
-    pub const fn workers(&self) -> &Arc<Vec<Worker<N>>> {
+    pub const fn workers(&self) -> &Arc<[Worker<N>]> {
         &self.workers
     }
 
