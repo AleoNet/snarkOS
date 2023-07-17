@@ -65,7 +65,7 @@ use tokio::{
 /// A helper type for an optional proposed batch.
 pub type ProposedBatch<N> = RwLock<Option<Proposal<N>>>;
 /// A helper type for the ledger service.
-pub type Ledger<N> = Box<dyn LedgerService<N>>;
+pub type Ledger<N> = Arc<dyn LedgerService<N>>;
 
 #[derive(Clone)]
 pub struct Primary<N: Network> {
@@ -74,7 +74,7 @@ pub struct Primary<N: Network> {
     /// The storage.
     storage: Storage<N>,
     /// The ledger service.
-    ledger: Arc<Ledger<N>>,
+    ledger: Ledger<N>,
     /// The workers.
     workers: Arc<Vec<Worker<N>>>,
     /// The BFT sender.
@@ -99,7 +99,7 @@ impl<N: Network> Primary<N> {
         Ok(Self {
             gateway: Gateway::new(account, storage.clone(), ip, dev)?,
             storage,
-            ledger: Arc::from(ledger),
+            ledger,
             workers: Default::default(),
             bft_sender: Default::default(),
             proposed_batch: Default::default(),

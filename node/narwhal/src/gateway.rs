@@ -990,10 +990,9 @@ pub mod prop_tests {
                 // Construct the worker channels.
                 let (tx_worker, rx_worker) = init_worker_channels();
                 // Construct the worker instance.
-                let ledger = Box::new(MockLedgerService::new());
+                let ledger = Arc::new(MockLedgerService::new());
                 let worker =
-                    Worker::new(id, gateway.clone(), worker_storage.clone(), Arc::new(ledger), Default::default())
-                        .unwrap();
+                    Worker::new(id, gateway.clone(), worker_storage.clone(), ledger, Default::default()).unwrap();
                 // Run the worker instance.
                 worker.run(rx_worker);
 

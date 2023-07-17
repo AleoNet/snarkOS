@@ -106,7 +106,7 @@ pub async fn start_bft(
     // Initialize the components.
     let (storage, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
-    let ledger = Box::new(MockLedgerService::new());
+    let ledger = Arc::new(MockLedgerService::new());
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -139,7 +139,7 @@ pub async fn start_primary(
     // Initialize the components.
     let (storage, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
-    let ledger = Box::new(MockLedgerService::new());
+    let ledger = Arc::new(MockLedgerService::new());
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),

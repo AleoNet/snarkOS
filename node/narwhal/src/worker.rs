@@ -47,7 +47,7 @@ pub struct Worker<N: Network> {
     /// The storage.
     storage: Storage<N>,
     /// The ledger service.
-    ledger: Arc<Ledger<N>>,
+    ledger: Ledger<N>,
     /// The proposed batch.
     proposed_batch: Arc<ProposedBatch<N>>,
     /// The ready queue.
@@ -64,7 +64,7 @@ impl<N: Network> Worker<N> {
         id: u8,
         gateway: Gateway<N>,
         storage: Storage<N>,
-        ledger: Arc<Ledger<N>>,
+        ledger: Ledger<N>,
         proposed_batch: Arc<ProposedBatch<N>>,
     ) -> Result<Self> {
         // Ensure the worker ID is valid.
@@ -465,8 +465,8 @@ mod prop_tests {
         gateway: Gateway<CurrentNetwork>,
         storage: Storage<CurrentNetwork>,
     ) {
-        let ledger: Ledger<CurrentNetwork> = Box::new(MockLedgerService::new());
-        let worker = Worker::new(id, gateway, storage, Arc::new(ledger), Default::default()).unwrap();
+        let ledger: Ledger<CurrentNetwork> = Arc::new(MockLedgerService::new());
+        let worker = Worker::new(id, gateway, storage, ledger, Default::default()).unwrap();
         assert_eq!(worker.id(), id);
     }
 
@@ -476,8 +476,8 @@ mod prop_tests {
         gateway: Gateway<CurrentNetwork>,
         storage: Storage<CurrentNetwork>,
     ) {
-        let ledger: Ledger<CurrentNetwork> = Box::new(MockLedgerService::new());
-        let worker = Worker::new(id, gateway, storage, Arc::new(ledger), Default::default());
+        let ledger: Ledger<CurrentNetwork> = Arc::new(MockLedgerService::new());
+        let worker = Worker::new(id, gateway, storage, ledger, Default::default());
         // TODO once Worker implements Debug, simplify this with `unwrap_err`
         if let Err(error) = worker {
             assert_eq!(error.to_string(), format!("Invalid worker ID '{}'", id));
