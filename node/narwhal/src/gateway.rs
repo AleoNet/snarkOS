@@ -355,6 +355,8 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Broadcasts the given event to all connected peers.
+    // TODO(ljedrz): the event should be checked for the presence of Data::Object, and
+    // serialized in advance if it's there.
     pub(crate) fn broadcast(&self, event: Event<N>) {
         // Ensure there are connected peers.
         if self.number_of_connected_peers() > 0 {

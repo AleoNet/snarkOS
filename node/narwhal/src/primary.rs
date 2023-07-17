@@ -259,6 +259,7 @@ impl<N: Network> Primary<N> {
         // rebroadcast the batch header to the non-signers, and return early.
         if let Some(proposal) = self.proposed_batch.read().as_ref() {
             // Construct the event.
+            // TODO(ljedrz): the BatchHeader should be serialized only once in advance before being sent to non-signers.
             let event = Event::BatchPropose(proposal.batch_header().clone().into());
             // Iterate through the non-signers.
             for address in proposal.nonsigners() {

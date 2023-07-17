@@ -77,6 +77,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
         let proof_target = self.ledger.latest_proof_target();
 
         // Ensure that the prover solution is valid for the given epoch.
+        // TODO(ljedrz): check if this operation requires a blocking task.
         if !solution.verify(coinbase_verifying_key, &epoch_challenge, proof_target)? {
             bail!("Invalid prover solution '{puzzle_commitment}' for the current epoch.");
         }
@@ -96,6 +97,7 @@ impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<
             bail!("Invalid transaction - expected {transaction_id}, found {}", transaction.id());
         }
         // Check the transaction is well-formed.
+        // TODO(ljedrz): check if this operation requires a blocking task.
         self.ledger.check_transaction_basic(&transaction, None)
     }
 }
