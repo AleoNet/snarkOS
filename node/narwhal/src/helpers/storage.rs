@@ -249,7 +249,7 @@ impl<N: Network> Storage<N> {
     /// If the batch ID does not exist in storage, `None` is returned.
     pub fn get_round_for_batch(&self, batch_id: Field<N>) -> Option<u64> {
         // Get the round.
-        self.batch_ids.read().get(&batch_id).cloned()
+        self.batch_ids.read().get(&batch_id).copied()
     }
 
     /// Returns the certificate round for the given `certificate ID`.
