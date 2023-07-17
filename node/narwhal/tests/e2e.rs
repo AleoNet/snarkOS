@@ -43,7 +43,7 @@ async fn test_state_coherence() {
     std::future::pending::<()>().await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_quorum_threshold() {
     // Start N nodes but don't connect them.
     const N: u16 = 4;
@@ -94,7 +94,7 @@ async fn test_quorum_threshold() {
     deadline!(Duration::from_secs(20), move || { network.is_round_reached(TARGET_ROUND) });
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_quorum_break() {
     // Start N nodes, connect them and start the cannons for each.
     const N: u16 = 4;
