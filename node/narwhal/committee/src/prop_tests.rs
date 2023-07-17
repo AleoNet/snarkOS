@@ -207,16 +207,10 @@ fn invalid_stakes(#[strategy(too_low_stake_committee())] committee: Result<Commi
 
 #[proptest]
 fn invalid_member_count(#[strategy(too_small_committee())] committee: Result<Committee<CurrentNetwork>>) {
-    assert!(committee.is_err());
-    if let Err(err) = committee {
-        assert_eq!(err.to_string().as_str(), "Committee must have at least 4 members");
-    }
+    assert!(matches!(committee, Err(e) if e.to_string().as_str() == "Committee must have at least 4 members"))
 }
 
 #[proptest]
 fn invalid_round(#[strategy(invalid_round_committee())] committee: Result<Committee<CurrentNetwork>>) {
-    assert!(committee.is_err());
-    if let Err(err) = committee {
-        assert_eq!(err.to_string().as_str(), "Round must be nonzero");
-    }
+    assert!(matches!(committee, Err(e) if e.to_string().as_str() == "Round must be nonzero"))
 }
