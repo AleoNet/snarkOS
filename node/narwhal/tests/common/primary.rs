@@ -36,35 +36,53 @@ use parking_lot::Mutex;
 use tokio::{task::JoinHandle, time::sleep};
 use tracing::*;
 
+/// The configuration for the test network.
 #[derive(Clone, Copy, Debug)]
 pub struct TestNetworkConfig {
+    /// The number of nodes to spin up.
     pub num_nodes: u16,
+    /// If this is set to `true`, the BFT protocol is started on top of Narwhal.
     pub bft: bool,
+    /// If this is set to `true`, all nodes are connected to each other (when they're first
+    /// started).
     pub connect_all: bool,
-    pub fire_cannons: bool,
+    /// If `Some(i)` is set, the cannons will fire every `i` milliseconds.
+    pub fire_cannons: Option<u64>,
+    /// The log level to use for the test.
     pub log_level: Option<u8>,
+    /// If this is set to `true`, the number of connections is logged every 5 seconds.
     pub log_connections: bool,
 }
 
+/// A test network.
 #[derive(Clone)]
 pub struct TestNetwork {
+    /// The configuration for the test network.
     pub config: TestNetworkConfig,
+    /// A map of node IDs to validators in the network.
     pub validators: HashMap<u16, TestValidator>,
 }
 
+/// A test validator.
 #[derive(Clone)]
 pub struct TestValidator {
+    /// The ID of the validator.
     pub id: u16,
+    /// The primary instance. When the BFT is enabled this is a clone of the BFT primary.
     pub primary: Primary<CurrentNetwork>,
+    /// The channel sender of the primary.
     pub primary_sender: Option<PrimarySender<CurrentNetwork>>,
+    /// The BFT instance. This is only set if the BFT is enabled.
     pub bft: Option<BFT<CurrentNetwork>>,
+    /// The tokio handles of all long-running tasks associated with the validator (incl. cannons).
     pub handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 impl TestValidator {
-    pub fn fire_cannons(&mut self) {
-        let solution_handle = fire_unconfirmed_solutions(self.primary_sender.as_mut().unwrap(), self.id);
-        let transaction_handle = fire_unconfirmed_transactions(self.primary_sender.as_mut().unwrap(), self.id);
+    pub fn fire_cannons(&mut self, interval_ms: u64) {
+        let solution_handle = fire_unconfirmed_solutions(self.primary_sender.as_mut().unwrap(), self.id, interval_ms);
+        let transaction_handle =
+            fire_unconfirmed_transactions(self.primary_sender.as_mut().unwrap(), self.id, interval_ms);
 
         self.handles.lock().push(solution_handle);
         self.handles.lock().push(transaction_handle);
@@ -119,18 +137,17 @@ impl TestNetwork {
     pub async fn start(&mut self) {
         for validator in self.validators.values_mut() {
             let (primary_sender, primary_receiver) = init_primary_channels();
+            validator.primary_sender = Some(primary_sender.clone());
             if let Some(bft) = &mut validator.bft {
                 // Setup the channels and start the bft.
-                validator.primary_sender = Some(primary_sender.clone());
                 bft.run(primary_sender, primary_receiver, None).await.unwrap();
             } else {
                 // Setup the channels and start the primary.
-                validator.primary_sender = Some(primary_sender.clone());
                 validator.primary.run(primary_sender, primary_receiver, None).await.unwrap();
             }
 
-            if self.config.fire_cannons {
-                validator.fire_cannons();
+            if let Some(interval_ms) = self.config.fire_cannons {
+                validator.fire_cannons(interval_ms);
             }
 
             if self.config.log_connections {
@@ -144,8 +161,8 @@ impl TestNetwork {
     }
 
     // Starts the solution and trasnaction cannons for node.
-    pub fn fire_cannons_at(&mut self, id: u16) {
-        self.validators.get_mut(&id).unwrap().fire_cannons();
+    pub fn fire_cannons_at(&mut self, id: u16, interval_ms: u64) {
+        self.validators.get_mut(&id).unwrap().fire_cannons(interval_ms);
     }
 
     // Connects a node to another node.
