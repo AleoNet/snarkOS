@@ -13,23 +13,24 @@
 // limitations under the License.
 
 mod common;
+
 use crate::common::primary::{TestNetwork, TestNetworkConfig};
-use snarkos_node_narwhal::MAX_BATCH_DELAY;
-
-use std::time::Duration;
-
 use deadline::deadline;
+use snarkos_node_narwhal::MAX_BATCH_DELAY;
+use std::time::Duration;
 use tokio::time::sleep;
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Long-running e2e test"]
+#[ignore = "long-running e2e test"]
 async fn test_state_coherence() {
     const N: u16 = 4;
+    const CANNON_INTERVAL_MS: u64 = 10;
+
     let mut network = TestNetwork::new(TestNetworkConfig {
         num_nodes: N,
+        bft: true,
         connect_all: true,
-        fire_cannons: true,
-
+        fire_cannons: Some(CANNON_INTERVAL_MS),
         // Set this to Some(0..=4) to see the logs.
         log_level: Some(0),
         log_connections: true,
@@ -37,21 +38,20 @@ async fn test_state_coherence() {
 
     network.start().await;
 
-    // TODO(nkls): the easiest would be to assert on the anchor or bullshark's output, once
-    // implemented.
-
     std::future::pending::<()>().await;
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_quorum_threshold() {
     // Start N nodes but don't connect them.
     const N: u16 = 4;
+    const CANNON_INTERVAL_MS: u64 = 10;
+
     let mut network = TestNetwork::new(TestNetworkConfig {
         num_nodes: N,
+        bft: true,
         connect_all: false,
-        fire_cannons: false,
-
+        fire_cannons: None,
         // Set this to Some(0..=4) to see the logs.
         log_level: None,
         log_connections: true,
@@ -64,7 +64,7 @@ async fn test_quorum_threshold() {
     }
 
     // Start the cannons for node 0.
-    network.fire_cannons_at(0);
+    network.fire_cannons_at(0, CANNON_INTERVAL_MS);
 
     sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
 
@@ -75,7 +75,7 @@ async fn test_quorum_threshold() {
 
     // Connect the first two nodes and start the cannons for node 1.
     network.connect_validators(0, 1).await;
-    network.fire_cannons_at(1);
+    network.fire_cannons_at(1, CANNON_INTERVAL_MS);
 
     sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
 
@@ -87,22 +87,23 @@ async fn test_quorum_threshold() {
     // Connect the third node and start the cannons for it.
     network.connect_validators(0, 2).await;
     network.connect_validators(1, 2).await;
-    network.fire_cannons_at(2);
+    network.fire_cannons_at(2, CANNON_INTERVAL_MS);
 
     // Check the nodes reach quorum and advance through the rounds.
     const TARGET_ROUND: u64 = 4;
     deadline!(Duration::from_secs(20), move || { network.is_round_reached(TARGET_ROUND) });
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 async fn test_quorum_break() {
     // Start N nodes, connect them and start the cannons for each.
     const N: u16 = 4;
+    const CANNON_INTERVAL_MS: u64 = 10;
     let mut network = TestNetwork::new(TestNetworkConfig {
         num_nodes: N,
+        bft: true,
         connect_all: true,
-        fire_cannons: true,
-
+        fire_cannons: Some(CANNON_INTERVAL_MS),
         // Set this to Some(0..=4) to see the logs.
         log_level: None,
         log_connections: true,
