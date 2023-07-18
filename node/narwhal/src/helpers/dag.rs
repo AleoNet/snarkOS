@@ -101,8 +101,7 @@ impl<N: Network> DAG<N> {
         let author = certificate.author();
 
         // Update the last committed round for the author.
-        let last_committed_round = self
-            .last_committed_authors
+        self.last_committed_authors
             .entry(author)
             .and_modify(|last_committed_round| {
                 if certificate_round > *last_committed_round {
@@ -112,7 +111,8 @@ impl<N: Network> DAG<N> {
             .or_insert(certificate_round);
 
         // Update the last committed round.
-        self.last_committed_round = *last_committed_round;
+        // Note: The '.unwrap()' here is guaranteed to be safe.
+        self.last_committed_round = *self.last_committed_authors.values().max().unwrap();
 
         // Remove certificates that are below the GC round.
         self.graph.retain(|round, _| round + max_gc_rounds > self.last_committed_round);
