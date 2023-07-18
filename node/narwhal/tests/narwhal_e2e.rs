@@ -13,6 +13,7 @@
 // limitations under the License.
 
 mod common;
+
 use crate::common::primary::{TestNetwork, TestNetworkConfig};
 use snarkos_node_narwhal::MAX_BATCH_DELAY;
 
@@ -22,14 +23,14 @@ use deadline::deadline;
 use tokio::time::sleep;
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "Long-running e2e test"]
+#[ignore = "long-running e2e test"]
 async fn test_state_coherence() {
     const N: u16 = 4;
     let mut network = TestNetwork::new(TestNetworkConfig {
         num_nodes: N,
+        bft: false,
         connect_all: true,
         fire_cannons: true,
-
         // Set this to Some(0..=4) to see the logs.
         log_level: Some(0),
         log_connections: true,
@@ -49,9 +50,9 @@ async fn test_quorum_threshold() {
     const N: u16 = 4;
     let mut network = TestNetwork::new(TestNetworkConfig {
         num_nodes: N,
+        bft: false,
         connect_all: false,
         fire_cannons: false,
-
         // Set this to Some(0..=4) to see the logs.
         log_level: None,
         log_connections: true,
@@ -100,9 +101,9 @@ async fn test_quorum_break() {
     const N: u16 = 4;
     let mut network = TestNetwork::new(TestNetworkConfig {
         num_nodes: N,
+        bft: false,
         connect_all: true,
         fire_cannons: true,
-
         // Set this to Some(0..=4) to see the logs.
         log_level: None,
         log_connections: true,

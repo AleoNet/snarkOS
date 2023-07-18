@@ -21,6 +21,7 @@ use snarkos_account::Account;
 use snarkos_node_narwhal::{
     helpers::{init_primary_channels, PrimarySender, Storage},
     Primary,
+    BFT,
     MAX_BATCH_DELAY,
     MAX_GC_ROUNDS,
 };
@@ -38,6 +39,7 @@ use tracing::*;
 #[derive(Clone, Copy, Debug)]
 pub struct TestNetworkConfig {
     pub num_nodes: u16,
+    pub bft: bool,
     pub connect_all: bool,
     pub fire_cannons: bool,
     pub log_level: Option<u8>,
@@ -54,14 +56,15 @@ pub struct TestNetwork {
 pub struct TestValidator {
     pub id: u16,
     pub primary: Primary<CurrentNetwork>,
-    pub sender: Option<PrimarySender<CurrentNetwork>>,
+    pub primary_sender: Option<PrimarySender<CurrentNetwork>>,
+    pub bft: Option<BFT<CurrentNetwork>>,
     pub handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 impl TestValidator {
     pub fn fire_cannons(&mut self) {
-        let solution_handle = fire_unconfirmed_solutions(self.sender.as_mut().unwrap(), self.id);
-        let transaction_handle = fire_unconfirmed_transactions(self.sender.as_mut().unwrap(), self.id);
+        let solution_handle = fire_unconfirmed_solutions(self.primary_sender.as_mut().unwrap(), self.id);
+        let transaction_handle = fire_unconfirmed_transactions(self.primary_sender.as_mut().unwrap(), self.id);
 
         self.handles.lock().push(solution_handle);
         self.handles.lock().push(transaction_handle);
@@ -76,7 +79,7 @@ impl TestValidator {
                 for connection in connections {
                     debug!("  {}", connection);
                 }
-                sleep(Duration::from_secs(10)).await;
+                sleep(Duration::from_secs(5)).await;
             }
         }));
     }
@@ -95,9 +98,17 @@ impl TestNetwork {
         for (id, account) in accounts.into_iter().enumerate() {
             let storage = Storage::new(committee.clone(), MAX_GC_ROUNDS);
             let ledger = Arc::new(MockLedgerService::new());
-            let primary = Primary::<CurrentNetwork>::new(account, storage, ledger, None, Some(id as u16)).unwrap();
 
-            let test_validator = TestValidator { id: id as u16, primary, sender: None, handles: Default::default() };
+            let (primary, bft) = if config.bft {
+                let bft = BFT::<CurrentNetwork>::new(account, storage, ledger, None, Some(id as u16)).unwrap();
+                (bft.primary().clone(), Some(bft))
+            } else {
+                let primary = Primary::<CurrentNetwork>::new(account, storage, ledger, None, Some(id as u16)).unwrap();
+                (primary, None)
+            };
+
+            let test_validator =
+                TestValidator { id: id as u16, primary, primary_sender: None, bft, handles: Default::default() };
             validators.insert(id as u16, test_validator);
         }
 
@@ -107,10 +118,16 @@ impl TestNetwork {
     // Starts each node in the network.
     pub async fn start(&mut self) {
         for validator in self.validators.values_mut() {
-            // Setup the channels and start the primary.
-            let (sender, receiver) = init_primary_channels();
-            validator.sender = Some(sender.clone());
-            validator.primary.run(sender.clone(), receiver, None).await.unwrap();
+            let (primary_sender, primary_receiver) = init_primary_channels();
+            if let Some(bft) = &mut validator.bft {
+                // Setup the channels and start the bft.
+                validator.primary_sender = Some(primary_sender.clone());
+                bft.run(primary_sender, primary_receiver, None).await.unwrap();
+            } else {
+                // Setup the channels and start the primary.
+                validator.primary_sender = Some(primary_sender.clone());
+                validator.primary.run(primary_sender, primary_receiver, None).await.unwrap();
+            }
 
             if self.config.fire_cannons {
                 validator.fire_cannons();
@@ -147,7 +164,7 @@ impl TestNetwork {
             let ip = other_validator.primary.gateway().local_ip();
             validator.primary.gateway().connect(ip);
             // Give the connection time to be established.
-            tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(10)).await;
         }
     }
 
@@ -187,7 +204,6 @@ fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<Curren
         // Sample the account.
         let account = Account::new(&mut TestRng::fixed(i as u64)).unwrap();
 
-        // TODO(nkls): use tracing instead.
         info!("Validator {}: {}", i, account.address());
 
         members.insert(account.address(), INITIAL_STAKE);
