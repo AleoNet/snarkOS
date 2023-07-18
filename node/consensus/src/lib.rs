@@ -82,7 +82,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Initialize the Narwhal storage.
         let storage = NarwhalStorage::new(committee, MAX_GC_ROUNDS);
         // Initialize the ledger service.
-        let ledger_service = Box::new(CoreLedgerService::<N, C>::new(ledger.clone()));
+        let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone()));
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger_service, None, dev)?;
         // Return the consensus.

@@ -94,7 +94,7 @@ impl TestNetwork {
         let mut validators = HashMap::with_capacity(config.num_nodes as usize);
         for (id, account) in accounts.into_iter().enumerate() {
             let storage = Storage::new(committee.clone(), MAX_GC_ROUNDS);
-            let ledger = Box::new(MockLedgerService::new());
+            let ledger = Arc::new(MockLedgerService::new());
             let primary = Primary::<CurrentNetwork>::new(account, storage, ledger, None, Some(id as u16)).unwrap();
 
             let test_validator = TestValidator { id: id as u16, primary, sender: None, handles: Default::default() };

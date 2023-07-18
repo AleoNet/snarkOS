@@ -65,7 +65,7 @@ use tokio::{
 /// A helper type for an optional proposed batch.
 pub type ProposedBatch<N> = RwLock<Option<Proposal<N>>>;
 /// A helper type for the ledger service.
-pub type Ledger<N> = Box<dyn LedgerService<N>>;
+pub type Ledger<N> = Arc<dyn LedgerService<N>>;
 
 #[derive(Clone)]
 pub struct Primary<N: Network> {
@@ -74,9 +74,9 @@ pub struct Primary<N: Network> {
     /// The storage.
     storage: Storage<N>,
     /// The ledger service.
-    ledger: Arc<Ledger<N>>,
+    ledger: Ledger<N>,
     /// The workers.
-    workers: Arc<Vec<Worker<N>>>,
+    workers: Arc<[Worker<N>]>,
     /// The BFT sender.
     bft_sender: Arc<OnceCell<BFTSender<N>>>,
     /// The batch proposal, if the primary is currently proposing a batch.
@@ -99,8 +99,8 @@ impl<N: Network> Primary<N> {
         Ok(Self {
             gateway: Gateway::new(account, storage.clone(), ip, dev)?,
             storage,
-            ledger: Arc::from(ledger),
-            workers: Default::default(),
+            ledger,
+            workers: Arc::from(vec![]),
             bft_sender: Default::default(),
             proposed_batch: Default::default(),
             pending: Default::default(),
@@ -148,7 +148,7 @@ impl<N: Network> Primary<N> {
             tx_workers.insert(id, tx_worker);
         }
         // Set the workers.
-        self.workers = Arc::new(workers);
+        self.workers = Arc::from(workers);
 
         // Initialize the gateway.
         self.gateway.run(tx_workers).await;
@@ -190,12 +190,12 @@ impl<N: Network> Primary<N> {
     }
 
     /// Returns the workers.
-    pub const fn workers(&self) -> &Arc<Vec<Worker<N>>> {
+    pub const fn workers(&self) -> &Arc<[Worker<N>]> {
         &self.workers
     }
 
     /// Returns the batch proposal of our primary, if one currently exists.
-    pub fn proposed_batch(&self) -> &Arc<RwLock<Option<Proposal<N>>>> {
+    pub fn proposed_batch(&self) -> &Arc<ProposedBatch<N>> {
         &self.proposed_batch
     }
 }
@@ -259,6 +259,7 @@ impl<N: Network> Primary<N> {
         // rebroadcast the batch header to the non-signers, and return early.
         if let Some(proposal) = self.proposed_batch.read().as_ref() {
             // Construct the event.
+            // TODO(ljedrz): the BatchHeader should be serialized only once in advance before being sent to non-signers.
             let event = Event::BatchPropose(proposal.batch_header().clone().into());
             // Iterate through the non-signers.
             for address in proposal.nonsigners() {

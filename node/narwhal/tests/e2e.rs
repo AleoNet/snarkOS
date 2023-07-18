@@ -31,7 +31,7 @@ async fn test_state_coherence() {
         fire_cannons: true,
 
         // Set this to Some(0..=4) to see the logs.
-        log_level: None,
+        log_level: Some(0),
         log_connections: true,
     });
 

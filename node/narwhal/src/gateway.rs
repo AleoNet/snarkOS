@@ -355,6 +355,8 @@ impl<N: Network> Gateway<N> {
     }
 
     /// Broadcasts the given event to all connected peers.
+    // TODO(ljedrz): the event should be checked for the presence of Data::Object, and
+    // serialized in advance if it's there.
     pub(crate) fn broadcast(&self, event: Event<N>) {
         // Ensure there are connected peers.
         if self.number_of_connected_peers() > 0 {
@@ -988,10 +990,9 @@ pub mod prop_tests {
                 // Construct the worker channels.
                 let (tx_worker, rx_worker) = init_worker_channels();
                 // Construct the worker instance.
-                let ledger = Box::new(MockLedgerService::new());
+                let ledger = Arc::new(MockLedgerService::new());
                 let worker =
-                    Worker::new(id, gateway.clone(), worker_storage.clone(), Arc::new(ledger), Default::default())
-                        .unwrap();
+                    Worker::new(id, gateway.clone(), worker_storage.clone(), ledger, Default::default()).unwrap();
                 // Run the worker instance.
                 worker.run(rx_worker);
 

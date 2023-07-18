@@ -19,7 +19,7 @@ use snarkvm::{
     prelude::{bail, ensure, Address, Field, Network, Result},
 };
 
-use indexmap::{indexmap, IndexMap, IndexSet};
+use indexmap::{indexmap, map::Entry, IndexMap, IndexSet};
 use parking_lot::RwLock;
 use std::{
     collections::{HashMap, HashSet},
@@ -249,7 +249,7 @@ impl<N: Network> Storage<N> {
     /// If the batch ID does not exist in storage, `None` is returned.
     pub fn get_round_for_batch(&self, batch_id: Field<N>) -> Option<u64> {
         // Get the round.
-        self.batch_ids.read().get(&batch_id).cloned()
+        self.batch_ids.read().get(&batch_id).copied()
     }
 
     /// Returns the certificate round for the given `certificate ID`.
@@ -567,16 +567,18 @@ impl<N: Network> Storage<N> {
         // If this is the last certificate ID for the transmission ID, remove the transmission.
         for transmission_id in certificate.transmission_ids() {
             // Remove the certificate ID for the transmission ID, and determine if there are any more certificate IDs.
-            let is_empty = transmissions.get_mut(transmission_id).map_or(false, |(_, certificate_ids)| {
-                // Remove the certificate ID for the transmission ID.
-                certificate_ids.remove(&certificate_id);
-                // Determine if there are any more certificate IDs for the transmission ID.
-                certificate_ids.is_empty()
-            });
-            // If there are no more certificate IDs for the transmission ID, remove the transmission.
-            if is_empty {
-                // Remove the entry for the transmission ID.
-                transmissions.remove(transmission_id);
+            match transmissions.entry(*transmission_id) {
+                Entry::Occupied(mut occupied_entry) => {
+                    let (_, certificate_ids) = occupied_entry.get_mut();
+                    // Remove the certificate ID for the transmission ID.
+                    certificate_ids.remove(&certificate_id);
+                    // If there are no more certificate IDs for the transmission ID, remove the transmission.
+                    if certificate_ids.is_empty() {
+                        // Remove the entry for the transmission ID.
+                        occupied_entry.remove();
+                    }
+                }
+                Entry::Vacant(_) => {}
             }
         }
         // Return successfully.
