@@ -46,7 +46,7 @@ path = "snarkos/main.rs"
 jemalloc = [ "tikv-jemallocator" ]
 
 [dependencies.anyhow]
-version = "1.0.70"
+version = "1.0.72"
 
 [dependencies.clap]
 version = "4.3"
