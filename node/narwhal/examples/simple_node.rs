@@ -109,12 +109,12 @@ pub async fn start_bft(
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new());
     // Initialize the gateway IP and dev mode.
-    let (ip, dev) = match peers.get(&node_id) {
-        Some(ip) => (Some(*ip), None),
+    let (port, dev) = match peers.get(&node_id) {
+        Some(ip) => (Some(ip.port()), None),
         None => (None, Some(node_id)),
     };
     // Initialize the BFT instance.
-    let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, ip, dev)?;
+    let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, port, dev)?;
     // Run the BFT instance.
     bft.run(sender.clone(), receiver, None).await?;
     // Retrieve the BFT's primary.
@@ -142,12 +142,12 @@ pub async fn start_primary(
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new());
     // Initialize the gateway IP and dev mode.
-    let (ip, dev) = match peers.get(&node_id) {
-        Some(ip) => (Some(*ip), None),
+    let (port, dev) = match peers.get(&node_id) {
+        Some(ip) => (Some(ip.port()), None),
         None => (None, Some(node_id)),
     };
     // Initialize the primary instance.
-    let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, ip, dev)?;
+    let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, port, dev)?;
     // Run the primary instance.
     primary.run(sender.clone(), receiver, None).await?;
     // Keep the node's connections.

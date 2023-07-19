@@ -89,7 +89,8 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Initialize the ledger service.
         let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone()));
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger_service, ip, dev)?;
+        // Note that ip is always passed in as None by the validator.
+        let bft = BFT::new(account, storage, ledger_service, ip.map(|ip| ip.port()), dev)?;
         // Return the consensus.
         Ok(Self { ledger, bft, primary_sender: Default::default(), handles: Default::default() })
     }

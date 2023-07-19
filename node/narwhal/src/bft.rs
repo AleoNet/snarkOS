@@ -45,7 +45,6 @@ use parking_lot::{Mutex, RwLock};
 use std::{
     collections::{BTreeMap, HashSet},
     future::Future,
-    net::SocketAddr,
     sync::{
         atomic::{AtomicI64, Ordering},
         Arc,
@@ -75,11 +74,11 @@ impl<N: Network> BFT<N> {
         account: Account<N>,
         storage: Storage<N>,
         ledger: Ledger<N>,
-        ip: Option<SocketAddr>,
+        port: Option<u16>,
         dev: Option<u16>,
     ) -> Result<Self> {
         Ok(Self {
-            primary: Primary::new(account, storage, ledger, ip, dev)?,
+            primary: Primary::new(account, storage, ledger, port, dev)?,
             dag: Default::default(),
             leader_certificate: Default::default(),
             leader_certificate_timer: Default::default(),
