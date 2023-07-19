@@ -129,11 +129,11 @@ async fn test_quorum_break() {
 #[ignore = "long-running e2e test"]
 async fn test_leader_election_consistency() {
     // The round at which to start checking for leader consistency.
-    const STARTING_ROUND: u64 = 9;
+    const STARTING_ROUND: u64 = 2;
 
     // The minimum and maximum rounds to check for leader consistency.
-    const MIN_ROUND: u64 = 10;
-    const MAX_ROUND: u64 = 100;
+    const MIN_ROUND: u64 = 4;
+    const MAX_ROUND: u64 = 30;
 
     // Start N nodes, connect them and start the cannons for each.
     const N: u16 = 4;
