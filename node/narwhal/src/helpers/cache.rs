@@ -163,7 +163,7 @@ mod tests {
         }
     }
 
-    const INTERVAL_IN_SECS: i64 = 5;
+    const INTERVAL_IN_SECS: i64 = 1;
 
     macro_rules! test_cache_fields {
         ($($name:ident),*) => {
@@ -179,15 +179,25 @@ mod tests {
 
                         // Insert an input, recent events should be 1.
                         assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 1);
-
-                        // Check that the cache contains the input.
-                        assert_eq!(cache.[<seen_ $name s>].read().len(), 1);
-
-                        // Insert the same input again, recent events should be 2.
+                        // Insert an input, recent events should be 2.
                         assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 2);
+                        // Insert an input, recent events should be 3.
+                        assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 3);
+
+                        // Check that the cache contains the input for 3 entries.
+                        assert_eq!(cache.[<seen_ $name s>].read().get(&input).unwrap().len(), 3);
+
+                        // Wait for the input to expire.
+                        std::thread::sleep(std::time::Duration::from_secs(INTERVAL_IN_SECS as u64 + 1));
+
+                        // Insert an input again, recent events should be 1.
+                        assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 1);
 
                         // Check that the cache still contains the input.
                         assert_eq!(cache.[<seen_ $name s>].read().len(), 1);
+
+                        // Check that the cache contains the input and 1 timestamp entry.
+                        assert_eq!(cache.[<seen_ $name s>].read().get(&input).unwrap().len(), 1);
                     }
                 }
             )*
