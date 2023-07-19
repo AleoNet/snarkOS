@@ -31,9 +31,6 @@ version = "1.0"
 [dependencies.bytes]
 version = "1"
 
-[dependencies.clap]
-version = "4.3"
-
 [dependencies.futures]
 version = "0.3.27"
 features = [ "thread-pool" ]
@@ -100,6 +97,9 @@ version = "0.6"
 version = "0.7.4"
 default-features = false
 features = [ "erased-json" ]
+
+[dev-dependencies.clap]
+version = "4.3"
 
 [dev-dependencies.deadline]
 version = "0.2"
