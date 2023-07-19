@@ -74,6 +74,13 @@ const MAX_CONNECTION_ATTEMPTS: usize = 10;
 /// The maximum interval to restrict a peer.
 const RESTRICTED_INTERVAL: i64 = (MAX_CONNECTION_ATTEMPTS as u64 * MAX_BATCH_DELAY / 1000) as i64; // seconds
 
+/// Part of the Gateway API that deals with networking.
+/// This is a separate trait to allow for easier testing/mocking.
+pub trait Transport<N: Network>: Send + Sync {
+    fn send(&self, peer_ip: SocketAddr, event: Event<N>);
+    fn broadcast(&self, event: Event<N>);
+}
+
 #[derive(Clone)]
 pub struct Gateway<N: Network> {
     /// The account of the node.
@@ -291,46 +298,6 @@ impl<N: Network> Gateway<N> {
 
     /// Sends the given event to specified peer.
     ///
-    /// This method is rate limited to prevent spamming the peer.
-    pub(crate) fn send(&self, peer_ip: SocketAddr, event: Event<N>) {
-        macro_rules! send {
-            ($self:ident, $cache_map:ident, $interval:expr, $freq:expr) => {
-                let self_ = $self.clone();
-                tokio::spawn(async move {
-                    // Rate limit the number of certificate requests sent to the peer.
-                    while self_.cache.$cache_map(peer_ip, $interval) > $freq {
-                        // Sleep for a short period of time to allow the cache to clear.
-                        tokio::time::sleep(Duration::from_millis(10)).await;
-                    }
-                    // Send the event to the peer.
-                    self_.send_inner(peer_ip, event);
-                });
-            };
-        }
-
-        // If the event type is a certificate request, increment the cache.
-        if matches!(event, Event::CertificateRequest(_)) | matches!(event, Event::CertificateResponse(_)) {
-            // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
-            self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
-            // Send the event to the peer.
-            send!(self, insert_outbound_certificate, CACHE_REQUESTS_INTERVAL, CACHE_CERTIFICATES);
-        }
-        // If the event type is a transmission request, increment the cache.
-        else if matches!(event, Event::TransmissionRequest(_)) | matches!(event, Event::TransmissionResponse(_)) {
-            // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
-            self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
-            // Send the event to the peer.
-            send!(self, insert_outbound_transmission, CACHE_REQUESTS_INTERVAL, CACHE_TRANSMISSIONS);
-        }
-        // Otherwise, employ a general rate limit.
-        else {
-            // Send the event to the peer.
-            send!(self, insert_outbound_event, CACHE_EVENTS_INTERVAL, CACHE_EVENTS);
-        }
-    }
-
-    /// Sends the given event to specified peer.
-    ///
     /// This function returns as soon as the event is queued to be sent,
     /// without waiting for the actual delivery; instead, the caller is provided with a [`oneshot::Receiver`]
     /// which can be used to determine when and whether the event has been delivered.
@@ -352,20 +319,6 @@ impl<N: Network> Gateway<N> {
             self.disconnect(peer_ip);
         }
         result.ok()
-    }
-
-    /// Broadcasts the given event to all connected peers.
-    // TODO(ljedrz): the event should be checked for the presence of Data::Object, and
-    // serialized in advance if it's there.
-    pub(crate) fn broadcast(&self, event: Event<N>) {
-        // Ensure there are connected peers.
-        if self.number_of_connected_peers() > 0 {
-            // Iterate through all connected peers.
-            for peer_ip in self.connected_peers.read().iter() {
-                // Send the event to the peer.
-                self.send(*peer_ip, event.clone());
-            }
-        }
     }
 
     /// Handles the inbound event from the peer.
@@ -513,6 +466,62 @@ impl<N: Network> Gateway<N> {
         self.handles.lock().iter().for_each(|handle| handle.abort());
         // Close the listener.
         self.tcp.shut_down().await;
+    }
+}
+
+impl<N: Network> Transport<N> for Gateway<N> {
+    /// Sends the given event to specified peer.
+    ///
+    /// This method is rate limited to prevent spamming the peer.
+    fn send(&self, peer_ip: SocketAddr, event: Event<N>) {
+        macro_rules! send {
+            ($self:ident, $cache_map:ident, $interval:expr, $freq:expr) => {
+                let self_ = $self.clone();
+                tokio::spawn(async move {
+                    // Rate limit the number of certificate requests sent to the peer.
+                    while self_.cache.$cache_map(peer_ip, $interval) > $freq {
+                        // Sleep for a short period of time to allow the cache to clear.
+                        tokio::time::sleep(Duration::from_millis(10)).await;
+                    }
+                    // Send the event to the peer.
+                    self_.send_inner(peer_ip, event);
+                });
+            };
+        }
+
+        // If the event type is a certificate request, increment the cache.
+        if matches!(event, Event::CertificateRequest(_)) | matches!(event, Event::CertificateResponse(_)) {
+            // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
+            self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
+            // Send the event to the peer.
+            send!(self, insert_outbound_certificate, CACHE_REQUESTS_INTERVAL, CACHE_CERTIFICATES);
+        }
+        // If the event type is a transmission request, increment the cache.
+        else if matches!(event, Event::TransmissionRequest(_)) | matches!(event, Event::TransmissionResponse(_)) {
+            // Update the outbound event cache. This is necessary to ensure we don't under count the outbound events.
+            self.cache.insert_outbound_event(peer_ip, CACHE_EVENTS_INTERVAL);
+            // Send the event to the peer.
+            send!(self, insert_outbound_transmission, CACHE_REQUESTS_INTERVAL, CACHE_TRANSMISSIONS);
+        }
+        // Otherwise, employ a general rate limit.
+        else {
+            // Send the event to the peer.
+            send!(self, insert_outbound_event, CACHE_EVENTS_INTERVAL, CACHE_EVENTS);
+        }
+    }
+
+    /// Broadcasts the given event to all connected peers.
+    // TODO(ljedrz): the event should be checked for the presence of Data::Object, and
+    // serialized in advance if it's there.
+    fn broadcast(&self, event: Event<N>) {
+        // Ensure there are connected peers.
+        if self.number_of_connected_peers() > 0 {
+            // Iterate through all connected peers.
+            for peer_ip in self.connected_peers.read().iter() {
+                // Send the event to the peer.
+                self.send(*peer_ip, event.clone());
+            }
+        }
     }
 }
 
@@ -992,7 +1001,8 @@ pub mod prop_tests {
                 // Construct the worker instance.
                 let ledger = Arc::new(MockLedgerService::new());
                 let worker =
-                    Worker::new(id, gateway.clone(), worker_storage.clone(), ledger, Default::default()).unwrap();
+                    Worker::new(id, Arc::new(gateway.clone()), worker_storage.clone(), ledger, Default::default())
+                        .unwrap();
                 // Run the worker instance.
                 worker.run(rx_worker);
 

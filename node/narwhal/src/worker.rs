@@ -15,9 +15,9 @@
 use crate::{
     event::{Event, TransmissionRequest, TransmissionResponse},
     helpers::{fmt_id, Pending, Ready, Storage, WorkerReceiver},
-    Gateway,
     Ledger,
     ProposedBatch,
+    Transport,
     MAX_BATCH_DELAY,
     MAX_TRANSMISSIONS_PER_BATCH,
     MAX_WORKERS,
@@ -43,7 +43,7 @@ pub struct Worker<N: Network> {
     /// The worker ID.
     id: u8,
     /// The gateway.
-    gateway: Gateway<N>,
+    gateway: Arc<dyn Transport<N>>,
     /// The storage.
     storage: Storage<N>,
     /// The ledger service.
@@ -62,7 +62,7 @@ impl<N: Network> Worker<N> {
     /// Initializes a new worker instance.
     pub fn new(
         id: u8,
-        gateway: Gateway<N>,
+        gateway: Arc<dyn Transport<N>>,
         storage: Storage<N>,
         ledger: Ledger<N>,
         proposed_batch: Arc<ProposedBatch<N>>,
@@ -452,8 +452,10 @@ impl<N: Network> Worker<N> {
 
 #[cfg(test)]
 mod prop_tests {
+
     use super::*;
 
+    use crate::Gateway;
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
     use test_strategy::proptest;
 
@@ -466,7 +468,7 @@ mod prop_tests {
         storage: Storage<CurrentNetwork>,
     ) {
         let ledger: Ledger<CurrentNetwork> = Arc::new(MockLedgerService::new());
-        let worker = Worker::new(id, gateway, storage, ledger, Default::default()).unwrap();
+        let worker = Worker::new(id, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
         assert_eq!(worker.id(), id);
     }
 
@@ -477,7 +479,7 @@ mod prop_tests {
         storage: Storage<CurrentNetwork>,
     ) {
         let ledger: Ledger<CurrentNetwork> = Arc::new(MockLedgerService::new());
-        let worker = Worker::new(id, gateway, storage, ledger, Default::default());
+        let worker = Worker::new(id, Arc::new(gateway), storage, ledger, Default::default());
         // TODO once Worker implements Debug, simplify this with `unwrap_err`
         if let Err(error) = worker {
             assert_eq!(error.to_string(), format!("Invalid worker ID '{}'", id));
