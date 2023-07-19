@@ -20,7 +20,7 @@ pub mod prop_tests;
 pub const MIN_STAKE: u64 = 1_000u64; // microcredits
 
 /// The maximum number of nodes that can be in a committee.
-pub const MAX_COMMITTEE_SIZE: u16 = 100; // members
+pub const MAX_COMMITTEE_SIZE: u16 = 4; // members
 
 use snarkvm::console::{
     prelude::*,
