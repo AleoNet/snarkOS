@@ -36,8 +36,8 @@ impl<N: Network> From<IndexSet<TransmissionID<N>>> for WorkerPing<N> {
 impl<N: Network> EventTrait for WorkerPing<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> String {
-        "WorkerPing".to_string()
+    fn name(&self) -> &'static str {
+        "WorkerPing"
     }
 
     /// Serializes the event into the buffer.

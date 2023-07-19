@@ -36,8 +36,8 @@ impl<N: Network> From<Field<N>> for CertificateRequest<N> {
 impl<N: Network> EventTrait for CertificateRequest<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> String {
-        "CertificateRequest".to_string()
+    fn name(&self) -> &'static str {
+        "CertificateRequest"
     }
 
     /// Serializes the event into the buffer.

@@ -58,7 +58,7 @@ use serde::{Deserialize, Serialize};
 
 pub trait EventTrait {
     /// Returns the event name.
-    fn name(&self) -> String;
+    fn name(&self) -> &'static str;
     /// Serializes the event into the buffer.
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()>;
     /// Deserializes the given buffer into a event.
@@ -94,7 +94,7 @@ impl<N: Network> Event<N> {
 
     /// Returns the event name.
     #[inline]
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> &'static str {
         match self {
             Self::BatchPropose(event) => event.name(),
             Self::BatchSignature(event) => event.name(),

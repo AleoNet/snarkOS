@@ -22,8 +22,8 @@ pub struct ChallengeResponse<N: Network> {
 impl<N: Network> EventTrait for ChallengeResponse<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> String {
-        "ChallengeResponse".to_string()
+    fn name(&self) -> &'static str {
+        "ChallengeResponse"
     }
 
     /// Serializes the event into the buffer.

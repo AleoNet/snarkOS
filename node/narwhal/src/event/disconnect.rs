@@ -41,8 +41,8 @@ impl From<DisconnectReason> for Disconnect {
 impl EventTrait for Disconnect {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> String {
-        "Disconnect".to_string()
+    fn name(&self) -> &'static str {
+        "Disconnect"
     }
 
     /// Serializes the event into the buffer.

@@ -32,8 +32,8 @@ impl<N: Network> ChallengeRequest<N> {
 impl<N: Network> EventTrait for ChallengeRequest<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> String {
-        "ChallengeRequest".to_string()
+    fn name(&self) -> &'static str {
+        "ChallengeRequest"
     }
 
     /// Serializes the event into the buffer.
