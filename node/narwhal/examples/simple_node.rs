@@ -469,9 +469,10 @@ async fn main() -> Result<()> {
     };
 
     // Fire unconfirmed solutions.
+    const DEFAULT_INTERVAL_MS: u64 = 450;
     let interval_ms = match args.fire_cannons {
         Some(Some(interval)) => Some(interval),
-        Some(None) => Some(450),
+        Some(None) => Some(DEFAULT_INTERVAL_MS),
         None => None,
     };
 
