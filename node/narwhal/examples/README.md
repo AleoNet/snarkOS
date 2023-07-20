@@ -23,12 +23,27 @@ cargo run --release -- example monitor
 Usage: simple_node [OPTIONS] --mode <MODE> --node-id <ID> --num-nodes <N>
 
 Options:
-      --mode <MODE>                   The mode to run the node in [possible values: narwhal, bft]
-      --node-id <ID>                  The ID of the node
-      --num-nodes <N>                 The number of nodes in the network
-      --config <PATH>                 If set, the path to the file containing the committee configuration
-      --fire-cannons [<INTERVAL_MS>]  Enables the tx and solution cannons, and optionally the interval in ms to run them on
-  -h, --help                          Print help
+      --mode <MODE>
+          The mode to run the node in
+
+          Possible values:
+          - narwhal: Runs the node with the Narwhal memory pool protocol
+          - bft:     Runs the node with the Bullshark BFT protocol (on top of Narwhal)
+
+      --node-id <ID>
+          The ID of the node
+
+      --num-nodes <N>
+          The number of nodes in the network
+
+      --config <PATH>
+          If set, the path to the file containing the committee configuration
+
+      --fire-cannons [<INTERVAL_MS>]
+          Enables the tx and solution cannons, and optionally the interval in ms to run them on
+
+  -h, --help
+          Print help (see a summary with '-h')
 ```
 
 To start 4 **BFT** nodes manually, run:
@@ -72,5 +87,3 @@ If this parameter is not present, all nodes are run on localhost.
 
 In addition, `--fire-cannons` will enable the transaction and solution cannons for each node.
 If enabled, the interval in milliseconds can optionally be passed in as an argument.
-
-

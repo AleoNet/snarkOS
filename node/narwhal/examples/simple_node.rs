@@ -399,9 +399,12 @@ async fn start_server(bft: Option<BFT<CurrentNetwork>>, primary: Primary<Current
 
 /**************************************************************************************************/
 
+/// The operating mode of the node.
 #[derive(Debug, Clone, ValueEnum)]
 enum Mode {
+    /// Runs the node with the Narwhal memory pool protocol.
     Narwhal,
+    /// Runs the node with the Bullshark BFT protocol (on top of Narwhal).
     Bft,
 }
 
