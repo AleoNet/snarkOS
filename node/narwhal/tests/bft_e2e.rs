@@ -126,7 +126,6 @@ async fn test_quorum_break() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-#[ignore = "long-running e2e test"]
 async fn test_leader_election_consistency() {
     // The round at which to start checking for leader consistency.
     const STARTING_ROUND: u64 = 2;
