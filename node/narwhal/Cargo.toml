@@ -146,3 +146,6 @@ features = [ "fs", "trace" ]
 [dev-dependencies.tracing-subscriber]
 version = "0.3"
 features = [ "env-filter" ]
+
+[dev-dependencies.mockall]
+version = "0.11.4"

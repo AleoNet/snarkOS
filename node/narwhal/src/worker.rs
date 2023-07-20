@@ -486,3 +486,239 @@ mod prop_tests {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use bytes::Bytes;
+    use mockall::mock;
+    use snarkos_node_narwhal_ledger_service::LedgerService;
+    use snarkvm::prelude::{narwhal::TransmissionID, Field, Network, Result};
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    mock! {
+        Gateway<N: Network> {}
+        impl<N:Network> Transport<N> for Gateway<N> {
+            fn broadcast(&self, event: Event<N>);
+            fn send(&self, peer_ip: SocketAddr, event: Event<N>);
+        }
+    }
+
+    mock! {
+        Ledger<N: Network> {}
+        #[async_trait]
+        impl<N: Network> LedgerService<N> for Ledger<N> {
+            fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
+            fn contains_transmission(&self, transmission_id: &TransmissionID<N>) -> Result<bool>;
+            async fn check_solution_basic(
+                &self,
+                puzzle_commitment: PuzzleCommitment<N>,
+                solution: Data<ProverSolution<N>>,
+            ) -> Result<()>;
+            async fn check_transaction_basic(
+                &self,
+                transaction_id: N::TransactionID,
+                transaction: Data<Transaction<N>>,
+            ) -> Result<()>;
+        }
+    }
+
+    #[tokio::test]
+    async fn test_process_transmission() {
+        let rng = &mut TestRng::default();
+        // Sample a committee.
+        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        // Initialize the storage.
+        let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
+        // Setup the mock gateway and ledger.
+        let gateway = MockGateway::default();
+        let mut mock_ledger = MockLedger::default();
+        mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
+        mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
+        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+
+        // Create the Worker.
+        let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
+        let transmission_id = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
+        let transmission = Transmission::Solution(data(rng));
+
+        // Process the transmission.
+        worker.process_transmission_from_peer(peer_ip, transmission_id, transmission.clone());
+        assert!(worker.contains_transmission(transmission_id));
+        assert!(worker.ready.contains(transmission_id));
+        assert_eq!(worker.get_transmission(transmission_id), Some(transmission));
+        // Take the transmission from the ready set.
+        let transmission: Vec<_> = worker.take_candidates(1).await.collect();
+        assert_eq!(transmission.len(), 1);
+        assert!(!worker.ready.contains(transmission_id));
+    }
+
+    #[tokio::test]
+    async fn test_send_transmission() {
+        let rng = &mut TestRng::default();
+        // Sample a committee.
+        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        // Initialize the storage.
+        let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
+        // Setup the mock gateway and ledger.
+        let mut gateway = MockGateway::default();
+        gateway.expect_send().returning(|_, _| ());
+        let ledger: Ledger<CurrentNetwork> = Arc::new(MockLedger::new());
+
+        // Create the Worker.
+        let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let transmission_id = TransmissionID::Solution(PuzzleCommitment::from_g1_affine(rng.gen()));
+        let worker_ = worker.clone();
+        let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
+        let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
+        assert!(worker.pending.contains(transmission_id));
+        let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
+        // Fake the transmission response.
+        worker.finish_transmission_request(peer_ip, TransmissionResponse {
+            transmission_id,
+            transmission: Transmission::Solution(Data::Buffer(Bytes::from(vec![0; 512]))),
+        });
+        // Check the transmission was removed from the pending set.
+        assert!(!worker.pending.contains(transmission_id));
+    }
+
+    #[tokio::test]
+    async fn test_process_solution_ok() {
+        let rng = &mut TestRng::default();
+        // Sample a committee.
+        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        // Initialize the storage.
+        let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
+        // Setup the mock gateway and ledger.
+        let mut gateway = MockGateway::default();
+        gateway.expect_send().returning(|_, _| ());
+        let mut mock_ledger = MockLedger::default();
+        mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
+        mock_ledger.expect_check_solution_basic().returning(|_, _| Ok(()));
+        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+
+        // Create the Worker.
+        let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let puzzle = PuzzleCommitment::from_g1_affine(rng.gen());
+        let transmission_id = TransmissionID::Solution(puzzle);
+        let worker_ = worker.clone();
+        let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
+        let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
+        assert!(worker.pending.contains(transmission_id));
+        let result = worker
+            .process_unconfirmed_solution(
+                puzzle,
+                Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>())),
+            )
+            .await;
+        assert!(result.is_ok());
+        assert!(!worker.pending.contains(transmission_id));
+        assert!(worker.ready.contains(puzzle));
+    }
+
+    #[tokio::test]
+    async fn test_process_solution_nok() {
+        let rng = &mut TestRng::default();
+        // Sample a committee.
+        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        // Initialize the storage.
+        let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
+        // Setup the mock gateway and ledger.
+        let mut gateway = MockGateway::default();
+        gateway.expect_send().returning(|_, _| ());
+        let mut mock_ledger = MockLedger::default();
+        mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
+        mock_ledger.expect_check_solution_basic().returning(|_, _| Err(anyhow!("")));
+        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+
+        // Create the Worker.
+        let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let puzzle = PuzzleCommitment::from_g1_affine(rng.gen());
+        let transmission_id = TransmissionID::Solution(puzzle);
+        let worker_ = worker.clone();
+        let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
+        let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
+        assert!(worker.pending.contains(transmission_id));
+        let result = worker
+            .process_unconfirmed_solution(
+                puzzle,
+                Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>())),
+            )
+            .await;
+        assert!(result.is_err());
+        assert!(!worker.pending.contains(puzzle));
+        assert!(!worker.ready.contains(puzzle));
+    }
+
+    #[tokio::test]
+    async fn test_process_transaction_ok() {
+        let mut rng = &mut TestRng::default();
+        // Sample a committee.
+        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        // Initialize the storage.
+        let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
+        // Setup the mock gateway and ledger.
+        let mut gateway = MockGateway::default();
+        gateway.expect_send().returning(|_, _| ());
+        let mut mock_ledger = MockLedger::default();
+        mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
+        mock_ledger.expect_check_transaction_basic().returning(|_, _| Ok(()));
+        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+
+        // Create the Worker.
+        let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
+        let transmission_id = TransmissionID::Transaction(transaction_id);
+        let worker_ = worker.clone();
+        let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
+        let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
+        assert!(worker.pending.contains(transmission_id));
+        let result = worker
+            .process_unconfirmed_transaction(
+                transaction_id,
+                Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>())),
+            )
+            .await;
+        assert!(result.is_ok());
+        assert!(!worker.pending.contains(transmission_id));
+        assert!(worker.ready.contains(transmission_id));
+    }
+
+    #[tokio::test]
+    async fn test_process_transaction_nok() {
+        let mut rng = &mut TestRng::default();
+        // Sample a committee.
+        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        // Initialize the storage.
+        let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
+        // Setup the mock gateway and ledger.
+        let mut gateway = MockGateway::default();
+        gateway.expect_send().returning(|_, _| ());
+        let mut mock_ledger = MockLedger::default();
+        mock_ledger.expect_contains_transmission().returning(|_| Ok(false));
+        mock_ledger.expect_check_transaction_basic().returning(|_, _| Err(anyhow!("")));
+        let ledger: Ledger<CurrentNetwork> = Arc::new(mock_ledger);
+
+        // Create the Worker.
+        let worker = Worker::new(1, Arc::new(gateway), storage, ledger, Default::default()).unwrap();
+        let transaction_id: <CurrentNetwork as Network>::TransactionID = Field::<CurrentNetwork>::rand(&mut rng).into();
+        let transmission_id = TransmissionID::Transaction(transaction_id);
+        let worker_ = worker.clone();
+        let peer_ip = SocketAddr::from(([127, 0, 0, 1], 1234));
+        let _ = worker_.send_transmission_request(peer_ip, transmission_id).await;
+        assert!(worker.pending.contains(transmission_id));
+        let result = worker
+            .process_unconfirmed_transaction(
+                transaction_id,
+                Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>())),
+            )
+            .await;
+        assert!(result.is_err());
+        assert!(!worker.pending.contains(transmission_id));
+        assert!(!worker.ready.contains(transmission_id));
+    }
+}
