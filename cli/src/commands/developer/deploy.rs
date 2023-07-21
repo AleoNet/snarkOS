@@ -12,19 +12,24 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{CurrentNetwork, Developer};
+use super::{CurrentAleo, CurrentNetwork, Developer};
 
-use snarkvm::prelude::{
-    query::Query,
-    store::{helpers::memory::ConsensusMemory, ConsensusStore},
-    Plaintext,
-    PrivateKey,
-    ProgramID,
-    Record,
-    VM,
+use snarkvm::{
+    console::program::ProgramOwner,
+    prelude::{
+        block::Transaction,
+        deployment_cost,
+        query::Query,
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+        Plaintext,
+        PrivateKey,
+        ProgramID,
+        Record,
+        VM,
+    },
 };
 
-use anyhow::{bail, Result};
+use anyhow::{anyhow, bail, Result};
 use clap::Parser;
 use colored::Colorize;
 use std::str::FromStr;
@@ -43,9 +48,9 @@ pub struct Deploy {
     /// The endpoint to query node state from.
     #[clap(short, long)]
     query: String,
-    /// The deployment fee in microcredits.
+    /// The additional fee in microcredits.
     #[clap(short, long)]
-    fee: u64,
+    additional_fee: u64,
     /// The record to spend the fee from.
     #[clap(short, long)]
     record: String,
@@ -69,18 +74,22 @@ impl Deploy {
         }
 
         // Specify the query
-        let query = Query::from(self.query);
+        let query = Query::from(&self.query);
 
         // Retrieve the private key.
         let private_key = PrivateKey::from_str(&self.private_key)?;
 
-        // Fetch the program from the directory.
-        let program = Developer::parse_program(self.program_id, self.path)?;
+        // Fetch the package from the directory.
+        let package = Developer::parse_package(self.program_id, self.path)?;
 
         println!("📦 Creating deployment transaction for '{}'...\n", &self.program_id.to_string().bold());
 
+        // Generate the deployment
+        let deployment = package.deploy::<CurrentAleo>(Some(self.query))?;
+        let deployment_id = deployment.to_deployment_id()?;
+
         // Generate the deployment transaction.
-        let deployment = {
+        let deployment_transaction = {
             // Initialize an RNG.
             let rng = &mut rand::thread_rng();
 
@@ -88,16 +97,34 @@ impl Deploy {
             let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
 
+            // Compute the minimum deployment cost.
+            let (minimum_deployment_cost, (_, _)) = deployment_cost(&deployment)?;
+            // Determine the fee.
+            let fee_in_microcredits = minimum_deployment_cost
+                .checked_add(self.additional_fee)
+                .ok_or_else(|| anyhow!("Fee overflowed for a deployment transaction"))?;
+
             // Prepare the fees.
-            let fee = (Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.record)?, self.fee);
+            let fee_record = Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.record)?;
+            let (_, fee) =
+                vm.execute_fee_raw(&private_key, fee_record, fee_in_microcredits, deployment_id, Some(query), rng)?;
+
+            // Construct the owner.
+            let owner = ProgramOwner::new(&private_key, deployment_id, rng)?;
 
             // Create a new transaction.
-            vm.deploy(&private_key, &program, fee, Some(query), rng)?
+            Transaction::from_deployment(owner, deployment, fee)?
         };
         println!("✅ Created deployment transaction for '{}'", self.program_id.to_string().bold());
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
-        Developer::handle_transaction(self.broadcast, self.dry_run, self.store, deployment, self.program_id.to_string())
+        Developer::handle_transaction(
+            self.broadcast,
+            self.dry_run,
+            self.store,
+            deployment_transaction,
+            self.program_id.to_string(),
+        )
     }
 }
 
@@ -128,7 +155,7 @@ mod tests {
             assert_eq!(deploy.program_id, "hello.aleo".try_into().unwrap());
             assert_eq!(deploy.private_key, "PRIVATE_KEY");
             assert_eq!(deploy.query, "QUERY");
-            assert_eq!(deploy.fee, 77);
+            assert_eq!(deploy.additional_fee, 77);
             assert_eq!(deploy.record, "RECORD");
         } else {
             panic!("Unexpected result of clap parsing!");

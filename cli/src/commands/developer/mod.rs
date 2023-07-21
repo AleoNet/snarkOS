@@ -28,7 +28,6 @@ mod transfer_private;
 pub use transfer_private::*;
 
 use snarkvm::{
-    file::{AleoFile, Manifest},
     package::Package,
     prelude::{block::Transaction, Program, ProgramID, ToBytes},
 };
@@ -38,6 +37,7 @@ use clap::Parser;
 use colored::Colorize;
 use std::{path::PathBuf, str::FromStr};
 
+type CurrentAleo = snarkvm::circuit::AleoV0;
 type CurrentNetwork = snarkvm::prelude::Testnet3;
 
 /// Commands to manage Aleo accounts.
@@ -66,52 +66,24 @@ impl Developer {
         }
     }
 
-    /// Parse the program from the directory.
-    fn parse_program(program_id: ProgramID<CurrentNetwork>, path: Option<String>) -> Result<Program<CurrentNetwork>> {
+    /// Parse the package from the directory.
+    fn parse_package(program_id: ProgramID<CurrentNetwork>, path: Option<String>) -> Result<Package<CurrentNetwork>> {
         // Instantiate a path to the directory containing the manifest file.
         let directory = match path {
             Some(path) => PathBuf::from_str(&path)?,
             None => std::env::current_dir()?,
         };
 
-        // Ensure the directory path exists.
-        ensure!(directory.exists(), "The program directory does not exist: {}", directory.display());
-        // Ensure the manifest file exists.
-        ensure!(
-            Manifest::<CurrentNetwork>::exists_at(&directory),
-            "Please ensure that the manifest file exists in the Aleo program directory (missing '{}' at '{}')",
-            Manifest::<CurrentNetwork>::file_name(),
-            directory.display()
-        );
-
-        // Open the manifest file.
-        let manifest = Manifest::<CurrentNetwork>::open(&directory)?;
-        ensure!(
-            manifest.program_id() == &program_id,
-            "The program name in the manifest file does not match the specified program name"
-        );
-
         // Load the package.
         let package = Package::open(&directory)?;
-        // Load the main program.
-        let program = package.program();
-        // Prepare the imports directory.
-        let imports_directory = package.imports_directory();
 
-        // TODO (raychu86): Handle additional checks in consensus.
-        // Find the program that is being deployed.
-        let program = match program.imports().keys().find(|id| **id == program_id) {
-            Some(program_id) => {
-                let file = AleoFile::open(&imports_directory, program_id, false)?;
-                file.program().clone()
-            }
-            None => match program_id == *program.id() {
-                true => program.clone(),
-                false => bail!("The program '{}' does not exist in {}", program_id, directory.display()),
-            },
-        };
+        ensure!(
+            package.program_id() == &program_id,
+            "The program name in the package does not match the specified program name"
+        );
 
-        Ok(program)
+        // Return the package.
+        Ok(package)
     }
 
     /// Determine if the transaction should be broadcast or displayed to user.
