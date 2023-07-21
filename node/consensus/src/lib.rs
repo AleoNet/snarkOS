@@ -25,7 +25,14 @@ pub use memory_pool::*;
 
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
-    helpers::{init_consensus_channels, ConsensusReceiver, PrimaryReceiver, PrimarySender, Storage as NarwhalStorage},
+    helpers::{
+        fmt_id,
+        init_consensus_channels,
+        ConsensusReceiver,
+        PrimaryReceiver,
+        PrimarySender,
+        Storage as NarwhalStorage,
+    },
     BFT,
     MAX_GC_ROUNDS,
 };
@@ -35,7 +42,7 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
-        narwhal::{Data, Transmission, TransmissionID},
+        narwhal::{BatchCertificate, Data, Transmission, TransmissionID},
         store::ConsensusStorage,
     },
     prelude::*,
@@ -45,7 +52,7 @@ use ::rand::thread_rng;
 use anyhow::Result;
 use indexmap::IndexMap;
 use parking_lot::Mutex;
-use std::{future::Future, sync::Arc};
+use std::{collections::BTreeMap, future::Future, sync::Arc};
 use tokio::{
     sync::{oneshot, OnceCell},
     task::JoinHandle,
@@ -170,19 +177,6 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
-    /// Adds the given unconfirmed transaction to the memory pool.
-    pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
-        // Initialize a callback sender and receiver.
-        let (callback, callback_receiver) = oneshot::channel();
-        // Send the transaction to the primary.
-        self.primary_sender()
-            .tx_unconfirmed_transaction
-            .send((transaction.id(), Data::Object(transaction), callback))
-            .await?;
-        // Return the callback.
-        callback_receiver.await?
-    }
-
     /// Adds the given unconfirmed solution to the memory pool.
     pub async fn add_unconfirmed_solution(&self, solution: ProverSolution<N>) -> Result<()> {
         // Initialize a callback sender and receiver.
@@ -195,6 +189,19 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Return the callback.
         callback_receiver.await?
     }
+
+    /// Adds the given unconfirmed transaction to the memory pool.
+    pub async fn add_unconfirmed_transaction(&self, transaction: Transaction<N>) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback, callback_receiver) = oneshot::channel();
+        // Send the transaction to the primary.
+        self.primary_sender()
+            .tx_unconfirmed_transaction
+            .send((transaction.id(), Data::Object(transaction), callback))
+            .await?;
+        // Return the callback.
+        callback_receiver.await?
+    }
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
@@ -203,12 +210,77 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         let ConsensusReceiver { mut rx_consensus_subdag } = consensus_receiver;
 
         // Process the committed subdag and transmissions from the BFT.
-        let _self_ = self.clone();
+        let self_ = self.clone();
         self.spawn(async move {
-            while let Some((_committed_subdag, _transmissions)) = rx_consensus_subdag.recv().await {
-                // TODO (howardwu): Prepare to create a new block.
+            while let Some((committed_subdag, transmissions)) = rx_consensus_subdag.recv().await {
+                self_.process_bft_subdag(committed_subdag, transmissions).await;
             }
         });
+    }
+
+    /// Processes the committed subdag and transmissions from the BFT.
+    async fn process_bft_subdag(
+        &self,
+        committed_subdag: BTreeMap<u64, Vec<BatchCertificate<N>>>,
+        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+    ) {
+        // Try to advance to the next block.
+        if let Err(e) = self.try_advance_to_next_block(committed_subdag, transmissions.clone()) {
+            error!("Unable to advance to the next block - {e}");
+            // On failure, reinsert the transmissions into the memory pool.
+            self.reinsert_transmissions(transmissions).await;
+        }
+    }
+
+    /// Attempts to advance to the next block.
+    fn try_advance_to_next_block(
+        &self,
+        committed_subdag: BTreeMap<u64, Vec<BatchCertificate<N>>>,
+        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+    ) -> Result<()> {
+        // Create the candidate next block.
+        let next_block = self.ledger.prepare_advance_to_next_block_with_bft(committed_subdag, transmissions)?;
+        // Check that the block is well-formed.
+        self.ledger.check_next_block(&next_block)?;
+        // Advance to the next block.
+        self.ledger.advance_to_next_block(&next_block)?;
+        Ok(())
+    }
+
+    /// Reinserts the given transmissions into the memory pool.
+    async fn reinsert_transmissions(&self, transmissions: IndexMap<TransmissionID<N>, Transmission<N>>) {
+        // Iterate over the transmissions.
+        for (transmission_id, transmission) in transmissions.into_iter() {
+            // Reinsert the transmission into the memory pool.
+            if let Err(e) = self.reinsert_transmission(transmission_id, transmission).await {
+                warn!("Unable to reinsert transmission {} into the memory pool - {e}", fmt_id(transmission_id));
+            }
+        }
+    }
+
+    /// Reinserts the given transmission into the memory pool.
+    async fn reinsert_transmission(
+        &self,
+        transmission_id: TransmissionID<N>,
+        transmission: Transmission<N>,
+    ) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback, callback_receiver) = oneshot::channel();
+        // Send the transmission to the primary.
+        match (transmission_id, transmission) {
+            (TransmissionID::Ratification, Transmission::Ratification) => return Ok(()),
+            (TransmissionID::Solution(commitment), Transmission::Solution(solution)) => {
+                // Send the solution to the primary.
+                self.primary_sender().tx_unconfirmed_solution.send((commitment, solution, callback)).await?;
+            }
+            (TransmissionID::Transaction(transaction_id), Transmission::Transaction(transaction)) => {
+                // Send the transaction to the primary.
+                self.primary_sender().tx_unconfirmed_transaction.send((transaction_id, transaction, callback)).await?;
+            }
+            _ => bail!("Mismatching `(transmission_id, transmission)` pair in consensus"),
+        }
+        // Await the callback.
+        callback_receiver.await?
     }
 
     /// Spawns a task with the given future; it should only be used for long-running tasks.
