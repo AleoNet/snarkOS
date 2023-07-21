@@ -17,7 +17,12 @@ use super::{CurrentNetwork, Developer, Program};
 use snarkvm::prelude::{
     query::Query,
     store::{helpers::memory::ConsensusMemory, ConsensusStore},
-    Identifier, Locator, Plaintext, PrivateKey, ProgramID, Record, Value, VM,
+    Identifier,
+    Locator,
+    PrivateKey,
+    ProgramID,
+    Value,
+    VM,
 };
 
 use anyhow::{bail, Result};
@@ -100,10 +105,10 @@ impl Execute {
 
             // Prepare the fees.
             let fee = match self.record {
-                Some(record) => Some((
-                    Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&record)?,
-                    self.priority_fee.unwrap_or(0),
-                )),
+                Some(record_string) => {
+                    let fee_record = Developer::parse_record(&private_key, &record_string)?;
+                    Some((fee_record, self.priority_fee.unwrap_or(0)))
+                }
                 None => {
                     // Ensure that only the `credits.aleo/split` call can be created without a fee.
                     if program.id() != &ProgramID::from_str("credits.aleo")?

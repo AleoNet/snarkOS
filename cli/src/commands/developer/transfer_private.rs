@@ -19,9 +19,7 @@ use snarkvm::prelude::{
     store::{helpers::memory::ConsensusMemory, ConsensusStore},
     Address,
     Locator,
-    Plaintext,
     PrivateKey,
-    Record,
     Value,
     VM,
 };
@@ -35,7 +33,7 @@ use std::str::FromStr;
 pub struct TransferPrivate {
     /// The input record used to craft the transfer.
     #[clap(long)]
-    input_record: Record<CurrentNetwork, Plaintext<CurrentNetwork>>,
+    input_record: String,
     /// The recipient address.
     #[clap(long)]
     recipient: Address<CurrentNetwork>,
@@ -92,12 +90,13 @@ impl TransferPrivate {
             let vm = VM::from(store)?;
 
             // Prepare the fees.
-            let fee =
-                (Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.fee_record)?, self.priority_fee);
+            let fee_record = Developer::parse_record(&private_key, &self.fee_record)?;
+            let fee = (fee_record, self.priority_fee);
 
             // Prepare the inputs for a transfer.
+            let input_record = Developer::parse_record(&private_key, &self.input_record)?;
             let inputs = vec![
-                Value::Record(self.input_record.clone()),
+                Value::Record(input_record),
                 Value::from_str(&format!("{}", self.recipient))?,
                 Value::from_str(&format!("{}u64", self.amount))?,
             ];

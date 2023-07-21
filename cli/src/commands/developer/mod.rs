@@ -29,7 +29,7 @@ pub use transfer_private::*;
 
 use snarkvm::{
     package::Package,
-    prelude::{block::Transaction, Program, ProgramID, ToBytes},
+    prelude::{block::Transaction, Ciphertext, Plaintext, PrivateKey, Program, ProgramID, Record, ToBytes, ViewKey},
 };
 
 use anyhow::{bail, ensure, Result};
@@ -84,6 +84,24 @@ impl Developer {
 
         // Return the package.
         Ok(package)
+    }
+
+    /// Parses the record string. If the string is a plaintext, then attempt to decrypt it.
+    fn parse_record(
+        private_key: &PrivateKey<CurrentNetwork>,
+        record: &str,
+    ) -> Result<Record<CurrentNetwork, Plaintext<CurrentNetwork>>> {
+        match record.starts_with("record1") {
+            true => {
+                // Parse the ciphertext.
+                let ciphertext = Record::<CurrentNetwork, Ciphertext<CurrentNetwork>>::from_str(record)?;
+                // Derive the view key.
+                let view_key = ViewKey::try_from(private_key)?;
+                // Decrypt the ciphertext.
+                ciphertext.decrypt(&view_key)
+            }
+            false => Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(record),
+        }
     }
 
     /// Determine if the transaction should be broadcast or displayed to user.

@@ -21,10 +21,8 @@ use snarkvm::{
         deployment_cost,
         query::Query,
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
-        Plaintext,
         PrivateKey,
         ProgramID,
-        Record,
         VM,
     },
 };
@@ -105,7 +103,7 @@ impl Deploy {
                 .ok_or_else(|| anyhow!("Fee overflowed for a deployment transaction"))?;
 
             // Prepare the fees.
-            let fee_record = Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.record)?;
+            let fee_record = Developer::parse_record(&private_key, &self.record)?;
             let (_, fee) =
                 vm.execute_fee_raw(&private_key, fee_record, fee_in_microcredits, deployment_id, Some(query), rng)?;
 
