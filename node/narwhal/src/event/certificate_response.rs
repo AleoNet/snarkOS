@@ -36,8 +36,8 @@ impl<N: Network> From<BatchCertificate<N>> for CertificateResponse<N> {
 impl<N: Network> EventTrait for CertificateResponse<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> String {
-        "CertificateResponse".to_string()
+    fn name(&self) -> &'static str {
+        "CertificateResponse"
     }
 
     /// Serializes the event into the buffer.

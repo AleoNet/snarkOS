@@ -37,8 +37,8 @@ impl<N: Network> From<(TransmissionID<N>, Transmission<N>)> for TransmissionResp
 impl<N: Network> EventTrait for TransmissionResponse<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> String {
-        "TransmissionResponse".to_string()
+    fn name(&self) -> &'static str {
+        "TransmissionResponse"
     }
 
     /// Serializes the event into the buffer.

@@ -37,8 +37,8 @@ impl<N: Network> From<BatchHeader<N>> for BatchPropose<N> {
 impl<N: Network> EventTrait for BatchPropose<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> String {
-        "BatchPropose".to_string()
+    fn name(&self) -> &'static str {
+        "BatchPropose"
     }
 
     /// Serializes the event into the buffer.

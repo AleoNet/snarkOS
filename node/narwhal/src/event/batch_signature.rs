@@ -31,8 +31,8 @@ impl<N: Network> BatchSignature<N> {
 impl<N: Network> EventTrait for BatchSignature<N> {
     /// Returns the event name.
     #[inline]
-    fn name(&self) -> String {
-        "BatchSignature".to_string()
+    fn name(&self) -> &'static str {
+        "BatchSignature"
     }
 
     /// Serializes the event into the buffer.
