@@ -48,7 +48,7 @@ pub struct Deploy {
     query: String,
     /// The priority fee in microcredits.
     #[clap(short, long)]
-    priority_fee: u64,
+    fee: u64,
     /// The record to spend the fee from.
     #[clap(short, long)]
     record: String,
@@ -99,7 +99,7 @@ impl Deploy {
             let (minimum_deployment_cost, (_, _)) = deployment_cost(&deployment)?;
             // Determine the fee.
             let fee_in_microcredits = minimum_deployment_cost
-                .checked_add(self.priority_fee)
+                .checked_add(self.fee)
                 .ok_or_else(|| anyhow!("Fee overflowed for a deployment transaction"))?;
 
             // Prepare the fees.
@@ -153,7 +153,7 @@ mod tests {
             assert_eq!(deploy.program_id, "hello.aleo".try_into().unwrap());
             assert_eq!(deploy.private_key, "PRIVATE_KEY");
             assert_eq!(deploy.query, "QUERY");
-            assert_eq!(deploy.priority_fee, 77);
+            assert_eq!(deploy.fee, 77);
             assert_eq!(deploy.record, "RECORD");
         } else {
             panic!("Unexpected result of clap parsing!");

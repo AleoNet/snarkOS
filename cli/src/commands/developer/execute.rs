@@ -47,7 +47,7 @@ pub struct Execute {
     query: String,
     /// The priority fee in microcredits.
     #[clap(short, long)]
-    priority_fee: Option<u64>,
+    fee: Option<u64>,
     /// The record to spend the fee from.
     #[clap(short, long)]
     record: Option<String>,
@@ -107,7 +107,7 @@ impl Execute {
             let fee = match self.record {
                 Some(record_string) => {
                     let fee_record = Developer::parse_record(&private_key, &record_string)?;
-                    Some((fee_record, self.priority_fee.unwrap_or(0)))
+                    Some((fee_record, self.fee.unwrap_or(0)))
                 }
                 None => {
                     // Ensure that only the `credits.aleo/split` call can be created without a fee.
@@ -159,7 +159,7 @@ mod tests {
         if let Command::Developer(Developer::Execute(execute)) = cli.command {
             assert_eq!(execute.private_key, "PRIVATE_KEY");
             assert_eq!(execute.query, "QUERY");
-            assert_eq!(execute.priority_fee, Some(77));
+            assert_eq!(execute.fee, Some(77));
             assert_eq!(execute.record, Some("RECORD".into()));
             assert_eq!(execute.program_id, "hello.aleo".try_into().unwrap());
             assert_eq!(execute.function, "hello".try_into().unwrap());
