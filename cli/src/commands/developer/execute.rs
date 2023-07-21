@@ -103,6 +103,11 @@ impl Execute {
             let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
 
+            // Add the program to the process if it does not already exist.
+            if !vm.contains_program(program.id()) {
+                vm.process().write().add_program(&program)?;
+            }
+
             // Prepare the fees.
             let fee = match self.record {
                 Some(record_string) => {
