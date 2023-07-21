@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use super::{CurrentNetwork, Developer, Program};
+use super::{CurrentNetwork, Developer};
 
 use snarkvm::prelude::{
     query::Query,
@@ -20,6 +20,7 @@ use snarkvm::prelude::{
     Identifier,
     Locator,
     PrivateKey,
+    Process,
     ProgramID,
     Value,
     VM,
@@ -77,20 +78,6 @@ impl Execute {
         // Retrieve the private key.
         let private_key = PrivateKey::from_str(&self.private_key)?;
 
-        // Send a request to the query node.
-        let response = ureq::get(&format!("{}/testnet3/program/{}", self.query, self.program_id)).call();
-
-        // Deserialize the program.
-        let program: Program<CurrentNetwork> = match response {
-            Ok(response) => response.into_json()?,
-            Err(err) => match err {
-                ureq::Error::Status(_status, response) => {
-                    bail!(response.into_string().unwrap_or("Response too large!".to_owned()))
-                }
-                err => bail!(err),
-            },
-        };
-
         let locator = Locator::<CurrentNetwork>::from_str(&format!("{}/{}", self.program_id, self.function))?;
         println!("📦 Creating execution transaction for '{}'...\n", &locator.to_string().bold());
 
@@ -103,10 +90,8 @@ impl Execute {
             let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
 
-            // Add the program to the process if it does not already exist.
-            if !vm.contains_program(program.id()) {
-                vm.process().write().add_program(&program)?;
-            }
+            // Load the program and it's imports into the process.
+            load_program(&self.query, &mut vm.process().write(), &self.program_id)?;
 
             // Prepare the fees.
             let fee = match self.record {
@@ -116,7 +101,7 @@ impl Execute {
                 }
                 None => {
                     // Ensure that only the `credits.aleo/split` call can be created without a fee.
-                    if program.id() != &ProgramID::from_str("credits.aleo")?
+                    if self.program_id != ProgramID::from_str("credits.aleo")?
                         && self.function != Identifier::from_str("split")?
                     {
                         bail!("❌ A record must be provided to pay for the transaction fee.");
@@ -133,6 +118,37 @@ impl Execute {
         // Determine if the transaction should be broadcast, stored, or displayed to user.
         Developer::handle_transaction(self.broadcast, self.dry_run, self.store, transaction, locator.to_string())
     }
+}
+
+/// A helper function to recursively load the program and all of its imports into the process.
+fn load_program(
+    endpoint: &str,
+    process: &mut Process<CurrentNetwork>,
+    program_id: &ProgramID<CurrentNetwork>,
+) -> Result<()> {
+    // Fetch the program.
+    let program = Developer::fetch_program(program_id, endpoint)?;
+
+    // Return early if the program is already loaded.
+    if process.contains_program(program.id()) {
+        return Ok(());
+    }
+
+    // Iterate through the program imports.
+    for import_program_id in program.imports().keys() {
+        // Add the imports to the process if does not exist yet.
+        if !process.contains_program(import_program_id) {
+            // Recursively load the program and its imports.
+            load_program(endpoint, process, import_program_id)?;
+        }
+    }
+
+    // Add the program to the process if it does not already exist.
+    if !process.contains_program(program.id()) {
+        process.add_program(&program)?;
+    }
+
+    Ok(())
 }
 
 #[cfg(test)]

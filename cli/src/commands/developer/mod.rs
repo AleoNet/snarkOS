@@ -104,6 +104,23 @@ impl Developer {
         }
     }
 
+    /// Fetch the program from the given endpoint.
+    fn fetch_program(program_id: &ProgramID<CurrentNetwork>, endpoint: &str) -> Result<Program<CurrentNetwork>> {
+        // Send a request to the query node.
+        let response = ureq::get(&format!("{endpoint}/testnet3/program/{program_id}")).call();
+
+        // Deserialize the program.
+        match response {
+            Ok(response) => response.into_json().map_err(|err| err.into()),
+            Err(err) => match err {
+                ureq::Error::Status(_status, response) => {
+                    bail!(response.into_string().unwrap_or("Response too large!".to_owned()))
+                }
+                err => bail!(err),
+            },
+        }
+    }
+
     /// Determine if the transaction should be broadcast or displayed to user.
     fn handle_transaction(
         broadcast: Option<String>,
