@@ -36,7 +36,7 @@ num_nodes=${2:-$default_num_nodes}
 
 # Loop to open terminal windows and execute the command
 for ((i = 0; i < num_nodes; i++)); do
-	FULL_COMMAND="$command -- --mode $mode --node-id $i --num-nodes $num_nodes --fire-cannons"
+	FULL_COMMAND="$command -- --mode $mode --id $i --num-nodes $num_nodes --fire-transmissions"
 
 	if [[ "$terminal_app" == "iTerm" ]]; then
 		osascript -e "tell application \"$terminal_app\" to create window with default profile"

@@ -416,16 +416,22 @@ struct Args {
     mode: Mode,
     /// The ID of the node.
     #[arg(long, value_name = "ID")]
-    node_id: u16,
+    id: u16,
     /// The number of nodes in the network.
     #[arg(long, value_name = "N")]
     num_nodes: u16,
     /// If set, the path to the file containing the committee configuration.
     #[arg(long, value_name = "PATH")]
     config: Option<PathBuf>,
-    /// Enables the tx and solution cannons, and optionally the interval in ms to run them on.
+    /// Enables the solution cannons, and optionally the interval in ms to run them on.
     #[arg(long, value_name = "INTERVAL_MS")]
-    fire_cannons: Option<Option<u64>>,
+    fire_solutions: Option<Option<u64>>,
+    /// Enables the transaction cannons, and optionally the interval in ms to run them on.
+    #[arg(long, value_name = "INTERVAL_MS")]
+    fire_transactions: Option<Option<u64>>,
+    /// Enables the solution and transaction cannons, and optionally the interval in ms to run them on.
+    #[arg(long, value_name = "INTERVAL_MS")]
+    fire_transmissions: Option<Option<u64>>,
 }
 
 /// A helper method to parse the peers provided to the CLI.
@@ -462,32 +468,50 @@ async fn main() -> Result<()> {
     let (primary, sender) = match args.mode {
         Mode::Bft => {
             // Start the BFT.
-            let (bft, sender) = start_bft(args.node_id, args.num_nodes, peers).await?;
+            let (bft, sender) = start_bft(args.id, args.num_nodes, peers).await?;
             // Set the BFT holder.
             bft_holder = Some(bft.clone());
             // Return the primary and sender.
             (bft.primary().clone(), sender)
         }
-        Mode::Narwhal => start_primary(args.node_id, args.num_nodes, peers).await?,
+        Mode::Narwhal => start_primary(args.id, args.num_nodes, peers).await?,
     };
 
-    // Fire unconfirmed solutions.
     const DEFAULT_INTERVAL_MS: u64 = 450;
-    let interval_ms = match args.fire_cannons {
-        Some(Some(interval)) => Some(interval),
-        Some(None) => Some(DEFAULT_INTERVAL_MS),
-        None => None,
-    };
 
-    if let Some(interval_ms) = interval_ms {
-        // Fire unconfirmed solutions.
-        fire_unconfirmed_solutions(&sender, args.node_id, interval_ms);
-        // Fire unconfirmed transactions.
-        fire_unconfirmed_transactions(&sender, args.node_id, interval_ms);
+    // Set the interval in milliseconds for the solution and transaction cannons.
+    let (solution_interval_ms, transaction_interval_ms) =
+        match (args.fire_transmissions, args.fire_solutions, args.fire_transactions) {
+            // Set the solution and transaction intervals to the same value.
+            (Some(fire_transmissions), _, _) => (
+                Some(fire_transmissions.unwrap_or(DEFAULT_INTERVAL_MS)),
+                Some(fire_transmissions.unwrap_or(DEFAULT_INTERVAL_MS)),
+            ),
+            // Set the solution and transaction intervals to their configured values.
+            (None, Some(fire_solutions), Some(fire_transactions)) => (
+                Some(fire_solutions.unwrap_or(DEFAULT_INTERVAL_MS)),
+                Some(fire_transactions.unwrap_or(DEFAULT_INTERVAL_MS)),
+            ),
+            // Set only the solution interval.
+            (None, Some(fire_solutions), None) => (Some(fire_solutions.unwrap_or(DEFAULT_INTERVAL_MS)), None),
+            // Set only the transaction interval.
+            (None, None, Some(fire_transactions)) => (None, Some(fire_transactions.unwrap_or(DEFAULT_INTERVAL_MS))),
+            // Don't fire any solutions or transactions.
+            _ => (None, None),
+        };
+
+    // Fire solutions.
+    if let Some(interval_ms) = solution_interval_ms {
+        fire_unconfirmed_solutions(&sender, args.id, interval_ms);
+    }
+
+    // Fire transactions.
+    if let Some(interval_ms) = transaction_interval_ms {
+        fire_unconfirmed_transactions(&sender, args.id, interval_ms);
     }
 
     // Start the monitoring server.
-    start_server(bft_holder, primary, args.node_id).await;
+    start_server(bft_holder, primary, args.id).await;
     // // Note: Do not move this.
     // std::future::pending::<()>().await;
     Ok(())
