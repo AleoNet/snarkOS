@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-env"
-version = "2.1.4"
+version = "2.1.5"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Execution environment information for snarkOS"
 homepage = "https://aleo.org"
