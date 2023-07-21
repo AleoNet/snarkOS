@@ -48,9 +48,9 @@ pub struct TransferPrivate {
     /// The endpoint to query node state from.
     #[clap(short, long)]
     query: String,
-    /// The transaction fee in microcredits.
+    /// The priority fee in microcredits.
     #[clap(short, long)]
-    fee: u64,
+    priority_fee: u64,
     /// The record to spend the fee from.
     #[clap(long)]
     fee_record: String,
@@ -92,7 +92,8 @@ impl TransferPrivate {
             let vm = VM::from(store)?;
 
             // Prepare the fees.
-            let fee = (Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.fee_record)?, self.fee);
+            let fee =
+                (Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.fee_record)?, self.priority_fee);
 
             // Prepare the inputs for a transfer.
             let inputs = vec![

@@ -47,9 +47,9 @@ pub struct Execute {
     /// The endpoint to query node state from.
     #[clap(short, long)]
     query: String,
-    /// The transaction fee in microcredits.
+    /// The priority fee in microcredits.
     #[clap(short, long)]
-    fee: Option<u64>,
+    priority_fee: Option<u64>,
     /// The record to spend the fee from.
     #[clap(short, long)]
     record: Option<String>,
@@ -116,7 +116,7 @@ impl Execute {
             let fee = match self.record {
                 Some(record) => Some((
                     Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&record)?,
-                    self.fee.unwrap_or(0),
+                    self.priority_fee.unwrap_or(0),
                 )),
                 None => {
                     // Ensure that only the `credits.aleo/split` call can be created without a fee.
@@ -166,7 +166,7 @@ mod tests {
         if let Command::Developer(Developer::Execute(execute)) = cli.command {
             assert_eq!(execute.private_key, "PRIVATE_KEY");
             assert_eq!(execute.query, "QUERY");
-            assert_eq!(execute.fee, Some(77));
+            assert_eq!(execute.priority_fee, Some(77));
             assert_eq!(execute.record, Some("RECORD".into()));
             assert_eq!(execute.program_id, "hello.aleo".try_into().unwrap());
             assert_eq!(execute.function, "hello".try_into().unwrap());
