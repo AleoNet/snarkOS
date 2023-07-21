@@ -17,14 +17,7 @@ use super::{CurrentNetwork, Developer, Program};
 use snarkvm::prelude::{
     query::Query,
     store::{helpers::memory::ConsensusMemory, ConsensusStore},
-    Identifier,
-    Locator,
-    Plaintext,
-    PrivateKey,
-    ProgramID,
-    Record,
-    Value,
-    VM,
+    Identifier, Locator, Plaintext, PrivateKey, ProgramID, Record, Value, VM,
 };
 
 use anyhow::{bail, Result};
@@ -97,20 +90,13 @@ impl Execute {
         println!("📦 Creating execution transaction for '{}'...\n", &locator.to_string().bold());
 
         // Generate the execution transaction.
-        let execution = {
+        let transaction = {
             // Initialize an RNG.
             let rng = &mut rand::thread_rng();
 
             // Initialize the VM.
             let store = ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?;
             let vm = VM::from(store)?;
-
-            // Add the program deployment to the VM.
-            let credits = ProgramID::<CurrentNetwork>::try_from("credits.aleo")?;
-            if program.id() != &credits {
-                let deployment = vm.deploy_raw(&program, rng)?;
-                vm.process().write().load_deployment(&deployment)?;
-            }
 
             // Prepare the fees.
             let fee = match self.record {
@@ -120,7 +106,9 @@ impl Execute {
                 )),
                 None => {
                     // Ensure that only the `credits.aleo/split` call can be created without a fee.
-                    if program.id() != &credits && self.function != Identifier::from_str("split")? {
+                    if program.id() != &ProgramID::from_str("credits.aleo")?
+                        && self.function != Identifier::from_str("split")?
+                    {
                         bail!("❌ A record must be provided to pay for the transaction fee.");
                     }
                     None
@@ -133,7 +121,7 @@ impl Execute {
         println!("✅ Created execution transaction for '{}'", locator.to_string().bold());
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
-        Developer::handle_transaction(self.broadcast, self.dry_run, self.store, execution, locator.to_string())
+        Developer::handle_transaction(self.broadcast, self.dry_run, self.store, transaction, locator.to_string())
     }
 }
 

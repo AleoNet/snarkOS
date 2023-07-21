@@ -85,11 +85,11 @@ impl Deploy {
         println!("📦 Creating deployment transaction for '{}'...\n", &self.program_id.to_string().bold());
 
         // Generate the deployment
-        let deployment = package.deploy::<CurrentAleo>(Some(self.query))?;
+        let deployment = package.deploy::<CurrentAleo>(None)?;
         let deployment_id = deployment.to_deployment_id()?;
 
         // Generate the deployment transaction.
-        let deployment_transaction = {
+        let transaction = {
             // Initialize an RNG.
             let rng = &mut rand::thread_rng();
 
@@ -122,7 +122,7 @@ impl Deploy {
             self.broadcast,
             self.dry_run,
             self.store,
-            deployment_transaction,
+            transaction,
             self.program_id.to_string(),
         )
     }

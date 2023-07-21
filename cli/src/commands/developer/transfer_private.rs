@@ -82,8 +82,8 @@ impl TransferPrivate {
 
         println!("📦 Creating private transfer of {} microcredits to {}...\n", self.amount, self.recipient);
 
-        // Generate the transfer transaction.
-        let execution = {
+        // Generate the transfer_private transaction.
+        let transaction = {
             // Initialize an RNG.
             let rng = &mut rand::thread_rng();
 
@@ -109,6 +109,6 @@ impl TransferPrivate {
         println!("✅ Created private transfer of {} microcredits to {}\n", &self.amount, self.recipient);
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
-        Developer::handle_transaction(self.broadcast, self.dry_run, self.store, execution, locator.to_string())
+        Developer::handle_transaction(self.broadcast, self.dry_run, self.store, transaction, locator.to_string())
     }
 }
