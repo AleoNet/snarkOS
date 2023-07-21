@@ -52,7 +52,7 @@ use ::rand::thread_rng;
 use anyhow::Result;
 use indexmap::IndexMap;
 use parking_lot::Mutex;
-use std::{collections::BTreeMap, future::Future, sync::Arc};
+use std::{collections::BTreeMap, future::Future, net::SocketAddr, sync::Arc};
 use tokio::{
     sync::{oneshot, OnceCell},
     task::JoinHandle,
@@ -66,15 +66,13 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
     bft: BFT<N>,
     /// The primary sender.
     primary_sender: Arc<OnceCell<PrimarySender<N>>>,
-    /// The memory pool.
-    memory_pool: MemoryPool<N>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Initializes a new instance of consensus.
-    pub fn new(account: Account<N>, ledger: Ledger<N, C>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(account: Account<N>, ledger: Ledger<N, C>, ip: Option<SocketAddr>, dev: Option<u16>) -> Result<Self> {
         // Initialize the committee.
         let committee = {
             // TODO (howardwu): Fix the ledger round number.
@@ -91,15 +89,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Initialize the ledger service.
         let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone()));
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger_service, None, dev)?;
+        let bft = BFT::new(account, storage, ledger_service, ip, dev)?;
         // Return the consensus.
-        Ok(Self {
-            ledger,
-            bft,
-            primary_sender: Default::default(),
-            memory_pool: Default::default(),
-            handles: Default::default(),
-        })
+        Ok(Self { ledger, bft, primary_sender: Default::default(), handles: Default::default() })
     }
 
     /// Run the consensus instance.
