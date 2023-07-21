@@ -128,3 +128,30 @@ async fn test_quorum_break() {
     // Check the nodes have stopped advancing through the rounds.
     assert!(network.is_halted().await);
 }
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_committee_coherence() {
+    // Start N nodes, connect them and start the cannons for each.
+    const N: u16 = 4;
+    const CANNON_INTERVAL_MS: u64 = 10;
+    let mut network = TestNetwork::new(TestNetworkConfig {
+        num_nodes: N,
+        bft: false,
+        connect_all: true,
+        fire_cannons: Some(CANNON_INTERVAL_MS),
+        // Set this to Some(0..=4) to see the logs.
+        log_level: None,
+        log_connections: true,
+    });
+    network.start().await;
+
+    // Check the nodes have started advancing through the rounds.
+    const TARGET_ROUND: u64 = 12;
+    // Note: cloning the network is fine because the primaries it wraps are `Arc`ed.
+    let network_clone = network.clone();
+    deadline!(Duration::from_secs(40), move || { network_clone.is_round_reached(TARGET_ROUND) });
+
+    // Check the committee is coherent across the network up to the target round. We skip the
+    // genesis round.
+    assert!(network.is_committee_coherent(1..TARGET_ROUND));
+}

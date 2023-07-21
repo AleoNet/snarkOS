@@ -28,7 +28,7 @@ use snarkos_node_narwhal::{
 use snarkos_node_narwhal_committee::{Committee, MIN_STAKE};
 use snarkvm::prelude::TestRng;
 
-use std::{collections::HashMap, sync::Arc, time::Duration};
+use std::{collections::HashMap, ops::RangeBounds, sync::Arc, time::Duration};
 
 use indexmap::IndexMap;
 use itertools::Itertools;
@@ -208,6 +208,16 @@ impl TestNetwork {
         let halt_round = self.validators.values().map(|v| v.primary.current_round()).max().unwrap();
         sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
         self.validators.values().all(|v| v.primary.current_round() <= halt_round)
+    }
+
+    pub fn is_committee_coherent<T>(&self, rounds_range: T) -> bool
+    where
+        T: RangeBounds<u64> + IntoIterator<Item = u64>,
+    {
+        rounds_range.into_iter().fold(true, |acc, round| {
+            acc && self.validators.values().map(|v| v.primary.storage().get_committee(round).unwrap()).dedup().count()
+                == 1
+        })
     }
 }
 
