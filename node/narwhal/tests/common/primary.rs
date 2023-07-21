@@ -215,9 +215,8 @@ impl TestNetwork {
     where
         T: RangeBounds<u64> + IntoIterator<Item = u64>,
     {
-        rounds_range.into_iter().fold(true, |acc, round| {
-            acc && self.validators.values().map(|v| v.primary.storage().get_committee(round).unwrap()).dedup().count()
-                == 1
+        rounds_range.into_iter().all(|round| {
+            self.validators.values().map(|v| v.primary.storage().get_committee(round).unwrap()).dedup().count() == 1
         })
     }
 
@@ -226,14 +225,8 @@ impl TestNetwork {
     where
         T: RangeBounds<u64> + IntoIterator<Item = u64>,
     {
-        rounds_range.into_iter().fold(true, |acc, round| {
-            acc && self
-                .validators
-                .values()
-                .map(|v| v.primary.storage().get_certificates_for_round(round))
-                .dedup()
-                .count()
-                == 1
+        rounds_range.into_iter().all(|round| {
+            self.validators.values().map(|v| v.primary.storage().get_certificates_for_round(round)).dedup().count() == 1
         })
     }
 }
