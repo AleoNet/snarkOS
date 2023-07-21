@@ -47,7 +47,7 @@ pub struct TestNetworkConfig {
     /// started).
     pub connect_all: bool,
     /// If `Some(i)` is set, the cannons will fire every `i` milliseconds.
-    pub fire_cannons: Option<u64>,
+    pub fire_transmissions: Option<u64>,
     /// The log level to use for the test.
     pub log_level: Option<u8>,
     /// If this is set to `true`, the number of connections is logged every 5 seconds.
@@ -79,7 +79,7 @@ pub struct TestValidator {
 }
 
 impl TestValidator {
-    pub fn fire_cannons(&mut self, interval_ms: u64) {
+    pub fn fire_transmissions(&mut self, interval_ms: u64) {
         let solution_handle = fire_unconfirmed_solutions(self.primary_sender.as_mut().unwrap(), self.id, interval_ms);
         let transaction_handle =
             fire_unconfirmed_transactions(self.primary_sender.as_mut().unwrap(), self.id, interval_ms);
@@ -146,8 +146,8 @@ impl TestNetwork {
                 validator.primary.run(primary_sender, primary_receiver, None).await.unwrap();
             }
 
-            if let Some(interval_ms) = self.config.fire_cannons {
-                validator.fire_cannons(interval_ms);
+            if let Some(interval_ms) = self.config.fire_transmissions {
+                validator.fire_transmissions(interval_ms);
             }
 
             if self.config.log_connections {
@@ -161,8 +161,8 @@ impl TestNetwork {
     }
 
     // Starts the solution and trasnaction cannons for node.
-    pub fn fire_cannons_at(&mut self, id: u16, interval_ms: u64) {
-        self.validators.get_mut(&id).unwrap().fire_cannons(interval_ms);
+    pub fn fire_transmissions_at(&mut self, id: u16, interval_ms: u64) {
+        self.validators.get_mut(&id).unwrap().fire_transmissions(interval_ms);
     }
 
     // Connects a node to another node.

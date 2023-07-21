@@ -25,13 +25,13 @@ use tokio::time::sleep;
 #[ignore = "long-running e2e test"]
 async fn test_state_coherence() {
     const N: u16 = 4;
-    const CANNON_INTERVAL_MS: u64 = 10;
+    const TRANSMISSION_INTERVAL_MS: u64 = 10;
 
     let mut network = TestNetwork::new(TestNetworkConfig {
         num_nodes: N,
         bft: true,
         connect_all: true,
-        fire_cannons: Some(CANNON_INTERVAL_MS),
+        fire_transmissions: Some(TRANSMISSION_INTERVAL_MS),
         // Set this to Some(0..=4) to see the logs.
         log_level: Some(0),
         log_connections: true,
@@ -46,13 +46,13 @@ async fn test_state_coherence() {
 async fn test_quorum_threshold() {
     // Start N nodes but don't connect them.
     const N: u16 = 4;
-    const CANNON_INTERVAL_MS: u64 = 10;
+    const TRANSMISSION_INTERVAL_MS: u64 = 10;
 
     let mut network = TestNetwork::new(TestNetworkConfig {
         num_nodes: N,
         bft: true,
         connect_all: false,
-        fire_cannons: None,
+        fire_transmissions: None,
         // Set this to Some(0..=4) to see the logs.
         log_level: None,
         log_connections: true,
@@ -65,7 +65,7 @@ async fn test_quorum_threshold() {
     }
 
     // Start the cannons for node 0.
-    network.fire_cannons_at(0, CANNON_INTERVAL_MS);
+    network.fire_transmissions_at(0, TRANSMISSION_INTERVAL_MS);
 
     sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
 
@@ -76,7 +76,7 @@ async fn test_quorum_threshold() {
 
     // Connect the first two nodes and start the cannons for node 1.
     network.connect_validators(0, 1).await;
-    network.fire_cannons_at(1, CANNON_INTERVAL_MS);
+    network.fire_transmissions_at(1, TRANSMISSION_INTERVAL_MS);
 
     sleep(Duration::from_millis(MAX_BATCH_DELAY * 2)).await;
 
@@ -88,7 +88,7 @@ async fn test_quorum_threshold() {
     // Connect the third node and start the cannons for it.
     network.connect_validators(0, 2).await;
     network.connect_validators(1, 2).await;
-    network.fire_cannons_at(2, CANNON_INTERVAL_MS);
+    network.fire_transmissions_at(2, TRANSMISSION_INTERVAL_MS);
 
     // Check the nodes reach quorum and advance through the rounds.
     const TARGET_ROUND: u64 = 4;
@@ -99,12 +99,12 @@ async fn test_quorum_threshold() {
 async fn test_quorum_break() {
     // Start N nodes, connect them and start the cannons for each.
     const N: u16 = 4;
-    const CANNON_INTERVAL_MS: u64 = 10;
+    const TRANSMISSION_INTERVAL_MS: u64 = 10;
     let mut network = TestNetwork::new(TestNetworkConfig {
         num_nodes: N,
         bft: true,
         connect_all: true,
-        fire_cannons: Some(CANNON_INTERVAL_MS),
+        fire_transmissions: Some(TRANSMISSION_INTERVAL_MS),
         // Set this to Some(0..=4) to see the logs.
         log_level: None,
         log_connections: true,
