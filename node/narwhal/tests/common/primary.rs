@@ -210,12 +210,29 @@ impl TestNetwork {
         self.validators.values().all(|v| v.primary.current_round() <= halt_round)
     }
 
+    // Checks if the committee is coherent in storage for all nodes (not quorum).
     pub fn is_committee_coherent<T>(&self, rounds_range: T) -> bool
     where
         T: RangeBounds<u64> + IntoIterator<Item = u64>,
     {
         rounds_range.into_iter().fold(true, |acc, round| {
             acc && self.validators.values().map(|v| v.primary.storage().get_committee(round).unwrap()).dedup().count()
+                == 1
+        })
+    }
+
+    // Checks if the certificates are coherent in storage for all nodes (not quorum).
+    pub fn is_certificate_round_coherent<T>(&self, rounds_range: T) -> bool
+    where
+        T: RangeBounds<u64> + IntoIterator<Item = u64>,
+    {
+        rounds_range.into_iter().fold(true, |acc, round| {
+            acc && self
+                .validators
+                .values()
+                .map(|v| v.primary.storage().get_certificates_for_round(round))
+                .dedup()
+                .count()
                 == 1
         })
     }

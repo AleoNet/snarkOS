@@ -130,7 +130,7 @@ async fn test_quorum_break() {
 }
 
 #[tokio::test(flavor = "multi_thread")]
-async fn test_committee_coherence() {
+async fn test_storage_coherence() {
     // Start N nodes, connect them and start the cannons for each.
     const N: u16 = 4;
     const CANNON_INTERVAL_MS: u64 = 10;
@@ -154,4 +154,10 @@ async fn test_committee_coherence() {
     // Check the committee is coherent across the network up to the target round. We skip the
     // genesis round.
     assert!(network.is_committee_coherent(1..TARGET_ROUND));
+
+    // Check the round certificates are coherent across the network. We skip the genesis round and
+    // check up to 2 rounds before the the target round as the round preceding the target round
+    // might still be incomplete since the network advances when quorum is reached, not when all
+    // the nodes have completed the round.
+    assert!(network.is_certificate_round_coherent(1..TARGET_ROUND - 1));
 }
