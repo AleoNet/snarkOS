@@ -27,6 +27,7 @@ use crate::{
         Storage,
     },
     Gateway,
+    Transport,
     Worker,
     MAX_BATCH_DELAY,
     MAX_TRANSMISSIONS_PER_BATCH,
@@ -135,7 +136,7 @@ impl<N: Network> Primary<N> {
             // Construct the worker instance.
             let worker = Worker::new(
                 id,
-                self.gateway.clone(),
+                Arc::new(self.gateway.clone()),
                 self.storage.clone(),
                 self.ledger.clone(),
                 self.proposed_batch.clone(),
