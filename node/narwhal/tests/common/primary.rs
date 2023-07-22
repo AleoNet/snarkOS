@@ -210,7 +210,8 @@ impl TestNetwork {
         self.validators.values().all(|v| v.primary.current_round() <= halt_round)
     }
 
-    // Checks if the committee is coherent in storage for all nodes (not quorum).
+    // Checks if the committee is coherent in storage for all nodes (not quorum) over a range of
+    // rounds.
     pub fn is_committee_coherent<T>(&self, rounds_range: T) -> bool
     where
         T: RangeBounds<u64> + IntoIterator<Item = u64>,
@@ -220,7 +221,8 @@ impl TestNetwork {
         })
     }
 
-    // Checks if the certificates are coherent in storage for all nodes (not quorum).
+    // Checks if the certificates are coherent in storage for all nodes (not quorum) over a range
+    // of rounds.
     pub fn is_certificate_round_coherent<T>(&self, rounds_range: T) -> bool
     where
         T: RangeBounds<u64> + IntoIterator<Item = u64>,
