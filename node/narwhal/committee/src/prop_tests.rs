@@ -93,7 +93,7 @@ pub struct ValidatorSet(pub HashSet<Validator>);
 impl Default for ValidatorSet {
     fn default() -> Self {
         ValidatorSet(
-            (0..=4u64)
+            (0..4u64)
                 .map(|i| Validator {
                     account: Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i)).unwrap(),
                     stake: MIN_STAKE,
