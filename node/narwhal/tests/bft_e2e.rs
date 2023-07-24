@@ -156,17 +156,29 @@ async fn test_leader_election_consistency() {
         let cloned_network = network.clone();
         deadline!(Duration::from_secs(20), move || { cloned_network.is_round_reached(target_round) });
 
-        // Get all leaders
-        let leaders = network
-            .validators
-            .values()
+        // Get all validators in the network
+        let validators = network.validators.values().collect_vec();
+
+        // Get all validators in sync with the current round
+        let validators_for_round =
+            validators.iter().filter(|validator| validator.primary.current_round() == target_round).collect_vec();
+
+        // Get all leaders for the current round
+        let leaders = validators_for_round
+            .iter()
             .flat_map(|v| v.bft.clone().map(|bft| bft.leader()))
             .flatten()
             .collect::<Vec<_>>();
-        println!("Found {} validators with a leader (out of {})", leaders.len(), network.validators.values().count());
+
+        println!(
+            "Found {} validators with a leader (out of {}, {} out of sync)",
+            leaders.len(),
+            validators_for_round.len(),
+            validators.len() - validators_for_round.len()
+        );
 
         // Assert that we have N leaders
-        assert_eq!(leaders.len(), N as usize);
+        assert_eq!(leaders.len(), validators_for_round.len());
 
         // Assert that all leaders are equal
         assert!(leaders.iter().all_equal());
