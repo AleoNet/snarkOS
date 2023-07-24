@@ -127,11 +127,10 @@ async fn test_quorum_break() {
 
 #[tokio::test(flavor = "multi_thread")]
 async fn test_leader_election_consistency() {
-    // The round at which to start checking for leader consistency.
-    const STARTING_ROUND: u64 = 2;
-
     // The minimum and maximum rounds to check for leader consistency.
-    const MIN_ROUND: u64 = 4;
+    // From manual experimentation, the minimum round that works is 4.
+    // Starting at 0 or 2 causes assertion failures. Seems like the committee takes a few rounds to stabilize.
+    const STARTING_ROUND: u64 = 4;
     const MAX_ROUND: u64 = 30;
 
     // Start N nodes, connect them and start the cannons for each.
@@ -153,19 +152,21 @@ async fn test_leader_election_consistency() {
     deadline!(Duration::from_secs(60), move || { cloned_network.is_round_reached(STARTING_ROUND) });
 
     // Check that validators agree about leaders in every even round
-    for target_round in (MIN_ROUND..MAX_ROUND).step_by(2) {
+    for target_round in (STARTING_ROUND..=MAX_ROUND).step_by(2) {
         let cloned_network = network.clone();
         deadline!(Duration::from_secs(20), move || { cloned_network.is_round_reached(target_round) });
 
         // Get all leaders
-        let leaders =
-            network.validators.values().flat_map(|v| v.bft.clone().map(|bft| bft.leader())).collect::<Vec<_>>();
+        let leaders = network
+            .validators
+            .values()
+            .flat_map(|v| v.bft.clone().map(|bft| bft.leader()))
+            .flatten()
+            .collect::<Vec<_>>();
+        println!("Found {} validators with a leader (out of {})", leaders.len(), network.validators.values().count());
 
         // Assert that we have N leaders
         assert_eq!(leaders.len(), N as usize);
-
-        // Assert that all validators have elected a leader
-        assert!(leaders.iter().all(|l| l.is_some()));
 
         // Assert that all leaders are equal
         assert!(leaders.iter().all_equal());
