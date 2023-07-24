@@ -142,7 +142,7 @@ async fn test_leader_election_consistency() {
         connect_all: true,
         fire_cannons: Some(CANNON_INTERVAL_MS),
         // Set this to Some(0..=4) to see the logs.
-        log_level: Some(1),
+        log_level: None,
         log_connections: true,
     });
     network.start().await;
