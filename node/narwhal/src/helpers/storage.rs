@@ -602,22 +602,22 @@ mod tests {
     /// Asserts that the storage matches the expected layout.
     pub fn assert_storage<N: Network>(
         storage: &Storage<N>,
-        committees: Vec<(u64, Committee<N>)>,
-        rounds: Vec<(u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)>,
-        certificates: Vec<(Field<N>, BatchCertificate<N>)>,
-        batch_ids: Vec<(Field<N>, u64)>,
-        transmissions: HashMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>,
+        committees: &Vec<(u64, Committee<N>)>,
+        rounds: &Vec<(u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)>,
+        certificates: &Vec<(Field<N>, BatchCertificate<N>)>,
+        batch_ids: &Vec<(Field<N>, u64)>,
+        transmissions: &HashMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>,
     ) {
         // Ensure the committees are well-formed.
-        assert_eq!(storage.committees_iter().collect::<Vec<_>>(), committees);
+        assert_eq!(storage.committees_iter().collect::<Vec<_>>(), *committees);
         // Ensure the rounds are well-formed.
-        assert_eq!(storage.rounds_iter().collect::<Vec<_>>(), rounds);
+        assert_eq!(storage.rounds_iter().collect::<Vec<_>>(), *rounds);
         // Ensure the certificates are well-formed.
-        assert_eq!(storage.certificates_iter().collect::<Vec<_>>(), certificates);
+        assert_eq!(storage.certificates_iter().collect::<Vec<_>>(), *certificates);
         // Ensure the batch IDs are well-formed.
-        assert_eq!(storage.batch_ids_iter().collect::<Vec<_>>(), batch_ids);
+        assert_eq!(storage.batch_ids_iter().collect::<Vec<_>>(), *batch_ids);
         // Ensure the transmissions are well-formed.
-        assert_eq!(storage.transmissions_iter().collect::<HashMap<_, _>>(), transmissions);
+        assert_eq!(storage.transmissions_iter().collect::<HashMap<_, _>>(), *transmissions);
     }
 
     /// Samples a random transmission.
@@ -677,11 +677,11 @@ mod tests {
         // Ensure the storage is empty.
         assert_storage(
             &storage,
-            committees.clone(),
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            Default::default(),
+            &committees,
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
         );
 
         // Create a new certificate.
@@ -714,7 +714,7 @@ mod tests {
             // Construct the expected layout for 'batch_ids'.
             let batch_ids = vec![(batch_id, round)];
             // Assert the storage is well-formed.
-            assert_storage(&storage, committees.clone(), rounds, certificates, batch_ids, transmissions);
+            assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &transmissions);
         }
 
         // Retrieve the certificate.
@@ -731,11 +731,11 @@ mod tests {
         // Ensure the storage is empty.
         assert_storage(
             &storage,
-            committees,
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            Default::default(),
+            &committees,
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
         );
     }
 
@@ -753,11 +753,11 @@ mod tests {
         // Ensure the storage is empty.
         assert_storage(
             &storage,
-            committees.clone(),
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            Default::default(),
+            &committees,
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
         );
 
         // Create a new certificate.
@@ -785,35 +785,21 @@ mod tests {
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation is correct.
-        assert_storage(
-            &storage,
-            committees.clone(),
-            rounds.clone(),
-            certificates.clone(),
-            batch_ids.clone(),
-            transmissions.clone(),
-        );
+        assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &transmissions);
 
         // Insert the certificate again - without any missing transmissions.
         storage.insert_certificate_atomic(certificate.clone(), Default::default());
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation remains unchanged.
-        assert_storage(
-            &storage,
-            committees.clone(),
-            rounds.clone(),
-            certificates.clone(),
-            batch_ids.clone(),
-            transmissions.clone(),
-        );
+        assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &transmissions);
 
         // Insert the certificate again - with all of the original missing transmissions.
         storage.insert_certificate_atomic(certificate, missing_transmissions);
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation remains unchanged.
-        assert_storage(&storage, committees, rounds, certificates, batch_ids, transmissions);
+        assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &transmissions);
     }
 }
 
@@ -987,11 +973,11 @@ pub mod prop_tests {
         // Ensure the storage is empty.
         assert_storage(
             &storage,
-            committees.clone(),
-            Default::default(),
-            Default::default(),
-            Default::default(),
-            Default::default(),
+            &committees,
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
+            &Default::default(),
         );
 
         // Create a new certificate.
@@ -1046,34 +1032,20 @@ pub mod prop_tests {
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation is correct.
-        assert_storage(
-            &storage,
-            committees.clone(),
-            rounds.clone(),
-            certificates.clone(),
-            batch_ids.clone(),
-            internal_transmissions.clone(),
-        );
+        assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &internal_transmissions);
 
         // Insert the certificate again - without any missing transmissions.
         storage.insert_certificate_atomic(certificate.clone(), Default::default());
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation remains unchanged.
-        assert_storage(
-            &storage,
-            committees.clone(),
-            rounds.clone(),
-            certificates.clone(),
-            batch_ids.clone(),
-            internal_transmissions.clone(),
-        );
+        assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &internal_transmissions);
 
         // Insert the certificate again - with all of the original missing transmissions.
         storage.insert_certificate_atomic(certificate, missing_transmissions);
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation remains unchanged.
-        assert_storage(&storage, committees, rounds, certificates, batch_ids, internal_transmissions);
+        assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &internal_transmissions);
     }
 }
