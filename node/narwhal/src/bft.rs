@@ -35,7 +35,7 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
-        narwhal::{BatchCertificate, Data, Transmission, TransmissionID},
+        narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
     prelude::{bail, ensure, Field, Network, Result},
 };
@@ -446,23 +446,28 @@ impl<N: Network> BFT<N> {
                     transmissions.insert(*transmission_id, transmission);
                 }
             }
+            // Construct the subdag.
+            let subdag = Subdag::from(commit_subdag)?;
             info!(
                 "\n\nCommitting a subdag from round {leader_round} with {} transmissions: {:?}\n",
                 transmissions.len(),
-                commit_subdag.iter().map(|(round, certificates)| (round, certificates.len())).collect::<Vec<_>>()
+                subdag.iter().map(|(round, certificates)| (round, certificates.len())).collect::<Vec<_>>()
             );
             // Trigger consensus.
             if let Some(consensus_sender) = self.consensus_sender.get() {
-                consensus_sender.tx_consensus_subdag.send((commit_subdag, transmissions)).await?;
+                consensus_sender.tx_consensus_subdag.send((subdag, transmissions)).await?;
             }
         }
         Ok(())
     }
 
     /// Returns the certificates to commit.
-    fn order_dag_with_dfs(&self, leader_certificate: BatchCertificate<N>) -> BTreeMap<u64, Vec<BatchCertificate<N>>> {
+    fn order_dag_with_dfs(
+        &self,
+        leader_certificate: BatchCertificate<N>,
+    ) -> BTreeMap<u64, IndexSet<BatchCertificate<N>>> {
         // Initialize a map for the certificates to commit.
-        let mut commit = BTreeMap::<u64, Vec<_>>::new();
+        let mut commit = BTreeMap::<u64, IndexSet<_>>::new();
         // Initialize a set for the already ordered certificates.
         let mut already_ordered = HashSet::new();
         // Initialize a buffer for the certificates to order.
@@ -470,7 +475,7 @@ impl<N: Network> BFT<N> {
         // Iterate over the certificates to order.
         while let Some(certificate) = buffer.pop() {
             // Insert the certificate into the map.
-            commit.entry(certificate.round()).or_default().push(certificate.clone());
+            commit.entry(certificate.round()).or_default().insert(certificate.clone());
             // Iterate over the previous certificate IDs.
             for previous_certificate_id in certificate.previous_certificate_ids() {
                 let Some(previous_certificate) = self

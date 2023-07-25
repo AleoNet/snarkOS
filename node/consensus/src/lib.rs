@@ -42,7 +42,7 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
-        narwhal::{BatchCertificate, Data, Transmission, TransmissionID},
+        narwhal::{Data, Subdag, Transmission, TransmissionID},
         store::ConsensusStorage,
     },
     prelude::*,
@@ -52,7 +52,7 @@ use ::rand::thread_rng;
 use anyhow::Result;
 use indexmap::IndexMap;
 use parking_lot::Mutex;
-use std::{collections::BTreeMap, future::Future, net::SocketAddr, sync::Arc};
+use std::{future::Future, net::SocketAddr, sync::Arc};
 use tokio::{
     sync::{oneshot, OnceCell},
     task::JoinHandle,
@@ -211,13 +211,9 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     }
 
     /// Processes the committed subdag and transmissions from the BFT.
-    async fn process_bft_subdag(
-        &self,
-        committed_subdag: BTreeMap<u64, Vec<BatchCertificate<N>>>,
-        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
-    ) {
+    async fn process_bft_subdag(&self, subdag: Subdag<N>, transmissions: IndexMap<TransmissionID<N>, Transmission<N>>) {
         // Try to advance to the next block.
-        if let Err(e) = self.try_advance_to_next_block(committed_subdag, transmissions.clone()) {
+        if let Err(e) = self.try_advance_to_next_block(subdag, transmissions.clone()) {
             error!("Unable to advance to the next block - {e}");
             // On failure, reinsert the transmissions into the memory pool.
             self.reinsert_transmissions(transmissions).await;
@@ -227,11 +223,11 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Attempts to advance to the next block.
     fn try_advance_to_next_block(
         &self,
-        committed_subdag: BTreeMap<u64, Vec<BatchCertificate<N>>>,
+        subdag: Subdag<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<()> {
         // Create the candidate next block.
-        let next_block = self.ledger.prepare_advance_to_next_block_with_bft(committed_subdag, transmissions)?;
+        let next_block = self.ledger.prepare_advance_to_next_block_with_bft(subdag, transmissions)?;
         // Check that the block is well-formed.
         self.ledger.check_next_block(&next_block)?;
         // Advance to the next block.
