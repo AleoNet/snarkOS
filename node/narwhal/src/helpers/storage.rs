@@ -899,11 +899,11 @@ pub mod prop_tests {
         .boxed()
     }
 
-    fn any_puzzle_commitment() -> BoxedStrategy<PuzzleCommitment<CurrentNetwork>> {
+    pub fn any_puzzle_commitment() -> BoxedStrategy<PuzzleCommitment<CurrentNetwork>> {
         Just(0).prop_perturb(|_, rng| PuzzleCommitment::from_g1_affine(CryptoTestRng(rng).gen())).boxed()
     }
 
-    fn any_transaction_id() -> BoxedStrategy<<CurrentNetwork as Network>::TransactionID> {
+    pub fn any_transaction_id() -> BoxedStrategy<<CurrentNetwork as Network>::TransactionID> {
         Just(0)
             .prop_perturb(|_, rng| {
                 <CurrentNetwork as Network>::TransactionID::from(Field::rand(&mut CryptoTestRng(rng)))

@@ -60,3 +60,51 @@ impl<N: Network> EventTrait for TransmissionResponse<N> {
         Ok(Self { transmission_id, transmission })
     }
 }
+
+#[cfg(test)]
+mod prop_tests {
+    use crate::{
+        event::EventTrait,
+        helpers::storage::prop_tests::{any_puzzle_commitment, any_transaction_id},
+        TransmissionResponse,
+    };
+    use ::bytes::Bytes;
+    use bytes::{BufMut, BytesMut};
+    use proptest::{
+        collection,
+        prelude::{any, BoxedStrategy, Strategy},
+        prop_oneof,
+    };
+    use snarkvm::ledger::narwhal::{Data, Transmission, TransmissionID};
+    use test_strategy::proptest;
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    fn any_transmission() -> BoxedStrategy<(TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>)> {
+        prop_oneof![
+            (any_puzzle_commitment(), collection::vec(any::<u8>(), 256..=256)).prop_map(|(pc, bytes)| (
+                TransmissionID::Solution(pc),
+                Transmission::Solution(Data::Buffer(Bytes::from(bytes)))
+            )),
+            (any_transaction_id(), collection::vec(any::<u8>(), 512..=512)).prop_map(|(tid, bytes)| (
+                TransmissionID::Transaction(tid),
+                Transmission::Transaction(Data::Buffer(Bytes::from(bytes)))
+            )),
+        ]
+        .boxed()
+    }
+
+    #[proptest]
+    fn serialize_deserialize(
+        #[strategy(any_transmission())] input: (TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>),
+    ) {
+        let (id, transmission) = input;
+        let response = TransmissionResponse::new(id, transmission.clone());
+
+        let mut buf = BytesMut::with_capacity(64).writer();
+        TransmissionResponse::serialize(&response, &mut buf).unwrap();
+
+        let response = TransmissionResponse::deserialize(buf.get_ref().clone()).unwrap();
+        assert_eq!(id, response.transmission_id);
+        assert_eq!(transmission, response.transmission);
+    }
+}
