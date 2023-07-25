@@ -131,7 +131,7 @@ impl<N: Network> Event<N> {
     /// Serializes the event into the buffer.
     #[inline]
     pub fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.id().to_le_bytes()[..])?;
+        self.id().write_le(&mut *writer)?;
 
         match self {
             Self::BatchPropose(event) => event.serialize(writer),

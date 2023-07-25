@@ -44,7 +44,7 @@ impl<N: Network> EventTrait for BatchPropose<N> {
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.round.to_le_bytes())?;
+        self.round.write_le(&mut *writer)?;
         self.batch_header.serialize_blocking_into(writer)
     }
 

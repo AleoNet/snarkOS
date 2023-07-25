@@ -38,9 +38,9 @@ impl<N: Network> EventTrait for BatchSignature<N> {
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.batch_id.to_bytes_le()?)?;
-        writer.write_all(&self.signature.to_bytes_le()?)?;
-        writer.write_all(&self.timestamp.to_bytes_le()?)?;
+        self.batch_id.write_le(&mut *writer)?;
+        self.signature.write_le(&mut *writer)?;
+        self.timestamp.write_le(&mut *writer)?;
         Ok(())
     }
 
