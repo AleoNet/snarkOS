@@ -14,6 +14,8 @@
 
 use super::*;
 
+use std::borrow::Cow;
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct Disconnect {
     pub reason: DisconnectReason,
@@ -28,8 +30,8 @@ impl From<DisconnectReason> for Disconnect {
 impl MessageTrait for Disconnect {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
-        "Disconnect".to_string()
+    fn name(&self) -> Cow<'static, str> {
+        "Disconnect".into()
     }
 
     /// Serializes the message into the buffer.

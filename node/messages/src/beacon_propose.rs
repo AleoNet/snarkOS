@@ -14,6 +14,8 @@
 
 use super::*;
 
+use std::borrow::Cow;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BeaconPropose<N: Network> {
     pub version: u8,
@@ -36,8 +38,8 @@ impl<N: Network> BeaconPropose<N> {
 impl<N: Network> MessageTrait for BeaconPropose<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
-        format!("BeaconPropose {}", self.block_height)
+    fn name(&self) -> Cow<'static, str> {
+        format!("BeaconPropose {}", self.block_height).into()
     }
 
     /// Serializes the message into the buffer.

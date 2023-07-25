@@ -14,14 +14,16 @@
 
 use super::*;
 
+use std::borrow::Cow;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PeerRequest;
 
 impl MessageTrait for PeerRequest {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
-        "PeerRequest".to_string()
+    fn name(&self) -> Cow<'static, str> {
+        "PeerRequest".into()
     }
 
     /// Serializes the message into the buffer.

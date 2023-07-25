@@ -14,6 +14,8 @@
 
 use super::*;
 
+use std::borrow::Cow;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockResponse<N: Network> {
     /// The original block request.
@@ -25,13 +27,14 @@ pub struct BlockResponse<N: Network> {
 impl<N: Network> MessageTrait for BlockResponse<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
+    fn name(&self) -> Cow<'static, str> {
         let start = self.request.start_height;
         let end = self.request.end_height;
         match start + 1 == end {
             true => format!("BlockResponse {start}"),
             false => format!("BlockResponse {start}..{end}"),
         }
+        .into()
     }
 
     /// Serializes the message into the buffer.

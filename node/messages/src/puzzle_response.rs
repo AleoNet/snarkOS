@@ -14,6 +14,8 @@
 
 use super::*;
 
+use std::borrow::Cow;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PuzzleResponse<N: Network> {
     pub epoch_challenge: EpochChallenge<N>,
@@ -23,8 +25,8 @@ pub struct PuzzleResponse<N: Network> {
 impl<N: Network> MessageTrait for PuzzleResponse<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
-        "PuzzleResponse".to_string()
+    fn name(&self) -> Cow<'static, str> {
+        "PuzzleResponse".into()
     }
 
     /// Serializes the message into the buffer.

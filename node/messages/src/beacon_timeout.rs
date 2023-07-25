@@ -14,6 +14,8 @@
 
 use super::*;
 
+use std::borrow::Cow;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BeaconTimeout<N: Network> {
     pub version: u8,
@@ -36,8 +38,8 @@ impl<N: Network> BeaconTimeout<N> {
 impl<N: Network> MessageTrait for BeaconTimeout<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
-        format!("BeaconTimeout {}", self.block_height)
+    fn name(&self) -> Cow<'static, str> {
+        format!("BeaconTimeout {}", self.block_height).into()
     }
 
     /// Serializes the message into the buffer.

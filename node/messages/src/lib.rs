@@ -82,6 +82,7 @@ use snarkvm::prelude::{
 use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
 use std::{
+    borrow::Cow,
     fmt,
     fmt::{Display, Formatter},
     io::{Read, Result as IoResult, Write},
@@ -91,7 +92,7 @@ use std::{
 
 pub trait MessageTrait {
     /// Returns the message name.
-    fn name(&self) -> String;
+    fn name(&self) -> Cow<'static, str>;
     /// Serializes the message into the buffer.
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()>;
     /// Deserializes the given buffer into a message.
@@ -132,7 +133,7 @@ impl<N: Network> Message<N> {
 
     /// Returns the message name.
     #[inline]
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> Cow<'static, str> {
         match self {
             Self::BeaconPropose(message) => message.name(),
             Self::BeaconTimeout(message) => message.name(),
