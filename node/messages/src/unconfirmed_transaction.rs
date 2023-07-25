@@ -30,7 +30,7 @@ impl<N: Network> MessageTrait for UnconfirmedTransaction<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.transaction_id.to_bytes_le()?)?;
+        self.transaction_id.write_le(&mut *writer)?;
         self.transaction.serialize_blocking_into(writer)
     }
 

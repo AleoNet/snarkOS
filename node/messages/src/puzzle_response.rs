@@ -30,7 +30,7 @@ impl<N: Network> MessageTrait for PuzzleResponse<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.epoch_challenge.to_bytes_le()?)?;
+        self.epoch_challenge.write_le(&mut *writer)?;
         self.block_header.serialize_blocking_into(writer)
     }
 

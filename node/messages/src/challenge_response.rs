@@ -30,7 +30,7 @@ impl<N: Network> MessageTrait for ChallengeResponse<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.genesis_header.to_bytes_le()?)?;
+        self.genesis_header.write_le(&mut *writer)?;
         self.signature.serialize_blocking_into(writer)
     }
 

@@ -43,10 +43,10 @@ impl<N: Network> MessageTrait for BeaconPropose<N> {
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.version.to_le_bytes())?;
-        writer.write_all(&self.round.to_le_bytes())?;
-        writer.write_all(&self.block_height.to_le_bytes())?;
-        writer.write_all(&self.block_hash.to_bytes_le()?)?;
+        self.version.write_le(&mut *writer)?;
+        self.round.write_le(&mut *writer)?;
+        self.block_height.write_le(&mut *writer)?;
+        self.block_hash.write_le(&mut *writer)?;
         self.block.serialize_blocking_into(writer)
     }
 
