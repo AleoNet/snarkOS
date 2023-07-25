@@ -64,3 +64,34 @@ impl<N: Network> EventTrait for WorkerPing<N> {
         Ok(Self { transmission_ids })
     }
 }
+
+#[cfg(test)]
+mod prop_tests {
+    use crate::{event::EventTrait, helpers::storage::prop_tests::any_transmission_id, WorkerPing};
+    use bytes::{BufMut, BytesMut};
+    use indexmap::IndexSet;
+    use proptest::{
+        collection::hash_set,
+        prelude::{BoxedStrategy, Strategy},
+    };
+    use snarkvm::ledger::narwhal::TransmissionID;
+    use std::collections::HashSet;
+    use test_strategy::proptest;
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    fn any_ids() -> BoxedStrategy<HashSet<TransmissionID<CurrentNetwork>>> {
+        hash_set(any_transmission_id(), 1..16).boxed()
+    }
+
+    #[proptest]
+    fn serialize_deserialize(#[strategy(any_ids())] ids: HashSet<TransmissionID<CurrentNetwork>>) {
+        let input: IndexSet<TransmissionID<CurrentNetwork>> = ids.into_iter().collect();
+        let worker_ping = WorkerPing::new(input.clone());
+
+        let mut buf = BytesMut::with_capacity(64).writer();
+        WorkerPing::serialize(&worker_ping, &mut buf).unwrap();
+
+        let output = WorkerPing::deserialize(buf.get_ref().clone()).unwrap().transmission_ids;
+        assert_eq!(input, output);
+    }
+}
