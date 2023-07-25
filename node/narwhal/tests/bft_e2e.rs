@@ -177,7 +177,7 @@ async fn test_leader_election_consistency() {
             validators.len() - validators_for_round.len()
         );
 
-        // Assert that we have N leaders
+        // Assert that we have x leaders for x validators that have reached the target round
         assert_eq!(leaders.len(), validators_for_round.len());
 
         // Assert that all leaders are equal
