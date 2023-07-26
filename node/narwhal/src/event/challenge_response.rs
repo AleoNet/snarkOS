@@ -41,7 +41,7 @@ impl<N: Network> EventTrait for ChallengeResponse<N> {
 }
 
 #[cfg(test)]
-mod prop_tests {
+pub mod prop_tests {
     use crate::{event::EventTrait, helpers::storage::prop_tests::CryptoTestRng, ChallengeResponse};
     use bytes::{BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
@@ -54,7 +54,7 @@ mod prop_tests {
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    fn any_signature() -> BoxedStrategy<Signature<CurrentNetwork>> {
+    pub fn any_signature() -> BoxedStrategy<Signature<CurrentNetwork>> {
         (any::<CryptoTestRng>(), 0..64)
             .prop_map(|(mut rng, message_size)| {
                 let message: Vec<_> = (0..message_size).map(|_| Uniform::rand(&mut rng)).collect();

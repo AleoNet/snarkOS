@@ -55,3 +55,39 @@ impl<N: Network> EventTrait for BatchSignature<N> {
         })
     }
 }
+
+#[cfg(test)]
+mod prop_tests {
+    use crate::{
+        event::{
+            certificate_request::prop_tests::any_field,
+            challenge_response::prop_tests::any_signature,
+            EventTrait,
+        },
+        helpers::now,
+        BatchSignature,
+    };
+    use bytes::{BufMut, BytesMut};
+    use proptest::prelude::{BoxedStrategy, Just, Strategy};
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    fn any_batch_signature() -> BoxedStrategy<BatchSignature<CurrentNetwork>> {
+        (any_field(), any_signature(), Just(now()), -10..10i64)
+            .prop_map(|(certificate_id, signature, timestamp, drift)| {
+                BatchSignature::new(certificate_id, signature, timestamp + drift)
+            })
+            .boxed()
+    }
+
+    #[proptest]
+    fn serialize_deserialize(#[strategy(any_batch_signature())] signature: BatchSignature<CurrentNetwork>) {
+        let mut buf = BytesMut::with_capacity(64).writer();
+        BatchSignature::serialize(&signature, &mut buf).unwrap();
+
+        let deserialized_signature: BatchSignature<CurrentNetwork> =
+            BatchSignature::deserialize(buf.get_ref().clone()).unwrap();
+        assert_eq!(signature, deserialized_signature);
+    }
+}

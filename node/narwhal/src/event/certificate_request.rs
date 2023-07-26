@@ -59,7 +59,7 @@ impl<N: Network> EventTrait for CertificateRequest<N> {
 }
 
 #[cfg(test)]
-mod prop_tests {
+pub mod prop_tests {
     use crate::{event::EventTrait, helpers::storage::prop_tests::CryptoTestRng, CertificateRequest};
     use bytes::{BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
@@ -68,7 +68,7 @@ mod prop_tests {
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    fn any_field() -> BoxedStrategy<Field<CurrentNetwork>> {
+    pub fn any_field() -> BoxedStrategy<Field<CurrentNetwork>> {
         any::<CryptoTestRng>().prop_map(|mut rng| Field::rand(&mut rng)).boxed()
     }
 
