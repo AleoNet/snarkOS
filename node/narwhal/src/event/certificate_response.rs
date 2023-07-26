@@ -59,7 +59,7 @@ impl<N: Network> EventTrait for CertificateResponse<N> {
 }
 
 #[cfg(test)]
-mod prop_tests {
+pub mod prop_tests {
     use crate::{
         event::{transmission_response::prop_tests::any_transmission, EventTrait},
         helpers::{
@@ -71,7 +71,7 @@ mod prop_tests {
     use bytes::{BufMut, BytesMut};
     use proptest::{
         collection::vec,
-        prelude::{any, BoxedStrategy, Strategy},
+        prelude::{any, BoxedStrategy, Just, Strategy},
         sample::Selector,
     };
     use snarkos_node_narwhal_committee::prop_tests::{CommitteeContext, ValidatorSet};
@@ -80,25 +80,32 @@ mod prop_tests {
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    fn any_certificate_response() -> BoxedStrategy<CertificateResponse<CurrentNetwork>> {
-        (any::<CommitteeContext>(), any::<Selector>(), any::<CryptoTestRng>(), vec(any_transmission(), 0..16))
+    pub fn any_batch_header(committee: &CommitteeContext) -> BoxedStrategy<BatchHeader<CurrentNetwork>> {
+        (Just(committee.clone()), any::<Selector>(), any::<CryptoTestRng>(), vec(any_transmission(), 0..16))
             .prop_map(|(committee, selector, mut rng, transmissions)| {
                 let CommitteeContext(_, validator_set) = committee;
-                let batch_header = {
-                    let ValidatorSet(validators) = validator_set.clone();
-                    let signer = selector.select(validators);
-                    let transmission_ids = transmissions.into_iter().map(|(id, _)| id).collect();
+                let ValidatorSet(validators) = validator_set.clone();
+                let signer = selector.select(validators);
+                let transmission_ids = transmissions.into_iter().map(|(id, _)| id).collect();
 
-                    BatchHeader::new(
-                        &signer.account.private_key(),
-                        0,
-                        now(),
-                        transmission_ids,
-                        Default::default(),
-                        &mut rng,
-                    )
-                    .unwrap()
-                };
+                BatchHeader::new(
+                    &signer.account.private_key(),
+                    0,
+                    now(),
+                    transmission_ids,
+                    Default::default(),
+                    &mut rng,
+                )
+                .unwrap()
+            })
+            .boxed()
+    }
+
+    fn any_certificate_response() -> BoxedStrategy<CertificateResponse<CurrentNetwork>> {
+        any::<CommitteeContext>()
+            .prop_flat_map(|committee| (Just(committee.clone()), any_batch_header(&committee), any::<CryptoTestRng>()))
+            .prop_map(|(committee, batch_header, mut rng)| {
+                let CommitteeContext(_, validator_set) = committee;
                 let certificate = BatchCertificate::new(
                     batch_header.clone(),
                     sign_batch_header(&validator_set, &batch_header, &mut rng),
