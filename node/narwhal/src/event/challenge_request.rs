@@ -72,12 +72,12 @@ mod prop_tests {
     }
 
     #[proptest]
-    fn serialize_deserialize(#[strategy(any_challenge_request())] request: ChallengeRequest<CurrentNetwork>) {
+    fn serialize_deserialize(#[strategy(any_challenge_request())] original: ChallengeRequest<CurrentNetwork>) {
         let mut buf = BytesMut::with_capacity(64).writer();
-        ChallengeRequest::serialize(&request, &mut buf).unwrap();
+        ChallengeRequest::serialize(&original, &mut buf).unwrap();
 
-        let deserialized_request: ChallengeRequest<CurrentNetwork> =
+        let deserialized: ChallengeRequest<CurrentNetwork> =
             ChallengeRequest::deserialize(buf.get_ref().clone()).unwrap();
-        assert_eq!(request, deserialized_request);
+        assert_eq!(original, deserialized);
     }
 }

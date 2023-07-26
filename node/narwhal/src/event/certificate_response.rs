@@ -117,12 +117,12 @@ pub mod prop_tests {
     }
 
     #[proptest]
-    fn serialize_deserialize(#[strategy(any_certificate_response())] response: CertificateResponse<CurrentNetwork>) {
+    fn serialize_deserialize(#[strategy(any_certificate_response())] original: CertificateResponse<CurrentNetwork>) {
         let mut buf = BytesMut::with_capacity(64).writer();
-        CertificateResponse::serialize(&response, &mut buf).unwrap();
+        CertificateResponse::serialize(&original, &mut buf).unwrap();
 
-        let deserialized_response: CertificateResponse<CurrentNetwork> =
+        let deserialized: CertificateResponse<CurrentNetwork> =
             CertificateResponse::deserialize(buf.get_ref().clone()).unwrap();
-        assert_eq!(response, deserialized_response);
+        assert_eq!(original, deserialized);
     }
 }

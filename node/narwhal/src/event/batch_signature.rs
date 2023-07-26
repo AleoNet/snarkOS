@@ -82,12 +82,12 @@ mod prop_tests {
     }
 
     #[proptest]
-    fn serialize_deserialize(#[strategy(any_batch_signature())] signature: BatchSignature<CurrentNetwork>) {
+    fn serialize_deserialize(#[strategy(any_batch_signature())] original: BatchSignature<CurrentNetwork>) {
         let mut buf = BytesMut::with_capacity(64).writer();
-        BatchSignature::serialize(&signature, &mut buf).unwrap();
+        BatchSignature::serialize(&original, &mut buf).unwrap();
 
-        let deserialized_signature: BatchSignature<CurrentNetwork> =
+        let deserialized: BatchSignature<CurrentNetwork> =
             BatchSignature::deserialize(buf.get_ref().clone()).unwrap();
-        assert_eq!(signature, deserialized_signature);
+        assert_eq!(original, deserialized);
     }
 }

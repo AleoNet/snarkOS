@@ -74,7 +74,7 @@ mod prop_tests {
     use test_strategy::proptest;
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    fn any_transmission() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
+    fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
         prop_oneof![
             any_puzzle_commitment().prop_map(TransmissionID::Solution),
             any_transaction_id().prop_map(TransmissionID::Transaction),
@@ -82,14 +82,16 @@ mod prop_tests {
         .boxed()
     }
 
+    fn any_transmission_request() -> BoxedStrategy<TransmissionRequest<CurrentNetwork>> {
+        any_transmission_id().prop_map(TransmissionRequest::new).boxed()
+    }
+
     #[proptest]
-    fn serialize_deserialize(#[strategy(any_transmission())] input: TransmissionID<CurrentNetwork>) {
-        let request = TransmissionRequest::new(input);
-
+    fn serialize_deserialize(#[strategy(any_transmission_request())] original: TransmissionRequest<CurrentNetwork>) {
         let mut buf = BytesMut::with_capacity(64).writer();
-        TransmissionRequest::serialize(&request, &mut buf).unwrap();
+        TransmissionRequest::serialize(&original, &mut buf).unwrap();
 
-        let request = TransmissionRequest::deserialize(buf.get_ref().clone()).unwrap();
-        assert_eq!(input, request.transmission_id);
+        let deserialized = TransmissionRequest::deserialize(buf.get_ref().clone()).unwrap();
+        assert_eq!(original, deserialized);
     }
 }

@@ -74,15 +74,14 @@ mod prop_tests {
     }
 
     #[proptest]
-    fn serialize_deserialize(#[strategy(any_batch_certified())] batch_certified: BatchCertified<CurrentNetwork>) {
+    fn serialize_deserialize(#[strategy(any_batch_certified())] original: BatchCertified<CurrentNetwork>) {
         let mut buf = BytesMut::with_capacity(64).writer();
-        BatchCertified::serialize(&batch_certified, &mut buf).unwrap();
+        BatchCertified::serialize(&original, &mut buf).unwrap();
 
-        let deserialized_batch_certified: BatchCertified<CurrentNetwork> =
-            BatchCertified::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized: BatchCertified<CurrentNetwork> = BatchCertified::deserialize(buf.get_ref().clone()).unwrap();
         assert_eq!(
-            batch_certified.certificate.deserialize_blocking().unwrap(),
-            deserialized_batch_certified.certificate.deserialize_blocking().unwrap()
+            original.certificate.deserialize_blocking().unwrap(),
+            deserialized.certificate.deserialize_blocking().unwrap()
         );
     }
 }

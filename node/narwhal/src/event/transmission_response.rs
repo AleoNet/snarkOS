@@ -77,6 +77,7 @@ pub mod prop_tests {
     };
     use snarkvm::ledger::narwhal::{Data, Transmission, TransmissionID};
     use test_strategy::proptest;
+
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     pub fn any_transmission() -> BoxedStrategy<(TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>)> {
@@ -93,18 +94,16 @@ pub mod prop_tests {
         .boxed()
     }
 
+    pub fn any_transmission_response() -> BoxedStrategy<TransmissionResponse<CurrentNetwork>> {
+        any_transmission().prop_map(|(id, t)| TransmissionResponse::new(id, t)).boxed()
+    }
+
     #[proptest]
-    fn serialize_deserialize(
-        #[strategy(any_transmission())] input: (TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>),
-    ) {
-        let (id, transmission) = input;
-        let response = TransmissionResponse::new(id, transmission.clone());
-
+    fn serialize_deserialize(#[strategy(any_transmission_response())] original: TransmissionResponse<CurrentNetwork>) {
         let mut buf = BytesMut::with_capacity(64).writer();
-        TransmissionResponse::serialize(&response, &mut buf).unwrap();
+        TransmissionResponse::serialize(&original, &mut buf).unwrap();
 
-        let response = TransmissionResponse::deserialize(buf.get_ref().clone()).unwrap();
-        assert_eq!(id, response.transmission_id);
-        assert_eq!(transmission, response.transmission);
+        let deserialized = TransmissionResponse::deserialize(buf.get_ref().clone()).unwrap();
+        assert_eq!(original, deserialized);
     }
 }

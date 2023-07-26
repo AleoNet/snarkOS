@@ -82,17 +82,17 @@ mod prop_tests {
     }
 
     #[proptest]
-    fn serialize_deserialize(#[strategy(any_batch_propose())] propose: BatchPropose<CurrentNetwork>) {
+    fn serialize_deserialize(#[strategy(any_batch_propose())] original: BatchPropose<CurrentNetwork>) {
         let mut buf = BytesMut::with_capacity(64).writer();
-        BatchPropose::serialize(&propose, &mut buf).unwrap();
+        BatchPropose::serialize(&original, &mut buf).unwrap();
 
-        let deserialized_propose: BatchPropose<CurrentNetwork> =
+        let deserialized: BatchPropose<CurrentNetwork> =
             BatchPropose::deserialize(buf.get_ref().clone()).unwrap();
         // because of the Data enum, we cannot compare the structs directly even though it derives PartialEq
-        assert_eq!(propose.round, deserialized_propose.round);
+        assert_eq!(original.round, deserialized.round);
         assert_eq!(
-            propose.batch_header.deserialize_blocking().unwrap(),
-            deserialized_propose.batch_header.deserialize_blocking().unwrap()
+            original.batch_header.deserialize_blocking().unwrap(),
+            deserialized.batch_header.deserialize_blocking().unwrap()
         );
     }
 }

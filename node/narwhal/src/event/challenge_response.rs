@@ -64,15 +64,20 @@ pub mod prop_tests {
             .boxed()
     }
 
+    fn any_challenge_response() -> BoxedStrategy<ChallengeResponse<CurrentNetwork>> {
+        any_signature().prop_map(|sig| ChallengeResponse { signature: Data::Object(sig) }).boxed()
+    }
+
     #[proptest]
-    fn serialize_deserialize(#[strategy(any_signature())] signature: Signature<CurrentNetwork>) {
-        let response = ChallengeResponse::<CurrentNetwork> { signature: Data::Object(signature) };
-
+    fn serialize_deserialize(#[strategy(any_challenge_response())] original: ChallengeResponse<CurrentNetwork>) {
         let mut buf = BytesMut::with_capacity(64).writer();
-        ChallengeResponse::serialize(&response, &mut buf).unwrap();
+        ChallengeResponse::serialize(&original, &mut buf).unwrap();
 
-        let response: ChallengeResponse<CurrentNetwork> =
+        let deserialized: ChallengeResponse<CurrentNetwork> =
             ChallengeResponse::deserialize(buf.get_ref().clone()).unwrap();
-        assert_eq!(signature, response.signature.deserialize_blocking().unwrap());
+        assert_eq!(
+            original.signature.deserialize_blocking().unwrap(),
+            deserialized.signature.deserialize_blocking().unwrap()
+        );
     }
 }
