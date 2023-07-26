@@ -83,7 +83,7 @@ pub mod prop_tests {
 
     #[proptest]
     fn serialize_deserialize(#[strategy(any_batch_signature())] original: BatchSignature<CurrentNetwork>) {
-        let mut buf = BytesMut::with_capacity(64).writer();
+        let mut buf = BytesMut::default().writer();
         BatchSignature::serialize(&original, &mut buf).unwrap();
 
         let deserialized: BatchSignature<CurrentNetwork> = BatchSignature::deserialize(buf.get_ref().clone()).unwrap();

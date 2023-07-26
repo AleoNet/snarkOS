@@ -81,7 +81,7 @@ mod tests {
 
         for reason in all_reasons.iter() {
             let disconnect = Disconnect::from(*reason);
-            let mut buf = BytesMut::with_capacity(64).writer();
+            let mut buf = BytesMut::default().writer();
             Disconnect::serialize(&disconnect, &mut buf).unwrap();
 
             let disconnect = Disconnect::deserialize(buf.get_ref().clone()).unwrap();
@@ -91,7 +91,7 @@ mod tests {
 
     #[test]
     fn deserializing_empty_defaults_no_reason() {
-        let buf = BytesMut::with_capacity(64).writer();
+        let buf = BytesMut::default().writer();
         let disconnect = Disconnect::deserialize(buf.get_ref().clone()).unwrap();
         assert_eq!(disconnect.reason, DisconnectReason::NoReasonGiven);
     }
@@ -99,7 +99,7 @@ mod tests {
     #[test]
     #[should_panic(expected = "Invalid 'Disconnect' event")]
     fn deserializing_invalid_data_panics() {
-        let mut buf = BytesMut::with_capacity(64).writer();
+        let mut buf = BytesMut::default().writer();
         bincode::serialize_into(&mut buf, "not a DisconnectReason-value").unwrap();
         let _disconnect = Disconnect::deserialize(buf.get_ref().clone()).unwrap();
     }

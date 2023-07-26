@@ -82,7 +82,7 @@ pub mod prop_tests {
 
     #[proptest]
     fn serialize_deserialize(#[strategy(any_worker_ping())] original: WorkerPing<CurrentNetwork>) {
-        let mut buf = BytesMut::with_capacity(64).writer();
+        let mut buf = BytesMut::default().writer();
         WorkerPing::serialize(&original, &mut buf).unwrap();
 
         let deserialized = WorkerPing::deserialize(buf.get_ref().clone()).unwrap();

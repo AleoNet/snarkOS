@@ -70,7 +70,7 @@ pub mod prop_tests {
 
     #[proptest]
     fn serialize_deserialize(#[strategy(any_challenge_response())] original: ChallengeResponse<CurrentNetwork>) {
-        let mut buf = BytesMut::with_capacity(64).writer();
+        let mut buf = BytesMut::default().writer();
         ChallengeResponse::serialize(&original, &mut buf).unwrap();
 
         let deserialized: ChallengeResponse<CurrentNetwork> =

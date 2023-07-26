@@ -88,7 +88,7 @@ pub mod prop_tests {
 
     #[proptest]
     fn serialize_deserialize(#[strategy(any_transmission_request())] original: TransmissionRequest<CurrentNetwork>) {
-        let mut buf = BytesMut::with_capacity(64).writer();
+        let mut buf = BytesMut::default().writer();
         TransmissionRequest::serialize(&original, &mut buf).unwrap();
 
         let deserialized = TransmissionRequest::deserialize(buf.get_ref().clone()).unwrap();

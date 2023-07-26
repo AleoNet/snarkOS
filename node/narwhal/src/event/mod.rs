@@ -236,7 +236,7 @@ mod prop_tests {
 
     #[proptest]
     fn serialize_deserialize(#[strategy(any_event())] original: Event<CurrentNetwork>) {
-        let mut buf = BytesMut::with_capacity(64).writer();
+        let mut buf = BytesMut::default().writer();
         Event::serialize(&original, &mut buf).unwrap();
 
         let deserialized: Event<CurrentNetwork> = Event::deserialize(buf.get_ref().clone()).unwrap();
@@ -254,14 +254,14 @@ mod tests {
     #[test]
     #[should_panic(expected = "Missing event ID")]
     fn deserializing_empty_defaults_no_reason() {
-        let buf = BytesMut::with_capacity(64).writer();
+        let buf = BytesMut::default().writer();
         Event::<CurrentNetwork>::deserialize(buf.get_ref().clone()).unwrap();
     }
 
     #[test]
     fn deserializing_invalid_data_panics() {
-        let mut buf = BytesMut::with_capacity(64).writer();
-        let invalid_id = 11u16;
+        let mut buf = BytesMut::default().writer();
+        let invalid_id = u16::MAX;
         bincode::serialize_into(&mut buf, &invalid_id).unwrap();
         assert_eq!(
             Event::<CurrentNetwork>::deserialize(buf.get_ref().clone()).unwrap_err().to_string(),
