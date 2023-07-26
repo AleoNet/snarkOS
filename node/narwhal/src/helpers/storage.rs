@@ -602,10 +602,10 @@ mod tests {
     /// Asserts that the storage matches the expected layout.
     pub fn assert_storage<N: Network>(
         storage: &Storage<N>,
-        committees: &Vec<(u64, Committee<N>)>,
-        rounds: &Vec<(u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)>,
-        certificates: &Vec<(Field<N>, BatchCertificate<N>)>,
-        batch_ids: &Vec<(Field<N>, u64)>,
+        committees: &[(u64, Committee<N>)],
+        rounds: &[(u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)],
+        certificates: &[(Field<N>, BatchCertificate<N>)],
+        batch_ids: &[(Field<N>, u64)],
         transmissions: &HashMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>,
     ) {
         // Ensure the committees are well-formed.
@@ -673,16 +673,9 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
 
         // Initialize the committees.
-        let committees = vec![(1, committee)];
+        let committees = [(1, committee)];
         // Ensure the storage is empty.
-        assert_storage(
-            &storage,
-            &committees,
-            &Default::default(),
-            &Default::default(),
-            &Default::default(),
-            &Default::default(),
-        );
+        assert_storage(&storage, &committees, &[], &[], &[], &Default::default());
 
         // Create a new certificate.
         let certificate = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(rng);
@@ -708,11 +701,11 @@ mod tests {
         // Check that the underlying storage representation is correct.
         {
             // Construct the expected layout for 'rounds'.
-            let rounds = vec![(round, indexset! { (certificate_id, batch_id, author) })];
+            let rounds = [(round, indexset! { (certificate_id, batch_id, author) })];
             // Construct the expected layout for 'certificates'.
-            let certificates = vec![(certificate_id, certificate.clone())];
+            let certificates = [(certificate_id, certificate.clone())];
             // Construct the expected layout for 'batch_ids'.
-            let batch_ids = vec![(batch_id, round)];
+            let batch_ids = [(batch_id, round)];
             // Assert the storage is well-formed.
             assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &transmissions);
         }
@@ -729,14 +722,7 @@ mod tests {
         // Ensure the certificate is no longer stored in the round.
         assert!(storage.get_certificates_for_round(round).is_empty());
         // Ensure the storage is empty.
-        assert_storage(
-            &storage,
-            &committees,
-            &Default::default(),
-            &Default::default(),
-            &Default::default(),
-            &Default::default(),
-        );
+        assert_storage(&storage, &committees, &[], &[], &[], &Default::default());
     }
 
     #[test]
@@ -749,16 +735,9 @@ mod tests {
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
 
         // Initialize the committees.
-        let committees = vec![(1, committee)];
+        let committees = [(1, committee)];
         // Ensure the storage is empty.
-        assert_storage(
-            &storage,
-            &committees,
-            &Default::default(),
-            &Default::default(),
-            &Default::default(),
-            &Default::default(),
-        );
+        assert_storage(&storage, &committees, &[], &[], &[], &Default::default());
 
         // Create a new certificate.
         let certificate = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(rng);
@@ -772,11 +751,11 @@ mod tests {
         let author = certificate.author();
 
         // Construct the expected layout for 'rounds'.
-        let rounds = vec![(round, indexset! { (certificate_id, batch_id, author) })];
+        let rounds = [(round, indexset! { (certificate_id, batch_id, author) })];
         // Construct the expected layout for 'certificates'.
-        let certificates = vec![(certificate_id, certificate.clone())];
+        let certificates = [(certificate_id, certificate.clone())];
         // Construct the expected layout for 'batch_ids'.
-        let batch_ids = vec![(batch_id, round)];
+        let batch_ids = [(batch_id, round)];
         // Construct the sample 'transmissions'.
         let (missing_transmissions, transmissions) = sample_transmissions(&certificate, rng);
 
@@ -969,16 +948,9 @@ pub mod prop_tests {
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
 
         // Initialize the committees.
-        let committees = vec![(committee.round(), committee)];
+        let committees = [(committee.round(), committee)];
         // Ensure the storage is empty.
-        assert_storage(
-            &storage,
-            &committees,
-            &Default::default(),
-            &Default::default(),
-            &Default::default(),
-            &Default::default(),
-        );
+        assert_storage(&storage, &committees, &[], &[], &[], &Default::default());
 
         // Create a new certificate.
         let signer = selector.select(&validators);
@@ -1019,11 +991,11 @@ pub mod prop_tests {
         let author = certificate.author();
 
         // Construct the expected layout for 'rounds'.
-        let rounds = vec![(round, indexset! { (certificate_id, batch_id, author) })];
+        let rounds = [(round, indexset! { (certificate_id, batch_id, author) })];
         // Construct the expected layout for 'certificates'.
-        let certificates = vec![(certificate_id, certificate.clone())];
+        let certificates = [(certificate_id, certificate.clone())];
         // Construct the expected layout for 'batch_ids'.
-        let batch_ids = vec![(batch_id, round)];
+        let batch_ids = [(batch_id, round)];
 
         // Insert the certificate.
         let missing_transmissions: HashMap<TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>> =
