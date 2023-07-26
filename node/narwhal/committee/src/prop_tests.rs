@@ -108,7 +108,8 @@ impl Arbitrary for ValidatorSet {
     type Strategy = BoxedStrategy<ValidatorSet>;
 
     fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
-        validator_set(any_valid_validator(), size_range(4..=MAX_COMMITTEE_SIZE as usize)).boxed()
+        // use minimal validator set to speed up tests that require signing from the committee members
+        validator_set(any_valid_validator(), size_range(4..=4usize)).boxed()
     }
 }
 
