@@ -86,8 +86,7 @@ mod prop_tests {
         let mut buf = BytesMut::with_capacity(64).writer();
         BatchSignature::serialize(&original, &mut buf).unwrap();
 
-        let deserialized: BatchSignature<CurrentNetwork> =
-            BatchSignature::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized: BatchSignature<CurrentNetwork> = BatchSignature::deserialize(buf.get_ref().clone()).unwrap();
         assert_eq!(original, deserialized);
     }
 }

@@ -86,8 +86,7 @@ mod prop_tests {
         let mut buf = BytesMut::with_capacity(64).writer();
         BatchPropose::serialize(&original, &mut buf).unwrap();
 
-        let deserialized: BatchPropose<CurrentNetwork> =
-            BatchPropose::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized: BatchPropose<CurrentNetwork> = BatchPropose::deserialize(buf.get_ref().clone()).unwrap();
         // because of the Data enum, we cannot compare the structs directly even though it derives PartialEq
         assert_eq!(original.round, deserialized.round);
         assert_eq!(
