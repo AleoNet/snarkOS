@@ -58,7 +58,7 @@ impl<N: Network> EventTrait for BatchCertified<N> {
 }
 
 #[cfg(test)]
-mod prop_tests {
+pub mod prop_tests {
     use crate::{
         event::{certificate_response::prop_tests::any_batch_certificate, EventTrait},
         BatchCertified,
@@ -69,7 +69,7 @@ mod prop_tests {
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    fn any_batch_certified() -> BoxedStrategy<BatchCertified<CurrentNetwork>> {
+    pub fn any_batch_certified() -> BoxedStrategy<BatchCertified<CurrentNetwork>> {
         any_batch_certificate().prop_map(BatchCertified::from).boxed()
     }
 

@@ -104,7 +104,7 @@ pub mod prop_tests {
             .boxed()
     }
 
-    fn any_certificate_response() -> BoxedStrategy<CertificateResponse<CurrentNetwork>> {
+    pub fn any_certificate_response() -> BoxedStrategy<CertificateResponse<CurrentNetwork>> {
         any_batch_certificate().prop_map(CertificateResponse::new).boxed()
     }
 

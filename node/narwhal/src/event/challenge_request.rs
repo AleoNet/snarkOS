@@ -51,7 +51,7 @@ impl<N: Network> EventTrait for ChallengeRequest<N> {
 }
 
 #[cfg(test)]
-mod prop_tests {
+pub mod prop_tests {
     use crate::{event::EventTrait, ChallengeRequest};
     use bytes::{BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
@@ -60,7 +60,7 @@ mod prop_tests {
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    fn any_challenge_request() -> BoxedStrategy<ChallengeRequest<CurrentNetwork>> {
+    pub fn any_challenge_request() -> BoxedStrategy<ChallengeRequest<CurrentNetwork>> {
         (any_valid_account(), any::<u64>(), any::<u32>(), any::<u16>())
             .prop_map(|(account, nonce, version, listener_port)| ChallengeRequest {
                 address: account.address(),

@@ -59,7 +59,7 @@ impl<N: Network> EventTrait for TransmissionRequest<N> {
 }
 
 #[cfg(test)]
-mod prop_tests {
+pub mod prop_tests {
     use crate::{
         event::EventTrait,
         helpers::storage::prop_tests::{any_puzzle_commitment, any_transaction_id},
@@ -82,7 +82,7 @@ mod prop_tests {
         .boxed()
     }
 
-    fn any_transmission_request() -> BoxedStrategy<TransmissionRequest<CurrentNetwork>> {
+    pub fn any_transmission_request() -> BoxedStrategy<TransmissionRequest<CurrentNetwork>> {
         any_transmission_id().prop_map(TransmissionRequest::new).boxed()
     }
 

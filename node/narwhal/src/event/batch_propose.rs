@@ -61,7 +61,7 @@ impl<N: Network> EventTrait for BatchPropose<N> {
 }
 
 #[cfg(test)]
-mod prop_tests {
+pub mod prop_tests {
     use crate::{
         event::{certificate_response::prop_tests::any_batch_header, EventTrait},
         BatchPropose,
@@ -74,7 +74,7 @@ mod prop_tests {
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    fn any_batch_propose() -> BoxedStrategy<BatchPropose<CurrentNetwork>> {
+    pub fn any_batch_propose() -> BoxedStrategy<BatchPropose<CurrentNetwork>> {
         any::<CommitteeContext>()
             .prop_flat_map(|committee| (any::<u64>(), any_batch_header(&committee)))
             .prop_map(|(round, batch_header)| BatchPropose::new(round, Data::Object(batch_header)))

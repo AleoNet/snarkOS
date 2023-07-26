@@ -64,7 +64,7 @@ pub mod prop_tests {
             .boxed()
     }
 
-    fn any_challenge_response() -> BoxedStrategy<ChallengeResponse<CurrentNetwork>> {
+    pub fn any_challenge_response() -> BoxedStrategy<ChallengeResponse<CurrentNetwork>> {
         any_signature().prop_map(|sig| ChallengeResponse { signature: Data::Object(sig) }).boxed()
     }
 

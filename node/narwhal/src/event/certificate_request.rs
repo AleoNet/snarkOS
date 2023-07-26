@@ -72,12 +72,12 @@ pub mod prop_tests {
         any::<CryptoTestRng>().prop_map(|mut rng| Field::rand(&mut rng)).boxed()
     }
 
-    fn any_challenge_request() -> BoxedStrategy<CertificateRequest<CurrentNetwork>> {
+    pub fn any_certificate_request() -> BoxedStrategy<CertificateRequest<CurrentNetwork>> {
         any_field().prop_map(CertificateRequest::new).boxed()
     }
 
     #[proptest]
-    fn serialize_deserialize(#[strategy(any_challenge_request())] original: CertificateRequest<CurrentNetwork>) {
+    fn serialize_deserialize(#[strategy(any_certificate_request())] original: CertificateRequest<CurrentNetwork>) {
         let mut buf = BytesMut::with_capacity(64).writer();
         CertificateRequest::serialize(&original, &mut buf).unwrap();
 

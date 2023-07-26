@@ -57,7 +57,7 @@ impl<N: Network> EventTrait for BatchSignature<N> {
 }
 
 #[cfg(test)]
-mod prop_tests {
+pub mod prop_tests {
     use crate::{
         event::{
             certificate_request::prop_tests::any_field,
@@ -73,7 +73,7 @@ mod prop_tests {
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    fn any_batch_signature() -> BoxedStrategy<BatchSignature<CurrentNetwork>> {
+    pub fn any_batch_signature() -> BoxedStrategy<BatchSignature<CurrentNetwork>> {
         (any_field(), any_signature(), Just(now()), -10..10i64)
             .prop_map(|(certificate_id, signature, timestamp, drift)| {
                 BatchSignature::new(certificate_id, signature, timestamp + drift)
