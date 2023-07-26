@@ -101,19 +101,19 @@ pub mod prop_tests {
             .boxed()
     }
 
-    fn any_certificate_response() -> BoxedStrategy<CertificateResponse<CurrentNetwork>> {
+    pub fn any_batch_certificate() -> BoxedStrategy<BatchCertificate<CurrentNetwork>> {
         any::<CommitteeContext>()
             .prop_flat_map(|committee| (Just(committee.clone()), any_batch_header(&committee), any::<CryptoTestRng>()))
             .prop_map(|(committee, batch_header, mut rng)| {
                 let CommitteeContext(_, validator_set) = committee;
-                let certificate = BatchCertificate::new(
-                    batch_header.clone(),
-                    sign_batch_header(&validator_set, &batch_header, &mut rng),
-                )
-                .unwrap();
-                CertificateResponse::new(certificate)
+                BatchCertificate::new(batch_header.clone(), sign_batch_header(&validator_set, &batch_header, &mut rng))
+                    .unwrap()
             })
             .boxed()
+    }
+
+    fn any_certificate_response() -> BoxedStrategy<CertificateResponse<CurrentNetwork>> {
+        any_batch_certificate().prop_map(CertificateResponse::new).boxed()
     }
 
     #[proptest]

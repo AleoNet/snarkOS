@@ -56,3 +56,33 @@ impl<N: Network> EventTrait for BatchCertified<N> {
         Ok(Self { certificate })
     }
 }
+
+#[cfg(test)]
+mod prop_tests {
+    use crate::{
+        event::{certificate_response::prop_tests::any_batch_certificate, EventTrait},
+        BatchCertified,
+    };
+    use bytes::{BufMut, BytesMut};
+    use proptest::prelude::{BoxedStrategy, Strategy};
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    fn any_batch_certified() -> BoxedStrategy<BatchCertified<CurrentNetwork>> {
+        any_batch_certificate().prop_map(BatchCertified::from).boxed()
+    }
+
+    #[proptest]
+    fn serialize_deserialize(#[strategy(any_batch_certified())] batch_certified: BatchCertified<CurrentNetwork>) {
+        let mut buf = BytesMut::with_capacity(64).writer();
+        BatchCertified::serialize(&batch_certified, &mut buf).unwrap();
+
+        let deserialized_batch_certified: BatchCertified<CurrentNetwork> =
+            BatchCertified::deserialize(buf.get_ref().clone()).unwrap();
+        assert_eq!(
+            batch_certified.certificate.deserialize_blocking().unwrap(),
+            deserialized_batch_certified.certificate.deserialize_blocking().unwrap()
+        );
+    }
+}
