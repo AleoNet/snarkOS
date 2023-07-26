@@ -62,7 +62,7 @@ impl<N: Network> EventTrait for TransmissionResponse<N> {
 }
 
 #[cfg(test)]
-mod prop_tests {
+pub mod prop_tests {
     use crate::{
         event::EventTrait,
         helpers::storage::prop_tests::{any_puzzle_commitment, any_transaction_id},
@@ -79,7 +79,7 @@ mod prop_tests {
     use test_strategy::proptest;
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    fn any_transmission() -> BoxedStrategy<(TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>)> {
+    pub fn any_transmission() -> BoxedStrategy<(TransmissionID<CurrentNetwork>, Transmission<CurrentNetwork>)> {
         prop_oneof![
             (any_puzzle_commitment(), collection::vec(any::<u8>(), 256..=256)).prop_map(|(pc, bytes)| (
                 TransmissionID::Solution(pc),

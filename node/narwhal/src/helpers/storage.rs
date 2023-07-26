@@ -919,7 +919,7 @@ pub mod prop_tests {
         .boxed()
     }
 
-    fn sign_batch_header<R: Rng + CryptoRng>(
+    pub fn sign_batch_header<R: Rng + CryptoRng>(
         validator_set: &ValidatorSet,
         batch_header: &BatchHeader<CurrentNetwork>,
         rng: &mut R,
