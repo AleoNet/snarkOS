@@ -83,20 +83,12 @@ pub mod prop_tests {
     pub fn any_batch_header(committee: &CommitteeContext) -> BoxedStrategy<BatchHeader<CurrentNetwork>> {
         (Just(committee.clone()), any::<Selector>(), any::<CryptoTestRng>(), vec(any_transmission(), 0..16))
             .prop_map(|(committee, selector, mut rng, transmissions)| {
-                let CommitteeContext(_, validator_set) = committee;
-                let ValidatorSet(validators) = validator_set.clone();
+                let CommitteeContext(_, ValidatorSet(validators)) = committee;
                 let signer = selector.select(validators);
                 let transmission_ids = transmissions.into_iter().map(|(id, _)| id).collect();
 
-                BatchHeader::new(
-                    &signer.account.private_key(),
-                    0,
-                    now(),
-                    transmission_ids,
-                    Default::default(),
-                    &mut rng,
-                )
-                .unwrap()
+                BatchHeader::new(signer.account.private_key(), 0, now(), transmission_ids, Default::default(), &mut rng)
+                    .unwrap()
             })
             .boxed()
     }

@@ -73,7 +73,7 @@ pub mod prop_tests {
     }
 
     fn any_challenge_request() -> BoxedStrategy<CertificateRequest<CurrentNetwork>> {
-        any_field().prop_map(|certificate_id| CertificateRequest::new(certificate_id)).boxed()
+        any_field().prop_map(CertificateRequest::new).boxed()
     }
 
     #[proptest]
