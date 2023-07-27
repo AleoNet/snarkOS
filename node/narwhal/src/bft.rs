@@ -578,3 +578,155 @@ impl<N: Network> BFT<N> {
         self.handles.lock().iter().for_each(|handle| handle.abort());
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{atomic::Ordering, Arc};
+
+    use anyhow::Result;
+    use indexmap::IndexSet;
+    use snarkos_account::Account;
+    use snarkos_node_narwhal_committee::test_helpers::{sample_committee, sample_committee_for_round};
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkvm::{prelude::narwhal::batch_certificate::test_helpers::sample_batch_certificate, utilities::TestRng};
+
+    use crate::{
+        helpers::{now, Storage},
+        BFT,
+    };
+
+    #[test]
+    fn test_is_leader_quorum_odd() -> Result<()> {
+        let mut rng = TestRng::default();
+        let committee = sample_committee(&mut rng);
+        let account = Account::new(&mut rng)?;
+        let storage = Storage::new(committee, 10);
+        let ledger = Arc::new(MockLedgerService::new());
+        let bft = BFT::new(account, storage, ledger, None, None)?;
+
+        assert!(bft.is_timer_expired()); // 0 + 5 < now()
+        let result = bft.is_leader_quorum_or_nonleaders_available(1);
+        assert!(result.is_ok()); // no previous leader certificate
+        assert!(result.unwrap());
+        // Set the leader certificate.
+        let leader_certificate = sample_batch_certificate(&mut rng);
+        *bft.leader_certificate.write() = Some(leader_certificate);
+        let result = bft.is_leader_quorum_or_nonleaders_available(1);
+        assert!(result.is_ok()); // should now fall through to end of function
+        assert!(result.unwrap());
+        // Set the timer to now().
+        bft.leader_certificate_timer.store(now(), Ordering::SeqCst);
+        assert!(!bft.is_timer_expired());
+        let result = bft.is_leader_quorum_or_nonleaders_available(1);
+        assert!(result.is_ok()); // should now fall through to end of function
+        // Should now return false, as the timer is not expired.
+        assert!(!result.unwrap());
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_leader_quorum_even_out_of_sync() -> Result<()> {
+        let mut rng = TestRng::default();
+        // Create a committee with round 1
+        let committee = sample_committee(&mut rng);
+        let account = Account::new(&mut rng)?;
+        let storage = Storage::new(committee, 10);
+        let ledger = Arc::new(MockLedgerService::new());
+        let bft = BFT::new(account, storage, ledger, None, None)?;
+
+        assert!(bft.is_timer_expired()); // 0 + 5 < now()
+        // Store is at round 1, and we are checking for round 2.
+        let result = bft.is_leader_quorum_or_nonleaders_available(2);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "BFT storage reference is out of sync with the current round");
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_leader_quorum_even() -> Result<()> {
+        let mut rng = TestRng::default();
+        let committee = sample_committee_for_round(2, &mut rng);
+        let account = Account::new(&mut rng)?;
+        let storage = Storage::new(committee, 10);
+        let ledger = Arc::new(MockLedgerService::new());
+        let bft = BFT::new(account, storage, ledger, None, None)?;
+
+        assert!(bft.is_timer_expired()); // 0 + 5 < now()
+        let result = bft.is_leader_quorum_or_nonleaders_available(2);
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "BFT does not compute stakes for the leader certificate in an even round"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn test_is_even_round_ready() -> Result<()> {
+        let mut rng = TestRng::default();
+        let committee = sample_committee_for_round(2, &mut rng);
+        let account = Account::new(&mut rng)?;
+        let storage = Storage::new(committee.clone(), 10);
+        let ledger = Arc::new(MockLedgerService::new());
+        let bft = BFT::new(account, storage, ledger, None, None)?;
+
+        let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee.clone());
+        assert!(!result);
+
+        // Set the leader certificate.
+        let leader_certificate = sample_batch_certificate(&mut rng);
+        *bft.leader_certificate.write() = Some(leader_certificate);
+        let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee);
+        // If leader certificate is set, we should be ready for next round.
+        assert!(result);
+        Ok(())
+    }
+
+    #[test]
+    fn test_update_leader_certificate_odd() -> Result<()> {
+        let mut rng = TestRng::default();
+        let committee = sample_committee(&mut rng);
+        let account = Account::new(&mut rng)?;
+        let storage = Storage::new(committee, 10);
+        let ledger = Arc::new(MockLedgerService::new());
+        let bft = BFT::new(account, storage, ledger, None, None)?;
+
+        let result = bft.update_leader_certificate(1);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "BFT cannot update the leader certificate in an odd round");
+        Ok(())
+    }
+
+    #[test]
+    fn test_update_leader_certificate_bad_round() -> Result<()> {
+        let mut rng = TestRng::default();
+        let committee = sample_committee(&mut rng);
+        let account = Account::new(&mut rng)?;
+        let storage = Storage::new(committee, 10);
+        let ledger = Arc::new(MockLedgerService::new());
+        let bft = BFT::new(account, storage, ledger, None, None)?;
+
+        let result = bft.update_leader_certificate(6);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), "BFT storage reference is out of sync with the current round");
+        Ok(())
+    }
+
+    #[test]
+    fn test_update_leader_certificate_even() -> Result<()> {
+        let mut rng = TestRng::default();
+        let committee = sample_committee_for_round(2, &mut rng);
+        let account = Account::new(&mut rng)?;
+        let storage = Storage::new(committee, 10);
+        let ledger = Arc::new(MockLedgerService::new());
+        let bft = BFT::new(account, storage, ledger, None, None)?;
+
+        // Set the leader certificate.
+        let leader_certificate = sample_batch_certificate(&mut rng);
+        *bft.leader_certificate.write() = Some(leader_certificate);
+        let result = bft.update_leader_certificate(2);
+        assert!(result.is_ok());
+
+        Ok(())
+    }
+}
