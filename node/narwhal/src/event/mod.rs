@@ -178,3 +178,94 @@ impl<N: Network> Event<N> {
         Ok(event)
     }
 }
+
+#[cfg(test)]
+mod prop_tests {
+    use crate::{
+        event::{
+            batch_certified::prop_tests::any_batch_certified,
+            batch_propose::prop_tests::any_batch_propose,
+            batch_signature::prop_tests::any_batch_signature,
+            certificate_request::prop_tests::any_certificate_request,
+            certificate_response::prop_tests::any_certificate_response,
+            challenge_request::prop_tests::any_challenge_request,
+            challenge_response::prop_tests::any_challenge_response,
+            transmission_request::prop_tests::any_transmission_request,
+            transmission_response::prop_tests::any_transmission_response,
+            worker_ping::prop_tests::any_worker_ping,
+        },
+        Disconnect,
+        DisconnectReason,
+        Event,
+    };
+    use bytes::{BufMut, BytesMut};
+    use proptest::{
+        prelude::{any, BoxedStrategy, Just, Strategy},
+        prop_oneof,
+        sample::Selector,
+    };
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    fn any_event() -> BoxedStrategy<Event<CurrentNetwork>> {
+        prop_oneof![
+            any_batch_certified().prop_map(Event::BatchCertified),
+            any_batch_propose().prop_map(Event::BatchPropose),
+            any_batch_signature().prop_map(Event::BatchSignature),
+            any_certificate_request().prop_map(Event::CertificateRequest),
+            any_certificate_response().prop_map(Event::CertificateResponse),
+            any_challenge_request().prop_map(Event::ChallengeRequest),
+            any_challenge_response().prop_map(Event::ChallengeResponse),
+            (
+                Just(vec![
+                    DisconnectReason::ProtocolViolation,
+                    DisconnectReason::NoReasonGiven,
+                    DisconnectReason::InvalidChallengeResponse,
+                    DisconnectReason::OutdatedClientVersion,
+                ]),
+                any::<Selector>()
+            )
+                .prop_map(|(reasons, selector)| Event::Disconnect(Disconnect::from(selector.select(reasons)))),
+            any_transmission_request().prop_map(Event::TransmissionRequest),
+            any_transmission_response().prop_map(Event::TransmissionResponse),
+            any_worker_ping().prop_map(Event::WorkerPing)
+        ]
+        .boxed()
+    }
+
+    #[proptest]
+    fn serialize_deserialize(#[strategy(any_event())] original: Event<CurrentNetwork>) {
+        let mut buf = BytesMut::default().writer();
+        Event::serialize(&original, &mut buf).unwrap();
+
+        let deserialized: Event<CurrentNetwork> = Event::deserialize(buf.get_ref().clone()).unwrap();
+        assert_eq!(original.id(), deserialized.id());
+        assert_eq!(original.name(), deserialized.name());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Event;
+    use bytes::{BufMut, BytesMut};
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    #[test]
+    #[should_panic(expected = "Missing event ID")]
+    fn deserializing_empty_defaults_no_reason() {
+        let buf = BytesMut::default().writer();
+        Event::<CurrentNetwork>::deserialize(buf.get_ref().clone()).unwrap();
+    }
+
+    #[test]
+    fn deserializing_invalid_data_panics() {
+        let mut buf = BytesMut::default().writer();
+        let invalid_id = u16::MAX;
+        bincode::serialize_into(&mut buf, &invalid_id).unwrap();
+        assert_eq!(
+            Event::<CurrentNetwork>::deserialize(buf.get_ref().clone()).unwrap_err().to_string(),
+            format!("Unknown event ID {invalid_id}")
+        );
+    }
+}

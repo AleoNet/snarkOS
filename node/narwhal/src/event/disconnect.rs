@@ -63,3 +63,44 @@ impl EventTrait for Disconnect {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::{event::EventTrait, Disconnect, DisconnectReason};
+    use bytes::{BufMut, BytesMut};
+
+    #[test]
+    fn serialize_deserialize() {
+        // TODO switch to an iteration method that doesn't require manually updating this vec if enums are added
+        let all_reasons = vec![
+            DisconnectReason::ProtocolViolation,
+            DisconnectReason::NoReasonGiven,
+            DisconnectReason::InvalidChallengeResponse,
+            DisconnectReason::OutdatedClientVersion,
+        ];
+
+        for reason in all_reasons.iter() {
+            let disconnect = Disconnect::from(*reason);
+            let mut buf = BytesMut::default().writer();
+            Disconnect::serialize(&disconnect, &mut buf).unwrap();
+
+            let disconnect = Disconnect::deserialize(buf.get_ref().clone()).unwrap();
+            assert_eq!(reason, &disconnect.reason);
+        }
+    }
+
+    #[test]
+    fn deserializing_empty_defaults_no_reason() {
+        let buf = BytesMut::default().writer();
+        let disconnect = Disconnect::deserialize(buf.get_ref().clone()).unwrap();
+        assert_eq!(disconnect.reason, DisconnectReason::NoReasonGiven);
+    }
+
+    #[test]
+    #[should_panic(expected = "Invalid 'Disconnect' event")]
+    fn deserializing_invalid_data_panics() {
+        let mut buf = BytesMut::default().writer();
+        bincode::serialize_into(&mut buf, "not a DisconnectReason-value").unwrap();
+        let _disconnect = Disconnect::deserialize(buf.get_ref().clone()).unwrap();
+    }
+}

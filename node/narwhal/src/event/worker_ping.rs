@@ -64,3 +64,28 @@ impl<N: Network> EventTrait for WorkerPing<N> {
         Ok(Self { transmission_ids })
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{event::EventTrait, helpers::storage::prop_tests::any_transmission_id, WorkerPing};
+    use bytes::{BufMut, BytesMut};
+    use proptest::{
+        collection::hash_set,
+        prelude::{BoxedStrategy, Strategy},
+    };
+    use test_strategy::proptest;
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_worker_ping() -> BoxedStrategy<WorkerPing<CurrentNetwork>> {
+        hash_set(any_transmission_id(), 1..16).prop_map(|ids| WorkerPing::new(ids.into_iter().collect())).boxed()
+    }
+
+    #[proptest]
+    fn serialize_deserialize(#[strategy(any_worker_ping())] original: WorkerPing<CurrentNetwork>) {
+        let mut buf = BytesMut::default().writer();
+        WorkerPing::serialize(&original, &mut buf).unwrap();
+
+        let deserialized = WorkerPing::deserialize(buf.get_ref().clone()).unwrap();
+        assert_eq!(original, deserialized);
+    }
+}

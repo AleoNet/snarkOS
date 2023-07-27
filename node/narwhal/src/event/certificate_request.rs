@@ -57,3 +57,32 @@ impl<N: Network> EventTrait for CertificateRequest<N> {
         Ok(Self { certificate_id })
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{event::EventTrait, helpers::storage::prop_tests::CryptoTestRng, CertificateRequest};
+    use bytes::{BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use snarkvm::prelude::{Field, Uniform};
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_field() -> BoxedStrategy<Field<CurrentNetwork>> {
+        any::<CryptoTestRng>().prop_map(|mut rng| Field::rand(&mut rng)).boxed()
+    }
+
+    pub fn any_certificate_request() -> BoxedStrategy<CertificateRequest<CurrentNetwork>> {
+        any_field().prop_map(CertificateRequest::new).boxed()
+    }
+
+    #[proptest]
+    fn serialize_deserialize(#[strategy(any_certificate_request())] original: CertificateRequest<CurrentNetwork>) {
+        let mut buf = BytesMut::default().writer();
+        CertificateRequest::serialize(&original, &mut buf).unwrap();
+
+        let deserialized: CertificateRequest<CurrentNetwork> =
+            CertificateRequest::deserialize(buf.get_ref().clone()).unwrap();
+        assert_eq!(original, deserialized);
+    }
+}

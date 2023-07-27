@@ -49,3 +49,35 @@ impl<N: Network> EventTrait for ChallengeRequest<N> {
         Ok(Self { version, listener_port, address, nonce })
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{event::EventTrait, ChallengeRequest};
+    use bytes::{BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use snarkos_node_narwhal_committee::prop_tests::any_valid_account;
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_challenge_request() -> BoxedStrategy<ChallengeRequest<CurrentNetwork>> {
+        (any_valid_account(), any::<u64>(), any::<u32>(), any::<u16>())
+            .prop_map(|(account, nonce, version, listener_port)| ChallengeRequest {
+                address: account.address(),
+                nonce,
+                version,
+                listener_port,
+            })
+            .boxed()
+    }
+
+    #[proptest]
+    fn serialize_deserialize(#[strategy(any_challenge_request())] original: ChallengeRequest<CurrentNetwork>) {
+        let mut buf = BytesMut::default().writer();
+        ChallengeRequest::serialize(&original, &mut buf).unwrap();
+
+        let deserialized: ChallengeRequest<CurrentNetwork> =
+            ChallengeRequest::deserialize(buf.get_ref().clone()).unwrap();
+        assert_eq!(original, deserialized);
+    }
+}

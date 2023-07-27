@@ -39,3 +39,45 @@ impl<N: Network> EventTrait for ChallengeResponse<N> {
         Ok(Self { signature: Data::Buffer(reader.into_inner().freeze()) })
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{event::EventTrait, helpers::storage::prop_tests::CryptoTestRng, ChallengeResponse};
+    use bytes::{BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use snarkvm::{
+        ledger::narwhal::Data,
+        prelude::{PrivateKey, Signature},
+        utilities::rand::Uniform,
+    };
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_signature() -> BoxedStrategy<Signature<CurrentNetwork>> {
+        (any::<CryptoTestRng>(), 0..64)
+            .prop_map(|(mut rng, message_size)| {
+                let message: Vec<_> = (0..message_size).map(|_| Uniform::rand(&mut rng)).collect();
+                let private_key = PrivateKey::new(&mut rng).unwrap();
+                Signature::sign(&private_key, &message, &mut rng).unwrap()
+            })
+            .boxed()
+    }
+
+    pub fn any_challenge_response() -> BoxedStrategy<ChallengeResponse<CurrentNetwork>> {
+        any_signature().prop_map(|sig| ChallengeResponse { signature: Data::Object(sig) }).boxed()
+    }
+
+    #[proptest]
+    fn serialize_deserialize(#[strategy(any_challenge_response())] original: ChallengeResponse<CurrentNetwork>) {
+        let mut buf = BytesMut::default().writer();
+        ChallengeResponse::serialize(&original, &mut buf).unwrap();
+
+        let deserialized: ChallengeResponse<CurrentNetwork> =
+            ChallengeResponse::deserialize(buf.get_ref().clone()).unwrap();
+        assert_eq!(
+            original.signature.deserialize_blocking().unwrap(),
+            deserialized.signature.deserialize_blocking().unwrap()
+        );
+    }
+}

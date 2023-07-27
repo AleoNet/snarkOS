@@ -59,3 +59,39 @@ impl<N: Network> EventTrait for BatchPropose<N> {
         Ok(Self { round, batch_header })
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{
+        event::{certificate_response::prop_tests::any_batch_header, EventTrait},
+        BatchPropose,
+    };
+    use bytes::{BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use snarkos_node_narwhal_committee::prop_tests::CommitteeContext;
+    use snarkvm::prelude::narwhal::Data;
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_batch_propose() -> BoxedStrategy<BatchPropose<CurrentNetwork>> {
+        any::<CommitteeContext>()
+            .prop_flat_map(|committee| (any::<u64>(), any_batch_header(&committee)))
+            .prop_map(|(round, batch_header)| BatchPropose::new(round, Data::Object(batch_header)))
+            .boxed()
+    }
+
+    #[proptest]
+    fn serialize_deserialize(#[strategy(any_batch_propose())] original: BatchPropose<CurrentNetwork>) {
+        let mut buf = BytesMut::default().writer();
+        BatchPropose::serialize(&original, &mut buf).unwrap();
+
+        let deserialized: BatchPropose<CurrentNetwork> = BatchPropose::deserialize(buf.get_ref().clone()).unwrap();
+        // because of the Data enum, we cannot compare the structs directly even though it derives PartialEq
+        assert_eq!(original.round, deserialized.round);
+        assert_eq!(
+            original.batch_header.deserialize_blocking().unwrap(),
+            deserialized.batch_header.deserialize_blocking().unwrap()
+        );
+    }
+}

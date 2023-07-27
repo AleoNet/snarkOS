@@ -57,3 +57,41 @@ impl<N: Network> EventTrait for TransmissionRequest<N> {
         Ok(Self { transmission_id })
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{
+        event::EventTrait,
+        helpers::storage::prop_tests::{any_puzzle_commitment, any_transaction_id},
+        TransmissionRequest,
+    };
+    use bytes::{BufMut, BytesMut};
+    use proptest::{
+        prelude::{BoxedStrategy, Strategy},
+        prop_oneof,
+    };
+    use snarkvm::ledger::narwhal::TransmissionID;
+    use test_strategy::proptest;
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
+        prop_oneof![
+            any_puzzle_commitment().prop_map(TransmissionID::Solution),
+            any_transaction_id().prop_map(TransmissionID::Transaction),
+        ]
+        .boxed()
+    }
+
+    pub fn any_transmission_request() -> BoxedStrategy<TransmissionRequest<CurrentNetwork>> {
+        any_transmission_id().prop_map(TransmissionRequest::new).boxed()
+    }
+
+    #[proptest]
+    fn serialize_deserialize(#[strategy(any_transmission_request())] original: TransmissionRequest<CurrentNetwork>) {
+        let mut buf = BytesMut::default().writer();
+        TransmissionRequest::serialize(&original, &mut buf).unwrap();
+
+        let deserialized = TransmissionRequest::deserialize(buf.get_ref().clone()).unwrap();
+        assert_eq!(original, deserialized);
+    }
+}

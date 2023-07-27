@@ -57,3 +57,64 @@ impl<N: Network> EventTrait for CertificateResponse<N> {
         Ok(Self { certificate })
     }
 }
+
+#[cfg(test)]
+pub mod prop_tests {
+    use crate::{
+        event::{transmission_response::prop_tests::any_transmission, EventTrait},
+        helpers::{
+            now,
+            storage::prop_tests::{sign_batch_header, CryptoTestRng},
+        },
+        CertificateResponse,
+    };
+    use bytes::{BufMut, BytesMut};
+    use proptest::{
+        collection::vec,
+        prelude::{any, BoxedStrategy, Just, Strategy},
+        sample::Selector,
+    };
+    use snarkos_node_narwhal_committee::prop_tests::{CommitteeContext, ValidatorSet};
+    use snarkvm::ledger::narwhal::{BatchCertificate, BatchHeader};
+    use test_strategy::proptest;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    pub fn any_batch_header(committee: &CommitteeContext) -> BoxedStrategy<BatchHeader<CurrentNetwork>> {
+        (Just(committee.clone()), any::<Selector>(), any::<CryptoTestRng>(), vec(any_transmission(), 0..16))
+            .prop_map(|(committee, selector, mut rng, transmissions)| {
+                let CommitteeContext(_, ValidatorSet(validators)) = committee;
+                let signer = selector.select(validators);
+                let transmission_ids = transmissions.into_iter().map(|(id, _)| id).collect();
+
+                BatchHeader::new(signer.account.private_key(), 0, now(), transmission_ids, Default::default(), &mut rng)
+                    .unwrap()
+            })
+            .boxed()
+    }
+
+    pub fn any_batch_certificate() -> BoxedStrategy<BatchCertificate<CurrentNetwork>> {
+        any::<CommitteeContext>()
+            .prop_flat_map(|committee| (Just(committee.clone()), any_batch_header(&committee), any::<CryptoTestRng>()))
+            .prop_map(|(committee, batch_header, mut rng)| {
+                let CommitteeContext(_, validator_set) = committee;
+                BatchCertificate::new(batch_header.clone(), sign_batch_header(&validator_set, &batch_header, &mut rng))
+                    .unwrap()
+            })
+            .boxed()
+    }
+
+    pub fn any_certificate_response() -> BoxedStrategy<CertificateResponse<CurrentNetwork>> {
+        any_batch_certificate().prop_map(CertificateResponse::new).boxed()
+    }
+
+    #[proptest]
+    fn serialize_deserialize(#[strategy(any_certificate_response())] original: CertificateResponse<CurrentNetwork>) {
+        let mut buf = BytesMut::default().writer();
+        CertificateResponse::serialize(&original, &mut buf).unwrap();
+
+        let deserialized: CertificateResponse<CurrentNetwork> =
+            CertificateResponse::deserialize(buf.get_ref().clone()).unwrap();
+        assert_eq!(original, deserialized);
+    }
+}
