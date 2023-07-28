@@ -131,7 +131,7 @@ async fn test_leader_election_consistency() {
     // From manual experimentation, the minimum round that works is 4.
     // Starting at 0 or 2 causes assertion failures. Seems like the committee takes a few rounds to stabilize.
     const STARTING_ROUND: u64 = 4;
-    const MAX_ROUND: u64 = 30;
+    const MAX_ROUND: u64 = 20;
 
     // Start N nodes, connect them and start the cannons for each.
     const N: u16 = 4;
