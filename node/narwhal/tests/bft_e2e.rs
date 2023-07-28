@@ -16,6 +16,7 @@ mod common;
 
 use crate::common::primary::{TestNetwork, TestNetworkConfig};
 use deadline::deadline;
+use itertools::Itertools;
 use snarkos_node_narwhal::MAX_BATCH_DELAY;
 use std::time::Duration;
 use tokio::time::sleep;
@@ -122,4 +123,64 @@ async fn test_quorum_break() {
 
     // Check the nodes have stopped advancing through the rounds.
     assert!(network.is_halted().await);
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn test_leader_election_consistency() {
+    // The minimum and maximum rounds to check for leader consistency.
+    // From manual experimentation, the minimum round that works is 4.
+    // Starting at 0 or 2 causes assertion failures. Seems like the committee takes a few rounds to stabilize.
+    const STARTING_ROUND: u64 = 4;
+    const MAX_ROUND: u64 = 20;
+
+    // Start N nodes, connect them and start the cannons for each.
+    const N: u16 = 4;
+    const CANNON_INTERVAL_MS: u64 = 10;
+    let mut network = TestNetwork::new(TestNetworkConfig {
+        num_nodes: N,
+        bft: true,
+        connect_all: true,
+        fire_cannons: Some(CANNON_INTERVAL_MS),
+        // Set this to Some(0..=4) to see the logs.
+        log_level: None,
+        log_connections: true,
+    });
+    network.start().await;
+
+    // Wait for starting round to be reached
+    let cloned_network = network.clone();
+    deadline!(Duration::from_secs(60), move || { cloned_network.is_round_reached(STARTING_ROUND) });
+
+    // Check that validators agree about leaders in every even round
+    for target_round in (STARTING_ROUND..=MAX_ROUND).step_by(2) {
+        let cloned_network = network.clone();
+        deadline!(Duration::from_secs(20), move || { cloned_network.is_round_reached(target_round) });
+
+        // Get all validators in the network
+        let validators = network.validators.values().collect_vec();
+
+        // Get all validators in sync with the current round
+        let validators_for_round =
+            validators.iter().filter(|validator| validator.primary.current_round() == target_round).collect_vec();
+
+        // Get all leaders for the current round
+        let leaders = validators_for_round
+            .iter()
+            .flat_map(|v| v.bft.clone().map(|bft| bft.leader()))
+            .flatten()
+            .collect::<Vec<_>>();
+
+        println!(
+            "Found {} validators with a leader (out of {}, {} out of sync)",
+            leaders.len(),
+            validators_for_round.len(),
+            validators.len() - validators_for_round.len()
+        );
+
+        // Assert that we have x leaders for x validators that have reached the target round
+        assert_eq!(leaders.len(), validators_for_round.len());
+
+        // Assert that all leaders are equal
+        assert!(leaders.iter().all_equal());
+    }
 }
