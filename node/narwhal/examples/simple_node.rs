@@ -420,9 +420,9 @@ struct Args {
     /// The number of nodes in the network.
     #[arg(long, value_name = "N")]
     num_nodes: u16,
-    /// If set, the path to the file containing the committee configuration.
+    /// If set, the path to the file containing the committee peers.
     #[arg(long, value_name = "PATH")]
-    config: Option<PathBuf>,
+    peers: Option<PathBuf>,
     /// Enables the solution cannons, and optionally the interval in ms to run them on.
     #[arg(long, value_name = "INTERVAL_MS")]
     fire_solutions: Option<Option<u64>>,
@@ -456,7 +456,7 @@ async fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    let peers = match args.config {
+    let peers = match args.peers {
         Some(path) => parse_peers(std::fs::read_to_string(path)?)?,
         None => Default::default(),
     };
@@ -477,38 +477,26 @@ async fn main() -> Result<()> {
         Mode::Narwhal => start_primary(args.id, args.num_nodes, peers).await?,
     };
 
-    const DEFAULT_INTERVAL_MS: u64 = 450;
+    // The default interval to fire transmissions at.
+    const DEFAULT_INTERVAL_MS: u64 = 450; // ms
 
-    // Set the interval in milliseconds for the solution and transaction cannons.
-    let (solution_interval_ms, transaction_interval_ms) =
-        match (args.fire_transmissions, args.fire_solutions, args.fire_transactions) {
-            // Set the solution and transaction intervals to the same value.
-            (Some(fire_transmissions), _, _) => (
-                Some(fire_transmissions.unwrap_or(DEFAULT_INTERVAL_MS)),
-                Some(fire_transmissions.unwrap_or(DEFAULT_INTERVAL_MS)),
-            ),
-            // Set the solution and transaction intervals to their configured values.
-            (None, Some(fire_solutions), Some(fire_transactions)) => (
-                Some(fire_solutions.unwrap_or(DEFAULT_INTERVAL_MS)),
-                Some(fire_transactions.unwrap_or(DEFAULT_INTERVAL_MS)),
-            ),
-            // Set only the solution interval.
-            (None, Some(fire_solutions), None) => (Some(fire_solutions.unwrap_or(DEFAULT_INTERVAL_MS)), None),
-            // Set only the transaction interval.
-            (None, None, Some(fire_transactions)) => (None, Some(fire_transactions.unwrap_or(DEFAULT_INTERVAL_MS))),
-            // Don't fire any solutions or transactions.
-            _ => (None, None),
-        };
+    // Fire unconfirmed solutions.
+    match (args.fire_transmissions, args.fire_solutions) {
+        // Note: We allow the user to overload the solutions rate, even when the 'fire-transmissions' flag is enabled.
+        (Some(rate), _) | (_, Some(rate)) => {
+            fire_unconfirmed_solutions(&sender, args.id, rate.unwrap_or(DEFAULT_INTERVAL_MS));
+        }
+        _ => (),
+    };
 
-    // Fire solutions.
-    if let Some(interval_ms) = solution_interval_ms {
-        fire_unconfirmed_solutions(&sender, args.id, interval_ms);
-    }
-
-    // Fire transactions.
-    if let Some(interval_ms) = transaction_interval_ms {
-        fire_unconfirmed_transactions(&sender, args.id, interval_ms);
-    }
+    // Fire unconfirmed transactions.
+    match (args.fire_transmissions, args.fire_transactions) {
+        // Note: We allow the user to overload the transactions rate, even when the 'fire-transmissions' flag is enabled.
+        (Some(rate), _) | (_, Some(rate)) => {
+            fire_unconfirmed_transactions(&sender, args.id, rate.unwrap_or(DEFAULT_INTERVAL_MS));
+        }
+        _ => (),
+    };
 
     // Start the monitoring server.
     start_server(bft_holder, primary, args.id).await;
