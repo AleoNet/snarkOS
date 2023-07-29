@@ -98,6 +98,9 @@ version = "0.7.4"
 default-features = false
 features = [ "erased-json" ]
 
+[dev-dependencies.clap]
+version = "4.3"
+
 [dev-dependencies.deadline]
 version = "0.2"
 

@@ -37,7 +37,7 @@ use snarkvm::{
 };
 
 use ::bytes::Bytes;
-use anyhow::{anyhow, bail, ensure, Error, Result};
+use anyhow::{anyhow, ensure, Error, Result};
 use axum::{
     extract::{Path, State},
     http::StatusCode,
@@ -46,10 +46,11 @@ use axum::{
     Router,
 };
 use axum_extra::response::ErasedJson;
+use clap::{Parser, ValueEnum};
 use indexmap::IndexMap;
 use parking_lot::RwLock;
 use rand::{Rng, SeedableRng};
-use std::{collections::HashMap, net::SocketAddr, str::FromStr, sync::Arc};
+use std::{collections::HashMap, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use tokio::sync::oneshot;
 use tracing_subscriber::{
     layer::{Layer, SubscriberExt},
@@ -247,7 +248,7 @@ fn handle_signals(primary: &Primary<CurrentNetwork>) {
 /**************************************************************************************************/
 
 /// Fires *fake* unconfirmed solutions at the node.
-fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_id: u16) {
+fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_id: u16, interval_ms: u64) {
     let tx_unconfirmed_solution = sender.tx_unconfirmed_solution.clone();
     tokio::task::spawn(async move {
         // This RNG samples the *same* fake solutions for all nodes.
@@ -283,13 +284,13 @@ fn fire_unconfirmed_solutions(sender: &PrimarySender<CurrentNetwork>, node_id: u
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(450)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(interval_ms)).await;
         }
     });
 }
 
 /// Fires *fake* unconfirmed transactions at the node.
-fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id: u16) {
+fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id: u16, interval_ms: u64) {
     let tx_unconfirmed_transaction = sender.tx_unconfirmed_transaction.clone();
     tokio::task::spawn(async move {
         // This RNG samples the *same* fake transactions for all nodes.
@@ -325,7 +326,7 @@ fn fire_unconfirmed_transactions(sender: &PrimarySender<CurrentNetwork>, node_id
             // Increment the counter.
             counter += 1;
             // Sleep briefly.
-            tokio::time::sleep(std::time::Duration::from_millis(450)).await;
+            tokio::time::sleep(std::time::Duration::from_millis(interval_ms)).await;
         }
     });
 }
@@ -398,6 +399,41 @@ async fn start_server(bft: Option<BFT<CurrentNetwork>>, primary: Primary<Current
 
 /**************************************************************************************************/
 
+/// The operating mode of the node.
+#[derive(Debug, Clone, ValueEnum)]
+enum Mode {
+    /// Runs the node with the Narwhal memory pool protocol.
+    Narwhal,
+    /// Runs the node with the Bullshark BFT protocol (on top of Narwhal).
+    Bft,
+}
+
+/// A simple CLI for the node.
+#[derive(Parser, Debug)]
+struct Args {
+    /// The mode to run the node in.
+    #[arg(long)]
+    mode: Mode,
+    /// The ID of the node.
+    #[arg(long, value_name = "ID")]
+    id: u16,
+    /// The number of nodes in the network.
+    #[arg(long, value_name = "N")]
+    num_nodes: u16,
+    /// If set, the path to the file containing the committee configuration.
+    #[arg(long, value_name = "PATH")]
+    config: Option<PathBuf>,
+    /// Enables the solution cannons, and optionally the interval in ms to run them on.
+    #[arg(long, value_name = "INTERVAL_MS")]
+    fire_solutions: Option<Option<u64>>,
+    /// Enables the transaction cannons, and optionally the interval in ms to run them on.
+    #[arg(long, value_name = "INTERVAL_MS")]
+    fire_transactions: Option<Option<u64>>,
+    /// Enables the solution and transaction cannons, and optionally the interval in ms to run them on.
+    #[arg(long, value_name = "INTERVAL_MS")]
+    fire_transmissions: Option<Option<u64>>,
+}
+
 /// A helper method to parse the peers provided to the CLI.
 fn parse_peers(peers_string: String) -> Result<HashMap<u16, SocketAddr>, Error> {
     // Expect list of peers in the form of `node_id=ip:port`, one per line.
@@ -418,52 +454,64 @@ fn parse_peers(peers_string: String) -> Result<HashMap<u16, SocketAddr>, Error> 
 async fn main() -> Result<()> {
     initialize_logger(1);
 
-    // Retrieve the command-line arguments.
-    let args: Vec<String> = std::env::args().collect();
-    if args.len() < 4 {
-        bail!("Please provide the commands to start a node.")
-    }
+    let args = Args::parse();
 
-    // Parse the mode.
-    let mode = args[1].as_str();
-    if mode != "bft" && mode != "narwhal" {
-        bail!("Please provide a valid mode - 'bft' or 'narwhal'.")
-    }
-    // Parse the node ID.
-    let node_id = u16::from_str(&args[2])?;
-    // Parse the number of nodes.
-    let num_nodes = u16::from_str(&args[3])?;
-
-    // (optional) Parse the peers from a file.
-    let peers = match args.len() > 4 {
-        true => parse_peers(std::fs::read_to_string(&args[4])?)?,
-        false => Default::default(),
+    let peers = match args.config {
+        Some(path) => parse_peers(std::fs::read_to_string(path)?)?,
+        None => Default::default(),
     };
 
     // Initialize an optional BFT holder.
     let mut bft_holder = None;
 
     // Start the node.
-    let (primary, sender) = match mode {
-        "bft" => {
+    let (primary, sender) = match args.mode {
+        Mode::Bft => {
             // Start the BFT.
-            let (bft, sender) = start_bft(node_id, num_nodes, peers).await?;
+            let (bft, sender) = start_bft(args.id, args.num_nodes, peers).await?;
             // Set the BFT holder.
             bft_holder = Some(bft.clone());
             // Return the primary and sender.
             (bft.primary().clone(), sender)
         }
-        "narwhal" => start_primary(node_id, num_nodes, peers).await?,
-        _ => unreachable!(),
+        Mode::Narwhal => start_primary(args.id, args.num_nodes, peers).await?,
     };
 
-    // Fire unconfirmed solutions.
-    fire_unconfirmed_solutions(&sender, node_id);
-    // Fire unconfirmed transactions.
-    fire_unconfirmed_transactions(&sender, node_id);
+    const DEFAULT_INTERVAL_MS: u64 = 450;
+
+    // Set the interval in milliseconds for the solution and transaction cannons.
+    let (solution_interval_ms, transaction_interval_ms) =
+        match (args.fire_transmissions, args.fire_solutions, args.fire_transactions) {
+            // Set the solution and transaction intervals to the same value.
+            (Some(fire_transmissions), _, _) => (
+                Some(fire_transmissions.unwrap_or(DEFAULT_INTERVAL_MS)),
+                Some(fire_transmissions.unwrap_or(DEFAULT_INTERVAL_MS)),
+            ),
+            // Set the solution and transaction intervals to their configured values.
+            (None, Some(fire_solutions), Some(fire_transactions)) => (
+                Some(fire_solutions.unwrap_or(DEFAULT_INTERVAL_MS)),
+                Some(fire_transactions.unwrap_or(DEFAULT_INTERVAL_MS)),
+            ),
+            // Set only the solution interval.
+            (None, Some(fire_solutions), None) => (Some(fire_solutions.unwrap_or(DEFAULT_INTERVAL_MS)), None),
+            // Set only the transaction interval.
+            (None, None, Some(fire_transactions)) => (None, Some(fire_transactions.unwrap_or(DEFAULT_INTERVAL_MS))),
+            // Don't fire any solutions or transactions.
+            _ => (None, None),
+        };
+
+    // Fire solutions.
+    if let Some(interval_ms) = solution_interval_ms {
+        fire_unconfirmed_solutions(&sender, args.id, interval_ms);
+    }
+
+    // Fire transactions.
+    if let Some(interval_ms) = transaction_interval_ms {
+        fire_unconfirmed_transactions(&sender, args.id, interval_ms);
+    }
 
     // Start the monitoring server.
-    start_server(bft_holder, primary, node_id).await;
+    start_server(bft_holder, primary, args.id).await;
     // // Note: Do not move this.
     // std::future::pending::<()>().await;
     Ok(())
