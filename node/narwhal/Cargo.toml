@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-narwhal"
-version = "2.1.4"
+version = "2.1.6"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A Narwhal-style memory pool for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -54,21 +54,21 @@ default-features = false
 
 [dependencies.snarkos-account]
 path = "../../account"
-version = "=2.1.4"
+version = "=2.1.6"
 
 [dependencies.snarkos-node-narwhal-committee]
 path = "./committee"
-version = "=2.1.4"
+version = "=2.1.6"
 default-features = false
 
 [dependencies.snarkos-node-narwhal-ledger-service]
 path = "./ledger-service"
-version = "=2.1.4"
+version = "=2.1.6"
 default-features = false
 
 [dependencies.snarkos-node-tcp]
 path = "../tcp"
-version = "=2.1.4"
+version = "=2.1.6"
 
 [dependencies.snarkvm]
 workspace = true

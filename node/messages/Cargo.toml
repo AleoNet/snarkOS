@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-messages"
-version = "2.1.4"
+version = "2.1.6"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Node messages for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -21,7 +21,7 @@ default = [ ]
 test = [ ]
 
 [dependencies.anyhow]
-version = "1.0.70"
+version = "1.0.72"
 
 [dependencies.bincode]
 version = "1.0"

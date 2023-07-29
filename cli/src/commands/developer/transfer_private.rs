@@ -19,9 +19,7 @@ use snarkvm::prelude::{
     store::{helpers::memory::ConsensusMemory, ConsensusStore},
     Address,
     Locator,
-    Plaintext,
     PrivateKey,
-    Record,
     Value,
     VM,
 };
@@ -35,7 +33,7 @@ use std::str::FromStr;
 pub struct TransferPrivate {
     /// The input record used to craft the transfer.
     #[clap(long)]
-    input_record: Record<CurrentNetwork, Plaintext<CurrentNetwork>>,
+    input_record: String,
     /// The recipient address.
     #[clap(long)]
     recipient: Address<CurrentNetwork>,
@@ -48,7 +46,7 @@ pub struct TransferPrivate {
     /// The endpoint to query node state from.
     #[clap(short, long)]
     query: String,
-    /// The transaction fee in microcredits.
+    /// The priority fee in microcredits.
     #[clap(short, long)]
     fee: u64,
     /// The record to spend the fee from.
@@ -82,8 +80,8 @@ impl TransferPrivate {
 
         println!("📦 Creating private transfer of {} microcredits to {}...\n", self.amount, self.recipient);
 
-        // Generate the transfer transaction.
-        let execution = {
+        // Generate the transfer_private transaction.
+        let transaction = {
             // Initialize an RNG.
             let rng = &mut rand::thread_rng();
 
@@ -92,11 +90,13 @@ impl TransferPrivate {
             let vm = VM::from(store)?;
 
             // Prepare the fees.
-            let fee = (Record::<CurrentNetwork, Plaintext<CurrentNetwork>>::from_str(&self.fee_record)?, self.fee);
+            let fee_record = Developer::parse_record(&private_key, &self.fee_record)?;
+            let fee = (fee_record, self.fee);
 
             // Prepare the inputs for a transfer.
+            let input_record = Developer::parse_record(&private_key, &self.input_record)?;
             let inputs = vec![
-                Value::Record(self.input_record.clone()),
+                Value::Record(input_record),
                 Value::from_str(&format!("{}", self.recipient))?,
                 Value::from_str(&format!("{}u64", self.amount))?,
             ];
@@ -108,6 +108,6 @@ impl TransferPrivate {
         println!("✅ Created private transfer of {} microcredits to {}\n", &self.amount, self.recipient);
 
         // Determine if the transaction should be broadcast, stored, or displayed to user.
-        Developer::handle_transaction(self.broadcast, self.dry_run, self.store, execution, locator.to_string())
+        Developer::handle_transaction(self.broadcast, self.dry_run, self.store, transaction, locator.to_string())
     }
 }

@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-account"
-version = "2.1.4"
+version = "2.1.6"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "Account for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -17,7 +17,7 @@ license = "Apache-2.0"
 edition = "2021"
 
 [dependencies.anyhow]
-version = "1.0.70"
+version = "1.0.72"
 
 [dependencies.colored]
 version = "2"

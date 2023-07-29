@@ -878,9 +878,9 @@ dependencies = [
 
 [[package]]
 name = "curl-sys"
-version = "0.4.64+curl-8.2.0"
+version = "0.4.65+curl-8.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f96069f0b1cb1241c838740659a771ef143363f52772a9ce1bd9c04c75eee0dc"
+checksum = "961ba061c9ef2fe34bbd12b807152d96f0badd2bebe7b90ce6c8c8b7572a0986"
 dependencies = [
  "cc",
  "libc",
@@ -1678,9 +1678,9 @@ dependencies = [
 
 [[package]]
 name = "libz-sys"
-version = "1.1.11"
+version = "1.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "121f7402cc6ab5821dad08d1b9d11618a9ea4da992343909fecf8e430e86364c"
+checksum = "d97137b25e321a73eef1418d1d5d2eda4d77e12813f8e6dead84bc52c5870a7b"
 dependencies = [
  "cc",
  "libc",
@@ -1755,9 +1755,9 @@ dependencies = [
 
 [[package]]
 name = "matchit"
-version = "0.7.0"
+version = "0.7.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b87248edafb776e59e6ee64a79086f65890d3510f2c656c000bf2a7e8a0aea40"
+checksum = "67827e6ea8ee8a7c4a72227ef4fc08957040acffdb5f122733b24fa12daff41b"
 
 [[package]]
 name = "memchr"
@@ -2282,9 +2282,9 @@ dependencies = [
 
 [[package]]
 name = "portable-atomic"
-version = "1.4.1"
+version = "1.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "edc55135a600d700580e406b4de0d59cb9ad25e344a3a091a97ded2622ec4ec6"
+checksum = "f32154ba0af3a075eefa1eda8bb414ee928f62303a54ea85b8d6638ff1a6ee9e"
 
 [[package]]
 name = "ppv-lite86"
@@ -2524,7 +2524,7 @@ checksum = "b2eae68fc220f7cf2532e4494aded17545fce192d59cd996e0fe7887f4ceb575"
 dependencies = [
  "aho-corasick",
  "memchr",
- "regex-automata 0.3.3",
+ "regex-automata 0.3.4",
  "regex-syntax 0.7.4",
 ]
 
@@ -2539,9 +2539,9 @@ dependencies = [
 
 [[package]]
 name = "regex-automata"
-version = "0.3.3"
+version = "0.3.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "39354c10dd07468c2e73926b23bb9c2caca74c5501e38a35da70406f1d923310"
+checksum = "b7b6d6190b7594385f61bd3911cd1be99dfddcfc365a4160cc2ab5bff4aed294"
 dependencies = [
  "aho-corasick",
  "memchr",
@@ -2664,7 +2664,7 @@ checksum = "79ea77c539259495ce8ca47f53e66ae0330a8819f67e23ac96ca02f50e7b7d36"
 dependencies = [
  "log",
  "ring",
- "rustls-webpki 0.101.1",
+ "rustls-webpki 0.101.2",
  "sct",
 ]
 
@@ -2680,9 +2680,9 @@ dependencies = [
 
 [[package]]
 name = "rustls-webpki"
-version = "0.101.1"
+version = "0.101.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15f36a6828982f422756984e47912a7a51dcbc2a197aa791158f8ca61cd8204e"
+checksum = "513722fd73ad80a71f72b61009ea1b584bcfa1483ca93949c8f290298837fa59"
 dependencies = [
  "ring",
  "untrusted",
@@ -2807,18 +2807,18 @@ checksum = "b0293b4b29daaf487284529cc2f5675b8e57c61f70167ba415a463651fd6a918"
 
 [[package]]
 name = "serde"
-version = "1.0.175"
+version = "1.0.178"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5d25439cd7397d044e2748a6fe2432b5e85db703d6d097bd014b3c0ad1ebff0b"
+checksum = "60363bdd39a7be0266a520dab25fdc9241d2f987b08a01e01f0ec6d06a981348"
 dependencies = [
  "serde_derive",
 ]
 
 [[package]]
 name = "serde_derive"
-version = "1.0.175"
+version = "1.0.178"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b23f7ade6f110613c0d63858ddb8b94c1041f550eab58a16b371bdf2c9c80ab4"
+checksum = "f28482318d6641454cb273da158647922d1be6b5a2fcc6165cd89ebdd7ed576b"
 dependencies = [
  "proc-macro2",
  "quote 1.0.32",
@@ -2827,9 +2827,9 @@ dependencies = [
 
 [[package]]
 name = "serde_json"
-version = "1.0.103"
+version = "1.0.104"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d03b412469450d4404fe8499a268edd7f8b79fecb074b0d812ad64ca21f4031b"
+checksum = "076066c5f1078eac5b722a31827a8832fe108bed65dfa75e233c89f8206e976c"
 dependencies = [
  "indexmap 2.0.0",
  "itoa",
@@ -2961,7 +2961,7 @@ checksum = "62bb4feee49fdd9f707ef802e22365a35de4b7b299de4763d44bfea899442ff9"
 
 [[package]]
 name = "snarkos"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "anyhow",
  "clap",
@@ -2985,7 +2985,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-account"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "anyhow",
  "colored",
@@ -2995,7 +2995,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-cli"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "aleo-std",
  "anstyle",
@@ -3026,7 +3026,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-display"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "anyhow",
  "crossterm 0.26.1",
@@ -3038,7 +3038,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-integration"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "snarkos-node-cdn",
  "snarkvm",
@@ -3049,7 +3049,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "aleo-std",
  "anyhow",
@@ -3083,7 +3083,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-cdn"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "anyhow",
  "backoff",
@@ -3103,7 +3103,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-consensus"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "anyhow",
  "indexmap 2.0.0",
@@ -3123,7 +3123,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-env"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "once_cell",
  "serde",
@@ -3131,7 +3131,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-messages"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "anyhow",
  "bincode 1.3.3",
@@ -3149,7 +3149,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-metrics"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "metrics",
  "metrics-exporter-prometheus",
@@ -3158,7 +3158,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-narwhal"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "anyhow",
  "async-recursion",
@@ -3200,7 +3200,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-narwhal-committee"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "anyhow",
  "indexmap 2.0.0",
@@ -3218,7 +3218,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-narwhal-ledger-service"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "async-trait",
  "snarkvm",
@@ -3228,7 +3228,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-rest"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "anyhow",
  "axum",
@@ -3254,7 +3254,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-router"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "anyhow",
  "async-trait",
@@ -3288,7 +3288,7 @@ dependencies = [
 
 [[package]]
 name = "snarkos-node-tcp"
-version = "2.1.4"
+version = "2.1.6"
 dependencies = [
  "async-trait",
  "bytes",
@@ -4244,9 +4244,9 @@ dependencies = [
 
 [[package]]
 name = "tikv-jemalloc-sys"
-version = "0.5.3+5.3.0-patched"
+version = "0.5.4+5.3.0-patched"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a678df20055b43e57ef8cddde41cdfda9a3c1a060b67f4c5836dfb1d78543ba8"
+checksum = "9402443cb8fd499b6f327e40565234ff34dbda27460c5b47db0db77443dd85d1"
 dependencies = [
  "cc",
  "libc",
@@ -4254,9 +4254,9 @@ dependencies = [
 
 [[package]]
 name = "tikv-jemallocator"
-version = "0.5.0"
+version = "0.5.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "20612db8a13a6c06d57ec83953694185a367e16945f66565e8028d2c0bd76979"
+checksum = "965fe0c26be5c56c94e38ba547249074803efd52adfb66de62107d95aab3eaca"
 dependencies = [
  "libc",
  "tikv-jemalloc-sys",
