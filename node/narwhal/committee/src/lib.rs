@@ -223,6 +223,17 @@ pub mod test_helpers {
         Committee::<CurrentNetwork>::new(1, members).unwrap()
     }
 
+    /// Samples a random committee for a given round.
+    pub fn sample_committee_for_round(round: u64, rng: &mut TestRng) -> Committee<CurrentNetwork> {
+        // Sample the members.
+        let mut members = IndexMap::new();
+        for _ in 0..4 {
+            members.insert(Address::<CurrentNetwork>::new(rng.gen()), MIN_STAKE);
+        }
+        // Return the committee.
+        Committee::<CurrentNetwork>::new(round, members).unwrap()
+    }
+
     /// Samples a random committee.
     pub fn sample_committee_custom(num_members: u16, rng: &mut TestRng) -> Committee<CurrentNetwork> {
         assert!(num_members >= 4);
