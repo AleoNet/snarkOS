@@ -184,7 +184,7 @@ impl<N: Network> BFT<N> {
     fn update_to_next_round(&self, current_round: u64) -> Result<()> {
         // Determine if the BFT is ready to update to the next round.
         let is_ready = match current_round % 2 == 0 {
-            true => self.update_leader_certificate(current_round)?,
+            true => self.update_leader_certificate_to_even_round(current_round)?,
             false => self.is_leader_quorum_or_nonleaders_available(current_round)?,
         };
 
@@ -198,7 +198,7 @@ impl<N: Network> BFT<N> {
         // If the BFT is ready to update to the next round, update to the next committee.
         if is_ready {
             // Update to the next committee in storage.
-            self.storage().increment_committee_to_next_round()?;
+            self.storage().increment_to_next_round(self.storage().current_committee().to_next_round())?;
             // Update the timer for the leader certificate.
             self.leader_certificate_timer.store(now(), Ordering::SeqCst);
         }
@@ -210,11 +210,11 @@ impl<N: Network> BFT<N> {
     ///
     /// This method runs on every even round, by determining the leader of the current even round,
     /// and setting the leader certificate to their certificate in the round, if they were present.
-    fn update_leader_certificate(&self, round: u64) -> Result<bool> {
+    fn update_leader_certificate_to_even_round(&self, even_round: u64) -> Result<bool> {
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
-        ensure!(current_round == round, "BFT storage reference is out of sync with the current round");
+        ensure!(current_round == even_round, "BFT storage reference is out of sync with the current round");
         // If the current round is odd, throw an error.
         if current_round % 2 != 0 {
             bail!("BFT cannot update the leader certificate in an odd round")
@@ -276,11 +276,11 @@ impl<N: Network> BFT<N> {
     ///  - The leader certificate reached quorum threshold `(2f + 1)` (in the previous certificates in the current round).
     ///  - The leader certificate is not included up to availability threshold `(f + 1)` (in the previous certificates of the current round).
     ///  - The leader certificate timer has expired.
-    fn is_leader_quorum_or_nonleaders_available(&self, round: u64) -> Result<bool> {
+    fn is_leader_quorum_or_nonleaders_available(&self, odd_round: u64) -> Result<bool> {
         // Retrieve the current round.
         let current_round = self.storage().current_round();
         // Ensure the current round matches the given round.
-        ensure!(current_round == round, "BFT storage reference is out of sync with the current round");
+        ensure!(current_round == odd_round, "BFT storage reference is out of sync with the current round");
         // If the current round is even, throw an error.
         if current_round % 2 != 1 {
             bail!("BFT does not compute stakes for the leader certificate in an even round")
@@ -581,19 +581,18 @@ impl<N: Network> BFT<N> {
 
 #[cfg(test)]
 mod tests {
-    use std::sync::{atomic::Ordering, Arc};
-
-    use anyhow::Result;
-    use indexmap::IndexSet;
+    use crate::{
+        helpers::{now, Storage},
+        BFT,
+    };
     use snarkos_account::Account;
     use snarkos_node_narwhal_committee::test_helpers::{sample_committee, sample_committee_for_round};
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
     use snarkvm::{prelude::narwhal::batch_certificate::test_helpers::sample_batch_certificate, utilities::TestRng};
 
-    use crate::{
-        helpers::{now, Storage},
-        BFT,
-    };
+    use anyhow::Result;
+    use indexmap::IndexSet;
+    use std::sync::{atomic::Ordering, Arc};
 
     #[test]
     fn test_is_leader_quorum_odd() -> Result<()> {
@@ -602,21 +601,30 @@ mod tests {
         let account = Account::new(&mut rng)?;
         let storage = Storage::new(committee, 10);
         let ledger = Arc::new(MockLedgerService::new());
-        let bft = BFT::new(account, storage, ledger, None, None)?;
 
+        // Initialize the BFT.
+        let bft = BFT::new(account, storage, ledger, None, None)?;
         assert!(bft.is_timer_expired()); // 0 + 5 < now()
+
+        // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
         assert!(result.is_ok()); // no previous leader certificate
         assert!(result.unwrap());
+
         // Set the leader certificate.
         let leader_certificate = sample_batch_certificate(&mut rng);
         *bft.leader_certificate.write() = Some(leader_certificate);
+
+        // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
         assert!(result.is_ok()); // should now fall through to end of function
         assert!(result.unwrap());
+
         // Set the timer to now().
         bft.leader_certificate_timer.store(now(), Ordering::SeqCst);
         assert!(!bft.is_timer_expired());
+
+        // Ensure this call succeeds on an odd round.
         let result = bft.is_leader_quorum_or_nonleaders_available(1);
         assert!(result.is_ok()); // should now fall through to end of function
         // Should now return false, as the timer is not expired.
@@ -632,10 +640,13 @@ mod tests {
         let account = Account::new(&mut rng)?;
         let storage = Storage::new(committee, 10);
         let ledger = Arc::new(MockLedgerService::new());
-        let bft = BFT::new(account, storage, ledger, None, None)?;
 
+        // Initialize the BFT.
+        let bft = BFT::new(account, storage, ledger, None, None)?;
         assert!(bft.is_timer_expired()); // 0 + 5 < now()
+
         // Store is at round 1, and we are checking for round 2.
+        // Ensure this call fails on an even round.
         let result = bft.is_leader_quorum_or_nonleaders_available(2);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().to_string(), "BFT storage reference is out of sync with the current round");
@@ -649,9 +660,12 @@ mod tests {
         let account = Account::new(&mut rng)?;
         let storage = Storage::new(committee, 10);
         let ledger = Arc::new(MockLedgerService::new());
-        let bft = BFT::new(account, storage, ledger, None, None)?;
 
+        // Initialize the BFT.
+        let bft = BFT::new(account, storage, ledger, None, None)?;
         assert!(bft.is_timer_expired()); // 0 + 5 < now()
+
+        // Ensure this call fails on an even round.
         let result = bft.is_leader_quorum_or_nonleaders_available(2);
         assert!(result.is_err());
         assert_eq!(
@@ -668,6 +682,8 @@ mod tests {
         let account = Account::new(&mut rng)?;
         let storage = Storage::new(committee.clone(), 10);
         let ledger = Arc::new(MockLedgerService::new());
+
+        // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
 
         let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee.clone());
@@ -676,6 +692,7 @@ mod tests {
         // Set the leader certificate.
         let leader_certificate = sample_batch_certificate(&mut rng);
         *bft.leader_certificate.write() = Some(leader_certificate);
+
         let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee);
         // If leader certificate is set, we should be ready for next round.
         assert!(result);
@@ -689,9 +706,12 @@ mod tests {
         let account = Account::new(&mut rng)?;
         let storage = Storage::new(committee, 10);
         let ledger = Arc::new(MockLedgerService::new());
+
+        // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
 
-        let result = bft.update_leader_certificate(1);
+        // Ensure this call fails on an odd round.
+        let result = bft.update_leader_certificate_to_even_round(1);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().to_string(), "BFT cannot update the leader certificate in an odd round");
         Ok(())
@@ -706,7 +726,8 @@ mod tests {
         let ledger = Arc::new(MockLedgerService::new());
         let bft = BFT::new(account, storage, ledger, None, None)?;
 
-        let result = bft.update_leader_certificate(6);
+        // Ensure this call succeeds on an even round.
+        let result = bft.update_leader_certificate_to_even_round(6);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().to_string(), "BFT storage reference is out of sync with the current round");
         Ok(())
@@ -719,12 +740,17 @@ mod tests {
         let account = Account::new(&mut rng)?;
         let storage = Storage::new(committee, 10);
         let ledger = Arc::new(MockLedgerService::new());
+
+        // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
 
         // Set the leader certificate.
         let leader_certificate = sample_batch_certificate(&mut rng);
         *bft.leader_certificate.write() = Some(leader_certificate);
-        let result = bft.update_leader_certificate(2);
+
+        // Update the leader certificate.
+        // Ensure this call succeeds on an even round.
+        let result = bft.update_leader_certificate_to_even_round(2);
         assert!(result.is_ok());
 
         Ok(())

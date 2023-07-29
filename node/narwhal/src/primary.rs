@@ -287,15 +287,10 @@ impl<N: Network> Primary<N> {
         if self.storage.contains_certificate_in_round_from(round, self.gateway.account().address()) {
             // If a BFT sender was provided, attempt to advance the current round.
             if let Some(bft_sender) = self.bft_sender.get() {
-                // Initialize a callback sender and receiver.
-                let (callback_sender, callback_receiver) = oneshot::channel();
-                // Send the current round to the BFT.
-                bft_sender.tx_primary_round.send((self.current_round(), callback_sender)).await?;
-                // Await the callback to continue.
-                if let Err(e) = callback_receiver.await? {
+                if let Err(e) = self.send_primary_round_to_bft(bft_sender).await {
                     warn!("Failed to update the BFT to the next round: {e}");
                     return Err(e);
-                };
+                }
             }
             bail!("Primary is safely skipping (round {round} was already certified)")
         }
@@ -470,22 +465,12 @@ impl<N: Network> Primary<N> {
 
         info!("Quorum threshold reached - Preparing to certify our batch...");
         // Store the certified batch and broadcast it to all validators.
-        match self.store_and_broadcast_certificate(&proposal).await {
-            Ok(certificate) => {
-                // Log the certified batch.
-                let num_transmissions = certificate.transmission_ids().len();
-                let round = certificate.round();
-                info!("\n\nOur batch with {num_transmissions} transmissions for round {round} was certified!\n");
-                // Update the committee to the next round.
-                // self.update_committee_to_next_round().await
-                self.update_committee_to_round(round + 1).await
-            }
-            Err(e) => {
-                // Reinsert the transmissions back into the ready queue for the next proposal.
-                self.reinsert_transmissions_into_workers(proposal)?;
-                Err(e)
-            }
+        if let Err(e) = self.store_and_broadcast_certificate(&proposal).await {
+            // Reinsert the transmissions back into the ready queue for the next proposal.
+            self.reinsert_transmissions_into_workers(proposal)?;
+            return Err(e);
         }
+        Ok(())
     }
 
     /// Processes a batch certificate from a peer.
@@ -503,7 +488,6 @@ impl<N: Network> Primary<N> {
         self.sync_with_certificate_from_peer(peer_ip, certificate).await?;
         // If there are enough certificates to reach quorum threshold for the current round,
         // then proceed to advance to the next round.
-        // self.update_committee_to_next_round_with_thresholding().await
         self.try_advance_to_next_round().await
     }
 }
@@ -635,10 +619,9 @@ impl<N: Network> Primary<N> {
             if let Some(proposal) = proposal {
                 self.reinsert_transmissions_into_workers(proposal)?;
             }
-            // Proceed to the next round.
+            // If there are enough certificates to reach quorum threshold for the current round,
+            // then proceed to advance to the next round.
             self.try_advance_to_next_round().await?;
-            // // If we have reached the quorum threshold, then proceed to the next round.
-            // self.update_committee_to_next_round_with_thresholding().await?;
         }
         Ok(())
     }
@@ -683,7 +666,7 @@ impl<N: Network> Primary<N> {
         // Iterate until the penultimate round is reached.
         while self.current_round() < next_round.saturating_sub(1) {
             // Update to the next committee in storage.
-            self.storage.increment_committee_to_next_round()?;
+            self.storage.increment_to_next_round(self.storage.current_committee().to_next_round())?;
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;
         }
@@ -691,25 +674,30 @@ impl<N: Network> Primary<N> {
         if self.current_round() < next_round {
             // If a BFT sender was provided, send the current round to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
-                // Initialize a callback sender and receiver.
-                let (callback_sender, callback_receiver) = oneshot::channel();
-                // Send the current round to the BFT.
-                bft_sender.tx_primary_round.send((self.current_round(), callback_sender)).await?;
-                // Await the callback to continue.
-                if let Err(e) = callback_receiver.await? {
+                if let Err(e) = self.send_primary_round_to_bft(bft_sender).await {
                     warn!("Failed to update the BFT to the next round: {e}");
                     return Err(e);
-                };
+                }
             }
             // Otherwise, handle the Narwhal case.
             else {
                 // Update to the next committee in storage.
-                self.storage.increment_committee_to_next_round()?;
+                self.storage.increment_to_next_round(self.storage.current_committee().to_next_round())?;
             }
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;
         }
         Ok(())
+    }
+
+    /// Sends the current round to the BFT.
+    async fn send_primary_round_to_bft(&self, bft_sender: &BFTSender<N>) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback_sender, callback_receiver) = oneshot::channel();
+        // Send the current round to the BFT.
+        bft_sender.tx_primary_round.send((self.current_round(), callback_sender)).await?;
+        // Await the callback to continue.
+        callback_receiver.await?
     }
 
     /// Ensures the primary is signing for the specified batch round.
@@ -738,7 +726,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Stores the certified batch and broadcasts it to all validators, returning the certificate.
-    async fn store_and_broadcast_certificate(&self, proposal: &Proposal<N>) -> Result<BatchCertificate<N>> {
+    async fn store_and_broadcast_certificate(&self, proposal: &Proposal<N>) -> Result<()> {
         // Create the batch certificate and transmissions.
         let (certificate, transmissions) = proposal.to_certificate()?;
         // Convert the transmissions into a HashMap.
@@ -761,8 +749,13 @@ impl<N: Network> Primary<N> {
                 return Err(e);
             };
         }
-        // Return the certificate.
-        Ok(certificate)
+        // Log the certified batch.
+        let num_transmissions = certificate.transmission_ids().len();
+        let round = certificate.round();
+        info!("\n\nOur batch with {num_transmissions} transmissions for round {round} was certified!\n");
+        // Update the committee to the next round.
+        // self.update_committee_to_next_round().await
+        self.update_committee_to_round(round + 1).await
     }
 
     /// Inserts the missing transmissions from the proposal into the workers.

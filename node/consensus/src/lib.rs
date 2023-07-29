@@ -227,7 +227,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<()> {
         // Create the candidate next block.
-        let next_block = self.ledger.prepare_advance_to_next_block_with_bft(subdag, transmissions)?;
+        let next_block = self.ledger.prepare_advance_to_next_quorum_block(subdag, transmissions)?;
         // Check that the block is well-formed.
         self.ledger.check_next_block(&next_block)?;
         // Advance to the next block.

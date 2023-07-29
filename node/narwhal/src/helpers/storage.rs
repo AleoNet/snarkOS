@@ -150,12 +150,12 @@ impl<N: Network> Storage<N> {
         self.committees.read().get(&round).cloned()
     }
 
-    // TODO (howardwu): We need to know which members (and stake) to add, update, and remove.
-    /// Increments the committee to the next round, updating the current round.
+    /// Increments storage to the next round, updating the current round and committee.
     /// Note: This method is only called once per round, upon certification of the primary's batch.
-    pub fn increment_committee_to_next_round(&self) -> Result<()> {
-        // Construct the next committee.
-        let next_committee = self.current_committee().to_next_round();
+    pub fn increment_to_next_round(&self, next_committee: Committee<N>) -> Result<()> {
+        // Ensure the next committee is for the next round.
+        ensure!(next_committee.round() == self.current_round() + 1, "The next committee must be for the next round");
+
         // Retrieve the next round.
         let next_round = next_committee.round();
         // Ensure there are no certificates for the next round yet.
@@ -943,7 +943,6 @@ pub mod prop_tests {
     ) {
         let CommitteeContext(committee, ValidatorSet(validators)) = context;
 
-        // Sample a committee.
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
 

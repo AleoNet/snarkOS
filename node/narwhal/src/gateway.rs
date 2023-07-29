@@ -811,6 +811,8 @@ impl<N: Network> Gateway<N> {
             warn!("{CONTEXT} Gateway is dropping '{peer_addr}' on version {version} (outdated)");
             return Some(DisconnectReason::OutdatedClientVersion);
         }
+        // TODO (howardwu): Remove this check, instead checking the address is unique.
+        //  Then, later on, use the committee object to perform filtering of all active connections.
         // Ensure the address is in the committee.
         if !self.storage.current_committee().is_committee_member(address) {
             warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
