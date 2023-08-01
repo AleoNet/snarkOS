@@ -866,7 +866,7 @@ pub mod prop_tests {
 
     use crate::{
         helpers::Storage,
-        prop_tests::GatewayAddress::{Dev, Prod},
+        prop_tests::GatewayAddress::{Dev, Prod, Test},
     };
     use snarkos_account::Account;
     use snarkos_node_narwhal_committee::{
@@ -885,13 +885,14 @@ pub mod prop_tests {
     #[derive(Debug, test_strategy::Arbitrary)]
     enum GatewayAddress {
         Dev(u8),
-        Prod(Option<SocketAddr>),
+        Prod,
+        Test(SocketAddr),
     }
 
     impl GatewayAddress {
         fn ip(&self) -> Option<SocketAddr> {
-            if let GatewayAddress::Prod(ip) = self {
-                return *ip;
+            if let GatewayAddress::Test(ip) = self {
+                return Some(*ip);
             }
             None
         }
@@ -942,9 +943,23 @@ pub mod prop_tests {
                     any_with::<Storage<CurrentNetwork>>(context.clone()),
                     Just(context),
                     Just(account_selector.select(validators)),
-                    any::<Option<SocketAddr>>(),
                 )
-                    .prop_map(|(a, b, c, d)| (a, b, c.account, Prod(d)))
+                    .prop_map(|(a, b, c)| (a, b, c.account, Prod))
+            })
+            .boxed()
+    }
+
+    fn any_valid_test_gateway() -> BoxedStrategy<GatewayInput> {
+        (any::<CommitteeContext>(), any::<Selector>())
+            .prop_flat_map(|(context, account_selector)| {
+                let CommitteeContext(_, ValidatorSet(validators)) = context.clone();
+                (
+                    any_with::<Storage<CurrentNetwork>>(context.clone()),
+                    Just(context),
+                    Just(account_selector.select(validators)),
+                    any::<SocketAddr>(),
+                )
+                    .prop_map(|(a, b, c, d)| (a, b, c.account, Test(d)))
             })
             .boxed()
     }
@@ -967,22 +982,26 @@ pub mod prop_tests {
     fn gateway_prod_initialization(#[strategy(any_valid_prod_gateway())] input: GatewayInput) {
         let (storage, _, account, dev) = input;
         let address = account.address();
-        let gateway = Gateway::new(account, storage, dev.ip().map(|ip| ip.port()), dev.port()).unwrap();
+        let gateway = Gateway::new(account, storage, dev.port(), dev.port()).unwrap();
         let tcp_config = gateway.tcp().config();
-        match (dev.ip(), dev.port()) {
-            (_, Some(dev)) => {
-                assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1))));
-                assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev));
-            }
-            (None, None) => {
-                assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
-                assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT));
-            }
-            (Some(ip), None) => {
-                assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
-                assert_eq!(tcp_config.desired_listening_port, Some(ip.port()));
-            }
-        }
+        assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
+        assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT));
+
+        let tcp_config = gateway.tcp().config();
+        assert_eq!(tcp_config.max_connections, MAX_COMMITTEE_SIZE);
+        assert_eq!(gateway.account().address(), address);
+    }
+
+    #[proptest]
+    fn gateway_test_initialization(#[strategy(any_valid_test_gateway())] input: GatewayInput) {
+        let (storage, _, account, gateway_address) = input;
+        let address = account.address();
+        let gateway =
+            Gateway::new(account, storage, gateway_address.ip().map(|ip| ip.port()), gateway_address.port()).unwrap();
+        let tcp_config = gateway.tcp().config();
+        let ip = gateway_address.ip().unwrap();
+        assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::UNSPECIFIED)));
+        assert_eq!(tcp_config.desired_listening_port, Some(ip.port()));
 
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.max_connections, MAX_COMMITTEE_SIZE);
