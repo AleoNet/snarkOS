@@ -73,17 +73,8 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Initializes a new instance of consensus.
     pub fn new(account: Account<N>, ledger: Ledger<N, C>, ip: Option<SocketAddr>, dev: Option<u16>) -> Result<Self> {
-        // Initialize the committee.
-        let committee = {
-            // TODO (howardwu): Fix the ledger round number.
-            // TODO (howardwu): Retrieve the real committee members.
-            // Sample the members.
-            let mut members = IndexMap::new();
-            for _ in 0..4 {
-                members.insert(Address::<N>::new(thread_rng().gen()), (MIN_STAKE, true));
-            }
-            Committee::new(ledger.latest_round() + 1, members)?
-        };
+        // Retrieve the committee.
+        let committee = ledger.latest_committee()?;
         // Initialize the Narwhal storage.
         let storage = NarwhalStorage::new(committee, MAX_GC_ROUNDS);
         // Initialize the ledger service.
