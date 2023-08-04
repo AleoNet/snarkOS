@@ -529,7 +529,7 @@ mod tests {
     async fn test_process_transmission() {
         let rng = &mut TestRng::default();
         // Sample a committee.
-        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
         // Setup the mock gateway and ledger.
@@ -561,7 +561,7 @@ mod tests {
     async fn test_send_transmission() {
         let rng = &mut TestRng::default();
         // Sample a committee.
-        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
         // Setup the mock gateway and ledger.
@@ -590,7 +590,7 @@ mod tests {
     async fn test_process_solution_ok() {
         let rng = &mut TestRng::default();
         // Sample a committee.
-        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
         // Setup the mock gateway and ledger.
@@ -624,7 +624,7 @@ mod tests {
     async fn test_process_solution_nok() {
         let rng = &mut TestRng::default();
         // Sample a committee.
-        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
         // Setup the mock gateway and ledger.
@@ -658,7 +658,7 @@ mod tests {
     async fn test_process_transaction_ok() {
         let mut rng = &mut TestRng::default();
         // Sample a committee.
-        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
         // Setup the mock gateway and ledger.
@@ -692,7 +692,7 @@ mod tests {
     async fn test_process_transaction_nok() {
         let mut rng = &mut TestRng::default();
         // Sample a committee.
-        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
         // Setup the mock gateway and ledger.

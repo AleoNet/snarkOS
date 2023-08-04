@@ -16,14 +16,16 @@ use crate::{
     helpers::{check_timestamp_for_liveness, now},
     MAX_EXPIRATION_TIME_IN_SECS,
 };
-use snarkos_node_narwhal_committee::Committee;
 use snarkvm::{
     console::{
         account::{Address, Signature},
         network::Network,
         types::Field,
     },
-    ledger::narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
+    ledger::{
+        committee::Committee,
+        narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
+    },
     prelude::{bail, ensure, Itertools, Result},
 };
 
@@ -49,7 +51,10 @@ impl<N: Network> Proposal<N> {
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<Self> {
         // Ensure the committee round batches the proposed batch round.
-        ensure!(committee.round() == batch_header.round(), "The committee round does not match the batch round");
+        ensure!(
+            committee.starting_round() == batch_header.round(),
+            "The committee round does not match the batch round"
+        );
         // Ensure the batch author is a member of the committee.
         ensure!(committee.is_committee_member(batch_header.author()), "The batch author is not a committee member");
         // Ensure the transmissions are not empty.
@@ -179,10 +184,13 @@ pub mod prop_tests {
         storage::prop_tests::{AnyTransmission, AnyTransmissionID, CryptoTestRng},
         Proposal,
     };
+    use snarkvm::ledger::{
+        committee::prop_tests::{CommitteeContext, ValidatorSet},
+        narwhal::BatchHeader,
+    };
+
     use indexmap::IndexMap;
     use proptest::sample::{size_range, Selector};
-    use snarkos_node_narwhal_committee::prop_tests::{CommitteeContext, ValidatorSet};
-    use snarkvm::ledger::narwhal::BatchHeader;
     use test_strategy::proptest;
 
     #[proptest]
@@ -202,8 +210,8 @@ pub mod prop_tests {
         }
 
         let header = BatchHeader::new(
-            signer.account.private_key(),
-            committee.round(),
+            &signer.private_key,
+            committee.starting_round(),
             now(),
             transmission_map.keys().cloned().collect(),
             Default::default(),

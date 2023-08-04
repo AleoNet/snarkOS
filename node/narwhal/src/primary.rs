@@ -34,13 +34,13 @@ use crate::{
     MAX_WORKERS,
 };
 use snarkos_account::Account;
-use snarkos_node_narwhal_committee::Committee;
 use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
+        committee::Committee,
         narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
     },
     prelude::Field,
@@ -631,7 +631,7 @@ impl<N: Network> Primary<N> {
         // Retrieve the current committee.
         let current_committee = self.current_committee();
         // Retrieve the current round.
-        let current_round = current_committee.round();
+        let current_round = current_committee.starting_round();
         // Retrieve the certificates.
         let certificates = self.storage.get_certificates_for_round(current_round);
         // Construct a set over the authors.
@@ -666,7 +666,8 @@ impl<N: Network> Primary<N> {
         // Iterate until the penultimate round is reached.
         while self.current_round() < next_round.saturating_sub(1) {
             // Update to the next committee in storage.
-            self.storage.increment_to_next_round(self.storage.current_committee().to_next_round())?;
+            // TODO (howardwu): Fix to increment to the next round.
+            self.storage.increment_to_next_round(self.storage.current_committee())?;
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;
         }
@@ -682,7 +683,8 @@ impl<N: Network> Primary<N> {
             // Otherwise, handle the Narwhal case.
             else {
                 // Update to the next committee in storage.
-                self.storage.increment_to_next_round(self.storage.current_committee().to_next_round())?;
+                // TODO (howardwu): Fix to increment to the next round.
+                self.storage.increment_to_next_round(self.storage.current_committee())?;
             }
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;

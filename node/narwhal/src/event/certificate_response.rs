@@ -68,14 +68,17 @@ pub mod prop_tests {
         },
         CertificateResponse,
     };
+    use snarkvm::ledger::{
+        committee::prop_tests::{CommitteeContext, ValidatorSet},
+        narwhal::{BatchCertificate, BatchHeader},
+    };
+
     use bytes::{BufMut, BytesMut};
     use proptest::{
         collection::vec,
         prelude::{any, BoxedStrategy, Just, Strategy},
         sample::Selector,
     };
-    use snarkos_node_narwhal_committee::prop_tests::{CommitteeContext, ValidatorSet};
-    use snarkvm::ledger::narwhal::{BatchCertificate, BatchHeader};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -87,8 +90,7 @@ pub mod prop_tests {
                 let signer = selector.select(validators);
                 let transmission_ids = transmissions.into_iter().map(|(id, _)| id).collect();
 
-                BatchHeader::new(signer.account.private_key(), 0, now(), transmission_ids, Default::default(), &mut rng)
-                    .unwrap()
+                BatchHeader::new(&signer.private_key, 0, now(), transmission_ids, Default::default(), &mut rng).unwrap()
             })
             .boxed()
     }

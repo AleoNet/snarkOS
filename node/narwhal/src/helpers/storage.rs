@@ -13,9 +13,11 @@
 // limitations under the License.
 
 use crate::helpers::check_timestamp_for_liveness;
-use snarkos_node_narwhal_committee::Committee;
 use snarkvm::{
-    ledger::narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
+    ledger::{
+        committee::Committee,
+        narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
+    },
     prelude::{bail, ensure, Address, Field, Network, Result},
 };
 
@@ -73,7 +75,7 @@ impl<N: Network> Storage<N> {
     /// Initializes a new instance of storage.
     pub fn new(committee: Committee<N>, max_gc_rounds: u64) -> Self {
         // Retrieve the current round.
-        let current_round = committee.round();
+        let current_round = committee.starting_round();
         // Return the storage.
         Self {
             current_round: Arc::new(AtomicU64::new(current_round)),
@@ -154,10 +156,10 @@ impl<N: Network> Storage<N> {
     /// Note: This method is only called once per round, upon certification of the primary's batch.
     pub fn increment_to_next_round(&self, next_committee: Committee<N>) -> Result<()> {
         // Ensure the next committee is for the next round.
-        ensure!(next_committee.round() == self.current_round() + 1, "The next committee must be for the next round");
+        ensure!(next_committee.starting_round() == self.current_round() + 1, "Next committee is for wrong round");
 
         // Retrieve the next round.
-        let next_round = next_committee.round();
+        let next_round = next_committee.starting_round();
         // Ensure there are no certificates for the next round yet.
         ensure!(!self.contains_certificates_for_round(next_round), "Certificates for the next round cannot exist yet");
 
@@ -668,7 +670,7 @@ mod tests {
         let rng = &mut TestRng::default();
 
         // Sample a committee.
-        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
 
@@ -730,7 +732,7 @@ mod tests {
         let rng = &mut TestRng::default();
 
         // Sample a committee.
-        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
 
@@ -784,7 +786,19 @@ mod tests {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use std::fmt::Debug;
+    use super::*;
+    use crate::{
+        helpers::{now, storage::tests::assert_storage},
+        MAX_GC_ROUNDS,
+    };
+    use snarkvm::{
+        ledger::{
+            coinbase::PuzzleCommitment,
+            committee::prop_tests::{CommitteeContext, ValidatorSet},
+            narwhal::Data,
+        },
+        prelude::{Signature, Uniform},
+    };
 
     use ::bytes::Bytes;
     use indexmap::indexset;
@@ -796,19 +810,8 @@ pub mod prop_tests {
         test_runner::TestRng,
     };
     use rand::{CryptoRng, Error, Rng, RngCore};
-    use snarkvm::{
-        ledger::{coinbase::PuzzleCommitment, narwhal::Data},
-        prelude::{Signature, Uniform},
-    };
+    use std::fmt::Debug;
     use test_strategy::proptest;
-
-    use crate::{
-        helpers::{now, storage::tests::assert_storage},
-        MAX_GC_ROUNDS,
-    };
-    use snarkos_node_narwhal_committee::prop_tests::{CommitteeContext, ValidatorSet};
-
-    use super::*;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -926,7 +929,7 @@ pub mod prop_tests {
     ) -> IndexMap<Signature<CurrentNetwork>, i64> {
         let mut signatures = IndexMap::with_capacity(validator_set.0.len());
         for validator in validator_set.0.iter() {
-            let private_key = validator.account.private_key();
+            let private_key = validator.private_key;
             let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
             let timestamp_field = Field::from_u64(timestamp as u64);
             signatures.insert(private_key.sign(&[batch_header.batch_id(), timestamp_field], rng).unwrap(), timestamp);
@@ -947,7 +950,7 @@ pub mod prop_tests {
         let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
 
         // Initialize the committees.
-        let committees = [(committee.round(), committee)];
+        let committees = [(committee.starting_round(), committee)];
         // Ensure the storage is empty.
         assert_storage(&storage, &committees, &[], &[], &[], &Default::default());
 
@@ -961,7 +964,7 @@ pub mod prop_tests {
         }
 
         let batch_header = BatchHeader::new(
-            signer.account.private_key(),
+            &signer.private_key,
             0,
             now(),
             transmission_map.keys().cloned().collect(),

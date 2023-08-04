@@ -66,10 +66,10 @@ pub mod prop_tests {
         event::{certificate_response::prop_tests::any_batch_header, EventTrait},
         BatchPropose,
     };
+    use snarkvm::{ledger::committee::prop_tests::CommitteeContext, prelude::narwhal::Data};
+
     use bytes::{BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
-    use snarkos_node_narwhal_committee::prop_tests::CommitteeContext;
-    use snarkvm::prelude::narwhal::Data;
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;

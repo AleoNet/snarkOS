@@ -32,7 +32,6 @@ use crate::{
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
-use snarkos_node_narwhal_committee::MAX_COMMITTEE_SIZE;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
@@ -54,6 +53,9 @@ use tokio::{
 };
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
+
+/// TODO (howardwu): Remove me and switch to dynamic.
+const MAX_COMMITTEE_SIZE: u16 = 100;
 
 /// The maximum interval of events to cache.
 const CACHE_EVENTS_INTERVAL: i64 = (MAX_BATCH_DELAY / 1000) as i64; // seconds
@@ -847,14 +849,28 @@ impl<N: Network> Gateway<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{helpers::init_worker_channels, Gateway, Worker, MAX_WORKERS, MEMORY_POOL_PORT};
+    use super::MAX_COMMITTEE_SIZE;
+    use crate::{
+        helpers::{init_worker_channels, Storage},
+        prop_tests::GatewayAddress::{Dev, Prod},
+        Gateway,
+        Worker,
+        MAX_WORKERS,
+        MEMORY_POOL_PORT,
+    };
+    use snarkos_account::Account;
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkos_node_tcp::P2P;
+    use snarkvm::{
+        ledger::committee::prop_tests::{CommitteeContext, ValidatorSet},
+        prelude::PrivateKey,
+    };
+
     use indexmap::IndexMap;
     use proptest::{
         prelude::{any, any_with, Arbitrary, BoxedStrategy, Just, Strategy},
         sample::Selector,
     };
-    use snarkos_node_tcp::P2P;
-    use snarkvm::prelude::Testnet3;
     use std::{
         fmt::{Debug, Formatter},
         net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -862,18 +878,7 @@ pub mod prop_tests {
     };
     use test_strategy::proptest;
 
-    type CurrentNetwork = Testnet3;
-
-    use crate::{
-        helpers::Storage,
-        prop_tests::GatewayAddress::{Dev, Prod},
-    };
-    use snarkos_account::Account;
-    use snarkos_node_narwhal_committee::{
-        prop_tests::{CommitteeContext, ValidatorSet},
-        MAX_COMMITTEE_SIZE,
-    };
-    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     impl Debug for Gateway<CurrentNetwork> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -910,14 +915,15 @@ pub mod prop_tests {
 
         fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
             any_valid_dev_gateway()
-                .prop_map(|(storage, _, account, address)| {
-                    Gateway::new(account, storage, address.ip(), address.port()).unwrap()
+                .prop_map(|(storage, _, private_key, address)| {
+                    Gateway::new(Account::try_from(private_key).unwrap(), storage, address.ip(), address.port())
+                        .unwrap()
                 })
                 .boxed()
         }
     }
 
-    type GatewayInput = (Storage<CurrentNetwork>, CommitteeContext, Account<CurrentNetwork>, GatewayAddress);
+    type GatewayInput = (Storage<CurrentNetwork>, CommitteeContext, PrivateKey<CurrentNetwork>, GatewayAddress);
 
     fn any_valid_dev_gateway() -> BoxedStrategy<GatewayInput> {
         (any::<CommitteeContext>(), any::<Selector>())
@@ -929,7 +935,7 @@ pub mod prop_tests {
                     Just(account_selector.select(validators)),
                     0u8..,
                 )
-                    .prop_map(|(a, b, c, d)| (a, b, c.account, Dev(d)))
+                    .prop_map(|(a, b, c, d)| (a, b, c.private_key, Dev(d)))
             })
             .boxed()
     }
@@ -944,30 +950,32 @@ pub mod prop_tests {
                     Just(account_selector.select(validators)),
                     any::<Option<SocketAddr>>(),
                 )
-                    .prop_map(|(a, b, c, d)| (a, b, c.account, Prod(d)))
+                    .prop_map(|(a, b, c, d)| (a, b, c.private_key, Prod(d)))
             })
             .boxed()
     }
 
     #[proptest]
     fn gateway_dev_initialization(#[strategy(any_valid_dev_gateway())] input: GatewayInput) {
-        let (storage, _, account, dev) = input;
-        let address = account.address();
-        let gateway = Gateway::new(account, storage, dev.ip(), dev.port()).unwrap();
+        let (storage, _, private_key, dev) = input;
+        let account = Account::try_from(private_key).unwrap();
+
+        let gateway = Gateway::new(account.clone(), storage, dev.ip(), dev.port()).unwrap();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
         assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev.port().unwrap()));
 
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.max_connections, MAX_COMMITTEE_SIZE);
-        assert_eq!(gateway.account().address(), address);
+        assert_eq!(gateway.account().address(), account.address());
     }
 
     #[proptest]
     fn gateway_prod_initialization(#[strategy(any_valid_prod_gateway())] input: GatewayInput) {
-        let (storage, _, account, dev) = input;
-        let address = account.address();
-        let gateway = Gateway::new(account, storage, dev.ip(), dev.port()).unwrap();
+        let (storage, _, private_key, dev) = input;
+        let account = Account::try_from(private_key).unwrap();
+
+        let gateway = Gateway::new(account.clone(), storage, dev.ip(), dev.port()).unwrap();
         let tcp_config = gateway.tcp().config();
         if let Some(socket_addr) = dev.ip() {
             assert_eq!(tcp_config.listener_ip, Some(socket_addr.ip()));
@@ -979,7 +987,7 @@ pub mod prop_tests {
 
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.max_connections, MAX_COMMITTEE_SIZE);
-        assert_eq!(gateway.account().address(), address);
+        assert_eq!(gateway.account().address(), account.address());
     }
 
     #[proptest(async = "tokio")]
@@ -987,8 +995,10 @@ pub mod prop_tests {
         #[strategy(any_valid_dev_gateway())] input: GatewayInput,
         #[strategy(0..MAX_WORKERS)] workers_count: u8,
     ) {
-        let (storage, _, account, dev) = input;
+        let (storage, _, private_key, dev) = input;
         let worker_storage = storage.clone();
+        let account = Account::try_from(private_key).unwrap();
+
         let gateway = Gateway::new(account, storage, dev.ip(), dev.port()).unwrap();
 
         let (workers, worker_senders) = {

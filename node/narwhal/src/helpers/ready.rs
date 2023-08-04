@@ -155,7 +155,7 @@ mod tests {
         let data = |rng: &mut TestRng| Data::Buffer(Bytes::from((0..512).map(|_| rng.gen::<u8>()).collect::<Vec<_>>()));
 
         // Sample a committee.
-        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee, 1);
         // Initialize the ready queue.
@@ -222,7 +222,7 @@ mod tests {
         let data = Data::Buffer(Bytes::from(vec));
 
         // Sample a committee.
-        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         // Initialize the storage.
         let storage = Storage::<CurrentNetwork>::new(committee, 1);
         // Initialize the ready queue.

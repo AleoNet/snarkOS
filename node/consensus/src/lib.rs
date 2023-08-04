@@ -36,12 +36,12 @@ use snarkos_node_narwhal::{
     BFT,
     MAX_GC_ROUNDS,
 };
-use snarkos_node_narwhal_committee::{Committee, MIN_STAKE};
 use snarkos_node_narwhal_ledger_service::CoreLedgerService;
 use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
+        committee::{Committee, MIN_STAKE},
         narwhal::{Data, Subdag, Transmission, TransmissionID},
         store::ConsensusStorage,
     },
@@ -80,7 +80,7 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
             // Sample the members.
             let mut members = IndexMap::new();
             for _ in 0..4 {
-                members.insert(Address::<N>::new(thread_rng().gen()), MIN_STAKE);
+                members.insert(Address::<N>::new(thread_rng().gen()), (MIN_STAKE, true));
             }
             Committee::new(ledger.latest_round() + 1, members)?
         };
