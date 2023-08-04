@@ -41,14 +41,12 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
-        committee::{Committee, MIN_STAKE},
         narwhal::{Data, Subdag, Transmission, TransmissionID},
         store::ConsensusStorage,
     },
     prelude::*,
 };
 
-use ::rand::thread_rng;
 use anyhow::Result;
 use indexmap::IndexMap;
 use parking_lot::Mutex;
