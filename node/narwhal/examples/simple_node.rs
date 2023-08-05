@@ -25,7 +25,10 @@ use snarkos_node_narwhal::{
 };
 use snarkos_node_narwhal_ledger_service::MockLedgerService;
 use snarkvm::{
-    ledger::{committee::Committee, narwhal::Data},
+    ledger::{
+        committee::{Committee, MIN_STAKE},
+        narwhal::Data,
+    },
     prelude::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
@@ -178,7 +181,7 @@ fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Committee<Curr
         // Sample the account.
         let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64))?;
         // Add the validator.
-        members.insert(account.address(), (1000, false));
+        members.insert(account.address(), (MIN_STAKE, false));
         println!("  Validator {}: {}", i, account.address());
     }
     println!();
