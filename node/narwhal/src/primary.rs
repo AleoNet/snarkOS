@@ -832,7 +832,7 @@ impl<N: Network> Primary<N> {
             // If a BFT sender was provided, send the certificate to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
                 // Await the callback to continue.
-                if let Err(e) = self.send_primary_certificate_to_bft(bft_sender, certificate.clone()).await {
+                if let Err(e) = self.send_primary_certificate_to_bft(bft_sender, certificate).await {
                     warn!("Failed to update the BFT DAG from sync: {e}");
                     return Err(e);
                 };
