@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::check_timestamp_for_liveness;
+use crate::{helpers::check_timestamp_for_liveness, primary::Ledger};
 use snarkvm::{
     ledger::{
         committee::Committee,
@@ -51,6 +51,7 @@ use std::{
 ///  - The `committee` for the next round is inserted into the `committees` map.
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network> {
+    ledger: Ledger<N>,
     /* Once per round */
     /// The current round.
     current_round: Arc<AtomicU64>,
@@ -73,11 +74,14 @@ pub struct Storage<N: Network> {
 
 impl<N: Network> Storage<N> {
     /// Initializes a new instance of storage.
-    pub fn new(committee: Committee<N>, max_gc_rounds: u64) -> Self {
+    pub fn new(ledger: Ledger<N>, max_gc_rounds: u64) -> Self {
+        // Retrieve the current committee.
+        let committee = ledger.current_committee().expect("Ledger is missing a committee.");
         // Retrieve the current round.
         let current_round = committee.starting_round();
         // Return the storage.
         Self {
+            ledger,
             current_round: Arc::new(AtomicU64::new(current_round)),
             committees: Arc::new(RwLock::new(indexmap! { current_round => committee })),
             gc_round: Default::default(),
@@ -135,13 +139,6 @@ impl<N: Network> Storage<N> {
     /// Returns the maximum number of rounds to keep in storage.
     pub fn max_gc_rounds(&self) -> u64 {
         self.max_gc_rounds
-    }
-
-    /// Returns the `committee` for the given `round`.
-    /// If the round does not exist in storage, `None` is returned.
-    pub fn get_committee(&self, round: u64) -> Option<Committee<N>> {
-        // Get the committee from storage.
-        self.committees.read().get(&round).cloned()
     }
 
     /// Increments storage to the next round, updating the current round and committee.
@@ -312,7 +309,7 @@ impl<N: Network> Storage<N> {
         }
 
         // Retrieve the committee for the batch round.
-        let Some(committee) = self.get_committee(round) else {
+        let Ok(committee) = self.ledger.get_committee_for_round(round) else {
             bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
         };
         // Ensure the author is in the committee.
@@ -343,7 +340,7 @@ impl<N: Network> Storage<N> {
         // Check if the previous round is within range of the GC round.
         if previous_round > gc_round {
             // Retrieve the committee for the previous round.
-            let Some(previous_committee) = self.get_committee(previous_round) else {
+            let Ok(previous_committee) = self.ledger.get_committee_for_round(previous_round) else {
                 bail!("Missing committee for the previous round {previous_round} in storage {gc_log}")
             };
             // Ensure the previous round certificates exists in storage.
@@ -428,7 +425,7 @@ impl<N: Network> Storage<N> {
         }
 
         // Retrieve the committee for the batch round.
-        let Some(committee) = self.get_committee(round) else {
+        let Ok(committee) = self.ledger.get_committee_for_round(round) else {
             bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
         };
 
@@ -589,6 +586,7 @@ impl<N: Network> Storage<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
     use snarkvm::{
         ledger::narwhal::Data,
         prelude::{Rng, TestRng},
@@ -669,8 +667,10 @@ mod tests {
 
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
 
         // Initialize the committees.
         let committees = [(1, committee)];
@@ -731,8 +731,10 @@ mod tests {
 
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
 
         // Initialize the committees.
         let committees = [(1, committee)];
@@ -789,6 +791,7 @@ pub mod prop_tests {
         helpers::{now, storage::tests::assert_storage},
         MAX_GC_ROUNDS,
     };
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
     use snarkvm::{
         ledger::{
             coinbase::PuzzleCommitment,
@@ -820,7 +823,8 @@ pub mod prop_tests {
         fn arbitrary() -> Self::Strategy {
             (any::<CommitteeContext>(), 0..MAX_GC_ROUNDS)
                 .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
-                    Storage::<CurrentNetwork>::new(committee, gc_rounds)
+                    let ledger = Arc::new(MockLedgerService::new(committee));
+                    Storage::<CurrentNetwork>::new(ledger, gc_rounds)
                 })
                 .boxed()
         }
@@ -828,7 +832,8 @@ pub mod prop_tests {
         fn arbitrary_with(context: Self::Parameters) -> Self::Strategy {
             (Just(context), 0..MAX_GC_ROUNDS)
                 .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
-                    Storage::<CurrentNetwork>::new(committee, gc_rounds)
+                    let ledger = Arc::new(MockLedgerService::new(committee));
+                    Storage::<CurrentNetwork>::new(ledger, gc_rounds)
                 })
                 .boxed()
         }
@@ -945,7 +950,8 @@ pub mod prop_tests {
         let CommitteeContext(committee, ValidatorSet(validators)) = context;
 
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
 
         // Initialize the committees.
         let committees = [(committee.starting_round(), committee)];

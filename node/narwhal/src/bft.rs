@@ -231,7 +231,8 @@ impl<N: Network> BFT<N> {
         }
 
         // Retrieve the committee for the current round.
-        let Some(committee) = self.storage().get_committee(current_round) else {
+        // Note: This is equivalent to calling `self.ledger().current_committee()`.
+        let Ok(committee) = self.ledger().get_committee_for_round(current_round) else {
             bail!("BFT failed to retrieve the committee for the even round")
         };
         // Determine the leader of the current round.
@@ -297,7 +298,8 @@ impl<N: Network> BFT<N> {
         // Retrieve the certificates for the current round.
         let current_certificates = self.storage().get_certificates_for_round(current_round);
         // Retrieve the committee of the current round.
-        let Some(current_committee) = self.storage().get_committee(current_round) else {
+        // Note: This is equivalent to calling `self.ledger().current_committee()`.
+        let Ok(current_committee) = self.ledger().get_committee_for_round(current_round) else {
             bail!("BFT failed to retrieve the committee for the current round")
         };
 
@@ -363,7 +365,8 @@ impl<N: Network> BFT<N> {
         }
 
         // Retrieve the committee for the commit round.
-        let Some(committee) = self.storage().get_committee(commit_round) else {
+        // Note: This is equivalent to calling `self.ledger().current_committee()`.
+        let Ok(committee) = self.ledger().get_committee_for_round(commit_round) else {
             bail!("BFT failed to retrieve the committee for commit round {commit_round}");
         };
         // Compute the leader for the commit round.
@@ -600,8 +603,8 @@ mod tests {
 
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         let account = Account::new(rng)?;
-        let storage = Storage::new(committee.clone(), 10);
         let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -640,8 +643,8 @@ mod tests {
         // Create a committee with round 1.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         let account = Account::new(rng)?;
-        let storage = Storage::new(committee.clone(), 10);
         let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -661,8 +664,8 @@ mod tests {
 
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
         let account = Account::new(rng)?;
-        let storage = Storage::new(committee.clone(), 10);
         let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -684,8 +687,8 @@ mod tests {
 
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
         let account = Account::new(rng)?;
-        let storage = Storage::new(committee.clone(), 10);
         let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -709,8 +712,8 @@ mod tests {
 
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         let account = Account::new(rng)?;
-        let storage = Storage::new(committee.clone(), 10);
         let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -728,8 +731,8 @@ mod tests {
 
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         let account = Account::new(rng)?;
-        let storage = Storage::new(committee.clone(), 10);
         let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -747,8 +750,8 @@ mod tests {
 
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
         let account = Account::new(rng)?;
-        let storage = Storage::new(committee.clone(), 10);
         let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;

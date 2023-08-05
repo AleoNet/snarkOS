@@ -103,9 +103,11 @@ pub async fn start_bft(
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
-    let (committee, storage, account) = initialize_components(node_id, num_nodes)?;
+    let (committee, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
+    // Initialize the storage.
+    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -136,9 +138,11 @@ pub async fn start_primary(
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
-    let (committee, storage, account) = initialize_components(node_id, num_nodes)?;
+    let (committee, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
     let ledger = Arc::new(MockLedgerService::new(committee));
+    // Initialize the storage.
+    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -159,10 +163,7 @@ pub async fn start_primary(
 }
 
 /// Initializes the components of the node.
-fn initialize_components(
-    node_id: u16,
-    num_nodes: u16,
-) -> Result<(Committee<CurrentNetwork>, Storage<CurrentNetwork>, Account<CurrentNetwork>)> {
+fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Committee<CurrentNetwork>, Account<CurrentNetwork>)> {
     // Ensure that the node ID is valid.
     ensure!(node_id < num_nodes, "Node ID {node_id} must be less than {num_nodes}");
 
@@ -184,10 +185,8 @@ fn initialize_components(
 
     // Initialize the committee.
     let committee = Committee::<CurrentNetwork>::new(1u64, members)?;
-    // Initialize the storage.
-    let storage = Storage::new(committee.clone(), MAX_GC_ROUNDS);
-    // Return the committee, storage, and account.
-    Ok((committee, storage, account))
+    // Return the committee and account.
+    Ok((committee, account))
 }
 
 /// Actively try to keep the node's connections to all nodes.

@@ -26,6 +26,7 @@ use snarkvm::{
 use tracing::*;
 
 /// A mock ledger service that always returns `false`.
+#[derive(Debug)]
 pub struct MockLedgerService<N: Network> {
     committee: Committee<N>,
 }
@@ -41,6 +42,12 @@ impl<N: Network> MockLedgerService<N> {
 impl<N: Network> LedgerService<N> for MockLedgerService<N> {
     /// Returns the current committee.
     fn current_committee(&self) -> Result<Committee<N>> {
+        Ok(self.committee.clone())
+    }
+
+    /// Returns the committee for the given round.
+    /// If the given round is in the future, then the current committee is returned.
+    fn get_committee_for_round(&self, _round: u64) -> Result<Committee<N>> {
         Ok(self.committee.clone())
     }
 

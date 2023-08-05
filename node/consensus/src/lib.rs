@@ -71,12 +71,10 @@ pub struct Consensus<N: Network, C: ConsensusStorage<N>> {
 impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
     /// Initializes a new instance of consensus.
     pub fn new(account: Account<N>, ledger: Ledger<N, C>, ip: Option<SocketAddr>, dev: Option<u16>) -> Result<Self> {
-        // Retrieve the committee.
-        let committee = ledger.latest_committee()?;
-        // Initialize the Narwhal storage.
-        let storage = NarwhalStorage::new(committee, MAX_GC_ROUNDS);
         // Initialize the ledger service.
         let ledger_service = Arc::new(CoreLedgerService::<N, C>::new(ledger.clone()));
+        // Initialize the Narwhal storage.
+        let storage = NarwhalStorage::new(ledger_service.clone(), MAX_GC_ROUNDS);
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger_service, ip, dev)?;
         // Return the consensus.

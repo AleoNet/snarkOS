@@ -40,7 +40,6 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
-        committee::Committee,
         narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
     },
     prelude::Field,
@@ -298,7 +297,7 @@ impl<N: Network> Primary<N> {
         // If the previous round is not 0, check if the previous certificates have reached the quorum threshold.
         if previous_round > 0 {
             // Retrieve the committee for the round.
-            let Some(committee) = self.storage.get_committee(previous_round) else {
+            let Ok(committee) = self.ledger.get_committee_for_round(previous_round) else {
                 bail!("Cannot propose a batch for round {round}: the previous committee is not known yet")
             };
             // Construct a set over the authors.

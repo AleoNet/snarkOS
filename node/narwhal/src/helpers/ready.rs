@@ -141,6 +141,7 @@ impl<N: Network> Ready<N> {
 mod tests {
     use super::*;
     use crate::helpers::Storage;
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
     use snarkvm::ledger::{coinbase::PuzzleCommitment, narwhal::Data};
 
     use ::bytes::Bytes;
@@ -156,8 +157,10 @@ mod tests {
 
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(committee, 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
         // Initialize the ready queue.
         let ready = Ready::<CurrentNetwork>::new(storage);
 
@@ -223,8 +226,10 @@ mod tests {
 
         // Sample a committee.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(committee, 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
         // Initialize the ready queue.
         let ready = Ready::<CurrentNetwork>::new(storage);
 
