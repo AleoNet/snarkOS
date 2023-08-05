@@ -458,7 +458,9 @@ impl<N: Network> Primary<N> {
         /* Proceeding to certify the batch. */
 
         info!("Quorum threshold reached - Preparing to certify our batch...");
+
         // Store the certified batch and broadcast it to all validators.
+        // If there was an error storing the certificate, reinsert the transmissions back into the ready queue.
         if let Err(e) = self.store_and_broadcast_certificate(&proposal).await {
             // Reinsert the transmissions back into the ready queue for the next proposal.
             self.reinsert_transmissions_into_workers(proposal)?;
@@ -696,6 +698,20 @@ impl<N: Network> Primary<N> {
         callback_receiver.await?
     }
 
+    /// Sends the batch certificate to the BFT.
+    async fn send_primary_certificate_to_bft(
+        &self,
+        bft_sender: &BFTSender<N>,
+        certificate: BatchCertificate<N>,
+    ) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback_sender, callback_receiver) = oneshot::channel();
+        // Send the certificate to the BFT.
+        bft_sender.tx_primary_certificate.send((certificate, callback_sender)).await?;
+        // Await the callback to continue.
+        callback_receiver.await?
+    }
+
     /// Ensures the primary is signing for the specified batch round.
     /// This method is used to ensure: for a given round, as soon as the primary starts proposing,
     /// it will no longer sign for the previous round (as it has enough previous certificates to proceed).
@@ -735,12 +751,8 @@ impl<N: Network> Primary<N> {
         self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
         // If a BFT sender was provided, send the certificate to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
-            // Initialize a callback sender and receiver.
-            let (callback_sender, callback_receiver) = oneshot::channel();
-            // Send the certificate to the BFT.
-            bft_sender.tx_primary_certificate.send((certificate.clone(), callback_sender)).await?;
             // Await the callback to continue.
-            if let Err(e) = callback_receiver.await? {
+            if let Err(e) = self.send_primary_certificate_to_bft(bft_sender, certificate.clone()).await {
                 warn!("Failed to update the BFT DAG from primary: {e}");
                 return Err(e);
             };
@@ -819,12 +831,8 @@ impl<N: Network> Primary<N> {
             debug!("Stored certificate for round {batch_round} from peer '{peer_ip}'");
             // If a BFT sender was provided, send the certificate to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
-                // Initialize a callback sender and receiver.
-                let (callback_sender, callback_receiver) = oneshot::channel();
-                // Send the certificate to the BFT.
-                bft_sender.tx_primary_certificate.send((certificate, callback_sender)).await?;
                 // Await the callback to continue.
-                if let Err(e) = callback_receiver.await? {
+                if let Err(e) = self.send_primary_certificate_to_bft(bft_sender, certificate.clone()).await {
                     warn!("Failed to update the BFT DAG from sync: {e}");
                     return Err(e);
                 };

@@ -560,10 +560,11 @@ impl<N: Network> BFT<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((certificate, callback)) = rx_primary_certificate.recv().await {
-                callback.send(Ok(())).ok();
-                if let Err(e) = self_.update_dag(certificate).await {
-                    warn!("BFT failed to update the DAG: {e}");
-                }
+                // Update the DAG with the certificate.
+                let result = self_.update_dag(certificate).await;
+                // Send the callback **after** updating the DAG.
+                // Note: We must await the DAG update before proceeding.
+                callback.send(result).ok();
             }
         });
     }
