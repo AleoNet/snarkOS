@@ -17,7 +17,7 @@ extern crate tracing;
 
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
-    helpers::{init_primary_channels, PrimarySender, Storage},
+    helpers::{init_consensus_channels, init_primary_channels, ConsensusReceiver, PrimarySender, Storage},
     Primary,
     BFT,
     MAX_GC_ROUNDS,
@@ -116,10 +116,14 @@ pub async fn start_bft(
         Some(ip) => (Some(*ip), None),
         None => (None, Some(node_id)),
     };
+    // Initialize the consensus channels.
+    let (consensus_sender, consensus_receiver) = init_consensus_channels::<CurrentNetwork>();
+    // Initialize the consensus receiver handler.
+    consensus_handler(consensus_receiver);
     // Initialize the BFT instance.
     let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, ip, dev)?;
     // Run the BFT instance.
-    bft.run(sender.clone(), receiver, None).await?;
+    bft.run(sender.clone(), receiver, Some(consensus_sender)).await?;
     // Retrieve the BFT's primary.
     let primary = bft.primary();
     // Keep the node's connections.
@@ -190,6 +194,28 @@ fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Committee<Curr
     let committee = Committee::<CurrentNetwork>::new(1u64, members)?;
     // Return the committee and account.
     Ok((committee, account))
+}
+
+/// Handles the consensus receiver.
+fn consensus_handler(receiver: ConsensusReceiver<CurrentNetwork>) {
+    let ConsensusReceiver { mut rx_consensus_subdag } = receiver;
+
+    tokio::task::spawn(async move {
+        while let Some((subdag, transmissions, callback)) = rx_consensus_subdag.recv().await {
+            // Determine the amount of time to sleep for the subdag.
+            let subdag_ms = subdag.values().flatten().count();
+            // Determine the amount of time to sleep for the transmissions.
+            let transmissions_ms = transmissions.len() * 25;
+            // Add a constant delay.
+            let constant_ms = 100;
+            // Compute the total amount of time to sleep.
+            let sleep_ms = (subdag_ms + transmissions_ms + constant_ms) as u64;
+            // Sleep for the determined amount of time.
+            tokio::time::sleep(std::time::Duration::from_millis(sleep_ms)).await;
+            // Call the callback.
+            callback.send(Ok(())).ok();
+        }
+    });
 }
 
 /// Actively try to keep the node's connections to all nodes.

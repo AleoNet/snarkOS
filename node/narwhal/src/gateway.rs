@@ -426,7 +426,7 @@ impl<N: Network> Gateway<N> {
             }
             Event::WorkerPing(ping) => {
                 let num_workers = self.num_workers();
-                for transmission_id in ping.transmission_ids {
+                for transmission_id in ping.transmission_ids.into_iter().take(MAX_TRANSMISSIONS_PER_BATCH) {
                     // Determine the worker ID.
                     let Ok(worker_id) = assign_to_worker(transmission_id, num_workers) else {
                         warn!("{CONTEXT} Unable to assign transmission ID '{transmission_id}' to a worker");

@@ -576,12 +576,15 @@ impl<N: Network> Primary<N> {
                     error!("Unable to determine the worker ID for the unconfirmed solution");
                     continue;
                 };
-                // Retrieve the worker.
-                let worker = &self_.workers[worker_id as usize];
-                // Process the unconfirmed solution.
-                let result = worker.process_unconfirmed_solution(puzzle_commitment, prover_solution).await;
-                // Send the result to the callback.
-                callback.send(result).ok();
+                let self_ = self_.clone();
+                tokio::spawn(async move {
+                    // Retrieve the worker.
+                    let worker = &self_.workers[worker_id as usize];
+                    // Process the unconfirmed solution.
+                    let result = worker.process_unconfirmed_solution(puzzle_commitment, prover_solution).await;
+                    // Send the result to the callback.
+                    callback.send(result).ok();
+                });
             }
         });
 
@@ -594,12 +597,15 @@ impl<N: Network> Primary<N> {
                     error!("Unable to determine the worker ID for the unconfirmed transaction");
                     continue;
                 };
-                // Retrieve the worker.
-                let worker = &self_.workers[worker_id as usize];
-                // Process the unconfirmed transaction.
-                let result = worker.process_unconfirmed_transaction(transaction_id, transaction).await;
-                // Send the result to the callback.
-                callback.send(result).ok();
+                let self_ = self_.clone();
+                tokio::spawn(async move {
+                    // Retrieve the worker.
+                    let worker = &self_.workers[worker_id as usize];
+                    // Process the unconfirmed transaction.
+                    let result = worker.process_unconfirmed_transaction(transaction_id, transaction).await;
+                    // Send the result to the callback.
+                    callback.send(result).ok();
+                });
             }
         });
     }
