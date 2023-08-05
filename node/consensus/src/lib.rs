@@ -191,20 +191,30 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         // Process the committed subdag and transmissions from the BFT.
         let self_ = self.clone();
         self.spawn(async move {
-            while let Some((committed_subdag, transmissions)) = rx_consensus_subdag.recv().await {
-                self_.process_bft_subdag(committed_subdag, transmissions).await;
+            while let Some((committed_subdag, transmissions, callback)) = rx_consensus_subdag.recv().await {
+                self_.process_bft_subdag(committed_subdag, transmissions, callback).await;
             }
         });
     }
 
     /// Processes the committed subdag and transmissions from the BFT.
-    async fn process_bft_subdag(&self, subdag: Subdag<N>, transmissions: IndexMap<TransmissionID<N>, Transmission<N>>) {
+    async fn process_bft_subdag(
+        &self,
+        subdag: Subdag<N>,
+        transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
+        callback: oneshot::Sender<Result<()>>,
+    ) {
         // Try to advance to the next block.
-        if let Err(e) = self.try_advance_to_next_block(subdag, transmissions.clone()) {
+        let result = self.try_advance_to_next_block(subdag, transmissions.clone());
+        // If the block failed to advance, reinsert the transmissions into the memory pool.
+        if let Err(e) = &result {
             error!("Unable to advance to the next block - {e}");
             // On failure, reinsert the transmissions into the memory pool.
             self.reinsert_transmissions(transmissions).await;
         }
+        // Send the callback **after** advancing to the next block.
+        // Note: We must await the block to be advanced before sending the callback.
+        callback.send(result).ok();
     }
 
     /// Attempts to advance to the next block.

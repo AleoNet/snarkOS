@@ -51,7 +51,10 @@ use std::{
         Arc,
     },
 };
-use tokio::{sync::OnceCell, task::JoinHandle};
+use tokio::{
+    sync::{oneshot, OnceCell},
+    task::JoinHandle,
+};
 
 #[derive(Clone)]
 pub struct BFT<N: Network> {
@@ -459,7 +462,17 @@ impl<N: Network> BFT<N> {
             );
             // Trigger consensus.
             if let Some(consensus_sender) = self.consensus_sender.get() {
-                consensus_sender.tx_consensus_subdag.send((subdag, transmissions)).await?;
+                // Retrieve the anchor round.
+                let anchor_round = subdag.anchor_round();
+                // Initialize a callback sender and receiver.
+                let (callback_sender, callback_receiver) = oneshot::channel();
+                // Send the subdag and transmissions to consensus.
+                consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
+                // Await the callback to continue.
+                if let Err(e) = callback_receiver.await {
+                    error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
+                    break;
+                }
             }
         }
         Ok(())
