@@ -716,17 +716,17 @@ impl<N: Network> Primary<N> {
     /// This method is used to ensure: for a given round, as soon as the primary starts proposing,
     /// it will no longer sign for the previous round (as it has enough previous certificates to proceed).
     fn ensure_is_signing_round(&self, batch_round: u64) -> Result<()> {
-        // Retrieve the committee round.
-        let committee_round = self.current_round();
-        // Ensure the batch round is within GC range of the committee round.
-        if committee_round + self.storage.max_gc_rounds() <= batch_round {
+        // Retrieve the current round.
+        let current_round = self.current_round();
+        // Ensure the batch round is within GC range of the current round.
+        if current_round + self.storage.max_gc_rounds() <= batch_round {
             bail!("Round {batch_round} is too far in the future")
         }
-        // Ensure the batch round is at or one before the committee round.
+        // Ensure the batch round is at or one before the current round.
         // Intuition: Our primary has moved on to the next round, but has not necessarily started proposing,
         // so we can still sign for the previous round. If we have started proposing, the next check will fail.
-        if committee_round > batch_round + 1 {
-            bail!("Primary is on round {committee_round}, and no longer signing for round {batch_round}")
+        if current_round > batch_round + 1 {
+            bail!("Primary is on round {current_round}, and no longer signing for round {batch_round}")
         }
         // Check if the primary is still signing for the batch round.
         if let Some(signing_round) = self.proposed_batch.read().as_ref().map(|proposal| proposal.round()) {
