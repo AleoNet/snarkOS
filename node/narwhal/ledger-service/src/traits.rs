@@ -16,6 +16,7 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
+        committee::Committee,
         narwhal::Data,
     },
     prelude::{narwhal::TransmissionID, Field, Network, Result},
@@ -23,6 +24,9 @@ use snarkvm::{
 
 #[async_trait]
 pub trait LedgerService<N: Network>: Send + Sync {
+    /// Returns the current committee.
+    fn current_committee(&self) -> Result<Committee<N>>;
+
     /// Returns `true` if the ledger contains the given certificate ID.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
 

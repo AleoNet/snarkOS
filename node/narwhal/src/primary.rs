@@ -165,11 +165,6 @@ impl<N: Network> Primary<N> {
         self.storage.current_round()
     }
 
-    /// Returns the current committee.
-    pub fn current_committee(&self) -> Committee<N> {
-        self.storage.current_committee()
-    }
-
     /// Returns the gateway.
     pub const fn gateway(&self) -> &Gateway<N> {
         &self.gateway
@@ -181,7 +176,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Returns the ledger.
-    pub fn ledger(&self) -> &Ledger<N> {
+    pub const fn ledger(&self) -> &Ledger<N> {
         &self.ledger
     }
 
@@ -348,7 +343,7 @@ impl<N: Network> Primary<N> {
         // Sign the batch header.
         let batch_header = BatchHeader::new(private_key, round, timestamp, transmission_ids, certificate_ids, rng)?;
         // Construct the proposal.
-        let proposal = Proposal::new(self.current_committee(), batch_header.clone(), transmissions)?;
+        let proposal = Proposal::new(self.ledger.current_committee()?, batch_header.clone(), transmissions)?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
         // Set the proposed batch.
@@ -629,7 +624,7 @@ impl<N: Network> Primary<N> {
     /// If the current round has reached quorum threshold, then advance to the next round.
     async fn try_advance_to_next_round(&self) -> Result<()> {
         // Retrieve the current committee.
-        let current_committee = self.current_committee();
+        let current_committee = self.ledger.current_committee()?;
         // Retrieve the current round.
         let current_round = self.current_round();
         // Retrieve the certificates.
@@ -667,7 +662,7 @@ impl<N: Network> Primary<N> {
         while self.current_round() < next_round.saturating_sub(1) {
             // Update to the next committee in storage.
             // TODO (howardwu): Fix to increment to the next round.
-            self.storage.increment_to_next_round(Some(self.storage.current_committee()))?;
+            self.storage.increment_to_next_round(Some(self.ledger.current_committee()?))?;
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;
         }
@@ -684,7 +679,7 @@ impl<N: Network> Primary<N> {
             else {
                 // Update to the next committee in storage.
                 // TODO (howardwu): Fix to increment to the next round.
-                self.storage.increment_to_next_round(Some(self.storage.current_committee()))?;
+                self.storage.increment_to_next_round(Some(self.ledger.current_committee()?))?;
             }
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;

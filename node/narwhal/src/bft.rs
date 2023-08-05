@@ -199,7 +199,7 @@ impl<N: Network> BFT<N> {
         if is_ready {
             // Update to the next committee in storage.
             // TODO (howardwu): Fix to increment to the next round.
-            self.storage().increment_to_next_round(Some(self.storage().current_committee()))?;
+            self.storage().increment_to_next_round(Some(self.ledger().current_committee()?))?;
             // Update the timer for the leader certificate.
             self.leader_certificate_timer.store(now(), Ordering::SeqCst);
         }
@@ -600,8 +600,8 @@ mod tests {
 
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         let account = Account::new(rng)?;
-        let storage = Storage::new(committee, 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let storage = Storage::new(committee.clone(), 10);
+        let ledger = Arc::new(MockLedgerService::new(committee));
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -640,8 +640,8 @@ mod tests {
         // Create a committee with round 1.
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         let account = Account::new(rng)?;
-        let storage = Storage::new(committee, 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let storage = Storage::new(committee.clone(), 10);
+        let ledger = Arc::new(MockLedgerService::new(committee));
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -661,8 +661,8 @@ mod tests {
 
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
         let account = Account::new(rng)?;
-        let storage = Storage::new(committee, 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let storage = Storage::new(committee.clone(), 10);
+        let ledger = Arc::new(MockLedgerService::new(committee));
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -685,7 +685,7 @@ mod tests {
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
         let account = Account::new(rng)?;
         let storage = Storage::new(committee.clone(), 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -709,8 +709,8 @@ mod tests {
 
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         let account = Account::new(rng)?;
-        let storage = Storage::new(committee, 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let storage = Storage::new(committee.clone(), 10);
+        let ledger = Arc::new(MockLedgerService::new(committee));
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -728,8 +728,10 @@ mod tests {
 
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
         let account = Account::new(rng)?;
-        let storage = Storage::new(committee, 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let storage = Storage::new(committee.clone(), 10);
+        let ledger = Arc::new(MockLedgerService::new(committee));
+
+        // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
 
         // Ensure this call succeeds on an even round.
@@ -745,8 +747,8 @@ mod tests {
 
         let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
         let account = Account::new(rng)?;
-        let storage = Storage::new(committee, 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let storage = Storage::new(committee.clone(), 10);
+        let ledger = Arc::new(MockLedgerService::new(committee));
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;

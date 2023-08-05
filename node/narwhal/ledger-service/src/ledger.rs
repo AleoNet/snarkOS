@@ -17,6 +17,7 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
+        committee::Committee,
         narwhal::{Data, TransmissionID},
         store::ConsensusStorage,
         Ledger,
@@ -40,6 +41,11 @@ impl<N: Network, C: ConsensusStorage<N>> CoreLedgerService<N, C> {
 
 #[async_trait]
 impl<N: Network, C: ConsensusStorage<N>> LedgerService<N> for CoreLedgerService<N, C> {
+    /// Returns the current committee.
+    fn current_committee(&self) -> Result<Committee<N>> {
+        self.ledger.latest_committee()
+    }
+
     /// Returns `false` for all queries.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
         // TODO (howardwu): Implement fetching certificates from ledger.

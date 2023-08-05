@@ -815,11 +815,11 @@ impl<N: Network> Gateway<N> {
         }
         // TODO (howardwu): Remove this check, instead checking the address is unique.
         //  Then, later on, use the committee object to perform filtering of all active connections.
-        // Ensure the address is in the committee.
-        if !self.storage.current_committee().is_committee_member(address) {
-            warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
-            return Some(DisconnectReason::ProtocolViolation);
-        }
+        // // Ensure the address is in the committee.
+        // if !self.storage.current_committee().is_committee_member(address) {
+        //     warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
+        //     return Some(DisconnectReason::ProtocolViolation);
+        // }
         None
     }
 
@@ -995,7 +995,8 @@ pub mod prop_tests {
         #[strategy(any_valid_dev_gateway())] input: GatewayInput,
         #[strategy(0..MAX_WORKERS)] workers_count: u8,
     ) {
-        let (storage, _, private_key, dev) = input;
+        let (storage, committee, private_key, dev) = input;
+        let committee = committee.0;
         let worker_storage = storage.clone();
         let account = Account::try_from(private_key).unwrap();
 
@@ -1011,7 +1012,7 @@ pub mod prop_tests {
                 // Construct the worker channels.
                 let (tx_worker, rx_worker) = init_worker_channels();
                 // Construct the worker instance.
-                let ledger = Arc::new(MockLedgerService::new());
+                let ledger = Arc::new(MockLedgerService::new(committee.clone()));
                 let worker =
                     Worker::new(id, Arc::new(gateway.clone()), worker_storage.clone(), ledger, Default::default())
                         .unwrap();

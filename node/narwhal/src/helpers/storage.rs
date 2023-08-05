@@ -137,14 +137,6 @@ impl<N: Network> Storage<N> {
         self.max_gc_rounds
     }
 
-    /// Returns the current committee.
-    pub fn current_committee(&self) -> Committee<N> {
-        // Get the current round.
-        let round = self.current_round();
-        // Get the committee for the current round.
-        self.get_committee(round).expect("The committee for current round should exist")
-    }
-
     /// Returns the `committee` for the given `round`.
     /// If the round does not exist in storage, `None` is returned.
     pub fn get_committee(&self, round: u64) -> Option<Committee<N>> {

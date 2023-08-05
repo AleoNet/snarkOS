@@ -47,7 +47,6 @@ use axum::{
 use axum_extra::response::ErasedJson;
 use clap::{Parser, ValueEnum};
 use indexmap::IndexMap;
-use parking_lot::RwLock;
 use rand::{Rng, SeedableRng};
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use tokio::sync::oneshot;
@@ -104,9 +103,9 @@ pub async fn start_bft(
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
-    let (storage, account) = initialize_components(node_id, num_nodes)?;
+    let (committee, storage, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
-    let ledger = Arc::new(MockLedgerService::new());
+    let ledger = Arc::new(MockLedgerService::new(committee));
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -137,9 +136,9 @@ pub async fn start_primary(
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
-    let (storage, account) = initialize_components(node_id, num_nodes)?;
+    let (committee, storage, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
-    let ledger = Arc::new(MockLedgerService::new());
+    let ledger = Arc::new(MockLedgerService::new(committee));
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -160,7 +159,10 @@ pub async fn start_primary(
 }
 
 /// Initializes the components of the node.
-fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Storage<CurrentNetwork>, Account<CurrentNetwork>)> {
+fn initialize_components(
+    node_id: u16,
+    num_nodes: u16,
+) -> Result<(Committee<CurrentNetwork>, Storage<CurrentNetwork>, Account<CurrentNetwork>)> {
     // Ensure that the node ID is valid.
     ensure!(node_id < num_nodes, "Node ID {node_id} must be less than {num_nodes}");
 
@@ -181,11 +183,11 @@ fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Storage<Curren
     println!();
 
     // Initialize the committee.
-    let committee = Arc::new(RwLock::new(Committee::<CurrentNetwork>::new(1u64, members)?));
+    let committee = Committee::<CurrentNetwork>::new(1u64, members)?;
     // Initialize the storage.
-    let storage = Storage::new(committee.read().clone(), MAX_GC_ROUNDS);
-    // Return the storage and account.
-    Ok((storage, account))
+    let storage = Storage::new(committee.clone(), MAX_GC_ROUNDS);
+    // Return the committee, storage, and account.
+    Ok((committee, storage, account))
 }
 
 /// Actively try to keep the node's connections to all nodes.
