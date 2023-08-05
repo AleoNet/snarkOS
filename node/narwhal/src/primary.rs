@@ -631,7 +631,7 @@ impl<N: Network> Primary<N> {
         // Retrieve the current committee.
         let current_committee = self.current_committee();
         // Retrieve the current round.
-        let current_round = current_committee.starting_round();
+        let current_round = self.current_round();
         // Retrieve the certificates.
         let certificates = self.storage.get_certificates_for_round(current_round);
         // Construct a set over the authors.
@@ -667,7 +667,7 @@ impl<N: Network> Primary<N> {
         while self.current_round() < next_round.saturating_sub(1) {
             // Update to the next committee in storage.
             // TODO (howardwu): Fix to increment to the next round.
-            self.storage.increment_to_next_round(self.storage.current_committee())?;
+            self.storage.increment_to_next_round(Some(self.storage.current_committee()))?;
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;
         }
@@ -684,7 +684,7 @@ impl<N: Network> Primary<N> {
             else {
                 // Update to the next committee in storage.
                 // TODO (howardwu): Fix to increment to the next round.
-                self.storage.increment_to_next_round(self.storage.current_committee())?;
+                self.storage.increment_to_next_round(Some(self.storage.current_committee()))?;
             }
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;

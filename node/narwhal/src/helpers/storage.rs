@@ -154,19 +154,25 @@ impl<N: Network> Storage<N> {
 
     /// Increments storage to the next round, updating the current round and committee.
     /// Note: This method is only called once per round, upon certification of the primary's batch.
-    pub fn increment_to_next_round(&self, next_committee: Committee<N>) -> Result<()> {
-        // Ensure the next committee is for the next round.
-        ensure!(next_committee.starting_round() == self.current_round() + 1, "Next committee is for wrong round");
+    pub fn increment_to_next_round(&self, next_committee: Option<Committee<N>>) -> Result<()> {
+        // If an updated committee was provided, ensure it is for the next round.
+        if let Some(next_committee) = next_committee.as_ref() {
+            // Ensure the next committee round is greater than the current round.
+            ensure!(next_committee.starting_round() > self.current_round(), "Next committee is for wrong round");
+        }
 
         // Retrieve the next round.
-        let next_round = next_committee.starting_round();
+        let next_round = self.current_round() + 1;
         // Ensure there are no certificates for the next round yet.
         ensure!(!self.contains_certificates_for_round(next_round), "Certificates for the next round cannot exist yet");
 
         // Update the current round.
         self.current_round.store(next_round, Ordering::Relaxed);
-        // Insert the committee into storage.
-        self.committees.write().insert(next_round, next_committee);
+        // If an updated committee was provided, update storage.
+        if let Some(next_committee) = next_committee {
+            // Insert the committee into storage.
+            self.committees.write().insert(next_round, next_committee);
+        }
 
         // Fetch the current GC round.
         let current_gc_round = self.gc_round();

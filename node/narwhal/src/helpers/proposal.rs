@@ -50,11 +50,8 @@ impl<N: Network> Proposal<N> {
         batch_header: BatchHeader<N>,
         transmissions: IndexMap<TransmissionID<N>, Transmission<N>>,
     ) -> Result<Self> {
-        // Ensure the committee round batches the proposed batch round.
-        ensure!(
-            committee.starting_round() == batch_header.round(),
-            "The committee round does not match the batch round"
-        );
+        // Ensure the committee is for the batch round.
+        ensure!(batch_header.round() >= committee.starting_round(), "Batch round must be >= the committee round");
         // Ensure the batch author is a member of the committee.
         ensure!(committee.is_committee_member(batch_header.author()), "The batch author is not a committee member");
         // Ensure the transmissions are not empty.
