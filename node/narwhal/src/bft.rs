@@ -199,7 +199,7 @@ impl<N: Network> BFT<N> {
         if is_ready {
             // Update to the next committee in storage.
             // TODO (howardwu): Fix to increment to the next round.
-            self.storage().increment_to_next_round(Some(self.ledger().current_committee()?))?;
+            self.storage().increment_to_next_round()?;
             // Update the timer for the leader certificate.
             self.leader_certificate_timer.store(now(), Ordering::SeqCst);
         }

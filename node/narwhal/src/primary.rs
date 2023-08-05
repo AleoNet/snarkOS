@@ -661,7 +661,7 @@ impl<N: Network> Primary<N> {
         while self.current_round() < next_round.saturating_sub(1) {
             // Update to the next committee in storage.
             // TODO (howardwu): Fix to increment to the next round.
-            self.storage.increment_to_next_round(Some(self.ledger.current_committee()?))?;
+            self.storage.increment_to_next_round()?;
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;
         }
@@ -678,7 +678,7 @@ impl<N: Network> Primary<N> {
             else {
                 // Update to the next committee in storage.
                 // TODO (howardwu): Fix to increment to the next round.
-                self.storage.increment_to_next_round(Some(self.ledger.current_committee()?))?;
+                self.storage.increment_to_next_round()?;
             }
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;
