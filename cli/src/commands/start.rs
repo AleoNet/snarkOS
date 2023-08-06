@@ -257,7 +257,7 @@ impl Start {
                 // Construct the public balances.
                 let public_balances = development_private_keys
                     .iter()
-                    .map(|private_key| Ok((Address::try_from(private_key)?, MIN_STAKE)))
+                    .map(|private_key| Ok((Address::try_from(private_key)?, 100 * MIN_STAKE)))
                     .collect::<Result<indexmap::IndexMap<_, _>>>()?;
 
                 // Initialize a new VM.

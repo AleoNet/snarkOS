@@ -56,7 +56,7 @@ pub const MAX_WORKERS: u8 = 2; // workers
 /// The port on which the memory pool listens for incoming connections.
 pub const MEMORY_POOL_PORT: u16 = 5000; // port
 /// The frequency at which each worker broadcasts a ping to every other node.
-pub const WORKER_PING_INTERVAL: u64 = 1000; // ms
+pub const WORKER_PING_INTERVAL: u64 = 1500; // ms
 
 // TODO (howardwu): Switch the worker's `TransmissionID` to use or include a sha256/blake2s hash.
 // TODO (howardwu): Implement sha256/blake2s hashing on `Data::Bytes`, so we can compare IDs without deserializing.

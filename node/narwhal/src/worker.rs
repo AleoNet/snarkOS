@@ -38,6 +38,8 @@ use parking_lot::Mutex;
 use std::{future::Future, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{sync::oneshot, task::JoinHandle, time::timeout};
 
+const MAX_TRANSMISSIONS_PER_WORKER: usize = MAX_TRANSMISSIONS_PER_BATCH / MAX_WORKERS as usize;
+
 #[derive(Clone)]
 pub struct Worker<N: Network> {
     /// The worker ID.
@@ -254,7 +256,7 @@ impl<N: Network> Worker<N> {
         }
         // If the ready queue is full, then skip this transmission.
         // Note: We must prioritize the unconfirmed solutions and unconfirmed transactions, not transmissions.
-        if self.ready.num_transmissions() > MAX_TRANSMISSIONS_PER_BATCH {
+        if self.ready.num_transmissions() > MAX_TRANSMISSIONS_PER_WORKER {
             return Ok(());
         }
         trace!("Worker {} - Found a new transmission ID '{}' from peer '{peer_ip}'", self.id, fmt_id(transmission_id));
@@ -386,7 +388,12 @@ impl<N: Network> Worker<N> {
     fn broadcast_ping(&self) {
         // Broadcast the ping event.
         self.gateway.broadcast(Event::WorkerPing(
-            self.ready.transmission_ids().into_iter().take(MAX_TRANSMISSIONS_PER_BATCH).collect::<IndexSet<_>>().into(),
+            self.ready
+                .transmission_ids()
+                .into_iter()
+                .take(MAX_TRANSMISSIONS_PER_WORKER)
+                .collect::<IndexSet<_>>()
+                .into(),
         ));
     }
 

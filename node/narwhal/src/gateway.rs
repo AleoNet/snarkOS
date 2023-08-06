@@ -475,6 +475,7 @@ impl<N: Network> Gateway<N> {
         self.spawn(async move {
             // Sleep briefly to ensure the other nodes are ready to connect.
             tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            info!("Starting the heartbeat of the gateway...");
             loop {
                 // Process a heartbeat in the router.
                 self_clone.heartbeat();
