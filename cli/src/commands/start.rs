@@ -15,14 +15,18 @@
 use snarkos_account::Account;
 use snarkos_display::Display;
 use snarkos_node::{messages::NodeType, narwhal::MEMORY_POOL_PORT, Node};
-use snarkvm::prelude::{
-    block::Block,
-    store::{helpers::memory::ConsensusMemory, ConsensusStore},
-    FromBytes,
-    Network,
-    PrivateKey,
-    Testnet3,
-    VM,
+use snarkvm::{
+    console::{
+        account::{Address, PrivateKey},
+        network::{Network, Testnet3},
+    },
+    ledger::{
+        block::Block,
+        committee::{Committee, MIN_STAKE},
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+    },
+    prelude::FromBytes,
+    synthesizer::VM,
 };
 
 use anyhow::{bail, Result};
@@ -203,8 +207,11 @@ impl Start {
                 bail!("At most one beacon at '--dev 0' is supported in development mode");
             }
 
+            // Set the number of validators.
+            const NUM_VALIDATORS: u16 = 4;
+
             // To avoid ambiguity, we define the first 4 nodes to be the trusted validators to connect to.
-            for i in 0..4 {
+            for i in 0..NUM_VALIDATORS {
                 if i != dev {
                     trusted_validators.push(SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i))?);
                 }
@@ -233,12 +240,30 @@ impl Start {
 
             // Sample the genesis block.
             let genesis = {
-                // Initialize a new VM.
-                let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
                 // Initialize the (fixed) RNG.
                 let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
+                // Initialize the development private keys.
+                let development_private_keys =
+                    (0..NUM_VALIDATORS).map(|_| PrivateKey::<N>::new(&mut rng)).collect::<Result<Vec<_>>>()?;
+
+                // Construct the committee members.
+                let members = development_private_keys
+                    .iter()
+                    .map(|private_key| Ok((Address::try_from(private_key)?, (MIN_STAKE, true))))
+                    .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+                // Construct the committee.
+                let committee = Committee::<N>::new_genesis(members)?;
+
+                // Construct the public balances.
+                let public_balances = development_private_keys
+                    .iter()
+                    .map(|private_key| Ok((Address::try_from(private_key)?, MIN_STAKE)))
+                    .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+
+                // Initialize a new VM.
+                let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
                 // Initialize the genesis block.
-                vm.genesis_beacon(&PrivateKey::<N>::new(&mut rng)?, &mut rng)?
+                vm.genesis_quorum(&development_private_keys[0], committee, public_balances, &mut rng)?
             };
 
             // A helper method to set the account private key in the node type.
