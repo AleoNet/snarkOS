@@ -120,7 +120,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
             shutdown: Default::default(),
         };
         // Initialize the transaction pool.
-        node.initialize_transaction_pool()?;
+        node.initialize_transaction_pool(dev)?;
 
         // Initialize the REST server.
         if let Some(rest_ip) = rest_ip {
@@ -230,121 +230,207 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         }
     }
 
+    // /// Initialize the transaction pool.
+    // fn initialize_transaction_pool(&self, dev: Option<u16>) -> Result<()> {
+    //     use snarkvm::{
+    //         console::{
+    //             account::ViewKey,
+    //             program::{Identifier, Literal, Plaintext, ProgramID, Record, Value},
+    //             types::U64,
+    //         },
+    //         ledger::block::transition::Output,
+    //     };
+    //     use std::str::FromStr;
+    //
+    //     // Initialize the locator.
+    //     let locator = (ProgramID::from_str("credits.aleo")?, Identifier::from_str("split")?);
+    //     // Initialize the record name.
+    //     let record_name = Identifier::from_str("credits")?;
+    //
+    //     /// Searches the genesis block for the mint record.
+    //     fn search_genesis_for_mint<N: Network>(
+    //         block: Block<N>,
+    //         view_key: &ViewKey<N>,
+    //     ) -> Option<Record<N, Plaintext<N>>> {
+    //         for transition in block.transitions().filter(|t| t.is_mint()) {
+    //             if let Output::Record(_, _, Some(ciphertext)) = &transition.outputs()[0] {
+    //                 if ciphertext.is_owner(view_key) {
+    //                     match ciphertext.decrypt(view_key) {
+    //                         Ok(record) => return Some(record),
+    //                         Err(error) => {
+    //                             error!("Failed to decrypt the mint output record - {error}");
+    //                             return None;
+    //                         }
+    //                     }
+    //                 }
+    //             }
+    //         }
+    //         None
+    //     }
+    //
+    //     /// Searches the block for the split record.
+    //     fn search_block_for_split<N: Network>(
+    //         block: Block<N>,
+    //         view_key: &ViewKey<N>,
+    //     ) -> Option<Record<N, Plaintext<N>>> {
+    //         let mut found = None;
+    //         // TODO (howardwu): Switch to the iterator when DoubleEndedIterator is supported.
+    //         // block.transitions().rev().for_each(|t| {
+    //         let splits = block.transitions().filter(|t| t.is_split()).collect::<Vec<_>>();
+    //         splits.iter().rev().for_each(|t| {
+    //             if found.is_some() {
+    //                 return;
+    //             }
+    //             let Output::Record(_, _, Some(ciphertext)) = &t.outputs()[1] else {
+    //                 error!("Failed to find the split output record");
+    //                 return;
+    //             };
+    //             if ciphertext.is_owner(view_key) {
+    //                 match ciphertext.decrypt(view_key) {
+    //                     Ok(record) => found = Some(record),
+    //                     Err(error) => {
+    //                         error!("Failed to decrypt the split output record - {error}");
+    //                     }
+    //                 }
+    //             }
+    //         });
+    //         found
+    //     }
+    //
+    //     let self_ = self.clone();
+    //     self.spawn(async move {
+    //         // Retrieve the view key.
+    //         let view_key = self_.view_key();
+    //         // Initialize the record.
+    //         let mut record = {
+    //             let mut found = None;
+    //             let mut height = self_.ledger.latest_height();
+    //             while found.is_none() && height > 0 {
+    //                 // Retrieve the block.
+    //                 let Ok(block) = self_.ledger.get_block(height) else {
+    //                     error!("Failed to get block at height {}", height);
+    //                     break;
+    //                 };
+    //                 // Search for the latest split record.
+    //                 if let Some(record) = search_block_for_split(block, view_key) {
+    //                     found = Some(record);
+    //                 }
+    //                 // Decrement the height.
+    //                 height = height.saturating_sub(1);
+    //             }
+    //             match found {
+    //                 Some(record) => record,
+    //                 None => {
+    //                     // Retrieve the genesis block.
+    //                     let Ok(block) = self_.ledger.get_block(0) else {
+    //                         error!("Failed to get the genesis block");
+    //                         return;
+    //                     };
+    //                     // Search the genesis block for the mint record.
+    //                     if let Some(record) = search_genesis_for_mint(block, view_key) {
+    //                         found = Some(record);
+    //                     }
+    //                     found.expect("Failed to find the split output record")
+    //                 }
+    //             }
+    //         };
+    //         info!("Starting transaction pool...");
+    //         // Start the transaction loop.
+    //         loop {
+    //             tokio::time::sleep(Duration::from_secs(1)).await;
+    //             // If the node is running in development mode, only generate if you are allowed.
+    //             if let Some(dev) = dev {
+    //                 if dev != 0 {
+    //                     continue;
+    //                 }
+    //             }
+    //
+    //             // Prepare the inputs.
+    //             let inputs = [Value::from(record.clone()), Value::from(Literal::U64(U64::new(1)))].into_iter();
+    //             // Execute the transaction.
+    //             let transaction = match self_.ledger.vm().execute(
+    //                 self_.private_key(),
+    //                 locator,
+    //                 inputs,
+    //                 None,
+    //                 None,
+    //                 &mut rand::thread_rng(),
+    //             ) {
+    //                 Ok(transaction) => transaction,
+    //                 Err(error) => {
+    //                     error!("Transaction pool encountered an execution error - {error}");
+    //                     continue;
+    //                 }
+    //             };
+    //             // Retrieve the transition.
+    //             let Some(transition) = transaction.transitions().next() else {
+    //                 error!("Transaction pool encountered a missing transition");
+    //                 continue;
+    //             };
+    //             // Retrieve the second output.
+    //             let Output::Record(_, _, Some(ciphertext)) = &transition.outputs()[1] else {
+    //                 error!("Transaction pool encountered a missing output");
+    //                 continue;
+    //             };
+    //             // Save the second output record.
+    //             let Ok(next_record) = ciphertext.decrypt(view_key) else {
+    //                 error!("Transaction pool encountered a decryption error");
+    //                 continue;
+    //             };
+    //             // Broadcast the transaction.
+    //             if self_
+    //                 .unconfirmed_transaction(
+    //                     self_.router.local_ip(),
+    //                     UnconfirmedTransaction::from(transaction.clone()),
+    //                     transaction.clone(),
+    //                 )
+    //                 .await
+    //             {
+    //                 info!("Transaction pool broadcasted the transaction");
+    //                 let commitment = next_record.to_commitment(&locator.0, &record_name).unwrap();
+    //                 while !self_.ledger.contains_commitment(&commitment).unwrap_or(false) {
+    //                     tokio::time::sleep(Duration::from_secs(1)).await;
+    //                 }
+    //                 info!("Transaction accepted by the ledger");
+    //             }
+    //             // Save the record.
+    //             record = next_record;
+    //         }
+    //     });
+    //     Ok(())
+    // }
+
     /// Initialize the transaction pool.
-    fn initialize_transaction_pool(&self) -> Result<()> {
-        use snarkvm::{
-            console::{
-                account::ViewKey,
-                program::{Identifier, Literal, Plaintext, ProgramID, Record, Value},
-                types::U64,
-            },
-            ledger::block::transition::Output,
+    fn initialize_transaction_pool(&self, dev: Option<u16>) -> Result<()> {
+        use snarkvm::console::{
+            program::{Identifier, Literal, ProgramID, Value},
+            types::U64,
         };
         use std::str::FromStr;
 
         // Initialize the locator.
-        let locator = (ProgramID::from_str("credits.aleo")?, Identifier::from_str("split")?);
-        // Initialize the record name.
-        let record_name = Identifier::from_str("credits")?;
-
-        /// Searches the genesis block for the mint record.
-        fn search_genesis_for_mint<N: Network>(
-            block: Block<N>,
-            view_key: &ViewKey<N>,
-        ) -> Option<Record<N, Plaintext<N>>> {
-            for transition in block.transitions().filter(|t| t.is_mint()) {
-                if let Output::Record(_, _, Some(ciphertext)) = &transition.outputs()[0] {
-                    if ciphertext.is_owner(view_key) {
-                        match ciphertext.decrypt(view_key) {
-                            Ok(record) => return Some(record),
-                            Err(error) => {
-                                error!("Failed to decrypt the mint output record - {error}");
-                                return None;
-                            }
-                        }
-                    }
-                }
-            }
-            None
-        }
-
-        /// Searches the block for the split record.
-        fn search_block_for_split<N: Network>(
-            block: Block<N>,
-            view_key: &ViewKey<N>,
-        ) -> Option<Record<N, Plaintext<N>>> {
-            let mut found = None;
-            // TODO (howardwu): Switch to the iterator when DoubleEndedIterator is supported.
-            // block.transitions().rev().for_each(|t| {
-            let splits = block.transitions().filter(|t| t.is_split()).collect::<Vec<_>>();
-            splits.iter().rev().for_each(|t| {
-                if found.is_some() {
-                    return;
-                }
-                let Output::Record(_, _, Some(ciphertext)) = &t.outputs()[1] else {
-                    error!("Failed to find the split output record");
-                    return;
-                };
-                if ciphertext.is_owner(view_key) {
-                    match ciphertext.decrypt(view_key) {
-                        Ok(record) => found = Some(record),
-                        Err(error) => {
-                            error!("Failed to decrypt the split output record - {error}");
-                        }
-                    }
-                }
-            });
-            found
-        }
+        let locator = (ProgramID::from_str("credits.aleo")?, Identifier::from_str("mint")?);
 
         let self_ = self.clone();
         self.spawn(async move {
-            // Retrieve the view key.
-            let view_key = self_.view_key();
-            // Initialize the record.
-            let mut record = {
-                let mut found = None;
-                let mut height = self_.ledger.latest_height();
-                while found.is_none() && height > 0 {
-                    // Retrieve the block.
-                    let Ok(block) = self_.ledger.get_block(height) else {
-                        error!("Failed to get block at height {}", height);
-                        break;
-                    };
-                    // Search for the latest split record.
-                    if let Some(record) = search_block_for_split(block, view_key) {
-                        found = Some(record);
-                    }
-                    // Decrement the height.
-                    height = height.saturating_sub(1);
-                }
-                match found {
-                    Some(record) => record,
-                    None => {
-                        // Retrieve the genesis block.
-                        let Ok(block) = self_.ledger.get_block(0) else {
-                            error!("Failed to get the genesis block");
-                            return;
-                        };
-                        // Search the genesis block for the mint record.
-                        if let Some(record) = search_genesis_for_mint(block, view_key) {
-                            found = Some(record);
-                        }
-                        found.expect("Failed to find the split output record")
-                    }
-                }
-            };
             info!("Starting transaction pool...");
             // Start the transaction loop.
             loop {
                 tokio::time::sleep(Duration::from_secs(1)).await;
+                // If the node is running in development mode, only generate if you are allowed.
+                if let Some(dev) = dev {
+                    if dev != 0 {
+                        continue;
+                    }
+                }
+
                 // Prepare the inputs.
-                let inputs = [Value::from(record.clone()), Value::from(Literal::U64(U64::new(1)))].into_iter();
+                let inputs = [Value::from(Literal::Address(self_.address())), Value::from(Literal::U64(U64::new(1)))];
                 // Execute the transaction.
                 let transaction = match self_.ledger.vm().execute(
                     self_.private_key(),
                     locator,
-                    inputs,
+                    inputs.into_iter(),
                     None,
                     None,
                     &mut rand::thread_rng(),
@@ -354,21 +440,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                         error!("Transaction pool encountered an execution error - {error}");
                         continue;
                     }
-                };
-                // Retrieve the transition.
-                let Some(transition) = transaction.transitions().next() else {
-                    error!("Transaction pool encountered a missing transition");
-                    continue;
-                };
-                // Retrieve the second output.
-                let Output::Record(_, _, Some(ciphertext)) = &transition.outputs()[1] else {
-                    error!("Transaction pool encountered a missing output");
-                    continue;
-                };
-                // Save the second output record.
-                let Ok(next_record) = ciphertext.decrypt(view_key) else {
-                    error!("Transaction pool encountered a decryption error");
-                    continue;
                 };
                 // Broadcast the transaction.
                 if self_
@@ -380,14 +451,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                     .await
                 {
                     info!("Transaction pool broadcasted the transaction");
-                    let commitment = next_record.to_commitment(&locator.0, &record_name).unwrap();
-                    while !self_.ledger.contains_commitment(&commitment).unwrap_or(false) {
-                        tokio::time::sleep(Duration::from_secs(1)).await;
-                    }
-                    info!("Transaction accepted by the ledger");
                 }
-                // Save the record.
-                record = next_record;
             }
         });
         Ok(())
