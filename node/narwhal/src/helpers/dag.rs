@@ -128,6 +128,19 @@ impl<N: Network> DAG<N> {
 }
 
 #[cfg(test)]
+pub(crate) mod test_helpers {
+    use super::*;
+
+    /// Returns a (malformed) mock DAG, with a modified `last_committed_round`.
+    /// Note: This is useful **only** for testing purposes.
+    pub(crate) fn mock_dag_with_modified_last_committed_round<N: Network>(last_committed_round: u64) -> DAG<N> {
+        let mut dag = DAG::<N>::new();
+        dag.last_committed_round = last_committed_round;
+        dag
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use super::*;
     use snarkvm::{
