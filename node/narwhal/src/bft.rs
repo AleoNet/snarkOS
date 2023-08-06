@@ -955,7 +955,7 @@ mod tests {
         );
 
         // Ensure this call fails on a missing previous certificate.
-        let result = bft.order_dag_with_dfs(certificate.clone());
+        let result = bft.order_dag_with_dfs(certificate);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err().to_string(), error_msg);
         Ok(())
