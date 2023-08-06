@@ -290,7 +290,6 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                         Ok(record) => found = Some(record),
                         Err(error) => {
                             error!("Failed to decrypt the split output record - {error}");
-                            return;
                         }
                     }
                 }
