@@ -24,7 +24,8 @@ use crate::{
         TransmissionRequest,
         TransmissionResponse,
     },
-    helpers::{assign_to_worker, Cache, EventCodec, PrimarySender, Resolver, Storage, WorkerSender},
+    helpers::{assign_to_worker, Cache, EventCodec, PrimarySender, Resolver, WorkerSender},
+    primary::Ledger,
     CONTEXT,
     MAX_BATCH_DELAY,
     MAX_GC_ROUNDS,
@@ -87,8 +88,8 @@ pub trait Transport<N: Network>: Send + Sync {
 pub struct Gateway<N: Network> {
     /// The account of the node.
     account: Account<N>,
-    /// The storage.
-    storage: Storage<N>,
+    /// The ledger service.
+    ledger: Ledger<N>,
     /// The TCP stack.
     tcp: Tcp,
     /// The cache.
@@ -116,7 +117,7 @@ impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
     pub fn new(
         account: Account<N>,
-        storage: Storage<N>,
+        ledger: Ledger<N>,
         ip: Option<SocketAddr>,
         trusted_validators: &[SocketAddr],
         dev: Option<u16>,
@@ -132,7 +133,7 @@ impl<N: Network> Gateway<N> {
         // Return the gateway.
         Ok(Self {
             account,
-            storage,
+            ledger,
             tcp,
             cache: Default::default(),
             resolver: Default::default(),
@@ -882,11 +883,13 @@ impl<N: Network> Gateway<N> {
         }
         // TODO (howardwu): Remove this check, instead checking the address is unique.
         //  Then, later on, use the committee object to perform filtering of all active connections.
-        // // Ensure the address is in the committee.
-        // if !self.storage.current_committee().is_committee_member(address) {
-        //     warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
-        //     return Some(DisconnectReason::ProtocolViolation);
-        // }
+        // Ensure the address is in the committee.
+        if let Ok(committee) = self.ledger.current_committee() {
+            if !committee.is_committee_member(address) {
+                warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
+                return Some(DisconnectReason::ProtocolViolation);
+            }
+        }
         None
     }
 
@@ -983,8 +986,14 @@ pub mod prop_tests {
         fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
             any_valid_dev_gateway()
                 .prop_map(|(storage, _, private_key, address)| {
-                    Gateway::new(Account::try_from(private_key).unwrap(), storage, address.ip(), &[], address.port())
-                        .unwrap()
+                    Gateway::new(
+                        Account::try_from(private_key).unwrap(),
+                        storage.ledger().clone(),
+                        address.ip(),
+                        &[],
+                        address.port(),
+                    )
+                    .unwrap()
                 })
                 .boxed()
         }
@@ -1027,7 +1036,7 @@ pub mod prop_tests {
         let (storage, _, private_key, dev) = input;
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account.clone(), storage, dev.ip(), &[], dev.port()).unwrap();
+        let gateway = Gateway::new(account.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
         assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev.port().unwrap()));
@@ -1042,7 +1051,7 @@ pub mod prop_tests {
         let (storage, _, private_key, dev) = input;
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account.clone(), storage, dev.ip(), &[], dev.port()).unwrap();
+        let gateway = Gateway::new(account.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
         let tcp_config = gateway.tcp().config();
         if let Some(socket_addr) = dev.ip() {
             assert_eq!(tcp_config.listener_ip, Some(socket_addr.ip()));
@@ -1067,7 +1076,7 @@ pub mod prop_tests {
         let worker_storage = storage.clone();
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account, storage, dev.ip(), &[], dev.port()).unwrap();
+        let gateway = Gateway::new(account, storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
 
         let (workers, worker_senders) = {
             // Construct a map of the worker senders.

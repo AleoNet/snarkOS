@@ -98,7 +98,7 @@ impl<N: Network> Primary<N> {
         dev: Option<u16>,
     ) -> Result<Self> {
         Ok(Self {
-            gateway: Gateway::new(account, storage.clone(), ip, trusted_validators, dev)?,
+            gateway: Gateway::new(account, ledger.clone(), ip, trusted_validators, dev)?,
             storage,
             ledger,
             workers: Arc::from(vec![]),

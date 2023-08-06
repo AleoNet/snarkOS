@@ -86,6 +86,12 @@ impl<N: Network> Storage<N> {
             transmissions: Default::default(),
         }
     }
+
+    /// Returns the ledger service.
+    #[cfg(test)]
+    pub const fn ledger(&self) -> &Ledger<N> {
+        &self.ledger
+    }
 }
 
 impl<N: Network> Storage<N> {
