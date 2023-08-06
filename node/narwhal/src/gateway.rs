@@ -215,6 +215,11 @@ impl<N: Network> Gateway<N> {
         self.connected_peers.read().contains(&ip)
     }
 
+    /// Returns `true` if the node is connecting to the given peer IP.
+    pub fn is_connecting(&self, ip: SocketAddr) -> bool {
+        self.connecting_peers.lock().contains(&ip)
+    }
+
     /// Returns the maximum number of connected peers.
     pub fn max_connected_peers(&self) -> usize {
         self.tcp.config().max_connections as usize
@@ -264,8 +269,8 @@ impl<N: Network> Gateway<N> {
             bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (already connected)")
         }
         // Ensure the node is not already connecting to this peer.
-        if !self.connecting_peers.lock().insert(peer_ip) {
-            bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (already shaking hands as the initiator)")
+        if self.is_connecting(peer_ip) {
+            bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (already connecting)")
         }
         Ok(())
     }
@@ -532,7 +537,10 @@ impl<N: Network> Gateway<N> {
         // Ensure that the trusted nodes are connected.
         for validator_ip in &self.trusted_validators {
             // If the trusted_validator is not connected, attempt to connect to it.
-            if !self.is_local_ip(*validator_ip) && !self.is_connected(*validator_ip) {
+            if !self.is_local_ip(*validator_ip)
+                && !self.is_connecting(*validator_ip)
+                && !self.is_connected(*validator_ip)
+            {
                 // Attempt to connect to the trusted validator.
                 self.connect(*validator_ip);
             }

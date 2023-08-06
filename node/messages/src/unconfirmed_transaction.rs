@@ -20,6 +20,13 @@ pub struct UnconfirmedTransaction<N: Network> {
     pub transaction: Data<Transaction<N>>,
 }
 
+impl<N: Network> From<Transaction<N>> for UnconfirmedTransaction<N> {
+    /// Initializes a new `UnconfirmedTransaction` message.
+    fn from(transaction: Transaction<N>) -> Self {
+        Self { transaction_id: transaction.id(), transaction: Data::Object(transaction) }
+    }
+}
+
 impl<N: Network> MessageTrait for UnconfirmedTransaction<N> {
     /// Returns the message name.
     #[inline]

@@ -178,9 +178,9 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Beacon<N, C> {
         // Shut down the router.
         self.router.shut_down().await;
 
-        // Shut down the ledger.
-        trace!("Shutting down the ledger...");
-        // self.ledger.shut_down().await;
+        // Shut down consensus.
+        trace!("Shutting down consensus...");
+        self.consensus.shut_down().await;
 
         info!("Node has shut down.");
     }

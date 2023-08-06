@@ -79,10 +79,15 @@ pub fn initialize_logger(verbosity: u8) {
             .add_directive("hyper=off".parse().unwrap())
             .add_directive("reqwest=off".parse().unwrap())
             .add_directive("want=off".parse().unwrap())
-            .add_directive("snarkos_node_narwhal::gateway=off".parse().unwrap())
             .add_directive("warp=off".parse().unwrap());
 
-        if verbosity > 3 {
+        let filter = if verbosity > 3 {
+            filter.add_directive("snarkos_node_narwhal::gateway=trace".parse().unwrap())
+        } else {
+            filter.add_directive("snarkos_node_narwhal::gateway=off".parse().unwrap())
+        };
+
+        if verbosity > 4 {
             filter.add_directive("snarkos_node_tcp=trace".parse().unwrap())
         } else {
             filter.add_directive("snarkos_node_tcp=off".parse().unwrap())
@@ -187,7 +192,7 @@ fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Committee<Curr
     println!();
 
     // Initialize the committee.
-    let committee = Committee::<CurrentNetwork>::new(1u64, members)?;
+    let committee = Committee::<CurrentNetwork>::new_genesis(members)?;
     // Return the committee and account.
     Ok((committee, account))
 }

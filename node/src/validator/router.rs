@@ -243,8 +243,13 @@ impl<N: Network, C: ConsensusStorage<N>> Inbound<N> for Validator<N, C> {
         &self,
         peer_ip: SocketAddr,
         serialized: UnconfirmedTransaction<N>,
-        _transaction: Transaction<N>,
+        transaction: Transaction<N>,
     ) -> bool {
+        // Add the unconfirmed transaction to the memory pool.
+        if let Err(error) = self.consensus.add_unconfirmed_transaction(transaction).await {
+            trace!("[UnconfirmedTransaction] {error}");
+            return true; // Maintain the connection.
+        }
         let message = Message::UnconfirmedTransaction(serialized);
         // Propagate the "UnconfirmedTransaction" to the connected beacons.
         self.propagate_to_beacons(message.clone(), &[peer_ip]);

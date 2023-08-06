@@ -73,7 +73,7 @@ impl<N: Network> Storage<N> {
         // Retrieve the current committee.
         let committee = ledger.current_committee().expect("Ledger is missing a committee.");
         // Retrieve the current round.
-        let current_round = committee.starting_round();
+        let current_round = committee.starting_round().max(1);
         // Return the storage.
         Self {
             ledger,
