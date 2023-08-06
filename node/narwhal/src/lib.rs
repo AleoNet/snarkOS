@@ -50,9 +50,9 @@ pub const MAX_LEADER_CERTIFICATE_DELAY: i64 = 2 * MAX_BATCH_DELAY as i64 / 1000;
 /// The maximum number of seconds before the timestamp is considered expired.
 pub const MAX_TIMESTAMP_DELTA_IN_SECS: i64 = 10; // seconds
 /// The maximum number of transmissions allowed in a batch.
-pub const MAX_TRANSMISSIONS_PER_BATCH: usize = 1000; // transmissions
+pub const MAX_TRANSMISSIONS_PER_BATCH: usize = 250; // transmissions
 /// The maximum number of workers that can be spawned.
-pub const MAX_WORKERS: u8 = 3; // workers
+pub const MAX_WORKERS: u8 = 2; // workers
 /// The port on which the memory pool listens for incoming connections.
 pub const MEMORY_POOL_PORT: u16 = 5000; // port
 /// The frequency at which each worker broadcasts a ping to every other node.
