@@ -131,7 +131,7 @@ impl<N: Network, C: ConsensusStorage<N>> Routing<N> for Validator<N, C> {}
 
 impl<N: Network, C: ConsensusStorage<N>> Heartbeat<N> for Validator<N, C> {
     /// The maximum number of peers permitted to maintain connections with.
-    const MAXIMUM_NUMBER_OF_PEERS: usize = 1_000;
+    const MAXIMUM_NUMBER_OF_PEERS: usize = 100;
 }
 
 impl<N: Network, C: ConsensusStorage<N>> Outbound<N> for Validator<N, C> {

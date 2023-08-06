@@ -75,6 +75,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         rest_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
+        trusted_validators: &[SocketAddr],
         genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
@@ -96,7 +97,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         }
 
         // Initialize the consensus.
-        let mut consensus = Consensus::new(account.clone(), ledger.clone(), None, dev)?;
+        let mut consensus = Consensus::new(account.clone(), ledger.clone(), None, trusted_validators, dev)?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.
@@ -466,6 +467,7 @@ mod tests {
             node,
             Some(rest),
             beacon_account,
+            &[],
             &[],
             genesis,
             None,

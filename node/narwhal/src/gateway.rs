@@ -95,6 +95,8 @@ pub struct Gateway<N: Network> {
     cache: Arc<Cache<N>>,
     /// The resolver.
     resolver: Arc<Resolver<N>>,
+    /// The set of trusted validators.
+    trusted_validators: IndexSet<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
     connected_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of handshaking peers. While `Tcp` already recognizes the connecting IP addresses
@@ -112,7 +114,13 @@ pub struct Gateway<N: Network> {
 
 impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
-    pub fn new(account: Account<N>, storage: Storage<N>, ip: Option<SocketAddr>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(
+        account: Account<N>,
+        storage: Storage<N>,
+        ip: Option<SocketAddr>,
+        trusted_validators: &[SocketAddr],
+        dev: Option<u16>,
+    ) -> Result<Self> {
         // Initialize the gateway IP.
         let ip = match (ip, dev) {
             (_, Some(dev)) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev))?,
@@ -128,6 +136,7 @@ impl<N: Network> Gateway<N> {
             tcp,
             cache: Default::default(),
             resolver: Default::default(),
+            trusted_validators: trusted_validators.iter().copied().collect(),
             connected_peers: Default::default(),
             connecting_peers: Default::default(),
             primary_sender: Default::default(),
@@ -151,6 +160,9 @@ impl<N: Network> Gateway<N> {
         self.enable_on_connect().await;
         // Enable the TCP listener. Note: This must be called after the above protocols.
         let _listening_addr = self.tcp.enable_listener().await.expect("Failed to enable the TCP listener");
+
+        // Initialize the heartbeat.
+        self.initialize_heartbeat();
 
         info!("Started the gateway for the memory pool at '{}'", self.local_ip());
     }
@@ -227,6 +239,7 @@ impl<N: Network> Gateway<N> {
 
         let self_ = self.clone();
         Some(tokio::spawn(async move {
+            debug!("Connecting to validator {peer_ip}...");
             // Attempt to connect to the peer.
             if let Err(error) = self_.tcp.connect(peer_ip).await {
                 self_.connecting_peers.lock().shift_remove(&peer_ip);
@@ -455,6 +468,21 @@ impl<N: Network> Gateway<N> {
         })
     }
 
+    /// Initialize a new instance of the heartbeat.
+    fn initialize_heartbeat(&self) {
+        let self_clone = self.clone();
+        self.spawn(async move {
+            // Sleep briefly to ensure the other nodes are ready to connect.
+            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            loop {
+                // Process a heartbeat in the router.
+                self_clone.heartbeat();
+                // Sleep for the heartbeat interval.
+                tokio::time::sleep(Duration::from_secs(10)).await;
+            }
+        });
+    }
+
     /// Spawns a task with the given future; it should only be used for long-running tasks.
     #[allow(dead_code)]
     fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
@@ -468,6 +496,45 @@ impl<N: Network> Gateway<N> {
         self.handles.lock().iter().for_each(|handle| handle.abort());
         // Close the listener.
         self.tcp.shut_down().await;
+    }
+}
+
+impl<N: Network> Gateway<N> {
+    /// Handles the heartbeat request.
+    fn heartbeat(&self) {
+        self.log_connected_validators();
+        // Keep the trusted validators connected.
+        self.handle_trusted_validators();
+    }
+
+    /// Logs the connected validators.
+    fn log_connected_validators(&self) {
+        // Log the connected validators.
+        let validators = self.connected_peers().read().clone();
+        // Construct the connections message.
+        let connections_msg = match validators.len() {
+            0 => "No connected validators".to_string(),
+            1 => "Connected to 1 validator".to_string(),
+            num_connected => format!("Connected to {num_connected} validators"),
+        };
+        // Log the connected validators.
+        info!("{connections_msg}");
+        for peer_ip in validators {
+            let address = self.resolver.get_address(peer_ip).map_or("Unknown".to_string(), |a| a.to_string());
+            debug!("  {peer_ip} - {address}");
+        }
+    }
+
+    /// This function attempts to connect to any disconnected trusted validators.
+    fn handle_trusted_validators(&self) {
+        // Ensure that the trusted nodes are connected.
+        for validator_ip in &self.trusted_validators {
+            // If the trusted_validator is not connected, attempt to connect to it.
+            if !self.is_local_ip(*validator_ip) && !self.is_connected(*validator_ip) {
+                // Attempt to connect to the trusted validator.
+                self.connect(*validator_ip);
+            }
+        }
     }
 }
 
@@ -916,7 +983,7 @@ pub mod prop_tests {
         fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
             any_valid_dev_gateway()
                 .prop_map(|(storage, _, private_key, address)| {
-                    Gateway::new(Account::try_from(private_key).unwrap(), storage, address.ip(), address.port())
+                    Gateway::new(Account::try_from(private_key).unwrap(), storage, address.ip(), &[], address.port())
                         .unwrap()
                 })
                 .boxed()
@@ -960,7 +1027,7 @@ pub mod prop_tests {
         let (storage, _, private_key, dev) = input;
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account.clone(), storage, dev.ip(), dev.port()).unwrap();
+        let gateway = Gateway::new(account.clone(), storage, dev.ip(), &[], dev.port()).unwrap();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
         assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev.port().unwrap()));
@@ -975,7 +1042,7 @@ pub mod prop_tests {
         let (storage, _, private_key, dev) = input;
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account.clone(), storage, dev.ip(), dev.port()).unwrap();
+        let gateway = Gateway::new(account.clone(), storage, dev.ip(), &[], dev.port()).unwrap();
         let tcp_config = gateway.tcp().config();
         if let Some(socket_addr) = dev.ip() {
             assert_eq!(tcp_config.listener_ip, Some(socket_addr.ip()));
@@ -1000,7 +1067,7 @@ pub mod prop_tests {
         let worker_storage = storage.clone();
         let account = Account::try_from(private_key).unwrap();
 
-        let gateway = Gateway::new(account, storage, dev.ip(), dev.port()).unwrap();
+        let gateway = Gateway::new(account, storage, dev.ip(), &[], dev.port()).unwrap();
 
         let (workers, worker_senders) = {
             // Construct a map of the worker senders.

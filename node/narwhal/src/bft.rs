@@ -79,10 +79,11 @@ impl<N: Network> BFT<N> {
         storage: Storage<N>,
         ledger: Ledger<N>,
         ip: Option<SocketAddr>,
+        trusted_validators: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
         Ok(Self {
-            primary: Primary::new(account, storage, ledger, ip, dev)?,
+            primary: Primary::new(account, storage, ledger, ip, trusted_validators, dev)?,
             dag: Default::default(),
             leader_certificate: Default::default(),
             leader_certificate_timer: Default::default(),
@@ -621,7 +622,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
         assert!(bft.is_timer_expired()); // 0 + 5 < now()
 
         // Ensure this call succeeds on an odd round.
@@ -661,7 +662,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
         assert!(bft.is_timer_expired()); // 0 + 5 < now()
 
         // Store is at round 1, and we are checking for round 2.
@@ -682,7 +683,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
         assert!(bft.is_timer_expired()); // 0 + 5 < now()
 
         // Ensure this call fails on an even round.
@@ -705,7 +706,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
 
         let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee.clone());
         assert!(!result);
@@ -730,7 +731,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
 
         // Ensure this call fails on an odd round.
         let result = bft.update_leader_certificate_to_even_round(1);
@@ -749,7 +750,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
 
         // Ensure this call succeeds on an even round.
         let result = bft.update_leader_certificate_to_even_round(6);
@@ -768,7 +769,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
 
         // Set the leader certificate.
         let leader_certificate = sample_batch_certificate(rng);
