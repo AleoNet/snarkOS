@@ -521,11 +521,8 @@ impl<N: Network> BFT<N> {
                         //  - If the previous certificate was not recently committed, retrieve it from the storage.
                         //  - If the previous certificate was recently committed, continue.
                         None => {
-                            // Determine if the previous certificate was recently committed.
-                            let is_recently_committed =
-                                self.dag.read().is_recently_committed(previous_round, *previous_certificate_id);
                             // If the previous certificate was recently committed, continue.
-                            if is_recently_committed {
+                            if self.dag.read().is_recently_committed(previous_round, *previous_certificate_id) {
                                 continue;
                             }
                             // Otherwise, retrieve the previous certificate from the storage.
