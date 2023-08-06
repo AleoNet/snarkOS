@@ -485,7 +485,7 @@ impl<N: Network> Gateway<N> {
                 // Process a heartbeat in the router.
                 self_clone.heartbeat();
                 // Sleep for the heartbeat interval.
-                tokio::time::sleep(Duration::from_secs(10)).await;
+                tokio::time::sleep(Duration::from_secs(30)).await;
             }
         });
     }
