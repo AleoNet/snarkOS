@@ -235,6 +235,12 @@ impl<N: Network, C: ConsensusStorage<N>> Consensus<N, C> {
         self.ledger.check_next_block(&next_block)?;
         // Advance to the next block.
         self.ledger.advance_to_next_block(&next_block)?;
+        info!(
+            "\n\nAdvanced to block {} at round {} - {}\n",
+            next_block.height(),
+            next_block.round(),
+            next_block.hash(),
+        );
         Ok(())
     }
 

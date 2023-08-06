@@ -517,9 +517,18 @@ impl<N: Network> BFT<N> {
                     match self.dag.read().get_certificate_for_round_with_id(previous_round, *previous_certificate_id) {
                         // If the previous certificate is found, return it.
                         Some(previous_certificate) => previous_certificate,
-                        // If the previous certificate is not found, retrieve it from the storage.
+                        // If the previous certificate is not found, check if it was recently committed.
+                        //  - If the previous certificate was not recently committed, retrieve it from the storage.
+                        //  - If the previous certificate was recently committed, continue.
                         None => {
-                            // Retrieve the previous certificate from the storage.
+                            // Determine if the previous certificate was recently committed.
+                            let is_recently_committed =
+                                self.dag.read().is_recently_committed(previous_round, *previous_certificate_id);
+                            // If the previous certificate was recently committed, continue.
+                            if is_recently_committed {
+                                continue;
+                            }
+                            // Otherwise, retrieve the previous certificate from the storage.
                             match self.storage().get_certificate(*previous_certificate_id) {
                                 // If the previous certificate is found, return it.
                                 Some(previous_certificate) => previous_certificate,
