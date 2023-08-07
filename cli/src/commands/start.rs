@@ -74,7 +74,7 @@ pub struct Start {
     #[clap(default_value = "", long = "peers")]
     pub peers: String,
     /// Specify the IP address and port of the validator(s) to connect to
-    #[clap(default_value = "", long = "peers")]
+    #[clap(default_value = "", long = "validators")]
     pub validators: String,
 
     /// Specify the IP address and port for the REST server
@@ -221,7 +221,9 @@ impl Start {
             }
             // Add the dev nodes to the trusted peers.
             for i in 0..dev {
-                trusted_peers.push(SocketAddr::from_str(&format!("127.0.0.1:{}", 4130 + i))?);
+                if i != dev {
+                    trusted_peers.push(SocketAddr::from_str(&format!("127.0.0.1:{}", 4130 + i))?);
+                }
             }
             // Set the node IP to `4130 + dev`.
             self.node = SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?;
@@ -441,16 +443,16 @@ mod tests {
     #[test]
     fn test_parse_trusted_validators() {
         let config = Start::try_parse_from(["snarkos", "--validators", ""].iter()).unwrap();
-        assert!(config.parse_trusted_peers().is_ok());
-        assert!(config.parse_trusted_peers().unwrap().is_empty());
+        assert!(config.parse_trusted_validators().is_ok());
+        assert!(config.parse_trusted_validators().unwrap().is_empty());
 
         let config = Start::try_parse_from(["snarkos", "--validators", "1.2.3.4:5"].iter()).unwrap();
-        assert!(config.parse_trusted_peers().is_ok());
-        assert_eq!(config.parse_trusted_peers().unwrap(), vec![SocketAddr::from_str("1.2.3.4:5").unwrap()]);
+        assert!(config.parse_trusted_validators().is_ok());
+        assert_eq!(config.parse_trusted_validators().unwrap(), vec![SocketAddr::from_str("1.2.3.4:5").unwrap()]);
 
         let config = Start::try_parse_from(["snarkos", "--validators", "1.2.3.4:5,6.7.8.9:0"].iter()).unwrap();
-        assert!(config.parse_trusted_peers().is_ok());
-        assert_eq!(config.parse_trusted_peers().unwrap(), vec![
+        assert!(config.parse_trusted_validators().is_ok());
+        assert_eq!(config.parse_trusted_validators().unwrap(), vec![
             SocketAddr::from_str("1.2.3.4:5").unwrap(),
             SocketAddr::from_str("6.7.8.9:0").unwrap()
         ]);
@@ -574,7 +576,7 @@ mod tests {
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4130").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
         assert_eq!(trusted_peers.len(), 0);
-        assert_eq!(trusted_validators.len(), 0);
+        assert_eq!(trusted_validators.len(), 3);
         assert!(config.beacon.is_none());
         assert!(config.validator.is_none());
         assert!(config.prover.is_none());
@@ -588,7 +590,7 @@ mod tests {
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4130").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
         assert_eq!(trusted_peers.len(), 0);
-        assert_eq!(trusted_validators.len(), 0);
+        assert_eq!(trusted_validators.len(), 3);
         assert!(config.beacon.is_some());
         assert!(config.validator.is_none());
         assert!(config.prover.is_none());
@@ -602,7 +604,7 @@ mod tests {
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4131").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3031").unwrap());
         assert_eq!(trusted_peers.len(), 1);
-        assert_eq!(trusted_validators.len(), 1);
+        assert_eq!(trusted_validators.len(), 3);
         assert!(config.beacon.is_none());
         assert!(config.validator.is_some());
         assert!(config.prover.is_none());
@@ -616,7 +618,7 @@ mod tests {
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4132").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3032").unwrap());
         assert_eq!(trusted_peers.len(), 2);
-        assert_eq!(trusted_validators.len(), 2);
+        assert_eq!(trusted_validators.len(), 3);
         assert!(config.beacon.is_none());
         assert!(config.validator.is_none());
         assert!(config.prover.is_some());
