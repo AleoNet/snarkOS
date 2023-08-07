@@ -207,6 +207,9 @@ impl Start {
                 bail!("At most one beacon at '--dev 0' is supported in development mode");
             }
 
+            // TODO (howardwu): Remove me after we stabilize syncing.
+            crate::commands::Clean::remove_ledger(N::ID, Some(dev))?;
+
             // Set the number of validators.
             const NUM_VALIDATORS: u16 = 4;
 
