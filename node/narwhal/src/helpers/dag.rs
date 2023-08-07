@@ -104,8 +104,11 @@ impl<N: Network> DAG<N> {
     pub fn insert(&mut self, certificate: BatchCertificate<N>) {
         let round = certificate.round();
         let author = certificate.author();
-        // Insert the certificate into the DAG.
-        self.graph.entry(round).or_default().insert(author, certificate);
+        // If the certificate was not recently committed, insert it into the DAG.
+        if !self.is_recently_committed(round, certificate.certificate_id()) {
+            // Insert the certificate into the DAG.
+            self.graph.entry(round).or_default().insert(author, certificate);
+        }
     }
 
     /// Commits a certificate, removing all certificates for this author at or before this round from the DAG.
