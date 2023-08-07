@@ -43,6 +43,7 @@ use snarkos_node_tcp::{
 };
 use snarkvm::{console::prelude::*, ledger::narwhal::Data, prelude::Address};
 
+use colored::Colorize;
 use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
@@ -528,7 +529,7 @@ impl<N: Network> Gateway<N> {
         info!("{connections_msg}");
         for peer_ip in validators {
             let address = self.resolver.get_address(peer_ip).map_or("Unknown".to_string(), |a| a.to_string());
-            debug!("  {peer_ip} - {address}");
+            debug!("{}", format!("  {peer_ip} - {address}").dimmed());
         }
     }
 
