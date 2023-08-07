@@ -126,8 +126,10 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         if let Some(rest_ip) = rest_ip {
             node.rest = Some(Rest::start(rest_ip, Some(consensus), ledger, Arc::new(node.clone()))?);
         }
-        // Initialize the sync pool.
-        node.initialize_sync()?;
+        // TODO (howardwu): The sync pool needs to be unified with the BFT, otherwise there is
+        //  no trigger to advance the round when using the sync protocol to catch up.
+        // // Initialize the sync pool.
+        // node.initialize_sync()?;
         // Initialize the routing.
         node.initialize_routing().await;
         // Initialize the signal handler.
