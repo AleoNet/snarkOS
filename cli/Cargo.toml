@@ -34,7 +34,7 @@ features = [ "derive", "color", "unstable-styles" ]
 version = "2"
 
 [dependencies.crossterm]
-version = "0.26"
+version = "0.27"
 
 [dependencies.num_cpus]
 version = "1"
