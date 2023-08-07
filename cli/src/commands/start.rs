@@ -235,7 +235,7 @@ impl Start {
                 // Initialize the (fixed) RNG.
                 let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
                 // Iterate through 'dev' address instances to match the account.
-                for _ in 0..dev.saturating_sub(1) {
+                for _ in 0..=dev.saturating_sub(1) {
                     let _ = PrivateKey::<N>::new(&mut rng)?;
                 }
                 PrivateKey::<N>::new(&mut rng)?
