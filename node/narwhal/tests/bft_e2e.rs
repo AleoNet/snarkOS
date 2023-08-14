@@ -141,7 +141,7 @@ async fn test_leader_election_consistency() {
         num_nodes: N,
         bft: true,
         connect_all: true,
-        fire_cannons: Some(CANNON_INTERVAL_MS),
+        fire_transmissions: Some(CANNON_INTERVAL_MS),
         // Set this to Some(0..=4) to see the logs.
         log_level: None,
         log_connections: true,
