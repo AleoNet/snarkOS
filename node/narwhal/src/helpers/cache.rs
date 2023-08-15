@@ -12,33 +12,32 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use snarkvm::{console::types::Field, ledger::narwhal::TransmissionID, prelude::Network};
-
 use core::hash::Hash;
-use indexmap::IndexMap;
-use parking_lot::RwLock;
 use std::{
-    collections::VecDeque,
+    collections::BTreeMap,
     net::{IpAddr, SocketAddr},
 };
+
+use parking_lot::RwLock;
+use snarkvm::{console::types::Field, ledger::narwhal::TransmissionID, prelude::Network};
 use time::{Duration, OffsetDateTime};
 
 #[derive(Debug)]
 pub struct Cache<N: Network> {
-    /// The map of peer connections to their recent timestamps.
-    seen_inbound_connections: RwLock<IndexMap<IpAddr, VecDeque<OffsetDateTime>>>,
+    /// The ordered timestamp map of peer connections.
+    seen_inbound_connections: RwLock<BTreeMap<OffsetDateTime, IpAddr>>,
+    /// The ordered timestamp map of peer IPs.
+    seen_inbound_events: RwLock<BTreeMap<OffsetDateTime, SocketAddr>>,
+    /// The ordered timestamp map of certificate IDs.
+    seen_inbound_certificates: RwLock<BTreeMap<OffsetDateTime, Field<N>>>,
+    /// The ordered timestamp map of transmission IDs.
+    seen_inbound_transmissions: RwLock<BTreeMap<OffsetDateTime, TransmissionID<N>>>,
     /// The map of peer IPs to their recent timestamps.
-    seen_inbound_events: RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>,
-    /// The map of certificate IDs to their last seen timestamp.
-    seen_inbound_certificates: RwLock<IndexMap<Field<N>, VecDeque<OffsetDateTime>>>,
-    /// The map of transmission IDs to their last seen timestamp.
-    seen_inbound_transmissions: RwLock<IndexMap<TransmissionID<N>, VecDeque<OffsetDateTime>>>,
-    /// The map of peer IPs to their recent timestamps.
-    seen_outbound_events: RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>,
+    seen_outbound_events: RwLock<BTreeMap<OffsetDateTime, SocketAddr>>,
     /// The map of peer IPs to the number of certificate requests.
-    seen_outbound_certificates: RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>,
+    seen_outbound_certificates: RwLock<BTreeMap<OffsetDateTime, SocketAddr>>,
     /// The map of peer IPs to the number of transmission requests.
-    seen_outbound_transmissions: RwLock<IndexMap<SocketAddr, VecDeque<OffsetDateTime>>>,
+    seen_outbound_transmissions: RwLock<BTreeMap<OffsetDateTime, SocketAddr>>,
 }
 
 impl<N: Network> Default for Cache<N> {
@@ -105,33 +104,41 @@ impl<N: Network> Cache<N> {
 impl<N: Network> Cache<N> {
     /// Insert a new timestamp for the given key, returning the number of recent entries.
     fn retain_and_insert<K: Copy + Clone + PartialEq + Eq + Hash>(
-        map: &RwLock<IndexMap<K, VecDeque<OffsetDateTime>>>,
+        map: &RwLock<BTreeMap<OffsetDateTime, K>>,
         key: K,
         interval_in_secs: i64,
     ) -> usize {
         // Fetch the current timestamp.
         let now = OffsetDateTime::now_utc();
 
+        // Get the write lock.
         let mut map_write = map.write();
-        // Load the entry for the key.
-        let timestamps = map_write.entry(key).or_default();
         // Insert the new timestamp.
-        timestamps.push_back(now);
-        // Retain only the timestamps that are within the recent interval.
-        while timestamps.front().map_or(false, |t| now - *t > Duration::seconds(interval_in_secs)) {
-            timestamps.pop_front();
+        map_write.insert(now, key);
+        // Extract the subtree after interval (i.e. non-expired entries)
+        let retained = map_write.split_off(&now.saturating_sub(Duration::seconds(interval_in_secs)));
+        // Clear all the expired entries.
+        map_write.clear();
+        // Reinsert the entries into map and count the frequency of recent requests for `key` while looping.
+        let mut cache_hits = 0usize;
+        for (time, cache_key) in retained {
+            map_write.insert(time, cache_key);
+            if key == cache_key {
+                cache_hits += 1;
+            }
         }
-        // Return the frequency of recent requests.
-        timestamps.len()
+        // Return the frequency.
+        cache_hits
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::net::Ipv4Addr;
+
     use snarkvm::prelude::Testnet3;
 
-    use std::net::Ipv4Addr;
+    use super::*;
 
     type CurrentNetwork = Testnet3;
 
@@ -185,7 +192,7 @@ mod tests {
                         assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 3);
 
                         // Check that the cache contains the input for 3 entries.
-                        assert_eq!(cache.[<seen_ $name s>].read().get(&input).unwrap().len(), 3);
+                        assert_eq!(cache.[<seen_ $name s>].read().len(), 3);
 
                         // Wait for the input to expire.
                         std::thread::sleep(std::time::Duration::from_secs(INTERVAL_IN_SECS as u64 + 1));
@@ -194,10 +201,10 @@ mod tests {
                         assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 1);
 
                         // Check that the cache still contains the input.
-                        assert_eq!(cache.[<seen_ $name s>].read().len(), 1);
+                        assert_eq!(cache.[<seen_ $name s>].read().values().filter(|key| *key == &input).count(), 1);
 
                         // Check that the cache contains the input and 1 timestamp entry.
-                        assert_eq!(cache.[<seen_ $name s>].read().get(&input).unwrap().len(), 1);
+                        assert_eq!(cache.[<seen_ $name s>].read().len(), 1);
                     }
                 }
             )*
