@@ -14,7 +14,7 @@
 
 use core::hash::Hash;
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashMap},
     net::{IpAddr, SocketAddr},
 };
 
@@ -24,20 +24,20 @@ use time::{Duration, OffsetDateTime};
 
 #[derive(Debug)]
 pub struct Cache<N: Network> {
-    /// The ordered timestamp map of peer connections.
-    seen_inbound_connections: RwLock<BTreeMap<OffsetDateTime, IpAddr>>,
-    /// The ordered timestamp map of peer IPs.
-    seen_inbound_events: RwLock<BTreeMap<OffsetDateTime, SocketAddr>>,
-    /// The ordered timestamp map of certificate IDs.
-    seen_inbound_certificates: RwLock<BTreeMap<OffsetDateTime, Field<N>>>,
-    /// The ordered timestamp map of transmission IDs.
-    seen_inbound_transmissions: RwLock<BTreeMap<OffsetDateTime, TransmissionID<N>>>,
-    /// The map of peer IPs to their recent timestamps.
-    seen_outbound_events: RwLock<BTreeMap<OffsetDateTime, SocketAddr>>,
-    /// The map of peer IPs to the number of certificate requests.
-    seen_outbound_certificates: RwLock<BTreeMap<OffsetDateTime, SocketAddr>>,
-    /// The map of peer IPs to the number of transmission requests.
-    seen_outbound_transmissions: RwLock<BTreeMap<OffsetDateTime, SocketAddr>>,
+    /// The ordered timestamp map of peer connections and cache hits.
+    seen_inbound_connections: RwLock<BTreeMap<OffsetDateTime, HashMap<IpAddr, u32>>>,
+    /// The ordered timestamp map of peer IPs and cache hits.
+    seen_inbound_events: RwLock<BTreeMap<OffsetDateTime, HashMap<SocketAddr, u32>>>,
+    /// The ordered timestamp map of certificate IDs and cache hits.
+    seen_inbound_certificates: RwLock<BTreeMap<OffsetDateTime, HashMap<Field<N>, u32>>>,
+    /// The ordered timestamp map of transmission IDs and cache hits.
+    seen_inbound_transmissions: RwLock<BTreeMap<OffsetDateTime, HashMap<TransmissionID<N>, u32>>>,
+    /// The ordered timestamp map of peer IPs and their cache hits on outbound events.
+    seen_outbound_events: RwLock<BTreeMap<OffsetDateTime, HashMap<SocketAddr, u32>>>,
+    /// The ordered timestamp map of peer IPs and their cache hits on certificate requests.
+    seen_outbound_certificates: RwLock<BTreeMap<OffsetDateTime, HashMap<SocketAddr, u32>>>,
+    /// The ordered timestamp map of peer IPs and their cache hits on transmission requests.
+    seen_outbound_transmissions: RwLock<BTreeMap<OffsetDateTime, HashMap<SocketAddr, u32>>>,
 }
 
 impl<N: Network> Default for Cache<N> {
@@ -104,7 +104,7 @@ impl<N: Network> Cache<N> {
 impl<N: Network> Cache<N> {
     /// Insert a new timestamp for the given key, returning the number of recent entries.
     fn retain_and_insert<K: Copy + Clone + PartialEq + Eq + Hash>(
-        map: &RwLock<BTreeMap<OffsetDateTime, K>>,
+        map: &RwLock<BTreeMap<OffsetDateTime, HashMap<K, u32>>>,
         key: K,
         interval_in_secs: i64,
     ) -> usize {
@@ -113,22 +113,20 @@ impl<N: Network> Cache<N> {
 
         // Get the write lock.
         let mut map_write = map.write();
-        // Insert the new timestamp.
-        map_write.insert(now, key);
+        // Insert the new timestamp and increment the frequency for the key.
+        *map_write.entry(now).or_default().entry(key).or_default() += 1;
         // Extract the subtree after interval (i.e. non-expired entries)
         let retained = map_write.split_off(&now.saturating_sub(Duration::seconds(interval_in_secs)));
         // Clear all the expired entries.
         map_write.clear();
-        // Reinsert the entries into map and count the frequency of recent requests for `key` while looping.
-        let mut cache_hits = 0usize;
-        for (time, cache_key) in retained {
-            map_write.insert(time, cache_key);
-            if key == cache_key {
-                cache_hits += 1;
-            }
+        // Reinsert the entries into map and sum the frequency of recent requests for `key` while looping.
+        let mut cache_hits = 0;
+        for (time, cache_keys) in retained {
+            cache_hits += *cache_keys.get(&key).unwrap_or(&0);
+            map_write.insert(time, cache_keys);
         }
         // Return the frequency.
-        cache_hits
+        cache_hits as usize
     }
 }
 
@@ -201,7 +199,8 @@ mod tests {
                         assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 1);
 
                         // Check that the cache still contains the input.
-                        assert_eq!(cache.[<seen_ $name s>].read().values().filter(|key| *key == &input).count(), 1);
+                        let counts: u32 = cache.[<seen_ $name s>].read().values().map(|hash_map| hash_map.get(&input).unwrap_or(&0)).cloned().sum();
+                        assert_eq!(counts, 1);
 
                         // Check that the cache contains the input and 1 timestamp entry.
                         assert_eq!(cache.[<seen_ $name s>].read().len(), 1);
