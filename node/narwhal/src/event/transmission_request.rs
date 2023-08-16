@@ -43,7 +43,7 @@ impl<N: Network> EventTrait for TransmissionRequest<N> {
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.transmission_id.to_bytes_le()?)?;
+        self.transmission_id.write_le(writer)?;
         Ok(())
     }
 

@@ -15,6 +15,7 @@
 use super::*;
 
 use bincode::Options;
+use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Ping<N: Network> {
@@ -26,8 +27,8 @@ pub struct Ping<N: Network> {
 impl<N: Network> MessageTrait for Ping<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
-        "Ping".to_string()
+    fn name(&self) -> Cow<'static, str> {
+        "Ping".into()
     }
 
     /// Serializes the message into the buffer.

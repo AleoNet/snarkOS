@@ -43,7 +43,7 @@ impl<N: Network> EventTrait for CertificateResponse<N> {
     /// Serializes the event into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.certificate.to_bytes_le()?)?;
+        self.certificate.write_le(writer)?;
         Ok(())
     }
 

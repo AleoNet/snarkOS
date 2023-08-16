@@ -14,6 +14,8 @@
 
 use super::*;
 
+use std::borrow::Cow;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BeaconVote<N: Network> {
     pub version: u8,
@@ -43,18 +45,18 @@ impl<N: Network> BeaconVote<N> {
 impl<N: Network> MessageTrait for BeaconVote<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
-        format!("BeaconVote {}", self.block_height)
+    fn name(&self) -> Cow<'static, str> {
+        format!("BeaconVote {}", self.block_height).into()
     }
 
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.version.to_le_bytes())?;
-        writer.write_all(&self.round.to_le_bytes())?;
-        writer.write_all(&self.block_height.to_le_bytes())?;
-        writer.write_all(&self.block_hash.to_bytes_le()?)?;
-        writer.write_all(&self.timestamp.to_le_bytes())?;
+        self.version.write_le(&mut *writer)?;
+        self.round.write_le(&mut *writer)?;
+        self.block_height.write_le(&mut *writer)?;
+        self.block_hash.write_le(&mut *writer)?;
+        self.timestamp.write_le(&mut *writer)?;
         self.signature.serialize_blocking_into(writer)
     }
 

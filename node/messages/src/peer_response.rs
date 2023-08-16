@@ -15,6 +15,7 @@
 use super::*;
 
 use bincode::Options;
+use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PeerResponse {
@@ -24,8 +25,8 @@ pub struct PeerResponse {
 impl MessageTrait for PeerResponse {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
-        "PeerResponse".to_string()
+    fn name(&self) -> Cow<'static, str> {
+        "PeerResponse".into()
     }
 
     /// Serializes the message into the buffer.
