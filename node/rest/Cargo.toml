@@ -28,7 +28,7 @@ version = "0.6"
 features = [ "headers" ]
 
 [dependencies.axum-extra]
-version = "0.7.5"
+version = "0.7.7"
 features = [ "erased-json" ]
 
 [dependencies.http]
