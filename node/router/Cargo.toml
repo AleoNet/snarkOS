@@ -20,7 +20,7 @@ edition = "2021"
 test = [ ]
 
 [dependencies.anyhow]
-version = "1.0.72"
+version = "1.0.74"
 
 [dependencies.async-trait]
 version = "0.1"

@@ -17,7 +17,7 @@ license = "Apache-2.0"
 edition = "2021"
 
 [dependencies.anyhow]
-version = "1.0.72"
+version = "1.0.74"
 
 [dependencies.colored]
 version = "2"
