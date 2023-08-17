@@ -21,7 +21,7 @@ default = [ ]
 test = [ ]
 
 [dependencies.anyhow]
-version = "1.0.74"
+version = "1.0.75"
 
 [dependencies.bincode]
 version = "1.0"

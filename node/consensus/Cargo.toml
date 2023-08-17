@@ -20,7 +20,7 @@ edition = "2021"
 default = [ ]
 
 [dependencies.anyhow]
-version = "1.0.74"
+version = "1.0.75"
 
 [dependencies.parking_lot]
 version = "0.12"
