@@ -20,24 +20,24 @@ use std::{
 
 use parking_lot::RwLock;
 use snarkvm::{console::types::Field, ledger::narwhal::TransmissionID, prelude::Network};
-use time::{Duration, OffsetDateTime};
+use time::OffsetDateTime;
 
 #[derive(Debug)]
 pub struct Cache<N: Network> {
     /// The ordered timestamp map of peer connections and cache hits.
-    seen_inbound_connections: RwLock<BTreeMap<OffsetDateTime, HashMap<IpAddr, u32>>>,
+    seen_inbound_connections: RwLock<BTreeMap<i64, HashMap<IpAddr, u32>>>,
     /// The ordered timestamp map of peer IPs and cache hits.
-    seen_inbound_events: RwLock<BTreeMap<OffsetDateTime, HashMap<SocketAddr, u32>>>,
+    seen_inbound_events: RwLock<BTreeMap<i64, HashMap<SocketAddr, u32>>>,
     /// The ordered timestamp map of certificate IDs and cache hits.
-    seen_inbound_certificates: RwLock<BTreeMap<OffsetDateTime, HashMap<Field<N>, u32>>>,
+    seen_inbound_certificates: RwLock<BTreeMap<i64, HashMap<Field<N>, u32>>>,
     /// The ordered timestamp map of transmission IDs and cache hits.
-    seen_inbound_transmissions: RwLock<BTreeMap<OffsetDateTime, HashMap<TransmissionID<N>, u32>>>,
+    seen_inbound_transmissions: RwLock<BTreeMap<i64, HashMap<TransmissionID<N>, u32>>>,
     /// The ordered timestamp map of peer IPs and their cache hits on outbound events.
-    seen_outbound_events: RwLock<BTreeMap<OffsetDateTime, HashMap<SocketAddr, u32>>>,
+    seen_outbound_events: RwLock<BTreeMap<i64, HashMap<SocketAddr, u32>>>,
     /// The ordered timestamp map of peer IPs and their cache hits on certificate requests.
-    seen_outbound_certificates: RwLock<BTreeMap<OffsetDateTime, HashMap<SocketAddr, u32>>>,
+    seen_outbound_certificates: RwLock<BTreeMap<i64, HashMap<SocketAddr, u32>>>,
     /// The ordered timestamp map of peer IPs and their cache hits on transmission requests.
-    seen_outbound_transmissions: RwLock<BTreeMap<OffsetDateTime, HashMap<SocketAddr, u32>>>,
+    seen_outbound_transmissions: RwLock<BTreeMap<i64, HashMap<SocketAddr, u32>>>,
 }
 
 impl<N: Network> Default for Cache<N> {
@@ -104,19 +104,19 @@ impl<N: Network> Cache<N> {
 impl<N: Network> Cache<N> {
     /// Insert a new timestamp for the given key, returning the number of recent entries.
     fn retain_and_insert<K: Copy + Clone + PartialEq + Eq + Hash>(
-        map: &RwLock<BTreeMap<OffsetDateTime, HashMap<K, u32>>>,
+        map: &RwLock<BTreeMap<i64, HashMap<K, u32>>>,
         key: K,
         interval_in_secs: i64,
     ) -> usize {
         // Fetch the current timestamp.
-        let now = OffsetDateTime::now_utc();
+        let now = OffsetDateTime::now_utc().unix_timestamp();
 
         // Get the write lock.
         let mut map_write = map.write();
         // Insert the new timestamp and increment the frequency for the key.
         *map_write.entry(now).or_default().entry(key).or_default() += 1;
         // Extract the subtree after interval (i.e. non-expired entries)
-        let retained = map_write.split_off(&now.saturating_sub(Duration::seconds(interval_in_secs)));
+        let retained = map_write.split_off(&now.saturating_sub(interval_in_secs));
         // Clear all the expired entries.
         map_write.clear();
         // Reinsert the entries into map and sum the frequency of recent requests for `key` while looping.
@@ -168,7 +168,7 @@ mod tests {
         }
     }
 
-    const INTERVAL_IN_SECS: i64 = 1;
+    const INTERVAL_IN_SECS: i64 = 3;
 
     macro_rules! test_cache_fields {
         ($($name:ident),*) => {
@@ -184,8 +184,10 @@ mod tests {
 
                         // Insert an input, recent events should be 1.
                         assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 1);
+                        std::thread::sleep(std::time::Duration::from_secs(1));
                         // Insert an input, recent events should be 2.
                         assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 2);
+                        std::thread::sleep(std::time::Duration::from_secs(1));
                         // Insert an input, recent events should be 3.
                         assert_eq!(cache.[<insert_ $name>](input, INTERVAL_IN_SECS), 3);
 
