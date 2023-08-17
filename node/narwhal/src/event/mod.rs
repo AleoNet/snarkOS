@@ -247,6 +247,7 @@ mod prop_tests {
 mod tests {
     use crate::Event;
     use bytes::{BufMut, BytesMut};
+    use snarkvm::console::prelude::ToBytes;
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     #[test]
@@ -260,7 +261,7 @@ mod tests {
     fn deserializing_invalid_data_panics() {
         let mut buf = BytesMut::default().writer();
         let invalid_id = u16::MAX;
-        bincode::serialize_into(&mut buf, &invalid_id).unwrap();
+        invalid_id.write_le(&mut buf).unwrap();
         assert_eq!(
             Event::<CurrentNetwork>::deserialize(buf.get_ref().clone()).unwrap_err().to_string(),
             format!("Unknown event ID {invalid_id}")

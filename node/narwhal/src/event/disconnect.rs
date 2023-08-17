@@ -108,7 +108,7 @@ mod tests {
     #[should_panic(expected = "Invalid 'Disconnect' event")]
     fn deserializing_invalid_data_panics() {
         let mut buf = BytesMut::default().writer();
-        bincode::serialize_into(&mut buf, "not a DisconnectReason-value").unwrap();
+        "not a DisconnectReason-value".as_bytes().write_le(&mut buf).unwrap();
         let _disconnect = Disconnect::read_le(buf.into_inner().reader()).unwrap();
     }
 }
