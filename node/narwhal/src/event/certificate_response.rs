@@ -40,13 +40,6 @@ impl<N: Network> EventTrait for CertificateResponse<N> {
         "CertificateResponse"
     }
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.certificate.write_le(writer)?;
-        Ok(())
-    }
-
     /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
@@ -55,6 +48,13 @@ impl<N: Network> EventTrait for CertificateResponse<N> {
         let certificate = BatchCertificate::read_le(&mut reader)?;
 
         Ok(Self { certificate })
+    }
+}
+
+impl<N: Network> ToBytes for CertificateResponse<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.certificate.write_le(&mut writer)?;
+        Ok(())
     }
 }
 

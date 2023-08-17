@@ -55,12 +55,11 @@ use ::bytes::{Buf, BytesMut};
 use anyhow::{bail, Result};
 use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
+pub use std::io::Result as IoResult;
 
-pub trait EventTrait {
+pub trait EventTrait: ToBytes {
     /// Returns the event name.
     fn name(&self) -> &'static str;
-    /// Serializes the event into the buffer.
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()>;
     /// Deserializes the given buffer into a event.
     fn deserialize(bytes: BytesMut) -> Result<Self>
     where
@@ -130,21 +129,21 @@ impl<N: Network> Event<N> {
 
     /// Serializes the event into the buffer.
     #[inline]
-    pub fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
+    pub fn serialize<W: Write>(&self, writer: &mut W) -> IoResult<()> {
         self.id().write_le(&mut *writer)?;
 
         match self {
-            Self::BatchPropose(event) => event.serialize(writer),
-            Self::BatchSignature(event) => event.serialize(writer),
-            Self::BatchCertified(event) => event.serialize(writer),
-            Self::CertificateRequest(event) => event.serialize(writer),
-            Self::CertificateResponse(event) => event.serialize(writer),
-            Self::ChallengeRequest(event) => event.serialize(writer),
-            Self::ChallengeResponse(event) => event.serialize(writer),
-            Self::Disconnect(event) => event.serialize(writer),
-            Self::TransmissionRequest(event) => event.serialize(writer),
-            Self::TransmissionResponse(event) => event.serialize(writer),
-            Self::WorkerPing(event) => event.serialize(writer),
+            Self::BatchPropose(event) => event.write_le(writer),
+            Self::BatchSignature(event) => event.write_le(writer),
+            Self::BatchCertified(event) => event.write_le(writer),
+            Self::CertificateRequest(event) => event.write_le(writer),
+            Self::CertificateResponse(event) => event.write_le(writer),
+            Self::ChallengeRequest(event) => event.write_le(writer),
+            Self::ChallengeResponse(event) => event.write_le(writer),
+            Self::Disconnect(event) => event.write_le(writer),
+            Self::TransmissionRequest(event) => event.write_le(writer),
+            Self::TransmissionResponse(event) => event.write_le(writer),
+            Self::WorkerPing(event) => event.write_le(writer),
         }
     }
 

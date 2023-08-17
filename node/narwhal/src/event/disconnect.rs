@@ -16,6 +16,7 @@ use super::*;
 
 /// The reason behind the node disconnecting from a peer.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[repr(u8)]
 pub enum DisconnectReason {
     /// The peer's challenge response is invalid.
     InvalidChallengeResponse,
@@ -45,12 +46,6 @@ impl EventTrait for Disconnect {
         "Disconnect"
     }
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(writer, &self.reason)?)
-    }
-
     /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
@@ -61,6 +56,13 @@ impl EventTrait for Disconnect {
         } else {
             bail!("Invalid 'Disconnect' event");
         }
+    }
+}
+
+impl ToBytes for Disconnect {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        (self.reason as u16).write_le(&mut writer)?;
+        Ok(())
     }
 }
 

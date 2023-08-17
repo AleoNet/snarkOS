@@ -40,16 +40,6 @@ impl<N: Network> EventTrait for WorkerPing<N> {
         "WorkerPing"
     }
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        (self.transmission_ids.len() as u32).write_le(&mut *writer)?;
-        for transmission_id in &self.transmission_ids {
-            transmission_id.write_le(&mut *writer)?;
-        }
-        Ok(())
-    }
-
     /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
@@ -62,6 +52,16 @@ impl<N: Network> EventTrait for WorkerPing<N> {
         }
 
         Ok(Self { transmission_ids })
+    }
+}
+
+impl<N: Network> ToBytes for WorkerPing<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        (self.transmission_ids.len() as u32).write_le(&mut writer)?;
+        for transmission_id in &self.transmission_ids {
+            transmission_id.write_le(&mut writer)?;
+        }
+        Ok(())
     }
 }
 

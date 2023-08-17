@@ -41,13 +41,6 @@ impl<N: Network> EventTrait for BatchPropose<N> {
         "BatchPropose"
     }
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.round.write_le(&mut *writer)?;
-        self.batch_header.serialize_blocking_into(writer)
-    }
-
     /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
@@ -57,6 +50,14 @@ impl<N: Network> EventTrait for BatchPropose<N> {
         let batch_header = Data::Buffer(reader.into_inner().freeze());
 
         Ok(Self { round, batch_header })
+    }
+}
+
+impl<N: Network> ToBytes for BatchPropose<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.round.write_le(&mut writer)?;
+        self.batch_header.write_le(&mut writer)?;
+        Ok(())
     }
 }
 

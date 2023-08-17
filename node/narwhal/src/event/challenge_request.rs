@@ -36,17 +36,21 @@ impl<N: Network> EventTrait for ChallengeRequest<N> {
         "ChallengeRequest"
     }
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(writer, &(self.version, self.listener_port, self.address, self.nonce))?)
-    }
-
     /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let (version, listener_port, address, nonce) = bincode::deserialize_from(&mut bytes.reader())?;
         Ok(Self { version, listener_port, address, nonce })
+    }
+}
+
+impl<N: Network> ToBytes for ChallengeRequest<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.version.write_le(&mut writer)?;
+        self.listener_port.write_le(&mut writer)?;
+        self.address.write_le(&mut writer)?;
+        self.nonce.write_le(&mut writer)?;
+        Ok(())
     }
 }
 

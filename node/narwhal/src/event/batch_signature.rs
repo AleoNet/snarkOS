@@ -35,15 +35,6 @@ impl<N: Network> EventTrait for BatchSignature<N> {
         "BatchSignature"
     }
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.batch_id.write_le(&mut *writer)?;
-        self.signature.write_le(&mut *writer)?;
-        self.timestamp.write_le(&mut *writer)?;
-        Ok(())
-    }
-
     /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
@@ -53,6 +44,15 @@ impl<N: Network> EventTrait for BatchSignature<N> {
             signature: Signature::read_le(&mut reader)?,
             timestamp: i64::read_le(&mut reader)?,
         })
+    }
+}
+
+impl<N: Network> ToBytes for BatchSignature<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.batch_id.write_le(&mut writer)?;
+        self.signature.write_le(&mut writer)?;
+        self.timestamp.write_le(&mut writer)?;
+        Ok(())
     }
 }
 

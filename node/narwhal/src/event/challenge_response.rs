@@ -26,17 +26,18 @@ impl<N: Network> EventTrait for ChallengeResponse<N> {
         "ChallengeResponse"
     }
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.signature.serialize_blocking_into(writer)
-    }
-
     /// Deserializes the given buffer into an event.
     #[inline]
     fn deserialize(bytes: BytesMut) -> Result<Self> {
         let reader = bytes.reader();
         Ok(Self { signature: Data::Buffer(reader.into_inner().freeze()) })
+    }
+}
+
+impl<N: Network> ToBytes for ChallengeResponse<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.signature.write_le(&mut writer)?;
+        Ok(())
     }
 }
 
