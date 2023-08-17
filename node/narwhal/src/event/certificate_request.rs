@@ -39,22 +39,20 @@ impl<N: Network> EventTrait for CertificateRequest<N> {
     fn name(&self) -> &'static str {
         "CertificateRequest"
     }
-
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-
-        let certificate_id = Field::read_le(&mut reader)?;
-
-        Ok(Self { certificate_id })
-    }
 }
 
 impl<N: Network> ToBytes for CertificateRequest<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.certificate_id.write_le(&mut writer)?;
         Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for CertificateRequest<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let certificate_id = Field::read_le(&mut reader)?;
+
+        Ok(Self { certificate_id })
     }
 }
 

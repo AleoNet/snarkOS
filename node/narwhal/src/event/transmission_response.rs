@@ -40,17 +40,6 @@ impl<N: Network> EventTrait for TransmissionResponse<N> {
     fn name(&self) -> &'static str {
         "TransmissionResponse"
     }
-
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-
-        let transmission_id = TransmissionID::read_le(&mut reader)?;
-        let transmission = Transmission::read_le(&mut reader)?;
-
-        Ok(Self { transmission_id, transmission })
-    }
 }
 
 impl<N: Network> ToBytes for TransmissionResponse<N> {
@@ -58,6 +47,15 @@ impl<N: Network> ToBytes for TransmissionResponse<N> {
         self.transmission_id.write_le(&mut writer)?;
         self.transmission.write_le(&mut writer)?;
         Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for TransmissionResponse<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let transmission_id = TransmissionID::read_le(&mut reader)?;
+        let transmission = Transmission::read_le(&mut reader)?;
+
+        Ok(Self { transmission_id, transmission })
     }
 }
 

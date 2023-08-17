@@ -35,13 +35,6 @@ impl<N: Network> EventTrait for ChallengeRequest<N> {
     fn name(&self) -> &'static str {
         "ChallengeRequest"
     }
-
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let (version, listener_port, address, nonce) = bincode::deserialize_from(&mut bytes.reader())?;
-        Ok(Self { version, listener_port, address, nonce })
-    }
 }
 
 impl<N: Network> ToBytes for ChallengeRequest<N> {
@@ -51,6 +44,17 @@ impl<N: Network> ToBytes for ChallengeRequest<N> {
         self.address.write_le(&mut writer)?;
         self.nonce.write_le(&mut writer)?;
         Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for ChallengeRequest<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let version = u32::read_le(&mut reader)?;
+        let listener_port = u16::read_le(&mut reader)?;
+        let address = Address::<N>::read_le(&mut reader)?;
+        let nonce = u64::read_le(&mut reader)?;
+
+        Ok(Self { version, listener_port, address, nonce })
     }
 }
 

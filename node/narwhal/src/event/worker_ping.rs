@@ -39,20 +39,6 @@ impl<N: Network> EventTrait for WorkerPing<N> {
     fn name(&self) -> &'static str {
         "WorkerPing"
     }
-
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-
-        let num_transmissions = u32::read_le(&mut reader)?;
-        let mut transmission_ids = IndexSet::with_capacity(num_transmissions as usize);
-        for _ in 0..num_transmissions {
-            transmission_ids.insert(TransmissionID::read_le(&mut reader)?);
-        }
-
-        Ok(Self { transmission_ids })
-    }
 }
 
 impl<N: Network> ToBytes for WorkerPing<N> {
@@ -62,6 +48,18 @@ impl<N: Network> ToBytes for WorkerPing<N> {
             transmission_id.write_le(&mut writer)?;
         }
         Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for WorkerPing<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let num_transmissions = u32::read_le(&mut reader)?;
+        let mut transmission_ids = IndexSet::with_capacity(num_transmissions as usize);
+        for _ in 0..num_transmissions {
+            transmission_ids.insert(TransmissionID::read_le(&mut reader)?);
+        }
+
+        Ok(Self { transmission_ids })
     }
 }
 

@@ -14,6 +14,8 @@
 
 use super::*;
 
+use std::io;
+
 /// The reason behind the node disconnecting from a peer.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
 #[repr(u8)]
@@ -45,24 +47,27 @@ impl EventTrait for Disconnect {
     fn name(&self) -> &'static str {
         "Disconnect"
     }
-
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        if bytes.remaining() == 0 {
-            Ok(Self { reason: DisconnectReason::NoReasonGiven })
-        } else if let Ok(reason) = bincode::deserialize_from(&mut bytes.reader()) {
-            Ok(Self { reason })
-        } else {
-            bail!("Invalid 'Disconnect' event");
-        }
-    }
 }
 
 impl ToBytes for Disconnect {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         (self.reason as u16).write_le(&mut writer)?;
         Ok(())
+    }
+}
+
+impl FromBytes for Disconnect {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let reason = match u8::read_le(&mut reader) {
+            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => DisconnectReason::NoReasonGiven,
+            Ok(0) => DisconnectReason::InvalidChallengeResponse,
+            Ok(1) => DisconnectReason::NoReasonGiven,
+            Ok(2) => DisconnectReason::ProtocolViolation,
+            Ok(3) => DisconnectReason::OutdatedClientVersion,
+            _ => return Err(io::Error::new(io::ErrorKind::Other, "Invalid disconnect reason")),
+        };
+
+        Ok(Self { reason })
     }
 }
 

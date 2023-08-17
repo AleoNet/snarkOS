@@ -40,17 +40,6 @@ impl<N: Network> EventTrait for BatchPropose<N> {
     fn name(&self) -> &'static str {
         "BatchPropose"
     }
-
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-
-        let round = u64::read_le(&mut reader)?;
-        let batch_header = Data::Buffer(reader.into_inner().freeze());
-
-        Ok(Self { round, batch_header })
-    }
 }
 
 impl<N: Network> ToBytes for BatchPropose<N> {
@@ -58,6 +47,15 @@ impl<N: Network> ToBytes for BatchPropose<N> {
         self.round.write_le(&mut writer)?;
         self.batch_header.write_le(&mut writer)?;
         Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for BatchPropose<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let round = u64::read_le(&mut reader)?;
+        let batch_header = Data::read_le(&mut reader)?;
+
+        Ok(Self { round, batch_header })
     }
 }
 

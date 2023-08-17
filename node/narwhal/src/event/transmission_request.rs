@@ -39,22 +39,20 @@ impl<N: Network> EventTrait for TransmissionRequest<N> {
     fn name(&self) -> &'static str {
         "TransmissionRequest"
     }
-
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-
-        let transmission_id = TransmissionID::read_le(&mut reader)?;
-
-        Ok(Self { transmission_id })
-    }
 }
 
 impl<N: Network> ToBytes for TransmissionRequest<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.transmission_id.write_le(&mut writer)?;
         Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for TransmissionRequest<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let transmission_id = TransmissionID::read_le(&mut reader)?;
+
+        Ok(Self { transmission_id })
     }
 }
 

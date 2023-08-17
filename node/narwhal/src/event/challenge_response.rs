@@ -25,19 +25,20 @@ impl<N: Network> EventTrait for ChallengeResponse<N> {
     fn name(&self) -> &'static str {
         "ChallengeResponse"
     }
-
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let reader = bytes.reader();
-        Ok(Self { signature: Data::Buffer(reader.into_inner().freeze()) })
-    }
 }
 
 impl<N: Network> ToBytes for ChallengeResponse<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.signature.write_le(&mut writer)?;
         Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for ChallengeResponse<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let signature = Data::read_le(&mut reader)?;
+
+        Ok(Self { signature })
     }
 }
 

@@ -46,7 +46,7 @@ mod worker_ping;
 pub use worker_ping::WorkerPing;
 
 use snarkvm::{
-    console::prelude::{FromBytes, Network, ToBytes, Write},
+    console::prelude::{FromBytes, Network, Read, ToBytes, Write},
     ledger::narwhal::{BatchCertificate, BatchHeader, Data, Transmission, TransmissionID},
     prelude::{Address, Field, Signature},
 };
@@ -57,13 +57,9 @@ use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 pub use std::io::Result as IoResult;
 
-pub trait EventTrait: ToBytes {
+pub trait EventTrait: ToBytes + FromBytes {
     /// Returns the event name.
     fn name(&self) -> &'static str;
-    /// Deserializes the given buffer into a event.
-    fn deserialize(bytes: BytesMut) -> Result<Self>
-    where
-        Self: Sized;
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -158,19 +154,22 @@ impl<N: Network> Event<N> {
         // Read the event ID.
         let id: u16 = bytes.get_u16_le();
 
+        // Prepare a reader.
+        let reader = bytes.reader();
+
         // Deserialize the data field.
         let event = match id {
-            0 => Self::BatchPropose(BatchPropose::deserialize(bytes)?),
-            1 => Self::BatchSignature(BatchSignature::deserialize(bytes)?),
-            2 => Self::BatchCertified(BatchCertified::deserialize(bytes)?),
-            3 => Self::CertificateRequest(CertificateRequest::deserialize(bytes)?),
-            4 => Self::CertificateResponse(CertificateResponse::deserialize(bytes)?),
-            5 => Self::ChallengeRequest(EventTrait::deserialize(bytes)?),
-            6 => Self::ChallengeResponse(EventTrait::deserialize(bytes)?),
-            7 => Self::Disconnect(EventTrait::deserialize(bytes)?),
-            8 => Self::TransmissionRequest(EventTrait::deserialize(bytes)?),
-            9 => Self::TransmissionResponse(EventTrait::deserialize(bytes)?),
-            10 => Self::WorkerPing(EventTrait::deserialize(bytes)?),
+            0 => Self::BatchPropose(BatchPropose::read_le(reader)?),
+            1 => Self::BatchSignature(BatchSignature::read_le(reader)?),
+            2 => Self::BatchCertified(BatchCertified::read_le(reader)?),
+            3 => Self::CertificateRequest(CertificateRequest::read_le(reader)?),
+            4 => Self::CertificateResponse(CertificateResponse::read_le(reader)?),
+            5 => Self::ChallengeRequest(ChallengeRequest::read_le(reader)?),
+            6 => Self::ChallengeResponse(ChallengeResponse::read_le(reader)?),
+            7 => Self::Disconnect(Disconnect::read_le(reader)?),
+            8 => Self::TransmissionRequest(TransmissionRequest::read_le(reader)?),
+            9 => Self::TransmissionResponse(TransmissionResponse::read_le(reader)?),
+            10 => Self::WorkerPing(WorkerPing::read_le(reader)?),
             _ => bail!("Unknown event ID {id}"),
         };
 

@@ -39,22 +39,20 @@ impl<N: Network> EventTrait for BatchCertified<N> {
     fn name(&self) -> &'static str {
         "BatchCertified"
     }
-
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let reader = bytes.reader();
-
-        let certificate = Data::Buffer(reader.into_inner().freeze());
-
-        Ok(Self { certificate })
-    }
 }
 
 impl<N: Network> ToBytes for BatchCertified<N> {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
         self.certificate.write_le(&mut writer)?;
         Ok(())
+    }
+}
+
+impl<N: Network> FromBytes for BatchCertified<N> {
+    fn read_le<R: Read>(reader: R) -> IoResult<Self> {
+        let certificate = Data::read_le(reader)?;
+
+        Ok(Self { certificate })
     }
 }
 
