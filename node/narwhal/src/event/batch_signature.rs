@@ -58,16 +58,13 @@ impl<N: Network> FromBytes for BatchSignature<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        event::{
-            certificate_request::prop_tests::any_field,
-            challenge_response::prop_tests::any_signature,
-            EventTrait,
-        },
+        event::{certificate_request::prop_tests::any_field, challenge_response::prop_tests::any_signature},
         helpers::now,
         BatchSignature,
     };
-    use bytes::{BufMut, BytesMut};
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{BoxedStrategy, Just, Strategy};
+    use snarkvm::console::prelude::{FromBytes, ToBytes};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -83,9 +80,9 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_batch_signature())] original: BatchSignature<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        BatchSignature::serialize(&original, &mut buf).unwrap();
+        BatchSignature::write_le(&original, &mut buf).unwrap();
 
-        let deserialized: BatchSignature<CurrentNetwork> = BatchSignature::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized: BatchSignature<CurrentNetwork> = BatchSignature::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(original, deserialized);
     }
 }

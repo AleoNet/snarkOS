@@ -59,16 +59,18 @@ impl<N: Network> FromBytes for TransmissionRequest<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        event::EventTrait,
         helpers::storage::prop_tests::{any_puzzle_commitment, any_transaction_id},
         TransmissionRequest,
     };
-    use bytes::{BufMut, BytesMut};
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         prelude::{BoxedStrategy, Strategy},
         prop_oneof,
     };
-    use snarkvm::ledger::narwhal::TransmissionID;
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        ledger::narwhal::TransmissionID,
+    };
     use test_strategy::proptest;
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -87,9 +89,9 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_transmission_request())] original: TransmissionRequest<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        TransmissionRequest::serialize(&original, &mut buf).unwrap();
+        TransmissionRequest::write_le(&original, &mut buf).unwrap();
 
-        let deserialized = TransmissionRequest::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized = TransmissionRequest::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(original, deserialized);
     }
 }

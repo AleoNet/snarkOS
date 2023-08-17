@@ -60,10 +60,11 @@ impl<N: Network> FromBytes for ChallengeRequest<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{event::EventTrait, ChallengeRequest};
-    use bytes::{BufMut, BytesMut};
+    use crate::ChallengeRequest;
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use snarkos_node_narwhal_committee::prop_tests::any_valid_account;
+    use snarkvm::console::prelude::{FromBytes, ToBytes};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -82,10 +83,10 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_challenge_request())] original: ChallengeRequest<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        ChallengeRequest::serialize(&original, &mut buf).unwrap();
+        ChallengeRequest::write_le(&original, &mut buf).unwrap();
 
         let deserialized: ChallengeRequest<CurrentNetwork> =
-            ChallengeRequest::deserialize(buf.get_ref().clone()).unwrap();
+            ChallengeRequest::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(original, deserialized);
     }
 }

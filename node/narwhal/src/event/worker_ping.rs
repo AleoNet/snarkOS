@@ -65,12 +65,13 @@ impl<N: Network> FromBytes for WorkerPing<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{event::EventTrait, helpers::storage::prop_tests::any_transmission_id, WorkerPing};
-    use bytes::{BufMut, BytesMut};
+    use crate::{helpers::storage::prop_tests::any_transmission_id, WorkerPing};
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         collection::hash_set,
         prelude::{BoxedStrategy, Strategy},
     };
+    use snarkvm::console::prelude::{FromBytes, ToBytes};
     use test_strategy::proptest;
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -81,9 +82,9 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_worker_ping())] original: WorkerPing<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        WorkerPing::serialize(&original, &mut buf).unwrap();
+        WorkerPing::write_le(&original, &mut buf).unwrap();
 
-        let deserialized = WorkerPing::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized = WorkerPing::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(original, deserialized);
     }
 }

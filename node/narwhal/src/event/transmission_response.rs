@@ -62,18 +62,19 @@ impl<N: Network> FromBytes for TransmissionResponse<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        event::EventTrait,
         helpers::storage::prop_tests::{any_puzzle_commitment, any_transaction_id},
         TransmissionResponse,
     };
-    use ::bytes::Bytes;
-    use bytes::{BufMut, BytesMut};
+    use bytes::{Buf, BufMut, Bytes, BytesMut};
     use proptest::{
         collection,
         prelude::{any, BoxedStrategy, Strategy},
         prop_oneof,
     };
-    use snarkvm::ledger::narwhal::{Data, Transmission, TransmissionID};
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        ledger::narwhal::{Data, Transmission, TransmissionID},
+    };
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -99,9 +100,9 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_transmission_response())] original: TransmissionResponse<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        TransmissionResponse::serialize(&original, &mut buf).unwrap();
+        TransmissionResponse::write_le(&original, &mut buf).unwrap();
 
-        let deserialized = TransmissionResponse::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized = TransmissionResponse::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(original, deserialized);
     }
 }

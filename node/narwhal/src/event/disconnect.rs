@@ -64,7 +64,7 @@ impl FromBytes for Disconnect {
             Ok(1) => DisconnectReason::NoReasonGiven,
             Ok(2) => DisconnectReason::ProtocolViolation,
             Ok(3) => DisconnectReason::OutdatedClientVersion,
-            _ => return Err(io::Error::new(io::ErrorKind::Other, "Invalid disconnect reason")),
+            _ => return Err(io::Error::new(io::ErrorKind::Other, "Invalid 'Disconnect' event")),
         };
 
         Ok(Self { reason })
@@ -73,8 +73,9 @@ impl FromBytes for Disconnect {
 
 #[cfg(test)]
 mod tests {
-    use crate::{event::EventTrait, Disconnect, DisconnectReason};
-    use bytes::{BufMut, BytesMut};
+    use crate::{Disconnect, DisconnectReason};
+    use bytes::{Buf, BufMut, Bytes, BytesMut};
+    use snarkvm::console::prelude::{FromBytes, ToBytes};
 
     #[test]
     fn serialize_deserialize() {
@@ -89,17 +90,17 @@ mod tests {
         for reason in all_reasons.iter() {
             let disconnect = Disconnect::from(*reason);
             let mut buf = BytesMut::default().writer();
-            Disconnect::serialize(&disconnect, &mut buf).unwrap();
+            Disconnect::write_le(&disconnect, &mut buf).unwrap();
 
-            let disconnect = Disconnect::deserialize(buf.get_ref().clone()).unwrap();
+            let disconnect = Disconnect::read_le(buf.into_inner().reader()).unwrap();
             assert_eq!(reason, &disconnect.reason);
         }
     }
 
     #[test]
     fn deserializing_empty_defaults_no_reason() {
-        let buf = BytesMut::default().writer();
-        let disconnect = Disconnect::deserialize(buf.get_ref().clone()).unwrap();
+        let buf = Bytes::default();
+        let disconnect = Disconnect::read_le(buf.reader()).unwrap();
         assert_eq!(disconnect.reason, DisconnectReason::NoReasonGiven);
     }
 
@@ -108,6 +109,6 @@ mod tests {
     fn deserializing_invalid_data_panics() {
         let mut buf = BytesMut::default().writer();
         bincode::serialize_into(&mut buf, "not a DisconnectReason-value").unwrap();
-        let _disconnect = Disconnect::deserialize(buf.get_ref().clone()).unwrap();
+        let _disconnect = Disconnect::read_le(buf.into_inner().reader()).unwrap();
     }
 }

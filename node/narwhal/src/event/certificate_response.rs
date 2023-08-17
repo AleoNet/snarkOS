@@ -59,21 +59,24 @@ impl<N: Network> FromBytes for CertificateResponse<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        event::{transmission_response::prop_tests::any_transmission, EventTrait},
+        event::transmission_response::prop_tests::any_transmission,
         helpers::{
             now,
             storage::prop_tests::{sign_batch_header, CryptoTestRng},
         },
         CertificateResponse,
     };
-    use bytes::{BufMut, BytesMut};
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         collection::vec,
         prelude::{any, BoxedStrategy, Just, Strategy},
         sample::Selector,
     };
     use snarkos_node_narwhal_committee::prop_tests::{CommitteeContext, ValidatorSet};
-    use snarkvm::ledger::narwhal::{BatchCertificate, BatchHeader};
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        ledger::narwhal::{BatchCertificate, BatchHeader},
+    };
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -109,10 +112,10 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_certificate_response())] original: CertificateResponse<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        CertificateResponse::serialize(&original, &mut buf).unwrap();
+        CertificateResponse::write_le(&original, &mut buf).unwrap();
 
         let deserialized: CertificateResponse<CurrentNetwork> =
-            CertificateResponse::deserialize(buf.get_ref().clone()).unwrap();
+            CertificateResponse::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(original, deserialized);
     }
 }

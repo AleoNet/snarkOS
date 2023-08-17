@@ -44,10 +44,11 @@ impl<N: Network> FromBytes for ChallengeResponse<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{event::EventTrait, helpers::storage::prop_tests::CryptoTestRng, ChallengeResponse};
-    use bytes::{BufMut, BytesMut};
+    use crate::{helpers::storage::prop_tests::CryptoTestRng, ChallengeResponse};
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
         ledger::narwhal::Data,
         prelude::{PrivateKey, Signature},
         utilities::rand::Uniform,
@@ -73,10 +74,10 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_challenge_response())] original: ChallengeResponse<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        ChallengeResponse::serialize(&original, &mut buf).unwrap();
+        ChallengeResponse::write_le(&original, &mut buf).unwrap();
 
         let deserialized: ChallengeResponse<CurrentNetwork> =
-            ChallengeResponse::deserialize(buf.get_ref().clone()).unwrap();
+            ChallengeResponse::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(
             original.signature.deserialize_blocking().unwrap(),
             deserialized.signature.deserialize_blocking().unwrap()

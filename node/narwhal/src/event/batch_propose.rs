@@ -61,14 +61,14 @@ impl<N: Network> FromBytes for BatchPropose<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{
-        event::{certificate_response::prop_tests::any_batch_header, EventTrait},
-        BatchPropose,
-    };
-    use bytes::{BufMut, BytesMut};
+    use crate::{event::certificate_response::prop_tests::any_batch_header, BatchPropose};
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use snarkos_node_narwhal_committee::prop_tests::CommitteeContext;
-    use snarkvm::prelude::narwhal::Data;
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        prelude::narwhal::Data,
+    };
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -83,9 +83,9 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_batch_propose())] original: BatchPropose<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        BatchPropose::serialize(&original, &mut buf).unwrap();
+        BatchPropose::write_le(&original, &mut buf).unwrap();
 
-        let deserialized: BatchPropose<CurrentNetwork> = BatchPropose::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized: BatchPropose<CurrentNetwork> = BatchPropose::read_le(buf.into_inner().reader()).unwrap();
         // because of the Data enum, we cannot compare the structs directly even though it derives PartialEq
         assert_eq!(original.round, deserialized.round);
         assert_eq!(
