@@ -24,7 +24,7 @@ default-features = false
 version = "1"
 
 [dependencies.anyhow]
-version = "1.0.74"
+version = "1.0.75"
 
 [dependencies.clap]
 version = "4.3"
