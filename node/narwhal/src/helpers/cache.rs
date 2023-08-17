@@ -12,14 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+use snarkvm::{console::types::Field, ledger::narwhal::TransmissionID, prelude::Network};
+
 use core::hash::Hash;
+use parking_lot::RwLock;
 use std::{
     collections::{BTreeMap, HashMap},
     net::{IpAddr, SocketAddr},
 };
-
-use parking_lot::RwLock;
-use snarkvm::{console::types::Field, ledger::narwhal::TransmissionID, prelude::Network};
 use time::OffsetDateTime;
 
 #[derive(Debug)]
@@ -132,11 +132,10 @@ impl<N: Network> Cache<N> {
 
 #[cfg(test)]
 mod tests {
-    use std::net::Ipv4Addr;
-
+    use super::*;
     use snarkvm::prelude::Testnet3;
 
-    use super::*;
+    use std::net::Ipv4Addr;
 
     type CurrentNetwork = Testnet3;
 
