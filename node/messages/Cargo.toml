@@ -46,7 +46,7 @@ version = "1"
 workspace = true
 
 [dependencies.snow]
-version = "0.9.2"
+version = "0.9.3"
 
 [dependencies.tokio]
 version = "1.28"
