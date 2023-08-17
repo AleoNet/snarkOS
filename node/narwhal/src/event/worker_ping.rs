@@ -39,22 +39,20 @@ impl<N: Network> EventTrait for WorkerPing<N> {
     fn name(&self) -> &'static str {
         "WorkerPing"
     }
+}
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        (self.transmission_ids.len() as u32).write_le(&mut *writer)?;
+impl<N: Network> ToBytes for WorkerPing<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        (self.transmission_ids.len() as u32).write_le(&mut writer)?;
         for transmission_id in &self.transmission_ids {
-            transmission_id.write_le(&mut *writer)?;
+            transmission_id.write_le(&mut writer)?;
         }
         Ok(())
     }
+}
 
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-
+impl<N: Network> FromBytes for WorkerPing<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let num_transmissions = u32::read_le(&mut reader)?;
         let mut transmission_ids = IndexSet::with_capacity(num_transmissions as usize);
         for _ in 0..num_transmissions {
@@ -67,12 +65,13 @@ impl<N: Network> EventTrait for WorkerPing<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{event::EventTrait, helpers::storage::prop_tests::any_transmission_id, WorkerPing};
-    use bytes::{BufMut, BytesMut};
+    use crate::{helpers::storage::prop_tests::any_transmission_id, WorkerPing};
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         collection::hash_set,
         prelude::{BoxedStrategy, Strategy},
     };
+    use snarkvm::console::prelude::{FromBytes, ToBytes};
     use test_strategy::proptest;
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -83,9 +82,9 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_worker_ping())] original: WorkerPing<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        WorkerPing::serialize(&original, &mut buf).unwrap();
+        WorkerPing::write_le(&original, &mut buf).unwrap();
 
-        let deserialized = WorkerPing::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized = WorkerPing::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(original, deserialized);
     }
 }

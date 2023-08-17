@@ -14,8 +14,11 @@
 
 use super::*;
 
+use std::io;
+
 /// The reason behind the node disconnecting from a peer.
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize, Serialize)]
+#[repr(u8)]
 pub enum DisconnectReason {
     /// The peer's challenge response is invalid.
     InvalidChallengeResponse,
@@ -44,30 +47,35 @@ impl EventTrait for Disconnect {
     fn name(&self) -> &'static str {
         "Disconnect"
     }
+}
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(writer, &self.reason)?)
+impl ToBytes for Disconnect {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        (self.reason as u16).write_le(&mut writer)?;
+        Ok(())
     }
+}
 
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        if bytes.remaining() == 0 {
-            Ok(Self { reason: DisconnectReason::NoReasonGiven })
-        } else if let Ok(reason) = bincode::deserialize_from(&mut bytes.reader()) {
-            Ok(Self { reason })
-        } else {
-            bail!("Invalid 'Disconnect' event");
-        }
+impl FromBytes for Disconnect {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let reason = match u8::read_le(&mut reader) {
+            Err(e) if e.kind() == io::ErrorKind::UnexpectedEof => DisconnectReason::NoReasonGiven,
+            Ok(0) => DisconnectReason::InvalidChallengeResponse,
+            Ok(1) => DisconnectReason::NoReasonGiven,
+            Ok(2) => DisconnectReason::ProtocolViolation,
+            Ok(3) => DisconnectReason::OutdatedClientVersion,
+            _ => return Err(io::Error::new(io::ErrorKind::Other, "Invalid 'Disconnect' event")),
+        };
+
+        Ok(Self { reason })
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::{event::EventTrait, Disconnect, DisconnectReason};
-    use bytes::{BufMut, BytesMut};
+    use crate::{Disconnect, DisconnectReason};
+    use bytes::{Buf, BufMut, Bytes, BytesMut};
+    use snarkvm::console::prelude::{FromBytes, ToBytes};
 
     #[test]
     fn serialize_deserialize() {
@@ -82,17 +90,17 @@ mod tests {
         for reason in all_reasons.iter() {
             let disconnect = Disconnect::from(*reason);
             let mut buf = BytesMut::default().writer();
-            Disconnect::serialize(&disconnect, &mut buf).unwrap();
+            Disconnect::write_le(&disconnect, &mut buf).unwrap();
 
-            let disconnect = Disconnect::deserialize(buf.get_ref().clone()).unwrap();
+            let disconnect = Disconnect::read_le(buf.into_inner().reader()).unwrap();
             assert_eq!(reason, &disconnect.reason);
         }
     }
 
     #[test]
     fn deserializing_empty_defaults_no_reason() {
-        let buf = BytesMut::default().writer();
-        let disconnect = Disconnect::deserialize(buf.get_ref().clone()).unwrap();
+        let buf = Bytes::default();
+        let disconnect = Disconnect::read_le(buf.reader()).unwrap();
         assert_eq!(disconnect.reason, DisconnectReason::NoReasonGiven);
     }
 
@@ -100,7 +108,7 @@ mod tests {
     #[should_panic(expected = "Invalid 'Disconnect' event")]
     fn deserializing_invalid_data_panics() {
         let mut buf = BytesMut::default().writer();
-        bincode::serialize_into(&mut buf, "not a DisconnectReason-value").unwrap();
-        let _disconnect = Disconnect::deserialize(buf.get_ref().clone()).unwrap();
+        "not a DisconnectReason-value".as_bytes().write_le(&mut buf).unwrap();
+        let _disconnect = Disconnect::read_le(buf.into_inner().reader()).unwrap();
     }
 }

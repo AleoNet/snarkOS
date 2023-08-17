@@ -39,19 +39,17 @@ impl<N: Network> EventTrait for CertificateRequest<N> {
     fn name(&self) -> &'static str {
         "CertificateRequest"
     }
+}
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.certificate_id.write_le(writer)?;
+impl<N: Network> ToBytes for CertificateRequest<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.certificate_id.write_le(&mut writer)?;
         Ok(())
     }
+}
 
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-
+impl<N: Network> FromBytes for CertificateRequest<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let certificate_id = Field::read_le(&mut reader)?;
 
         Ok(Self { certificate_id })
@@ -60,10 +58,13 @@ impl<N: Network> EventTrait for CertificateRequest<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{event::EventTrait, helpers::storage::prop_tests::CryptoTestRng, CertificateRequest};
-    use bytes::{BufMut, BytesMut};
+    use crate::{helpers::storage::prop_tests::CryptoTestRng, CertificateRequest};
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
-    use snarkvm::prelude::{Field, Uniform};
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        prelude::{Field, Uniform},
+    };
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -79,10 +80,10 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_certificate_request())] original: CertificateRequest<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        CertificateRequest::serialize(&original, &mut buf).unwrap();
+        CertificateRequest::write_le(&original, &mut buf).unwrap();
 
         let deserialized: CertificateRequest<CurrentNetwork> =
-            CertificateRequest::deserialize(buf.get_ref().clone()).unwrap();
+            CertificateRequest::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(original, deserialized);
     }
 }

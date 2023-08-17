@@ -34,41 +34,37 @@ impl<N: Network> EventTrait for BatchSignature<N> {
     fn name(&self) -> &'static str {
         "BatchSignature"
     }
+}
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.batch_id.write_le(&mut *writer)?;
-        self.signature.write_le(&mut *writer)?;
-        self.timestamp.write_le(&mut *writer)?;
+impl<N: Network> ToBytes for BatchSignature<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.batch_id.write_le(&mut writer)?;
+        self.signature.write_le(&mut writer)?;
+        self.timestamp.write_le(&mut writer)?;
         Ok(())
     }
+}
 
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-        Ok(Self {
-            batch_id: Field::read_le(&mut reader)?,
-            signature: Signature::read_le(&mut reader)?,
-            timestamp: i64::read_le(&mut reader)?,
-        })
+impl<N: Network> FromBytes for BatchSignature<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let batch_id = Field::read_le(&mut reader)?;
+        let signature = Signature::read_le(&mut reader)?;
+        let timestamp = i64::read_le(&mut reader)?;
+
+        Ok(Self { batch_id, signature, timestamp })
     }
 }
 
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        event::{
-            certificate_request::prop_tests::any_field,
-            challenge_response::prop_tests::any_signature,
-            EventTrait,
-        },
+        event::{certificate_request::prop_tests::any_field, challenge_response::prop_tests::any_signature},
         helpers::now,
         BatchSignature,
     };
-    use bytes::{BufMut, BytesMut};
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{BoxedStrategy, Just, Strategy};
+    use snarkvm::console::prelude::{FromBytes, ToBytes};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -84,9 +80,9 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_batch_signature())] original: BatchSignature<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        BatchSignature::serialize(&original, &mut buf).unwrap();
+        BatchSignature::write_le(&original, &mut buf).unwrap();
 
-        let deserialized: BatchSignature<CurrentNetwork> = BatchSignature::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized: BatchSignature<CurrentNetwork> = BatchSignature::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(original, deserialized);
     }
 }

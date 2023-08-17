@@ -40,21 +40,20 @@ impl<N: Network> EventTrait for BatchPropose<N> {
     fn name(&self) -> &'static str {
         "BatchPropose"
     }
+}
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.round.write_le(&mut *writer)?;
-        self.batch_header.serialize_blocking_into(writer)
+impl<N: Network> ToBytes for BatchPropose<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.round.write_le(&mut writer)?;
+        self.batch_header.write_le(&mut writer)?;
+        Ok(())
     }
+}
 
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-
+impl<N: Network> FromBytes for BatchPropose<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let round = u64::read_le(&mut reader)?;
-        let batch_header = Data::Buffer(reader.into_inner().freeze());
+        let batch_header = Data::read_le(&mut reader)?;
 
         Ok(Self { round, batch_header })
     }
@@ -62,14 +61,14 @@ impl<N: Network> EventTrait for BatchPropose<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{
-        event::{certificate_response::prop_tests::any_batch_header, EventTrait},
-        BatchPropose,
-    };
-    use bytes::{BufMut, BytesMut};
+    use crate::{event::certificate_response::prop_tests::any_batch_header, BatchPropose};
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use snarkos_node_narwhal_committee::prop_tests::CommitteeContext;
-    use snarkvm::prelude::narwhal::Data;
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        prelude::narwhal::Data,
+    };
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -84,9 +83,9 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_batch_propose())] original: BatchPropose<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        BatchPropose::serialize(&original, &mut buf).unwrap();
+        BatchPropose::write_le(&original, &mut buf).unwrap();
 
-        let deserialized: BatchPropose<CurrentNetwork> = BatchPropose::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized: BatchPropose<CurrentNetwork> = BatchPropose::read_le(buf.into_inner().reader()).unwrap();
         // because of the Data enum, we cannot compare the structs directly even though it derives PartialEq
         assert_eq!(original.round, deserialized.round);
         assert_eq!(
