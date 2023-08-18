@@ -51,7 +51,7 @@ impl EventTrait for Disconnect {
 
 impl ToBytes for Disconnect {
     fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
-        (self.reason as u16).write_le(&mut writer)?;
+        (self.reason as u8).write_le(&mut writer)?;
         Ok(())
     }
 }
