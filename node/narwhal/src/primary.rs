@@ -1053,3 +1053,105 @@ impl<N: Network> Primary<N> {
         self.gateway.shut_down().await;
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use snarkos_node_narwhal_committee::MIN_STAKE;
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+
+    use bytes::Bytes;
+    use rand::RngCore;
+
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
+
+    async fn running_primary_without_handlers(rng: &mut TestRng) -> Primary<CurrentNetwork> {
+        // Create a committee containing the primary's account.
+        let (accounts, committee) = {
+            const COMMITTEE_SIZE: usize = 4;
+            let mut accounts = Vec::with_capacity(COMMITTEE_SIZE);
+            let mut members = IndexMap::new();
+
+            for _ in 0..COMMITTEE_SIZE {
+                let account = Account::new(rng).unwrap();
+                members.insert(account.address(), MIN_STAKE);
+                accounts.push(account);
+            }
+
+            (accounts, Committee::<CurrentNetwork>::new(1, members).unwrap())
+        };
+
+        let account = accounts.first().unwrap().clone();
+        let storage = Storage::new(committee, 10);
+        let ledger = Arc::new(MockLedgerService::new());
+
+        // Initialize the primary.
+        let mut primary = Primary::new(account, storage, ledger, None, None).unwrap();
+
+        // Construct a worker instance.
+        primary.workers = Arc::from([Worker::new(
+            0, // id
+            Arc::new(primary.gateway.clone()),
+            primary.storage.clone(),
+            primary.ledger.clone(),
+            primary.proposed_batch.clone(),
+        )
+        .unwrap()]);
+
+        primary
+    }
+
+    fn sample_unconfirmed_solution(
+        rng: &mut TestRng,
+    ) -> (PuzzleCommitment<CurrentNetwork>, Data<ProverSolution<CurrentNetwork>>) {
+        // Sample a random fake puzzle commitment.
+        let affine = rng.gen();
+        let commitment = PuzzleCommitment::<CurrentNetwork>::from_g1_affine(affine);
+        // Sample random fake solution bytes.
+        let mut vec = vec![0u8; 1024];
+        rng.fill_bytes(&mut vec);
+        let solution = Data::Buffer(Bytes::from(vec));
+        // Return the ID and solution.
+        (commitment, solution)
+    }
+
+    fn sample_unconfirmed_transaction(
+        rng: &mut TestRng,
+    ) -> (<CurrentNetwork as Network>::TransactionID, Data<Transaction<CurrentNetwork>>) {
+        // Sample a random fake transaction ID.
+        let id = Field::<CurrentNetwork>::rand(rng).into();
+        // Sample random fake transaction bytes.
+        let mut vec = vec![0u8; 1024];
+        rng.fill_bytes(&mut vec);
+        let transaction = Data::Buffer(Bytes::from(vec));
+        // Return the ID and transaction.
+        (id, transaction)
+    }
+
+    #[tokio::test]
+    async fn test_propose_batch_round_1() {
+        let mut rng = TestRng::default();
+        let primary = running_primary_without_handlers(&mut rng).await;
+
+        // Check there is no batch currently proposed.
+        assert!(primary.proposed_batch.read().is_none());
+
+        // Try to propose a batch. There are no transmissions in the workers so the method should
+        // just return without proposing a batch.
+        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.proposed_batch.read().is_none());
+
+        // Generate a solution and a transaction.
+        let (solution_commitment, solution) = sample_unconfirmed_solution(&mut rng);
+        let (transaction_id, transaction) = sample_unconfirmed_transaction(&mut rng);
+
+        // Store it on one of the workers.
+        primary.workers[0].process_unconfirmed_solution(solution_commitment, solution).await.unwrap();
+        primary.workers[0].process_unconfirmed_transaction(transaction_id, transaction).await.unwrap();
+
+        // Try to propose a batch again. This time, it should succeed.
+        assert!(primary.propose_batch().await.is_ok());
+        assert!(primary.proposed_batch.read().is_some());
+    }
+}
