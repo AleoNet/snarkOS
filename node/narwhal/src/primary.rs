@@ -1163,7 +1163,7 @@ mod tests {
         let batch_header =
             BatchHeader::new(private_key, round, timestamp, transmission_ids, certificate_ids, rng).unwrap();
         // Construct the proposal.
-        Proposal::new(current_committee, batch_header.clone(), transmissions).unwrap()
+        Proposal::new(current_committee, batch_header, transmissions).unwrap()
     }
 
     // Creates a signature of the primary's current proposal for each committe member (excluding
