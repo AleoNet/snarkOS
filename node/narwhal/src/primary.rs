@@ -1139,7 +1139,8 @@ mod tests {
 
     // Creates a batch proposal with one solution and one transaction.
     fn create_test_proposal(
-        primary: &Primary<CurrentNetwork>,
+        author: &Account<CurrentNetwork>,
+        current_committee: Committee<CurrentNetwork>,
         round: u64,
         timestamp: i64,
         rng: &mut TestRng,
@@ -1148,7 +1149,7 @@ mod tests {
         let (transaction_id, transaction) = sample_unconfirmed_transaction(rng);
 
         // Retrieve the private key.
-        let private_key = primary.gateway.account().private_key();
+        let private_key = author.private_key();
         // Prepare the transmission IDs.
         let transmission_ids = [solution_commitment.into(), (&transaction_id).into()].into();
         let transmissions = [
@@ -1162,7 +1163,7 @@ mod tests {
         let batch_header =
             BatchHeader::new(private_key, round, timestamp, transmission_ids, certificate_ids, rng).unwrap();
         // Construct the proposal.
-        Proposal::new(primary.current_committee(), batch_header.clone(), transmissions).unwrap()
+        Proposal::new(current_committee, batch_header.clone(), transmissions).unwrap()
     }
 
     // Creates a signature of the primary's current proposal for each committe member (excluding
@@ -1189,7 +1190,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_propose_batch_round_1() {
+    async fn test_propose_batch() {
         let mut rng = TestRng::default();
         let (primary, _) = primary_without_handlers(&mut rng).await;
 
@@ -1215,6 +1216,57 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn test_batch_propose_from_peer() {
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+
+        // Create a valid proposal with an author that isn't the primary.
+        let round = 1;
+        let timestamp = now();
+        let proposal = create_test_proposal(&accounts[1].1, primary.current_committee(), round, timestamp, &mut rng);
+
+        // Make sure the primary is aware of the transmissions in the proposal.
+        for (transmission_id, transmission) in proposal.transmissions() {
+            primary.workers[0].process_transmission_from_peer(accounts[1].0, *transmission_id, transmission.clone())
+        }
+
+        // Try to process the batch proposal from the peer, should succeed.
+        assert!(
+            primary
+                .process_batch_propose_from_peer(accounts[1].0, (*proposal.batch_header()).clone().into())
+                .await
+                .is_ok()
+        );
+    }
+
+    #[tokio::test]
+    async fn test_batch_propose_from_peer_wrong_round() {
+        let mut rng = TestRng::default();
+        let (primary, accounts) = primary_without_handlers(&mut rng).await;
+
+        // Create a valid proposal with an author that isn't the primary.
+        let round = 1;
+        let timestamp = now();
+        let proposal = create_test_proposal(&accounts[1].1, primary.current_committee(), round, timestamp, &mut rng);
+
+        // Make sure the primary is aware of the transmissions in the proposal.
+        for (transmission_id, transmission) in proposal.transmissions() {
+            primary.workers[0].process_transmission_from_peer(accounts[1].0, *transmission_id, transmission.clone())
+        }
+
+        // Try to process the batch proposal from the peer, should error.
+        assert!(
+            primary
+                .process_batch_propose_from_peer(accounts[1].0, BatchPropose {
+                    round: round + 1,
+                    batch_header: Data::Object(proposal.batch_header().clone())
+                })
+                .await
+                .is_err()
+        );
+    }
+
+    #[tokio::test]
     async fn test_batch_signature_from_peer() {
         let mut rng = TestRng::default();
         let (primary, accounts) = primary_without_handlers(&mut rng).await;
@@ -1228,7 +1280,8 @@ mod tests {
         // Create a valid proposal.
         let round = 1;
         let timestamp = now();
-        let proposal = create_test_proposal(&primary, round, timestamp, &mut rng);
+        let proposal =
+            create_test_proposal(primary.gateway.account(), primary.current_committee(), round, timestamp, &mut rng);
 
         // Store the proposal on the primary.
         *primary.proposed_batch.write() = Some(proposal);
@@ -1261,7 +1314,8 @@ mod tests {
         // Create an expired proposal.
         let round = 1;
         let timestamp = now() - (MAX_EXPIRATION_TIME_IN_SECS + 1);
-        let proposal = create_test_proposal(&primary, round, timestamp, &mut rng);
+        let proposal =
+            create_test_proposal(primary.gateway.account(), primary.current_committee(), round, timestamp, &mut rng);
 
         // Store the proposal on the primary.
         *primary.proposed_batch.write() = Some(proposal);
@@ -1294,7 +1348,8 @@ mod tests {
         // Create a valid proposal.
         let round = 1;
         let timestamp = now();
-        let proposal = create_test_proposal(&primary, round, timestamp, &mut rng);
+        let proposal =
+            create_test_proposal(primary.gateway.account(), primary.current_committee(), round, timestamp, &mut rng);
 
         // Store the proposal on the primary.
         *primary.proposed_batch.write() = Some(proposal);
