@@ -290,6 +290,8 @@ async fn duplicate_connection_attempts() {
 
     // Attempt to connect the 1st node to the other one several times at once.
     let (result1, result2, result3) = tokio::join!(conn1, conn2, conn3);
+    // A small anti-flakiness buffer.
+    sleep(Duration::from_millis(200)).await;
 
     // Count the successes.
     let mut successes = 0;
