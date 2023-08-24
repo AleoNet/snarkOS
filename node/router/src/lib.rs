@@ -134,7 +134,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Attempts to connect to the given peer IP.
-    pub fn connect(&self, peer_ip: SocketAddr) -> Option<JoinHandle<()>> {
+    pub fn connect(&self, peer_ip: SocketAddr) -> Option<JoinHandle<bool>> {
         // Return early if the attempt is against the protocol rules.
         if let Err(forbidden_message) = self.check_connection_attempt(peer_ip) {
             warn!("{forbidden_message}");
@@ -146,11 +146,15 @@ impl<N: Network> Router<N> {
             // Attempt to connect to the candidate peer.
             match router.tcp.connect(peer_ip).await {
                 // Remove the peer from the candidate peers.
-                Ok(()) => router.remove_candidate_peer(peer_ip),
+                Ok(()) => {
+                    router.remove_candidate_peer(peer_ip);
+                    true
+                }
                 // If the connection was not allowed, log the error.
                 Err(error) => {
                     router.connecting_peers.lock().remove(&peer_ip);
-                    warn!("Unable to connect to '{peer_ip}' - {error}")
+                    warn!("Unable to connect to '{peer_ip}' - {error}");
+                    false
                 }
             }
         }))
