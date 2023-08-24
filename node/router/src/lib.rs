@@ -186,13 +186,16 @@ impl<N: Network> Router<N> {
     }
 
     /// Disconnects from the given peer IP, if the peer is connected.
-    pub fn disconnect(&self, peer_ip: SocketAddr) -> JoinHandle<()> {
+    pub fn disconnect(&self, peer_ip: SocketAddr) -> JoinHandle<bool> {
         let router = self.clone();
         tokio::spawn(async move {
             if let Some(peer_addr) = router.resolve_to_ambiguous(&peer_ip) {
                 // Disconnect from this peer.
-                let _disconnected = router.tcp.disconnect(peer_addr).await;
-                debug_assert!(_disconnected);
+                let disconnected = router.tcp.disconnect(peer_addr).await;
+                debug_assert!(disconnected);
+                disconnected
+            } else {
+                false
             }
         })
     }
