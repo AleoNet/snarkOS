@@ -3187,6 +3187,7 @@ dependencies = [
  "snarkos-node-narwhal-ledger-service",
  "snarkos-node-tcp",
  "snarkvm",
+ "snow",
  "test-strategy",
  "time",
  "tokio",
