@@ -24,7 +24,18 @@ use crate::{
         TransmissionRequest,
         TransmissionResponse,
     },
-    helpers::{assign_to_worker, Cache, EventCodec, PrimarySender, Resolver, Storage, WorkerSender},
+    helpers::{
+        assign_to_worker,
+        Cache,
+        EventCodec,
+        EventOrBytes,
+        NoiseCodec,
+        NoiseState,
+        PrimarySender,
+        Resolver,
+        Storage,
+        WorkerSender,
+    },
     CONTEXT,
     MAX_BATCH_DELAY,
     MAX_GC_ROUNDS,
@@ -43,9 +54,11 @@ use snarkos_node_tcp::{
 };
 use snarkvm::{console::prelude::*, ledger::narwhal::Data, prelude::Address};
 
+use bytes::Bytes;
 use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
+use snow::{params::NoiseParams, Builder};
 use std::{future::Future, io, net::SocketAddr, sync::Arc, time::Duration};
 use tokio::{
     net::TcpStream,
@@ -53,7 +66,7 @@ use tokio::{
     task::{self, JoinHandle},
 };
 use tokio_stream::StreamExt;
-use tokio_util::codec::Framed;
+use tokio_util::codec::{Framed, FramedParts};
 
 /// The maximum interval of events to cache.
 const CACHE_EVENTS_INTERVAL: i64 = (MAX_BATCH_DELAY / 1000) as i64; // seconds
@@ -638,16 +651,16 @@ macro_rules! expect_event {
     ($event_ty:path, $framed:expr, $peer_addr:expr) => {
         match $framed.try_next().await? {
             // Received the expected event, proceed.
-            Some($event_ty(data)) => {
+            Some(EventOrBytes::Event($event_ty(data))) => {
                 trace!("{CONTEXT} Gateway received '{}' from '{}'", data.name(), $peer_addr);
                 data
             }
             // Received a disconnect event, abort.
-            Some(Event::Disconnect(reason)) => {
+            Some(EventOrBytes::Event(Event::Disconnect(reason))) => {
                 return Err(error(format!("{CONTEXT} '{}' disconnected: {reason:?}", $peer_addr)));
             }
             // Received an unexpected event, abort.
-            Some(ty) => {
+            Some(EventOrBytes::Event(ty)) => {
                 return Err(error(format!(
                     "{CONTEXT} '{}' did not follow the handshake protocol: received {:?} instead of {}",
                     $peer_addr,
@@ -655,6 +668,16 @@ macro_rules! expect_event {
                     stringify!($event_ty),
                 )))
             }
+
+            // Received some bytes, abort.
+            Some(EventOrBytes::Bytes(_)) => {
+                return Err(error(format!(
+                    "{CONTEXT} '{}' did not follow the handshake protocol: received bytes instead of {}",
+                    $peer_addr,
+                    stringify!($event_ty),
+                )))
+            }
+
             // Received nothing.
             None => {
                 return Err(error(format!(
@@ -668,13 +691,13 @@ macro_rules! expect_event {
 }
 
 /// Send the given message to the peer.
-async fn send<N: Network>(
-    framed: &mut Framed<&mut TcpStream, EventCodec<N>>,
+async fn send_event<N: Network>(
+    framed: &mut Framed<&mut TcpStream, NoiseCodec<N>>,
     peer_addr: SocketAddr,
     event: Event<N>,
 ) -> io::Result<()> {
     trace!("{CONTEXT} Gateway is sending '{}' to '{peer_addr}'", event.name());
-    framed.send(event).await
+    framed.send(EventOrBytes::Event(event)).await
 }
 
 impl<N: Network> Gateway<N> {
@@ -684,11 +707,37 @@ impl<N: Network> Gateway<N> {
         peer_addr: SocketAddr,
         peer_ip: &mut Option<SocketAddr>,
         stream: &'a mut TcpStream,
-    ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, EventCodec<N>>)> {
+    ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, NoiseCodec<N>>)> {
         // This value is immediately guaranteed to be present, so it can be unwrapped.
         let peer_ip = peer_ip.unwrap();
+
+        /* Noise codec setup */
+
+        let params: NoiseParams = "Noise_XX_25519_ChaChaPoly_BLAKE2s".parse().unwrap();
+        let noise_builder = Builder::new(params);
+        let kp = noise_builder.generate_keypair().unwrap();
+        let initiator = noise_builder.local_private_key(&kp.private).build_initiator().unwrap();
+        let codec = NoiseCodec::<N>::new(NoiseState::Handshake(Box::new(initiator)));
+
         // Construct the stream.
-        let mut framed = Framed::new(stream, EventCodec::<N>::handshake());
+        // let mut framed = Framed::new(stream, EventCodec::<N>::handshake());
+        let mut framed = Framed::new(stream, codec);
+
+        /* Noise handshake */
+
+        // -> e
+        framed.send(EventOrBytes::Bytes(Bytes::new())).await?;
+
+        // <- e, ee, s, es
+        let _secure_payload = framed.try_next().await?;
+
+        // -> s, se
+        framed.send(EventOrBytes::Bytes(Bytes::new())).await?;
+
+        // Set the codec to post-handshake mode.
+        let mut framed = framed.map_codec(|c| NoiseCodec::<N>::new(c.noise_state.into_post_handshake_state()));
+
+        /* Post noise handshake */
 
         // Initialize an RNG.
         let rng = &mut rand::rngs::OsRng;
@@ -699,7 +748,7 @@ impl<N: Network> Gateway<N> {
         let our_nonce = rng.gen();
         // Send a challenge request to the peer.
         let our_request = ChallengeRequest::new(self.local_ip().port(), self.account.address(), our_nonce);
-        send(&mut framed, peer_addr, Event::ChallengeRequest(our_request)).await?;
+        send_event(&mut framed, peer_addr, Event::ChallengeRequest(our_request)).await?;
 
         /* Step 2: Receive the peer's challenge response followed by the challenge request. */
 
@@ -712,12 +761,12 @@ impl<N: Network> Gateway<N> {
         if let Some(reason) =
             self.verify_challenge_response(peer_addr, peer_request.address, peer_response, our_nonce).await
         {
-            send(&mut framed, peer_addr, reason.into()).await?;
+            send_event(&mut framed, peer_addr, reason.into()).await?;
             return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
         }
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
         if let Some(reason) = self.verify_challenge_request(peer_addr, &peer_request) {
-            send(&mut framed, peer_addr, reason.into()).await?;
+            send_event(&mut framed, peer_addr, reason.into()).await?;
             return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
         }
 
@@ -729,7 +778,7 @@ impl<N: Network> Gateway<N> {
         };
         // Send the challenge response.
         let our_response = ChallengeResponse { signature: Data::Object(our_signature) };
-        send(&mut framed, peer_addr, Event::ChallengeResponse(our_response)).await?;
+        send_event(&mut framed, peer_addr, Event::ChallengeResponse(our_response)).await?;
 
         // Add the peer to the gateway.
         self.insert_connected_peer(peer_ip, peer_addr, peer_request.address);
@@ -743,10 +792,33 @@ impl<N: Network> Gateway<N> {
         peer_addr: SocketAddr,
         peer_ip: &mut Option<SocketAddr>,
         stream: &'a mut TcpStream,
-    ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, EventCodec<N>>)> {
-        // Construct the stream.
-        let mut framed = Framed::new(stream, EventCodec::<N>::handshake());
+    ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, NoiseCodec<N>>)> {
+        /* Noise codec setup */
 
+        let params: NoiseParams = "Noise_XX_25519_ChaChaPoly_BLAKE2s".parse().unwrap();
+        let noise_builder = Builder::new(params);
+        let kp = noise_builder.generate_keypair().unwrap();
+        let responder = noise_builder.local_private_key(&kp.private).build_responder().unwrap();
+        let codec = NoiseCodec::<N>::new(NoiseState::Handshake(Box::new(responder)));
+
+        // Construct the stream.
+        let mut framed = Framed::new(stream, codec);
+
+        /* Noise handshake */
+
+        // <- e
+        framed.try_next().await?;
+
+        // -> e, ee, s, es
+        framed.send(EventOrBytes::Bytes(Bytes::new())).await?;
+
+        // <- s, se
+        framed.try_next().await?;
+
+        // Set the codec to post-handshake mode.
+        let mut framed = framed.map_codec(|c| NoiseCodec::<N>::new(c.noise_state.into_post_handshake_state()));
+
+        /* Post noise handshake */
         /* Step 1: Receive the challenge request. */
 
         // Listen for the challenge request message.
@@ -762,7 +834,7 @@ impl<N: Network> Gateway<N> {
         }
         // Verify the challenge request. If a disconnect reason was returned, send the disconnect message and abort.
         if let Some(reason) = self.verify_challenge_request(peer_addr, &peer_request) {
-            send(&mut framed, peer_addr, reason.into()).await?;
+            send_event(&mut framed, peer_addr, reason.into()).await?;
             return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
         }
 
@@ -777,13 +849,13 @@ impl<N: Network> Gateway<N> {
         };
         // Send the challenge response.
         let our_response = ChallengeResponse { signature: Data::Object(our_signature) };
-        send(&mut framed, peer_addr, Event::ChallengeResponse(our_response)).await?;
+        send_event(&mut framed, peer_addr, Event::ChallengeResponse(our_response)).await?;
 
         // Sample a random nonce.
         let our_nonce = rng.gen();
         // Send the challenge request.
         let our_request = ChallengeRequest::new(self.local_ip().port(), self.account.address(), our_nonce);
-        send(&mut framed, peer_addr, Event::ChallengeRequest(our_request)).await?;
+        send_event(&mut framed, peer_addr, Event::ChallengeRequest(our_request)).await?;
 
         /* Step 3: Receive the challenge response. */
 
@@ -793,7 +865,7 @@ impl<N: Network> Gateway<N> {
         if let Some(reason) =
             self.verify_challenge_response(peer_addr, peer_request.address, peer_response, our_nonce).await
         {
-            send(&mut framed, peer_addr, reason.into()).await?;
+            send_event(&mut framed, peer_addr, reason.into()).await?;
             return Err(error(format!("Dropped '{peer_addr}' for reason: {reason:?}")));
         }
         // Add the peer to the gateway.

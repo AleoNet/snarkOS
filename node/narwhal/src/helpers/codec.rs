@@ -165,7 +165,7 @@ impl NoiseState {
 pub struct NoiseCodec<N: Network> {
     codec: LengthDelimitedCodec,
     event_codec: EventCodec<N>,
-    noise_state: NoiseState,
+    pub noise_state: NoiseState,
 }
 
 impl<N: Network> NoiseCodec<N> {
