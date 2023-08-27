@@ -66,7 +66,7 @@ use tokio::{
     task::{self, JoinHandle},
 };
 use tokio_stream::StreamExt;
-use tokio_util::codec::{Framed, FramedParts};
+use tokio_util::codec::Framed;
 
 /// The maximum interval of events to cache.
 const CACHE_EVENTS_INTERVAL: i64 = (MAX_BATCH_DELAY / 1000) as i64; // seconds
@@ -627,7 +627,7 @@ impl<N: Network> Handshake for Gateway<N> {
 
         // Perform the handshake; we pass on a mutable reference to peer_ip in case the process is broken at any point in time.
         let handshake_result = if peer_side == ConnectionSide::Responder {
-            self.handshake_inner_initiator(peer_addr, &mut peer_ip, stream).await
+            self.handshake_inner_initiator(peer_addr, peer_ip, stream).await
         } else {
             self.handshake_inner_responder(peer_addr, &mut peer_ip, stream).await
         };
@@ -705,7 +705,7 @@ impl<N: Network> Gateway<N> {
     async fn handshake_inner_initiator<'a>(
         &'a self,
         peer_addr: SocketAddr,
-        peer_ip: &mut Option<SocketAddr>,
+        peer_ip: Option<SocketAddr>,
         stream: &'a mut TcpStream,
     ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, NoiseCodec<N>>)> {
         // This value is immediately guaranteed to be present, so it can be unwrapped.
