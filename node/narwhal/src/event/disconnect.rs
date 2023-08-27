@@ -80,7 +80,7 @@ mod tests {
     #[test]
     fn serialize_deserialize() {
         // TODO switch to an iteration method that doesn't require manually updating this vec if enums are added
-        let all_reasons = vec![
+        let all_reasons = [
             DisconnectReason::ProtocolViolation,
             DisconnectReason::NoReasonGiven,
             DisconnectReason::InvalidChallengeResponse,

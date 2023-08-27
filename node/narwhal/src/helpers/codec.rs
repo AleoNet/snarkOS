@@ -333,9 +333,10 @@ impl<N: Network> Decoder for NoiseCodec<N> {
 mod tests {
     use super::*;
 
-    use crate::{Disconnect, DisconnectReason};
+    use crate::prop_tests::any_event;
 
     use snow::{params::NoiseParams, Builder};
+    use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -387,17 +388,8 @@ mod tests {
         assert_eq!(responder_codec.decode(&mut ciphertext).unwrap().unwrap(), msg);
     }
 
-    macro_rules! test_disconnect_roundtrip {
-        ($($reason:ident), *) => {
-            #[test]
-            fn disconnect_roundtrip() {
-                $(
-                    let disconnect = EventOrBytes::Event(Event::Disconnect(Disconnect { reason: DisconnectReason::$reason }));
-                    assert_roundtrip(disconnect);
-                )*
-            }
-        };
+    #[proptest]
+    fn event_roundtrip(#[strategy(any_event())] event: Event<CurrentNetwork>) {
+        assert_roundtrip(EventOrBytes::Event(event))
     }
-
-    test_disconnect_roundtrip!(InvalidChallengeResponse, NoReasonGiven, ProtocolViolation, OutdatedClientVersion);
 }

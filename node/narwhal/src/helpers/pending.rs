@@ -147,8 +147,8 @@ mod tests {
         assert!(!pending.is_empty());
 
         // Check the items.
-        let ids = vec![commitment_1, commitment_2, commitment_3];
-        let peers = vec![addr_1, addr_2, addr_3];
+        let ids = [commitment_1, commitment_2, commitment_3];
+        let peers = [addr_1, addr_2, addr_3];
 
         for i in 0..3 {
             let id = ids[i];

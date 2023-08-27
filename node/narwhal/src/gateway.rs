@@ -918,15 +918,29 @@ impl<N: Network> Gateway<N> {
 }
 
 #[cfg(test)]
-pub mod prop_tests {
-    use crate::{helpers::init_worker_channels, Gateway, Worker, MAX_WORKERS, MEMORY_POOL_PORT};
+mod prop_tests {
+    use crate::{
+        helpers::{init_worker_channels, Storage},
+        Gateway,
+        Worker,
+        MAX_WORKERS,
+        MEMORY_POOL_PORT,
+    };
+
+    use snarkos_account::Account;
+    use snarkos_node_narwhal_committee::{
+        prop_tests::{CommitteeContext, ValidatorSet},
+        MAX_COMMITTEE_SIZE,
+    };
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkos_node_tcp::P2P;
+    use snarkvm::prelude::Testnet3;
+
     use indexmap::IndexMap;
     use proptest::{
         prelude::{any, any_with, Arbitrary, BoxedStrategy, Just, Strategy},
         sample::Selector,
     };
-    use snarkos_node_tcp::P2P;
-    use snarkvm::prelude::Testnet3;
     use std::{
         fmt::{Debug, Formatter},
         net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -935,17 +949,6 @@ pub mod prop_tests {
     use test_strategy::proptest;
 
     type CurrentNetwork = Testnet3;
-
-    use crate::{
-        helpers::Storage,
-        prop_tests::GatewayAddress::{Dev, Prod},
-    };
-    use snarkos_account::Account;
-    use snarkos_node_narwhal_committee::{
-        prop_tests::{CommitteeContext, ValidatorSet},
-        MAX_COMMITTEE_SIZE,
-    };
-    use snarkos_node_narwhal_ledger_service::MockLedgerService;
 
     impl Debug for Gateway<CurrentNetwork> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -1001,7 +1004,7 @@ pub mod prop_tests {
                     Just(account_selector.select(validators)),
                     0u8..,
                 )
-                    .prop_map(|(a, b, c, d)| (a, b, c.account, Dev(d)))
+                    .prop_map(|(a, b, c, d)| (a, b, c.account, GatewayAddress::Dev(d)))
             })
             .boxed()
     }
@@ -1016,7 +1019,7 @@ pub mod prop_tests {
                     Just(account_selector.select(validators)),
                     any::<Option<SocketAddr>>(),
                 )
-                    .prop_map(|(a, b, c, d)| (a, b, c.account, Prod(d)))
+                    .prop_map(|(a, b, c, d)| (a, b, c.account, GatewayAddress::Prod(d)))
             })
             .boxed()
     }
