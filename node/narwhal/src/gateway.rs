@@ -87,6 +87,9 @@ const MAX_CONNECTION_ATTEMPTS: usize = 10;
 /// The maximum interval to restrict a peer.
 const RESTRICTED_INTERVAL: i64 = (MAX_CONNECTION_ATTEMPTS as u64 * MAX_BATCH_DELAY / 1000) as i64; // seconds
 
+// The type of noise handshake to use for network encryption.
+pub(crate) const NOISE_HANDSHAKE_TYPE: &str = "Noise_XX_25519_ChaChaPoly_BLAKE2s";
+
 /// Part of the Gateway API that deals with networking.
 /// This is a separate trait to allow for easier testing/mocking.
 pub trait Transport<N: Network>: Send + Sync {
@@ -713,23 +716,23 @@ impl<N: Network> Gateway<N> {
 
         /* Noise codec setup */
 
-        let params: NoiseParams = "Noise_XX_25519_ChaChaPoly_BLAKE2s".parse().unwrap();
+        let params: NoiseParams = NOISE_HANDSHAKE_TYPE.parse().unwrap();
         let noise_builder = Builder::new(params);
         let kp = noise_builder.generate_keypair().unwrap();
         let initiator = noise_builder.local_private_key(&kp.private).build_initiator().unwrap();
         let codec = NoiseCodec::<N>::new(NoiseState::Handshake(Box::new(initiator)));
 
         // Construct the stream.
-        // let mut framed = Framed::new(stream, EventCodec::<N>::handshake());
         let mut framed = Framed::new(stream, codec);
 
         /* Noise handshake */
+        // Note: the optional payloads are empty for now but could be used in future if needed.
 
         // -> e
         framed.send(EventOrBytes::Bytes(Bytes::new())).await?;
 
         // <- e, ee, s, es
-        let _secure_payload = framed.try_next().await?;
+        framed.try_next().await?;
 
         // -> s, se
         framed.send(EventOrBytes::Bytes(Bytes::new())).await?;
@@ -795,7 +798,7 @@ impl<N: Network> Gateway<N> {
     ) -> io::Result<(SocketAddr, Framed<&mut TcpStream, NoiseCodec<N>>)> {
         /* Noise codec setup */
 
-        let params: NoiseParams = "Noise_XX_25519_ChaChaPoly_BLAKE2s".parse().unwrap();
+        let params: NoiseParams = NOISE_HANDSHAKE_TYPE.parse().unwrap();
         let noise_builder = Builder::new(params);
         let kp = noise_builder.generate_keypair().unwrap();
         let responder = noise_builder.local_private_key(&kp.private).build_responder().unwrap();
@@ -805,6 +808,7 @@ impl<N: Network> Gateway<N> {
         let mut framed = Framed::new(stream, codec);
 
         /* Noise handshake */
+        // Note: the optional payloads are empty for now but could be used in future if needed.
 
         // <- e
         framed.try_next().await?;

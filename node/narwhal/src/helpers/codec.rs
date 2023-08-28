@@ -333,7 +333,7 @@ impl<N: Network> Decoder for NoiseCodec<N> {
 mod tests {
     use super::*;
 
-    use crate::prop_tests::any_event;
+    use crate::{gateway::NOISE_HANDSHAKE_TYPE, prop_tests::any_event};
 
     use snow::{params::NoiseParams, Builder};
     use test_strategy::proptest;
@@ -341,8 +341,7 @@ mod tests {
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     fn handshake_xx() -> (NoiseCodec<CurrentNetwork>, NoiseCodec<CurrentNetwork>) {
-        let params: NoiseParams = "Noise_XX_25519_ChaChaPoly_BLAKE2s".parse().unwrap();
-
+        let params: NoiseParams = NOISE_HANDSHAKE_TYPE.parse().unwrap();
         let initiator_builder = Builder::new(params.clone());
         let initiator_kp = initiator_builder.generate_keypair().unwrap();
         let initiator = initiator_builder.local_private_key(&initiator_kp.private).build_initiator().unwrap();
