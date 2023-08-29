@@ -1079,7 +1079,7 @@ mod tests {
             let mut members = IndexMap::new();
 
             for i in 0..COMMITTEE_SIZE {
-                let socket_addr = format!("127.0.0.1:{i}").parse().unwrap();
+                let socket_addr = format!("127.0.0.1:{}", 5000 + i).parse().unwrap();
                 let account = Account::new(rng).unwrap();
                 members.insert(account.address(), MIN_STAKE);
                 accounts.push((socket_addr, account));
