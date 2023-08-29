@@ -145,7 +145,7 @@ pub enum NoiseState {
 impl Clone for NoiseState {
     fn clone(&self) -> Self {
         match self {
-            Self::Handshake(..) => unimplemented!(),
+            Self::Handshake(..) => unreachable!(),
             Self::PostHandshake(ph_state) => Self::PostHandshake(ph_state.clone()),
         }
     }
@@ -157,7 +157,7 @@ impl NoiseState {
             let noise_state = noise_state.into_stateless_transport_mode().expect("handshake isn't finished");
             Self::PostHandshake(PostHandshakeState { state: Arc::new(noise_state), tx_nonce: 0, rx_nonce: 0 })
         } else {
-            panic!()
+            unreachable!()
         }
     }
 }
@@ -204,7 +204,7 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
                 let mut bytes = BytesMut::new();
                 match message_or_bytes {
                     // Don't allow sending raw bytes after the noise handshake has completed.
-                    EventOrBytes::Bytes(_) => unimplemented!(),
+                    EventOrBytes::Bytes(_) => panic!("Unsupported post-handshake"),
                     EventOrBytes::Event(event) => self.event_codec.encode(event, &mut bytes)?,
                 }
 
