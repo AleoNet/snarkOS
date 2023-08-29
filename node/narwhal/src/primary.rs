@@ -1115,8 +1115,10 @@ mod tests {
         // Sample a random fake puzzle commitment.
         let affine = rng.gen();
         let commitment = PuzzleCommitment::<CurrentNetwork>::from_g1_affine(affine);
+        // Vary the size of the solutions.
+        let size = rng.gen_range(1024..10 * 1024);
         // Sample random fake solution bytes.
-        let mut vec = vec![0u8; 1024];
+        let mut vec = vec![0u8; size];
         rng.fill_bytes(&mut vec);
         let solution = Data::Buffer(Bytes::from(vec));
         // Return the ID and solution.
@@ -1129,8 +1131,10 @@ mod tests {
     ) -> (<CurrentNetwork as Network>::TransactionID, Data<Transaction<CurrentNetwork>>) {
         // Sample a random fake transaction ID.
         let id = Field::<CurrentNetwork>::rand(rng).into();
+        // Vary the size of the transactions.
+        let size = rng.gen_range(1024..10 * 1024);
         // Sample random fake transaction bytes.
-        let mut vec = vec![0u8; 1024];
+        let mut vec = vec![0u8; size];
         rng.fill_bytes(&mut vec);
         let transaction = Data::Buffer(Bytes::from(vec));
         // Return the ID and transaction.
