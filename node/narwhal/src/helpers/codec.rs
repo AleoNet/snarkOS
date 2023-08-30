@@ -16,8 +16,13 @@ use crate::Event;
 use snarkvm::prelude::Network;
 
 use ::bytes::{BufMut, BytesMut};
+use bytes::Bytes;
 use core::marker::PhantomData;
+use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use snow::{HandshakeState, StatelessTransportState};
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
+
+use std::{io, sync::Arc};
 
 /// The maximum size of an event that can be transmitted during the handshake.
 const MAX_HANDSHAKE_SIZE: usize = 1024 * 1024; // 1 MiB
@@ -85,49 +90,16 @@ impl<N: Network> Decoder for EventCodec<N> {
     }
 }
 
-// NOISE CODEC //
-
-use bytes::{Buf, Bytes};
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
-use snow::{HandshakeState, StatelessTransportState};
-
-use std::{io, sync::Arc};
+/* NOISE CODEC */
 
 // The maximum message size for noise messages. If the data to be encrypted exceedes it, it is
 // chunked.
 const MAX_MESSAGE_LEN: usize = 65535;
 
-#[repr(u8)]
-pub enum MessageType {
-    Bytes = 0,
-    Event,
-}
-
-impl TryFrom<u8> for MessageType {
-    type Error = String;
-
-    fn try_from(value: u8) -> Result<Self, Self::Error> {
-        match value {
-            0 => Ok(MessageType::Bytes),
-            1 => Ok(MessageType::Event),
-            _ => Err(format!("u8 value: {value} doesn't correspond to a message variant")),
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum EventOrBytes<N: Network> {
     Bytes(Bytes),
     Event(Event<N>),
-}
-
-impl<N: Network> EventOrBytes<N> {
-    fn message_type(&self) -> MessageType {
-        match self {
-            EventOrBytes::Bytes(_) => MessageType::Bytes,
-            EventOrBytes::Event(_) => MessageType::Event,
-        }
-    }
 }
 
 #[derive(Clone)]
@@ -178,23 +150,18 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
     type Error = std::io::Error;
 
     fn encode(&mut self, message_or_bytes: EventOrBytes<N>, dst: &mut BytesMut) -> Result<(), Self::Error> {
-        let message_type = message_or_bytes.message_type();
-
         let ciphertext = match self.noise_state {
             NoiseState::Handshake(ref mut noise) => {
                 match message_or_bytes {
                     // Don't allow message sending before the noise handshake has completed.
                     EventOrBytes::Event(_) => unimplemented!(),
                     EventOrBytes::Bytes(bytes) => {
-                        let mut buffer = [0u8; MAX_MESSAGE_LEN + 1];
+                        let mut buffer = [0u8; MAX_MESSAGE_LEN];
                         let len = noise
-                            .write_message(&bytes, &mut buffer[1..])
+                            .write_message(&bytes, &mut buffer[..])
                             .map_err(|e| Self::Error::new(io::ErrorKind::InvalidInput, e))?;
 
-                        // Set the message type flag.
-                        buffer[0] = message_type as u8;
-
-                        buffer[..len + 1].into()
+                        buffer[..len].into()
                     }
                 }
             }
@@ -236,9 +203,6 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
                     .collect();
 
                 let mut buffer = BytesMut::new();
-                // Set the message type flag.
-                buffer.put_u8(message_type as u8);
-
                 for chunk in encrypted_chunks {
                     buffer.extend_from_slice(&chunk?)
                 }
@@ -260,21 +224,12 @@ impl<N: Network> Decoder for NoiseCodec<N> {
 
     fn decode(&mut self, src: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
         // Decode the ciphertext with the length-delimited codec.
-        let (flag, bytes) = if let Some(mut bytes) = self.codec.decode(src)? {
-            let flag =
-                MessageType::try_from(bytes.get_u8()).map_err(|e| Self::Error::new(io::ErrorKind::InvalidData, e))?;
-            (flag, bytes)
-        } else {
+        let Some(bytes) = self.codec.decode(src)? else {
             return Ok(None);
         };
 
         let msg = match self.noise_state {
             NoiseState::Handshake(ref mut noise) => {
-                // Ignore any messages before the noise handshake has completed.
-                if let MessageType::Event = flag {
-                    return Ok(None);
-                }
-
                 // Decrypt the ciphertext in handshake mode.
                 let mut buffer = [0u8; MAX_MESSAGE_LEN];
                 let len = noise.read_message(&bytes, &mut buffer).map_err(|_| io::ErrorKind::InvalidData)?;
@@ -283,11 +238,6 @@ impl<N: Network> Decoder for NoiseCodec<N> {
             }
 
             NoiseState::PostHandshake(ref mut noise) => {
-                // Ignore raw bytes after the noise handshake has completed.
-                if let MessageType::Bytes = flag {
-                    return Ok(None);
-                }
-
                 // Noise decryption.
                 let chunked_encrypted_msg: Vec<_> = bytes.chunks(MAX_MESSAGE_LEN).collect();
                 let num_chunks = chunked_encrypted_msg.len() as u64;
@@ -318,10 +268,7 @@ impl<N: Network> Decoder for NoiseCodec<N> {
                 }
 
                 // Decode with message codecs.
-                match flag {
-                    MessageType::Event => self.event_codec.decode(&mut plaintext)?.map(|msg| EventOrBytes::Event(msg)),
-                    _ => unreachable!("bytes variant was handled as an early return"),
-                }
+                self.event_codec.decode(&mut plaintext)?.map(|msg| EventOrBytes::Event(msg))
             }
         };
 
