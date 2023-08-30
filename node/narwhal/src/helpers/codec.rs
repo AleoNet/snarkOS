@@ -185,8 +185,9 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
                 // 16 bytes of authentication data.
                 //
                 // See: https://noiseprotocol.org/noise.html#the-handshakestate-object
-                let encrypted_chunks: Vec<io::Result<Vec<u8>>> = bytes
-                    .par_chunks(MAX_MESSAGE_LEN - 16)
+                const TAG_LEN: usize = 16;
+                let encrypted_chunks = bytes
+                    .par_chunks(MAX_MESSAGE_LEN - TAG_LEN)
                     .enumerate()
                     .map(|(nonce_offset, plaintext_chunk)| {
                         let mut buffer = vec![0u8; MAX_MESSAGE_LEN];
@@ -199,11 +200,11 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
 
                         Ok(buffer)
                     })
-                    .collect();
+                    .collect::<io::Result<Vec<Vec<u8>>>>()?;
 
-                let mut buffer = BytesMut::new();
+                let mut buffer = BytesMut::with_capacity(encrypted_chunks.len());
                 for chunk in encrypted_chunks {
-                    buffer.extend_from_slice(&chunk?);
+                    buffer.extend_from_slice(&chunk);
                     noise.tx_nonce += 1;
                 }
 
@@ -237,7 +238,7 @@ impl<N: Network> Decoder for NoiseCodec<N> {
 
             NoiseState::PostHandshake(ref mut noise) => {
                 // Noise decryption.
-                let decrypted_chunks: Vec<io::Result<Vec<u8>>> = bytes
+                let decrypted_chunks = bytes
                     .par_chunks(MAX_MESSAGE_LEN)
                     .enumerate()
                     .map(|(nonce_offset, encrypted_chunk)| {
@@ -252,12 +253,12 @@ impl<N: Network> Decoder for NoiseCodec<N> {
                         buffer.truncate(len);
                         Ok(buffer)
                     })
-                    .collect();
+                    .collect::<io::Result<Vec<Vec<u8>>>>()?;
 
                 // Collect chunks into plaintext to be passed to the message codecs.
                 let mut plaintext = BytesMut::new();
                 for chunk in decrypted_chunks {
-                    plaintext.extend_from_slice(&chunk?);
+                    plaintext.extend_from_slice(&chunk);
                     noise.rx_nonce += 1;
                 }
 
