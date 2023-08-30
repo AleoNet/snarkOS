@@ -18,7 +18,10 @@ use snarkvm::prelude::Network;
 use ::bytes::{BufMut, BytesMut};
 use bytes::Bytes;
 use core::marker::PhantomData;
-use rayon::iter::{IndexedParallelIterator, IntoParallelIterator, ParallelIterator};
+use rayon::{
+    iter::{IndexedParallelIterator, ParallelIterator},
+    prelude::ParallelSlice,
+};
 use snow::{HandshakeState, StatelessTransportState};
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
@@ -175,19 +178,15 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
                     EventOrBytes::Event(event) => self.event_codec.encode(event, &mut bytes)?,
                 }
 
-                // Chunk the payload if necessary.
+                // Chunk the payload if necessary and encrypt with Noise.
                 //
                 // A Noise transport message is simply an AEAD ciphertext that is less than or
                 // equal to 65535 bytes in length, and that consists of an encrypted payload plus
                 // 16 bytes of authentication data.
                 //
                 // See: https://noiseprotocol.org/noise.html#the-handshakestate-object
-                let chunked_plaintext_msg: Vec<_> = bytes.chunks(MAX_MESSAGE_LEN - 16).collect();
-                let num_chunks = chunked_plaintext_msg.len() as u64;
-
-                // Encrypt the resulting bytes with Noise.
-                let encrypted_chunks: Vec<io::Result<Vec<u8>>> = chunked_plaintext_msg
-                    .into_par_iter()
+                let encrypted_chunks: Vec<io::Result<Vec<u8>>> = bytes
+                    .par_chunks(MAX_MESSAGE_LEN - 16)
                     .enumerate()
                     .map(|(nonce_offset, plaintext_chunk)| {
                         let mut buffer = vec![0u8; MAX_MESSAGE_LEN];
@@ -204,10 +203,9 @@ impl<N: Network> Encoder<EventOrBytes<N>> for NoiseCodec<N> {
 
                 let mut buffer = BytesMut::new();
                 for chunk in encrypted_chunks {
-                    buffer.extend_from_slice(&chunk?)
+                    buffer.extend_from_slice(&chunk?);
+                    noise.tx_nonce += 1;
                 }
-
-                noise.tx_nonce += num_chunks;
 
                 buffer
             }
@@ -239,11 +237,8 @@ impl<N: Network> Decoder for NoiseCodec<N> {
 
             NoiseState::PostHandshake(ref mut noise) => {
                 // Noise decryption.
-                let chunked_encrypted_msg: Vec<_> = bytes.chunks(MAX_MESSAGE_LEN).collect();
-                let num_chunks = chunked_encrypted_msg.len() as u64;
-
-                let decrypted_chunks: Vec<io::Result<Vec<u8>>> = chunked_encrypted_msg
-                    .into_par_iter()
+                let decrypted_chunks: Vec<io::Result<Vec<u8>>> = bytes
+                    .par_chunks(MAX_MESSAGE_LEN)
                     .enumerate()
                     .map(|(nonce_offset, encrypted_chunk)| {
                         let mut buffer = vec![0u8; MAX_MESSAGE_LEN];
@@ -259,12 +254,11 @@ impl<N: Network> Decoder for NoiseCodec<N> {
                     })
                     .collect();
 
-                noise.rx_nonce += num_chunks;
-
                 // Collect chunks into plaintext to be passed to the message codecs.
                 let mut plaintext = BytesMut::new();
                 for chunk in decrypted_chunks {
                     plaintext.extend_from_slice(&chunk?);
+                    noise.rx_nonce += 1;
                 }
 
                 // Decode with message codecs.
