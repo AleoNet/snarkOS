@@ -42,7 +42,7 @@ impl<N: Network> IntoIterator for BlockLocators<N> {
     //  Check by sorting 300-1000 items and comparing the performance.
     //  (https://docs.rs/indexmap/latest/indexmap/map/struct.IndexMap.html#method.from_par_iter)
     fn into_iter(self) -> Self::IntoIter {
-        BTreeMap::from_iter(self.checkpoints.into_iter().chain(self.recents.into_iter())).into_iter()
+        BTreeMap::from_iter(self.checkpoints.into_iter().chain(self.recents)).into_iter()
     }
 }
 
