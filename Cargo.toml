@@ -38,8 +38,11 @@ members = [
 ]
 
 [workspace.dependencies.snarkvm]
-git = "https://github.com/AleoHQ/snarkVM.git"
-rev = "51e5aa5"
+# git = "https://github.com/AleoHQ/snarkVM.git"
+# rev = "bafe8907d"
+#git = "https://github.com/AleoHQ/snarkVM.git"
+#rev = "ea0aea9cd"
+path = "../snarkVM"
 #version = "=0.14.1"
 features = [ "circuit", "console", "rocks" ]
 
@@ -49,6 +52,7 @@ path = "snarkos/main.rs"
 
 [features]
 jemalloc = [ "tikv-jemallocator" ]
+metrics = [ "snarkos-node/metrics" ]
 
 [dependencies.anyhow]
 version = "1.0.75"
@@ -70,6 +74,10 @@ version = "=2.1.7"
 
 [dependencies.snarkos-display]
 path = "./display"
+version = "=2.1.7"
+
+[dependencies.snarkos-node-metrics]
+path = "./node/metrics"
 version = "=2.1.7"
 
 [dependencies.snarkos-node]
