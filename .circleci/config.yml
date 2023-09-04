@@ -237,7 +237,7 @@ jobs:
 
   node-narwhal:
     docker:
-      - image: cimg/rust:1.68
+      - image: cimg/rust:1.72
     resource_class: 2xlarge
     steps:
       - run_serial:
