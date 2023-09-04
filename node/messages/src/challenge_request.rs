@@ -15,6 +15,7 @@
 use super::*;
 
 use bincode::Options;
+use std::borrow::Cow;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChallengeRequest<N: Network> {
@@ -28,8 +29,8 @@ pub struct ChallengeRequest<N: Network> {
 impl<N: Network> MessageTrait for ChallengeRequest<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
-        "ChallengeRequest".to_string()
+    fn name(&self) -> Cow<'static, str> {
+        "ChallengeRequest".into()
     }
 
     /// Serializes the message into the buffer.

@@ -14,6 +14,8 @@
 
 use super::*;
 
+use std::borrow::Cow;
+
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub struct BlockRequest {
     /// The starting block height (inclusive).
@@ -25,13 +27,14 @@ pub struct BlockRequest {
 impl MessageTrait for BlockRequest {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
+    fn name(&self) -> Cow<'static, str> {
         let start = self.start_height;
         let end = self.end_height;
         match start + 1 == end {
             true => format!("BlockRequest {start}"),
             false => format!("BlockRequest {start}..{end}"),
         }
+        .into()
     }
 
     /// Serializes the message into the buffer.

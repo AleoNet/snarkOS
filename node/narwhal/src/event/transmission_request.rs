@@ -39,19 +39,17 @@ impl<N: Network> EventTrait for TransmissionRequest<N> {
     fn name(&self) -> &'static str {
         "TransmissionRequest"
     }
+}
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.transmission_id.to_bytes_le()?)?;
+impl<N: Network> ToBytes for TransmissionRequest<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.transmission_id.write_le(&mut writer)?;
         Ok(())
     }
+}
 
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-
+impl<N: Network> FromBytes for TransmissionRequest<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let transmission_id = TransmissionID::read_le(&mut reader)?;
 
         Ok(Self { transmission_id })
@@ -61,17 +59,21 @@ impl<N: Network> EventTrait for TransmissionRequest<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        event::EventTrait,
         helpers::storage::prop_tests::{any_puzzle_commitment, any_transaction_id},
         TransmissionRequest,
     };
-    use bytes::{BufMut, BytesMut};
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        ledger::narwhal::TransmissionID,
+    };
+
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         prelude::{BoxedStrategy, Strategy},
         prop_oneof,
     };
-    use snarkvm::ledger::narwhal::TransmissionID;
     use test_strategy::proptest;
+
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     fn any_transmission_id() -> BoxedStrategy<TransmissionID<CurrentNetwork>> {
@@ -89,9 +91,9 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_transmission_request())] original: TransmissionRequest<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        TransmissionRequest::serialize(&original, &mut buf).unwrap();
+        TransmissionRequest::write_le(&original, &mut buf).unwrap();
 
-        let deserialized = TransmissionRequest::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized = TransmissionRequest::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(original, deserialized);
     }
 }

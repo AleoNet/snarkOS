@@ -82,6 +82,9 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         cdn: Option<String>,
         dev: Option<u16>,
     ) -> Result<Self> {
+        // Initialize the signal handler.
+        let signal_node = Self::handle_signals();
+
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
         // Initialize the CDN.
@@ -132,8 +135,8 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         // node.initialize_sync()?;
         // Initialize the routing.
         node.initialize_routing().await;
-        // Initialize the signal handler.
-        node.handle_signals();
+        // Pass the node to the signal handler.
+        let _ = signal_node.set(node.clone());
         // Return the node.
         Ok(node)
     }

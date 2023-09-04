@@ -14,6 +14,8 @@
 
 use super::*;
 
+use std::borrow::Cow;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ChallengeResponse<N: Network> {
     pub genesis_header: Header<N>,
@@ -23,14 +25,14 @@ pub struct ChallengeResponse<N: Network> {
 impl<N: Network> MessageTrait for ChallengeResponse<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
-        "ChallengeResponse".to_string()
+    fn name(&self) -> Cow<'static, str> {
+        "ChallengeResponse".into()
     }
 
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.genesis_header.to_bytes_le()?)?;
+        self.genesis_header.write_le(&mut *writer)?;
         self.signature.serialize_blocking_into(writer)
     }
 
