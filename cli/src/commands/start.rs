@@ -14,15 +14,19 @@
 
 use snarkos_account::Account;
 use snarkos_display::Display;
-use snarkos_node::{messages::NodeType, Node};
-use snarkvm::prelude::{
-    block::Block,
-    store::{helpers::memory::ConsensusMemory, ConsensusStore},
-    FromBytes,
-    Network,
-    PrivateKey,
-    Testnet3,
-    VM,
+use snarkos_node::{messages::NodeType, narwhal::MEMORY_POOL_PORT, Node};
+use snarkvm::{
+    console::{
+        account::{Address, PrivateKey},
+        network::{Network, Testnet3},
+    },
+    ledger::{
+        block::Block,
+        committee::{Committee, MIN_STAKE},
+        store::{helpers::memory::ConsensusMemory, ConsensusStore},
+    },
+    prelude::FromBytes,
+    synthesizer::VM,
 };
 
 use anyhow::{bail, Result};
@@ -73,9 +77,12 @@ pub struct Start {
     /// Specify the IP address and port for the node server
     #[clap(default_value = "0.0.0.0:4133", long = "node")]
     pub node: SocketAddr,
-    /// Specify the IP address and port of a peer to connect to
-    #[clap(default_value = "", long = "connect")]
-    pub connect: String,
+    /// Specify the IP address and port of the peer(s) to connect to
+    #[clap(default_value = "", long = "peers")]
+    pub peers: String,
+    /// Specify the IP address and port of the validator(s) to connect to
+    #[clap(default_value = "", long = "validators")]
+    pub validators: String,
 
     /// Specify the IP address and port for the REST server
     #[clap(default_value = "0.0.0.0:3033", long = "rest")]
@@ -88,7 +95,7 @@ pub struct Start {
     #[clap(long)]
     pub nodisplay: bool,
     /// Specify the verbosity of the node [options: 0, 1, 2, 3, 4]
-    #[clap(default_value = "2", long = "verbosity")]
+    #[clap(default_value = "1", long = "verbosity")]
     pub verbosity: u8,
     /// Specify the path to the file where logs will be stored
     #[clap(default_value_os_t = std::env::temp_dir().join("snarkos.log"), long = "logfile")]
@@ -134,17 +141,35 @@ impl Start {
 }
 
 impl Start {
-    /// Returns the initial node(s) to connect to, from the given configurations.
+    /// Returns the initial peer(s) to connect to, from the given configurations.
     fn parse_trusted_peers(&self) -> Result<Vec<SocketAddr>> {
-        match self.connect.is_empty() {
+        match self.peers.is_empty() {
             true => Ok(vec![]),
             false => Ok(self
-                .connect
+                .peers
                 .split(',')
                 .flat_map(|ip| match ip.parse::<SocketAddr>() {
                     Ok(ip) => Some(ip),
                     Err(e) => {
-                        eprintln!("The IP supplied to --connect ('{ip}') is malformed: {e}");
+                        eprintln!("The IP supplied to --peers ('{ip}') is malformed: {e}");
+                        None
+                    }
+                })
+                .collect()),
+        }
+    }
+
+    /// Returns the initial validator(s) to connect to, from the given configurations.
+    fn parse_trusted_validators(&self) -> Result<Vec<SocketAddr>> {
+        match self.validators.is_empty() {
+            true => Ok(vec![]),
+            false => Ok(self
+                .validators
+                .split(',')
+                .flat_map(|ip| match ip.parse::<SocketAddr>() {
+                    Ok(ip) => Some(ip),
+                    Err(e) => {
+                        eprintln!("The IP supplied to --validators ('{ip}') is malformed: {e}");
                         None
                     }
                 })
@@ -207,7 +232,11 @@ impl Start {
 
     /// Updates the configurations if the node is in development mode, and returns the
     /// alternative genesis block if the node is in development mode. Otherwise, returns the actual genesis block.
-    fn parse_development<N: Network>(&mut self, trusted_peers: &mut Vec<SocketAddr>) -> Result<Block<N>> {
+    fn parse_development<N: Network>(
+        &mut self,
+        trusted_peers: &mut Vec<SocketAddr>,
+        trusted_validators: &mut Vec<SocketAddr>,
+    ) -> Result<Block<N>> {
         // If `--dev` is set, assume the dev nodes are initialized from 0 to `dev`,
         // and add each of them to the trusted peers. In addition, set the node IP to `4130 + dev`,
         // and the REST IP to `3030 + dev`.
@@ -218,9 +247,23 @@ impl Start {
                 bail!("At most one beacon at '--dev 0' is supported in development mode");
             }
 
+            // TODO (howardwu): Remove me after we stabilize syncing.
+            crate::commands::Clean::remove_ledger(N::ID, Some(dev))?;
+
+            // Set the number of validators.
+            const NUM_VALIDATORS: u16 = 4;
+
+            // To avoid ambiguity, we define the first 4 nodes to be the trusted validators to connect to.
+            for i in 0..NUM_VALIDATORS {
+                if i != dev {
+                    trusted_validators.push(SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i))?);
+                }
+            }
             // Add the dev nodes to the trusted peers.
             for i in 0..dev {
-                trusted_peers.push(SocketAddr::from_str(&format!("127.0.0.1:{}", 4130 + i))?);
+                if i != dev {
+                    trusted_peers.push(SocketAddr::from_str(&format!("127.0.0.1:{}", 4130 + i))?);
+                }
             }
             // Set the node IP to `4130 + dev`.
             self.node = SocketAddr::from_str(&format!("0.0.0.0:{}", 4130 + dev))?;
@@ -229,35 +272,63 @@ impl Start {
                 self.rest = SocketAddr::from_str(&format!("0.0.0.0:{}", 3030 + dev))?;
             }
 
-            // Initialize an (insecure) fixed RNG.
-            let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
-            // Initialize the beacon private key.
-            let beacon_private_key = PrivateKey::<N>::new(&mut rng)?;
-            // Initialize a new VM.
-            let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
-            // Initialize the genesis block.
-            let genesis = vm.genesis_beacon(&beacon_private_key, &mut rng)?;
+            // Sample the private key of this node.
+            let node_private_key = {
+                // Initialize the (fixed) RNG.
+                let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
+                // Iterate through 'dev' address instances to match the account.
+                for _ in 0..dev {
+                    let _ = PrivateKey::<N>::new(&mut rng)?;
+                }
+                PrivateKey::<N>::new(&mut rng)?
+            };
+
+            // Sample the genesis block.
+            let genesis = {
+                // Initialize the (fixed) RNG.
+                let mut rng = ChaChaRng::seed_from_u64(1234567890u64);
+                // Initialize the development private keys.
+                let development_private_keys =
+                    (0..NUM_VALIDATORS).map(|_| PrivateKey::<N>::new(&mut rng)).collect::<Result<Vec<_>>>()?;
+
+                // Construct the committee members.
+                let members = development_private_keys
+                    .iter()
+                    .map(|private_key| Ok((Address::try_from(private_key)?, (MIN_STAKE, true))))
+                    .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+                // Construct the committee.
+                let committee = Committee::<N>::new_genesis(members)?;
+
+                // Construct the public balances.
+                let public_balances = development_private_keys
+                    .iter()
+                    .map(|private_key| Ok((Address::try_from(private_key)?, 100 * MIN_STAKE)))
+                    .collect::<Result<indexmap::IndexMap<_, _>>>()?;
+
+                // Initialize a new VM.
+                let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
+                // Initialize the genesis block.
+                vm.genesis_quorum(&development_private_keys[0], committee, public_balances, &mut rng)?
+            };
 
             // A helper method to set the account private key in the node type.
-            let sample_account = |node: &mut Option<String>, is_beacon: bool| -> Result<()> {
-                let account = match is_beacon {
-                    true => Account::<N>::try_from(beacon_private_key)?,
-                    false => Account::<N>::new(&mut rand::thread_rng())?,
-                };
-                *node = Some(account.private_key().to_string());
+            let sample_account = |node: &mut Option<String>| -> Result<()> {
+                *node = Some(node_private_key.to_string());
                 println!(
-                    "⚠️  Attention - Sampling a *one-time* account for this instance, please save this securely:\n\n{account}\n"
+                    "⚠️  Attention - Sampling a *one-time* account for this instance, please save this securely:\n\n{}\n",
+                    Account::try_from(&node_private_key)?
                 );
                 Ok(())
             };
 
-            // If the beacon type flag is set, override the private key.
+            // If the node is a beacon, override the private key.
+            #[allow(clippy::if_same_then_else)]
             if self.beacon {
-                sample_account(&mut self.private_key, true)?;
+                sample_account(&mut self.private_key)?;
             }
             // If the node type flag is set, but no private key is provided, then sample one.
             else if self.private_key.is_none() && (self.validator || self.prover || self.client) {
-                sample_account(&mut self.private_key, false)?;
+                sample_account(&mut self.private_key)?;
             }
 
             Ok(genesis)
@@ -287,14 +358,16 @@ impl Start {
         // Print the welcome.
         println!("{}", crate::helpers::welcome_message());
 
-        // Parse the trusted IPs to connect to.
+        // Parse the trusted peers to connect to.
         let mut trusted_peers = self.parse_trusted_peers()?;
+        // Parse the trusted validators to connect to.
+        let mut trusted_validators = self.parse_trusted_validators()?;
 
         // Parse the CDN.
         let cdn = self.parse_cdn();
 
         // Parse the development configurations, and determine the genesis block.
-        let genesis = self.parse_development::<N>(&mut trusted_peers)?;
+        let genesis = self.parse_development::<N>(&mut trusted_peers, &mut trusted_validators)?;
 
         // Parse the REST IP.
         let rest_ip = match self.norest {
@@ -346,8 +419,8 @@ impl Start {
 
         // Initialize the node.
         match node_type {
-            NodeType::Beacon => Node::new_beacon(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
-            NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, genesis, cdn, self.dev).await,
+            NodeType::Beacon => Node::new_beacon(self.node, rest_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
+            NodeType::Validator => Node::new_validator(self.node, rest_ip, account, &trusted_peers, &trusted_validators, genesis, cdn, self.dev).await,
             NodeType::Prover => Node::new_prover(self.node, account, &trusted_peers, genesis, self.dev).await,
             NodeType::Client => Node::new_client(self.node, account, &trusted_peers, genesis, self.dev).await,
         }
@@ -393,17 +466,35 @@ mod tests {
 
     #[test]
     fn test_parse_trusted_peers() {
-        let config = Start::try_parse_from(["snarkos", "--connect", ""].iter()).unwrap();
+        let config = Start::try_parse_from(["snarkos", "--peers", ""].iter()).unwrap();
         assert!(config.parse_trusted_peers().is_ok());
         assert!(config.parse_trusted_peers().unwrap().is_empty());
 
-        let config = Start::try_parse_from(["snarkos", "--connect", "1.2.3.4:5"].iter()).unwrap();
+        let config = Start::try_parse_from(["snarkos", "--peers", "1.2.3.4:5"].iter()).unwrap();
         assert!(config.parse_trusted_peers().is_ok());
         assert_eq!(config.parse_trusted_peers().unwrap(), vec![SocketAddr::from_str("1.2.3.4:5").unwrap()]);
 
-        let config = Start::try_parse_from(["snarkos", "--connect", "1.2.3.4:5,6.7.8.9:0"].iter()).unwrap();
+        let config = Start::try_parse_from(["snarkos", "--peers", "1.2.3.4:5,6.7.8.9:0"].iter()).unwrap();
         assert!(config.parse_trusted_peers().is_ok());
         assert_eq!(config.parse_trusted_peers().unwrap(), vec![
+            SocketAddr::from_str("1.2.3.4:5").unwrap(),
+            SocketAddr::from_str("6.7.8.9:0").unwrap()
+        ]);
+    }
+
+    #[test]
+    fn test_parse_trusted_validators() {
+        let config = Start::try_parse_from(["snarkos", "--validators", ""].iter()).unwrap();
+        assert!(config.parse_trusted_validators().is_ok());
+        assert!(config.parse_trusted_validators().unwrap().is_empty());
+
+        let config = Start::try_parse_from(["snarkos", "--validators", "1.2.3.4:5"].iter()).unwrap();
+        assert!(config.parse_trusted_validators().is_ok());
+        assert_eq!(config.parse_trusted_validators().unwrap(), vec![SocketAddr::from_str("1.2.3.4:5").unwrap()]);
+
+        let config = Start::try_parse_from(["snarkos", "--validators", "1.2.3.4:5,6.7.8.9:0"].iter()).unwrap();
+        assert!(config.parse_trusted_validators().is_ok());
+        assert_eq!(config.parse_trusted_validators().unwrap(), vec![
             SocketAddr::from_str("1.2.3.4:5").unwrap(),
             SocketAddr::from_str("6.7.8.9:0").unwrap()
         ]);
@@ -534,9 +625,12 @@ mod tests {
         let prod_genesis = Block::from_bytes_le(CurrentNetwork::genesis_bytes()).unwrap();
 
         let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
         let mut config = Start::try_parse_from(["snarkos"].iter()).unwrap();
-        let candidate_genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
+        let candidate_genesis =
+            config.parse_development::<CurrentNetwork>(&mut trusted_peers, &mut trusted_validators).unwrap();
         assert_eq!(trusted_peers.len(), 0);
+        assert_eq!(trusted_validators.len(), 0);
         assert_eq!(candidate_genesis, prod_genesis);
 
         let _config = Start::try_parse_from(["snarkos", "--dev", ""].iter()).unwrap_err();
@@ -544,14 +638,17 @@ mod tests {
         // Remove this for Phase 3.
         let mut config =
             Start::try_parse_from(["snarkos", "--dev", "1", "--beacon", "--private-key", ""].iter()).unwrap();
-        config.parse_development::<CurrentNetwork>(&mut vec![]).unwrap_err();
+        config.parse_development::<CurrentNetwork>(&mut vec![], &mut vec![]).unwrap_err();
 
         let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
         let mut config = Start::try_parse_from(["snarkos", "--dev", "0"].iter()).unwrap();
-        let expected_genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
+        let expected_genesis =
+            config.parse_development::<CurrentNetwork>(&mut trusted_peers, &mut trusted_validators).unwrap();
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4130").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
         assert_eq!(trusted_peers.len(), 0);
+        assert_eq!(trusted_validators.len(), 3);
         assert!(!config.beacon);
         assert!(!config.validator);
         assert!(!config.prover);
@@ -559,12 +656,14 @@ mod tests {
         assert_ne!(expected_genesis, prod_genesis);
 
         let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
         let mut config =
             Start::try_parse_from(["snarkos", "--dev", "0", "--beacon", "--private-key", ""].iter()).unwrap();
-        let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
+        let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers, &mut trusted_validators).unwrap();
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4130").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3030").unwrap());
         assert_eq!(trusted_peers.len(), 0);
+        assert_eq!(trusted_validators.len(), 3);
         assert!(config.beacon);
         assert!(!config.validator);
         assert!(!config.prover);
@@ -572,12 +671,14 @@ mod tests {
         assert_eq!(genesis, expected_genesis);
 
         let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
         let mut config =
             Start::try_parse_from(["snarkos", "--dev", "1", "--validator", "--private-key", ""].iter()).unwrap();
-        let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
+        let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers, &mut trusted_validators).unwrap();
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4131").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3031").unwrap());
         assert_eq!(trusted_peers.len(), 1);
+        assert_eq!(trusted_validators.len(), 3);
         assert!(!config.beacon);
         assert!(config.validator);
         assert!(!config.prover);
@@ -585,12 +686,14 @@ mod tests {
         assert_eq!(genesis, expected_genesis);
 
         let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
         let mut config =
             Start::try_parse_from(["snarkos", "--dev", "2", "--prover", "--private-key", ""].iter()).unwrap();
-        let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
+        let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers, &mut trusted_validators).unwrap();
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4132").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3032").unwrap());
         assert_eq!(trusted_peers.len(), 2);
+        assert_eq!(trusted_validators.len(), 3);
         assert!(!config.beacon);
         assert!(!config.validator);
         assert!(config.prover);
@@ -598,12 +701,14 @@ mod tests {
         assert_eq!(genesis, expected_genesis);
 
         let mut trusted_peers = vec![];
+        let mut trusted_validators = vec![];
         let mut config =
             Start::try_parse_from(["snarkos", "--dev", "3", "--client", "--private-key", ""].iter()).unwrap();
-        let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers).unwrap();
+        let genesis = config.parse_development::<CurrentNetwork>(&mut trusted_peers, &mut trusted_validators).unwrap();
         assert_eq!(config.node, SocketAddr::from_str("0.0.0.0:4133").unwrap());
         assert_eq!(config.rest, SocketAddr::from_str("0.0.0.0:3033").unwrap());
         assert_eq!(trusted_peers.len(), 3);
+        assert_eq!(trusted_validators.len(), 3);
         assert!(!config.beacon);
         assert!(!config.validator);
         assert!(!config.prover);
@@ -624,7 +729,9 @@ mod tests {
             "PRIVATE_KEY",
             "--cdn",
             "CDN",
-            "--connect",
+            "--peers",
+            "IP1,IP2,IP3",
+            "--validators",
             "IP1,IP2,IP3",
             "--rest",
             "127.0.0.1:3033",
@@ -639,7 +746,8 @@ mod tests {
             assert_eq!(start.cdn, "CDN");
             assert_eq!(start.rest, "127.0.0.1:3033".parse().unwrap());
             assert_eq!(start.network, 3);
-            assert_eq!(start.connect, "IP1,IP2,IP3");
+            assert_eq!(start.peers, "IP1,IP2,IP3");
+            assert_eq!(start.validators, "IP1,IP2,IP3");
         } else {
             panic!("Unexpected result of clap parsing!");
         }

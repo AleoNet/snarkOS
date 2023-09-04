@@ -25,6 +25,7 @@ pub async fn beacon() -> Beacon<CurrentNetwork, ConsensusMemory<CurrentNetwork>>
         None,
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
         &[],
+        &[],
         sample_genesis_block(), // Should load the current network's genesis block.
         None,                   // No CDN.
         None,
@@ -62,6 +63,7 @@ pub async fn validator() -> Validator<CurrentNetwork, ConsensusMemory<CurrentNet
         "127.0.0.1:0".parse().unwrap(),
         None,
         Account::<CurrentNetwork>::from_str("APrivateKey1zkp2oVPTci9kKcUprnbzMwq95Di1MQERpYBhEeqvkrDirK1").unwrap(),
+        &[],
         &[],
         sample_genesis_block(), // Should load the current network's genesis block.
         None,                   // No CDN.

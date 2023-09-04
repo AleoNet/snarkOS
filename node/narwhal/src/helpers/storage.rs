@@ -73,7 +73,7 @@ impl<N: Network> Storage<N> {
         // Retrieve the current committee.
         let committee = ledger.current_committee().expect("Ledger is missing a committee.");
         // Retrieve the current round.
-        let current_round = committee.starting_round();
+        let current_round = committee.starting_round().max(1);
         // Return the storage.
         Self {
             ledger,
@@ -85,6 +85,12 @@ impl<N: Network> Storage<N> {
             batch_ids: Default::default(),
             transmissions: Default::default(),
         }
+    }
+
+    /// Returns the ledger service.
+    #[cfg(test)]
+    pub const fn ledger(&self) -> &Ledger<N> {
+        &self.ledger
     }
 }
 

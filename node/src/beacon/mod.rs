@@ -75,6 +75,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         rest_ip: Option<SocketAddr>,
         account: Account<N>,
         trusted_peers: &[SocketAddr],
+        trusted_validators: &[SocketAddr],
         genesis: Block<N>,
         cdn: Option<String>,
         dev: Option<u16>,
@@ -99,7 +100,7 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         }
 
         // Initialize the consensus.
-        let mut consensus = Consensus::new(account.clone(), ledger.clone(), None, dev)?;
+        let mut consensus = Consensus::new(account.clone(), ledger.clone(), None, trusted_validators, dev)?;
         // Initialize the primary channels.
         let (primary_sender, primary_receiver) = init_primary_channels::<N>();
         // Start the consensus.
@@ -180,9 +181,9 @@ impl<N: Network, C: ConsensusStorage<N>> NodeInterface<N> for Beacon<N, C> {
         // Shut down the router.
         self.router.shut_down().await;
 
-        // Shut down the ledger.
-        trace!("Shutting down the ledger...");
-        // self.ledger.shut_down().await;
+        // Shut down consensus.
+        trace!("Shutting down consensus...");
+        self.consensus.shut_down().await;
 
         info!("Node has shut down.");
     }
@@ -469,6 +470,7 @@ mod tests {
             node,
             Some(rest),
             beacon_account,
+            &[],
             &[],
             genesis,
             None,

@@ -94,10 +94,11 @@ impl<N: Network> Primary<N> {
         storage: Storage<N>,
         ledger: Ledger<N>,
         ip: Option<SocketAddr>,
+        trusted_validators: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
         Ok(Self {
-            gateway: Gateway::new(account, storage.clone(), ip, dev)?,
+            gateway: Gateway::new(account, ledger.clone(), ip, trusted_validators, dev)?,
             storage,
             ledger,
             workers: Arc::from(vec![]),

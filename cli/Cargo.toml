@@ -36,6 +36,9 @@ version = "2"
 [dependencies.crossterm]
 version = "0.27"
 
+[dependencies.indexmap]
+version = "2"
+
 [dependencies.num_cpus]
 version = "1"
 

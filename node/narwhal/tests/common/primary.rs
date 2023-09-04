@@ -120,10 +120,11 @@ impl TestNetwork {
             let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
 
             let (primary, bft) = if config.bft {
-                let bft = BFT::<CurrentNetwork>::new(account, storage, ledger, None, Some(id as u16)).unwrap();
+                let bft = BFT::<CurrentNetwork>::new(account, storage, ledger, None, &[], Some(id as u16)).unwrap();
                 (bft.primary().clone(), Some(bft))
             } else {
-                let primary = Primary::<CurrentNetwork>::new(account, storage, ledger, None, Some(id as u16)).unwrap();
+                let primary =
+                    Primary::<CurrentNetwork>::new(account, storage, ledger, None, &[], Some(id as u16)).unwrap();
                 (primary, None)
             };
 

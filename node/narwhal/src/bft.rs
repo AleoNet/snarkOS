@@ -79,10 +79,11 @@ impl<N: Network> BFT<N> {
         storage: Storage<N>,
         ledger: Ledger<N>,
         ip: Option<SocketAddr>,
+        trusted_validators: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
         Ok(Self {
-            primary: Primary::new(account, storage, ledger, ip, dev)?,
+            primary: Primary::new(account, storage, ledger, ip, trusted_validators, dev)?,
             dag: Default::default(),
             leader_certificate: Default::default(),
             leader_certificate_timer: Default::default(),
@@ -427,7 +428,10 @@ impl<N: Network> BFT<N> {
             // Retrieve the leader certificate round.
             let leader_round = leader_certificate.round();
             // Compute the commit subdag.
-            let commit_subdag = self.order_dag_with_dfs(leader_certificate);
+            let commit_subdag = match self.order_dag_with_dfs(leader_certificate) {
+                Ok(subdag) => subdag,
+                Err(e) => bail!("BFT failed to order the DAG with DFS - {e}"),
+            };
             // Initialize a map for the deduped transmissions.
             let mut transmissions = IndexMap::new();
             // Start from the oldest leader certificate.
@@ -482,7 +486,7 @@ impl<N: Network> BFT<N> {
     fn order_dag_with_dfs(
         &self,
         leader_certificate: BatchCertificate<N>,
-    ) -> BTreeMap<u64, IndexSet<BatchCertificate<N>>> {
+    ) -> Result<BTreeMap<u64, IndexSet<BatchCertificate<N>>>> {
         // Initialize a map for the certificates to commit.
         let mut commit = BTreeMap::<u64, IndexSet<_>>::new();
         // Initialize a set for the already ordered certificates.
@@ -493,20 +497,47 @@ impl<N: Network> BFT<N> {
         while let Some(certificate) = buffer.pop() {
             // Insert the certificate into the map.
             commit.entry(certificate.round()).or_default().insert(certificate.clone());
+
+            // Check if the previous certificate is below the GC round.
+            let previous_round = certificate.round().saturating_sub(1);
+            if previous_round + self.storage().max_gc_rounds() <= self.dag.read().last_committed_round() {
+                continue;
+            }
             // Iterate over the previous certificate IDs.
-            for previous_certificate_id in certificate.previous_certificate_ids() {
-                let Some(previous_certificate) = self
-                    .dag
-                    .read()
-                    .get_certificate_for_round_with_id(certificate.round() - 1, *previous_certificate_id)
-                else {
-                    // It is either ordered or below the GC round.
-                    continue;
-                };
+            // Note: Using '.rev()' ensures we remain order-preserving (i.e. "left-to-right" on each level),
+            // because this 'while' loop uses 'pop()' to retrieve the next certificate to order.
+            for previous_certificate_id in certificate.previous_certificate_ids().iter().rev() {
                 // If the previous certificate is already ordered, continue.
-                if already_ordered.contains(&previous_certificate.certificate_id()) {
+                if already_ordered.contains(previous_certificate_id) {
                     continue;
                 }
+                // Retrieve the previous certificate.
+                let previous_certificate = {
+                    // Start by retrieving the previous certificate from the DAG.
+                    match self.dag.read().get_certificate_for_round_with_id(previous_round, *previous_certificate_id) {
+                        // If the previous certificate is found, return it.
+                        Some(previous_certificate) => previous_certificate,
+                        // If the previous certificate is not found, check if it was recently committed.
+                        //  - If the previous certificate was not recently committed, retrieve it from the storage.
+                        //  - If the previous certificate was recently committed, continue.
+                        None => {
+                            // If the previous certificate was recently committed, continue.
+                            if self.dag.read().is_recently_committed(previous_round, *previous_certificate_id) {
+                                continue;
+                            }
+                            // Otherwise, retrieve the previous certificate from the storage.
+                            match self.storage().get_certificate(*previous_certificate_id) {
+                                // If the previous certificate is found, return it.
+                                Some(previous_certificate) => previous_certificate,
+                                // If the previous certificate is not found, throw an error.
+                                None => bail!(
+                                    "Missing previous certificate {} for round {previous_round}",
+                                    fmt_id(previous_certificate_id)
+                                ),
+                            }
+                        }
+                    }
+                };
                 // If the last committed round is the same as the previous certificate round for this author, continue.
                 if self
                     .dag
@@ -527,7 +558,7 @@ impl<N: Network> BFT<N> {
         // Ensure we only retain certificates that are above the GC round.
         commit.retain(|round, _| round + self.storage().max_gc_rounds() > self.dag.read().last_committed_round());
         // Return the certificates to commit.
-        commit
+        Ok(commit)
     }
 
     /// Returns `true` if there is a path from the previous certificate to the current certificate.
@@ -605,7 +636,14 @@ mod tests {
     };
     use snarkos_account::Account;
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
-    use snarkvm::{prelude::narwhal::batch_certificate::test_helpers::sample_batch_certificate, utilities::TestRng};
+    use snarkvm::{
+        ledger::narwhal::batch_certificate::test_helpers::{
+            sample_batch_certificate,
+            sample_batch_certificate_for_round,
+            sample_batch_certificate_for_round_with_previous_certificate_ids,
+        },
+        utilities::TestRng,
+    };
 
     use anyhow::Result;
     use indexmap::IndexSet;
@@ -621,7 +659,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
         assert!(bft.is_timer_expired()); // 0 + 5 < now()
 
         // Ensure this call succeeds on an odd round.
@@ -661,7 +699,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
         assert!(bft.is_timer_expired()); // 0 + 5 < now()
 
         // Store is at round 1, and we are checking for round 2.
@@ -682,7 +720,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
         assert!(bft.is_timer_expired()); // 0 + 5 < now()
 
         // Ensure this call fails on an even round.
@@ -705,7 +743,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
 
         let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee.clone());
         assert!(!result);
@@ -730,7 +768,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
 
         // Ensure this call fails on an odd round.
         let result = bft.update_leader_certificate_to_even_round(1);
@@ -749,7 +787,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
 
         // Ensure this call succeeds on an even round.
         let result = bft.update_leader_certificate_to_even_round(6);
@@ -768,7 +806,7 @@ mod tests {
         let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
-        let bft = BFT::new(account, storage, ledger, None, None)?;
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
 
         // Set the leader certificate.
         let leader_certificate = sample_batch_certificate(rng);
@@ -779,6 +817,153 @@ mod tests {
         let result = bft.update_leader_certificate_to_even_round(2);
         assert!(result.is_ok());
 
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_order_dag_with_dfs() -> Result<()> {
+        use snarkvm::ledger::narwhal::batch_certificate::test_helpers::{
+            sample_batch_certificate_for_round,
+            sample_batch_certificate_for_round_with_previous_certificate_ids,
+        };
+
+        let rng = &mut TestRng::default();
+
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(1, rng);
+        let account = Account::new(rng)?;
+        let ledger = Arc::new(MockLedgerService::new(committee));
+
+        // Initialize the round parameters.
+        let previous_round = 2; // <- This must be an even number, for `BFT::update_dag` to behave correctly below.
+        let current_round = previous_round + 1;
+
+        // Sample the previous certificates.
+        let previous_certificates = vec![
+            sample_batch_certificate_for_round(previous_round, rng),
+            sample_batch_certificate_for_round(previous_round, rng),
+            sample_batch_certificate_for_round(previous_round, rng),
+        ];
+        // Construct the previous certificate IDs.
+        let previous_certificate_ids: IndexSet<_> = previous_certificates.iter().map(|c| c.certificate_id()).collect();
+        // Sample the leader certificate.
+        let certificate = sample_batch_certificate_for_round_with_previous_certificate_ids(
+            current_round,
+            previous_certificate_ids.clone(),
+            rng,
+        );
+
+        /* Test GC */
+
+        // Ensure the function succeeds in returning only certificates above GC.
+        {
+            // Initialize the storage.
+            let storage = Storage::new(ledger.clone(), 1);
+            // Initialize the BFT.
+            let bft = BFT::new(account.clone(), storage, ledger.clone(), None, &[], None)?;
+
+            // Insert a mock DAG in the BFT.
+            *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(3);
+
+            // Insert the previous certificates into the BFT.
+            for certificate in previous_certificates.clone() {
+                assert!(bft.update_dag(certificate).await.is_ok());
+            }
+
+            // Ensure this call succeeds and returns all given certificates.
+            let result = bft.order_dag_with_dfs(certificate.clone());
+            assert!(result.is_ok());
+            let candidate_certificates = result.unwrap().into_values().flatten().collect::<Vec<_>>();
+            assert_eq!(candidate_certificates.len(), 1);
+            let expected_certificates = vec![certificate.clone()];
+            assert_eq!(
+                candidate_certificates.iter().map(|c| c.certificate_id()).collect::<Vec<_>>(),
+                expected_certificates.iter().map(|c| c.certificate_id()).collect::<Vec<_>>()
+            );
+            assert_eq!(candidate_certificates, expected_certificates);
+        }
+
+        /* Test normal case */
+
+        // Ensure the function succeeds in returning all given certificates.
+        {
+            // Initialize the storage.
+            let storage = Storage::new(ledger.clone(), 1);
+            // Initialize the BFT.
+            let bft = BFT::new(account, storage, ledger, None, &[], None)?;
+
+            // Insert a mock DAG in the BFT.
+            *bft.dag.write() = crate::helpers::dag::test_helpers::mock_dag_with_modified_last_committed_round(2);
+
+            // Insert the previous certificates into the BFT.
+            for certificate in previous_certificates.clone() {
+                assert!(bft.update_dag(certificate).await.is_ok());
+            }
+
+            // Ensure this call succeeds and returns all given certificates.
+            let result = bft.order_dag_with_dfs(certificate.clone());
+            assert!(result.is_ok());
+            let candidate_certificates = result.unwrap().into_values().flatten().collect::<Vec<_>>();
+            assert_eq!(candidate_certificates.len(), 4);
+            let expected_certificates = vec![
+                previous_certificates[0].clone(),
+                previous_certificates[1].clone(),
+                previous_certificates[2].clone(),
+                certificate,
+            ];
+            assert_eq!(
+                candidate_certificates.iter().map(|c| c.certificate_id()).collect::<Vec<_>>(),
+                expected_certificates.iter().map(|c| c.certificate_id()).collect::<Vec<_>>()
+            );
+            assert_eq!(candidate_certificates, expected_certificates);
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_order_dag_with_dfs_fails_on_missing_previous_certificate() -> Result<()> {
+        let rng = &mut TestRng::default();
+
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(1, rng);
+        let account = Account::new(rng)?;
+        let ledger = Arc::new(MockLedgerService::new(committee));
+
+        // Initialize the round parameters.
+        let previous_round = 2; // <- This must be an even number, for `BFT::update_dag` to behave correctly below.
+        let current_round = previous_round + 1;
+
+        // Sample the previous certificates.
+        let previous_certificates = vec![
+            sample_batch_certificate_for_round(previous_round, rng),
+            sample_batch_certificate_for_round(previous_round, rng),
+            sample_batch_certificate_for_round(previous_round, rng),
+        ];
+        // Construct the previous certificate IDs.
+        let previous_certificate_ids: IndexSet<_> = previous_certificates.iter().map(|c| c.certificate_id()).collect();
+        // Sample the leader certificate.
+        let certificate = sample_batch_certificate_for_round_with_previous_certificate_ids(
+            current_round,
+            previous_certificate_ids.clone(),
+            rng,
+        );
+
+        /* Test missing previous certificate. */
+
+        // Initialize the storage.
+        let storage = Storage::new(ledger.clone(), 1);
+        // Initialize the BFT.
+        let bft = BFT::new(account, storage, ledger, None, &[], None)?;
+
+        // The expected error message.
+        let error_msg = format!(
+            "Missing previous certificate {} for round {previous_round}",
+            crate::helpers::fmt_id(previous_certificate_ids[2]),
+        );
+
+        // Ensure this call fails on a missing previous certificate.
+        let result = bft.order_dag_with_dfs(certificate);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().to_string(), error_msg);
         Ok(())
     }
 }

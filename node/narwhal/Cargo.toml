@@ -28,6 +28,9 @@ version = "0.1"
 [dependencies.bytes]
 version = "1"
 
+[dependencies.colored]
+version = "2"
+
 [dependencies.futures]
 version = "0.3.27"
 features = [ "thread-pool" ]
