@@ -17,6 +17,7 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
+        committee::Committee,
         narwhal::{Data, TransmissionID},
     },
     prelude::{Field, Network, Result},
@@ -25,18 +26,31 @@ use snarkvm::{
 use tracing::*;
 
 /// A mock ledger service that always returns `false`.
-#[derive(Default)]
-pub struct MockLedgerService {}
+#[derive(Debug)]
+pub struct MockLedgerService<N: Network> {
+    committee: Committee<N>,
+}
 
-impl MockLedgerService {
+impl<N: Network> MockLedgerService<N> {
     /// Initializes a new mock ledger service.
-    pub fn new() -> Self {
-        Self {}
+    pub fn new(committee: Committee<N>) -> Self {
+        Self { committee }
     }
 }
 
 #[async_trait]
-impl<N: Network> LedgerService<N> for MockLedgerService {
+impl<N: Network> LedgerService<N> for MockLedgerService<N> {
+    /// Returns the current committee.
+    fn current_committee(&self) -> Result<Committee<N>> {
+        Ok(self.committee.clone())
+    }
+
+    /// Returns the committee for the given round.
+    /// If the given round is in the future, then the current committee is returned.
+    fn get_committee_for_round(&self, _round: u64) -> Result<Committee<N>> {
+        Ok(self.committee.clone())
+    }
+
     /// Returns `false` for all queries.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool> {
         trace!("[MockLedgerService] Contains certificate ID {} - false", fmt_id(certificate_id));

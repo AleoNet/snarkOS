@@ -62,13 +62,14 @@ impl<N: Network> FromBytes for BatchPropose<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{event::certificate_response::prop_tests::any_batch_header, BatchPropose};
-    use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{any, BoxedStrategy, Strategy};
-    use snarkos_node_narwhal_committee::prop_tests::CommitteeContext;
     use snarkvm::{
         console::prelude::{FromBytes, ToBytes},
+        ledger::committee::prop_tests::CommitteeContext,
         prelude::narwhal::Data,
     };
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;

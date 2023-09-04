@@ -45,14 +45,15 @@ impl<N: Network> FromBytes for ChallengeResponse<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{helpers::storage::prop_tests::CryptoTestRng, ChallengeResponse};
-    use bytes::{Buf, BufMut, BytesMut};
-    use proptest::prelude::{any, BoxedStrategy, Strategy};
     use snarkvm::{
         console::prelude::{FromBytes, ToBytes},
         ledger::narwhal::Data,
         prelude::{PrivateKey, Signature},
         utilities::rand::Uniform,
     };
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;

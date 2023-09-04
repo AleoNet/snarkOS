@@ -134,7 +134,7 @@ impl<N: Network> Router<N> {
     }
 
     /// Attempts to connect to the given peer IP.
-    pub fn connect(&self, peer_ip: SocketAddr) -> Option<JoinHandle<()>> {
+    pub fn connect(&self, peer_ip: SocketAddr) -> Option<JoinHandle<bool>> {
         // Return early if the attempt is against the protocol rules.
         if let Err(forbidden_message) = self.check_connection_attempt(peer_ip) {
             warn!("{forbidden_message}");
@@ -146,11 +146,15 @@ impl<N: Network> Router<N> {
             // Attempt to connect to the candidate peer.
             match router.tcp.connect(peer_ip).await {
                 // Remove the peer from the candidate peers.
-                Ok(()) => router.remove_candidate_peer(peer_ip),
+                Ok(()) => {
+                    router.remove_candidate_peer(peer_ip);
+                    true
+                }
                 // If the connection was not allowed, log the error.
                 Err(error) => {
                     router.connecting_peers.lock().remove(&peer_ip);
-                    warn!("Unable to connect to '{peer_ip}' - {error}")
+                    warn!("Unable to connect to '{peer_ip}' - {error}");
+                    false
                 }
             }
         }))
@@ -182,13 +186,21 @@ impl<N: Network> Router<N> {
     }
 
     /// Disconnects from the given peer IP, if the peer is connected.
-    pub fn disconnect(&self, peer_ip: SocketAddr) -> JoinHandle<()> {
+    pub fn disconnect(&self, peer_ip: SocketAddr) -> JoinHandle<bool> {
         let router = self.clone();
         tokio::spawn(async move {
             if let Some(peer_addr) = router.resolve_to_ambiguous(&peer_ip) {
                 // Disconnect from this peer.
-                let _disconnected = router.tcp.disconnect(peer_addr).await;
-                debug_assert!(_disconnected);
+                let disconnected = router.tcp.disconnect(peer_addr).await;
+                // FIXME: this shouldn't be necessary; it's a double-check
+                // that the higher-level collection is cleaned up after the
+                // lower-level disconnect.
+                if router.is_connected(&peer_ip) && !router.tcp.is_connected(peer_addr) {
+                    router.remove_connected_peer(peer_ip);
+                }
+                disconnected
+            } else {
+                false
             }
         })
     }

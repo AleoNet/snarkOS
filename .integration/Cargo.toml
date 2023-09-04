@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-integration"
-version = "2.1.6"
+version = "2.1.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A integration testing suite for a decentralized operating system"
 homepage = "https://aleo.org"

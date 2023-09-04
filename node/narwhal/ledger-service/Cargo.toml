@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-narwhal-ledger-service"
-version = "2.1.6"
+version = "2.1.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A ledger service for the memory pool in a decentralized operating system"
 homepage = "https://aleo.org"

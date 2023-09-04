@@ -13,6 +13,7 @@
 // limitations under the License.
 
 #![forbid(unsafe_code)]
+#![allow(clippy::too_many_arguments)]
 #![recursion_limit = "256"]
 
 #[macro_use]
@@ -23,6 +24,7 @@ extern crate tracing;
 pub use snarkos_node_cdn as cdn;
 pub use snarkos_node_consensus as consensus;
 pub use snarkos_node_messages as messages;
+pub use snarkos_node_narwhal as narwhal;
 pub use snarkos_node_rest as rest;
 pub use snarkos_node_router as router;
 pub use snarkos_node_tcp as tcp;

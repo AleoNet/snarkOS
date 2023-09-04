@@ -62,9 +62,10 @@ pub mod prop_tests {
         helpers::now,
         BatchSignature,
     };
+    use snarkvm::console::prelude::{FromBytes, ToBytes};
+
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{BoxedStrategy, Just, Strategy};
-    use snarkvm::console::prelude::{FromBytes, ToBytes};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;

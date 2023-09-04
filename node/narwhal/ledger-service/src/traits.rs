@@ -16,13 +16,23 @@ use snarkvm::{
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
+        committee::Committee,
         narwhal::Data,
     },
     prelude::{narwhal::TransmissionID, Field, Network, Result},
 };
 
+use std::fmt::Debug;
+
 #[async_trait]
-pub trait LedgerService<N: Network>: Send + Sync {
+pub trait LedgerService<N: Network>: Debug + Send + Sync {
+    /// Returns the current committee.
+    fn current_committee(&self) -> Result<Committee<N>>;
+
+    /// Returns the committee for the given round.
+    /// If the given round is in the future, then the current committee is returned.
+    fn get_committee_for_round(&self, round: u64) -> Result<Committee<N>>;
+
     /// Returns `true` if the ledger contains the given certificate ID.
     fn contains_certificate(&self, certificate_id: &Field<N>) -> Result<bool>;
 

@@ -24,7 +24,8 @@ use crate::{
         TransmissionRequest,
         TransmissionResponse,
     },
-    helpers::{assign_to_worker, Cache, EventCodec, PrimarySender, Resolver, Storage, WorkerSender},
+    helpers::{assign_to_worker, Cache, EventCodec, PrimarySender, Resolver, WorkerSender},
+    primary::Ledger,
     CONTEXT,
     MAX_BATCH_DELAY,
     MAX_GC_ROUNDS,
@@ -32,7 +33,6 @@ use crate::{
     MEMORY_POOL_PORT,
 };
 use snarkos_account::Account;
-use snarkos_node_narwhal_committee::MAX_COMMITTEE_SIZE;
 use snarkos_node_tcp::{
     protocols::{Disconnect, Handshake, OnConnect, Reading, Writing},
     Config,
@@ -43,6 +43,7 @@ use snarkos_node_tcp::{
 };
 use snarkvm::{console::prelude::*, ledger::narwhal::Data, prelude::Address};
 
+use colored::Colorize;
 use futures::SinkExt;
 use indexmap::{IndexMap, IndexSet};
 use parking_lot::{Mutex, RwLock};
@@ -54,6 +55,9 @@ use tokio::{
 };
 use tokio_stream::StreamExt;
 use tokio_util::codec::Framed;
+
+/// TODO (howardwu): Remove me and switch to dynamic.
+const MAX_COMMITTEE_SIZE: u16 = 100;
 
 /// The maximum interval of events to cache.
 const CACHE_EVENTS_INTERVAL: i64 = (MAX_BATCH_DELAY / 1000) as i64; // seconds
@@ -85,14 +89,16 @@ pub trait Transport<N: Network>: Send + Sync {
 pub struct Gateway<N: Network> {
     /// The account of the node.
     account: Account<N>,
-    /// The storage.
-    storage: Storage<N>,
+    /// The ledger service.
+    ledger: Ledger<N>,
     /// The TCP stack.
     tcp: Tcp,
     /// The cache.
     cache: Arc<Cache<N>>,
     /// The resolver.
     resolver: Arc<Resolver<N>>,
+    /// The set of trusted validators.
+    trusted_validators: IndexSet<SocketAddr>,
     /// The map of connected peer IPs to their peer handlers.
     connected_peers: Arc<RwLock<IndexSet<SocketAddr>>>,
     /// The set of handshaking peers. While `Tcp` already recognizes the connecting IP addresses
@@ -110,7 +116,13 @@ pub struct Gateway<N: Network> {
 
 impl<N: Network> Gateway<N> {
     /// Initializes a new gateway.
-    pub fn new(account: Account<N>, storage: Storage<N>, ip: Option<SocketAddr>, dev: Option<u16>) -> Result<Self> {
+    pub fn new(
+        account: Account<N>,
+        ledger: Ledger<N>,
+        ip: Option<SocketAddr>,
+        trusted_validators: &[SocketAddr],
+        dev: Option<u16>,
+    ) -> Result<Self> {
         // Initialize the gateway IP.
         let ip = match (ip, dev) {
             (_, Some(dev)) => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + dev))?,
@@ -122,10 +134,11 @@ impl<N: Network> Gateway<N> {
         // Return the gateway.
         Ok(Self {
             account,
-            storage,
+            ledger,
             tcp,
             cache: Default::default(),
             resolver: Default::default(),
+            trusted_validators: trusted_validators.iter().copied().collect(),
             connected_peers: Default::default(),
             connecting_peers: Default::default(),
             primary_sender: Default::default(),
@@ -149,6 +162,9 @@ impl<N: Network> Gateway<N> {
         self.enable_on_connect().await;
         // Enable the TCP listener. Note: This must be called after the above protocols.
         let _listening_addr = self.tcp.enable_listener().await.expect("Failed to enable the TCP listener");
+
+        // Initialize the heartbeat.
+        self.initialize_heartbeat();
 
         info!("Started the gateway for the memory pool at '{}'", self.local_ip());
     }
@@ -200,6 +216,11 @@ impl<N: Network> Gateway<N> {
         self.connected_peers.read().contains(&ip)
     }
 
+    /// Returns `true` if the node is connecting to the given peer IP.
+    pub fn is_connecting(&self, ip: SocketAddr) -> bool {
+        self.connecting_peers.lock().contains(&ip)
+    }
+
     /// Returns the maximum number of connected peers.
     pub fn max_connected_peers(&self) -> usize {
         self.tcp.config().max_connections as usize
@@ -225,6 +246,7 @@ impl<N: Network> Gateway<N> {
 
         let self_ = self.clone();
         Some(tokio::spawn(async move {
+            debug!("Connecting to validator {peer_ip}...");
             // Attempt to connect to the peer.
             if let Err(error) = self_.tcp.connect(peer_ip).await {
                 self_.connecting_peers.lock().shift_remove(&peer_ip);
@@ -248,8 +270,8 @@ impl<N: Network> Gateway<N> {
             bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (already connected)")
         }
         // Ensure the node is not already connecting to this peer.
-        if !self.connecting_peers.lock().insert(peer_ip) {
-            bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (already shaking hands as the initiator)")
+        if self.is_connecting(peer_ip) {
+            bail!("{CONTEXT} Dropping connection attempt to '{peer_ip}' (already connecting)")
         }
         Ok(())
     }
@@ -424,7 +446,7 @@ impl<N: Network> Gateway<N> {
             }
             Event::WorkerPing(ping) => {
                 let num_workers = self.num_workers();
-                for transmission_id in ping.transmission_ids {
+                for transmission_id in ping.transmission_ids.into_iter().take(MAX_TRANSMISSIONS_PER_BATCH) {
                     // Determine the worker ID.
                     let Ok(worker_id) = assign_to_worker(transmission_id, num_workers) else {
                         warn!("{CONTEXT} Unable to assign transmission ID '{transmission_id}' to a worker");
@@ -453,6 +475,22 @@ impl<N: Network> Gateway<N> {
         })
     }
 
+    /// Initialize a new instance of the heartbeat.
+    fn initialize_heartbeat(&self) {
+        let self_clone = self.clone();
+        self.spawn(async move {
+            // Sleep briefly to ensure the other nodes are ready to connect.
+            tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+            info!("Starting the heartbeat of the gateway...");
+            loop {
+                // Process a heartbeat in the router.
+                self_clone.heartbeat();
+                // Sleep for the heartbeat interval.
+                tokio::time::sleep(Duration::from_secs(30)).await;
+            }
+        });
+    }
+
     /// Spawns a task with the given future; it should only be used for long-running tasks.
     #[allow(dead_code)]
     fn spawn<T: Future<Output = ()> + Send + 'static>(&self, future: T) {
@@ -466,6 +504,48 @@ impl<N: Network> Gateway<N> {
         self.handles.lock().iter().for_each(|handle| handle.abort());
         // Close the listener.
         self.tcp.shut_down().await;
+    }
+}
+
+impl<N: Network> Gateway<N> {
+    /// Handles the heartbeat request.
+    fn heartbeat(&self) {
+        self.log_connected_validators();
+        // Keep the trusted validators connected.
+        self.handle_trusted_validators();
+    }
+
+    /// Logs the connected validators.
+    fn log_connected_validators(&self) {
+        // Log the connected validators.
+        let validators = self.connected_peers().read().clone();
+        // Construct the connections message.
+        let connections_msg = match validators.len() {
+            0 => "No connected validators".to_string(),
+            1 => "Connected to 1 validator".to_string(),
+            num_connected => format!("Connected to {num_connected} validators"),
+        };
+        // Log the connected validators.
+        info!("{connections_msg}");
+        for peer_ip in validators {
+            let address = self.resolver.get_address(peer_ip).map_or("Unknown".to_string(), |a| a.to_string());
+            debug!("{}", format!("  {peer_ip} - {address}").dimmed());
+        }
+    }
+
+    /// This function attempts to connect to any disconnected trusted validators.
+    fn handle_trusted_validators(&self) {
+        // Ensure that the trusted nodes are connected.
+        for validator_ip in &self.trusted_validators {
+            // If the trusted_validator is not connected, attempt to connect to it.
+            if !self.is_local_ip(*validator_ip)
+                && !self.is_connecting(*validator_ip)
+                && !self.is_connected(*validator_ip)
+            {
+                // Attempt to connect to the trusted validator.
+                self.connect(*validator_ip);
+            }
+        }
     }
 }
 
@@ -814,9 +894,11 @@ impl<N: Network> Gateway<N> {
         // TODO (howardwu): Remove this check, instead checking the address is unique.
         //  Then, later on, use the committee object to perform filtering of all active connections.
         // Ensure the address is in the committee.
-        if !self.storage.current_committee().is_committee_member(address) {
-            warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
-            return Some(DisconnectReason::ProtocolViolation);
+        if let Ok(committee) = self.ledger.current_committee() {
+            if !committee.is_committee_member(address) {
+                warn!("{CONTEXT} Gateway is dropping '{peer_addr}' for an invalid address ({address})");
+                return Some(DisconnectReason::ProtocolViolation);
+            }
         }
         None
     }
@@ -847,14 +929,28 @@ impl<N: Network> Gateway<N> {
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{helpers::init_worker_channels, Gateway, Worker, MAX_WORKERS, MEMORY_POOL_PORT};
+    use super::MAX_COMMITTEE_SIZE;
+    use crate::{
+        helpers::{init_worker_channels, Storage},
+        prop_tests::GatewayAddress::{Dev, Prod},
+        Gateway,
+        Worker,
+        MAX_WORKERS,
+        MEMORY_POOL_PORT,
+    };
+    use snarkos_account::Account;
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkos_node_tcp::P2P;
+    use snarkvm::{
+        ledger::committee::prop_tests::{CommitteeContext, ValidatorSet},
+        prelude::PrivateKey,
+    };
+
     use indexmap::IndexMap;
     use proptest::{
         prelude::{any, any_with, Arbitrary, BoxedStrategy, Just, Strategy},
         sample::Selector,
     };
-    use snarkos_node_tcp::P2P;
-    use snarkvm::prelude::Testnet3;
     use std::{
         fmt::{Debug, Formatter},
         net::{IpAddr, Ipv4Addr, SocketAddr},
@@ -862,18 +958,7 @@ pub mod prop_tests {
     };
     use test_strategy::proptest;
 
-    type CurrentNetwork = Testnet3;
-
-    use crate::{
-        helpers::Storage,
-        prop_tests::GatewayAddress::{Dev, Prod},
-    };
-    use snarkos_account::Account;
-    use snarkos_node_narwhal_committee::{
-        prop_tests::{CommitteeContext, ValidatorSet},
-        MAX_COMMITTEE_SIZE,
-    };
-    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    type CurrentNetwork = snarkvm::prelude::Testnet3;
 
     impl Debug for Gateway<CurrentNetwork> {
         fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -910,14 +995,21 @@ pub mod prop_tests {
 
         fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
             any_valid_dev_gateway()
-                .prop_map(|(storage, _, account, address)| {
-                    Gateway::new(account, storage, address.ip(), address.port()).unwrap()
+                .prop_map(|(storage, _, private_key, address)| {
+                    Gateway::new(
+                        Account::try_from(private_key).unwrap(),
+                        storage.ledger().clone(),
+                        address.ip(),
+                        &[],
+                        address.port(),
+                    )
+                    .unwrap()
                 })
                 .boxed()
         }
     }
 
-    type GatewayInput = (Storage<CurrentNetwork>, CommitteeContext, Account<CurrentNetwork>, GatewayAddress);
+    type GatewayInput = (Storage<CurrentNetwork>, CommitteeContext, PrivateKey<CurrentNetwork>, GatewayAddress);
 
     fn any_valid_dev_gateway() -> BoxedStrategy<GatewayInput> {
         (any::<CommitteeContext>(), any::<Selector>())
@@ -929,7 +1021,7 @@ pub mod prop_tests {
                     Just(account_selector.select(validators)),
                     0u8..,
                 )
-                    .prop_map(|(a, b, c, d)| (a, b, c.account, Dev(d)))
+                    .prop_map(|(a, b, c, d)| (a, b, c.private_key, Dev(d)))
             })
             .boxed()
     }
@@ -944,30 +1036,32 @@ pub mod prop_tests {
                     Just(account_selector.select(validators)),
                     any::<Option<SocketAddr>>(),
                 )
-                    .prop_map(|(a, b, c, d)| (a, b, c.account, Prod(d)))
+                    .prop_map(|(a, b, c, d)| (a, b, c.private_key, Prod(d)))
             })
             .boxed()
     }
 
     #[proptest]
     fn gateway_dev_initialization(#[strategy(any_valid_dev_gateway())] input: GatewayInput) {
-        let (storage, _, account, dev) = input;
-        let address = account.address();
-        let gateway = Gateway::new(account, storage, dev.ip(), dev.port()).unwrap();
+        let (storage, _, private_key, dev) = input;
+        let account = Account::try_from(private_key).unwrap();
+
+        let gateway = Gateway::new(account.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.listener_ip, Some(IpAddr::V4(Ipv4Addr::LOCALHOST)));
         assert_eq!(tcp_config.desired_listening_port, Some(MEMORY_POOL_PORT + dev.port().unwrap()));
 
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.max_connections, MAX_COMMITTEE_SIZE);
-        assert_eq!(gateway.account().address(), address);
+        assert_eq!(gateway.account().address(), account.address());
     }
 
     #[proptest]
     fn gateway_prod_initialization(#[strategy(any_valid_prod_gateway())] input: GatewayInput) {
-        let (storage, _, account, dev) = input;
-        let address = account.address();
-        let gateway = Gateway::new(account, storage, dev.ip(), dev.port()).unwrap();
+        let (storage, _, private_key, dev) = input;
+        let account = Account::try_from(private_key).unwrap();
+
+        let gateway = Gateway::new(account.clone(), storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
         let tcp_config = gateway.tcp().config();
         if let Some(socket_addr) = dev.ip() {
             assert_eq!(tcp_config.listener_ip, Some(socket_addr.ip()));
@@ -979,7 +1073,7 @@ pub mod prop_tests {
 
         let tcp_config = gateway.tcp().config();
         assert_eq!(tcp_config.max_connections, MAX_COMMITTEE_SIZE);
-        assert_eq!(gateway.account().address(), address);
+        assert_eq!(gateway.account().address(), account.address());
     }
 
     #[proptest(async = "tokio")]
@@ -987,9 +1081,12 @@ pub mod prop_tests {
         #[strategy(any_valid_dev_gateway())] input: GatewayInput,
         #[strategy(0..MAX_WORKERS)] workers_count: u8,
     ) {
-        let (storage, _, account, dev) = input;
+        let (storage, committee, private_key, dev) = input;
+        let committee = committee.0;
         let worker_storage = storage.clone();
-        let gateway = Gateway::new(account, storage, dev.ip(), dev.port()).unwrap();
+        let account = Account::try_from(private_key).unwrap();
+
+        let gateway = Gateway::new(account, storage.ledger().clone(), dev.ip(), &[], dev.port()).unwrap();
 
         let (workers, worker_senders) = {
             // Construct a map of the worker senders.
@@ -1001,7 +1098,7 @@ pub mod prop_tests {
                 // Construct the worker channels.
                 let (tx_worker, rx_worker) = init_worker_channels();
                 // Construct the worker instance.
-                let ledger = Arc::new(MockLedgerService::new());
+                let ledger = Arc::new(MockLedgerService::new(committee.clone()));
                 let worker =
                     Worker::new(id, Arc::new(gateway.clone()), worker_storage.clone(), ledger, Default::default())
                         .unwrap();

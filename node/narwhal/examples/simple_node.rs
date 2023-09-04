@@ -17,16 +17,18 @@ extern crate tracing;
 
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
-    helpers::{init_primary_channels, PrimarySender, Storage},
+    helpers::{init_consensus_channels, init_primary_channels, ConsensusReceiver, PrimarySender, Storage},
     Primary,
     BFT,
     MAX_GC_ROUNDS,
     MEMORY_POOL_PORT,
 };
-use snarkos_node_narwhal_committee::Committee;
 use snarkos_node_narwhal_ledger_service::MockLedgerService;
 use snarkvm::{
-    ledger::narwhal::Data,
+    ledger::{
+        committee::{Committee, MIN_STAKE},
+        narwhal::Data,
+    },
     prelude::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
@@ -48,7 +50,6 @@ use axum::{
 use axum_extra::response::ErasedJson;
 use clap::{Parser, ValueEnum};
 use indexmap::IndexMap;
-use parking_lot::RwLock;
 use rand::{Rng, SeedableRng};
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use tokio::sync::oneshot;
@@ -78,10 +79,15 @@ pub fn initialize_logger(verbosity: u8) {
             .add_directive("hyper=off".parse().unwrap())
             .add_directive("reqwest=off".parse().unwrap())
             .add_directive("want=off".parse().unwrap())
-            .add_directive("snarkos_node_narwhal::gateway=off".parse().unwrap())
             .add_directive("warp=off".parse().unwrap());
 
-        if verbosity > 3 {
+        let filter = if verbosity > 3 {
+            filter.add_directive("snarkos_node_narwhal::gateway=trace".parse().unwrap())
+        } else {
+            filter.add_directive("snarkos_node_narwhal::gateway=off".parse().unwrap())
+        };
+
+        if verbosity > 4 {
             filter.add_directive("snarkos_node_tcp=trace".parse().unwrap())
         } else {
             filter.add_directive("snarkos_node_tcp=off".parse().unwrap())
@@ -105,24 +111,28 @@ pub async fn start_bft(
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
-    let (storage, account) = initialize_components(node_id, num_nodes)?;
+    let (committee, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
-    let ledger = Arc::new(MockLedgerService::new());
+    let ledger = Arc::new(MockLedgerService::new(committee));
+    // Initialize the storage.
+    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
         None => (None, Some(node_id)),
     };
+    // Initialize the trusted validators.
+    let trusted_validators = trusted_validators(node_id, num_nodes, peers);
+    // Initialize the consensus channels.
+    let (consensus_sender, consensus_receiver) = init_consensus_channels::<CurrentNetwork>();
+    // Initialize the consensus receiver handler.
+    consensus_handler(consensus_receiver);
     // Initialize the BFT instance.
-    let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, ip, dev)?;
+    let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, ip, &trusted_validators, dev)?;
     // Run the BFT instance.
-    bft.run(sender.clone(), receiver, None).await?;
+    bft.run(sender.clone(), receiver, Some(consensus_sender)).await?;
     // Retrieve the BFT's primary.
     let primary = bft.primary();
-    // Keep the node's connections.
-    keep_connections(primary, node_id, num_nodes, peers);
-    // Handle the log connections.
-    log_connections(primary);
     // Handle OS signals.
     handle_signals(primary);
     // Return the BFT instance.
@@ -138,22 +148,22 @@ pub async fn start_primary(
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
-    let (storage, account) = initialize_components(node_id, num_nodes)?;
+    let (committee, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
-    let ledger = Arc::new(MockLedgerService::new());
+    let ledger = Arc::new(MockLedgerService::new(committee));
+    // Initialize the storage.
+    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
         None => (None, Some(node_id)),
     };
+    // Initialize the trusted validators.
+    let trusted_validators = trusted_validators(node_id, num_nodes, peers);
     // Initialize the primary instance.
-    let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, ip, dev)?;
+    let mut primary = Primary::<CurrentNetwork>::new(account, storage, ledger, ip, &trusted_validators, dev)?;
     // Run the primary instance.
     primary.run(sender.clone(), receiver, None).await?;
-    // Keep the node's connections.
-    keep_connections(&primary, node_id, num_nodes, peers);
-    // Handle the log connections.
-    log_connections(&primary);
     // Handle OS signals.
     handle_signals(&primary);
     // Return the primary instance.
@@ -161,7 +171,7 @@ pub async fn start_primary(
 }
 
 /// Initializes the components of the node.
-fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Storage<CurrentNetwork>, Account<CurrentNetwork>)> {
+fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Committee<CurrentNetwork>, Account<CurrentNetwork>)> {
     // Ensure that the node ID is valid.
     ensure!(node_id < num_nodes, "Node ID {node_id} must be less than {num_nodes}");
 
@@ -176,58 +186,57 @@ fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Storage<Curren
         // Sample the account.
         let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64))?;
         // Add the validator.
-        members.insert(account.address(), 1000);
+        members.insert(account.address(), (MIN_STAKE, false));
         println!("  Validator {}: {}", i, account.address());
     }
     println!();
 
     // Initialize the committee.
-    let committee = Arc::new(RwLock::new(Committee::<CurrentNetwork>::new(1u64, members)?));
-    // Initialize the storage.
-    let storage = Storage::new(committee.read().clone(), MAX_GC_ROUNDS);
-    // Return the storage and account.
-    Ok((storage, account))
+    let committee = Committee::<CurrentNetwork>::new_genesis(members)?;
+    // Return the committee and account.
+    Ok((committee, account))
 }
 
-/// Actively try to keep the node's connections to all nodes.
-fn keep_connections(primary: &Primary<CurrentNetwork>, node_id: u16, num_nodes: u16, peers: HashMap<u16, SocketAddr>) {
-    let node = primary.clone();
+/// Handles the consensus receiver.
+fn consensus_handler(receiver: ConsensusReceiver<CurrentNetwork>) {
+    let ConsensusReceiver { mut rx_consensus_subdag } = receiver;
+
     tokio::task::spawn(async move {
-        // Sleep briefly to ensure the other nodes are ready to connect.
-        tokio::time::sleep(std::time::Duration::from_millis(100 * node_id as u64)).await;
-        // Start the loop.
-        loop {
-            for i in 0..num_nodes {
-                // Initialize the gateway IP.
-                let ip = match peers.get(&i) {
-                    Some(ip) => *ip,
-                    None => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i)).unwrap(),
-                };
-                // Check if the node is connected.
-                if i != node_id && !node.gateway().is_connected(ip) {
-                    // Connect to the node.
-                    debug!("Connecting to {}...", ip);
-                    node.gateway().connect(ip);
-                }
-            }
-            tokio::time::sleep(std::time::Duration::from_secs(30)).await;
+        while let Some((subdag, transmissions, callback)) = rx_consensus_subdag.recv().await {
+            // Determine the amount of time to sleep for the subdag.
+            let subdag_ms = subdag.values().flatten().count();
+            // Determine the amount of time to sleep for the transmissions.
+            let transmissions_ms = transmissions.len() * 25;
+            // Add a constant delay.
+            let constant_ms = 100;
+            // Compute the total amount of time to sleep.
+            let sleep_ms = (subdag_ms + transmissions_ms + constant_ms) as u64;
+            // Sleep for the determined amount of time.
+            tokio::time::sleep(std::time::Duration::from_millis(sleep_ms)).await;
+            // Call the callback.
+            callback.send(Ok(())).ok();
         }
     });
 }
 
-/// Logs the node's connections.
-fn log_connections(primary: &Primary<CurrentNetwork>) {
-    let node = primary.clone();
-    tokio::task::spawn(async move {
-        loop {
-            let connections = node.gateway().connected_peers().read().clone();
-            info!("{} connections", connections.len());
-            for connection in connections {
-                debug!("  {}", connection);
-            }
-            tokio::time::sleep(std::time::Duration::from_secs(15)).await;
+/// Returns the trusted validators.
+fn trusted_validators(node_id: u16, num_nodes: u16, peers: HashMap<u16, SocketAddr>) -> Vec<SocketAddr> {
+    // Initialize a vector for the trusted nodes.
+    let mut trusted = Vec::with_capacity(num_nodes as usize);
+    // Iterate through the nodes.
+    for i in 0..num_nodes {
+        // Initialize the gateway IP.
+        let ip = match peers.get(&i) {
+            Some(ip) => *ip,
+            None => SocketAddr::from_str(&format!("127.0.0.1:{}", MEMORY_POOL_PORT + i)).unwrap(),
+        };
+        // If the node is not the current node, add it to the trusted nodes.
+        if i != node_id {
+            trusted.push(ip);
         }
-    });
+    }
+    // Return the trusted nodes.
+    trusted
 }
 
 /// Handles OS signals for the node to intercept and perform a clean shutdown.

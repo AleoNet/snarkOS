@@ -18,6 +18,12 @@
 mod common;
 use common::{node::*, test_peer::TestPeer};
 
+use snarkos_node_router::Outbound;
+use snarkos_node_tcp::P2P;
+
+use std::time::Duration;
+use tokio::time::sleep;
+
 // Macro to simply construct disconnect cases.
 // Syntax:
 // - (full_node |> test_peer): full node disconnects from the synthetic test peer.
@@ -160,4 +166,47 @@ mod validator {
         validator <| validator,
         validator <| prover
     }
+}
+
+#[tokio::test(flavor = "multi_thread")]
+async fn duplicate_disconnect_attempts() {
+    // common::initialise_logger(3);
+
+    // Spin up 2 full nodes.
+    let node1 = validator().await;
+    let node2 = validator().await;
+    let addr2 = node2.tcp().listening_addr().unwrap();
+
+    // Connect node1 to node2.
+    assert!(node1.router().connect(addr2).unwrap().await.unwrap());
+
+    // Prepare disconnect attempts.
+    let node1_clone = node1.clone();
+    let disconn1 = tokio::spawn(async move { node1_clone.router().disconnect(addr2).await.unwrap() });
+    let node1_clone = node1.clone();
+    let disconn2 = tokio::spawn(async move { node1_clone.router().disconnect(addr2).await.unwrap() });
+    let node1_clone = node1.clone();
+    let disconn3 = tokio::spawn(async move { node1_clone.router().disconnect(addr2).await.unwrap() });
+
+    // Attempt to connect the 1st node to the other one several times at once.
+    let (result1, result2, result3) = tokio::join!(disconn1, disconn2, disconn3);
+    // A small anti-flakiness buffer.
+    sleep(Duration::from_millis(200)).await;
+
+    // Count the successes.
+    let mut successes = 0;
+    if result1.unwrap() {
+        successes += 1;
+    }
+    if result2.unwrap() {
+        successes += 1;
+    }
+    if result3.unwrap() {
+        successes += 1;
+    }
+
+    // Connection checks.
+    assert_eq!(successes, 1);
+    assert_eq!(node1.router().number_of_connected_peers(), 0);
+    assert_eq!(node2.router().number_of_connected_peers(), 0);
 }
