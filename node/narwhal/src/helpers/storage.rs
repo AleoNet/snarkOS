@@ -12,14 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use crate::helpers::check_timestamp_for_liveness;
-use snarkos_node_narwhal_committee::Committee;
+use crate::{helpers::check_timestamp_for_liveness, primary::Ledger};
 use snarkvm::{
     ledger::narwhal::{BatchCertificate, BatchHeader, Transmission, TransmissionID},
     prelude::{bail, ensure, Address, Field, Network, Result},
 };
 
-use indexmap::{indexmap, map::Entry, IndexMap, IndexSet};
+use indexmap::{map::Entry, IndexMap, IndexSet};
 use parking_lot::RwLock;
 use std::{
     collections::{HashMap, HashSet},
@@ -32,7 +31,7 @@ use std::{
 /// The storage for the memory pool.
 ///
 /// The storage is used to store the following:
-/// - `round` to `committee` entries.
+/// - `current_round` tracker.
 /// - `round` to `(certificate ID, batch ID, author)` entries.
 /// - `certificate ID` to `certificate` entries.
 /// - `batch ID` to `round` entries.
@@ -46,14 +45,13 @@ use std::{
 ///   - The missing `transmissions` from storage are inserted into the `transmissions` map.
 ///   - The certificate ID is inserted into the `transmissions` map.
 /// 3. After a `round` reaches quorum threshold:
-///  - The `committee` for the next round is inserted into the `committees` map.
+///  - The next round is inserted into the `current_round`.
 #[derive(Clone, Debug)]
 pub struct Storage<N: Network> {
+    ledger: Ledger<N>,
     /* Once per round */
     /// The current round.
     current_round: Arc<AtomicU64>,
-    /// The map of `round` to `committee`.
-    committees: Arc<RwLock<IndexMap<u64, Committee<N>>>>,
     /// The `round` for which garbage collection has occurred **up to** (inclusive).
     gc_round: Arc<AtomicU64>,
     /// The maximum number of rounds to keep in storage.
@@ -71,13 +69,15 @@ pub struct Storage<N: Network> {
 
 impl<N: Network> Storage<N> {
     /// Initializes a new instance of storage.
-    pub fn new(committee: Committee<N>, max_gc_rounds: u64) -> Self {
+    pub fn new(ledger: Ledger<N>, max_gc_rounds: u64) -> Self {
+        // Retrieve the current committee.
+        let committee = ledger.current_committee().expect("Ledger is missing a committee.");
         // Retrieve the current round.
-        let current_round = committee.round();
+        let current_round = committee.starting_round();
         // Return the storage.
         Self {
+            ledger,
             current_round: Arc::new(AtomicU64::new(current_round)),
-            committees: Arc::new(RwLock::new(indexmap! { current_round => committee })),
             gc_round: Default::default(),
             max_gc_rounds,
             rounds: Default::default(),
@@ -89,11 +89,6 @@ impl<N: Network> Storage<N> {
 }
 
 impl<N: Network> Storage<N> {
-    /// Returns an iterator over the `(round, committee)` entries.
-    pub fn committees_iter(&self) -> impl Iterator<Item = (u64, Committee<N>)> {
-        self.committees.read().clone().into_iter()
-    }
-
     /// Returns an iterator over the `(round, (certificate ID, batch ID, author))` entries.
     pub fn rounds_iter(&self) -> impl Iterator<Item = (u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)> {
         self.rounds.read().clone().into_iter()
@@ -135,36 +130,21 @@ impl<N: Network> Storage<N> {
         self.max_gc_rounds
     }
 
-    /// Returns the current committee.
-    pub fn current_committee(&self) -> Committee<N> {
-        // Get the current round.
-        let round = self.current_round();
-        // Get the committee for the current round.
-        self.get_committee(round).expect("The committee for current round should exist")
-    }
-
-    /// Returns the `committee` for the given `round`.
-    /// If the round does not exist in storage, `None` is returned.
-    pub fn get_committee(&self, round: u64) -> Option<Committee<N>> {
-        // Get the committee from storage.
-        self.committees.read().get(&round).cloned()
-    }
-
-    /// Increments storage to the next round, updating the current round and committee.
+    /// Increments storage to the next round, updating the current round.
     /// Note: This method is only called once per round, upon certification of the primary's batch.
-    pub fn increment_to_next_round(&self, next_committee: Committee<N>) -> Result<()> {
-        // Ensure the next committee is for the next round.
-        ensure!(next_committee.round() == self.current_round() + 1, "The next committee must be for the next round");
-
+    pub fn increment_to_next_round(&self) -> Result<()> {
         // Retrieve the next round.
-        let next_round = next_committee.round();
+        let next_round = self.current_round() + 1;
         // Ensure there are no certificates for the next round yet.
         ensure!(!self.contains_certificates_for_round(next_round), "Certificates for the next round cannot exist yet");
 
+        // Retrieve the current committee.
+        let current_committee = self.ledger.current_committee()?;
+        // Ensure the next round is at or after the current committee's starting round.
+        ensure!(next_round >= current_committee.starting_round(), "Next round is behind the current committee");
+
         // Update the current round.
         self.current_round.store(next_round, Ordering::Relaxed);
-        // Insert the committee into storage.
-        self.committees.write().insert(next_round, next_committee);
 
         // Fetch the current GC round.
         let current_gc_round = self.gc_round();
@@ -179,8 +159,6 @@ impl<N: Network> Storage<N> {
                     // Remove the certificate from storage.
                     self.remove_certificate(certificate.certificate_id());
                 }
-                // Remove the GC round from the committee.
-                self.remove_committee(gc_round);
             }
             // Update the GC round.
             self.gc_round.store(next_gc_round, Ordering::Relaxed);
@@ -191,13 +169,6 @@ impl<N: Network> Storage<N> {
         // Log the updated round.
         info!("Starting round {next_round}...");
         Ok(())
-    }
-
-    /// Removes the committee for the given `round` from storage.
-    /// Note: This method should only be called by garbage collection.
-    fn remove_committee(&self, round: u64) {
-        // Remove the committee from storage.
-        self.committees.write().remove(&round);
     }
 }
 
@@ -312,7 +283,7 @@ impl<N: Network> Storage<N> {
         }
 
         // Retrieve the committee for the batch round.
-        let Some(committee) = self.get_committee(round) else {
+        let Ok(committee) = self.ledger.get_committee_for_round(round) else {
             bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
         };
         // Ensure the author is in the committee.
@@ -343,7 +314,7 @@ impl<N: Network> Storage<N> {
         // Check if the previous round is within range of the GC round.
         if previous_round > gc_round {
             // Retrieve the committee for the previous round.
-            let Some(previous_committee) = self.get_committee(previous_round) else {
+            let Ok(previous_committee) = self.ledger.get_committee_for_round(previous_round) else {
                 bail!("Missing committee for the previous round {previous_round} in storage {gc_log}")
             };
             // Ensure the previous round certificates exists in storage.
@@ -428,7 +399,7 @@ impl<N: Network> Storage<N> {
         }
 
         // Retrieve the committee for the batch round.
-        let Some(committee) = self.get_committee(round) else {
+        let Ok(committee) = self.ledger.get_committee_for_round(round) else {
             bail!("Storage failed to retrieve the committee for round {round} {gc_log}")
         };
 
@@ -589,6 +560,7 @@ impl<N: Network> Storage<N> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
     use snarkvm::{
         ledger::narwhal::Data,
         prelude::{Rng, TestRng},
@@ -602,14 +574,11 @@ mod tests {
     /// Asserts that the storage matches the expected layout.
     pub fn assert_storage<N: Network>(
         storage: &Storage<N>,
-        committees: &[(u64, Committee<N>)],
         rounds: &[(u64, IndexSet<(Field<N>, Field<N>, Address<N>)>)],
         certificates: &[(Field<N>, BatchCertificate<N>)],
         batch_ids: &[(Field<N>, u64)],
         transmissions: &HashMap<TransmissionID<N>, (Transmission<N>, IndexSet<Field<N>>)>,
     ) {
-        // Ensure the committees are well-formed.
-        assert_eq!(storage.committees_iter().collect::<Vec<_>>(), *committees);
         // Ensure the rounds are well-formed.
         assert_eq!(storage.rounds_iter().collect::<Vec<_>>(), *rounds);
         // Ensure the certificates are well-formed.
@@ -668,14 +637,14 @@ mod tests {
         let rng = &mut TestRng::default();
 
         // Sample a committee.
-        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
 
-        // Initialize the committees.
-        let committees = [(1, committee)];
         // Ensure the storage is empty.
-        assert_storage(&storage, &committees, &[], &[], &[], &Default::default());
+        assert_storage(&storage, &[], &[], &[], &Default::default());
 
         // Create a new certificate.
         let certificate = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(rng);
@@ -707,7 +676,7 @@ mod tests {
             // Construct the expected layout for 'batch_ids'.
             let batch_ids = [(batch_id, round)];
             // Assert the storage is well-formed.
-            assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &transmissions);
+            assert_storage(&storage, &rounds, &certificates, &batch_ids, &transmissions);
         }
 
         // Retrieve the certificate.
@@ -722,7 +691,7 @@ mod tests {
         // Ensure the certificate is no longer stored in the round.
         assert!(storage.get_certificates_for_round(round).is_empty());
         // Ensure the storage is empty.
-        assert_storage(&storage, &committees, &[], &[], &[], &Default::default());
+        assert_storage(&storage, &[], &[], &[], &Default::default());
     }
 
     #[test]
@@ -730,14 +699,14 @@ mod tests {
         let rng = &mut TestRng::default();
 
         // Sample a committee.
-        let committee = snarkos_node_narwhal_committee::test_helpers::sample_committee(rng);
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        // Initialize the ledger.
+        let ledger = Arc::new(MockLedgerService::new(committee));
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
+        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
 
-        // Initialize the committees.
-        let committees = [(1, committee)];
         // Ensure the storage is empty.
-        assert_storage(&storage, &committees, &[], &[], &[], &Default::default());
+        assert_storage(&storage, &[], &[], &[], &Default::default());
 
         // Create a new certificate.
         let certificate = snarkvm::ledger::narwhal::batch_certificate::test_helpers::sample_batch_certificate(rng);
@@ -764,27 +733,40 @@ mod tests {
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation is correct.
-        assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &transmissions);
+        assert_storage(&storage, &rounds, &certificates, &batch_ids, &transmissions);
 
         // Insert the certificate again - without any missing transmissions.
         storage.insert_certificate_atomic(certificate.clone(), Default::default());
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation remains unchanged.
-        assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &transmissions);
+        assert_storage(&storage, &rounds, &certificates, &batch_ids, &transmissions);
 
         // Insert the certificate again - with all of the original missing transmissions.
         storage.insert_certificate_atomic(certificate, missing_transmissions);
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation remains unchanged.
-        assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &transmissions);
+        assert_storage(&storage, &rounds, &certificates, &batch_ids, &transmissions);
     }
 }
 
 #[cfg(test)]
 pub mod prop_tests {
-    use std::fmt::Debug;
+    use super::*;
+    use crate::{
+        helpers::{now, storage::tests::assert_storage},
+        MAX_GC_ROUNDS,
+    };
+    use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkvm::{
+        ledger::{
+            coinbase::PuzzleCommitment,
+            committee::prop_tests::{CommitteeContext, ValidatorSet},
+            narwhal::Data,
+        },
+        prelude::{Signature, Uniform},
+    };
 
     use ::bytes::Bytes;
     use indexmap::indexset;
@@ -796,19 +778,8 @@ pub mod prop_tests {
         test_runner::TestRng,
     };
     use rand::{CryptoRng, Error, Rng, RngCore};
-    use snarkvm::{
-        ledger::{coinbase::PuzzleCommitment, narwhal::Data},
-        prelude::{Signature, Uniform},
-    };
+    use std::fmt::Debug;
     use test_strategy::proptest;
-
-    use crate::{
-        helpers::{now, storage::tests::assert_storage},
-        MAX_GC_ROUNDS,
-    };
-    use snarkos_node_narwhal_committee::prop_tests::{CommitteeContext, ValidatorSet};
-
-    use super::*;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
@@ -819,7 +790,8 @@ pub mod prop_tests {
         fn arbitrary() -> Self::Strategy {
             (any::<CommitteeContext>(), 0..MAX_GC_ROUNDS)
                 .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
-                    Storage::<CurrentNetwork>::new(committee, gc_rounds)
+                    let ledger = Arc::new(MockLedgerService::new(committee));
+                    Storage::<CurrentNetwork>::new(ledger, gc_rounds)
                 })
                 .boxed()
         }
@@ -827,7 +799,8 @@ pub mod prop_tests {
         fn arbitrary_with(context: Self::Parameters) -> Self::Strategy {
             (Just(context), 0..MAX_GC_ROUNDS)
                 .prop_map(|(CommitteeContext(committee, _), gc_rounds)| {
-                    Storage::<CurrentNetwork>::new(committee, gc_rounds)
+                    let ledger = Arc::new(MockLedgerService::new(committee));
+                    Storage::<CurrentNetwork>::new(ledger, gc_rounds)
                 })
                 .boxed()
         }
@@ -926,7 +899,7 @@ pub mod prop_tests {
     ) -> IndexMap<Signature<CurrentNetwork>, i64> {
         let mut signatures = IndexMap::with_capacity(validator_set.0.len());
         for validator in validator_set.0.iter() {
-            let private_key = validator.account.private_key();
+            let private_key = validator.private_key;
             let timestamp = time::OffsetDateTime::now_utc().unix_timestamp();
             let timestamp_field = Field::from_u64(timestamp as u64);
             signatures.insert(private_key.sign(&[batch_header.batch_id(), timestamp_field], rng).unwrap(), timestamp);
@@ -944,12 +917,11 @@ pub mod prop_tests {
         let CommitteeContext(committee, ValidatorSet(validators)) = context;
 
         // Initialize the storage.
-        let storage = Storage::<CurrentNetwork>::new(committee.clone(), 1);
+        let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::<CurrentNetwork>::new(ledger, 1);
 
-        // Initialize the committees.
-        let committees = [(committee.round(), committee)];
         // Ensure the storage is empty.
-        assert_storage(&storage, &committees, &[], &[], &[], &Default::default());
+        assert_storage(&storage, &[], &[], &[], &Default::default());
 
         // Create a new certificate.
         let signer = selector.select(&validators);
@@ -961,7 +933,7 @@ pub mod prop_tests {
         }
 
         let batch_header = BatchHeader::new(
-            signer.account.private_key(),
+            &signer.private_key,
             0,
             now(),
             transmission_map.keys().cloned().collect(),
@@ -1003,20 +975,20 @@ pub mod prop_tests {
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation is correct.
-        assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &internal_transmissions);
+        assert_storage(&storage, &rounds, &certificates, &batch_ids, &internal_transmissions);
 
         // Insert the certificate again - without any missing transmissions.
         storage.insert_certificate_atomic(certificate.clone(), Default::default());
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation remains unchanged.
-        assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &internal_transmissions);
+        assert_storage(&storage, &rounds, &certificates, &batch_ids, &internal_transmissions);
 
         // Insert the certificate again - with all of the original missing transmissions.
         storage.insert_certificate_atomic(certificate, missing_transmissions);
         // Ensure the certificate exists in storage.
         assert!(storage.contains_certificate(certificate_id));
         // Check that the underlying storage representation remains unchanged.
-        assert_storage(&storage, &committees, &rounds, &certificates, &batch_ids, &internal_transmissions);
+        assert_storage(&storage, &rounds, &certificates, &batch_ids, &internal_transmissions);
     }
 }

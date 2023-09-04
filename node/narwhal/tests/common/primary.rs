@@ -25,8 +25,10 @@ use snarkos_node_narwhal::{
     MAX_BATCH_DELAY,
     MAX_GC_ROUNDS,
 };
-use snarkos_node_narwhal_committee::{Committee, MIN_STAKE};
-use snarkvm::prelude::TestRng;
+use snarkvm::{
+    ledger::committee::{Committee, MIN_STAKE},
+    prelude::TestRng,
+};
 
 use std::{collections::HashMap, ops::RangeBounds, sync::Arc, time::Duration};
 
@@ -114,8 +116,8 @@ impl TestNetwork {
 
         let mut validators = HashMap::with_capacity(config.num_nodes as usize);
         for (id, account) in accounts.into_iter().enumerate() {
-            let storage = Storage::new(committee.clone(), MAX_GC_ROUNDS);
-            let ledger = Arc::new(MockLedgerService::new());
+            let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+            let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
 
             let (primary, bft) = if config.bft {
                 let bft = BFT::<CurrentNetwork>::new(account, storage, ledger, None, Some(id as u16)).unwrap();
@@ -217,7 +219,8 @@ impl TestNetwork {
         T: RangeBounds<u64> + IntoIterator<Item = u64>,
     {
         rounds_range.into_iter().all(|round| {
-            self.validators.values().map(|v| v.primary.storage().get_committee(round).unwrap()).dedup().count() == 1
+            self.validators.values().map(|v| v.primary.ledger().get_committee_for_round(round).unwrap()).dedup().count()
+                == 1
         })
     }
 
@@ -245,7 +248,7 @@ fn new_test_committee(n: u16) -> (Vec<Account<CurrentNetwork>>, Committee<Curren
 
         info!("Validator {}: {}", i, account.address());
 
-        members.insert(account.address(), INITIAL_STAKE);
+        members.insert(account.address(), (INITIAL_STAKE, false));
         accounts.push(account);
     }
     // Initialize the committee.

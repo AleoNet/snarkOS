@@ -29,12 +29,12 @@ use crate::{
     MAX_LEADER_CERTIFICATE_DELAY,
 };
 use snarkos_account::Account;
-use snarkos_node_narwhal_committee::Committee;
 use snarkvm::{
     console::account::Address,
     ledger::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
+        committee::Committee,
         narwhal::{BatchCertificate, Data, Subdag, Transmission, TransmissionID},
     },
     prelude::{bail, ensure, Field, Network, Result},
@@ -51,7 +51,10 @@ use std::{
         Arc,
     },
 };
-use tokio::{sync::OnceCell, task::JoinHandle};
+use tokio::{
+    sync::{oneshot, OnceCell},
+    task::JoinHandle,
+};
 
 #[derive(Clone)]
 pub struct BFT<N: Network> {
@@ -198,7 +201,8 @@ impl<N: Network> BFT<N> {
         // If the BFT is ready to update to the next round, update to the next committee.
         if is_ready {
             // Update to the next committee in storage.
-            self.storage().increment_to_next_round(self.storage().current_committee().to_next_round())?;
+            // TODO (howardwu): Fix to increment to the next round.
+            self.storage().increment_to_next_round()?;
             // Update the timer for the leader certificate.
             self.leader_certificate_timer.store(now(), Ordering::SeqCst);
         }
@@ -230,11 +234,12 @@ impl<N: Network> BFT<N> {
         }
 
         // Retrieve the committee for the current round.
-        let Some(committee) = self.storage().get_committee(current_round) else {
+        // Note: This is equivalent to calling `self.ledger().current_committee()`.
+        let Ok(committee) = self.ledger().get_committee_for_round(current_round) else {
             bail!("BFT failed to retrieve the committee for the even round")
         };
         // Determine the leader of the current round.
-        let leader = committee.get_leader()?;
+        let leader = committee.get_leader(current_round)?;
         // Find and set the leader certificate, if the leader was present in the current even round.
         let leader_certificate = current_certificates.iter().find(|certificate| certificate.author() == leader);
         *self.leader_certificate.write() = leader_certificate.cloned();
@@ -296,7 +301,8 @@ impl<N: Network> BFT<N> {
         // Retrieve the certificates for the current round.
         let current_certificates = self.storage().get_certificates_for_round(current_round);
         // Retrieve the committee of the current round.
-        let Some(current_committee) = self.storage().get_committee(current_round) else {
+        // Note: This is equivalent to calling `self.ledger().current_committee()`.
+        let Ok(current_committee) = self.ledger().get_committee_for_round(current_round) else {
             bail!("BFT failed to retrieve the committee for the current round")
         };
 
@@ -362,11 +368,12 @@ impl<N: Network> BFT<N> {
         }
 
         // Retrieve the committee for the commit round.
-        let Some(committee) = self.storage().get_committee(commit_round) else {
+        // Note: This is equivalent to calling `self.ledger().current_committee()`.
+        let Ok(committee) = self.ledger().get_committee_for_round(commit_round) else {
             bail!("BFT failed to retrieve the committee for commit round {commit_round}");
         };
         // Compute the leader for the commit round.
-        let Ok(leader) = committee.get_leader() else {
+        let Ok(leader) = committee.get_leader(commit_round) else {
             bail!("BFT failed to compute the leader for commit round {commit_round}");
         };
         // Retrieve the leader certificate for the commit round.
@@ -455,7 +462,17 @@ impl<N: Network> BFT<N> {
             );
             // Trigger consensus.
             if let Some(consensus_sender) = self.consensus_sender.get() {
-                consensus_sender.tx_consensus_subdag.send((subdag, transmissions)).await?;
+                // Retrieve the anchor round.
+                let anchor_round = subdag.anchor_round();
+                // Initialize a callback sender and receiver.
+                let (callback_sender, callback_receiver) = oneshot::channel();
+                // Send the subdag and transmissions to consensus.
+                consensus_sender.tx_consensus_subdag.send((subdag, transmissions, callback_sender)).await?;
+                // Await the callback to continue.
+                if let Err(e) = callback_receiver.await {
+                    error!("BFT failed to advance the subdag for round {anchor_round} - {e}");
+                    break;
+                }
             }
         }
         Ok(())
@@ -556,10 +573,11 @@ impl<N: Network> BFT<N> {
         let self_ = self.clone();
         self.spawn(async move {
             while let Some((certificate, callback)) = rx_primary_certificate.recv().await {
-                callback.send(Ok(())).ok();
-                if let Err(e) = self_.update_dag(certificate).await {
-                    warn!("BFT failed to update the DAG: {e}");
-                }
+                // Update the DAG with the certificate.
+                let result = self_.update_dag(certificate).await;
+                // Send the callback **after** updating the DAG.
+                // Note: We must await the DAG update before proceeding.
+                callback.send(result).ok();
             }
         });
     }
@@ -586,7 +604,6 @@ mod tests {
         BFT,
     };
     use snarkos_account::Account;
-    use snarkos_node_narwhal_committee::test_helpers::{sample_committee, sample_committee_for_round};
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
     use snarkvm::{prelude::narwhal::batch_certificate::test_helpers::sample_batch_certificate, utilities::TestRng};
 
@@ -596,11 +613,12 @@ mod tests {
 
     #[test]
     fn test_is_leader_quorum_odd() -> Result<()> {
-        let mut rng = TestRng::default();
-        let committee = sample_committee(&mut rng);
-        let account = Account::new(&mut rng)?;
-        let storage = Storage::new(committee, 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let rng = &mut TestRng::default();
+
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let account = Account::new(rng)?;
+        let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -612,7 +630,7 @@ mod tests {
         assert!(result.unwrap());
 
         // Set the leader certificate.
-        let leader_certificate = sample_batch_certificate(&mut rng);
+        let leader_certificate = sample_batch_certificate(rng);
         *bft.leader_certificate.write() = Some(leader_certificate);
 
         // Ensure this call succeeds on an odd round.
@@ -634,12 +652,13 @@ mod tests {
 
     #[test]
     fn test_is_leader_quorum_even_out_of_sync() -> Result<()> {
-        let mut rng = TestRng::default();
-        // Create a committee with round 1
-        let committee = sample_committee(&mut rng);
-        let account = Account::new(&mut rng)?;
-        let storage = Storage::new(committee, 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let rng = &mut TestRng::default();
+
+        // Create a committee with round 1.
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let account = Account::new(rng)?;
+        let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -655,11 +674,12 @@ mod tests {
 
     #[test]
     fn test_is_leader_quorum_even() -> Result<()> {
-        let mut rng = TestRng::default();
-        let committee = sample_committee_for_round(2, &mut rng);
-        let account = Account::new(&mut rng)?;
-        let storage = Storage::new(committee, 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let rng = &mut TestRng::default();
+
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
+        let account = Account::new(rng)?;
+        let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -677,11 +697,12 @@ mod tests {
 
     #[test]
     fn test_is_even_round_ready() -> Result<()> {
-        let mut rng = TestRng::default();
-        let committee = sample_committee_for_round(2, &mut rng);
-        let account = Account::new(&mut rng)?;
-        let storage = Storage::new(committee.clone(), 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let rng = &mut TestRng::default();
+
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
+        let account = Account::new(rng)?;
+        let ledger = Arc::new(MockLedgerService::new(committee.clone()));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -690,7 +711,7 @@ mod tests {
         assert!(!result);
 
         // Set the leader certificate.
-        let leader_certificate = sample_batch_certificate(&mut rng);
+        let leader_certificate = sample_batch_certificate(rng);
         *bft.leader_certificate.write() = Some(leader_certificate);
 
         let result = bft.is_even_round_ready_for_next_round(IndexSet::new(), committee);
@@ -701,11 +722,12 @@ mod tests {
 
     #[test]
     fn test_update_leader_certificate_odd() -> Result<()> {
-        let mut rng = TestRng::default();
-        let committee = sample_committee(&mut rng);
-        let account = Account::new(&mut rng)?;
-        let storage = Storage::new(committee, 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let rng = &mut TestRng::default();
+
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let account = Account::new(rng)?;
+        let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
@@ -719,11 +741,14 @@ mod tests {
 
     #[test]
     fn test_update_leader_certificate_bad_round() -> Result<()> {
-        let mut rng = TestRng::default();
-        let committee = sample_committee(&mut rng);
-        let account = Account::new(&mut rng)?;
-        let storage = Storage::new(committee, 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let rng = &mut TestRng::default();
+
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee(rng);
+        let account = Account::new(rng)?;
+        let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), 10);
+
+        // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
 
         // Ensure this call succeeds on an even round.
@@ -735,17 +760,18 @@ mod tests {
 
     #[test]
     fn test_update_leader_certificate_even() -> Result<()> {
-        let mut rng = TestRng::default();
-        let committee = sample_committee_for_round(2, &mut rng);
-        let account = Account::new(&mut rng)?;
-        let storage = Storage::new(committee, 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let rng = &mut TestRng::default();
+
+        let committee = snarkvm::ledger::committee::test_helpers::sample_committee_for_round(2, rng);
+        let account = Account::new(rng)?;
+        let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the BFT.
         let bft = BFT::new(account, storage, ledger, None, None)?;
 
         // Set the leader certificate.
-        let leader_certificate = sample_batch_certificate(&mut rng);
+        let leader_certificate = sample_batch_certificate(rng);
         *bft.leader_certificate.write() = Some(leader_certificate);
 
         // Update the leader certificate.

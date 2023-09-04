@@ -17,16 +17,18 @@ extern crate tracing;
 
 use snarkos_account::Account;
 use snarkos_node_narwhal::{
-    helpers::{init_primary_channels, PrimarySender, Storage},
+    helpers::{init_consensus_channels, init_primary_channels, ConsensusReceiver, PrimarySender, Storage},
     Primary,
     BFT,
     MAX_GC_ROUNDS,
     MEMORY_POOL_PORT,
 };
-use snarkos_node_narwhal_committee::Committee;
 use snarkos_node_narwhal_ledger_service::MockLedgerService;
 use snarkvm::{
-    ledger::narwhal::Data,
+    ledger::{
+        committee::{Committee, MIN_STAKE},
+        narwhal::Data,
+    },
     prelude::{
         block::Transaction,
         coinbase::{ProverSolution, PuzzleCommitment},
@@ -48,7 +50,6 @@ use axum::{
 use axum_extra::response::ErasedJson;
 use clap::{Parser, ValueEnum};
 use indexmap::IndexMap;
-use parking_lot::RwLock;
 use rand::{Rng, SeedableRng};
 use std::{collections::HashMap, net::SocketAddr, path::PathBuf, str::FromStr, sync::Arc};
 use tokio::sync::oneshot;
@@ -105,18 +106,24 @@ pub async fn start_bft(
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
-    let (storage, account) = initialize_components(node_id, num_nodes)?;
+    let (committee, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
-    let ledger = Arc::new(MockLedgerService::new());
+    let ledger = Arc::new(MockLedgerService::new(committee));
+    // Initialize the storage.
+    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
         None => (None, Some(node_id)),
     };
+    // Initialize the consensus channels.
+    let (consensus_sender, consensus_receiver) = init_consensus_channels::<CurrentNetwork>();
+    // Initialize the consensus receiver handler.
+    consensus_handler(consensus_receiver);
     // Initialize the BFT instance.
     let mut bft = BFT::<CurrentNetwork>::new(account, storage, ledger, ip, dev)?;
     // Run the BFT instance.
-    bft.run(sender.clone(), receiver, None).await?;
+    bft.run(sender.clone(), receiver, Some(consensus_sender)).await?;
     // Retrieve the BFT's primary.
     let primary = bft.primary();
     // Keep the node's connections.
@@ -138,9 +145,11 @@ pub async fn start_primary(
     // Initialize the primary channels.
     let (sender, receiver) = init_primary_channels();
     // Initialize the components.
-    let (storage, account) = initialize_components(node_id, num_nodes)?;
+    let (committee, account) = initialize_components(node_id, num_nodes)?;
     // Initialize the mock ledger service.
-    let ledger = Arc::new(MockLedgerService::new());
+    let ledger = Arc::new(MockLedgerService::new(committee));
+    // Initialize the storage.
+    let storage = Storage::new(ledger.clone(), MAX_GC_ROUNDS);
     // Initialize the gateway IP and dev mode.
     let (ip, dev) = match peers.get(&node_id) {
         Some(ip) => (Some(*ip), None),
@@ -161,7 +170,7 @@ pub async fn start_primary(
 }
 
 /// Initializes the components of the node.
-fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Storage<CurrentNetwork>, Account<CurrentNetwork>)> {
+fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Committee<CurrentNetwork>, Account<CurrentNetwork>)> {
     // Ensure that the node ID is valid.
     ensure!(node_id < num_nodes, "Node ID {node_id} must be less than {num_nodes}");
 
@@ -176,17 +185,37 @@ fn initialize_components(node_id: u16, num_nodes: u16) -> Result<(Storage<Curren
         // Sample the account.
         let account = Account::new(&mut rand_chacha::ChaChaRng::seed_from_u64(i as u64))?;
         // Add the validator.
-        members.insert(account.address(), 1000);
+        members.insert(account.address(), (MIN_STAKE, false));
         println!("  Validator {}: {}", i, account.address());
     }
     println!();
 
     // Initialize the committee.
-    let committee = Arc::new(RwLock::new(Committee::<CurrentNetwork>::new(1u64, members)?));
-    // Initialize the storage.
-    let storage = Storage::new(committee.read().clone(), MAX_GC_ROUNDS);
-    // Return the storage and account.
-    Ok((storage, account))
+    let committee = Committee::<CurrentNetwork>::new(1u64, members)?;
+    // Return the committee and account.
+    Ok((committee, account))
+}
+
+/// Handles the consensus receiver.
+fn consensus_handler(receiver: ConsensusReceiver<CurrentNetwork>) {
+    let ConsensusReceiver { mut rx_consensus_subdag } = receiver;
+
+    tokio::task::spawn(async move {
+        while let Some((subdag, transmissions, callback)) = rx_consensus_subdag.recv().await {
+            // Determine the amount of time to sleep for the subdag.
+            let subdag_ms = subdag.values().flatten().count();
+            // Determine the amount of time to sleep for the transmissions.
+            let transmissions_ms = transmissions.len() * 25;
+            // Add a constant delay.
+            let constant_ms = 100;
+            // Compute the total amount of time to sleep.
+            let sleep_ms = (subdag_ms + transmissions_ms + constant_ms) as u64;
+            // Sleep for the determined amount of time.
+            tokio::time::sleep(std::time::Duration::from_millis(sleep_ms)).await;
+            // Call the callback.
+            callback.send(Ok(())).ok();
+        }
+    });
 }
 
 /// Actively try to keep the node's connections to all nodes.

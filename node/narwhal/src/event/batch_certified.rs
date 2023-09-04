@@ -59,9 +59,10 @@ impl<N: Network> FromBytes for BatchCertified<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{event::certificate_response::prop_tests::any_batch_certificate, BatchCertified};
+    use snarkvm::console::prelude::{FromBytes, ToBytes};
+
     use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{BoxedStrategy, Strategy};
-    use snarkvm::console::prelude::{FromBytes, ToBytes};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;

@@ -74,8 +74,9 @@ impl FromBytes for Disconnect {
 #[cfg(test)]
 mod tests {
     use crate::{Disconnect, DisconnectReason};
-    use bytes::{Buf, BufMut, Bytes, BytesMut};
     use snarkvm::console::prelude::{FromBytes, ToBytes};
+
+    use bytes::{Buf, BufMut, Bytes, BytesMut};
 
     #[test]
     fn serialize_deserialize() {

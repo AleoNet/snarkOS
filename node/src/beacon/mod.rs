@@ -461,7 +461,7 @@ mod tests {
         // Initialize a new VM.
         let vm = VM::from(ConsensusStore::<CurrentNetwork, ConsensusMemory<CurrentNetwork>>::open(None)?)?;
         // Initialize the genesis block.
-        let genesis = vm.genesis(beacon_account.private_key(), &mut rng)?;
+        let genesis = vm.genesis_beacon(beacon_account.private_key(), &mut rng)?;
 
         println!("Initializing beacon node...");
 

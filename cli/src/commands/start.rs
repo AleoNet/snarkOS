@@ -236,7 +236,7 @@ impl Start {
             // Initialize a new VM.
             let vm = VM::from(ConsensusStore::<N, ConsensusMemory<N>>::open(None)?)?;
             // Initialize the genesis block.
-            let genesis = vm.genesis(&beacon_private_key, &mut rng)?;
+            let genesis = vm.genesis_beacon(&beacon_private_key, &mut rng)?;
 
             // A helper method to set the account private key in the node type.
             let sample_account = |node: &mut Option<String>, is_beacon: bool| -> Result<()> {
