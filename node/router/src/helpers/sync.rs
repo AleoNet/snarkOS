@@ -190,7 +190,7 @@ impl<N: Network> Sync<N> {
         // Ensure the given block locators are well-formed.
         locators.ensure_is_valid()?;
         // Insert the block locators into canon.
-        locators.checkpoints.into_iter().chain(locators.recents.into_iter()).for_each(|(height, hash)| {
+        locators.checkpoints.into_iter().chain(locators.recents).for_each(|(height, hash)| {
             self.insert_canon_locator(height, hash);
         });
         Ok(())
