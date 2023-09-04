@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-narwhal-committee"
-version = "2.1.6"
+version = "2.1.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A committee for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -50,7 +50,7 @@ optional = true
 
 [dependencies.snarkos-account]
 path = "../../../account"
-version = "=2.1.6"
+version = "=2.1.7"
 optional = true
 
 [dependencies.test-strategy]
