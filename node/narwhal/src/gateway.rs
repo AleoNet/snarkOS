@@ -27,7 +27,6 @@ use crate::{
     helpers::{
         assign_to_worker,
         Cache,
-        EventCodec,
         EventOrBytes,
         NoiseCodec,
         NoiseState,
@@ -66,7 +65,7 @@ use tokio::{
     task::{self, JoinHandle},
 };
 use tokio_stream::StreamExt;
-use tokio_util::codec::Framed;
+use tokio_util::codec::{Framed, FramedParts};
 
 /// The maximum interval of events to cache.
 const CACHE_EVENTS_INTERVAL: i64 = (MAX_BATCH_DELAY / 1000) as i64; // seconds
@@ -120,6 +119,8 @@ pub struct Gateway<N: Network> {
     primary_sender: Arc<OnceCell<PrimarySender<N>>>,
     /// The worker senders.
     worker_senders: Arc<OnceCell<IndexMap<u8, WorkerSender<N>>>>,
+    /// A map of peer IPs to their noise states.
+    noise_states: Arc<RwLock<IndexMap<SocketAddr, NoiseState>>>,
     /// The spawned handles.
     handles: Arc<Mutex<Vec<JoinHandle<()>>>>,
 }
@@ -146,6 +147,7 @@ impl<N: Network> Gateway<N> {
             connecting_peers: Default::default(),
             primary_sender: Default::default(),
             worker_senders: Default::default(),
+            noise_states: Default::default(),
             handles: Default::default(),
         })
     }
@@ -327,7 +329,7 @@ impl<N: Network> Gateway<N> {
         let name = event.name();
         // Send the event to the peer.
         trace!("{CONTEXT} Sending '{name}' to '{peer_ip}'");
-        let result = self.unicast(peer_addr, event);
+        let result = self.unicast(peer_addr, EventOrBytes::Event(event));
         // If the event was unable to be sent, disconnect.
         if let Err(e) = &result {
             warn!("{CONTEXT} Failed to send '{name}' to '{peer_ip}': {e}");
@@ -550,22 +552,28 @@ impl<N: Network> P2P for Gateway<N> {
 
 #[async_trait]
 impl<N: Network> Reading for Gateway<N> {
-    type Codec = EventCodec<N>;
-    type Message = Event<N>;
+    type Codec = NoiseCodec<N>;
+    type Message = EventOrBytes<N>;
 
     /// The maximum queue depth of incoming messages for a single peer.
     const MESSAGE_QUEUE_DEPTH: usize = CACHE_TRANSMISSIONS;
 
     /// Creates a [`Decoder`] used to interpret messages from the network.
     /// The `side` param indicates the connection side **from the node's perspective**.
-    fn codec(&self, _peer_addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
-        Default::default()
+    fn codec(&self, peer_addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
+        // SAFETY: must exist as the connecton is established.
+        let peer_ip = self.resolver.get_listener(peer_addr).unwrap();
+        let state = self.noise_states.read().get(&peer_ip).cloned().unwrap();
+        NoiseCodec::new(state)
     }
 
     /// Processes a message received from the network.
     async fn process_message(&self, peer_addr: SocketAddr, message: Self::Message) -> io::Result<()> {
+        // Only process events.
+        let EventOrBytes::Event(event) = message else { return Ok(()) };
+
         // Process the message. Disconnect if the peer violated the protocol.
-        if let Err(error) = self.inbound(peer_addr, message).await {
+        if let Err(error) = self.inbound(peer_addr, event).await {
             if let Some(peer_ip) = self.resolver.get_listener(peer_addr) {
                 warn!("{CONTEXT} Disconnecting from '{peer_ip}' - {error}");
                 self.send(peer_ip, Event::Disconnect(DisconnectReason::ProtocolViolation.into()));
@@ -579,16 +587,19 @@ impl<N: Network> Reading for Gateway<N> {
 
 #[async_trait]
 impl<N: Network> Writing for Gateway<N> {
-    type Codec = EventCodec<N>;
-    type Message = Event<N>;
+    type Codec = NoiseCodec<N>;
+    type Message = EventOrBytes<N>;
 
     /// The maximum queue depth of outgoing messages for a single peer.
     const MESSAGE_QUEUE_DEPTH: usize = CACHE_TRANSMISSIONS;
 
     /// Creates an [`Encoder`] used to write the outbound messages to the target stream.
     /// The `side` parameter indicates the connection side **from the node's perspective**.
-    fn codec(&self, _addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
-        Default::default()
+    fn codec(&self, peer_addr: SocketAddr, _side: ConnectionSide) -> Self::Codec {
+        // SAFETY: must exist as the connection is established.
+        let peer_ip = self.resolver.get_listener(peer_addr).unwrap();
+        let state = self.noise_states.write().remove(&peer_ip).unwrap();
+        NoiseCodec::new(state)
     }
 }
 
@@ -641,7 +652,11 @@ impl<N: Network> Handshake for Gateway<N> {
         }
 
         // If the handshake succeeded, announce it.
-        if let Ok((ref peer_ip, _)) = handshake_result {
+        if let Ok((ref peer_ip, framed)) = handshake_result {
+            let FramedParts { codec, .. } = framed.into_parts();
+            let NoiseCodec { noise_state, .. } = codec;
+            self.noise_states.write().insert(*peer_ip, noise_state);
+
             info!("{CONTEXT} Gateway is connected to '{peer_ip}'");
         }
 
