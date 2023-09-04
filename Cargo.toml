@@ -49,7 +49,7 @@ jemalloc = [ "tikv-jemallocator" ]
 version = "1.0.75"
 
 [dependencies.clap]
-version = "4.3"
+version = "4.4"
 features = [ "derive" ]
 
 [dependencies.once_cell]
