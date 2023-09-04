@@ -1,6 +1,6 @@
 [package]
 name = "snarkos-node-narwhal"
-version = "2.1.6"
+version = "2.1.7"
 authors = [ "The Aleo Team <hello@aleo.org>" ]
 description = "A Narwhal-style memory pool for a decentralized operating system"
 homepage = "https://aleo.org"
@@ -25,11 +25,11 @@ version = "1.0"
 [dependencies.async-trait]
 version = "0.1"
 
-[dependencies.bincode]
-version = "1.0"
-
 [dependencies.bytes]
 version = "1"
+
+[dependencies.colored]
+version = "2"
 
 [dependencies.futures]
 version = "0.3.27"
@@ -54,21 +54,16 @@ default-features = false
 
 [dependencies.snarkos-account]
 path = "../../account"
-version = "=2.1.6"
-
-[dependencies.snarkos-node-narwhal-committee]
-path = "./committee"
-version = "=2.1.6"
-default-features = false
+version = "=2.1.7"
 
 [dependencies.snarkos-node-narwhal-ledger-service]
 path = "./ledger-service"
-version = "=2.1.6"
+version = "=2.1.7"
 default-features = false
 
 [dependencies.snarkos-node-tcp]
 path = "../tcp"
-version = "=2.1.6"
+version = "=2.1.7"
 
 [dependencies.snarkvm]
 workspace = true
@@ -128,11 +123,6 @@ version = "1"
 [dev-dependencies.snarkvm]
 workspace = true
 features = [ "test-helpers" ]
-
-[dev-dependencies.snarkos-node-narwhal-committee]
-path = "./committee"
-default-features = false
-features = [ "prop-tests", "test-helpers" ]
 
 [dev-dependencies.snarkos-node-narwhal-ledger-service]
 path = "./ledger-service"

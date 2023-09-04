@@ -34,7 +34,6 @@ use crate::{
     MAX_WORKERS,
 };
 use snarkos_account::Account;
-use snarkos_node_narwhal_committee::Committee;
 use snarkos_node_narwhal_ledger_service::LedgerService;
 use snarkvm::{
     console::prelude::*,
@@ -95,10 +94,11 @@ impl<N: Network> Primary<N> {
         storage: Storage<N>,
         ledger: Ledger<N>,
         ip: Option<SocketAddr>,
+        trusted_validators: &[SocketAddr],
         dev: Option<u16>,
     ) -> Result<Self> {
         Ok(Self {
-            gateway: Gateway::new(account, storage.clone(), ip, dev)?,
+            gateway: Gateway::new(account, ledger.clone(), ip, trusted_validators, dev)?,
             storage,
             ledger,
             workers: Arc::from(vec![]),
@@ -165,11 +165,6 @@ impl<N: Network> Primary<N> {
         self.storage.current_round()
     }
 
-    /// Returns the current committee.
-    pub fn current_committee(&self) -> Committee<N> {
-        self.storage.current_committee()
-    }
-
     /// Returns the gateway.
     pub const fn gateway(&self) -> &Gateway<N> {
         &self.gateway
@@ -181,7 +176,7 @@ impl<N: Network> Primary<N> {
     }
 
     /// Returns the ledger.
-    pub fn ledger(&self) -> &Ledger<N> {
+    pub const fn ledger(&self) -> &Ledger<N> {
         &self.ledger
     }
 
@@ -303,7 +298,7 @@ impl<N: Network> Primary<N> {
         // If the previous round is not 0, check if the previous certificates have reached the quorum threshold.
         if previous_round > 0 {
             // Retrieve the committee for the round.
-            let Some(committee) = self.storage.get_committee(previous_round) else {
+            let Ok(committee) = self.ledger.get_committee_for_round(previous_round) else {
                 bail!("Cannot propose a batch for round {round}: the previous committee is not known yet")
             };
             // Construct a set over the authors.
@@ -348,7 +343,7 @@ impl<N: Network> Primary<N> {
         // Sign the batch header.
         let batch_header = BatchHeader::new(private_key, round, timestamp, transmission_ids, certificate_ids, rng)?;
         // Construct the proposal.
-        let proposal = Proposal::new(self.current_committee(), batch_header.clone(), transmissions)?;
+        let proposal = Proposal::new(self.ledger.current_committee()?, batch_header.clone(), transmissions)?;
         // Broadcast the batch to all validators for signing.
         self.gateway.broadcast(Event::BatchPropose(batch_header.into()));
         // Set the proposed batch.
@@ -464,7 +459,9 @@ impl<N: Network> Primary<N> {
         /* Proceeding to certify the batch. */
 
         info!("Quorum threshold reached - Preparing to certify our batch...");
+
         // Store the certified batch and broadcast it to all validators.
+        // If there was an error storing the certificate, reinsert the transmissions back into the ready queue.
         if let Err(e) = self.store_and_broadcast_certificate(&proposal).await {
             // Reinsert the transmissions back into the ready queue for the next proposal.
             self.reinsert_transmissions_into_workers(proposal)?;
@@ -580,12 +577,15 @@ impl<N: Network> Primary<N> {
                     error!("Unable to determine the worker ID for the unconfirmed solution");
                     continue;
                 };
-                // Retrieve the worker.
-                let worker = &self_.workers[worker_id as usize];
-                // Process the unconfirmed solution.
-                let result = worker.process_unconfirmed_solution(puzzle_commitment, prover_solution).await;
-                // Send the result to the callback.
-                callback.send(result).ok();
+                let self_ = self_.clone();
+                tokio::spawn(async move {
+                    // Retrieve the worker.
+                    let worker = &self_.workers[worker_id as usize];
+                    // Process the unconfirmed solution.
+                    let result = worker.process_unconfirmed_solution(puzzle_commitment, prover_solution).await;
+                    // Send the result to the callback.
+                    callback.send(result).ok();
+                });
             }
         });
 
@@ -598,12 +598,15 @@ impl<N: Network> Primary<N> {
                     error!("Unable to determine the worker ID for the unconfirmed transaction");
                     continue;
                 };
-                // Retrieve the worker.
-                let worker = &self_.workers[worker_id as usize];
-                // Process the unconfirmed transaction.
-                let result = worker.process_unconfirmed_transaction(transaction_id, transaction).await;
-                // Send the result to the callback.
-                callback.send(result).ok();
+                let self_ = self_.clone();
+                tokio::spawn(async move {
+                    // Retrieve the worker.
+                    let worker = &self_.workers[worker_id as usize];
+                    // Process the unconfirmed transaction.
+                    let result = worker.process_unconfirmed_transaction(transaction_id, transaction).await;
+                    // Send the result to the callback.
+                    callback.send(result).ok();
+                });
             }
         });
     }
@@ -629,9 +632,9 @@ impl<N: Network> Primary<N> {
     /// If the current round has reached quorum threshold, then advance to the next round.
     async fn try_advance_to_next_round(&self) -> Result<()> {
         // Retrieve the current committee.
-        let current_committee = self.current_committee();
+        let current_committee = self.ledger.current_committee()?;
         // Retrieve the current round.
-        let current_round = current_committee.round();
+        let current_round = self.current_round();
         // Retrieve the certificates.
         let certificates = self.storage.get_certificates_for_round(current_round);
         // Construct a set over the authors.
@@ -666,7 +669,8 @@ impl<N: Network> Primary<N> {
         // Iterate until the penultimate round is reached.
         while self.current_round() < next_round.saturating_sub(1) {
             // Update to the next committee in storage.
-            self.storage.increment_to_next_round(self.storage.current_committee().to_next_round())?;
+            // TODO (howardwu): Fix to increment to the next round.
+            self.storage.increment_to_next_round()?;
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;
         }
@@ -682,7 +686,8 @@ impl<N: Network> Primary<N> {
             // Otherwise, handle the Narwhal case.
             else {
                 // Update to the next committee in storage.
-                self.storage.increment_to_next_round(self.storage.current_committee().to_next_round())?;
+                // TODO (howardwu): Fix to increment to the next round.
+                self.storage.increment_to_next_round()?;
             }
             // Clear the proposed batch.
             *self.proposed_batch.write() = None;
@@ -700,21 +705,35 @@ impl<N: Network> Primary<N> {
         callback_receiver.await?
     }
 
+    /// Sends the batch certificate to the BFT.
+    async fn send_primary_certificate_to_bft(
+        &self,
+        bft_sender: &BFTSender<N>,
+        certificate: BatchCertificate<N>,
+    ) -> Result<()> {
+        // Initialize a callback sender and receiver.
+        let (callback_sender, callback_receiver) = oneshot::channel();
+        // Send the certificate to the BFT.
+        bft_sender.tx_primary_certificate.send((certificate, callback_sender)).await?;
+        // Await the callback to continue.
+        callback_receiver.await?
+    }
+
     /// Ensures the primary is signing for the specified batch round.
     /// This method is used to ensure: for a given round, as soon as the primary starts proposing,
     /// it will no longer sign for the previous round (as it has enough previous certificates to proceed).
     fn ensure_is_signing_round(&self, batch_round: u64) -> Result<()> {
-        // Retrieve the committee round.
-        let committee_round = self.current_round();
-        // Ensure the batch round is within GC range of the committee round.
-        if committee_round + self.storage.max_gc_rounds() <= batch_round {
+        // Retrieve the current round.
+        let current_round = self.current_round();
+        // Ensure the batch round is within GC range of the current round.
+        if current_round + self.storage.max_gc_rounds() <= batch_round {
             bail!("Round {batch_round} is too far in the future")
         }
-        // Ensure the batch round is at or one before the committee round.
+        // Ensure the batch round is at or one before the current round.
         // Intuition: Our primary has moved on to the next round, but has not necessarily started proposing,
         // so we can still sign for the previous round. If we have started proposing, the next check will fail.
-        if committee_round > batch_round + 1 {
-            bail!("Primary is on round {committee_round}, and no longer signing for round {batch_round}")
+        if current_round > batch_round + 1 {
+            bail!("Primary is on round {current_round}, and no longer signing for round {batch_round}")
         }
         // Check if the primary is still signing for the batch round.
         if let Some(signing_round) = self.proposed_batch.read().as_ref().map(|proposal| proposal.round()) {
@@ -739,12 +758,8 @@ impl<N: Network> Primary<N> {
         self.gateway.broadcast(Event::BatchCertified(certificate.clone().into()));
         // If a BFT sender was provided, send the certificate to the BFT.
         if let Some(bft_sender) = self.bft_sender.get() {
-            // Initialize a callback sender and receiver.
-            let (callback_sender, callback_receiver) = oneshot::channel();
-            // Send the certificate to the BFT.
-            bft_sender.tx_primary_certificate.send((certificate.clone(), callback_sender)).await?;
             // Await the callback to continue.
-            if let Err(e) = callback_receiver.await? {
+            if let Err(e) = self.send_primary_certificate_to_bft(bft_sender, certificate.clone()).await {
                 warn!("Failed to update the BFT DAG from primary: {e}");
                 return Err(e);
             };
@@ -823,12 +838,8 @@ impl<N: Network> Primary<N> {
             debug!("Stored certificate for round {batch_round} from peer '{peer_ip}'");
             // If a BFT sender was provided, send the certificate to the BFT.
             if let Some(bft_sender) = self.bft_sender.get() {
-                // Initialize a callback sender and receiver.
-                let (callback_sender, callback_receiver) = oneshot::channel();
-                // Send the certificate to the BFT.
-                bft_sender.tx_primary_certificate.send((certificate, callback_sender)).await?;
                 // Await the callback to continue.
-                if let Err(e) = callback_receiver.await? {
+                if let Err(e) = self.send_primary_certificate_to_bft(bft_sender, certificate).await {
                     warn!("Failed to update the BFT DAG from sync: {e}");
                     return Err(e);
                 };

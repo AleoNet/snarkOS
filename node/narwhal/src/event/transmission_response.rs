@@ -40,20 +40,18 @@ impl<N: Network> EventTrait for TransmissionResponse<N> {
     fn name(&self) -> &'static str {
         "TransmissionResponse"
     }
+}
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.transmission_id.write_le(&mut *writer)?;
-        self.transmission.write_le(writer)?;
+impl<N: Network> ToBytes for TransmissionResponse<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.transmission_id.write_le(&mut writer)?;
+        self.transmission.write_le(&mut writer)?;
         Ok(())
     }
+}
 
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-
+impl<N: Network> FromBytes for TransmissionResponse<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let transmission_id = TransmissionID::read_le(&mut reader)?;
         let transmission = Transmission::read_le(&mut reader)?;
 
@@ -64,18 +62,20 @@ impl<N: Network> EventTrait for TransmissionResponse<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        event::EventTrait,
         helpers::storage::prop_tests::{any_puzzle_commitment, any_transaction_id},
         TransmissionResponse,
     };
-    use ::bytes::Bytes;
-    use bytes::{BufMut, BytesMut};
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        ledger::narwhal::{Data, Transmission, TransmissionID},
+    };
+
+    use bytes::{Buf, BufMut, Bytes, BytesMut};
     use proptest::{
         collection,
         prelude::{any, BoxedStrategy, Strategy},
         prop_oneof,
     };
-    use snarkvm::ledger::narwhal::{Data, Transmission, TransmissionID};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -101,9 +101,9 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_transmission_response())] original: TransmissionResponse<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        TransmissionResponse::serialize(&original, &mut buf).unwrap();
+        TransmissionResponse::write_le(&original, &mut buf).unwrap();
 
-        let deserialized = TransmissionResponse::deserialize(buf.get_ref().clone()).unwrap();
+        let deserialized = TransmissionResponse::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(original, deserialized);
     }
 }

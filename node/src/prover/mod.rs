@@ -77,6 +77,9 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         genesis: Block<N>,
         dev: Option<u16>,
     ) -> Result<Self> {
+        // Initialize the signal handler.
+        let signal_node = Self::handle_signals();
+
         // Initialize the node router.
         let router = Router::new(
             node_ip,
@@ -108,8 +111,8 @@ impl<N: Network, C: ConsensusStorage<N>> Prover<N, C> {
         node.initialize_routing().await;
         // Initialize the coinbase puzzle.
         node.initialize_coinbase_puzzle().await;
-        // Initialize the signal handler.
-        node.handle_signals();
+        // Pass the node to the signal handler.
+        let _ = signal_node.set(node.clone());
         // Return the node.
         Ok(node)
     }

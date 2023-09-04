@@ -25,31 +25,35 @@ impl<N: Network> EventTrait for ChallengeResponse<N> {
     fn name(&self) -> &'static str {
         "ChallengeResponse"
     }
+}
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        self.signature.serialize_blocking_into(writer)
+impl<N: Network> ToBytes for ChallengeResponse<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.signature.write_le(&mut writer)?;
+        Ok(())
     }
+}
 
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let reader = bytes.reader();
-        Ok(Self { signature: Data::Buffer(reader.into_inner().freeze()) })
+impl<N: Network> FromBytes for ChallengeResponse<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let signature = Data::read_le(&mut reader)?;
+
+        Ok(Self { signature })
     }
 }
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{event::EventTrait, helpers::storage::prop_tests::CryptoTestRng, ChallengeResponse};
-    use bytes::{BufMut, BytesMut};
-    use proptest::prelude::{any, BoxedStrategy, Strategy};
+    use crate::{helpers::storage::prop_tests::CryptoTestRng, ChallengeResponse};
     use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
         ledger::narwhal::Data,
         prelude::{PrivateKey, Signature},
         utilities::rand::Uniform,
     };
+
+    use bytes::{Buf, BufMut, BytesMut};
+    use proptest::prelude::{any, BoxedStrategy, Strategy};
     use test_strategy::proptest;
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
@@ -71,10 +75,10 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_challenge_response())] original: ChallengeResponse<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        ChallengeResponse::serialize(&original, &mut buf).unwrap();
+        ChallengeResponse::write_le(&original, &mut buf).unwrap();
 
         let deserialized: ChallengeResponse<CurrentNetwork> =
-            ChallengeResponse::deserialize(buf.get_ref().clone()).unwrap();
+            ChallengeResponse::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(
             original.signature.deserialize_blocking().unwrap(),
             deserialized.signature.deserialize_blocking().unwrap()
