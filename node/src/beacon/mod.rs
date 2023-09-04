@@ -97,6 +97,9 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
     ) -> Result<Self> {
         let timer = timer!("Beacon::new");
 
+        // Initialize the signal handler.
+        let signal_node = Self::handle_signals();
+
         // Initialize the ledger.
         let ledger = Ledger::load(genesis, dev)?;
         lap!(timer, "Initialize the ledger");
@@ -155,8 +158,8 @@ impl<N: Network, C: ConsensusStorage<N>> Beacon<N, C> {
         node.initialize_routing().await;
         // Initialize the block production.
         node.initialize_block_production().await;
-        // Initialize the signal handler.
-        node.handle_signals();
+        // Pass the node to the signal handler.
+        let _ = signal_node.set(node.clone());
         lap!(timer, "Initialize the handlers");
 
         finish!(timer);
