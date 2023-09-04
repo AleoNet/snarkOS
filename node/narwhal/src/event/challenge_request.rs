@@ -35,27 +35,36 @@ impl<N: Network> EventTrait for ChallengeRequest<N> {
     fn name(&self) -> &'static str {
         "ChallengeRequest"
     }
+}
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        Ok(bincode::serialize_into(writer, &(self.version, self.listener_port, self.address, self.nonce))?)
+impl<N: Network> ToBytes for ChallengeRequest<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.version.write_le(&mut writer)?;
+        self.listener_port.write_le(&mut writer)?;
+        self.address.write_le(&mut writer)?;
+        self.nonce.write_le(&mut writer)?;
+        Ok(())
     }
+}
 
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let (version, listener_port, address, nonce) = bincode::deserialize_from(&mut bytes.reader())?;
+impl<N: Network> FromBytes for ChallengeRequest<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
+        let version = u32::read_le(&mut reader)?;
+        let listener_port = u16::read_le(&mut reader)?;
+        let address = Address::<N>::read_le(&mut reader)?;
+        let nonce = u64::read_le(&mut reader)?;
+
         Ok(Self { version, listener_port, address, nonce })
     }
 }
 
 #[cfg(test)]
 pub mod prop_tests {
-    use crate::{event::EventTrait, ChallengeRequest};
+    use crate::ChallengeRequest;
     use snarkos_account::Account;
+    use snarkvm::console::prelude::{FromBytes, ToBytes};
 
-    use bytes::{BufMut, BytesMut};
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::prelude::{any, BoxedStrategy, Strategy};
     use rand::SeedableRng;
     use test_strategy::proptest;
@@ -85,10 +94,10 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_challenge_request())] original: ChallengeRequest<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        ChallengeRequest::serialize(&original, &mut buf).unwrap();
+        ChallengeRequest::write_le(&original, &mut buf).unwrap();
 
         let deserialized: ChallengeRequest<CurrentNetwork> =
-            ChallengeRequest::deserialize(buf.get_ref().clone()).unwrap();
+            ChallengeRequest::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(original, deserialized);
     }
 }

@@ -14,6 +14,8 @@
 
 use super::*;
 
+use std::borrow::Cow;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Pong {
     pub is_fork: Option<bool>,
@@ -22,8 +24,8 @@ pub struct Pong {
 impl MessageTrait for Pong {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
-        "Pong".to_string()
+    fn name(&self) -> Cow<'static, str> {
+        "Pong".into()
     }
 
     /// Serializes the message into the buffer.

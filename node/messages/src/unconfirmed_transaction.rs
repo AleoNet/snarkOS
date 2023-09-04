@@ -14,6 +14,8 @@
 
 use super::*;
 
+use std::borrow::Cow;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct UnconfirmedTransaction<N: Network> {
     pub transaction_id: N::TransactionID,
@@ -23,14 +25,14 @@ pub struct UnconfirmedTransaction<N: Network> {
 impl<N: Network> MessageTrait for UnconfirmedTransaction<N> {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
-        "UnconfirmedTransaction".to_string()
+    fn name(&self) -> Cow<'static, str> {
+        "UnconfirmedTransaction".into()
     }
 
     /// Serializes the message into the buffer.
     #[inline]
     fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.transaction_id.to_bytes_le()?)?;
+        self.transaction_id.write_le(&mut *writer)?;
         self.transaction.serialize_blocking_into(writer)
     }
 

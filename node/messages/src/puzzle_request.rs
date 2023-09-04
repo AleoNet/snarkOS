@@ -14,14 +14,16 @@
 
 use super::*;
 
+use std::borrow::Cow;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct PuzzleRequest;
 
 impl MessageTrait for PuzzleRequest {
     /// Returns the message name.
     #[inline]
-    fn name(&self) -> String {
-        "PuzzleRequest".to_string()
+    fn name(&self) -> Cow<'static, str> {
+        "PuzzleRequest".into()
     }
 
     /// Serializes the message into the buffer.

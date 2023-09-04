@@ -39,19 +39,17 @@ impl<N: Network> EventTrait for CertificateResponse<N> {
     fn name(&self) -> &'static str {
         "CertificateResponse"
     }
+}
 
-    /// Serializes the event into the buffer.
-    #[inline]
-    fn serialize<W: Write>(&self, writer: &mut W) -> Result<()> {
-        writer.write_all(&self.certificate.to_bytes_le()?)?;
+impl<N: Network> ToBytes for CertificateResponse<N> {
+    fn write_le<W: Write>(&self, mut writer: W) -> IoResult<()> {
+        self.certificate.write_le(&mut writer)?;
         Ok(())
     }
+}
 
-    /// Deserializes the given buffer into an event.
-    #[inline]
-    fn deserialize(bytes: BytesMut) -> Result<Self> {
-        let mut reader = bytes.reader();
-
+impl<N: Network> FromBytes for CertificateResponse<N> {
+    fn read_le<R: Read>(mut reader: R) -> IoResult<Self> {
         let certificate = BatchCertificate::read_le(&mut reader)?;
 
         Ok(Self { certificate })
@@ -61,19 +59,22 @@ impl<N: Network> EventTrait for CertificateResponse<N> {
 #[cfg(test)]
 pub mod prop_tests {
     use crate::{
-        event::{transmission_response::prop_tests::any_transmission, EventTrait},
+        event::transmission_response::prop_tests::any_transmission,
         helpers::{
             now,
             storage::prop_tests::{sign_batch_header, CryptoTestRng},
         },
         CertificateResponse,
     };
-    use snarkvm::ledger::{
-        committee::prop_tests::{CommitteeContext, ValidatorSet},
-        narwhal::{BatchCertificate, BatchHeader},
+    use snarkvm::{
+        console::prelude::{FromBytes, ToBytes},
+        ledger::{
+            committee::prop_tests::{CommitteeContext, ValidatorSet},
+            narwhal::{BatchCertificate, BatchHeader},
+        },
     };
 
-    use bytes::{BufMut, BytesMut};
+    use bytes::{Buf, BufMut, BytesMut};
     use proptest::{
         collection::vec,
         prelude::{any, BoxedStrategy, Just, Strategy},
@@ -113,10 +114,10 @@ pub mod prop_tests {
     #[proptest]
     fn serialize_deserialize(#[strategy(any_certificate_response())] original: CertificateResponse<CurrentNetwork>) {
         let mut buf = BytesMut::default().writer();
-        CertificateResponse::serialize(&original, &mut buf).unwrap();
+        CertificateResponse::write_le(&original, &mut buf).unwrap();
 
         let deserialized: CertificateResponse<CurrentNetwork> =
-            CertificateResponse::deserialize(buf.get_ref().clone()).unwrap();
+            CertificateResponse::read_le(buf.into_inner().reader()).unwrap();
         assert_eq!(original, deserialized);
     }
 }
