@@ -1071,8 +1071,8 @@ mod tests {
 
     use crate::MAX_EXPIRATION_TIME_IN_SECS;
 
-    use snarkos_node_narwhal_committee::MIN_STAKE;
     use snarkos_node_narwhal_ledger_service::MockLedgerService;
+    use snarkvm::ledger::committee::{Committee, MIN_STAKE};
 
     use bytes::Bytes;
     use rand::RngCore;
@@ -1092,7 +1092,7 @@ mod tests {
             for i in 0..COMMITTEE_SIZE {
                 let socket_addr = format!("127.0.0.1:{}", 5000 + i).parse().unwrap();
                 let account = Account::new(rng).unwrap();
-                members.insert(account.address(), MIN_STAKE);
+                members.insert(account.address(), (MIN_STAKE, true));
                 accounts.push((socket_addr, account));
             }
 
@@ -1100,11 +1100,11 @@ mod tests {
         };
 
         let account = accounts.first().unwrap().1.clone();
-        let storage = Storage::new(committee, 10);
-        let ledger = Arc::new(MockLedgerService::new());
+        let ledger = Arc::new(MockLedgerService::new(committee));
+        let storage = Storage::new(ledger.clone(), 10);
 
         // Initialize the primary.
-        let mut primary = Primary::new(account, storage, ledger, None, None).unwrap();
+        let mut primary = Primary::new(account, storage, ledger, None, &[], None).unwrap();
 
         // Construct a worker instance.
         primary.workers = Arc::from([Worker::new(
@@ -1238,7 +1238,13 @@ mod tests {
         // Create a valid proposal with an author that isn't the primary.
         let round = 1;
         let timestamp = now();
-        let proposal = create_test_proposal(&accounts[1].1, primary.current_committee(), round, timestamp, &mut rng);
+        let proposal = create_test_proposal(
+            &accounts[1].1,
+            primary.ledger.current_committee().unwrap(),
+            round,
+            timestamp,
+            &mut rng,
+        );
 
         // Make sure the primary is aware of the transmissions in the proposal.
         for (transmission_id, transmission) in proposal.transmissions() {
@@ -1262,7 +1268,13 @@ mod tests {
         // Create a valid proposal with an author that isn't the primary.
         let round = 1;
         let timestamp = now();
-        let proposal = create_test_proposal(&accounts[1].1, primary.current_committee(), round, timestamp, &mut rng);
+        let proposal = create_test_proposal(
+            &accounts[1].1,
+            primary.ledger.current_committee().unwrap(),
+            round,
+            timestamp,
+            &mut rng,
+        );
 
         // Make sure the primary is aware of the transmissions in the proposal.
         for (transmission_id, transmission) in proposal.transmissions() {
@@ -1295,8 +1307,13 @@ mod tests {
         // Create a valid proposal.
         let round = 1;
         let timestamp = now();
-        let proposal =
-            create_test_proposal(primary.gateway.account(), primary.current_committee(), round, timestamp, &mut rng);
+        let proposal = create_test_proposal(
+            primary.gateway.account(),
+            primary.ledger.current_committee().unwrap(),
+            round,
+            timestamp,
+            &mut rng,
+        );
 
         // Store the proposal on the primary.
         *primary.proposed_batch.write() = Some(proposal);
@@ -1329,8 +1346,13 @@ mod tests {
         // Create an expired proposal.
         let round = 1;
         let timestamp = now() - (MAX_EXPIRATION_TIME_IN_SECS + 1);
-        let proposal =
-            create_test_proposal(primary.gateway.account(), primary.current_committee(), round, timestamp, &mut rng);
+        let proposal = create_test_proposal(
+            primary.gateway.account(),
+            primary.ledger.current_committee().unwrap(),
+            round,
+            timestamp,
+            &mut rng,
+        );
 
         // Store the proposal on the primary.
         *primary.proposed_batch.write() = Some(proposal);
@@ -1363,8 +1385,13 @@ mod tests {
         // Create a valid proposal.
         let round = 1;
         let timestamp = now();
-        let proposal =
-            create_test_proposal(primary.gateway.account(), primary.current_committee(), round, timestamp, &mut rng);
+        let proposal = create_test_proposal(
+            primary.gateway.account(),
+            primary.ledger.current_committee().unwrap(),
+            round,
+            timestamp,
+            &mut rng,
+        );
 
         // Store the proposal on the primary.
         *primary.proposed_batch.write() = Some(proposal);
