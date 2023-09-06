@@ -178,7 +178,7 @@ impl<N: Network> Event<N> {
 }
 
 #[cfg(test)]
-mod prop_tests {
+pub mod prop_tests {
     use crate::{
         event::{
             batch_certified::prop_tests::any_batch_certified,
@@ -206,7 +206,7 @@ mod prop_tests {
 
     type CurrentNetwork = snarkvm::prelude::Testnet3;
 
-    fn any_event() -> BoxedStrategy<Event<CurrentNetwork>> {
+    pub fn any_event() -> BoxedStrategy<Event<CurrentNetwork>> {
         prop_oneof![
             any_batch_certified().prop_map(Event::BatchCertified),
             any_batch_propose().prop_map(Event::BatchPropose),
