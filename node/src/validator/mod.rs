@@ -414,17 +414,17 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
         use std::str::FromStr;
 
         // Initialize the locator.
-        let locator = (ProgramID::from_str("credits.aleo")?, Identifier::from_str("mint")?);
+        let locator = (ProgramID::from_str("credits.aleo")?, Identifier::from_str("transfer_public")?);
 
         let self_ = self.clone();
         self.spawn(async move {
             info!("Starting transaction pool...");
             // Start the transaction loop.
             loop {
-                tokio::time::sleep(Duration::from_secs(1)).await;
+                tokio::time::sleep(Duration::from_millis(500)).await;
                 // If the node is running in development mode, only generate if you are allowed.
                 if let Some(dev) = dev {
-                    if dev != 0 {
+                    if dev > 4 {
                         continue;
                     }
                 }
@@ -437,6 +437,7 @@ impl<N: Network, C: ConsensusStorage<N>> Validator<N, C> {
                     locator,
                     inputs.into_iter(),
                     None,
+                    10_000,
                     None,
                     &mut rand::thread_rng(),
                 ) {

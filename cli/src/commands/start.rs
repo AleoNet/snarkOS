@@ -22,7 +22,7 @@ use snarkvm::{
     },
     ledger::{
         block::Block,
-        committee::{Committee, MIN_STAKE},
+        committee::{Committee, MIN_VALIDATOR_STAKE},
         store::{helpers::memory::ConsensusMemory, ConsensusStore},
     },
     prelude::FromBytes,
@@ -278,15 +278,25 @@ impl Start {
             // Construct the committee members.
             let members = development_private_keys
                 .iter()
-                .map(|private_key| Ok((Address::try_from(private_key)?, (MIN_STAKE, true))))
+                .map(|private_key| Ok((Address::try_from(private_key)?, (MIN_VALIDATOR_STAKE, true))))
                 .collect::<Result<indexmap::IndexMap<_, _>>>()?;
             // Construct the committee.
             let committee = Committee::<N>::new_genesis(members)?;
 
+            // Determine the public balance per validator.
+            let public_balance_per_validator = (N::STARTING_SUPPLY
+                - (DEVELOPMENT_MODE_NUM_VALIDATORS as u64 * MIN_VALIDATOR_STAKE))
+                / (DEVELOPMENT_MODE_NUM_VALIDATORS as u64);
+            assert_eq!(
+                N::STARTING_SUPPLY,
+                (MIN_VALIDATOR_STAKE + public_balance_per_validator) * DEVELOPMENT_MODE_NUM_VALIDATORS as u64,
+                "The public balance per validator is not correct."
+            );
+
             // Construct the public balances.
             let public_balances = development_private_keys
                 .iter()
-                .map(|private_key| Ok((Address::try_from(private_key)?, 100 * MIN_STAKE)))
+                .map(|private_key| Ok((Address::try_from(private_key)?, public_balance_per_validator)))
                 .collect::<Result<indexmap::IndexMap<_, _>>>()?;
 
             // Initialize a new VM.

@@ -285,7 +285,7 @@ impl<N: Network> Router<N> {
         message: &ChallengeRequest<N>,
     ) -> Option<DisconnectReason> {
         // Retrieve the components of the challenge request.
-        let &ChallengeRequest { version, listener_port: _, node_type, address, nonce: _ } = message;
+        let &ChallengeRequest { version, listener_port: _, node_type: _, address: _, nonce: _ } = message;
 
         // Ensure the message protocol version is not outdated.
         if version < Message::<N>::VERSION {
