@@ -72,7 +72,7 @@ pub struct Start {
     pub private_key: Option<String>,
     /// Specify the path to a file containing the node's account private key.
     #[clap(long = "private-key-file")]
-    pub private_key_path: Option<PathBuf>,
+    pub private_key_file: Option<PathBuf>,
 
     /// Specify the IP address and port for the node server
     #[clap(default_value = "0.0.0.0:4133", long = "node")]
@@ -200,33 +200,27 @@ impl Start {
 
     /// Read the private key directly from an argument or from a filesystem location.
     fn parse_private_key(&mut self) -> Result<()> {
-        // Ensure only one private key flag is provided to the CLI.
-        if self.private_key.is_some() && self.private_key_path.is_some() {
-            bail!("Both the private key string and file path flags were specified, please pick only one");
-        }
-
-        // If the private key is provided directly, don't do anything else; make sure it's non-empty too.
-        if let Some(private_key) = &self.private_key {
-            if private_key.is_empty() {
-                bail!("The private-key argument can't be empty");
-            } else {
-                return Ok(());
+        match (&self.private_key, &self.private_key_file) {
+            // Parse the private key directly.
+            (Some(private_key), None) => {
+                self.private_key = Some(private_key.trim().to_string());
+                Ok(())
             }
-        }
-
-        // If a filesystem path to the private key is provided, attempt to
-        // read it and overwrite `self.private_key` in case of success.
-        if let Some(path) = &self.private_key_path {
-            let private_key = std::fs::read_to_string(path)?;
-            self.private_key = Some(private_key);
-            return Ok(());
-        }
-
-        // Only allow the private key to be missing if the node type is unspecified, in line with `parse_account`.
-        if self.beacon || self.validator || self.prover || self.client {
-            bail!("Misconfiguration; if the node type is provided, the private key must also be present.");
-        } else {
-            Ok(())
+            // Parse the private key from a file.
+            (None, Some(path)) => {
+                let private_key = std::fs::read_to_string(path)?;
+                self.private_key = Some(private_key.trim().to_string());
+                Ok(())
+            }
+            // Ensure the private key is provided to the CLI, except for clients or nodes in development mode.
+            (None, None) => match self.client || self.dev.is_none() {
+                true => Ok(()),
+                false => bail!("Missing the '--private-key' or '--private-key-file' argument"),
+            },
+            // Ensure only one private key flag is provided to the CLI.
+            (Some(_), Some(_)) => {
+                bail!("Cannot use '--private-key' and '--private-key-file' simultaneously, please use only one")
+            }
         }
     }
 
